@@ -1,0 +1,12 @@
+schema: agent-commons.workspace.v1
+workspace_id: {{WORKSPACE_ID_JSON}}
+workspace:
+  name: {{WORKSPACE_NAME_JSON}}
+  guidance: ONBOARDING.md
+security:
+  blocked_classifications:
+    - restricted
+    - pii
+    - secret
+  include_default_classified_keys: true
+  detect_free_text_pii: true

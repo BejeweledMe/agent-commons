@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Coordinate"
+  short_description: "Coordinate tasks, ownership, and claims"
+  default_prompt: "Use $commons-coordinate to choose non-duplicate work and claim the right scope."

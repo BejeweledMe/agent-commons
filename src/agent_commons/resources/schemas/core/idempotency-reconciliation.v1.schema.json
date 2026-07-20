@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:idempotency-reconciliation:v1",
+  "x-schema-name": "commons.idempotency_reconciliation.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "workspace_id",
+    "scope_id",
+    "key_digest",
+    "namespace",
+    "semantic_sha256",
+    "event_id",
+    "event_sha256",
+    "tombstone_sha256",
+    "actor_session_id",
+    "actor_principal_id",
+    "reason",
+    "reconciled_at"
+  ],
+  "properties": {
+    "schema": {"const": "commons.idempotency_reconciliation.v1"},
+    "workspace_id": {"type": "string", "minLength": 1},
+    "scope_id": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "key_digest": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "namespace": {"type": "string", "minLength": 1, "maxLength": 256},
+    "semantic_sha256": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "event_id": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "event_sha256": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "tombstone_sha256": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "actor_session_id": {"type": "string", "minLength": 1},
+    "actor_principal_id": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "reconciled_at": {"type": "string", "format": "date-time"}
+  }
+}

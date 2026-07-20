@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Review"
+  short_description: "Review work independently and record evidence"
+  default_prompt: "Use $commons-review to inspect peer work and record a scoped independent judgment."

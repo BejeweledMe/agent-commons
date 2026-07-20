@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:idempotency-abandonment:v1",
+  "x-schema-name": "commons.idempotency_abandonment.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "key_digest",
+    "namespace",
+    "semantic_sha256",
+    "event_id",
+    "reason",
+    "actor_session_id",
+    "actor_principal_id",
+    "abandoned_at"
+  ],
+  "properties": {
+    "schema": {"const": "commons.idempotency_abandonment.v1"},
+    "key_digest": {
+      "$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"
+    },
+    "namespace": {"type": "string", "minLength": 1, "maxLength": 256},
+    "semantic_sha256": {
+      "$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "reason": {"type": "string", "minLength": 1},
+    "actor_session_id": {"type": "string", "minLength": 1},
+    "actor_principal_id": {"type": "string", "minLength": 1},
+    "abandoned_at": {"type": "string", "format": "date-time"}
+  }
+}

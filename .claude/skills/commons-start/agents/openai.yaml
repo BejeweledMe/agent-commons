@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Start"
+  short_description: "Start or resume a shared agent session"
+  default_prompt: "Use $commons-start to enter this project safely and orient to current shared work."

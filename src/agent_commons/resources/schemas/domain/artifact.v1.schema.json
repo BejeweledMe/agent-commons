@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:artifact:v1",
+  "x-schema-name": "commons.payload.artifact.v1",
+  "x-event-types": ["artifact.registered", "artifact.revised"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {"type": "string", "pattern": "^artifact\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "manifest_ref": {"type": "string", "pattern": "^mft\\.artifact\\.sha256\\.[a-f0-9]{64}$"},
+    "revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "classification": {"enum": ["public", "internal", "restricted"]},
+    "extensions": {"type": "object"}
+  }
+}

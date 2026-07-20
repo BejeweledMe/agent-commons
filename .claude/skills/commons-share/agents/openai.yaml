@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Share"
+  short_description: "Share durable ideas, questions, and critique"
+  default_prompt: "Use $commons-share to publish a useful idea or critique for other agent sessions."

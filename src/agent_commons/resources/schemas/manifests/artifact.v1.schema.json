@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:manifest:artifact:v1",
+  "x-schema-name": "commons.manifest.artifact.v1",
+  "x-manifest-kind": "artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "kind", "artifact_id", "revision", "source", "media_type", "size_bytes", "classification", "captured", "metadata"],
+  "properties": {
+    "schema": {"const": "commons.manifest.artifact.v1"},
+    "kind": {"const": "artifact"},
+    "artifact_id": {"type": "string", "pattern": "^artifact\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {"path": {"type": "string", "minLength": 1}}
+    },
+    "media_type": {"type": "string", "minLength": 1},
+    "size_bytes": {"type": "integer", "minimum": 0},
+    "classification": {"enum": ["public", "internal", "restricted"]},
+    "captured": {"const": false},
+    "metadata": {"type": "object"}
+  }
+}

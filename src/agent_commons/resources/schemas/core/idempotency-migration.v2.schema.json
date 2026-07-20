@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:idempotency-migration:v2",
+  "x-schema-name": "commons.idempotency_migration.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "workspace_id",
+    "format",
+    "migrated_at",
+    "migrated_by_session_id",
+    "legacy_receipt_count",
+    "legacy_abandonment_count"
+  ],
+  "properties": {
+    "schema": {"const": "commons.idempotency_migration.v2"},
+    "workspace_id": {"type": "string", "minLength": 1},
+    "format": {"const": 2},
+    "migrated_at": {"type": "string", "format": "date-time"},
+    "migrated_by_session_id": {"type": "string", "minLength": 1},
+    "legacy_receipt_count": {"type": "integer", "minimum": 0},
+    "legacy_abandonment_count": {"type": "integer", "minimum": 0}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:idempotency-scope:v2",
+  "x-schema-name": "commons.idempotency_scope.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "workspace_id",
+    "scope_id",
+    "checkout_id",
+    "ref_kind",
+    "ref_value"
+  ],
+  "properties": {
+    "schema": {"const": "commons.idempotency_scope.v2"},
+    "workspace_id": {"type": "string", "minLength": 1},
+    "scope_id": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "checkout_id": {"type": "string", "minLength": 1},
+    "ref_kind": {"enum": ["symbolic", "detached", "non-git"]},
+    "ref_value": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:task:v1",
+  "x-schema-name": "commons.payload.task.v1",
+  "x-event-types": ["task.created", "task.taken", "task.started", "task.blocked", "task.unblocked", "task.completed", "task.submitted", "task.accepted", "task.cancelled", "task.reopened"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 512},
+    "description": {"type": "string", "minLength": 1},
+    "acceptance_criteria": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "priority": {"enum": ["low", "normal", "high", "critical"]},
+    "dependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"}},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "owner_session_id": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "resolution": {"type": "string", "minLength": 1},
+    "summary": {"type": "string", "minLength": 1},
+    "artifact_refs": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"}},
+    "acceptance_review": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"},
+    "extensions": {"type": "object"}
+  }
+}

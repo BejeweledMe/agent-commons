@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:idempotency-receipt:v1",
+  "x-schema-name": "commons.idempotency_receipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "key_digest",
+    "namespace",
+    "semantic_sha256",
+    "event_id",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema": {"const": "commons.idempotency_receipt.v1"},
+    "key_digest": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "namespace": {"type": "string", "minLength": 1, "maxLength": 256},
+    "semantic_sha256": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/sha256"},
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "recorded_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:decision:v1",
+  "x-schema-name": "commons.payload.decision.v1",
+  "x-event-types": ["decision.proposed", "decision.accepted", "decision.rejected", "decision.deferred", "decision.superseded"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "decision_id": {"type": "string", "pattern": "^decision\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "scope": {"type": "string", "minLength": 1, "maxLength": 512},
+    "proposal": {"type": "string", "minLength": 1},
+    "alternatives": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "rationale": {"type": "string", "minLength": 1},
+    "evidence_refs": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"}},
+    "dissent": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "reason": {"type": "string", "minLength": 1},
+    "replacement_decision_id": {"type": "string", "pattern": "^decision\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "extensions": {"type": "object"}
+  }
+}

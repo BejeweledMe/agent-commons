@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:finding:v1",
+  "x-schema-name": "commons.payload.finding.v1",
+  "x-event-types": ["finding.reported", "finding.promoted", "finding.contested", "finding.resolved"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "finding_id": {"type": "string", "pattern": "^finding\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "summary": {"type": "string", "minLength": 1},
+    "severity": {"enum": ["info", "low", "medium", "high", "critical"]},
+    "evidence_refs": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"}},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "reason": {"type": "string", "minLength": 1},
+    "resolution": {"type": "string", "minLength": 1},
+    "extensions": {"type": "object"}
+  }
+}

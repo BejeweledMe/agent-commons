@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Handoff"
+  short_description: "Hand work to another agent session safely"
+  default_prompt: "Use $commons-handoff to leave a precise handoff and release inactive claims."

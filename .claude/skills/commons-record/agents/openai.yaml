@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Record"
+  short_description: "Record findings, decisions, and artifacts"
+  default_prompt: "Use $commons-record to preserve a durable project outcome with evidence and scope."

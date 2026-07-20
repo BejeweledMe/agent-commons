@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:event:v1",
+  "x-schema-name": "commons.event.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "payload_schema",
+    "event_id",
+    "workspace_id",
+    "event_type",
+    "recorded_at",
+    "actor",
+    "subject_refs",
+    "idempotency_namespace",
+    "idempotency_key",
+    "provenance",
+    "payload"
+  ],
+  "properties": {
+    "schema": {"const": "commons.event.v1"},
+    "payload_schema": {"type": "string", "minLength": 1},
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^workspace\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "occurred_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "session_id", "software"],
+      "properties": {
+        "principal_id": {"type": "string", "minLength": 1},
+        "session_id": {"type": "string", "minLength": 1},
+        "stable_instance_id": {"type": "string", "minLength": 1},
+        "role_id": {"type": "string", "minLength": 1},
+        "client": {"type": "string", "minLength": 1},
+        "software": {"type": "string", "minLength": 1},
+        "model_family": {"type": ["string", "null"], "minLength": 1},
+        "model": {"type": ["string", "null"], "minLength": 1},
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "source_producer": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["client", "software"],
+          "properties": {
+            "client": {"type": "string", "minLength": 1},
+            "software": {"type": "string", "minLength": 1},
+            "model_family": {"type": ["string", "null"], "minLength": 1},
+            "model": {"type": ["string", "null"], "minLength": 1},
+            "principal": {"type": ["string", "null"], "minLength": 1},
+            "external_session_id": {"type": ["string", "null"], "minLength": 1}
+          }
+        },
+        "extensions": {"type": "object"}
+      }
+    },
+    "subject_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"}
+    },
+    "correlation_id": {"type": ["string", "null"], "minLength": 1},
+    "causation_event_id": {
+      "type": ["string", "null"],
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "idempotency_namespace": {"type": "string", "minLength": 1, "maxLength": 256},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 512},
+    "relations": {
+      "type": "array",
+      "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/relation"}
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["writer", "writer_version", "source_kind", "source_refs"],
+      "properties": {
+        "writer": {"type": "string", "minLength": 1},
+        "writer_version": {"type": "string", "minLength": 1},
+        "source_kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "extensions": {"type": "object"}
+      }
+    },
+    "payload": {"type": "object"},
+    "extensions": {"type": "object"}
+  }
+}

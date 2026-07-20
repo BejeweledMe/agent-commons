@@ -1,0 +1,3 @@
+# Rebuildable and operational Agent Commons state
+cache/
+.state/

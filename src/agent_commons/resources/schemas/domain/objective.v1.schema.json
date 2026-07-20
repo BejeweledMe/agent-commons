@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:objective:v1",
+  "x-schema-name": "commons.payload.objective.v1",
+  "x-event-types": ["objective.created", "objective.revised", "objective.closed"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "objective_id": {"type": "string", "pattern": "^objective\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 512},
+    "description": {"type": "string", "minLength": 1},
+    "acceptance_criteria": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "changes": {"type": "object"},
+    "reason": {"type": "string", "minLength": 1},
+    "extensions": {"type": "object"}
+  }
+}

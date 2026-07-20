@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:thread:v1",
+  "x-schema-name": "commons.payload.thread.v1",
+  "x-event-types": ["thread.opened", "thread.replied", "thread.resolved"],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "thread_id": {"type": "string", "pattern": "^thread\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "thread_type": {"enum": ["question", "proposal", "critique", "risk", "help_request", "review_discussion", "decision_request"]},
+    "subject": {"type": "string", "minLength": 1, "maxLength": 512},
+    "desired_outcome": {"type": "string", "minLength": 1},
+    "to": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "related_refs": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"}},
+    "message_id": {"type": "string", "pattern": "^message\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "body": {"type": "string", "minLength": 1},
+    "expected_revision": {"type": "string", "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "resolution": {"enum": ["resolved", "accepted", "rejected", "deferred", "archived"]},
+    "summary": {"type": "string", "minLength": 1},
+    "extensions": {"type": "object"}
+  }
+}
