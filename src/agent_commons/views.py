@@ -137,6 +137,24 @@ def orientation(
             max_items,
         )
     )
+    delegation_groups = {
+        state: list(
+            islice(
+                (item for item in snapshot.delegations.values() if item.get("state") == state),
+                max_items,
+            )
+        )
+        for state in (
+            "requested",
+            "active",
+            "input_needed",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "needs_operator",
+        )
+    }
     accepted_decisions = list(
         islice(
             (
@@ -163,6 +181,7 @@ def orientation(
         "objectives": objectives[:max_items],
         "work": task_groups,
         "pending_reviews": pending_reviews,
+        "delegations": delegation_groups,
         "inbox": inbox_threads,
         "handoffs": handoffs,
         "effective_truth": {
@@ -205,6 +224,7 @@ def _line_items(items: Iterable[Mapping[str, Any]], label: str) -> list[str]:
             or item.get("subject")
             or item.get("summary")
             or item.get("proposal")
+            or item.get("target_profile")
             or ""
         )
         title = _markdown_inline(title)
@@ -339,6 +359,11 @@ def render_views(snapshot: ProjectSnapshot, destination: str | Path) -> tuple[Pa
         ),
     ]
     outputs["HANDOFFS.md"] = ["# Handoffs", "", *_line_items(snapshot.handoffs.values(), "handoff")]
+    outputs["DELEGATIONS.md"] = [
+        "# Delegations",
+        "",
+        *_line_items(snapshot.delegations.values(), "delegation"),
+    ]
     paths: list[Path] = []
     for name, lines in outputs.items():
         path = root / name

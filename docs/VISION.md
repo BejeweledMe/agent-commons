@@ -32,6 +32,12 @@ that combines:
 - durable project memory for findings, decisions, rejected approaches, and
   handoffs.
 
+The manager-space remains the product center. An optional local broker may
+execute one already-recorded, exact-revision delegation through a fixed Codex
+or Claude profile, but that broker is deliberately subordinate to the ledger:
+it cannot invent work, widen authority, accept results, or become a general
+agent scheduler.
+
 ## What we want agents to be able to do
 
 An agent entering a project should be able to discover, without replaying old
@@ -101,7 +107,8 @@ Agent Commons succeeds when:
 
 Agent Commons is not intended to be:
 
-- an autonomous model launcher or task scheduler;
+- a general autonomous model launcher, open-ended task scheduler, or recursive
+  agent swarm;
 - a warehouse of hidden reasoning, complete chats, or every command output;
 - a voting system where more models make a claim true;
 - a replacement for Git, CI, an issue tracker, or user approval;
@@ -112,9 +119,9 @@ Agent Commons is not intended to be:
 
 The long-term goal is a portable collaboration layer that can be installed in an
 arbitrary project and understood by any compatible agent. A local file-based
-workspace is the first trustworthy boundary. Optional notifications, an MCP or
-daemon interface, authenticated remote collaboration, richer graph views, and
-domain-specific extensions can be added later without changing the core idea:
-many agents may contribute, but the project should retain one inspectable memory
-and one explicit account of what is current, provisional, verified, disputed,
-and next.
+workspace is the first trustworthy boundary. The optional bounded MCP and local
+broker are the next interoperability layer; notifications, authenticated remote
+collaboration, richer graph views, and domain-specific extensions may follow
+without changing the core idea: many agents may contribute, but the project
+should retain one inspectable memory and one explicit account of what is current,
+provisional, verified, disputed, and next.

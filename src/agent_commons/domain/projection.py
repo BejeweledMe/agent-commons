@@ -47,6 +47,17 @@ DECISION_STATES = {
     "decision.deferred": "deferred",
     "decision.superseded": "superseded",
 }
+DELEGATION_STATES = {
+    "delegation.requested": "requested",
+    "delegation.started": "active",
+    "delegation.input_needed": "input_needed",
+    "delegation.resumed": "active",
+    "delegation.succeeded": "succeeded",
+    "delegation.failed": "failed",
+    "delegation.cancelled": "cancelled",
+    "delegation.timed_out": "timed_out",
+    "delegation.needs_operator": "needs_operator",
+}
 
 
 @dataclass
@@ -61,6 +72,7 @@ class ProjectSnapshot:
     decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
     artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
     handoffs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     invalid_event_ids: set[str] = field(default_factory=set)
     stale_refs: set[tuple[str, str]] = field(default_factory=set)
@@ -81,6 +93,7 @@ class ProjectSnapshot:
                 "decision": "decisions",
                 "artifact": "artifacts",
                 "handoff": "handoffs",
+                "delegation": "delegations",
             }.get(kind, ""),
             None,
         )
@@ -100,6 +113,7 @@ class ProjectSnapshot:
             "decisions": list(self.decisions.values()),
             "artifacts": list(self.artifacts.values()),
             "handoffs": list(self.handoffs.values()),
+            "delegations": list(self.delegations.values()),
             "warnings": sorted(set(self.warnings)),
             "invalid_event_ids": sorted(self.invalid_event_ids),
             "stale_refs": [
@@ -231,6 +245,13 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
             event,
             "acknowledged" if event_type == "handoff.acknowledged" else "open",
         )
+    elif event_type in DELEGATION_STATES:
+        _apply(
+            snapshot.delegations,
+            str(payload["delegation_id"]),
+            event,
+            DELEGATION_STATES[event_type],
+        )
     else:  # pragma: no cover - kept defensive if the registry is extended incorrectly
         raise ValidationError(f"unsupported projection event type: {event_type}")
 
@@ -343,6 +364,7 @@ def _current_evidence_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]
         "decision": "decisions",
         "artifact": "artifacts",
         "handoff": "handoffs",
+        "delegation": "delegations",
     }.get(kind)
     if collection_name is None:
         return None

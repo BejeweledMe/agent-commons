@@ -65,6 +65,7 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
         "commons-review",
         "commons-record",
         "commons-handoff",
+        "commons-delegate",
     }
     for skill_name in skill_names:
         codex_skill = tmp_path / ".agents" / "skills" / skill_name / "SKILL.md"
@@ -372,6 +373,7 @@ def test_repository_and_packaged_skill_copies_are_identical() -> None:
         "commons-review",
         "commons-record",
         "commons-handoff",
+        "commons-delegate",
     )
     for name in names:
         copies = [

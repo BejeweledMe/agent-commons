@@ -1,0 +1,21 @@
+---
+name: commons-delegate
+description: Delegate bounded implementation, independent review, or verification to a configured local Codex or Claude worker. Use when another agent should execute an exact Agent Commons target under explicit time, depth, concurrency, attempt, and budget limits.
+---
+
+# Commons Delegate
+
+Delegate a precise unit of work without turning Agent Commons into a general shell, scheduler, or authority layer.
+
+## Workflow
+
+1. Complete `commons-start`, inspect active work and claims, and identify an exact typed target reference plus its current immutable target revision.
+2. Confirm the core CLI first. If `agent-commons` is unavailable, stop and install/initialize it from the README; the manual Commons flow also requires the core CLI. If the core CLI works but the optional broker, matching profile, or provider CLI is unavailable, use the README's manual two-window fallback instead of inventing a local executable or payload. Otherwise inspect `agent-commons broker profiles` before launch.
+3. Prefer a distinct `*-independent-reviewer` profile for `independent_review` or `verification`; its worker-scoped MCP permits only its own delegation/review/outcome plus bounded repository list/read/literal-search. A `*-builder` profile for `implementation`, including current Codex runners, is trusted-workspace-only: require explicit operator profile opt-in and an external OS-isolated worktree for untrusted content, or fail closed to the manual flow.
+4. Before every shared-checkout review, stop all writes and confirm the bytes under review match the exact registered artifacts/evidence bound to the subject revision; otherwise use an operator-provisioned quiescent worktree or immutable snapshot. Before writable delegation, also acquire the exact task/path claims and stop parent writes to transferred paths. Prefer the safe Claude-reviewer example `{"max_depth":0,"wall_time_seconds":1800,"max_attempts":1,"max_concurrency":1,"budget":{"unit":"micro_usd","limit":500000}}`. `micro_usd` requires a profile with a provider-native monetary cap (currently Claude); `provider_units` means one coarse unit per provider-process attempt and requires `max_attempts <= limit`; `tokens` fails before reservation. Codex additionally requires `provider_units` plus trusted-workspace isolation opt-in. Heartbeat the parent session so its TTL covers `wall_time_seconds` plus the broker's 60-second finalization margin. Use a stable create-specific idempotency key.
+5. Start the broker through the bounded MCP tool or `agent-commons broker run`. The expected revision here is the newly created delegation's current revision, not its target revision; use a different stable launch-specific idempotency key. Supply no command, executable, environment, raw prompt, secret, or session nonce.
+6. Track the canonical delegation state. A child uses a distinct session, receives no extra authority, and may report `input_needed` or `needs_operator` instead of guessing. The current headless MVP has no resume or provider-session reattachment channel: an exited `input_needed` attempt becomes `needs_operator`. Store only a sanitized requirement summary, never an answer or secret, and do not promise in-place continuation. Do not create recursive Codex/Claude ping-pong.
+7. Inspect result references and the exact target after success. A successful process or delegation is not task acceptance, independent approval, truth promotion, permission to overwrite another claim, or permission to commit, push, deploy, publish, or contact anyone.
+8. A parent may cancel only requested, unlaunched work through core `delegation cancel` or bounded MCP `commons_cancel_delegation`. Active cancellation is not implemented: an active request must fail closed until the provider is stopped and reconciled, never record canonical cancellation first. On crash or ambiguity, run bounded broker reconciliation. An ambiguous post-start attempt must become `needs_operator` and must never be relaunched. Create a new delegation only after the earlier one is terminal and inspection proves no prior child remains live.
+
+Use `agent-commons delegation create --help`, `agent-commons broker --help`, and the README's optional-runtime setup for exact syntax. Prefer the bounded MCP surface when both clients share it, while keeping the CLI as the inspectable fallback.

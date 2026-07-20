@@ -24,13 +24,41 @@ public extension ABI.
 - import/export of summarized records between workspaces;
 - protocol conformance fixtures for additional agent clients.
 
-## MVP-2 — optional local service
+## MVP-2 — optional local delegation runtime
 
-- a long-running local daemon for notifications and lower-latency queries;
-- an MCP adapter over the same service and canonical schemas;
-- authenticated local client registration;
-- observability and workspace health metrics;
-- compatibility-preserving schema migrations.
+MVP-2 removes the need to prompt every agent window manually while preserving the
+file-ledger core as a complete standalone mode. Its governing contract is
+[ADR 0004](adr/0004-optional-local-delegation-runtime.md).
+
+- a canonical, exact-revision-bound `delegation` aggregate with bounded lineage,
+  time, attempts, concurrency, and provider budget;
+- a long-running same-host broker for notification, live status, conservative
+  crash recovery, cancellation, and lower-latency queries;
+- one shared MCP adapter over `CommonsManager` and the broker, never a parallel
+  business-logic or generic-shell write path;
+- authenticated local client grants and operator-allowlisted Codex and Claude
+  provider profiles;
+- one writable worker per checkout scope, with explicit claims and
+  operator-provisioned worktrees when isolation is required;
+- metadata-only local observability, with optional OpenTelemetry export and no
+  prompts, reasoning, transcripts, secrets, or raw process output;
+- compatibility-preserving canonical migrations and versioned, disposable
+  operational state.
+
+Delivery is staged and feature-gated:
+
+1. delegation schema, replay, manager, CLI, projection, and fake-runner contract;
+2. authenticated bounded MCP tools with CLI/manager parity;
+3. one quiescent-checkout, read-only Codex-to-Claude review and reverse-direction
+   verification slices;
+4. writable delegation with checkout leases, claims, crash injection,
+   cancellation, and budget enforcement;
+5. local status/watch UX, optional OpenTelemetry export, and an optional AHP
+   adapter after its value and compatibility are independently validated.
+
+Every stage must be usable or removable independently. Deterministic CI uses fake
+runners; real-provider tests are explicit and opt-in so credentials and network
+access are not build prerequisites.
 
 ## Later — remote teams
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commons Delegate"
+  short_description: "Delegate bounded work across local agents"
+  default_prompt: "Use $commons-delegate to delegate a bounded task to another configured agent and track its result."

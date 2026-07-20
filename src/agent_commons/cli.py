@@ -13,6 +13,12 @@ import yaml
 from agent_commons.core.refs import parse_ref
 from agent_commons.errors import CommonsError, ValidationError
 from agent_commons.services import CommonsManager
+from agent_commons.services.delegation_runtime import (
+    DelegationRuntimeService,
+    load_profile_registry,
+    profile_summaries,
+    telemetry_sink,
+)
 
 
 class CommonsGroup(click.Group):
@@ -583,6 +589,404 @@ def task_reopen(
     _simple_task_transition(
         state, "reopen_task", entity_id, expected_revision, idempotency_key, reason=reason
     )
+
+
+_DELEGATION_PROFILES = (
+    "codex-builder",
+    "codex-independent-reviewer",
+    "claude-builder",
+    "claude-independent-reviewer",
+)
+_DELEGATION_PURPOSES = ("implementation", "independent_review", "verification")
+_DELEGATION_REASON_CODES = (
+    "provider_unavailable",
+    "provider_auth",
+    "rate_limited",
+    "policy_denied",
+    "launch_failed",
+    "runtime_error",
+    "invalid_result",
+    "integrity_error",
+    "budget_exhausted",
+    "orphaned",
+    "unknown",
+)
+
+
+@cli.group("delegation")
+def delegation_group() -> None:
+    """Record bounded cross-agent delegation lifecycles."""
+
+
+@delegation_group.command("create")
+@click.option("--target-ref", required=True)
+@click.option("--target-revision", required=True)
+@click.option("--target-profile", type=click.Choice(_DELEGATION_PROFILES), required=True)
+@click.option("--purpose", type=click.Choice(_DELEGATION_PURPOSES), required=True)
+@click.option("--limits-json", required=True)
+@click.option("--parent-delegation-id")
+@_idem
+@click.pass_obj
+def delegation_create(
+    state: CLIState,
+    target_ref: str,
+    target_revision: str,
+    target_profile: str,
+    purpose: str,
+    limits_json: str,
+    parent_delegation_id: str | None,
+    idempotency_key: str | None,
+) -> None:
+    """Create a requested delegation bound to one exact target revision."""
+
+    state.emit(
+        state.manager().create_delegation(
+            target_ref=parse_ref(target_ref).as_dict(),
+            target_revision=target_revision,
+            target_profile=target_profile,
+            purpose=purpose,
+            limits=_json_object(limits_json, "limits_json"),
+            parent_delegation_id=parent_delegation_id,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@delegation_group.command("list")
+@click.option("--state", "state_filter")
+@click.pass_obj
+def delegation_list(state: CLIState, state_filter: str | None) -> None:
+    """List delegations, optionally filtered by projected state."""
+
+    state.emit(state.manager().list_delegations(state=state_filter))
+
+
+@delegation_group.command("show")
+@click.argument("delegation_id")
+@click.pass_obj
+def delegation_show(state: CLIState, delegation_id: str) -> None:
+    """Show one projected delegation."""
+
+    state.emit(state.manager().get_delegation(delegation_id))
+
+
+def _delegation_transition(
+    state: CLIState,
+    method: str,
+    entity_id: str,
+    expected_revision: str,
+    idempotency_key: str | None,
+    **fields: Any,
+) -> None:
+    state.emit(
+        getattr(state.manager(), method)(
+            entity_id,
+            expected_revision,
+            idempotency_key=idempotency_key,
+            **fields,
+        )
+    )
+
+
+@delegation_group.command("start")
+@_expected
+@click.option("--child-session-id", required=True)
+@click.option("--attempt", type=click.IntRange(min=1, max=32), default=1, show_default=True)
+@_idem
+@click.pass_obj
+def delegation_start(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    child_session_id: str,
+    attempt: int,
+    idempotency_key: str | None,
+) -> None:
+    """Bind a distinct child session and activate a requested delegation."""
+
+    _delegation_transition(
+        state,
+        "start_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        child_session_id=child_session_id,
+        attempt=attempt,
+    )
+
+
+@delegation_group.command("input-needed")
+@_expected
+@click.option("--summary", required=True)
+@_idem
+@click.pass_obj
+def delegation_input_needed(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    summary: str,
+    idempotency_key: str | None,
+) -> None:
+    """Mark an active delegation as waiting for bounded operator input."""
+
+    _delegation_transition(
+        state,
+        "mark_delegation_input_needed",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        summary=summary,
+    )
+
+
+@delegation_group.command("resume")
+@_expected
+@click.option("--resolution", required=True)
+@_idem
+@click.pass_obj
+def delegation_resume(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    resolution: str,
+    idempotency_key: str | None,
+) -> None:
+    """Resume a delegation after its input request is resolved."""
+
+    _delegation_transition(
+        state,
+        "resume_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        resolution=resolution,
+    )
+
+
+@delegation_group.command("succeed")
+@_expected
+@click.option("--summary", required=True)
+@click.option("--result-ref", multiple=True, required=True)
+@_idem
+@click.pass_obj
+def delegation_succeed(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    summary: str,
+    result_ref: tuple[str, ...],
+    idempotency_key: str | None,
+) -> None:
+    """Finish an active delegation with canonical result references."""
+
+    _delegation_transition(
+        state,
+        "succeed_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        summary=summary,
+        result_refs=_refs(result_ref),
+    )
+
+
+@delegation_group.command("fail")
+@_expected
+@click.option("--reason-code", type=click.Choice(_DELEGATION_REASON_CODES), required=True)
+@click.option("--summary", required=True)
+@_idem
+@click.pass_obj
+def delegation_fail(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    reason_code: str,
+    summary: str,
+    idempotency_key: str | None,
+) -> None:
+    """Finish a delegation with a stable failure classification."""
+
+    _delegation_transition(
+        state,
+        "fail_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        reason_code=reason_code,
+        summary=summary,
+    )
+
+
+@delegation_group.command("cancel")
+@_expected
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def delegation_cancel(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Cancel a non-terminal delegation."""
+
+    _delegation_transition(
+        state,
+        "cancel_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        reason=reason,
+    )
+
+
+@delegation_group.command("time-out")
+@_expected
+@click.option("--summary", required=True)
+@_idem
+@click.pass_obj
+def delegation_time_out(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    summary: str,
+    idempotency_key: str | None,
+) -> None:
+    """Finish a delegation after its hard wall-time limit."""
+
+    _delegation_transition(
+        state,
+        "time_out_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        summary=summary,
+    )
+
+
+@delegation_group.command("needs-operator")
+@_expected
+@click.option("--reason-code", type=click.Choice(_DELEGATION_REASON_CODES), required=True)
+@click.option("--summary", required=True)
+@_idem
+@click.pass_obj
+def delegation_needs_operator(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    reason_code: str,
+    summary: str,
+    idempotency_key: str | None,
+) -> None:
+    """Finish a delegation that requires explicit operator recovery."""
+
+    _delegation_transition(
+        state,
+        "mark_delegation_needs_operator",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        reason_code=reason_code,
+        summary=summary,
+    )
+
+
+def _runtime_service(
+    state: CLIState,
+    profile_config: Path | None,
+    telemetry: str = "none",
+) -> DelegationRuntimeService:
+    manager = state.manager()
+    return DelegationRuntimeService(
+        manager,
+        profiles=load_profile_registry(profile_config, workspace_root=state.repo),
+        telemetry=telemetry_sink(telemetry, manager),
+    )
+
+
+def _profile_config(function: Any) -> Any:
+    return click.option(
+        "--profile-config",
+        type=click.Path(path_type=Path, dir_okay=False, exists=True),
+        help="Operator-owned strict YAML profile configuration.",
+    )(function)
+
+
+@cli.group("broker")
+def broker_group() -> None:
+    """Run and recover the optional allowlisted local delegation broker."""
+
+
+@broker_group.command("profiles")
+@_profile_config
+@click.pass_obj
+def broker_profiles(state: CLIState, profile_config: Path | None) -> None:
+    """List configured profile capabilities without exposing executable argv."""
+
+    state.emit(profile_summaries(load_profile_registry(profile_config, workspace_root=state.repo)))
+
+
+@broker_group.command("attempts")
+@_profile_config
+@click.pass_obj
+def broker_attempts(state: CLIState, profile_config: Path | None) -> None:
+    """List bounded operational attempt metadata; no provider content is retained."""
+
+    state.emit(_runtime_service(state, profile_config).list_attempts())
+
+
+@broker_group.command("run")
+@click.argument("delegation_id")
+@click.argument("expected_revision")
+@click.option("--idempotency-key", required=True, help="Stable launch-specific retry identity.")
+@click.option("--retry", is_flag=True, help="Retry only a proven pre-start failed attempt.")
+@click.option(
+    "--telemetry",
+    type=click.Choice(("none", "local", "otel")),
+    default="none",
+    show_default=True,
+)
+@_profile_config
+@click.pass_obj
+def broker_run(
+    state: CLIState,
+    delegation_id: str,
+    expected_revision: str,
+    idempotency_key: str,
+    retry: bool,
+    telemetry: str,
+    profile_config: Path | None,
+) -> None:
+    """Launch one requested delegation; no arbitrary command or prompt is accepted."""
+
+    state.emit(
+        _runtime_service(state, profile_config, telemetry).run(
+            delegation_id,
+            expected_revision,
+            idempotency_key=idempotency_key,
+            retry=retry,
+        )
+    )
+
+
+@broker_group.command("reconcile")
+@click.option(
+    "--telemetry",
+    type=click.Choice(("none", "local", "otel")),
+    default="none",
+    show_default=True,
+)
+@_profile_config
+@click.pass_obj
+def broker_reconcile(
+    state: CLIState,
+    telemetry: str,
+    profile_config: Path | None,
+) -> None:
+    """Fail ambiguous post-crash attempts closed to canonical needs_operator."""
+
+    state.emit(_runtime_service(state, profile_config, telemetry).reconcile())
 
 
 @cli.group("thread")

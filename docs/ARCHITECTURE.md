@@ -3,8 +3,11 @@
 ## Product boundary
 
 Agent Commons is a shared operating space for agents working on one project. It
-combines a blackboard, work board, review room, and durable project memory. It
-does not launch models or decide that agreement between models is truth.
+combines a blackboard, work board, review room, and durable project memory. The
+file-ledger core does not launch models or decide that agreement between models
+is truth. An optional local runtime may execute a bounded delegation through an
+operator-allowlisted provider profile; that execution never changes the core's
+truth or external-authority rules.
 
 Four information layers remain distinct:
 
@@ -37,6 +40,7 @@ Operational state is stored below the project's Git common directory:
 .git/agent-commons-state/
 ├── sessions/
 ├── claims/
+├── runtime/              # optional broker state; ignored and non-authoritative
 ├── idempotency-v2/
 │   ├── abandonments/
 │   ├── reconciliations/
@@ -57,7 +61,8 @@ Canonical event and manifest files are immutable and Git-friendly. Thread
 messages are `thread.replied` events; MVP-0 has no separate message store.
 SQLite is a disposable incremental projection and is never authoritative. Remote
 multi-host coordination, authentication, notifications, scheduling, and agent
-launching are outside MVP-0.
+launching are outside MVP-0. MVP-2 may add an optional same-host broker and MCP
+adapter without making either mandatory for ledger use.
 
 Canonical history belongs to one checkout. Cooperating windows on the same work
 therefore point at the same project root. Linked Git worktrees share operational
@@ -75,12 +80,27 @@ flowchart LR
     C[Codex] --> CLI[Agent Commons CLI]
     H[Claude Code] --> CLI
     O[Other clients] --> CLI
-    CLI --> B[Validation, policy, and lifecycle]
+    C -. optional .-> MCP[Shared MCP adapter]
+    H -. optional .-> MCP
+    CLI --> B[CommonsManager validation and lifecycle]
+    MCP --> B
+    MCP -. authenticated launch request .-> R[Local delegation broker]
+    R --> P[Allowlisted provider runners]
+    R --> B
     B --> L[Immutable event and manifest ledger]
     B --> S[Operational sessions and claims]
+    R --> RS[Ignored runtime journal and status]
+    R -. optional metadata only .-> OT[OpenTelemetry]
     L --> I[Rebuildable SQLite projection]
     I --> V[Orientation, inbox, and Markdown views]
 ```
+
+The broker is an optional execution boundary, not a second domain service.
+Canonical lifecycle writes still pass through `CommonsManager`. Broker queue
+state, attempts, process handles, heartbeats, cancellation intent, and bounded
+diagnostics are operational and may be rebuilt or conservatively reconciled.
+The complete boundary is in
+[ADR 0004](adr/0004-optional-local-delegation-runtime.md).
 
 ## Universal entities
 
@@ -92,6 +112,7 @@ flowchart LR
 - review request, review judgment, and verification;
 - finding and decision;
 - handoff;
+- delegation, including exact target revision and bounded parent/child lineage;
 - correction, invalidation, and supersession.
 
 References are explicit typed objects, and the service resolves canonical
@@ -116,6 +137,12 @@ review:   requested → approved | changes_requested | rejected | abstained
 finding:  reported → verified | contested → resolved
 
 decision: proposed → accepted | rejected | deferred → superseded
+
+delegation: requested ─→ cancelled
+                │
+                └→ active ↔ input_needed
+                       │
+                       └→ succeeded | failed | timed_out | needs_operator
 ```
 
 Task assignment is durable history; a claim is only a temporary coordination
@@ -148,6 +175,14 @@ uncorrected); manifest evidence uses its content-addressed manifest ID. A later
 artifact revision, correction, or invalidation preserves the historical
 judgment with `stale: true` but removes it from effective-truth views.
 
+A delegation binds `target_ref` and `target_revision` at request time. It cannot
+target itself or an ancestor delegation, and a later target change does not
+retarget it. Every launched worker uses a distinct Commons session. Delegation
+success means only that the provider completed its bounded run; it does not
+accept a task, approve a review, verify a claim, promote project truth, or grant
+an external side effect. Retry after a terminal outcome creates a new delegation
+rather than rewriting the old one.
+
 ## Security and trust
 
 Agent-supplied content is untrusted data, not an instruction to other agents.
@@ -161,9 +196,34 @@ and a stable instance identity. MVP-0 does not enforce operator authorization:
 roles and capabilities coordinate work but cannot prove authority, and a model
 name never grants it.
 
+The optional broker has a stricter boundary. Launch authority comes from an
+operator-managed local grant associated with an authenticated broker connection,
+not from a session's self-declared role or capabilities. Callers select a named
+profile; they cannot supply arbitrary executables, shell fragments, environment
+maps, or credentials. A bounded work instruction is ephemeral untrusted stdin,
+not argv or durable state. Effective child authority and limits can only narrow
+the parent grant. The first runtime permits one writable worker per checkout
+scope and does not create, switch, commit, reset, or remove Git worktrees for the
+user.
+
+Observability is also split by authority. The ledger preserves delegation intent
+and outcomes, an ignored local journal supports live status and recovery, and an
+optional metadata-only OpenTelemetry sink emits short-lived milestone spans with
+correlation attributes. The current slice has no metric instruments or propagated
+end-to-end span context.
+Telemetry is lossy and never affects replay. Prompts, reasoning, transcripts,
+file contents, tool payloads, environment variables, credentials, and raw process
+output are excluded by default.
+
 ## Extension boundary
 
 MVP-0 ships one universal software-collaboration domain. Internal registries allow
 additional schemas and projections, but a public plugin ABI is deferred until a
 second non-trivial domain validates the boundary. Existing specialist workflows
 remain independent and may later become optional domain packs.
+
+Provider runners, OpenTelemetry exporters, and an eventual AHP adapter are
+replaceable optional edges. None defines canonical entities or bypasses the
+manager. Remote multi-host execution remains a later service deployment with a
+new authentication, authorization, retention, and distributed-coordination
+design.

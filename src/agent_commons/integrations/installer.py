@@ -44,6 +44,7 @@ _COMMON_SKILLS = (
     "commons-review",
     "commons-record",
     "commons-handoff",
+    "commons-delegate",
 )
 _SKILL_FILES = (Path("SKILL.md"), Path("agents") / "openai.yaml")
 _WORKSPACE_DIRECTORIES = ("events", "manifests", "blobs", "cache")

@@ -34,6 +34,9 @@ FINDING_ID = f"finding.{ULID_0}"
 DECISION_ID = f"decision.{ULID_0}"
 REPLACEMENT_DECISION_ID = f"decision.{ULID_1}"
 HANDOFF_ID = f"handoff.{ULID_0}"
+DELEGATION_ID = f"delegation.{ULID_0}"
+PARENT_SESSION_ID = "session." + "a" * 32
+CHILD_SESSION_ID = "session." + "b" * 32
 MANIFEST_REF = "mft.artifact.sha256." + "a" * 64
 CONTENT_REVISION = "sha256:" + "a" * 64
 TYPED_ARTIFACT_REF = {"kind": "artifact", "id": ARTIFACT_ID}
@@ -42,6 +45,13 @@ BOUND_ARTIFACT_REF = {"ref": TYPED_ARTIFACT_REF, "revision": TARGET_REVISION}
 BOUND_REVIEW_REF = {
     "ref": {"kind": "review", "id": REVIEW_ID},
     "revision": TARGET_REVISION,
+}
+DELEGATION_LIMITS = {
+    "max_depth": 1,
+    "wall_time_seconds": 900,
+    "max_attempts": 2,
+    "max_concurrency": 1,
+    "budget": {"unit": "tokens", "limit": 10000},
 }
 
 
@@ -227,6 +237,61 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "expected_revision": EVENT_ID,
         "note": "review accepted",
     },
+    "delegation.requested": {
+        "delegation_id": DELEGATION_ID,
+        "target_ref": TYPED_ARTIFACT_REF,
+        "target_revision": TARGET_REVISION,
+        "target_profile": "claude-independent-reviewer",
+        "purpose": "independent_review",
+        "parent_session_id": PARENT_SESSION_ID,
+        "root_delegation_id": DELEGATION_ID,
+        "depth": 0,
+        "limits": DELEGATION_LIMITS,
+    },
+    "delegation.started": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "child_session_id": CHILD_SESSION_ID,
+        "attempt": 1,
+    },
+    "delegation.input_needed": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "summary": "Operator must choose a supported target.",
+    },
+    "delegation.resumed": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "resolution": "The operator selected the exact target revision.",
+    },
+    "delegation.succeeded": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "summary": "Independent review completed.",
+        "result_refs": [TYPED_ARTIFACT_REF],
+    },
+    "delegation.failed": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "reason_code": "runtime_error",
+        "summary": "The provider process exited unsuccessfully.",
+    },
+    "delegation.cancelled": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "reason": "Operator cancelled the requested work.",
+    },
+    "delegation.timed_out": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "summary": "The hard wall-time limit elapsed.",
+    },
+    "delegation.needs_operator": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "reason_code": "orphaned",
+        "summary": "Runtime state could not be reconciled automatically.",
+    },
     "event.corrected": {
         "target_event_id": EVENT_ID,
         "expected_target_sha256": "a" * 64,
@@ -318,7 +383,11 @@ def event_document(
 
 def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSnapshot:
     snapshot = ProjectSnapshot()
-    if event_type in {"review.requested", "verification.recorded"}:
+    if event_type in {
+        "review.requested",
+        "verification.recorded",
+        "delegation.requested",
+    }:
         snapshot.artifacts[ARTIFACT_ID] = {
             "id": ARTIFACT_ID,
             "state": "registered",
@@ -350,6 +419,14 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "decision.deferred": "proposed",
         "decision.superseded": "accepted",
         "handoff.acknowledged": "open",
+        "delegation.started": "requested",
+        "delegation.input_needed": "active",
+        "delegation.resumed": "input_needed",
+        "delegation.succeeded": "active",
+        "delegation.failed": "active",
+        "delegation.cancelled": "requested",
+        "delegation.timed_out": "active",
+        "delegation.needs_operator": "active",
     }
     state = current_states.get(event_type)
     if state is None:
@@ -364,6 +441,7 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "finding": "findings",
         "decision": "decisions",
         "handoff": "handoffs",
+        "delegation": "delegations",
     }[family]
     identifier = str(payload[f"{family}_id"])
     current: dict[str, Any] = {
@@ -381,6 +459,24 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         )
     if family == "decision":
         current["scope"] = "architecture.persistence"
+    if family == "delegation":
+        current.update(
+            {
+                "target_ref": TYPED_ARTIFACT_REF,
+                "target_revision": TARGET_REVISION,
+                "parent_session_id": PARENT_SESSION_ID,
+                "root_delegation_id": DELEGATION_ID,
+                "depth": 0,
+                "limits": DELEGATION_LIMITS,
+            }
+        )
+        if state != "requested":
+            current["child_session_id"] = CHILD_SESSION_ID
+        snapshot.artifacts[ARTIFACT_ID] = {
+            "id": ARTIFACT_ID,
+            "state": "registered",
+            "revision": TARGET_REVISION,
+        }
     getattr(snapshot, collection_name)[identifier] = current
     if event_type == "task.accepted":
         snapshot.reviews[REVIEW_ID] = {
@@ -441,11 +537,16 @@ def test_minimal_specimen_validates_schema_domain_and_lifecycle(event_type: str)
 
     registry.validate_event(event)
     validate_payload(event_type, payload)
+    actor_session_id = (
+        CHILD_SESSION_ID
+        if event_type in {"delegation.input_needed", "delegation.succeeded"}
+        else PARENT_SESSION_ID
+    )
     validate_transition(
         lifecycle_snapshot(event_type, payload),
         event_type,
         payload,
-        actor_session_id="session.independent-reviewer",
+        actor_session_id=actor_session_id,
     )
 
 

@@ -131,6 +131,61 @@ EVENT_SPECS: dict[str, EventSpec] = {
     "handoff.acknowledged": EventSpec(
         ("handoff_id", "expected_revision", "note"), "handoff", "handoff_id"
     ),
+    "delegation.requested": EventSpec(
+        (
+            "delegation_id",
+            "target_ref",
+            "target_revision",
+            "target_profile",
+            "purpose",
+            "parent_session_id",
+            "root_delegation_id",
+            "depth",
+            "limits",
+        ),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.started": EventSpec(
+        ("delegation_id", "expected_revision", "child_session_id", "attempt"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.input_needed": EventSpec(
+        ("delegation_id", "expected_revision", "summary"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.resumed": EventSpec(
+        ("delegation_id", "expected_revision", "resolution"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.succeeded": EventSpec(
+        ("delegation_id", "expected_revision", "summary", "result_refs"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.failed": EventSpec(
+        ("delegation_id", "expected_revision", "reason_code", "summary"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.cancelled": EventSpec(
+        ("delegation_id", "expected_revision", "reason"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.timed_out": EventSpec(
+        ("delegation_id", "expected_revision", "summary"),
+        "delegation",
+        "delegation_id",
+    ),
+    "delegation.needs_operator": EventSpec(
+        ("delegation_id", "expected_revision", "reason_code", "summary"),
+        "delegation",
+        "delegation_id",
+    ),
     "event.corrected": EventSpec(
         ("target_event_id", "expected_target_sha256", "replacement_payload"),
         "event",
@@ -155,6 +210,7 @@ _STRING_FIELDS = {
     "finding_id",
     "decision_id",
     "handoff_id",
+    "delegation_id",
     "title",
     "description",
     "summary",
@@ -176,6 +232,13 @@ _STRING_FIELDS = {
     "rationale",
     "claim",
     "note",
+    "target_profile",
+    "purpose",
+    "parent_session_id",
+    "parent_delegation_id",
+    "root_delegation_id",
+    "child_session_id",
+    "reason_code",
 }
 
 _STRING_LIST_FIELDS = {
@@ -194,9 +257,31 @@ _STRING_LIST_FIELDS = {
     "superseded_correction_event_ids",
 }
 
-_REF_LIST_FIELDS = {"artifact_refs", "related_refs"}
+_REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
 
 _OBJECTIVE_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "extensions"}
+
+_DELEGATION_TARGET_PROFILES = {
+    "codex-builder",
+    "codex-independent-reviewer",
+    "claude-builder",
+    "claude-independent-reviewer",
+}
+_DELEGATION_PURPOSES = {"implementation", "independent_review", "verification"}
+_DELEGATION_REASON_CODES = {
+    "provider_unavailable",
+    "provider_auth",
+    "rate_limited",
+    "policy_denied",
+    "launch_failed",
+    "runtime_error",
+    "invalid_result",
+    "integrity_error",
+    "budget_exhausted",
+    "orphaned",
+    "unknown",
+}
+_DELEGATION_BUDGET_UNITS = {"tokens", "micro_usd", "provider_units"}
 
 
 def _validate_ref(value: Any, field: str) -> None:
@@ -252,6 +337,54 @@ def _validate_objective_changes(value: Any) -> None:
         _validate_string_list(value["acceptance_criteria"], "changes.acceptance_criteria")
     if "extensions" in value and not isinstance(value["extensions"], Mapping):
         raise ValidationError("changes.extensions must be an object")
+
+
+def _bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValidationError(f"{field} must be an integer")
+    if not minimum <= value <= maximum:
+        raise ValidationError(f"{field} must be between {minimum} and {maximum}")
+    return value
+
+
+def _validate_delegation_limits(value: Any) -> None:
+    expected = {
+        "max_depth",
+        "wall_time_seconds",
+        "max_attempts",
+        "max_concurrency",
+        "budget",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise ValidationError(
+            "limits must contain exactly max_depth, wall_time_seconds, max_attempts, "
+            "max_concurrency, and budget"
+        )
+    _bounded_integer(value["max_depth"], "limits.max_depth", minimum=0, maximum=8)
+    _bounded_integer(
+        value["wall_time_seconds"],
+        "limits.wall_time_seconds",
+        minimum=1,
+        maximum=86400,
+    )
+    _bounded_integer(value["max_attempts"], "limits.max_attempts", minimum=1, maximum=32)
+    _bounded_integer(
+        value["max_concurrency"],
+        "limits.max_concurrency",
+        minimum=1,
+        maximum=32,
+    )
+    budget = value["budget"]
+    if not isinstance(budget, Mapping) or set(budget) != {"unit", "limit"}:
+        raise ValidationError("limits.budget must contain exactly unit and limit")
+    if budget["unit"] not in _DELEGATION_BUDGET_UNITS:
+        raise ValidationError("invalid delegation budget unit")
+    _bounded_integer(
+        budget["limit"],
+        "limits.budget.limit",
+        minimum=1,
+        maximum=1_000_000_000_000,
+    )
 
 
 def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
@@ -328,4 +461,25 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         or payload["resolution"] not in {"resolved", "accepted", "rejected", "deferred", "archived"}
     ):
         raise ValidationError("invalid thread resolution")
+    if event_type == "delegation.requested":
+        if payload["target_profile"] not in _DELEGATION_TARGET_PROFILES:
+            raise ValidationError("invalid delegation target_profile")
+        if payload["purpose"] not in _DELEGATION_PURPOSES:
+            raise ValidationError("invalid delegation purpose")
+        reviewer_profile = str(payload["target_profile"]).endswith("-independent-reviewer")
+        if payload["purpose"] == "implementation" and reviewer_profile:
+            raise ValidationError("implementation delegations require a builder profile")
+        if payload["purpose"] in {"independent_review", "verification"} and not reviewer_profile:
+            raise ValidationError(
+                "review and verification delegations require an independent-reviewer profile"
+            )
+        _bounded_integer(payload["depth"], "depth", minimum=0, maximum=8)
+        _validate_delegation_limits(payload["limits"])
+    if event_type == "delegation.started":
+        _bounded_integer(payload["attempt"], "attempt", minimum=1, maximum=32)
+    if (
+        event_type in {"delegation.failed", "delegation.needs_operator"}
+        and payload["reason_code"] not in _DELEGATION_REASON_CODES
+    ):
+        raise ValidationError("invalid delegation reason_code")
     return spec

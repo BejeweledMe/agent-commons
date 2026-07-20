@@ -16,6 +16,7 @@ _COLLECTIONS = {
     "decision": "decisions",
     "artifact": "artifacts",
     "handoff": "handoffs",
+    "delegation": "delegations",
 }
 
 _TASK_ALLOWED = {
@@ -45,7 +46,26 @@ _STATE_ALLOWED = {
     "decision.superseded": {"accepted"},
     "handoff.acknowledged": {"open"},
     "artifact.revised": {"registered"},
+    "delegation.started": {"requested"},
+    "delegation.input_needed": {"active"},
+    "delegation.resumed": {"input_needed"},
+    "delegation.succeeded": {"active"},
+    "delegation.failed": {"requested", "active", "input_needed"},
+    # The current runtime has no authenticated stop/kill acknowledgement in a
+    # canonical event.  Cancellation is therefore safe only before launch;
+    # started work must be stopped and classified through timeout/failure/
+    # needs_operator reconciliation instead of merely changing ledger state.
+    "delegation.cancelled": {"requested"},
+    "delegation.timed_out": {"requested", "active", "input_needed"},
+    "delegation.needs_operator": {"requested", "active", "input_needed"},
 }
+
+_DELEGATION_MONOTONIC_LIMITS = (
+    "max_depth",
+    "wall_time_seconds",
+    "max_attempts",
+    "max_concurrency",
+)
 
 
 def entity(snapshot: ProjectSnapshot, kind: str, identifier: str) -> dict[str, Any] | None:
@@ -89,8 +109,14 @@ def validate_transition(
         "event.invalidated",
         "event.invalidation_revoked",
         "event.corrected",
+        "delegation.requested",
     }:
-        _validate_creation(snapshot, event_type, payload)
+        _validate_creation(
+            snapshot,
+            event_type,
+            payload,
+            actor_session_id=actor_session_id,
+        )
         return
 
     family, _ = event_type.split(".", 1)
@@ -121,6 +147,86 @@ def validate_transition(
             if actor_session_id in work_author_sessions:
                 raise LifecycleConflictError(
                     "an independent task review cannot be completed by a work-author session"
+                )
+    if event_type == "review.completed":
+        bound = _bound_delegations(snapshot, actor_session_id)
+        if bound and not any(
+            delegation.get("purpose") == "independent_review"
+            and _delegation_matches_review(delegation, current)
+            for delegation in bound
+        ):
+            raise LifecycleConflictError(
+                "a delegated reviewer may complete only its exact bound review target"
+            )
+    if event_type == "delegation.started":
+        child_session_id = str(payload.get("child_session_id", ""))
+        if actor_session_id != str(current.get("parent_session_id", "")):
+            raise LifecycleConflictError(
+                "only the delegation requester session may start its provider child"
+            )
+        if child_session_id == actor_session_id:
+            raise LifecycleConflictError(
+                "a delegation child session must be distinct from its parent and starter"
+            )
+        attempt = int(payload.get("attempt", 0))
+        maximum = int((current.get("limits") or {}).get("max_attempts", 0))
+        if attempt > maximum:
+            raise LifecycleConflictError("delegation attempt exceeds its hard max_attempts limit")
+        _validate_target_binding(snapshot, current)
+    if event_type in {"delegation.input_needed", "delegation.succeeded"}:
+        if actor_session_id != str(current.get("child_session_id", "")):
+            raise LifecycleConflictError(
+                "only the delegation's bound child session may report this outcome"
+            )
+    if event_type in {"delegation.resumed", "delegation.cancelled", "delegation.timed_out"}:
+        if actor_session_id != str(current.get("parent_session_id", "")):
+            raise LifecycleConflictError(
+                "only the delegation requester session may control this transition"
+            )
+    if event_type in {"delegation.failed", "delegation.needs_operator"}:
+        if actor_session_id not in {
+            str(current.get("parent_session_id", "")),
+            str(current.get("child_session_id", "")),
+        }:
+            raise LifecycleConflictError(
+                "delegation failure classification requires its parent or bound child session"
+            )
+    if event_type == "delegation.succeeded":
+        result_refs = payload.get("result_refs") or []
+        for result_ref in result_refs:
+            _require_ref_exists(snapshot, result_ref)
+            if result_ref == {"kind": "delegation", "id": identifier}:
+                raise LifecycleConflictError("a delegation cannot return itself as a result")
+        purpose = str(current.get("purpose", ""))
+        if purpose == "independent_review":
+            if len(result_refs) != 1 or result_refs[0].get("kind") != "review":
+                raise LifecycleConflictError(
+                    "an independent-review delegation must return exactly one review"
+                )
+            review = require_entity(snapshot, "review", str(result_refs[0].get("id", "")))
+            if (
+                review.get("state") == "requested"
+                or (review.get("actor") or {}).get("session_id") != actor_session_id
+                or not _delegation_matches_review(current, review)
+            ):
+                raise LifecycleConflictError(
+                    "delegation result review is not the bound child's exact completed review"
+                )
+        if purpose == "verification":
+            if len(result_refs) != 1 or result_refs[0].get("kind") != "verification":
+                raise LifecycleConflictError(
+                    "a verification delegation must return exactly one verification"
+                )
+            verification = require_entity(
+                snapshot, "verification", str(result_refs[0].get("id", ""))
+            )
+            if (
+                (verification.get("actor") or {}).get("session_id") != actor_session_id
+                or verification.get("target_ref") != current.get("target_ref")
+                or verification.get("target_revision") != current.get("target_revision")
+            ):
+                raise LifecycleConflictError(
+                    "delegation result verification is not the bound child's exact verification"
                 )
     if event_type == "review.completed" and payload.get("target_revision") != current.get(
         "target_revision"
@@ -192,7 +298,11 @@ def validate_transition(
 
 
 def _validate_creation(
-    snapshot: ProjectSnapshot, event_type: str, payload: Mapping[str, Any]
+    snapshot: ProjectSnapshot,
+    event_type: str,
+    payload: Mapping[str, Any],
+    *,
+    actor_session_id: str,
 ) -> None:
     created_kind = {
         "objective.created": "objective",
@@ -204,6 +314,7 @@ def _validate_creation(
         "finding.reported": "finding",
         "decision.proposed": "decision",
         "handoff.created": "handoff",
+        "delegation.requested": "delegation",
     }.get(event_type)
     if created_kind:
         identifier = str(payload.get(f"{created_kind}_id", ""))
@@ -211,7 +322,11 @@ def _validate_creation(
             raise LifecycleConflictError(f"{created_kind} already exists: {identifier}")
     if event_type in {"review.requested", "verification.recorded"}:
         target = payload.get("target_ref") or {}
-        target_current = require_entity(snapshot, str(target.get("kind")), str(target.get("id")))
+        target_current = require_entity(
+            snapshot,
+            str(target.get("kind")),
+            str(target.get("id")),
+        )
         allowed_target_revisions = {
             target_current.get("revision"),
             target_current.get("effective_revision", target_current.get("revision")),
@@ -220,6 +335,154 @@ def _validate_creation(
             raise LifecycleConflictError(
                 "target_revision is not the current immutable target revision"
             )
+    if event_type == "verification.recorded":
+        bound = _bound_delegations(snapshot, actor_session_id)
+        if bound and not any(
+            delegation.get("purpose") == "verification"
+            and delegation.get("target_ref") == payload.get("target_ref")
+            and delegation.get("target_revision") == payload.get("target_revision")
+            for delegation in bound
+        ):
+            raise LifecycleConflictError(
+                "a delegated child may verify only its exact bound target revision"
+            )
+    if event_type == "delegation.requested":
+        _validate_target_binding(snapshot, payload)
     if event_type == "task.created":
         for dependency in payload.get("dependencies") or []:
             require_entity(snapshot, "task", str(dependency))
+    if event_type == "delegation.requested":
+        _validate_delegation_request(snapshot, payload, actor_session_id=actor_session_id)
+
+
+def _current_ref_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]) -> str | None:
+    kind = str(ref.get("kind", ""))
+    identifier = str(ref.get("id", ""))
+    if kind == "event":
+        return snapshot.effective_event_revisions.get(identifier)
+    if kind == "manifest":
+        return identifier if identifier in snapshot.known_manifest_ids else None
+    current = require_entity(snapshot, kind, identifier)
+    return str(current.get("effective_revision") or current.get("revision"))
+
+
+def _require_ref_exists(snapshot: ProjectSnapshot, ref: Mapping[str, Any]) -> None:
+    if _current_ref_revision(snapshot, ref) is None:
+        raise LifecycleConflictError(
+            f"{ref.get('kind')} does not exist or is not effective: {ref.get('id')}"
+        )
+
+
+def _validate_target_binding(snapshot: ProjectSnapshot, value: Mapping[str, Any]) -> None:
+    target = value.get("target_ref") or {}
+    current_revision = _current_ref_revision(snapshot, target)
+    if value.get("target_revision") != current_revision:
+        raise LifecycleConflictError("target_revision is not the current immutable target revision")
+
+
+def _delegation_ancestor_ids(
+    snapshot: ProjectSnapshot, parent_delegation_id: str
+) -> tuple[str, ...]:
+    ancestors: list[str] = []
+    current_id = parent_delegation_id
+    while current_id:
+        if current_id in ancestors:
+            raise LifecycleConflictError("delegation parent lineage contains a cycle")
+        ancestors.append(current_id)
+        current = require_entity(snapshot, "delegation", current_id)
+        current_id = str(current.get("parent_delegation_id") or "")
+    return tuple(ancestors)
+
+
+def _bound_delegations(
+    snapshot: ProjectSnapshot, actor_session_id: str
+) -> tuple[Mapping[str, Any], ...]:
+    """Return non-terminal delegations whose worker is the current actor."""
+
+    return tuple(
+        delegation
+        for delegation in snapshot.delegations.values()
+        if delegation.get("child_session_id") == actor_session_id
+        and delegation.get("state") in {"active", "input_needed"}
+    )
+
+
+def _delegation_matches_review(delegation: Mapping[str, Any], review: Mapping[str, Any]) -> bool:
+    target = delegation.get("target_ref") or {}
+    review_ref = {"kind": "review", "id": review.get("id")}
+    if target == review_ref:
+        return delegation.get("target_revision") in {
+            review.get("revision"),
+            review.get("effective_revision", review.get("revision")),
+            review.get("expected_revision"),
+        }
+    return target == review.get("target_ref") and delegation.get("target_revision") == review.get(
+        "target_revision"
+    )
+
+
+def _validate_delegation_request(
+    snapshot: ProjectSnapshot,
+    payload: Mapping[str, Any],
+    *,
+    actor_session_id: str,
+) -> None:
+    delegation_id = str(payload["delegation_id"])
+    if payload.get("parent_session_id") != actor_session_id:
+        raise LifecycleConflictError("delegation parent_session_id must match its requester")
+    depth = int(payload["depth"])
+    limits = payload["limits"]
+    if depth > int(limits["max_depth"]):
+        raise LifecycleConflictError("delegation depth exceeds its hard max_depth limit")
+
+    parent_id = str(payload.get("parent_delegation_id") or "")
+    if not parent_id:
+        if _bound_delegations(snapshot, actor_session_id):
+            raise LifecycleConflictError(
+                "a bound delegation child cannot escape its lineage with a new root delegation"
+            )
+        if depth != 0 or payload.get("root_delegation_id") != delegation_id:
+            raise LifecycleConflictError(
+                "a root delegation must have depth zero and identify itself as root"
+            )
+        return
+
+    if parent_id == delegation_id:
+        raise LifecycleConflictError("a delegation cannot be its own parent")
+    parent = require_entity(snapshot, "delegation", parent_id)
+    if parent.get("state") != "active":
+        raise LifecycleConflictError("a child delegation requires an active parent delegation")
+    if parent.get("child_session_id") != actor_session_id:
+        raise LifecycleConflictError(
+            "a child delegation must be requested by its parent's bound child session"
+        )
+    if depth != int(parent.get("depth", -1)) + 1:
+        raise LifecycleConflictError("delegation depth does not extend its parent by one")
+    if payload.get("root_delegation_id") != parent.get("root_delegation_id"):
+        raise LifecycleConflictError("delegation root does not match its parent lineage")
+
+    ancestors = _delegation_ancestor_ids(snapshot, parent_id)
+    target_ref = payload.get("target_ref") or {}
+    if target_ref.get("kind") == "delegation" and target_ref.get("id") in ancestors:
+        raise LifecycleConflictError("delegation target would create an ancestor cycle")
+
+    parent_limits = parent.get("limits") or {}
+    nonterminal_children = sum(
+        1
+        for delegation in snapshot.delegations.values()
+        if delegation.get("parent_delegation_id") == parent_id
+        and delegation.get("state") in {"requested", "active", "input_needed"}
+    )
+    if nonterminal_children >= int(parent_limits["max_concurrency"]):
+        raise LifecycleConflictError(
+            "child delegation exceeds its parent's hard max_concurrency limit"
+        )
+    for name in _DELEGATION_MONOTONIC_LIMITS:
+        if int(limits[name]) > int(parent_limits[name]):
+            raise LifecycleConflictError(f"child delegation cannot increase {name}")
+    parent_budget = parent_limits.get("budget") or {}
+    budget = limits.get("budget") or {}
+    if budget.get("unit") != parent_budget.get("unit"):
+        raise LifecycleConflictError("child delegation cannot change its budget unit")
+    if int(budget.get("limit", 0)) > int(parent_budget.get("limit", 0)):
+        raise LifecycleConflictError("child delegation cannot increase its budget limit")

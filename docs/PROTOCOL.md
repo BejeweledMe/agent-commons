@@ -1,6 +1,7 @@
 # Agent Commons operating protocol
 
-Status: MVP-0 contract for a project-local, shared-filesystem workspace.
+Status: MVP-0 shared-workspace contract plus the optional experimental local
+delegation extension specified by ADR 0004.
 
 ## 1. Keep information layers separate
 
@@ -158,14 +159,86 @@ when one of those structural links was wrong.
 Human-readable briefs, boards, indexes, and graphs are rebuildable projections.
 They must never become an independent source of truth.
 
-## 9. Keep Git operations explicit
+## 9. Delegate only exact, bounded work
+
+A delegation records one purpose against one typed target and exact immutable
+target revision. It selects a closed local profile; it never contains an
+executable, shell command, environment override, secret, nonce, or arbitrary
+provider prompt. `implementation` uses a builder profile, while
+`independent_review` and `verification` use an independent-reviewer profile.
+
+Every launch binds a newly registered child session distinct from the requester.
+The delegation carries hard depth, wall-time, attempt, concurrency, and budget
+limits. Descendants can only reduce those limits, an active child may create
+only correctly linked descendants, and the default operating depth is one.
+Do not create recursive Codex/Claude ping-pong or use a second client to escape
+lineage and budget accounting.
+
+The current experimental broker enforces two units. `micro_usd` requires a
+profile with a provider-native monetary cap (currently Claude).
+`provider_units` is a coarse launch budget: one unit equals one provider-process
+attempt, and `max_attempts` must not exceed its limit. `tokens` and mismatched
+unit/profile combinations fail before reservation/spawn; canonical schema
+acceptance never implies executable budget enforcement. Current Codex profiles
+therefore require `provider_units` in addition to trusted-workspace opt-in.
+
+Every review that reads a shared checkout requires a quiescent subject whose
+bytes match the exact registered artifacts/evidence bound to the reviewed
+revision. Stop all writers for the duration of the review; if that cannot be
+guaranteed, use an operator-provisioned quiescent worktree or immutable snapshot.
+A read-only provider profile does not make a changing checkout revision-bound.
+
+The canonical lifecycle records requested, active, input-needed, and terminal
+outcomes through `CommonsManager` with exact expected revisions and stable
+idempotency keys. The optional local broker owns only process execution,
+pre-start cancellation, crash recovery, and metadata-only telemetry under
+ignored operational state. MCP and CLI adapters call the same manager and
+broker; they do not create another write path.
+
+`input_needed` is a canonical state, not proof of a resumable provider channel.
+The current headless MVP cannot resume or reattach an exited provider session;
+such an attempt is classified `needs_operator`. Record only a bounded sanitized
+requirement, never the answer or a secret, and create new work only after the
+old attempt is terminal and no child can remain live.
+
+The current runtime may cancel only requested work that has not launched. It
+rejects active cancellation because no control path yet proves termination of
+the provider process group before the canonical transition. Stop the provider
+under operator control and reconcile; never mark active work cancelled first.
+
+The broker launches only operator-configured allowlisted profiles. It grants no
+new filesystem, Git, deployment, publication, network, communication, or truth
+authority. A successful child process or `delegation.succeeded` event is not
+task completion, independent approval, acceptance, or truth promotion. Inspect
+the exact result references and apply the normal review and acceptance rules.
+The current transport is trusted-local stdio under one operating-system user;
+it has no remote authentication boundary and must not be exposed as a remote
+service.
+
+The safe default automated path is an independent reviewer whose MCP scope is
+immutable: its own delegation, target review/outcome, and bounded repository
+list/read/literal-search. It receives no native filesystem, shell, edit, web,
+subagent, runtime, or delegation-creation tools. Writable builders and current
+Codex CLI runners are trusted-workspace-only; require explicit operator profile
+opt-in and external OS isolation for untrusted content. A provider permission
+prompt or worktree alone is not host isolation.
+
+Automatic operational retry is permitted only while the canonical delegation
+is still pre-start and the journal proves no child may be running. An ambiguous
+post-start crash becomes `needs_operator`; terminal work requires a new
+delegation. Prompts, responses, reasoning, file contents, commands, environment,
+raw output, and transcripts are excluded from durable telemetry. See
+[ADR 0004](adr/0004-optional-local-delegation-runtime.md) for the complete trust,
+crash, cancellation, observability, compatibility, and rollback contract.
+
+## 10. Keep Git operations explicit
 
 Agent Commons does not stage, commit, push, merge, publish, or assign ownership
 of repository changes. Those actions require separate user authority. Managed
 instruction blocks may be updated idempotently, while all project-authored text
 outside those markers remains untouched.
 
-## 10. Use the lightest adequate governance
+## 11. Use the lightest adequate governance
 
 - `light`: orientation, task/claim, communication, review, and handoff.
 - `standard`: adds durable findings, decisions, and acceptance workflows.

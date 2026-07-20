@@ -35,7 +35,62 @@ Outcome: after orientation and the relevant bounded views, a new window sees
 current architecture, completed and blocked work, pending reviews, and rejected
 approaches without replaying earlier chats.
 
-## 2. Prototype a product design
+## 2. Delegate one bounded local step
+
+The parent first records or finds the exact task or review request. It creates a
+delegation against that target's current immutable revision, chooses a built-in
+Codex or Claude profile whose role matches the purpose, and supplies explicit
+depth, time, attempt, concurrency, and budget limits. Creation records intent;
+the optional broker launch is a separate operation and uses a different stable
+idempotency key. The current broker enforces `micro_usd` only for a profile with
+a provider-native monetary cap (currently Claude). It also enforces
+`provider_units` as one coarse unit per provider-process attempt, with
+`max_attempts <= budget.limit`. `tokens` and mismatched unit/profile combinations
+fail before reservation/spawn even when the canonical schema can record them.
+
+Before any shared-checkout review, every writer stops and the operator confirms
+that the bytes match the exact registered artifacts/evidence bound to the
+subject revision; otherwise the reviewer gets a quiescent worktree or immutable
+snapshot. Before delegating writable work, the parent also obtains the relevant
+claims and stops writing
+the transferred paths. The first rollout defaults to depth one and one writable
+worker in a checkout. An independent reviewer receives a read-only provider
+profile and an immutable worker-scoped MCP limited to its own delegation,
+review/outcome, and bounded repository list/read/literal-search. It receives no
+native filesystem, edit, shell, web, subagent, runtime, or delegation-creation
+tools.
+
+The broker registers a distinct child session, records process identity before
+the child receives its instruction, and then binds `delegation.started`. The
+child works only on the recorded target. It may return `input_needed` with a
+sanitized requirement summary, but secrets and interactive input remain outside
+the canonical ledger. The current headless MVP cannot resume or reattach an
+exited `input_needed` provider session, so the broker classifies it
+`needs_operator` rather than promising continuation. On success it records typed
+result references. The parent then inspects those exact results and applies the
+ordinary review and acceptance rules; process success is never automatic
+acceptance.
+
+If the broker loses certainty after start, it records `needs_operator` and does
+not relaunch. A new delegation is safe only after the old attempt is terminal
+and no earlier child can remain live. The core `agent-commons` CLI remains a
+prerequisite for either launch mode. If only the optional runtime, profile, or
+provider integration is unavailable, follow the README's
+[manual two-window fallback](../README.md#manual-two-window-fallback) with the
+same task, review, revision, and session boundaries.
+
+Active cancellation is not a current runtime capability: only requested,
+unlaunched work may be cancelled through core `delegation cancel` or bounded
+MCP `commons_cancel_delegation`. Once active, stop the provider under operator
+control and reconcile; do not record canonical cancellation first.
+
+Outcome: the safe automated default lets Codex request a bounded Claude review.
+Claude-to-Codex implementation remains trusted-workspace-only because current
+Codex runners and writable builders lack host OS isolation; require explicit
+operator profile opt-in, a `provider_units` budget, plus an externally isolated
+worktree for untrusted content, or use the manual flow.
+
+## 3. Prototype a product design
 
 A designer session creates a task with measurable usability and accessibility
 criteria, then registers several immutable design revisions. It opens one
@@ -54,7 +109,7 @@ recreating a discarded direction.
 Outcome: critique and dissent are preserved, while only the accepted decision
 and verified findings enter effective project truth.
 
-## 3. Create a chatbot service
+## 4. Create a chatbot service
 
 The project starts with separate conversation, external-tool, user-interface,
 privacy, and security workstreams. One session defines the service contracts,
