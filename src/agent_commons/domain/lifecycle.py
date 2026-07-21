@@ -338,13 +338,10 @@ def _validate_creation(
     if event_type == "verification.recorded":
         bound = _bound_delegations(snapshot, actor_session_id)
         if bound and not any(
-            delegation.get("purpose") == "verification"
-            and delegation.get("target_ref") == payload.get("target_ref")
-            and delegation.get("target_revision") == payload.get("target_revision")
-            for delegation in bound
+            _delegation_allows_verification(snapshot, delegation, payload) for delegation in bound
         ):
             raise LifecycleConflictError(
-                "a delegated child may verify only its exact bound target revision"
+                "a delegated child may verify only its exact delegation or review target"
             )
     if event_type == "delegation.requested":
         _validate_target_binding(snapshot, payload)
@@ -418,6 +415,30 @@ def _delegation_matches_review(delegation: Mapping[str, Any], review: Mapping[st
         }
     return target == review.get("target_ref") and delegation.get("target_revision") == review.get(
         "target_revision"
+    )
+
+
+def _delegation_allows_verification(
+    snapshot: ProjectSnapshot,
+    delegation: Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> bool:
+    """Keep reviewer-produced facts bound to the exact review subject."""
+
+    target_ref = payload.get("target_ref")
+    target_revision = payload.get("target_revision")
+    if delegation.get("purpose") == "verification":
+        return (
+            delegation.get("target_ref") == target_ref
+            and delegation.get("target_revision") == target_revision
+        )
+    if delegation.get("purpose") != "independent_review":
+        return False
+    return any(
+        _delegation_matches_review(delegation, review)
+        and review.get("target_ref") == target_ref
+        and review.get("target_revision") == target_revision
+        for review in snapshot.reviews.values()
     )
 
 

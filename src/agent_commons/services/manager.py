@@ -113,8 +113,10 @@ class CommonsManager:
         *,
         session_id: str | None = None,
         state_root: str | Path | None = None,
+        read_only: bool = False,
     ) -> None:
         self.repo_root = Path(repo_root).expanduser().resolve()
+        self.read_only = read_only
         self.paths = CommonsPaths.for_workspace(self.repo_root, state_root=state_root)
         self.workspace_config = self._load_workspace_config()
         self.workspace_id = str(self.workspace_config["workspace_id"])
@@ -126,18 +128,20 @@ class CommonsManager:
         except (TypeError, ValueError) as exc:
             raise ConfigurationError("workspace security configuration is invalid") from exc
         self.policy.assert_safe(self.workspace_config, context="workspace configuration")
-        self.paths.ensure_layout()
+        self.paths.ensure_layout(read_only=read_only)
         self.schemas = SchemaRegistry()
         self.sessions = SessionRegistry(
             self.repo_root,
             state_root=self.paths.state_root,
             policy=self.policy,
+            read_only=read_only,
         )
         self.claims = ClaimService(
             self.repo_root,
             sessions=self.sessions,
             state_root=self.paths.state_root,
             policy=self.policy,
+            read_only=read_only,
         )
         self.events = EventStore(
             self.paths,
@@ -157,6 +161,10 @@ class CommonsManager:
             validators=(self._validate_stored_manifest,),
         )
         self.session_id = session_id
+
+    def _require_writable(self) -> None:
+        if self.read_only:
+            raise ConfigurationError("this manager was opened read-only")
 
     @staticmethod
     def initialize(
@@ -237,6 +245,7 @@ class CommonsManager:
         source_producer: SourceProducer | Mapping[str, Any] | None = None,
         ttl_seconds: int = 8 * 3600,
     ) -> dict[str, Any]:
+        self._require_writable()
         session = self.sessions.open_session(
             stable_instance_id=stable_instance_id,
             principal=principal,
@@ -262,11 +271,13 @@ class CommonsManager:
         raise ValidationError(f"session does not exist: {selected}")
 
     def end_session(self, *, nonce: str) -> dict[str, Any]:
+        self._require_writable()
         session = self._active_session()
         closed = self.sessions.close(session.session_id, nonce=nonce)
         return _public_session(closed)
 
     def heartbeat_session(self, *, nonce: str, ttl_seconds: int = 8 * 3600) -> dict[str, Any]:
+        self._require_writable()
         session = self._active_session()
         renewed = self.sessions.heartbeat(
             session.session_id,
@@ -479,6 +490,7 @@ class CommonsManager:
     def _canonical_write_lock(self) -> Iterable[None]:
         """Serialize lifecycle CAS and append across processes and worktrees."""
 
+        self._require_writable()
         self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         lock_path = self.paths.state_root / "canonical-write.lock"
         with lock_path.open("a+b") as handle:
@@ -514,6 +526,7 @@ class CommonsManager:
         return matches[0] if matches else None
 
     def _new_entity_id(self, kind: str, event_type: str, key: str) -> str:
+        self._require_writable()
         session = self._active_session()
         seed = "\0".join((self.workspace_id, session.session_id, event_type, key))
         return stable_id(kind, seed)
@@ -2189,6 +2202,7 @@ class CommonsManager:
         description: str = "",
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        self._require_writable()
         claim = self.claims.acquire(
             resources,
             owner_session_id=self._active_session().session_id,
@@ -2203,6 +2217,7 @@ class CommonsManager:
         return [_public_claim(value) for value in self.claims.list_claims(active_only=active_only)]
 
     def renew_claim(self, claim_id: str, *, nonce: str, ttl_seconds: int) -> dict[str, Any]:
+        self._require_writable()
         claim = self.claims.renew(
             claim_id,
             owner_session_id=self._active_session().session_id,
@@ -2212,6 +2227,7 @@ class CommonsManager:
         return _public_claim(claim, include_nonce=True)
 
     def release_claim(self, claim_id: str, *, nonce: str) -> dict[str, Any]:
+        self._require_writable()
         claim = self.claims.release(
             claim_id,
             owner_session_id=self._active_session().session_id,
@@ -2220,6 +2236,7 @@ class CommonsManager:
         return _public_claim(claim)
 
     def break_claim(self, claim_id: str, *, reason: str) -> dict[str, Any]:
+        self._require_writable()
         claim = self.claims.break_claim(
             claim_id,
             actor_session_id=self._active_session().session_id,
@@ -2228,6 +2245,7 @@ class CommonsManager:
         return _public_claim(claim)
 
     def build_views(self) -> dict[str, Any]:
+        self._require_writable()
         self._active_session()
         paths = render_views(self.snapshot(), self.paths.cache / "views")
         return {
@@ -2236,6 +2254,7 @@ class CommonsManager:
         }
 
     def rebuild_index(self) -> dict[str, int]:
+        self._require_writable()
         with SQLiteIndex(self.paths, self.events, self.manifests) as index:
             return asdict(index.rebuild())
 
@@ -2248,9 +2267,14 @@ class CommonsManager:
             records, snapshot = self._records_and_snapshot()
             event_count = len(records)
             warnings.extend(snapshot.warnings)
-            receipt_report = self.receipt_recovery.status(records)
-            issues.extend(receipt_report["issues"])
-            warnings.extend(receipt_report["warnings"])
+            if self.read_only:
+                warnings.append(
+                    "read-only doctor validated canonical history without receipt recovery state"
+                )
+            else:
+                receipt_report = self.receipt_recovery.status(records)
+                issues.extend(receipt_report["issues"])
+                warnings.extend(receipt_report["warnings"])
             manifest_issues, manifest_warnings = self._manifest_reference_issues(
                 records,
                 snapshot,
@@ -2274,12 +2298,14 @@ class CommonsManager:
         except Exception as exc:
             issues.append(f"claims: {exc}")
         index_result: dict[str, int] | None = None
-        if not issues:
+        if not issues and not self.read_only:
             try:
                 with SQLiteIndex(self.paths, self.events, self.manifests) as index:
                     index_result = asdict(index.sync(verify_unchanged=True))
             except Exception as exc:
                 issues.append(f"index: {exc}")
+        if self.read_only:
+            warnings.append("read-only doctor skipped the writable SQLite projection")
         return {
             "ok": not issues,
             "workspace_id": self.workspace_id,

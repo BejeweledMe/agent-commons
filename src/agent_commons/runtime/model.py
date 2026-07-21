@@ -71,6 +71,8 @@ _CLAUDE_COMMONS_READ_TOOLS = (
     "mcp__agent-commons__commons_show_delegation",
     "mcp__agent-commons__commons_list_reviews",
     "mcp__agent-commons__commons_show_review",
+    "mcp__agent-commons__commons_list_verifications",
+    "mcp__agent-commons__commons_show_verification",
     "mcp__agent-commons__commons_show_artifact",
     "mcp__agent-commons__commons_read_artifact",
     "mcp__agent-commons__commons_workspace_files",
@@ -86,6 +88,25 @@ _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_complete_review",
     "mcp__agent-commons__commons_record_verification",
 )
+_CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
+_WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verification"})
+
+
+def _profile_worker_purpose(
+    profile_id: BuiltinProfileId,
+    worker_purpose: str | None,
+) -> str:
+    purpose = worker_purpose or (
+        "independent_review" if profile_id.independent_reviewer else "implementation"
+    )
+    if purpose not in _WORKER_PURPOSES:
+        raise ConfigurationError("runner worker purpose is unsupported")
+    if profile_id.independent_reviewer:
+        if purpose not in {"independent_review", "verification"}:
+            raise ConfigurationError("independent reviewer profile requires a review purpose")
+    elif purpose != "implementation":
+        raise ConfigurationError("builder profile requires an implementation purpose")
+    return purpose
 
 
 def _safe_identifier(name: str, value: str, *, pattern: re.Pattern[str] = _SAFE_IDENTIFIER) -> str:
@@ -111,7 +132,7 @@ def _safe_executable(value: object) -> str:
     return value
 
 
-def _resolved_executable(value: str, *, workspace_root: Path) -> str:
+def resolve_trusted_executable(value: str, *, workspace_root: Path) -> str:
     """Resolve a provider once, rejecting workspace/PATH and mode hijacks."""
 
     candidate = Path(value).expanduser()
@@ -228,6 +249,7 @@ class RunnerProfile(Protocol):
         workspace_root: Path,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
+        worker_purpose: str | None = None,
     ) -> RunnerInvocation: ...
 
 
@@ -270,7 +292,9 @@ class CodexRunnerProfile:
         workspace_root: Path,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
+        worker_purpose: str | None = None,
     ) -> RunnerInvocation:
+        _profile_worker_purpose(self.profile_id, worker_purpose)
         if delegation_id is not None:
             _safe_identifier("delegation_id", delegation_id)
         if not self.trusted_workspace:
@@ -280,7 +304,7 @@ class CodexRunnerProfile:
         if max_budget_microusd is not None:
             raise ConfigurationError("Codex CLI cannot enforce a monetary launch budget")
         argv = [
-            _resolved_executable(self.executable, workspace_root=workspace_root),
+            resolve_trusted_executable(self.executable, workspace_root=workspace_root),
             "--ask-for-approval",
             self.approval_policy.value,
             "--sandbox",
@@ -302,9 +326,10 @@ class ClaudeRunnerProfile:
     profile_id: BuiltinProfileId
     executable: str = "claude"
     mcp_executable: str = "agent-commons-mcp"
+    git_executable: str = "/usr/bin/git"
     model: str | None = None
     permission_mode: ClaudePermissionMode = ClaudePermissionMode.ACCEPT_EDITS
-    max_budget_microusd: int | None = 1_000_000
+    max_budget_microusd: int | None = None
     trusted_workspace: bool = False
 
     def __post_init__(self) -> None:
@@ -312,6 +337,7 @@ class ClaudeRunnerProfile:
             raise ConfigurationError("Claude profile requires a Claude profile identifier")
         object.__setattr__(self, "executable", _safe_executable(self.executable))
         object.__setattr__(self, "mcp_executable", _safe_executable(self.mcp_executable))
+        object.__setattr__(self, "git_executable", _safe_executable(self.git_executable))
         object.__setattr__(self, "model", _safe_optional_identifier("model", self.model))
         try:
             object.__setattr__(self, "permission_mode", ClaudePermissionMode(self.permission_mode))
@@ -344,10 +370,12 @@ class ClaudeRunnerProfile:
         workspace_root: Path,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
+        worker_purpose: str | None = None,
     ) -> RunnerInvocation:
         if delegation_id is None:
             raise ConfigurationError("Claude runtime requires an exact delegation binding")
         _safe_identifier("delegation_id", delegation_id)
+        purpose = _profile_worker_purpose(self.profile_id, worker_purpose)
         if not self.profile_id.independent_reviewer and not self.trusted_workspace:
             raise ConfigurationError(
                 "writable Claude runtime requires explicit trusted_workspace opt-in or "
@@ -360,8 +388,15 @@ class ClaudeRunnerProfile:
                 if effective_budget is None
                 else min(effective_budget, max_budget_microusd)
             )
-        provider_executable = _resolved_executable(self.executable, workspace_root=workspace_root)
-        mcp_executable = _resolved_executable(self.mcp_executable, workspace_root=workspace_root)
+        provider_executable = resolve_trusted_executable(
+            self.executable, workspace_root=workspace_root
+        )
+        mcp_executable = resolve_trusted_executable(
+            self.mcp_executable, workspace_root=workspace_root
+        )
+        git_executable = resolve_trusted_executable(
+            self.git_executable, workspace_root=workspace_root
+        )
         # Pass the sole MCP server as immutable argv material.  Strict mode
         # excludes ambient user/project MCP configuration, while the server
         # inherits only the broker-selected child session identity.
@@ -376,6 +411,8 @@ class ClaudeRunnerProfile:
                             str(workspace_root.resolve()),
                             "--delegation-id",
                             delegation_id,
+                            "--git-executable",
+                            git_executable,
                         ],
                     }
                 }
@@ -409,7 +446,11 @@ class ClaudeRunnerProfile:
         # them.  Interactive parent sessions remain free to use those MCP tools.
         allowed_tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
         if self.profile_id.independent_reviewer:
-            allowed_tools += _CLAUDE_COMMONS_REVIEW_TOOLS
+            allowed_tools += (
+                _CLAUDE_COMMONS_REVIEW_TOOLS
+                if purpose == "independent_review"
+                else _CLAUDE_COMMONS_VERIFICATION_TOOLS
+            )
             argv.extend(
                 (
                     "--tools",
@@ -436,6 +477,7 @@ _CLAUDE_FIELDS = frozenset(
     {
         "executable",
         "mcp_executable",
+        "git_executable",
         "model",
         "permission_mode",
         "max_budget_microusd",
@@ -508,6 +550,7 @@ def default_profile_registry(
     codex_executable: str = "codex",
     claude_executable: str = "claude",
     mcp_executable: str = "agent-commons-mcp",
+    git_executable: str = "/usr/bin/git",
     trusted_workspace: bool = False,
 ) -> ProfileRegistry:
     """Return conservative built-in builder and reviewer launch profiles."""
@@ -530,6 +573,7 @@ def default_profile_registry(
                 profile_id=BuiltinProfileId.CLAUDE_BUILDER,
                 executable=claude_executable,
                 mcp_executable=mcp_executable,
+                git_executable=git_executable,
                 permission_mode=ClaudePermissionMode.ACCEPT_EDITS,
                 trusted_workspace=trusted_workspace,
             ),
@@ -537,6 +581,7 @@ def default_profile_registry(
                 profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
                 executable=claude_executable,
                 mcp_executable=mcp_executable,
+                git_executable=git_executable,
                 permission_mode=ClaudePermissionMode.DONT_ASK,
             ),
         }

@@ -342,6 +342,61 @@ class SecurityPolicy:
                         return findings
         return findings
 
+    def scan_text_lines(self, value: str | bytes) -> tuple[tuple[int, int, SecurityFinding], ...]:
+        """Return safe line ranges for every free-text finding without its value."""
+
+        values: set[tuple[int, int, str, DataClassification]] = set()
+
+        def add(
+            text: str,
+            match: re.Match[str],
+            category: str,
+            classification: DataClassification,
+        ) -> None:
+            start_line = text.count("\n", 0, match.start()) + 1
+            final_offset = max(match.start(), match.end() - 1)
+            end_line = text.count("\n", 0, final_offset) + 1
+            values.add((start_line, end_line, category, classification))
+
+        for text in _text_variants(value):
+            for match in _QUOTED_ASSIGNMENT.finditer(text):
+                key = match.group("key")
+                if key[:1] in {'"', "'"} and key[-1:] == key[:1]:
+                    key = key[1:-1]
+                if _credential_key(key) and match.group("value")[1:-1].strip():
+                    add(
+                        text,
+                        match,
+                        "credential_assignment",
+                        DataClassification.SECRET,
+                    )
+            for match in _UNQUOTED_ASSIGNMENT.finditer(text):
+                if _credential_key(match.group("key")):
+                    add(
+                        text,
+                        match,
+                        "credential_assignment",
+                        DataClassification.SECRET,
+                    )
+            for category, pattern in _SECRET_PATTERNS:
+                for match in pattern.finditer(text):
+                    add(text, match, category, DataClassification.SECRET)
+            if self.detect_free_text_pii:
+                for category, pattern in _PII_PATTERNS:
+                    for match in pattern.finditer(text):
+                        add(text, match, category, DataClassification.PII)
+        return tuple(
+            (
+                start_line,
+                end_line,
+                SecurityFinding(category, classification, "$"),
+            )
+            for start_line, end_line, category, classification in sorted(
+                values,
+                key=lambda item: (item[0], item[1], item[2], item[3].value),
+            )
+        )
+
     def scan(self, value: Any) -> tuple[SecurityFinding, ...]:
         findings: list[SecurityFinding] = []
         seen: set[int] = set()

@@ -17,7 +17,7 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
 
     help_result = runner.invoke(cli, ["broker", "--help"])
     assert help_result.exit_code == 0
-    for command in ("profiles", "attempts", "run", "reconcile"):
+    for command in ("profiles", "preflight", "attempts", "run", "reconcile"):
         assert command in help_result.output
 
     run_help = runner.invoke(cli, ["broker", "run", "--help"])
@@ -48,6 +48,43 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
     )
     assert attempts.exit_code == 0, attempts.output
     assert json.loads(attempts.output) == []
+
+
+def test_broker_preflight_exits_nonzero_for_an_incompatible_runtime(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-preflight-failure")
+    config = tmp_path / "profiles.yaml"
+    config.write_text(
+        "profiles:\n"
+        "  claude-independent-reviewer:\n"
+        "    executable: /usr/bin/false\n"
+        "    mcp_executable: /usr/bin/false\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: dontAsk\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "preflight",
+            "claude-independent-reviewer",
+            "--purpose",
+            "independent_review",
+            "--profile-config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 2
+    body = json.loads(result.output)
+    assert body["ok"] is False
+    assert body["consumed_delegation_attempt"] is False
 
 
 def test_broker_profile_config_rejects_unknown_authority_fields(tmp_path: Path) -> None:

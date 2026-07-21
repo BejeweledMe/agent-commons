@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import sys
+import time
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from agent_commons.runtime import (
     SafeEnvironment,
     SubprocessRunner,
 )
+from agent_commons.runtime.exec_gate import _EXEC_GATE_FRAME
 
 
 class MemoryStream(io.BytesIO):
@@ -110,7 +113,9 @@ def test_runner_uses_explicit_cwd_sanitized_child_identity_and_bounded_output(
     assert result.output_truncated is True
     assert result.stdout_bytes_seen + result.stderr_bytes_seen == 12
     assert len(result.stdout) + len(result.stderr) == 8
-    assert process.stdin.getvalue() == b"Do bounded work"
+    assert process.stdin.getvalue() == _EXEC_GATE_FRAME + b"Do bounded work"
+    assert tuple(captured["argv"])[-1] == "/bin/echo"
+    assert "Do bounded work" not in " ".join(captured["argv"])
     assert captured["cwd"] == tmp_path.resolve()
     assert captured["env"] == {
         "HOME": "/safe/home",
@@ -232,3 +237,65 @@ def test_runner_aborts_when_post_journal_lifecycle_hook_fails(tmp_path: Path) ->
     assert result.reason is RunReason.CONTROL_ERROR
     assert terminated == [False]
     assert process.stdin.getvalue() == b""
+
+
+def test_real_exec_gate_starts_provider_only_after_durable_hook(tmp_path: Path) -> None:
+    marker = tmp_path / "provider-started.txt"
+    provider_code = (
+        "import os,pathlib,sys;"
+        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()));"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())"
+    )
+    gated = RunnerInvocation(
+        provider=Provider.CODEX,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+        argv=(sys.executable, "-I", "-c", provider_code, str(marker)),
+        stdin=b"bounded review instruction",
+    )
+
+    def after_durable_start(_pid: int) -> None:
+        time.sleep(0.1)
+        assert not marker.exists()
+
+    result = SubprocessRunner().run(
+        gated,
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        timeout_seconds=10,
+        max_output_bytes=1_024,
+        on_started=after_durable_start,
+    )
+
+    assert result.outcome is RunOutcome.SUCCEEDED
+    assert result.stdout == b"bounded review instruction"
+    assert marker.read_text() == str(result.pid)
+
+
+def test_real_exec_gate_never_starts_provider_when_durable_hook_fails(tmp_path: Path) -> None:
+    marker = tmp_path / "provider-started.txt"
+    provider_code = "import pathlib,sys;pathlib.Path(sys.argv[1]).touch()"
+    gated = RunnerInvocation(
+        provider=Provider.CODEX,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+        argv=(sys.executable, "-I", "-c", provider_code, str(marker)),
+        stdin=b"must remain undisclosed",
+    )
+
+    def rejected_start(_pid: int) -> None:
+        time.sleep(0.1)
+        assert not marker.exists()
+        raise RuntimeError("canonical start rejected")
+
+    result = SubprocessRunner().run(
+        gated,
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=10,
+        max_output_bytes=1_024,
+        on_started=rejected_start,
+    )
+
+    assert result.outcome is RunOutcome.FAILED
+    assert result.reason is RunReason.CONTROL_ERROR
+    assert not marker.exists()

@@ -7,7 +7,12 @@ from typing import Any
 import pytest
 
 from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
-from agent_commons.mcp.server import build_server
+from agent_commons.mcp.server import INDEPENDENT_REVIEW_WORKER_TOOL_NAMES, build_server
+from agent_commons.runtime import (
+    BuiltinProfileId,
+    ClaudePermissionMode,
+    ClaudeRunnerProfile,
+)
 from agent_commons.services import CommonsManager
 
 
@@ -52,12 +57,20 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
     source = repo / "src" / "app.py"
     source.parent.mkdir()
     source.write_text("def answer() -> int:\n    return 42\n", encoding="utf-8")
+    reviewable = repo / "src" / "reviewable_gate.py"
+    reviewable.write_text(
+        "def release_gate():\n    return gated_argv(provider_argv)\ntoken = CancellationToken()\n",
+        encoding="utf-8",
+    )
     (repo / ".gitignore").write_text("evidence/\n.env\n*.pem\n", encoding="utf-8")
     (repo / ".env").write_text("LOCAL_ONLY=value\n", encoding="utf-8")
     (repo / "private.pem").write_text("not-a-real-key\n", encoding="utf-8")
     evidence = repo / "evidence" / "review.txt"
     evidence.parent.mkdir()
-    evidence.write_text("registered review evidence\n", encoding="utf-8")
+    evidence.write_text(
+        "registered review evidence\ncredential-free: it validates provider help\n",
+        encoding="utf-8",
+    )
     unrelated_evidence = repo / "evidence" / "unrelated.txt"
     unrelated_evidence.write_text("unrelated evidence\n", encoding="utf-8")
     (tmp_path / "canary.txt").write_text("outside workspace\n", encoding="utf-8")
@@ -103,6 +116,15 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
         summary="The exact review evidence is registered.",
         artifact_refs=(artifact["entity_ref"],),
         idempotency_key="worker-scope-task-complete",
+    )
+    verification = parent.record_verification(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        claim="The registered review evidence was reproduced.",
+        evidence_refs=(artifact["entity_ref"],),
+        method="Compared the exact registered artifact.",
+        outcome="passed",
+        idempotency_key="worker-scope-verification",
     )
     review = parent.request_review(
         target_ref=task["entity_ref"],
@@ -183,12 +205,14 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
     return {
         "repo": repo,
         "source": source,
+        "reviewable": reviewable,
         "evidence": evidence,
         "parent": parent,
         "child": child,
         "task": task,
         "review": review,
         "artifact": artifact,
+        "verification": verification,
         "unrelated_task": unrelated_task,
         "unrelated_review": unrelated_review,
         "unrelated_artifact": unrelated_artifact,
@@ -198,17 +222,33 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
     }
 
 
-def _worker_server(workspace: dict[str, Any]) -> FakeServer:
+def _worker_server(
+    workspace: dict[str, Any], *, git_executable: str = "/usr/bin/git"
+) -> FakeServer:
     server = build_server(
         workspace["repo"],
         manager=workspace["child"],
         runtime=FakeRuntime(),
         delegation_id=workspace["delegation"]["entity_ref"]["id"],
         binding_wait_seconds=0,
+        git_executable=git_executable,
         server_factory=FakeServer,
     )
     assert isinstance(server, FakeServer)
     return server
+
+
+def test_worker_snapshot_accepts_an_operator_configured_trusted_git(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    wrapper = tmp_path / "operator-git"
+    wrapper.write_text('#!/bin/sh\nexec /usr/bin/git "$@"\n', encoding="utf-8")
+    wrapper.chmod(0o700)
+
+    server = _worker_server(workspace, git_executable=str(wrapper))
+
+    assert any(
+        item["path"] == "src/app.py" for item in server.tools["commons_workspace_files"]("src", 10)
+    )
 
 
 def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
@@ -236,7 +276,7 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         )
 
     server = _worker_server(workspace)
-    assert set(server.tools) == {
+    expected_tools = {
         "commons_orient",
         "commons_inbox",
         "commons_list_tasks",
@@ -244,9 +284,12 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_show_delegation",
         "commons_list_reviews",
         "commons_show_review",
+        "commons_list_verifications",
+        "commons_show_verification",
         "commons_show_artifact",
         "commons_read_artifact",
         "commons_complete_review",
+        "commons_record_verification",
         "commons_delegation_input_needed",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
@@ -254,9 +297,26 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_workspace_read",
         "commons_workspace_search",
     }
+    assert expected_tools == set(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
+    assert set(server.tools) == expected_tools
+    profile = ClaudeRunnerProfile(
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/git",
+        permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+    invocation = profile.build_invocation(
+        "Review the exact worker contract",
+        workspace_root=workspace["repo"],
+        delegation_id=active_id,
+    )
+    allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
+    assert {
+        name.removeprefix("mcp__agent-commons__") for name in allowed.split(",")
+    } == expected_tools
     assert "commons_request_delegation" not in server.tools
     assert "commons_cancel_delegation" not in server.tools
-    assert "commons_record_verification" not in server.tools
     assert "commons_run_delegation" not in server.tools
 
     assert [item["id"] for item in server.tools["commons_list_delegations"](None)] == [active_id]
@@ -266,6 +326,31 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     assert [item["id"] for item in server.tools["commons_list_tasks"](None)] == [
         workspace["task"]["entity_ref"]["id"]
     ]
+    verification_id = workspace["verification"]["entity_ref"]["id"]
+    assert [item["id"] for item in server.tools["commons_list_verifications"]()] == [
+        verification_id
+    ]
+    assert server.tools["commons_show_verification"](verification_id)["id"] == verification_id
+    recorded = server.tools["commons_record_verification"](
+        f"task:{workspace['task']['entity_ref']['id']}",
+        workspace["task"]["revision"],
+        "The reviewer independently reproduced the bound artifact.",
+        "Compared the exact manifest-bound bytes.",
+        "passed",
+        [f"artifact:{workspace['artifact']['entity_ref']['id']}"],
+        "worker-scope-review-verification",
+    )
+    assert recorded["event_type"] == "verification.recorded"
+    with pytest.raises(LifecycleConflictError, match="exact target scope"):
+        server.tools["commons_record_verification"](
+            f"task:{workspace['unrelated_task']['entity_ref']['id']}",
+            workspace["unrelated_task"]["revision"],
+            "This unrelated verification must be rejected.",
+            "No method is authorized outside the exact target.",
+            "failed",
+            [f"artifact:{workspace['unrelated_artifact']['entity_ref']['id']}"],
+            "worker-scope-unrelated-verification",
+        )
     with pytest.raises(LifecycleConflictError, match="bound delegation"):
         server.tools["commons_show_delegation"](requested_id)
     with pytest.raises(LifecycleConflictError, match="bound review"):
@@ -286,8 +371,29 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
     source_item = next(item for item in files if item["path"] == "src/app.py")
     source = server.tools["commons_workspace_read"]("src/app.py", source_item["sha256"])
     assert "return 42" in source["content"]
+    assert source["redactions"] == []
     assert server.tools["commons_workspace_search"]("return 42", "src", 10) == [
         {"path": "src/app.py", "line": 2, "text": "    return 42"}
+    ]
+    reviewable_item = next(item for item in files if item["path"] == "src/reviewable_gate.py")
+    reviewable = server.tools["commons_workspace_read"](
+        "src/reviewable_gate.py", reviewable_item["sha256"]
+    )
+    assert "gated_argv(provider_argv)" in reviewable["content"]
+    assert "CancellationToken" not in reviewable["content"]
+    assert reviewable["redactions"] == [
+        {
+            "line": 3,
+            "categories": ["credential_assignment"],
+            "classifications": ["secret"],
+        }
+    ]
+    assert server.tools["commons_workspace_search"]("gated_argv", "src", 10) == [
+        {
+            "path": "src/reviewable_gate.py",
+            "line": 2,
+            "text": "    return gated_argv(provider_argv)",
+        }
     ]
     with pytest.raises(ValidationError, match="remain relative"):
         server.tools["commons_workspace_read"]("../canary.txt", None)
@@ -354,7 +460,14 @@ def test_registered_artifact_is_manifest_bound_scoped_and_quiescent(tmp_path: Pa
     assert shown["manifest"]["source"] == {"path": "evidence/review.txt"}
     read = server.tools["commons_read_artifact"](artifact_id)
     assert read["path"] == "evidence/review.txt"
-    assert read["content"] == "registered review evidence\n"
+    assert read["content"] == ("registered review evidence\n[agent-commons redacted source line]\n")
+    assert read["redactions"] == [
+        {
+            "line": 2,
+            "categories": ["credential_assignment"],
+            "classifications": ["secret"],
+        }
+    ]
     with pytest.raises(LifecycleConflictError, match="bound task artifact"):
         server.tools["commons_show_artifact"](unrelated_id)
     with pytest.raises(LifecycleConflictError, match="bound task artifact"):

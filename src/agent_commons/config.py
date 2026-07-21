@@ -157,7 +157,17 @@ class CommonsPaths:
     def index_db(self) -> Path:
         return self.state_root / "index.sqlite3"
 
-    def ensure_layout(self) -> None:
+    def ensure_layout(self, *, read_only: bool = False) -> None:
+        if read_only:
+            for label, path in (
+                ("repository root", self.repo_root),
+                ("canonical workspace", self.commons_root),
+                ("event directory", self.events),
+                ("manifest directory", self.manifests),
+            ):
+                if path.is_symlink() or not path.is_dir():
+                    raise ConfigurationError(f"read-only {label} is unavailable: {path}")
+            return
         _ensure_real_directory(self.repo_root, label="repository root")
         _ensure_real_directory(self.commons_root, label="canonical workspace")
         for label, path in (

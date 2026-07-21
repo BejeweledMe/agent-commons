@@ -127,6 +127,15 @@ Limits are validated before publication and cannot be widened by a descendant:
 - a provider budget has a positive bounded amount and an explicit unit
   (`tokens`, `micro_usd`, or `provider_units`).
 
+The executable MVP accepts only `provider_units` and `micro_usd` at the broker
+boundary. One `provider_units` unit authorizes one provider-process attempt and
+does not select or change a billing account. `micro_usd` is explicit opt-in to a
+provider-native monetary cap when that profile can enforce one. `tokens` remains
+reserved in the canonical schema but fails before reservation because the local
+adapters cannot enforce it. A local Claude Code subscription stays selected by
+the already authenticated Claude CLI; Agent Commons never falls back to API
+credits or changes credentials.
+
 The broker also applies operator-configured global and profile limits. Effective
 child authority and budgets are the intersection of the parent grant, inherited
 limits, target profile, workspace policy, and broker policy. The first rollout
@@ -205,6 +214,15 @@ return canonical references produced through Agent Commons, but raw output is
 not copied into events. Codex non-interactive execution, Claude headless/SDK
 execution, and a later AHP connection are separate adapters behind this contract.
 
+The credential-free broker preflight starts only provider `--help` and MCP
+`--preflight` processes. Contract v2 compares every generated provider flag, the
+purpose-specific worker tool allowlist, its catalog digest, and a full Python
+source fingerprint between the invoking CLI and separately installed MCP
+runtime. Malformed output, a different purpose catalog, or a stale build fails
+closed without allocating a delegation attempt or starting model work. The
+operator-owned profile file used for preflight must be the same file supplied to
+the runtime-enabled MCP server or `broker run`.
+
 ## Crash, retry, and cancellation semantics
 
 The broker keeps an fsync-safe operational attempt journal below the ignored
@@ -213,10 +231,20 @@ runtime state directory. For each launch it:
 1. locks the current delegation and checkout scope;
 2. revalidates the exact target, grant, limits, claims, and profile;
 3. writes a unique `attempt_id`, launch token, and `launching` reservation;
-4. starts the provider in its own process group;
-5. records the process/provider handle and distinct child session;
-6. appends canonical `delegation.started` only after the child is identifiable;
-7. observes the provider until a canonical terminal outcome can be recorded.
+4. starts an inert, shell-free exec gate in its own process group;
+5. records the gate PID and distinct child session;
+6. appends canonical `delegation.started` while the gate consumes no provider
+   startup time and has received no instruction bytes;
+7. sends a fixed control frame followed by the ephemeral instruction; the gate
+   strips only that frame and `execve`s the fixed provider argv in place, so the
+   recorded PID and process group remain authoritative;
+8. observes the provider until a canonical terminal outcome can be recorded.
+
+The gate is required because canonical publication and projection rebuilds may
+take longer as the ledger grows. Starting a real headless provider before that
+durable barrier can trigger the provider's own stdin/startup timeout even though
+the broker is healthy. A failed durable-start hook terminates the inert gate and
+never starts the provider or discloses the instruction.
 
 Only one attempt for a delegation may be live. Automatic attempts are limited to
 failures that occur before `delegation.started` and only when the journal proves

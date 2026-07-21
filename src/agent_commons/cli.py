@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
+import platform
+import sys
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
 import click
 import yaml
 
+from agent_commons import __version__
+from agent_commons.config import CommonsPaths
 from agent_commons.core.refs import parse_ref
 from agent_commons.errors import CommonsError, ValidationError
+from agent_commons.runtime import (
+    ATTEMPT_SCHEMA,
+    REQUEST_SCHEMA,
+    BuiltinProfileId,
+    preflight_profile,
+)
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
@@ -54,9 +67,16 @@ class CLIState:
     repo: Path
     session_id: str | None
     json_output: bool
+    state_root: Path | None
+    read_only: bool
 
     def manager(self) -> CommonsManager:
-        return CommonsManager(self.repo, session_id=self.session_id)
+        return CommonsManager(
+            self.repo,
+            session_id=self.session_id,
+            state_root=self.state_root,
+            read_only=self.read_only,
+        )
 
     def emit(self, value: Any) -> None:
         if self.json_output:
@@ -91,7 +111,22 @@ def _expected(function: Any) -> Any:
     return click.argument("entity_id")(function)
 
 
+def _installed_version(distribution: str) -> str | None:
+    try:
+        return metadata.version(distribution)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _module_available(module: str) -> bool:
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
 @click.group(cls=CommonsGroup)
+@click.version_option(__version__, prog_name="agent-commons")
 @click.option(
     "--repo",
     type=click.Path(path_type=Path, file_okay=False),
@@ -105,16 +140,35 @@ def _expected(function: Any) -> Any:
     help="Explicit active Agent Commons session identity.",
 )
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--state-root",
+    type=click.Path(path_type=Path, file_okay=False),
+    envvar="AGENT_COMMONS_STATE_ROOT",
+    help="Explicit operator-authorized operational state directory.",
+)
+@click.option(
+    "--read-only",
+    is_flag=True,
+    help="Inspect existing state without creating cache, index, session, or claim files.",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
     repo: Path,
     session_id: str | None,
     json_output: bool,
+    state_root: Path | None,
+    read_only: bool,
 ) -> None:
     """Coordinate heterogeneous coding agents through one immutable commons."""
 
-    ctx.obj = CLIState(repo.expanduser().resolve(), session_id, json_output)
+    ctx.obj = CLIState(
+        repo.expanduser().resolve(),
+        session_id,
+        json_output,
+        state_root.expanduser().resolve() if state_root is not None else None,
+        read_only,
+    )
 
 
 @cli.command("init")
@@ -132,6 +186,8 @@ def init_command(
 ) -> None:
     """Initialize or safely update a workspace and client integrations."""
 
+    if state.read_only:
+        raise ValidationError("init is unavailable in read-only mode")
     selected = integration or ("codex", "claude")
     state.emit(
         CommonsManager.initialize(
@@ -141,6 +197,38 @@ def init_command(
             replace_onboarding=replace_onboarding,
             replace_skills=replace_skills,
         )
+    )
+
+
+@cli.command("support")
+@click.pass_obj
+def support_command(state: CLIState) -> None:
+    """Report secret-free component and state availability for support requests."""
+
+    paths = CommonsPaths.for_workspace(state.repo, state_root=state.state_root)
+    state.emit(
+        {
+            "schema": "agent_commons.support.v1",
+            "agent_commons_version": __version__,
+            "workspace_schema": "agent-commons.workspace.v1",
+            "runtime_request_schema": REQUEST_SCHEMA,
+            "runtime_attempt_schema": ATTEMPT_SCHEMA,
+            "python_version": platform.python_version(),
+            "python_implementation": platform.python_implementation(),
+            "platform": sys.platform,
+            "canonical_workspace_available": paths.commons_root.is_dir(),
+            "state_root_explicit": state.state_root is not None,
+            "state_root_exists": paths.state_root.is_dir(),
+            "state_root_readable": paths.state_root.is_dir()
+            and os.access(paths.state_root, os.R_OK),
+            "state_root_writable": paths.state_root.is_dir()
+            and os.access(paths.state_root, os.W_OK),
+            "mcp_extra_available": _module_available("mcp.server.fastmcp"),
+            "mcp_package_version": _installed_version("mcp"),
+            "opentelemetry_api_available": _module_available("opentelemetry.trace"),
+            "opentelemetry_api_version": _installed_version("opentelemetry-api"),
+            "read_only": state.read_only,
+        }
     )
 
 
@@ -927,13 +1015,51 @@ def broker_profiles(state: CLIState, profile_config: Path | None) -> None:
     state.emit(profile_summaries(load_profile_registry(profile_config, workspace_root=state.repo)))
 
 
-@broker_group.command("attempts")
+@broker_group.command("preflight")
+@click.argument("profile_id", type=click.Choice(tuple(item.value for item in BuiltinProfileId)))
+@click.option(
+    "--purpose",
+    type=click.Choice(_DELEGATION_PURPOSES),
+    help="Worker purpose; defaults to implementation or independent_review from the profile.",
+)
 @_profile_config
 @click.pass_obj
-def broker_attempts(state: CLIState, profile_config: Path | None) -> None:
+def broker_preflight(
+    state: CLIState,
+    profile_id: str,
+    purpose: str | None,
+    profile_config: Path | None,
+) -> None:
+    """Check fixed provider flags and MCP startup without consuming a delegation attempt."""
+
+    profiles = load_profile_registry(profile_config, workspace_root=state.repo)
+    result = preflight_profile(
+        profiles,
+        profile_id,
+        workspace_root=state.repo,
+        purpose=purpose,
+    )
+    state.emit(result)
+    if not result["ok"]:
+        raise click.exceptions.Exit(2)
+
+
+@broker_group.command("attempts")
+@click.option(
+    "--diagnostic",
+    is_flag=True,
+    help="Include only fixed allowlisted diagnostic hints; raw provider output is unavailable.",
+)
+@_profile_config
+@click.pass_obj
+def broker_attempts(
+    state: CLIState,
+    diagnostic: bool,
+    profile_config: Path | None,
+) -> None:
     """List bounded operational attempt metadata; no provider content is retained."""
 
-    state.emit(_runtime_service(state, profile_config).list_attempts())
+    state.emit(_runtime_service(state, profile_config).list_attempts(diagnostic=diagnostic))
 
 
 @broker_group.command("run")

@@ -39,12 +39,15 @@ class BrokerRequest:
     correlation: CorrelationIds
     parent_policy: RuntimePolicy
     child_policy: RuntimePolicy
+    purpose: str = "implementation"
     launch_key_sha256: str = "0" * 64
     retry: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile_id", BuiltinProfileId(self.profile_id))
         object.__setattr__(self, "cwd", Path(self.cwd).expanduser().resolve())
+        if self.purpose not in {"implementation", "independent_review", "verification"}:
+            raise ConfigurationError("broker request purpose is unsupported")
         self.child_policy.assert_reduction_of(self.parent_policy)
         if len(self.launch_key_sha256) != 64 or any(
             character not in "0123456789abcdef" for character in self.launch_key_sha256
@@ -113,6 +116,7 @@ class LocalBroker:
             profile_id=attempt.profile_id,
             state=attempt.state.value,
             reason=attempt.reason,
+            diagnostic_code=attempt.diagnostic_code,
             pid=attempt.pid,
             exit_code=attempt.exit_code,
             duration_milliseconds=duration_milliseconds,
@@ -144,6 +148,7 @@ class LocalBroker:
             workspace_root=request.cwd,
             delegation_id=request.correlation.delegation_id,
             max_budget_microusd=request.child_policy.max_budget_microusd,
+            worker_purpose=request.purpose,
         )
         launch_plan_sha256 = hashlib.sha256(
             json.dumps(

@@ -28,12 +28,15 @@ from agent_commons.errors import (
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
 
+from .diagnostics import DiagnosticCode, classify_process_result
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 from .policy import PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .subprocess_runner import ProcessResult, RunOutcome
 
-REQUEST_SCHEMA = "agent_commons.runtime_request.v2"
-ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v2"
+REQUEST_SCHEMA = "agent_commons.runtime_request.v3"
+ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v3"
+_LEGACY_REQUEST_SCHEMA = "agent_commons.runtime_request.v2"
+_LEGACY_ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v2"
 _REQUEST_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _PROCESS_LOCKS_GUARD = threading.Lock()
@@ -223,6 +226,7 @@ class Attempt:
     stdout_bytes_seen: int
     stderr_bytes_seen: int
     output_truncated: bool
+    diagnostic_code: DiagnosticCode
     created_at: str
     updated_at: str
 
@@ -246,6 +250,7 @@ class Attempt:
             "stdout_bytes_seen": self.stdout_bytes_seen,
             "stderr_bytes_seen": self.stderr_bytes_seen,
             "output_truncated": self.output_truncated,
+            "diagnostic_code": self.diagnostic_code.value,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -295,10 +300,12 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
         "stdout_bytes_seen",
         "stderr_bytes_seen",
         "output_truncated",
+        "diagnostic_code",
         "created_at",
         "updated_at",
     }
-    if set(value) != expected:
+    legacy = value.get("schema") == _LEGACY_ATTEMPT_SCHEMA
+    if set(value) != (expected - {"diagnostic_code"} if legacy else expected):
         raise IntegrityError("stored runtime attempt has an invalid shape")
     try:
         attempt = Attempt(
@@ -320,12 +327,19 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
             stdout_bytes_seen=int(value["stdout_bytes_seen"]),
             stderr_bytes_seen=int(value["stderr_bytes_seen"]),
             output_truncated=bool(value["output_truncated"]),
+            diagnostic_code=(
+                DiagnosticCode.LEGACY_UNCLASSIFIED
+                if legacy
+                else DiagnosticCode(str(value["diagnostic_code"]))
+            ),
             created_at=str(value["created_at"]),
             updated_at=str(value["updated_at"]),
         )
     except (KeyError, TypeError, ValueError, ValidationError) as exc:
         raise IntegrityError("stored runtime attempt is invalid") from exc
-    if attempt.schema != ATTEMPT_SCHEMA or attempt.profile_id.provider is not attempt.provider:
+    if attempt.schema not in {ATTEMPT_SCHEMA, _LEGACY_ATTEMPT_SCHEMA} or (
+        attempt.profile_id.provider is not attempt.provider
+    ):
         raise IntegrityError("stored runtime attempt schema/provider is invalid")
     try:
         _safe_identifier("stored runtime attempt_id", attempt.attempt_id)
@@ -365,6 +379,7 @@ class AttemptStore:
         *,
         clock: Callable[[], float] = time.time,
         security_policy: SecurityPolicy | None = None,
+        read_only: bool = False,
     ) -> None:
         self.state_root = Path(state_root).expanduser().resolve()
         self.root = self.state_root / "runtime"
@@ -372,9 +387,15 @@ class AttemptStore:
         self.lock_path = self.root / "attempts.lock"
         self.clock = clock
         self.security_policy = security_policy or SecurityPolicy()
-        _ensure_private_directory(self.state_root)
-        _ensure_private_directory(self.root)
-        _ensure_private_directory(self.request_root)
+        self.read_only = read_only
+        if not read_only:
+            _ensure_private_directory(self.state_root)
+            _ensure_private_directory(self.root)
+            _ensure_private_directory(self.request_root)
+
+    def _require_writable(self) -> None:
+        if self.read_only:
+            raise LifecycleConflictError("runtime attempt store was opened read-only")
 
     def _path(self, request_id: str) -> Path:
         return self.request_root / f"{request_id}.json"
@@ -399,11 +420,27 @@ class AttemptStore:
         if not isinstance(value, dict) or raw != _canonical_bytes(value):
             raise IntegrityError("runtime request document is not canonical JSON")
         self._validate_document(value)
+        if value["schema"] == _LEGACY_REQUEST_SCHEMA:
+            return {
+                **value,
+                "schema": REQUEST_SCHEMA,
+                "attempts": [
+                    {
+                        **attempt,
+                        "schema": ATTEMPT_SCHEMA,
+                        "diagnostic_code": DiagnosticCode.LEGACY_UNCLASSIFIED.value,
+                    }
+                    for attempt in value["attempts"]
+                ],
+            }
         return value
 
     def _validate_document(self, value: Mapping[str, Any]) -> None:
         expected = {"schema", "request_id", "semantic_sha256", "spec", "attempts"}
-        if set(value) != expected or value.get("schema") != REQUEST_SCHEMA:
+        if set(value) != expected or value.get("schema") not in {
+            REQUEST_SCHEMA,
+            _LEGACY_REQUEST_SCHEMA,
+        }:
             raise IntegrityError("runtime request document has an invalid envelope")
         if _SHA256.fullmatch(str(value.get("semantic_sha256", ""))) is None:
             raise IntegrityError("runtime request semantic digest is invalid")
@@ -554,6 +591,7 @@ class AttemptStore:
             stdout_bytes_seen=0,
             stderr_bytes_seen=0,
             output_truncated=False,
+            diagnostic_code=DiagnosticCode.NONE,
             created_at=timestamp,
             updated_at=timestamp,
         )
@@ -565,6 +603,7 @@ class AttemptStore:
         parent_policy: RuntimePolicy,
         retry: bool = False,
     ) -> AttemptReservation:
+        self._require_writable()
         if spec.parent_policy != parent_policy:
             raise IdempotencyConflictError("runtime request parent policy does not match")
         spec.child_policy.assert_reduction_of(parent_policy)
@@ -617,6 +656,13 @@ class AttemptStore:
             return AttemptReservation(attempt, True)
 
     def list_attempts(self) -> tuple[Attempt, ...]:
+        if self.read_only:
+            attempts = [
+                _attempt_from_mapping(raw_attempt)
+                for _, document in self._documents()
+                for raw_attempt in document["attempts"]
+            ]
+            return tuple(sorted(attempts, key=lambda item: (item.created_at, item.attempt_id)))
         with _exclusive_lock(self.lock_path):
             attempts = [
                 _attempt_from_mapping(raw_attempt)
@@ -649,13 +695,18 @@ class AttemptStore:
         stdout_bytes_seen: int = 0,
         stderr_bytes_seen: int = 0,
         output_truncated: bool = False,
+        diagnostic_code: DiagnosticCode | str | None = None,
     ) -> Attempt:
+        self._require_writable()
         target = AttemptState(target)
         _safe_identifier("runtime transition reason", reason)
         if pid is not None and (isinstance(pid, bool) or pid < 1):
             raise ValidationError("runtime process id is invalid")
         if stdout_bytes_seen < 0 or stderr_bytes_seen < 0:
             raise ValidationError("runtime output counters cannot be negative")
+        normalized_diagnostic = (
+            DiagnosticCode(diagnostic_code) if diagnostic_code is not None else None
+        )
         with _exclusive_lock(self.lock_path):
             for path, document in self._documents():
                 for index, raw_attempt in enumerate(document["attempts"]):
@@ -670,6 +721,10 @@ class AttemptStore:
                             or current.stdout_bytes_seen != stdout_bytes_seen
                             or current.stderr_bytes_seen != stderr_bytes_seen
                             or current.output_truncated != bool(output_truncated)
+                            or (
+                                normalized_diagnostic is not None
+                                and current.diagnostic_code is not normalized_diagnostic
+                            )
                         ):
                             raise LifecycleConflictError(
                                 "idempotent runtime transition has different semantics"
@@ -690,6 +745,11 @@ class AttemptStore:
                         stdout_bytes_seen=stdout_bytes_seen,
                         stderr_bytes_seen=stderr_bytes_seen,
                         output_truncated=bool(output_truncated),
+                        diagnostic_code=(
+                            normalized_diagnostic
+                            if normalized_diagnostic is not None
+                            else current.diagnostic_code
+                        ),
                         updated_at=_iso(self.clock()),
                     )
                     attempts = list(document["attempts"])
@@ -705,6 +765,7 @@ class AttemptStore:
             RunOutcome.CANCELLED: AttemptState.CANCELLED,
             RunOutcome.TIMED_OUT: AttemptState.TIMED_OUT,
         }[result.outcome]
+        diagnostic = classify_process_result(result)
         return self.transition(
             attempt_id,
             target,
@@ -714,11 +775,13 @@ class AttemptStore:
             stdout_bytes_seen=result.stdout_bytes_seen,
             stderr_bytes_seen=result.stderr_bytes_seen,
             output_truncated=result.output_truncated,
+            diagnostic_code=diagnostic.code,
         )
 
     def reconcile(self) -> tuple[Attempt, ...]:
         """Fail closed after a broker restart; live pipes cannot be reattached safely."""
 
+        self._require_writable()
         reconciled: list[Attempt] = []
         with _exclusive_lock(self.lock_path):
             for path, document in self._documents():

@@ -23,6 +23,7 @@ from .broker import (
     LocalBroker,
     NoopBrokerLifecycleHook,
 )
+from .diagnostics import DiagnosticCode, SafeDiagnostic, classify_process_result, diagnostic_hint
 from .model import (
     BuiltinProfileId,
     ClaudePermissionMode,
@@ -36,8 +37,10 @@ from .model import (
     RunnerInvocation,
     RunnerProfile,
     default_profile_registry,
+    resolve_trusted_executable,
 )
 from .policy import PolicyViolationError, RuntimePolicy, RuntimeUsage
+from .preflight import preflight_profile
 from .subprocess_runner import (
     CancellationToken,
     ProcessFactory,
@@ -78,6 +81,7 @@ __all__ = [
     "CodexRunnerProfile",
     "CodexSandbox",
     "CorrelationIds",
+    "DiagnosticCode",
     "JsonlTelemetrySink",
     "LocalBroker",
     "NoopBrokerLifecycleHook",
@@ -96,11 +100,16 @@ __all__ = [
     "RunnerProfile",
     "RuntimePolicy",
     "RuntimeUsage",
+    "SafeDiagnostic",
     "SafeEnvironment",
     "SubprocessRunner",
     "TelemetryEvent",
     "TelemetryKind",
     "TelemetrySink",
     "checkout_fingerprint",
+    "classify_process_result",
     "default_profile_registry",
+    "diagnostic_hint",
+    "preflight_profile",
+    "resolve_trusted_executable",
 ]

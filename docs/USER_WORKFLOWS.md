@@ -4,7 +4,7 @@ The examples describe the shared operating flow rather than client-specific
 prompt syntax. Each participant begins by reading the generated onboarding
 contract, registering a distinct session, and running a bounded orientation.
 For a copyable two-terminal walkthrough, see
-[Build Snake with Codex and Claude Code](../README.md#worked-example-build-snake-with-codex-and-claude-code).
+[Build Snake with Codex and Claude Code](tutorials/CODEX_CLAUDE_SNAKE.md).
 
 ## 1. Build a web application
 
@@ -42,11 +42,15 @@ delegation against that target's current immutable revision, chooses a built-in
 Codex or Claude profile whose role matches the purpose, and supplies explicit
 depth, time, attempt, concurrency, and budget limits. Creation records intent;
 the optional broker launch is a separate operation and uses a different stable
-idempotency key. The current broker enforces `micro_usd` only for a profile with
-a provider-native monetary cap (currently Claude). It also enforces
-`provider_units` as one coarse unit per provider-process attempt, with
-`max_attempts <= budget.limit`. `tokens` and mismatched unit/profile combinations
-fail before reservation/spawn even when the canonical schema can record them.
+idempotency key. The current broker enforces `provider_units` as one coarse unit
+per provider-process attempt, with `max_attempts <= budget.limit`. Use it for a
+subscription-authenticated local provider CLI when the operator wants to limit
+launches, not claim a dollar cap; Commons never switches credentials or billing
+mode. `micro_usd` is explicit provider-native monetary-cap opt-in and must
+reflect current pricing plus canonical-finalization reserve; `$0.50` is not a
+safe default. `tokens` and mismatched unit/profile combinations fail before
+reservation/spawn even when the canonical schema can record them. Run broker
+preflight after upgrades; it consumes no attempt and starts no model work.
 
 Before any shared-checkout review, every writer stops and the operator confirms
 that the bytes match the exact registered artifacts/evidence bound to the
@@ -60,9 +64,13 @@ review/outcome, and bounded repository list/read/literal-search. It receives no
 native filesystem, edit, shell, web, subagent, runtime, or delegation-creation
 tools.
 
-The broker registers a distinct child session, records process identity before
-the child receives its instruction, and then binds `delegation.started`. The
-child works only on the recorded target. It may return `input_needed` with a
+The broker registers a distinct child session and starts an inert local exec
+gate. It records that stable PID and binds `delegation.started` before releasing
+the gate; the gate then replaces itself with the fixed provider process and only
+that provider receives the instruction. This prevents a slow ledger write from
+consuming the provider's own stdin/startup timeout while preserving the same PID
+and process group for cancellation and recovery. The child works only on the
+recorded target. It may return `input_needed` with a
 sanitized requirement summary, but secrets and interactive input remain outside
 the canonical ledger. The current headless MVP cannot resume or reattach an
 exited `input_needed` provider session, so the broker classifies it
@@ -75,8 +83,8 @@ If the broker loses certainty after start, it records `needs_operator` and does
 not relaunch. A new delegation is safe only after the old attempt is terminal
 and no earlier child can remain live. The core `agent-commons` CLI remains a
 prerequisite for either launch mode. If only the optional runtime, profile, or
-provider integration is unavailable, follow the README's
-[manual two-window fallback](../README.md#manual-two-window-fallback) with the
+provider integration is unavailable, follow the Quickstart's
+[manual two-window flow](QUICKSTART.md#3-start-a-distinct-reviewer-window) with the
 same task, review, revision, and session boundaries.
 
 Active cancellation is not a current runtime capability: only requested,

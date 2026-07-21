@@ -48,6 +48,7 @@ from agent_commons.runtime import (
     SubprocessRunner,
     TelemetrySink,
     default_profile_registry,
+    diagnostic_hint,
 )
 
 from .manager import CommonsManager
@@ -253,6 +254,7 @@ class DelegationRuntimeService:
         self.attempts = attempts or AttemptStore(
             manager.paths.state_root,
             security_policy=manager.policy,
+            read_only=manager.read_only,
         )
         self.runner = runner or SubprocessRunner()
         self.telemetry = telemetry or NoopTelemetrySink()
@@ -262,8 +264,12 @@ class DelegationRuntimeService:
 
         return profile_summaries(self.profiles)
 
-    def list_attempts(self) -> list[dict[str, Any]]:
-        return [attempt.as_dict() for attempt in self.attempts.list_attempts()]
+    def list_attempts(self, *, diagnostic: bool = False) -> list[dict[str, Any]]:
+        values = [attempt.as_dict() for attempt in self.attempts.list_attempts()]
+        if diagnostic:
+            for value in values:
+                value["diagnostic_hint"] = diagnostic_hint(str(value["diagnostic_code"]))
+        return values
 
     @staticmethod
     def _policies(delegation: Mapping[str, Any]) -> tuple[RuntimePolicy, RuntimePolicy]:
@@ -379,6 +385,10 @@ verdict, then finish this delegation with the review as a typed result reference
 Record verification only for facts you genuinely reproduced and can bind to
 existing evidence. For implementation, follow the target acceptance criteria
 and normal task/artifact/review workflow.
+
+Reserve time/budget for the canonical outcome tools. Record the bounded verdict
+or safe needs-operator/input-needed outcome before optional extended analysis;
+if the remaining limit is uncertain, stop analysis and finalize while able.
 
 If required information is missing, record a sanitized input-needed summary
 without secrets. If safe completion or process identity is uncertain, record
@@ -496,14 +506,19 @@ acceptance.
                 # requested so an explicit --retry can consume the next attempt.
                 return current
             reason_code = "launch_failed" if pre_start else "runtime_error"
+            hint = diagnostic_hint(attempt.diagnostic_code)
             self.manager.fail_delegation(
                 str(current["id"]),
                 expected,
                 reason_code=reason_code,
                 summary=(
-                    "The allowlisted provider failed before canonical start."
+                    "The allowlisted provider failed before canonical start. "
+                    f"Safe diagnostic: {attempt.diagnostic_code.value}. {hint}"
                     if pre_start
-                    else "The allowlisted provider exited without a canonical successful result."
+                    else (
+                        "The allowlisted provider exited without a canonical successful result. "
+                        f"Safe diagnostic: {attempt.diagnostic_code.value}. {hint}"
+                    )
                 ),
                 idempotency_key=_operation_key(attempt.attempt_id, "failed"),
             )
@@ -544,6 +559,8 @@ acceptance.
                     "stdout_bytes_seen": process.stdout_bytes_seen,
                     "stderr_bytes_seen": process.stderr_bytes_seen,
                     "output_truncated": process.output_truncated,
+                    "diagnostic_code": result.attempt.diagnostic_code.value,
+                    "diagnostic_hint": diagnostic_hint(result.attempt.diagnostic_code),
                 }
                 if process is not None
                 else None
@@ -618,6 +635,7 @@ acceptance.
                 workspace_root=self.manager.repo_root,
                 delegation_id=delegation_id,
                 max_budget_microusd=child_policy.max_budget_microusd,
+                worker_purpose=str(delegation["purpose"]),
             )
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
@@ -658,6 +676,7 @@ acceptance.
                         correlation=correlation,
                         parent_policy=parent_policy,
                         child_policy=child_policy,
+                        purpose=str(delegation["purpose"]),
                         launch_key_sha256=launch_key_sha256,
                         retry=retry,
                     )

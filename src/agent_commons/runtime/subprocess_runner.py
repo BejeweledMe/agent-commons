@@ -15,6 +15,7 @@ from typing import BinaryIO, Protocol
 
 from agent_commons.errors import ValidationError
 
+from .exec_gate import gated_argv, gated_stdin
 from .model import RunnerInvocation, _safe_identifier
 
 _SAFE_HOST_ENVIRONMENT = frozenset(
@@ -329,7 +330,11 @@ class SubprocessRunner:
             child_session_id, delegation_id=delegation_id
         )
         try:
-            process = self.process_factory(invocation.argv, workdir, environment)
+            # Spawn only the inert gate before canonical delegation.started.
+            # The gate is replaced in-place by the provider after the lifecycle
+            # hook succeeds, preserving the recorded PID and process group while
+            # preventing provider startup timeouts on a slow canonical write.
+            process = self.process_factory(gated_argv(invocation.argv), workdir, environment)
         except OSError:
             return self._empty_result(
                 outcome=RunOutcome.FAILED,
@@ -367,7 +372,7 @@ class SubprocessRunner:
         else:
             writer = threading.Thread(
                 target=self._write_stdin,
-                args=(process.stdin, invocation.stdin),
+                args=(process.stdin, gated_stdin(invocation.stdin)),
                 daemon=True,
             )
             writer.start()

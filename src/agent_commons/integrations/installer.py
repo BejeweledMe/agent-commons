@@ -156,14 +156,17 @@ def _validate_directory_chain(root: Path, directory: Path) -> None:
             )
 
 
-def _ensure_directory_chain(root: Path, directory: Path) -> None:
+def _ensure_directory_chain(root: Path, directory: Path) -> tuple[Path, ...]:
     _validate_directory_chain(root, directory)
+    created: list[Path] = []
     current = root
     for part in directory.relative_to(root).parts:
         current = current / part
         if not current.exists():
             current.mkdir(mode=0o755)
+            created.append(current)
         _validate_directory_chain(root, current)
+    return tuple(created)
 
 
 def _validate_workspace_path(root: Path, workspace: Path) -> None:
@@ -379,6 +382,53 @@ def _verify_preconditions(planned: Iterable[_PlannedWrite]) -> None:
         _verify_preimage(item, phase="preflight")
 
 
+def _rollback_publications(
+    root: Path,
+    published: list[_PlannedWrite],
+    created_directories: list[Path],
+) -> tuple[str, ...]:
+    """Best-effort rollback with content CAS; never erase a concurrent edit."""
+
+    failures: list[str] = []
+    for item in reversed(published):
+        try:
+            _validate_regular_or_missing(item.path, label=item.relative_path)
+            current = _read_utf8(item.path) if item.path.exists() else None
+            if current != item.content:
+                raise ConfigurationError(f"rollback refused changed target: {item.relative_path}")
+            if item.expected_content is None:
+                item.path.unlink()
+            else:
+                _atomic_write(
+                    _PlannedWrite(
+                        item.path,
+                        item.expected_content,
+                        item.relative_path,
+                        "updated",
+                        item.content,
+                    )
+                )
+        except Exception as exc:  # preserve exact partial-state reporting below
+            failures.append(f"{item.relative_path}: {type(exc).__name__}")
+
+    for directory in sorted(
+        set(created_directories),
+        key=lambda path: len(path.relative_to(root).parts),
+        reverse=True,
+    ):
+        try:
+            if directory.is_symlink():
+                raise ConfigurationError("rollback directory became a symlink")
+            directory.rmdir()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            # A non-empty directory either contains a rollback failure or a
+            # concurrent/user file.  Never remove it recursively.
+            failures.append(f"{directory.relative_to(root).as_posix()}: directory-not-empty")
+    return tuple(failures)
+
+
 def _initialize_workspace_locked(
     project_root: str | Path,
     *,
@@ -488,14 +538,35 @@ def _initialize_workspace_locked(
                     )
                 )
 
-    workspace.mkdir(mode=0o755, parents=False, exist_ok=True)
-    for directory in _WORKSPACE_DIRECTORIES:
-        (workspace / directory).mkdir(mode=0o755, exist_ok=True)
     _verify_preconditions(planned)
-    for item in planned:
-        if item.status != "unchanged":
-            _ensure_directory_chain(root, item.path.parent)
-            _atomic_write(item)
+    published: list[_PlannedWrite] = []
+    created_directories: list[Path] = []
+    try:
+        created_directories.extend(_ensure_directory_chain(root, workspace))
+        for directory in _WORKSPACE_DIRECTORIES:
+            created_directories.extend(_ensure_directory_chain(root, workspace / directory))
+        for item in planned:
+            if item.status != "unchanged":
+                created_directories.extend(_ensure_directory_chain(root, item.path.parent))
+                _atomic_write(item)
+                published.append(item)
+    except BaseException as exc:
+        rollback_failures = _rollback_publications(root, published, created_directories)
+        if rollback_failures:
+            published_paths = [item.relative_path for item in published]
+            raise ConfigurationError(
+                "initialization failed with partial changes; "
+                f"published={json.dumps(published_paths)}; "
+                f"rollback_failures={json.dumps(list(rollback_failures))}; "
+                "fix the reported paths and retry the same init command"
+            ) from exc
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        if isinstance(exc, ConfigurationError):
+            raise
+        raise ConfigurationError(
+            f"initialization failed and rolled back cleanly: {type(exc).__name__}"
+        ) from exc
 
     return InstallationReport(
         workspace=".agent-commons",

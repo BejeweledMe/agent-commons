@@ -83,6 +83,11 @@ only information another session will need after the current context is gone.
 A review is a scoped expert judgment. A verification records a reproducible
 fact. Acceptance is a governance transition.
 
+A delegated independent reviewer may record verification only for the exact
+target and revision of its bound review. The domain lifecycle revalidates this
+constraint during writes and replay; a role label or MCP argument cannot widen
+the verification target.
+
 Every review and verification binds the exact subject revision and explicit
 criteria. A changed revision makes previous judgments stale. When independent
 review is required, the authoring session cannot satisfy it itself. In MVP-0,
@@ -174,13 +179,20 @@ only correctly linked descendants, and the default operating depth is one.
 Do not create recursive Codex/Claude ping-pong or use a second client to escape
 lineage and budget accounting.
 
-The current experimental broker enforces two units. `micro_usd` requires a
-profile with a provider-native monetary cap (currently Claude).
-`provider_units` is a coarse launch budget: one unit equals one provider-process
-attempt, and `max_attempts` must not exceed its limit. `tokens` and mismatched
-unit/profile combinations fail before reservation/spawn; canonical schema
-acceptance never implies executable budget enforcement. Current Codex profiles
-therefore require `provider_units` in addition to trusted-workspace opt-in.
+The current experimental broker enforces two units. `provider_units` is a
+coarse launch budget: one unit equals one provider-process attempt, and
+`max_attempts` must not exceed its limit. It is the preferred example for a
+local provider CLI already authenticated through an operator-selected
+subscription; Commons neither selects that account nor changes its billing
+mode. `micro_usd` is explicit opt-in to a profile's provider-native monetary
+cap. Its limit must reflect current provider/model pricing and reserve enough
+room to record the canonical terminal outcome; the obsolete `$0.50` example is
+not a safe default. `tokens` and mismatched unit/profile combinations fail
+before reservation/spawn; canonical schema acceptance never implies executable
+budget enforcement. Current Codex profiles require `provider_units` in addition
+to trusted-workspace opt-in. Run broker preflight after provider/runtime
+upgrades; it may start provider `--help` and MCP preflight processes but consumes
+no attempt and starts no model work.
 
 Every review that reads a shared checkout requires a quiescent subject whose
 bytes match the exact registered artifacts/evidence bound to the reviewed

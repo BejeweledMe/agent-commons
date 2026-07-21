@@ -15,6 +15,7 @@ from agent_commons.errors import (
     ClaimConflictError,
     IdempotencyConflictError,
     IntegrityError,
+    LifecycleConflictError,
     ValidationError,
 )
 from agent_commons.security import SecurityPolicy
@@ -137,6 +138,7 @@ class ClaimService:
         state_root: str | Path | None = None,
         policy: SecurityPolicy | None = None,
         clock: Callable[[], float] = time.time,
+        read_only: bool = False,
     ) -> None:
         self.repo_root = Path(repo_root).expanduser().resolve()
         self.state_root = discover_operational_state_root(
@@ -150,9 +152,15 @@ class ClaimService:
         self.sessions = sessions
         self.policy = policy or sessions.policy
         self.clock = clock
-        _ensure_private_directory(self.state_root)
-        _ensure_private_directory(self.root)
-        _ensure_private_directory(self.event_root)
+        self.read_only = read_only
+        if not read_only:
+            _ensure_private_directory(self.state_root)
+            _ensure_private_directory(self.root)
+            _ensure_private_directory(self.event_root)
+
+    def _require_writable(self) -> None:
+        if self.read_only:
+            raise LifecycleConflictError("claim service was opened read-only")
 
     def _events(self) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
@@ -268,6 +276,7 @@ class ClaimService:
         description: str = "",
         idempotency_key: str | None = None,
     ) -> Claim:
+        self._require_writable()
         if mode not in {"advisory", "exclusive"}:
             raise ValidationError("claim mode must be advisory or exclusive")
         if ttl_seconds <= 0:
@@ -366,6 +375,7 @@ class ClaimService:
         nonce: str,
         ttl_seconds: int = 2 * 3600,
     ) -> Claim:
+        self._require_writable()
         if ttl_seconds <= 0:
             raise ValidationError("ttl_seconds must be positive")
         self.policy.assert_safe({"claim_id": claim_id, "nonce": nonce}, context="claim renewal")
@@ -405,6 +415,7 @@ class ClaimService:
         owner_session_id: str | None,
         nonce: str,
     ) -> Claim:
+        self._require_writable()
         self.policy.assert_safe({"claim_id": claim_id, "nonce": nonce}, context="claim release")
         with _exclusive_lock(self.sessions.lock_path):
             owner = self.sessions.require_active(owner_session_id)
@@ -443,6 +454,7 @@ class ClaimService:
         actor_session_id: str | None,
         reason: str,
     ) -> Claim:
+        self._require_writable()
         if not reason.strip():
             raise ValidationError("breaking a claim requires a reason")
         self.policy.assert_safe({"claim_id": claim_id, "reason": reason}, context="claim break")

@@ -200,8 +200,12 @@ The optional broker has a stricter boundary. Launch authority comes from an
 operator-managed local grant associated with an authenticated broker connection,
 not from a session's self-declared role or capabilities. Callers select a named
 profile; they cannot supply arbitrary executables, shell fragments, environment
-maps, or credentials. A bounded work instruction is ephemeral untrusted stdin,
-not argv or durable state. Effective child authority and limits can only narrow
+maps, or credentials. Before `delegation.started`, an inert local exec gate
+holds the eventual provider PID without starting provider code. After the
+durable start, the gate strips a fixed control frame and replaces itself with
+the allowlisted provider, which receives the bounded work instruction as
+ephemeral untrusted stdin, not argv or durable state. Effective child authority
+and limits can only narrow
 the parent grant. The first runtime permits one writable worker per checkout
 scope and does not create, switch, commit, reset, or remove Git worktrees for the
 user.
@@ -214,6 +218,15 @@ end-to-end span context.
 Telemetry is lossy and never affects replay. Prompts, reasoning, transcripts,
 file contents, tool payloads, environment variables, credentials, and raw process
 output are excluded by default.
+
+The worker snapshot reader verifies hashes against the frozen raw bytes but does
+not make one credential-shaped source line quarantine an entire implementation.
+It replaces each blocked line with a stable line-preserving marker and returns
+only category/classification metadata; unchanged safe lines remain searchable.
+Whole-document policy checks still fail closed if an unsafe pattern survives
+redaction. An independent reviewer may inspect existing verifications only for
+its exact review target and may record a new verification only against that same
+target and revision.
 
 ## Extension boundary
 

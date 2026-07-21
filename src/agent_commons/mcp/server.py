@@ -8,7 +8,9 @@ business-logic boundary.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
+import json
 import os
 import stat
 import subprocess
@@ -19,6 +21,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
+from agent_commons import __version__
 from agent_commons.core.refs import parse_ref
 from agent_commons.errors import (
     CommonsError,
@@ -27,6 +30,8 @@ from agent_commons.errors import (
     SecurityPolicyError,
     ValidationError,
 )
+from agent_commons.runtime import resolve_trusted_executable
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
@@ -95,24 +100,50 @@ _RUNTIME_WRITE = {
 
 _SENSITIVE_NAMES = {".env", ".env.local", "credentials", "credentials.json"}
 
+_COMMON_WORKER_TOOL_NAMES = frozenset(
+    {
+        "commons_orient",
+        "commons_inbox",
+        "commons_list_tasks",
+        "commons_list_delegations",
+        "commons_show_delegation",
+        "commons_list_reviews",
+        "commons_show_review",
+        "commons_list_verifications",
+        "commons_show_verification",
+        "commons_show_artifact",
+        "commons_read_artifact",
+        "commons_delegation_input_needed",
+        "commons_succeed_delegation",
+        "commons_delegation_needs_operator",
+        "commons_workspace_files",
+        "commons_workspace_read",
+        "commons_workspace_search",
+    }
+)
+IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES
+VERIFICATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_record_verification"}
+INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = VERIFICATION_WORKER_TOOL_NAMES | {"commons_complete_review"}
+
 
 class ScopedWorkspaceReader:
     """Immutable, bounded, no-symlink text view for delegated reviewers."""
 
-    def __init__(self, manager: CommonsManager) -> None:
+    def __init__(self, manager: CommonsManager, *, git_executable: str = "/usr/bin/git") -> None:
         self.manager = manager
         self.root = manager.repo_root.resolve()
         self.policy = manager.policy
         self.files: dict[str, tuple[str, int]] = {}
         self.registered_files: dict[str, tuple[str, int]] = {}
         total = 0
-        git = Path("/usr/bin/git")
-        if not git.is_file():
-            raise ConfigurationError("scoped reviewer requires trusted /usr/bin/git")
+        self.git_executable = resolve_trusted_executable(
+            git_executable,
+            workspace_root=self.root,
+        )
         try:
             result = subprocess.run(
                 (
-                    str(git),
+                    self.git_executable,
                     "-C",
                     str(self.root),
                     "ls-files",
@@ -160,7 +191,10 @@ class ScopedWorkspaceReader:
     def assert_unchanged(self) -> None:
         """Fail before a canonical result if any visible subject file moved."""
 
-        current = ScopedWorkspaceReader(self.manager)
+        current = ScopedWorkspaceReader(
+            self.manager,
+            git_executable=self.git_executable,
+        )
         if current.files != self.files:
             raise LifecycleConflictError(
                 "delegated workspace changed after reviewer snapshot creation"
@@ -208,6 +242,48 @@ class ScopedWorkspaceReader:
             return hashlib.sha256(body).hexdigest(), len(body)
         finally:
             os.close(descriptor)
+
+    def _review_content(self, content: str, *, context: str) -> tuple[str, list[dict[str, Any]]]:
+        """Redact unsafe lines without quarantining the remaining review surface."""
+
+        blocked_by_line: dict[int, list[Any]] = {}
+        for start_line, end_line, finding in self.policy.scan_text_lines(content):
+            if finding.classification not in self.policy.blocked_classifications:
+                continue
+            for line_number in range(start_line, end_line + 1):
+                blocked_by_line.setdefault(line_number, []).append(finding)
+
+        rendered: list[str] = []
+        redactions: list[dict[str, Any]] = []
+        for line_number, line in enumerate(content.splitlines(keepends=True), start=1):
+            blocked = blocked_by_line.get(line_number, [])
+            if not blocked:
+                rendered.append(line)
+                continue
+            ending = (
+                "\r\n"
+                if line.endswith("\r\n")
+                else "\n"
+                if line.endswith("\n")
+                else "\r"
+                if line.endswith("\r")
+                else ""
+            )
+            rendered.append("[agent-commons redacted source line]" + ending)
+            redactions.append(
+                {
+                    "line": line_number,
+                    "categories": sorted({finding.category for finding in blocked}),
+                    "classifications": sorted(
+                        {finding.classification.value for finding in blocked}
+                    ),
+                }
+            )
+        safe_content = "".join(rendered)
+        # Retain the whole-document fail-closed check for any pattern that spans
+        # line boundaries or survives the bounded line redactions.
+        self.policy.assert_safe(safe_content, context=context)
+        return safe_content, redactions
 
     def list_files(self, *, prefix: str = "", max_items: int = 200) -> list[dict[str, Any]]:
         if (
@@ -258,8 +334,13 @@ class ScopedWorkspaceReader:
             content = body.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValidationError("scoped reviewer can read UTF-8 text files only") from exc
-        self.policy.assert_safe(content, context="scoped reviewer file content")
-        return {"path": relative, "sha256": digest, "content": content}
+        content, redactions = self._review_content(content, context="scoped reviewer file content")
+        return {
+            "path": relative,
+            "sha256": digest,
+            "content": content,
+            "redactions": redactions,
+        }
 
     def search(
         self, query: str, *, prefix: str = "", max_matches: int = 100
@@ -334,10 +415,17 @@ class ScopedWorkspaceReader:
             content = body.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValidationError("scoped reviewer can read UTF-8 artifacts only") from exc
-        self.policy.assert_safe(content, context="scoped registered artifact content")
+        content, redactions = self._review_content(
+            content, context="scoped registered artifact content"
+        )
         relative = Path(source_path).as_posix()
         self.registered_files[relative] = (digest, size)
-        return {"path": relative, "sha256": digest, "content": content}
+        return {
+            "path": relative,
+            "sha256": digest,
+            "content": content,
+            "redactions": redactions,
+        }
 
 
 def _fastmcp_factory(name: str) -> MCPServer:
@@ -358,6 +446,7 @@ def build_server(
     runtime: RuntimeService | None = None,
     delegation_id: str | None = None,
     binding_wait_seconds: float = 5.0,
+    git_executable: str = "/usr/bin/git",
     server_factory: Callable[[str], ServerT] | None = None,
 ) -> ServerT | MCPServer:
     """Build a local stdio server with an intentionally bounded tool set."""
@@ -405,7 +494,11 @@ def build_server(
         if len(worker_matches) > 1:
             raise ConfigurationError("one child session cannot own multiple active delegations")
         worker = worker_matches[0] if worker_matches else None
-    workspace = ScopedWorkspaceReader(commons) if worker is not None else None
+    workspace = (
+        ScopedWorkspaceReader(commons, git_executable=git_executable)
+        if worker is not None
+        else None
+    )
 
     def require_live_worker() -> dict[str, Any] | None:
         if worker is None:
@@ -490,6 +583,27 @@ def build_server(
                     allowed.add(str(ref.get("id")))
         return allowed
 
+    def worker_verification_target() -> tuple[dict[str, Any], str] | None:
+        if worker is None:
+            return None
+        purpose = worker.get("purpose")
+        if purpose == "verification":
+            return dict(worker.get("target_ref") or {}), str(worker.get("target_revision"))
+        if purpose == "independent_review":
+            for review in commons.list_reviews(state=None):
+                if relevant_review(review):
+                    return dict(review.get("target_ref") or {}), str(review.get("target_revision"))
+        return None
+
+    def relevant_verification(verification: dict[str, Any]) -> bool:
+        if worker is None:
+            return True
+        target = worker_verification_target()
+        return target is not None and (
+            verification.get("target_ref") == target[0]
+            and verification.get("target_revision") == target[1]
+        )
+
     @register(_READ_ONLY)
     def commons_orient(max_items: int = 20) -> dict[str, Any]:
         """Return the current role-filtered workspace brief."""
@@ -501,6 +615,11 @@ def build_server(
             "delegation": worker,
             "reviews": [
                 review for review in commons.list_reviews(state=None) if relevant_review(review)
+            ][:max_items],
+            "verifications": [
+                verification
+                for verification in commons.list_verifications()
+                if relevant_verification(verification)
             ][:max_items],
         }
 
@@ -562,6 +681,32 @@ def build_server(
         if not relevant_review(review):
             raise LifecycleConflictError("worker may inspect only its bound review")
         return review
+
+    @register(_READ_ONLY, worker_only=True)
+    def commons_list_verifications() -> list[dict[str, Any]]:
+        """List reproducible checks relevant to the exact worker target."""
+
+        return [
+            verification
+            for verification in commons.list_verifications()
+            if relevant_verification(verification)
+        ]
+
+    @register(_READ_ONLY, worker_only=True)
+    def commons_show_verification(verification_id: str) -> dict[str, Any]:
+        """Return one target-scoped verification without widening worker access."""
+
+        verification = next(
+            (item for item in commons.list_verifications() if item.get("id") == verification_id),
+            None,
+        )
+        if verification is None:
+            raise LifecycleConflictError(f"verification does not exist: {verification_id}")
+        if not relevant_verification(verification):
+            raise LifecycleConflictError(
+                "worker may inspect only a verification of its exact target"
+            )
+        return verification
 
     @register(_READ_ONLY)
     def commons_show_artifact(artifact_id: str) -> dict[str, Any]:
@@ -685,7 +830,10 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
-    @register(_IDEMPOTENT_WRITE, worker_purposes=("verification",))
+    @register(
+        _IDEMPOTENT_WRITE,
+        worker_purposes=("verification", "independent_review"),
+    )
     def commons_record_verification(
         target_ref: str,
         target_revision: str,
@@ -698,14 +846,12 @@ def build_server(
         """Record a reproducible claim backed by existing canonical evidence."""
 
         parsed_target = parse_ref(target_ref).as_dict()
-        if worker is not None and (
-            worker.get("purpose") != "verification"
-            or worker.get("target_ref") != parsed_target
-            or worker.get("target_revision") != target_revision
-        ):
-            raise LifecycleConflictError(
-                "worker verification write is outside its delegation scope"
-            )
+        if worker is not None:
+            allowed_target = worker_verification_target()
+            if allowed_target != (parsed_target, target_revision):
+                raise LifecycleConflictError(
+                    "worker verification write is outside its exact target scope"
+                )
         if worker is not None and workspace is not None:
             workspace.assert_unchanged()
         return commons.record_verification(
@@ -852,6 +998,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repo", type=Path, default=Path("."))
     parser.add_argument(
+        "--state-root",
+        type=Path,
+        default=os.environ.get("AGENT_COMMONS_STATE_ROOT"),
+        help="Explicit operator-authorized operational state directory.",
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Validate imports and the root tool catalog without opening stdio or writing state.",
+    )
+    parser.add_argument(
         "--session-id",
         default=os.environ.get("AGENT_COMMONS_SESSION_ID"),
         help="Active writer session; defaults to AGENT_COMMONS_SESSION_ID.",
@@ -860,6 +1017,11 @@ def _parser() -> argparse.ArgumentParser:
         "--delegation-id",
         default=os.environ.get("AGENT_COMMONS_DELEGATION_ID"),
         help="Broker-bound delegation; defaults to AGENT_COMMONS_DELEGATION_ID.",
+    )
+    parser.add_argument(
+        "--git-executable",
+        default="/usr/bin/git",
+        help="Operator-selected trusted Git executable for scoped workspace reads.",
     )
     parser.add_argument(
         "--enable-runtime",
@@ -888,7 +1050,46 @@ def main(argv: list[str] | None = None) -> int:
         manager = CommonsManager(
             arguments.repo.expanduser().resolve(),
             session_id=arguments.session_id,
+            state_root=arguments.state_root,
+            read_only=arguments.preflight,
         )
+        if arguments.preflight:
+            git = resolve_trusted_executable(
+                arguments.git_executable,
+                workspace_root=manager.repo_root,
+            )
+            server = build_server(
+                arguments.repo.expanduser().resolve(),
+                manager=manager,
+                git_executable=git,
+            )
+            if not hasattr(server, "list_tools"):
+                raise ConfigurationError("FastMCP server does not expose its tool catalog")
+            tools = asyncio.run(server.list_tools())  # type: ignore[attr-defined]
+            names = sorted(tool.name for tool in tools)
+            worker_catalogs = {
+                "implementation": sorted(IMPLEMENTATION_WORKER_TOOL_NAMES),
+                "independent_review": sorted(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+                "verification": sorted(VERIFICATION_WORKER_TOOL_NAMES),
+            }
+            body = {
+                "schema": "agent_commons.mcp_preflight.v2",
+                "agent_commons_version": __version__,
+                "agent_commons_source_sha256": agent_commons_source_sha256(),
+                "tool_count": len(names),
+                "tool_catalog_sha256": hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest(),
+                "worker_catalogs": {
+                    purpose: {
+                        "tool_names": catalog,
+                        "tool_catalog_sha256": hashlib.sha256(
+                            "\n".join(catalog).encode("utf-8")
+                        ).hexdigest(),
+                    }
+                    for purpose, catalog in worker_catalogs.items()
+                },
+            }
+            print(json.dumps(body, sort_keys=True, separators=(",", ":")))
+            return 0
         runtime = None
         if arguments.enable_runtime:
             runtime = DelegationRuntimeService(
@@ -904,6 +1105,7 @@ def main(argv: list[str] | None = None) -> int:
             manager=manager,
             runtime=runtime,
             delegation_id=arguments.delegation_id,
+            git_executable=arguments.git_executable,
         )
         server.run(transport="stdio")
     except (CommonsError, FileNotFoundError) as exc:

@@ -95,9 +95,17 @@ typed parameters only. Operator-controlled profiles fix the adapter, executable,
 argument template, environment allowlist, checkout mode, and limits. The broker
 does not accept arbitrary argv, shell fragments, environment maps, or credentials
 and never gives a child more authority than the intersection of parent grant,
-profile, workspace policy, and broker policy. A bounded work instruction remains
-untrusted data, is passed only through process stdin, and is excluded from
-canonical, operational, and telemetry persistence.
+profile, workspace policy, and broker policy. An inert local exec gate is the
+only process running before canonical `delegation.started`; after that barrier
+it replaces itself with the fixed provider without changing PID or process
+group. A bounded work instruction remains untrusted data, follows the gate's
+fixed control frame through process stdin, and is excluded from canonical,
+operational, and telemetry persistence.
+
+Reviewer source reads are hash-bound to the frozen raw file. A blocked
+credential/PII-shaped line is replaced with a stable marker plus safe category
+metadata instead of exposing the line or quarantining unrelated code; line
+numbers remain stable and a final whole-document scan still fails closed.
 
 Purpose/profile pairing is also fixed: implementation uses a builder profile,
 while independent review and verification use an independent-reviewer profile.

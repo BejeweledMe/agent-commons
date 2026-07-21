@@ -16,6 +16,7 @@ from agent_commons.errors import ConfigurationError, ValidationError
 from agent_commons.security import SecurityPolicy
 
 from .attempts import _canonical_bytes, _ensure_private_directory, _exclusive_lock
+from .diagnostics import DiagnosticCode
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 
 
@@ -40,6 +41,7 @@ class TelemetryEvent:
     profile_id: BuiltinProfileId
     state: str
     reason: str
+    diagnostic_code: DiagnosticCode = DiagnosticCode.NONE
     pid: int | None = None
     exit_code: int | None = None
     duration_milliseconds: int | None = None
@@ -57,6 +59,7 @@ class TelemetryEvent:
         _safe_identifier("attempt_id", self.attempt_id)
         _safe_identifier("telemetry state", self.state)
         _safe_identifier("telemetry reason", self.reason)
+        object.__setattr__(self, "diagnostic_code", DiagnosticCode(self.diagnostic_code))
         try:
             datetime.fromisoformat(self.recorded_at.replace("Z", "+00:00"))
         except (AttributeError, ValueError) as exc:
@@ -123,6 +126,7 @@ class TelemetryEvent:
             "profile_id": self.profile_id.value,
             "state": self.state,
             "reason": self.reason,
+            "diagnostic_code": self.diagnostic_code.value,
             "pid": self.pid,
             "exit_code": self.exit_code,
             "duration_milliseconds": self.duration_milliseconds,
@@ -146,6 +150,7 @@ class TelemetryEvent:
             "agent_commons.profile.id": self.profile_id.value,
             "agent_commons.attempt.state": self.state,
             "agent_commons.attempt.reason": self.reason,
+            "agent_commons.attempt.diagnostic_code": self.diagnostic_code.value,
             "agent_commons.process.pid": self.pid,
             "agent_commons.process.exit_code": self.exit_code,
             "agent_commons.duration_ms": self.duration_milliseconds,

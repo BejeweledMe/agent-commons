@@ -51,11 +51,17 @@ IDs, lifecycle transitions, or stored payloads.
   `--idempotency-key`. Reuse that key only for an identical operation.
 - Use `commons-delegate` only after the core CLI, target, exact target revision,
   matching profile, enforced budget, other limits, claims, and local broker
-  configuration are known. `micro_usd` requires a provider-native monetary cap
-  (currently Claude); `provider_units` means one provider-process attempt and
-  must cover `max_attempts`; `tokens` fails before reservation. If the core CLI
+  configuration are known. Run `broker preflight` after provider/runtime
+  upgrades; it validates provider help and the generated MCP contract without
+  consuming an attempt or starting model work. For a local Claude CLI already
+  authenticated through an operator-selected subscription, prefer
+  `provider_units: 1` with one attempt; this is a process-launch bound, not a
+  dollar cap, and Commons never switches credentials or billing modes.
+  `micro_usd` is explicit opt-in to a provider-native monetary cap: choose it
+  from current pricing with room for canonical finalization, not the obsolete
+  `$0.50` tutorial value. `tokens` fails before reservation. If the core CLI
   is missing, stop and install/initialize it; if only the optional
-  broker/provider is missing, use the README's manual two-window flow. Creation
+  broker/provider is missing, use the Quickstart's manual two-window flow. Creation
   and launch use distinct
   idempotency keys. A child session is always distinct, receives no new
   authority, and must not create recursive Codex/Claude ping-pong.

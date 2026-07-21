@@ -55,6 +55,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
         profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
         executable="/bin/echo",
         mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
         permission_mode=ClaudePermissionMode.DONT_ASK,
     )
     with pytest.raises(ConfigurationError, match="delegation binding"):
@@ -73,6 +74,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     assert "--setting-sources" in invocation.argv
     mcp_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
     assert '"command":"/bin/echo"' in mcp_config
+    assert '"--git-executable","/usr/bin/true"' in mcp_config
     assert str(tmp_path.resolve()) in mcp_config
     assert "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ" in mcp_config
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
@@ -150,6 +152,19 @@ def test_profile_executables_reject_workspace_path_hijack_and_writable_targets(
             delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
         )
 
+    with pytest.raises(ConfigurationError, match="outside the delegated workspace"):
+        ClaudeRunnerProfile(
+            profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+            executable="/bin/echo",
+            mcp_executable="/bin/echo",
+            git_executable=str(hijack),
+            permission_mode=ClaudePermissionMode.DONT_ASK,
+        ).build_invocation(
+            "Review",
+            workspace_root=workspace,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        )
+
 
 def test_profiles_are_immutable_and_only_fixed_ids_are_accepted() -> None:
     profile = default_profile_registry().get(BuiltinProfileId.CODEX_BUILDER)
@@ -176,6 +191,7 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
     allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
 
     assert profile.permission_mode is ClaudePermissionMode.DONT_ASK
+    assert "--max-budget-usd" not in invocation.argv
     assert set(allowed.split(",")) == {
         "mcp__agent-commons__commons_orient",
         "mcp__agent-commons__commons_inbox",
@@ -184,6 +200,8 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_show_delegation",
         "mcp__agent-commons__commons_list_reviews",
         "mcp__agent-commons__commons_show_review",
+        "mcp__agent-commons__commons_list_verifications",
+        "mcp__agent-commons__commons_show_verification",
         "mcp__agent-commons__commons_show_artifact",
         "mcp__agent-commons__commons_read_artifact",
         "mcp__agent-commons__commons_workspace_files",
@@ -224,6 +242,25 @@ def test_claude_builder_cannot_escape_canonical_delegation_lineage(tmp_path) -> 
     assert "mcp__agent-commons__commons_request_delegation" not in allowed
     assert "mcp__agent-commons__commons_cancel_delegation" not in allowed
     assert "Agent,WebFetch,WebSearch" in invocation.argv
+
+
+def test_claude_verifier_receives_only_the_verification_write_tool(tmp_path: Path) -> None:
+    profile = ClaudeRunnerProfile(
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+    invocation = profile.build_invocation(
+        "Verify the exact target",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        worker_purpose="verification",
+    )
+    allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
+
+    assert "mcp__agent-commons__commons_record_verification" in allowed
+    assert "mcp__agent-commons__commons_complete_review" not in allowed
 
 
 def test_runtime_policy_can_only_shrink_and_consumes_depth() -> None:

@@ -323,6 +323,50 @@ def test_change_after_preflight_but_before_publication_is_not_overwritten(
     assert MANAGED_BLOCK_START not in agents.read_text(encoding="utf-8")
 
 
+def test_late_permission_failure_rolls_back_every_published_file_and_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_atomic = installer_module._atomic_write
+    publications = 0
+
+    def fail_late(item: object) -> None:
+        nonlocal publications
+        publications += 1
+        if publications == 6:
+            raise PermissionError("injected late permission failure")
+        original_atomic(item)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(installer_module, "_atomic_write", fail_late)
+
+    with pytest.raises(ConfigurationError, match="rolled back cleanly: PermissionError"):
+        initialize_workspace(tmp_path)
+
+    assert publications == 6
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_late_failure_restores_preexisting_instruction_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = b"# Existing rules\r\n\r\nKeep exactly.\r\n"
+    agents = tmp_path / "AGENTS.md"
+    agents.write_bytes(original)
+    original_atomic = installer_module._atomic_write
+
+    def fail_after_agents(item: object) -> None:
+        if getattr(item, "relative_path", "") == "CLAUDE.md":
+            raise PermissionError("injected after AGENTS publication")
+        original_atomic(item)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(installer_module, "_atomic_write", fail_after_agents)
+
+    with pytest.raises(ConfigurationError, match="rolled back cleanly: PermissionError"):
+        initialize_workspace(tmp_path)
+
+    assert agents.read_bytes() == original
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["AGENTS.md"]
+
+
 def test_parallel_initializers_serialize_and_converge_idempotently(tmp_path: Path) -> None:
     context = get_context("fork")
     start = context.Event()

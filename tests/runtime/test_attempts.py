@@ -13,10 +13,15 @@ from agent_commons.runtime import (
     AttemptStore,
     BuiltinProfileId,
     CorrelationIds,
+    DiagnosticCode,
     PolicyViolationError,
+    ProcessResult,
     Provider,
+    RunOutcome,
+    RunReason,
     RuntimePolicy,
     checkout_fingerprint,
+    classify_process_result,
 )
 
 
@@ -190,3 +195,116 @@ def test_tampered_request_body_is_detected(tmp_path: Path) -> None:
 
     with pytest.raises(Exception, match="semantic digest"):
         store.list_attempts()
+
+
+def test_failure_diagnostic_is_closed_and_raw_provider_content_is_not_persisted(
+    tmp_path: Path,
+) -> None:
+    state_root = tmp_path / "state"
+    store = AttemptStore(state_root, clock=Clock())
+    parent, _ = policies()
+    attempt = store.reserve(spec(tmp_path), parent_policy=parent).attempt
+    store.transition(attempt.attempt_id, AttemptState.LAUNCHING, reason="process_starting")
+    store.transition(
+        attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="process_started",
+        pid=123,
+    )
+
+    secret = "sk-ant-api03-never-persist-this"
+    finished = store.finish(
+        attempt.attempt_id,
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=b"",
+            stderr=(
+                f"MCP handshake failed; credential={secret}; internal path=/private/tmp/x"
+            ).encode(),
+            stdout_bytes_seen=0,
+            stderr_bytes_seen=96,
+            output_truncated=False,
+        ),
+    )
+
+    assert finished.diagnostic_code is DiagnosticCode.MCP_HANDSHAKE_FAILED
+    persisted = next((state_root / "runtime" / "requests").glob("*.json")).read_text()
+    assert secret not in persisted
+    assert "/private/tmp/x" not in persisted
+    assert "MCP handshake failed" not in persisted
+    assert '"diagnostic_code":"mcp_handshake_failed"' in persisted
+
+
+def test_v2_attempt_is_upgraded_in_memory_and_rewritten_on_next_transition(
+    tmp_path: Path,
+) -> None:
+    state_root = tmp_path / "state"
+    store = AttemptStore(state_root, clock=Clock())
+    parent, _ = policies()
+    reserved = store.reserve(spec(tmp_path), parent_policy=parent).attempt
+    path = next((state_root / "runtime" / "requests").glob("*.json"))
+    document = json.loads(path.read_text())
+    document["schema"] = "agent_commons.runtime_request.v2"
+    for attempt in document["attempts"]:
+        attempt["schema"] = "agent_commons.runtime_attempt.v2"
+        attempt.pop("diagnostic_code")
+    path.write_text(
+        json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = store.list_attempts()[0]
+    assert loaded.schema == "agent_commons.runtime_attempt.v3"
+    assert loaded.diagnostic_code is DiagnosticCode.LEGACY_UNCLASSIFIED
+
+    store.transition(reserved.attempt_id, AttemptState.FAILED, reason="start_failed")
+    rewritten = json.loads(path.read_text())
+    assert rewritten["schema"] == "agent_commons.runtime_request.v3"
+    assert rewritten["attempts"][0]["schema"] == "agent_commons.runtime_attempt.v3"
+    assert rewritten["attempts"][0]["diagnostic_code"] == "legacy_unclassified"
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    (
+        ("Please run /login; token=sk-secret", DiagnosticCode.PROVIDER_AUTH_FAILED),
+        ("Maximum budget exceeded; token=sk-secret", DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED),
+        ("Unknown option --future-flag; token=sk-secret", DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG),
+        ("Invalid MCP config; token=sk-secret", DiagnosticCode.MCP_CONFIG_INVALID),
+        ("Failed to spawn MCP server; token=sk-secret", DiagnosticCode.MCP_SPAWN_FAILED),
+        ("MCP binding timeout; token=sk-secret", DiagnosticCode.MCP_BINDING_TIMEOUT),
+        (
+            "agent-commons-exec-gate: provider exec failed",
+            DiagnosticCode.PROVIDER_START_FAILED,
+        ),
+        (
+            "agent-commons-exec-gate: invalid control frame",
+            DiagnosticCode.BROKER_CONTROL_ERROR,
+        ),
+    ),
+)
+def test_provider_failure_corpus_maps_only_to_closed_codes(
+    message: str,
+    expected: DiagnosticCode,
+) -> None:
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=b"",
+            stderr=message.encode(),
+            stdout_bytes_seen=0,
+            stderr_bytes_seen=len(message.encode()),
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is expected
+    assert "sk-secret" not in diagnostic.hint
