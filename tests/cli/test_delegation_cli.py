@@ -187,3 +187,80 @@ def test_cli_rejects_stale_target_revision_without_traceback(tmp_path: Path) -> 
     assert error["error"]["type"] == "LifecycleConflictError"
     assert "target_revision" in error["error"]["message"]
     assert "Traceback" not in result.output
+
+
+def test_cli_recovers_requested_work_after_requester_closes(tmp_path: Path) -> None:
+    repo, manager, parent, _ = _workspace(tmp_path)
+    runner = CliRunner()
+    task = _task(manager, "cli-recovery-target")
+    created = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        idempotency_key="cli-recovery-request",
+    )
+    manager.sessions.close(parent["session_id"], nonce=parent["nonce"])
+
+    recovery = CommonsManager(repo)
+    recovery_session = recovery.start_session(
+        stable_instance_id="delegation-cli-recovery-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator-recovery",
+        capabilities=("delegation:recover",),
+    )
+    result = _json(
+        _invoke(
+            runner,
+            repo,
+            recovery_session["session_id"],
+            "delegation",
+            "recover",
+            created["entity_ref"]["id"],
+            created["revision"],
+            "--reason",
+            "The requester closed before launch.",
+            "--idempotency-key",
+            "cli-recovery-transition",
+        )
+    )
+
+    assert isinstance(result, dict)
+    assert result["event_type"] == "delegation.recovered"
+    assert recovery.get_delegation(created["entity_ref"]["id"])["state"] == "cancelled"
+
+
+def test_cli_recovery_failure_is_structured_and_has_no_traceback(tmp_path: Path) -> None:
+    repo, manager, parent, _ = _workspace(tmp_path)
+    runner = CliRunner()
+    task = _task(manager, "cli-recovery-live-target")
+    created = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        idempotency_key="cli-recovery-live-request",
+    )
+    result = _invoke(
+        runner,
+        repo,
+        parent["session_id"],
+        "delegation",
+        "recover",
+        created["entity_ref"]["id"],
+        created["revision"],
+        "--reason",
+        "The requester is actually live.",
+        "--idempotency-key",
+        "cli-recovery-live-transition",
+    )
+
+    assert result.exit_code == 1
+    error = json.loads(result.output)
+    assert error["error"]["type"] == "LifecycleConflictError"
+    assert "required capability" in error["error"]["message"]
+    assert "Traceback" not in result.output

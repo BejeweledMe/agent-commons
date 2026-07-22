@@ -514,6 +514,12 @@ class SessionRegistry:
             sessions = [item for item in sessions if item.active_at(now)]
         return tuple(sessions)
 
+    def is_available(self, session_id: str) -> bool:
+        """Return whether one session is currently live and able to write."""
+
+        session = self._state().get(session_id)
+        return session is not None and session.active_at(self.clock())
+
     def require_active(
         self,
         session_id: str | None,

@@ -176,6 +176,11 @@ EVENT_SPECS: dict[str, EventSpec] = {
         "delegation",
         "delegation_id",
     ),
+    "delegation.recovered": EventSpec(
+        ("delegation_id", "expected_revision", "reason"),
+        "delegation",
+        "delegation_id",
+    ),
     "delegation.timed_out": EventSpec(
         ("delegation_id", "expected_revision", "summary"),
         "delegation",

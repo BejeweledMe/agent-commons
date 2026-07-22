@@ -18,6 +18,11 @@ state root:
 6. the final delegation state and result references, not provider prose, satisfy
    the grader.
 
+For an independent review, the worker must call `commons_complete_review` and
+then `commons_succeed_delegation` with the resulting `review:<id>`. A prose-only
+answer, a completed review without the delegation result, or process exit zero
+is not canonical completion.
+
 CI runs this contract without credentials or network access. Static preflight
 and the behavioral canary are intentionally separate signals.
 
@@ -33,7 +38,9 @@ delegation bounds.
 `micro_usd` delegation budget is divided across its maximum attempts; aggregate
 committed monetary caps are checked before reservation. Capacity waits in a
 bounded FIFO queue. A full or expired queue fails with explicit backpressure and
-does not allocate an attempt.
+does not allocate an attempt. If admission fails after allocating a prospective
+child identity but before an attempt exists, the broker closes that unbound
+child session immediately.
 
 ## Initial SLIs and SLOs
 
@@ -77,3 +84,8 @@ Use `broker attempts --diagnostic`, canonical `delegation list/show`, and
 `broker reconcile`. Reconcile never blindly relaunches ambiguous work. If
 process identity, child state, terminal tool outcome, or canonical finalization
 cannot be proven, preserve the attempt and transition to `needs_operator`.
+Attempts owned by another live requester remain isolated. If that requester is
+unavailable, reconcile returns `requester_unavailable` with safe next actions
+and makes no canonical change. Only canonical `requested` work may then use the
+explicit `delegation:recover` operator path; active work still requires proven
+provider termination and owner-aware reconciliation.

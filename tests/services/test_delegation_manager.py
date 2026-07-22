@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -202,3 +203,134 @@ def test_delegation_transition_security_failure_writes_no_event(tmp_path: Path) 
     assert secret not in str(caught.value)
     assert len(list(parent.events.iter_events())) == len(before)
     assert parent.get_delegation(requested["entity_ref"]["id"])["state"] == "active"
+
+
+def test_authorized_recovery_requires_an_unavailable_requester_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    parent, _, parent_session, _ = _workspace(tmp_path)
+    task = _task(parent, key="recovery-target")
+    requested = _create(parent, task, key="recovery-request")
+    delegation_id = requested["entity_ref"]["id"]
+
+    recovery = CommonsManager(parent.repo_root, state_root=parent.paths.state_root)
+    recovery_session = recovery.start_session(
+        stable_instance_id="delegation-recovery-session-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator-recovery",
+        capabilities=("delegation:recover",),
+    )
+    recovery.session_id = recovery_session["session_id"]
+
+    with pytest.raises(LifecycleConflictError, match="requester session"):
+        recovery.recover_delegation(
+            delegation_id,
+            requested["revision"],
+            reason="The requester is still live.",
+            idempotency_key="recover-live-requester",
+        )
+
+    parent.sessions.close(parent_session["session_id"], nonce=parent_session["nonce"])
+    without_capability = CommonsManager(parent.repo_root, state_root=parent.paths.state_root)
+    ordinary_session = without_capability.start_session(
+        stable_instance_id="delegation-ordinary-session-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator-recovery",
+    )
+    without_capability.session_id = ordinary_session["session_id"]
+    before = len(list(parent.events.iter_events()))
+    with pytest.raises(LifecycleConflictError, match="required capability"):
+        without_capability.recover_delegation(
+            delegation_id,
+            requested["revision"],
+            reason="This session lacks explicit recovery capability.",
+            idempotency_key="recover-without-capability",
+        )
+    assert len(list(parent.events.iter_events())) == before
+
+    recovered = recovery.recover_delegation(
+        delegation_id,
+        requested["revision"],
+        reason="The requester expired before canonical provider start.",
+        idempotency_key="recover-unavailable-requester",
+    )
+    repeated = recovery.recover_delegation(
+        delegation_id,
+        requested["revision"],
+        reason="The requester expired before canonical provider start.",
+        idempotency_key="recover-unavailable-requester",
+    )
+
+    assert recovered["event_type"] == "delegation.recovered"
+    assert repeated["event_id"] == recovered["event_id"]
+    assert parent.get_delegation(delegation_id)["state"] == "cancelled"
+    assert len(list(parent.events.iter_events())) == before + 1
+
+
+def test_session_close_rejects_owned_nonterminal_delegations(tmp_path: Path) -> None:
+    parent, _, parent_session, child_session = _workspace(tmp_path)
+    task = _task(parent, key="session-close-target")
+    requested = _create(parent, task, key="session-close-request")
+
+    with pytest.raises(LifecycleConflictError, match="non-terminal delegations"):
+        parent.end_session(nonce=parent_session["nonce"])
+
+    started = parent.start_delegation(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        child_session_id=child_session["session_id"],
+        idempotency_key="session-close-start",
+    )
+    with pytest.raises(LifecycleConflictError, match="stop and reconcile active work"):
+        parent.end_session(nonce=parent_session["nonce"])
+    assert parent.get_delegation(requested["entity_ref"]["id"])["revision"] == started["revision"]
+
+
+def test_authorized_recovery_accepts_an_effectively_expired_requester(tmp_path: Path) -> None:
+    parent, _, parent_session, _ = _workspace(tmp_path)
+    task = _task(parent, key="expired-recovery-target")
+    requested = _create(parent, task, key="expired-recovery-request")
+    recovery = CommonsManager(parent.repo_root, state_root=parent.paths.state_root)
+    recovery_session = recovery.start_session(
+        stable_instance_id="delegation-expiry-recovery-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator-recovery",
+        capabilities=("delegation:recover",),
+        ttl_seconds=86_400,
+    )
+    recovery.session_id = recovery_session["session_id"]
+    parent_expiry = datetime.fromisoformat(
+        parent_session["expires_at"].replace("Z", "+00:00")
+    ).timestamp()
+    recovery.sessions.clock = lambda: parent_expiry + 1
+
+    recovered = recovery.recover_delegation(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        reason="The requester TTL elapsed before launch.",
+        idempotency_key="recover-expired-requester",
+    )
+
+    assert recovered["event_type"] == "delegation.recovered"
+    assert recovery.get_delegation(requested["entity_ref"]["id"])["state"] == "cancelled"
+
+
+def test_session_listing_uses_effective_expiry_and_explicit_status(tmp_path: Path) -> None:
+    parent, _, parent_session, _ = _workspace(tmp_path)
+    observer = CommonsManager(parent.repo_root, state_root=parent.paths.state_root)
+    expires_at = parent_session["expires_at"]
+    observer.sessions.clock = lambda: (
+        datetime.fromisoformat(expires_at.replace("Z", "+00:00")).timestamp() + 1
+    )
+
+    assert observer.show_session() == []
+    explicit = observer.show_session(parent_session["session_id"])
+    assert isinstance(explicit, dict)
+    assert explicit["status"] == "active"
+    assert explicit["effective_status"] == "expired"

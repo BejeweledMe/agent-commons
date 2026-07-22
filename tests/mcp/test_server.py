@@ -80,6 +80,23 @@ class FakeManager:
         self.calls.append(("cancel", values))
         return values
 
+    def recover_delegation(
+        self,
+        delegation_id: str,
+        expected_revision: str,
+        *,
+        reason: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        values = {
+            "delegation_id": delegation_id,
+            "expected_revision": expected_revision,
+            "reason": reason,
+            "idempotency_key": idempotency_key,
+        }
+        self.calls.append(("recover", values))
+        return values
+
     def complete_review(
         self,
         review_id: str,
@@ -166,6 +183,7 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "commons_show_artifact",
         "commons_request_delegation",
         "commons_cancel_delegation",
+        "commons_recover_delegation",
         "commons_complete_review",
         "commons_record_verification",
         "commons_delegation_input_needed",
@@ -216,6 +234,13 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "cancel-review-task-01",
     )
     assert cancelled["reason"] == "operator stopped it"
+    recovered = server.tools["commons_recover_delegation"](
+        created["delegation_id"],
+        "evt.01K00000000000000000000001",
+        "requester unavailable",
+        "recover-review-task-01",
+    )
+    assert recovered["reason"] == "requester unavailable"
     completed = server.tools["commons_complete_review"](
         "review.01K00000000000000000000000",
         "evt.01K00000000000000000000001",
@@ -239,6 +264,7 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
     assert [name for name, _ in manager.calls] == [
         "create",
         "cancel",
+        "recover",
         "complete_review",
         "succeed",
     ]
@@ -262,6 +288,7 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
         "commons_show_artifact",
         "commons_request_delegation",
         "commons_cancel_delegation",
+        "commons_recover_delegation",
         "commons_complete_review",
         "commons_record_verification",
         "commons_delegation_input_needed",
@@ -282,6 +309,7 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
     assert by_name["commons_orient"].annotations.readOnlyHint is True
     assert by_name["commons_request_delegation"].annotations.idempotentHint is True
     assert by_name["commons_cancel_delegation"].annotations.destructiveHint is True
+    assert by_name["commons_recover_delegation"].annotations.destructiveHint is True
     assert by_name["commons_complete_review"].annotations.idempotentHint is True
     assert by_name["commons_show_review"].annotations.readOnlyHint is True
 

@@ -91,6 +91,12 @@ Active cancellation is not a current runtime capability: only requested,
 unlaunched work may be cancelled through core `delegation cancel` or bounded
 MCP `commons_cancel_delegation`. Once active, stop the provider under operator
 control and reconcile; do not record canonical cancellation first.
+If the original requester is unavailable, a separately authorized root session
+declaring `delegation:recover` may recover only the exact canonical `requested`
+revision through `delegation recover` or `commons_recover_delegation`. The
+distinct event projects to `cancelled`; it never grants worker scope or active
+process cancellation. A requester cannot end its session while it still owns
+requested, active, or input-needed delegations.
 
 Outcome: the safe automated default lets Codex request a bounded Claude review.
 Claude-to-Codex implementation remains trusted-workspace-only because current

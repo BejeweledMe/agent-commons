@@ -150,6 +150,8 @@ def test_session_heartbeat_close_expiry_and_capability_checks(tmp_path: Path) ->
     clock = Clock()
     registry = SessionRegistry(repo, clock=clock)
     opened = open_session(registry, capabilities=("task:write",), ttl_seconds=10)
+    assert registry.is_available(opened.session_id) is True
+    assert registry.is_available("session." + "f" * 32) is False
 
     with pytest.raises(LifecycleConflictError, match="required capability"):
         registry.require_active(opened.session_id, capability="claim:break")
@@ -162,11 +164,13 @@ def test_session_heartbeat_close_expiry_and_capability_checks(tmp_path: Path) ->
 
     closed = registry.close(opened.session_id, nonce=renewed.nonce)
     assert closed.status == "closed"
+    assert registry.is_available(opened.session_id) is False
     with pytest.raises(LifecycleConflictError, match="closed"):
         registry.require_active(opened.session_id)
 
     expiring = open_session(registry, suffix="b", ttl_seconds=1)
     clock.value += 2
+    assert registry.is_available(expiring.session_id) is False
     with pytest.raises(LifecycleConflictError, match="expired"):
         registry.require_active(expiring.session_id)
 

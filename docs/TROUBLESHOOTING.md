@@ -65,6 +65,7 @@ stderr.
 | `terminal_tool_rejected` | Refresh the canonical revision, inspect content-free terminal-tool counters, and reconcile the ambiguous attempt. |
 | `process_canonical_mismatch` | Join the attempt to its canonical delegation and finalization telemetry, then reconcile; never infer approval from process exit. |
 | `canonical_finalization_failed` | Run `doctor`, inspect canonical state, and reconcile the terminal attempt before creating replacement work. |
+| `requester_unavailable` | Reconcile did not mutate foreign-owned work. Recover only canonical `requested` work with an operator-authorized `delegation:recover` session; active work requires proven termination. |
 | `legacy_unclassified` | Attempt predates sanitized diagnostics. Do not infer a cause from it. |
 
 `agent-commons --read-only broker attempts --diagnostic` adds only
@@ -124,6 +125,23 @@ agent-commons delegation list
 Ambiguous post-start work becomes `needs_operator`. Create a replacement only
 after the earlier attempt is terminal and operator inspection proves no child
 can remain live.
+
+### Requested delegation belongs to an unavailable session
+
+First confirm that the delegation is still exactly `requested` and inspect any
+available attempt diagnostics. Then open a distinct operator-authorized session
+with `--capability delegation:recover` and run:
+
+```bash
+agent-commons delegation recover DELEGATION_ID EXPECTED_REVISION \
+  --reason 'Requester unavailable before canonical provider start' \
+  --idempotency-key 'stable-recovery-key'
+```
+
+The command fails while the requester is active and for every state beyond
+`requested`. It records `delegation.recovered` rather than impersonating the
+requester's normal cancellation. Do not use this path for an active or
+input-needed provider.
 
 ### The optional broker is unavailable
 

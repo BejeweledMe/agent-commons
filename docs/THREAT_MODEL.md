@@ -84,7 +84,9 @@ An agent may claim a trusted model, role, or capability. Such metadata never
 proves authority. The protocol requires explicit lifecycle transitions and
 independent task review, while operator-controlled principal authorization is a
 future service concern. The local trust limitation is displayed rather than
-hidden.
+hidden. `delegation:recover`, like `receipt:abandon`, is therefore an explicit
+local coordination gate that must also have external operator/user authority;
+it is not an authentication primitive.
 
 For the optional runtime, the broker authenticates the local connection and
 intersects its operator-managed grant with the selected profile, inherited
@@ -179,6 +181,12 @@ identity or termination becomes terminal `needs_operator`. This protocol version
 does not record active work as `cancelled` because it has no authenticated
 canonical stop receipt. Stopping a process never claims to reverse a provider,
 Git, network, or other external side effect.
+
+If a requester is absent, expired, or closed, the distinct
+`delegation.recovered` transition may terminalize only canonical `requested`
+work. Exact CAS decides any race with provider start, whose inert gate withholds
+the instruction until `delegation.started` commits. Recovery never applies to
+`active` or `input_needed`, and normal requester cancellation is not widened.
 
 ### Checkout collision and Git mutation
 

@@ -241,6 +241,15 @@ The current runtime may cancel only requested work that has not launched. It
 rejects active cancellation because no control path yet proves termination of
 the provider process group before the canonical transition. Stop the provider
 under operator control and reconcile; never mark active work cancelled first.
+The original requester uses `delegation cancel`. If that requester is absent,
+expired, or closed, an operator-authorized session declaring
+`delegation:recover` may use `delegation recover` against the exact current
+`requested` revision. This records the distinct `delegation.recovered` event,
+projects to `cancelled`, and cannot apply after canonical provider start.
+Capability metadata is a local coordination gate, not authentication or
+external user authority. `session end` rejects a requester that still owns
+requested, active, or input-needed delegations so ordinary shutdown cannot
+silently manufacture orphaned work.
 
 The broker launches only operator-configured allowlisted profiles. It grants no
 new filesystem, Git, deployment, publication, network, communication, or truth

@@ -55,6 +55,7 @@ DELEGATION_STATES = {
     "delegation.succeeded": "succeeded",
     "delegation.failed": "failed",
     "delegation.cancelled": "cancelled",
+    "delegation.recovered": "cancelled",
     "delegation.timed_out": "timed_out",
     "delegation.needs_operator": "needs_operator",
 }

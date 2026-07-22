@@ -9,6 +9,8 @@ import pytest
 
 from agent_commons.errors import LifecycleConflictError
 from agent_commons.runtime import (
+    BuiltinProfileId,
+    DiagnosticCode,
     ProcessResult,
     RunOutcome,
     RunReason,
@@ -248,6 +250,42 @@ def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> 
             idempotency_key="runtime-launch-retry",
             retry=True,
         )
+
+
+def test_independent_review_instruction_requires_both_canonical_terminal_calls(
+    tmp_path: Path,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(manager)
+
+    instruction = service._instruction(
+        manager.get_delegation(delegation["entity_ref"]["id"]),
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+    )
+
+    complete = instruction.index("commons_complete_review")
+    succeed = instruction.index("commons_succeed_delegation")
+    assert complete < succeed
+    assert "review:<id>" in instruction
+    assert "prose-only answer or successful process exit" in instruction
+    assert "commons_delegation_needs_operator" in instruction
+    assert "commons_delegation_input_needed" in instruction
+
+
+def test_missing_terminal_audit_does_not_claim_no_tool_was_called() -> None:
+    code = DelegationRuntimeService._workflow_diagnostic_code(
+        {
+            "diagnostic_code": "none",
+            "process_canonical_mismatch": True,
+            "terminal_tool_calls": 0,
+            "terminal_tool_rejections": 0,
+            "terminal_tool_completions": 0,
+            "terminal_tool_audit_available": False,
+        }
+    )
+
+    assert code is DiagnosticCode.PROCESS_CANONICAL_MISMATCH
 
 
 def test_successful_process_without_terminal_tool_gets_actionable_workflow_diagnostic(

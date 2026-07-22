@@ -372,13 +372,14 @@ class DelegationRuntimeService:
         if stored not in {DiagnosticCode.NONE, DiagnosticCode.LEGACY_UNCLASSIFIED}:
             return stored
         if value.get("process_canonical_mismatch") is True:
-            if int(value.get("terminal_tool_calls", 0)) == 0:
-                return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
-            if (
-                int(value.get("terminal_tool_rejections", 0)) > 0
-                and int(value.get("terminal_tool_completions", 0)) == 0
-            ):
-                return DiagnosticCode.TERMINAL_TOOL_REJECTED
+            if value.get("terminal_tool_audit_available") is True:
+                if int(value.get("terminal_tool_calls", 0)) == 0:
+                    return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
+                if (
+                    int(value.get("terminal_tool_rejections", 0)) > 0
+                    and int(value.get("terminal_tool_completions", 0)) == 0
+                ):
+                    return DiagnosticCode.TERMINAL_TOOL_REJECTED
             return DiagnosticCode.PROCESS_CANONICAL_MISMATCH
         return stored
 
@@ -619,20 +620,23 @@ commit, push, merge, deploy, publish, contact anyone, expose secrets, or perform
 unrelated work.
 
 For independent_review, do not edit source. Find the existing review request for
-the exact target; use only the bounded Agent Commons review tools to record the
-verdict, then finish this delegation with the review as a typed result reference.
-Record verification only for facts you genuinely reproduced and can bind to
-existing evidence. For implementation, follow the target acceptance criteria
-and normal task/artifact/review workflow.
+the exact target. After analysis, first call commons_complete_review with the
+bounded verdict, then call commons_succeed_delegation with that review as the
+typed result reference (review:<id>). Completing the review alone does not finish
+the delegation. A prose-only answer or successful process exit without both
+canonical calls is invalid. Record verification only for facts you genuinely
+reproduced and can bind to existing evidence. For implementation, follow the
+target acceptance criteria and normal task/artifact/review workflow.
 
 Reserve time/budget for the canonical outcome tools. Record the bounded verdict
 or safe needs-operator/input-needed outcome before optional extended analysis;
 if the remaining limit is uncertain, stop analysis and finalize while able.
 
-If required information is missing, record a sanitized input-needed summary
-without secrets. If safe completion or process identity is uncertain, record
-needs-operator rather than guessing. Process completion alone is not task
-acceptance.
+Do not finish with prose before a terminal outcome tool completes. If required
+information is missing, call commons_delegation_input_needed with a sanitized
+summary and no secrets. If safe completion or process identity is uncertain,
+call commons_delegation_needs_operator rather than guessing. Process completion
+alone is not task acceptance.
 """
 
     def _broker(
@@ -957,13 +961,18 @@ acceptance.
                 )
             finally:
                 current = canonical or self.manager.get_delegation(delegation_id)
-                attempt_terminal = result is not None and result.attempt.state.terminal
-                if current.get("state") in _TERMINAL_DELEGATION_STATES and attempt_terminal:
-                    child_manager = CommonsManager(
-                        self.manager.repo_root,
-                        session_id=child_session_id,
-                        state_root=self.manager.paths.state_root,
-                    )
+                latest_attempt = (
+                    result.attempt if result is not None else self._latest_attempt(delegation_id)
+                )
+                attempt_terminal = latest_attempt is not None and latest_attempt.state.terminal
+                # No request document means admission failed before a retry
+                # identity existed, so the freshly opened child is unbound.
+                # A terminal pre-start attempt may remain requested for an
+                # explicit retry and must retain the same child correlation.
+                safe_pre_start_exit = current.get("state") == "requested" and latest_attempt is None
+                if (
+                    current.get("state") in _TERMINAL_DELEGATION_STATES and attempt_terminal
+                ) or safe_pre_start_exit:
                     try:
                         child_manager.end_session(nonce=nonce)
                     except LifecycleConflictError:
@@ -985,6 +994,23 @@ acceptance.
             with _delegation_lock(self.manager.paths.state_root, delegation_id):
                 attempt = self._latest_attempt(delegation_id) or initial
                 if attempt.correlation.parent_session_id != self.manager.session_id:
+                    if not self.manager.sessions.is_available(
+                        attempt.correlation.parent_session_id
+                    ):
+                        current = self.manager.get_delegation(delegation_id)
+                        if current.get("state") not in _TERMINAL_DELEGATION_STATES:
+                            code = DiagnosticCode.REQUESTER_UNAVAILABLE
+                            values.append(
+                                {
+                                    "attempt": attempt.as_dict(),
+                                    "delegation": current,
+                                    "telemetry_failures": 0,
+                                    "reconciled": False,
+                                    "workflow_diagnostic_code": code.value,
+                                    "diagnostic_hint": diagnostic_hint(code),
+                                    "safe_next_actions": diagnostic_safe_next_actions(code),
+                                }
+                            )
                     continue
                 if not attempt.state.terminal:
                     attempt = self.attempts.transition(
