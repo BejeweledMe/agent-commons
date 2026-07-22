@@ -59,7 +59,10 @@ from version control.
 
 Canonical event and manifest files are immutable and Git-friendly. Thread
 messages are `thread.replied` events; MVP-0 has no separate message store.
-SQLite is a disposable incremental projection and is never authoritative. Remote
+SQLite is a disposable projection and is never authoritative. Normal reads
+currently replay the canonical ledger; writes defer index maintenance, while
+`doctor` verifies/synchronizes it and `index rebuild` reconstructs it. Projection
+work counters make event/correction/fixed-point cost visible. Remote
 multi-host coordination, authentication, notifications, scheduling, and agent
 launching are outside MVP-0. MVP-2 may add an optional same-host broker and MCP
 adapter without making either mandatory for ledger use.
@@ -99,6 +102,9 @@ The broker is an optional execution boundary, not a second domain service.
 Canonical lifecycle writes still pass through `CommonsManager`. Broker queue
 state, attempts, process handles, heartbeats, cancellation intent, and bounded
 diagnostics are operational and may be rebuilt or conservatively reconciled.
+The broker resolves one effective state root, embeds it in the child MCP argv
+and launch-plan fingerprint, and checks the child session through that same
+root before provider startup.
 The complete boundary is in
 [ADR 0004](adr/0004-optional-local-delegation-runtime.md).
 
@@ -157,6 +163,11 @@ Accepting the reviewed task does not stale that approval; reopening or changing
 the reviewed subject does. Artifact revisions make reviews and verifications of
 earlier revisions stale.
 
+Task completion/submission events preserve floating `artifact_refs` for v1
+compatibility and add revision-bound `artifact_bindings`. A stale binding marks
+the task dependency stale; the fixed-point projection then stales its review
+and removes any acceptance derived from that review.
+
 A finding does not have a synthetic `invalidated` lifecycle state. When its
 canonical assertion was wrong, the supported maintenance workflow invalidates
 the relevant event; replay then removes or rolls back that transition while
@@ -174,6 +185,12 @@ evidence uses the effective correction head (or the root event ID when
 uncorrected); manifest evidence uses its content-addressed manifest ID. A later
 artifact revision, correction, or invalidation preserves the historical
 judgment with `stale: true` but removes it from effective-truth views.
+
+Projection failures are emitted as structured issues (`code`, `severity`,
+`message`, related event IDs, and `repairable`) alongside display warnings.
+Integrity gates consume the structured severity. Recovery simulates the exact
+maintenance event and admits it only when the structured error measure strictly
+improves without a new or larger issue.
 
 A delegation binds `target_ref` and `target_revision` at request time. It cannot
 target itself or an ancestor delegation, and a later target change does not
@@ -213,7 +230,10 @@ user.
 Observability is also split by authority. The ledger preserves delegation intent
 and outcomes, an ignored local journal supports live status and recovery, and an
 optional metadata-only OpenTelemetry sink emits short-lived milestone spans with
-correlation attributes. The current slice has no metric instruments or propagated
+correlation attributes. Process completion and canonical finalization are
+separate phases, joined by attempt/delegation IDs and a mismatch flag. Queue
+wait/depth and terminal-tool call/rejection/completion counts contain no tool
+arguments or output. The current slice has no metric instruments or propagated
 end-to-end span context.
 Telemetry is lossy and never affects replay. Prompts, reasoning, transcripts,
 file contents, tool payloads, environment variables, credentials, and raw process

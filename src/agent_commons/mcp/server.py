@@ -30,12 +30,16 @@ from agent_commons.errors import (
     SecurityPolicyError,
     ValidationError,
 )
-from agent_commons.runtime import resolve_trusted_executable
+from agent_commons.runtime import (
+    TERMINAL_TOOL_NAMES,
+    TerminalToolAuditStore,
+    resolve_trusted_executable,
+)
 from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
-    load_profile_registry,
+    load_runtime_configuration,
     telemetry_sink,
 )
 
@@ -99,6 +103,11 @@ _RUNTIME_WRITE = {
 }
 
 _SENSITIVE_NAMES = {".env", ".env.local", "credentials", "credentials.json"}
+
+
+class _OversizedScopedFile(ConfigurationError):
+    pass
+
 
 _COMMON_WORKER_TOOL_NAMES = frozenset(
     {
@@ -166,23 +175,23 @@ class ScopedWorkspaceReader:
             raise ConfigurationError("scoped reviewer requires UTF-8 Git paths") from exc
         for relative in names:
             normalized = Path(relative)
-            path = self.root / normalized
             if (
                 normalized.is_absolute()
                 or ".." in normalized.parts
-                or path.is_symlink()
-                or path.name in _SENSITIVE_NAMES
-                or path.name.startswith(".env.")
-                or path.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
+                or normalized.name in _SENSITIVE_NAMES
+                or normalized.name.startswith(".env.")
+                or normalized.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
             ):
                 continue
             try:
-                size_hint = path.stat().st_size
-            except OSError as exc:
-                raise ConfigurationError("scoped reviewer Git path is unreadable") from exc
-            if size_hint > 1_048_576:
+                digest, size = self._digest(normalized)
+            except _OversizedScopedFile:
                 continue
-            digest, size = self._digest(path)
+            except LifecycleConflictError:
+                # A tracked path may have been replaced with a final or parent
+                # symlink after it entered the Git index. Exclude it from the
+                # immutable reviewer snapshot without ever following it.
+                continue
             total += size
             if len(self.files) >= 5_000 or total > 64 * 1024 * 1024:
                 raise ConfigurationError("scoped reviewer workspace exceeds safe snapshot limits")
@@ -215,33 +224,65 @@ class ScopedWorkspaceReader:
             or normalized.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
         ):
             raise ValidationError("artifact source path is outside the safe review scope")
-        candidate = self.root / normalized
-        try:
-            resolved = candidate.resolve(strict=True)
-        except OSError as exc:
-            raise LifecycleConflictError("registered artifact source is unavailable") from exc
-        if resolved != candidate.absolute() or self.root not in resolved.parents:
-            raise LifecycleConflictError("registered artifact source must not traverse symlinks")
-        return candidate
+        return normalized
 
-    @staticmethod
-    def _digest(path: Path) -> tuple[str, int]:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    def _open_regular(self, relative: Path) -> int:
+        """Open one repository-relative file without following any path symlink."""
+
+        if (
+            not relative.parts
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or not hasattr(os, "O_DIRECTORY")
+            or not hasattr(os, "O_NOFOLLOW")
+            or os.open not in os.supports_dir_fd
+        ):
+            raise LifecycleConflictError(
+                "scoped reviewer path cannot be opened with no-symlink guarantees"
+            )
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        file_flags = os.O_RDONLY | os.O_NOFOLLOW
+        descriptors: list[int] = []
+        try:
+            current = os.open(self.root, directory_flags)
+            descriptors.append(current)
+            for component in relative.parts[:-1]:
+                current = os.open(component, directory_flags, dir_fd=current)
+                descriptors.append(current)
+            descriptor = os.open(relative.parts[-1], file_flags, dir_fd=current)
+            return descriptor
+        except OSError as exc:
+            raise LifecycleConflictError("scoped reviewer path must not traverse symlinks") from exc
+        finally:
+            for descriptor in reversed(descriptors):
+                os.close(descriptor)
+
+    def _read_bytes(self, relative: Path) -> bytes:
+        descriptor = self._open_regular(relative)
         try:
             metadata = os.fstat(descriptor)
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 1_048_576:
-                raise ConfigurationError("scoped reviewer files must be regular and at most 1 MiB")
-            body = b""
-            while len(body) <= 1_048_576:
-                chunk = os.read(descriptor, 64 * 1024)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ConfigurationError("scoped reviewer files must be regular")
+            if metadata.st_size > 1_048_576:
+                raise _OversizedScopedFile("scoped reviewer files must be at most 1 MiB")
+            chunks: list[bytes] = []
+            remaining = metadata.st_size + 1
+            while remaining:
+                chunk = os.read(descriptor, min(remaining, 64 * 1024))
                 if not chunk:
                     break
-                body += chunk
-            if len(body) > 1_048_576:
-                raise ConfigurationError("scoped reviewer file exceeds 1 MiB")
-            return hashlib.sha256(body).hexdigest(), len(body)
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            body = b"".join(chunks)
+            if len(body) != metadata.st_size or len(body) > 1_048_576:
+                raise LifecycleConflictError("scoped reviewer file changed while it was read")
+            return body
         finally:
             os.close(descriptor)
+
+    def _digest(self, relative: Path) -> tuple[str, int]:
+        body = self._read_bytes(relative)
+        return hashlib.sha256(body).hexdigest(), len(body)
 
     def _review_content(self, content: str, *, context: str) -> tuple[str, list[dict[str, Any]]]:
         """Redact unsafe lines without quarantining the remaining review surface."""
@@ -309,27 +350,12 @@ class ScopedWorkspaceReader:
         frozen = self.files.get(relative)
         if frozen is None:
             raise LifecycleConflictError("workspace file is outside the delegated snapshot")
-        candidate = self.root / normalized
-        digest, size = self._digest(candidate)
+        body = self._read_bytes(normalized)
+        digest, size = hashlib.sha256(body).hexdigest(), len(body)
         if (digest, size) != frozen:
             raise LifecycleConflictError("workspace file changed after reviewer snapshot creation")
         if expected_sha256 is not None and expected_sha256 != digest:
             raise LifecycleConflictError("workspace file does not match expected_sha256")
-        descriptor = os.open(candidate, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-        try:
-            chunks: list[bytes] = []
-            remaining = size + 1
-            while remaining:
-                chunk = os.read(descriptor, min(remaining, 64 * 1024))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            body = b"".join(chunks)
-        finally:
-            os.close(descriptor)
-        if len(body) != size or hashlib.sha256(body).hexdigest() != digest:
-            raise LifecycleConflictError("workspace file changed while it was being read")
         try:
             content = body.decode("utf-8")
         except UnicodeDecodeError as exc:
@@ -390,27 +416,13 @@ class ScopedWorkspaceReader:
             or not 0 <= expected_size <= 1_048_576
         ):
             raise ValidationError("registered artifact size exceeds the review limit")
-        candidate = self._safe_candidate(source_path)
-        digest, size = self._digest(candidate)
+        relative_path = self._safe_candidate(source_path)
+        body = self._read_bytes(relative_path)
+        digest, size = hashlib.sha256(body).hexdigest(), len(body)
         if digest != expected_digest or size != expected_size:
             raise LifecycleConflictError(
                 "registered artifact bytes do not match their immutable manifest"
             )
-        descriptor = os.open(candidate, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-        try:
-            chunks: list[bytes] = []
-            remaining = size + 1
-            while remaining:
-                chunk = os.read(descriptor, min(remaining, 64 * 1024))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            body = b"".join(chunks)
-        finally:
-            os.close(descriptor)
-        if len(body) != size or hashlib.sha256(body).hexdigest() != digest:
-            raise LifecycleConflictError("registered artifact changed while it was being read")
         try:
             content = body.decode("utf-8")
         except UnicodeDecodeError as exc:
@@ -499,6 +511,15 @@ def build_server(
         if worker is not None
         else None
     )
+    terminal_audit = (
+        TerminalToolAuditStore(
+            commons.paths.state_root,
+            security_policy=commons.policy,
+            read_only=commons.read_only,
+        )
+        if worker is not None
+        else None
+    )
 
     def require_live_worker() -> dict[str, Any] | None:
         if worker is None:
@@ -534,8 +555,29 @@ def build_server(
 
                 @wraps(function)
                 def guarded(*args: Any, **kwargs: Any) -> Any:
-                    require_live_worker()
-                    return function(*args, **kwargs)
+                    terminal = function.__name__ in TERMINAL_TOOL_NAMES
+                    delegation = str(worker.get("id"))
+                    if terminal and terminal_audit is not None:
+                        try:
+                            terminal_audit.record(delegation, function.__name__, "called")
+                        except Exception:
+                            pass
+                    try:
+                        require_live_worker()
+                        result = function(*args, **kwargs)
+                    except Exception:
+                        if terminal and terminal_audit is not None:
+                            try:
+                                terminal_audit.record(delegation, function.__name__, "rejected")
+                            except Exception:
+                                pass
+                        raise
+                    if terminal and terminal_audit is not None:
+                        try:
+                            terminal_audit.record(delegation, function.__name__, "completed")
+                        except Exception:
+                            pass
+                    return result
 
                 registered = guarded
             return server.tool(annotations=annotations)(registered)
@@ -1092,11 +1134,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         runtime = None
         if arguments.enable_runtime:
+            runtime_config = load_runtime_configuration(
+                arguments.profile_config,
+                workspace_root=manager.repo_root,
+            )
             runtime = DelegationRuntimeService(
                 manager,
-                profiles=load_profile_registry(
-                    arguments.profile_config, workspace_root=manager.repo_root
-                ),
+                profiles=runtime_config.profiles,
+                operator_limits=runtime_config.limits,
                 telemetry=telemetry_sink(arguments.telemetry, manager),
             )
         server = build_server(

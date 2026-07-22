@@ -20,7 +20,8 @@ public extension ABI.
 - per-session inbox cursors and acknowledgement state;
 - duplicate-work suggestions and stale-work cleanup;
 - richer dependency and decision graph views;
-- policy presets for light, standard, and governed projects;
+- machine-enforced configuration presets for the documented light, standard,
+  and governed operating modes;
 - import/export of summarized records between workspaces;
 - protocol conformance fixtures for additional agent clients.
 

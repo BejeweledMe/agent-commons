@@ -11,7 +11,7 @@ from typing import Any
 
 from agent_commons.errors import ConfigurationError
 
-from .diagnostics import DiagnosticCode, diagnostic_hint
+from .diagnostics import DiagnosticCode, diagnostic_hint, diagnostic_safe_next_actions
 from .model import (
     BuiltinProfileId,
     ClaudeRunnerProfile,
@@ -91,7 +91,12 @@ def _run_probe(
 
 
 def _safe_failure(code: DiagnosticCode) -> dict[str, Any]:
-    return {"ok": False, "diagnostic_code": code.value, "hint": diagnostic_hint(code)}
+    return {
+        "ok": False,
+        "diagnostic_code": code.value,
+        "hint": diagnostic_hint(code),
+        "safe_next_actions": diagnostic_safe_next_actions(code),
+    }
 
 
 def preflight_profile(
@@ -99,6 +104,7 @@ def preflight_profile(
     profile_id: str | BuiltinProfileId,
     *,
     workspace_root: str | Path,
+    state_root: str | Path | None = None,
     purpose: str | None = None,
     runner: SubprocessRunner | None = None,
 ) -> dict[str, Any]:
@@ -107,6 +113,11 @@ def preflight_profile(
     normalized = BuiltinProfileId(profile_id)
     profile = profiles.get(normalized)
     root = Path(workspace_root).expanduser().resolve()
+    effective_state_root = (
+        Path(state_root if state_root is not None else root / ".agent-commons")
+        .expanduser()
+        .resolve()
+    )
     probe = runner or SubprocessRunner()
     effective_purpose = purpose or (
         "independent_review" if normalized.independent_reviewer else "implementation"
@@ -115,6 +126,7 @@ def preflight_profile(
         invocation = profile.build_invocation(
             "Agent Commons credential-free compatibility preflight.",
             workspace_root=root,
+            state_root=effective_state_root,
             delegation_id="delegation.preflight",
             max_budget_microusd=1 if profile.supports_budget else None,
             worker_purpose=effective_purpose,

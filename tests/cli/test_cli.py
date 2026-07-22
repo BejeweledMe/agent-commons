@@ -234,6 +234,7 @@ def test_cli_artifact_is_metadata_only_and_invalid_ref_is_concise(tmp_path: Path
     assert error == {
         "error": {
             "message": "reference must use '<kind>:<id>' syntax",
+            "safe_next_actions": ["Correct the bounded input using the command help, then retry."],
             "type": "ValidationError",
         },
         "ok": False,

@@ -116,8 +116,49 @@ def test_broker_profile_config_rejects_unknown_authority_fields(tmp_path: Path) 
     assert result.exit_code == 1
     error = json.loads(result.output)
     assert error["error"]["type"] == "ConfigurationError"
+    assert error["error"]["safe_next_actions"]
     assert "unsupported fields" in error["error"]["message"]
     assert "SECRET" not in result.output
+
+
+def test_broker_profile_config_exposes_effective_operator_caps(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-limits")
+    config = tmp_path / "runtime.yaml"
+    config.write_text(
+        "profiles:\n"
+        "  claude-independent-reviewer:\n"
+        "    executable: /usr/bin/false\n"
+        "    mcp_executable: /usr/bin/false\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: dontAsk\n"
+        "limits:\n"
+        "  global_concurrency: 1\n"
+        "  queue_capacity: 2\n"
+        "  provider_concurrency:\n"
+        "    claude: 1\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "profiles",
+            "--profile-config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    limits = json.loads(result.output)[0]["operator_limits"]
+    assert limits["global_concurrency"] == 1
+    assert limits["provider_concurrency"] == 1
+    assert limits["queue_capacity"] == 2
 
     link = tmp_path / "profiles-link.yaml"
     link.symlink_to(config)

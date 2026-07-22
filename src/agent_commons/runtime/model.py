@@ -247,6 +247,7 @@ class RunnerProfile(Protocol):
         instruction: str,
         *,
         workspace_root: Path,
+        state_root: Path | None = None,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
@@ -290,10 +291,12 @@ class CodexRunnerProfile:
         instruction: str,
         *,
         workspace_root: Path,
+        state_root: Path | None = None,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
     ) -> RunnerInvocation:
+        del state_root
         _profile_worker_purpose(self.profile_id, worker_purpose)
         if delegation_id is not None:
             _safe_identifier("delegation_id", delegation_id)
@@ -368,6 +371,7 @@ class ClaudeRunnerProfile:
         instruction: str,
         *,
         workspace_root: Path,
+        state_root: Path | None = None,
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
@@ -397,6 +401,11 @@ class ClaudeRunnerProfile:
         git_executable = resolve_trusted_executable(
             self.git_executable, workspace_root=workspace_root
         )
+        effective_state_root = (
+            Path(state_root if state_root is not None else workspace_root / ".agent-commons")
+            .expanduser()
+            .resolve()
+        )
         # Pass the sole MCP server as immutable argv material.  Strict mode
         # excludes ambient user/project MCP configuration, while the server
         # inherits only the broker-selected child session identity.
@@ -409,6 +418,8 @@ class ClaudeRunnerProfile:
                         "args": [
                             "--repo",
                             str(workspace_root.resolve()),
+                            "--state-root",
+                            str(effective_state_root),
                             "--delegation-id",
                             delegation_id,
                             "--git-executable",

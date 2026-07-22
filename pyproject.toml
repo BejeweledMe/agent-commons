@@ -8,6 +8,26 @@ version = "0.1.0"
 description = "A Git-friendly shared manager-space for heterogeneous coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+  {name = "Dmitrii Ershov"},
+]
+maintainers = [
+  {name = "Dmitrii Ershov"},
+]
+keywords = ["agents", "coordination", "governance", "llm", "mcp"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Version Control :: Git",
+]
 dependencies = [
   "click>=8.1",
   "jsonschema>=4.21",
@@ -21,12 +41,35 @@ mcp = [
 observability = [
   "opentelemetry-api>=1.29,<2",
 ]
-test = [
+test-core = [
+  "build>=1.2",
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.5",
   "pyflakes>=3.2",
 ]
+test-mcp = [
+  "build>=1.2",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "pyflakes>=3.2",
+  "mcp>=1.28,<2",
+]
+test = [
+  "build>=1.2",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "pyflakes>=3.2",
+  "mcp>=1.28,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/BejeweledMe/agent-commons"
+Documentation = "https://github.com/BejeweledMe/agent-commons/tree/main/docs"
+Issues = "https://github.com/BejeweledMe/agent-commons/issues"
+Changelog = "https://github.com/BejeweledMe/agent-commons/blob/main/CHANGELOG.md"
 
 [project.scripts]
 agent-commons = "agent_commons.cli:cli"

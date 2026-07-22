@@ -136,11 +136,12 @@ adapters cannot enforce it. A local Claude Code subscription stays selected by
 the already authenticated Claude CLI; Agent Commons never falls back to API
 credits or changes credentials.
 
-The broker also applies operator-configured global and profile limits. Effective
-child authority and budgets are the intersection of the parent grant, inherited
-limits, target profile, workspace policy, and broker policy. The first rollout
-uses depth 1 by default. A child may not create a sibling through a second client
-to evade lineage or budget checks.
+The broker also applies operator-configured global, per-provider, per-profile,
+aggregate parent-budget, queue-capacity, and queue-wait limits shared through
+the operational state root. Effective child authority and budgets are the
+minimum of the parent grant, delegation, target profile, and operator policy.
+The first rollout uses depth 1 by default. A child may not create a sibling
+through a second client to evade lineage or budget checks.
 
 Every worker gets a newly registered Commons session. Launching a reviewer does
 not waive the existing independent-review rule: `CommonsManager` still rejects a
@@ -335,11 +336,12 @@ sink remains the default, and deletion, loss, sampling, or exporter failure
 cannot change canonical behavior.
 
 The implemented signals are lifecycle kind/state/reason, duration, PID/exit code,
-bounded-output byte counts/truncation, provider/profile, and correlation IDs.
-Queue-depth metrics, retry/cancel counters, provider-reported budget totals, and
-long-lived causal spans are future additions. If metrics are added, unique task,
-session, delegation, and attempt IDs must not become labels with unbounded
-cardinality.
+bounded-output byte counts/truncation, provider/profile, correlation IDs, queue
+wait/depth, canonical finalization phase/state/reason, process/canonical
+mismatch, and content-free terminal-tool call/rejection/completion counters.
+Provider-reported budget totals and long-lived causal spans remain future
+additions. Unique task, session, delegation, and attempt IDs must not become
+metrics labels with unbounded cardinality.
 
 Prompts, responses, reasoning, complete conversations, file contents, tool
 arguments/results, shell commands, environment variables, credentials, and raw

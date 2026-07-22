@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import uuid
@@ -23,7 +22,7 @@ from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.domain.invalidations import derive_invalidation_state
 from agent_commons.domain.lifecycle import entity, validate_transition
-from agent_commons.domain.projection import ProjectSnapshot, project_events
+from agent_commons.domain.projection import ProjectionIssue, ProjectSnapshot, project_events
 from agent_commons.domain.revisions import resolve_revision, structural_correction_changes
 from agent_commons.domain.validation import validate_payload
 from agent_commons.errors import (
@@ -35,6 +34,7 @@ from agent_commons.errors import (
 )
 from agent_commons.index import SQLiteIndex
 from agent_commons.integrations import initialize_workspace
+from agent_commons.platform_support import lock_exclusive, require_supported_platform, unlock
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage import EventRecord, EventStore, ManifestStore, ReceiptRecovery
 from agent_commons.storage.events import semantic_event_body
@@ -115,6 +115,7 @@ class CommonsManager:
         state_root: str | Path | None = None,
         read_only: bool = False,
     ) -> None:
+        require_supported_platform()
         self.repo_root = Path(repo_root).expanduser().resolve()
         self.read_only = read_only
         self.paths = CommonsPaths.for_workspace(self.repo_root, state_root=state_root)
@@ -175,6 +176,7 @@ class CommonsManager:
         replace_onboarding: bool = False,
         replace_skills: bool = False,
     ) -> dict[str, Any]:
+        require_supported_platform()
         report = initialize_workspace(
             repo_root,
             integrations=integrations,
@@ -317,8 +319,7 @@ class CommonsManager:
         *,
         allow_missing_receipt: tuple[str, str] | None = None,
         actor: Mapping[str, Any] | None = None,
-        allowed_projection_warnings: frozenset[str] = frozenset(),
-        recovery_invalidation_payload: Mapping[str, Any] | None = None,
+        recovery_event: tuple[str, Mapping[str, Any]] | None = None,
     ) -> ProjectSnapshot:
         records, snapshot = self._records_and_snapshot()
         self.receipt_recovery.prepare_for_write(
@@ -329,22 +330,17 @@ class CommonsManager:
         manifest_issues, _ = self._manifest_reference_issues(records, snapshot)
         if manifest_issues:
             raise IntegrityError(manifest_issues[0])
-        allowed_warnings = set(allowed_projection_warnings)
-        if recovery_invalidation_payload is not None:
-            allowed_warnings.update(
-                self._warnings_resolved_by_invalidation(
-                    records,
-                    snapshot,
-                    recovery_invalidation_payload,
-                )
+        hard_issues = self._hard_projection_issues(snapshot)
+        if hard_issues and (
+            recovery_event is None
+            or not self._issues_resolved_by_maintenance(
+                records,
+                snapshot,
+                event_type=recovery_event[0],
+                payload=recovery_event[1],
             )
-        hard_warnings = [
-            warning
-            for warning in self._hard_projection_warnings(snapshot.warnings)
-            if warning not in allowed_warnings
-        ]
-        if hard_warnings:
-            raise IntegrityError(hard_warnings[0])
+        ):
+            raise IntegrityError(hard_issues[0].message)
         return snapshot
 
     def _manifest_reference_issues(
@@ -392,23 +388,25 @@ class CommonsManager:
         ]
         return issues, warnings
 
-    def _warnings_resolved_by_invalidation(
+    def _issues_resolved_by_maintenance(
         self,
         records: Sequence[EventRecord],
         snapshot: ProjectSnapshot,
+        *,
+        event_type: str,
         payload: Mapping[str, Any],
-    ) -> frozenset[str]:
-        """Allow only an invalidation that strictly improves existing hard warnings."""
+    ) -> bool:
+        """Allow only a maintenance event that strictly improves hard issues."""
 
-        current_hard = set(self._hard_projection_warnings(snapshot.warnings))
+        current_hard = self._hard_projection_issues(snapshot)
         if not current_hard:
-            return frozenset()
-        target = payload.get("target_ref")
-        if not isinstance(target, Mapping) or target.get("kind") != "event":
-            return frozenset()
-        target_event_id = str(target.get("id", ""))
-        if not any(record.event_id == target_event_id for record in records):
-            return frozenset()
+            return False
+        if event_type not in {
+            "event.corrected",
+            "event.invalidated",
+            "event.invalidation_revoked",
+        }:
+            return False
 
         synthetic_event_id = stable_id(
             "evt",
@@ -416,6 +414,7 @@ class CommonsManager:
                 (
                     "invalidation-integrity-preflight",
                     self.workspace_id,
+                    event_type,
                     canonical_sha256(payload),
                 )
             ),
@@ -427,60 +426,52 @@ class CommonsManager:
                     "event_id": synthetic_event_id,
                     "recorded_at": "9999-12-31T23:59:59Z",
                     "workspace_id": self.workspace_id,
-                    "event_type": "event.invalidated",
+                    "event_type": event_type,
                     "actor": {"session_id": self.session_id or "integrity-preflight"},
                     "payload": dict(payload),
                     "relations": [],
                 },
-            ]
+            ],
+            known_manifest_ids=(record.manifest_id for record in self.manifests.iter_manifests()),
         )
-        simulated_hard = set(self._hard_projection_warnings(simulated.warnings))
-        current_measure = self._hard_warning_measure(current_hard)
-        simulated_measure = self._hard_warning_measure(simulated_hard)
+        simulated_hard = self._hard_projection_issues(simulated)
+        current_measure = self._projection_issue_measure(current_hard)
+        simulated_measure = self._projection_issue_measure(simulated_hard)
         if set(simulated_measure) - set(current_measure):
-            return frozenset()
+            return False
         if any(simulated_measure.get(key, 0) > weight for key, weight in current_measure.items()):
-            return frozenset()
+            return False
         if not any(
             simulated_measure.get(key, 0) < weight for key, weight in current_measure.items()
         ):
-            return frozenset()
-        # Existing unrelated warnings may remain while conflicts with more than
-        # two heads are healed one event at a time. The preflight above ensures
-        # that every warning locus is non-worsening and at least one improves.
-        return frozenset(current_hard)
+            return False
+        return True
 
     @staticmethod
-    def _hard_warning_measure(warnings: Iterable[str]) -> dict[str, int]:
-        """Measure dynamic conflict warnings by locus and number of participants."""
+    def _projection_issue_measure(issues: Iterable[ProjectionIssue]) -> dict[str, int]:
+        """Measure structured issues by stable locus and participant count."""
 
         measure: dict[str, int] = {}
-        dynamic_prefixes = (
-            "conflicting accepted decisions for scope ",
-            "conflicting concurrent ",
-        )
-        for warning in warnings:
-            signature = warning
+        dynamic_codes = {
+            "concurrent_transition_conflict",
+            "correction_conflict",
+            "correction_revision_invalid",
+            "decision_scope_conflict",
+        }
+        for issue in issues:
+            signature = f"{issue.code}:{issue.message}"
             weight = 1
-            if warning.startswith(dynamic_prefixes):
-                locus, separator, participants = warning.partition(": ")
-                if separator:
-                    signature = locus
-                    weight = max(
-                        1,
-                        len(
-                            [participant for participant in participants.split(", ") if participant]
-                        ),
-                    )
+            if issue.code in dynamic_codes:
+                locus = issue.message.partition(": ")[0]
+                root = issue.event_ids[0] if issue.code.startswith("correction_") else ""
+                signature = f"{issue.code}:{root}:{locus}"
+                weight = max(1, len(issue.event_ids))
             measure[signature] = measure.get(signature, 0) + weight
         return measure
 
     @staticmethod
-    def _hard_projection_warnings(warnings: Sequence[str]) -> list[str]:
-        markers = ("conflict", "rejected by lifecycle", "rejected by domain validation")
-        return [
-            warning for warning in warnings if any(marker in warning.lower() for marker in markers)
-        ]
+    def _hard_projection_issues(snapshot: ProjectSnapshot) -> list[ProjectionIssue]:
+        return [issue for issue in snapshot.issues if issue.severity == "error"]
 
     def _sync_index(self) -> dict[str, int]:
         with SQLiteIndex(self.paths, self.events, self.manifests) as index:
@@ -498,13 +489,14 @@ class CommonsManager:
                 os.fchmod(handle.fileno(), 0o600)
             except OSError:
                 pass
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            lock_exclusive(handle.fileno())
             try:
                 yield
             finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                unlock(handle.fileno())
 
     def _idempotency_key(self, event_type: str, value: str | None) -> str:
+        self.events.idempotency.refresh_scope()
         key = value or f"{event_type}:{uuid.uuid4().hex}"
         if not key.strip() or len(key) > 512:
             raise ValidationError("idempotency_key must contain 1 to 512 characters")
@@ -766,23 +758,18 @@ class CommonsManager:
                 "tags": list(tags),
             }
             self.policy.assert_safe(pending, context="canonical write request")
-            allowed_projection_warnings: frozenset[str] = frozenset()
-            if event_type == "event.corrected" and payload_value.get(
-                "superseded_correction_event_ids"
-            ):
-                target_event_id = str(payload_value["target_event_id"])
-                allowed_projection_warnings = frozenset(
-                    {
-                        "corrections have multiple active heads",
-                        f"event {target_event_id} has conflicting corrections",
-                    }
-                )
             snapshot = self._guard_integrity(
                 allow_missing_receipt=(namespace, key),
                 actor=actor,
-                allowed_projection_warnings=allowed_projection_warnings,
-                recovery_invalidation_payload=(
-                    payload_value if event_type == "event.invalidated" else None
+                recovery_event=(
+                    (event_type, payload_value)
+                    if event_type
+                    in {
+                        "event.corrected",
+                        "event.invalidated",
+                        "event.invalidation_revoked",
+                    }
+                    else None
                 ),
             )
             reservation = self.events.idempotency.lookup(namespace=namespace, key=key)
@@ -864,7 +851,6 @@ class CommonsManager:
                 list(self.events.iter_events()),
                 actor=actor,
             )
-            index_result = self._sync_index()
         return {
             "event_id": record.event_id,
             "event_type": event_type,
@@ -873,7 +859,11 @@ class CommonsManager:
             "idempotency_key": key,
             "created": record.created,
             "repaired": record.repaired,
-            "index": index_result,
+            "index": {
+                "mode": "deferred",
+                "synchronized": False,
+                "next_action": "agent-commons index rebuild",
+            },
         }
 
     def orient(self, *, max_items: int = 20) -> dict[str, Any]:
@@ -1049,6 +1039,7 @@ class CommonsManager:
         action: str,
         *,
         idempotency_key: str | None = None,
+        relations: Sequence[Mapping[str, Any]] = (),
         **fields: Any,
     ) -> dict[str, Any]:
         event_type = f"task.{action}"
@@ -1057,6 +1048,7 @@ class CommonsManager:
             event_type,
             {"task_id": task_id, "expected_revision": expected_revision, **fields},
             idempotency_key=key,
+            relations=relations,
             tags=("task",),
         )
 
@@ -1095,13 +1087,17 @@ class CommonsManager:
         artifact_refs: Sequence[Mapping[str, str]] = (),
         **kwargs: Any,
     ) -> dict[str, Any]:
-        refs = self._assert_refs_exist(artifact_refs)
+        bindings = self._bind_evidence_refs(artifact_refs)
+        refs = [dict(binding["ref"]) for binding in bindings]
+        subject = {"kind": "task", "id": task_id}
         return self._task_transition(
             task_id,
             expected_revision,
             "completed",
             summary=summary,
             artifact_refs=refs,
+            artifact_bindings=bindings,
+            relations=[self._relation(subject, "depends_on", ref) for ref in refs],
             **kwargs,
         )
 
@@ -1114,13 +1110,17 @@ class CommonsManager:
         artifact_refs: Sequence[Mapping[str, str]] = (),
         **kwargs: Any,
     ) -> dict[str, Any]:
-        refs = self._assert_refs_exist(artifact_refs)
+        bindings = self._bind_evidence_refs(artifact_refs)
+        refs = [dict(binding["ref"]) for binding in bindings]
+        subject = {"kind": "task", "id": task_id}
         return self._task_transition(
             task_id,
             expected_revision,
             "submitted",
             summary=summary,
             artifact_refs=refs,
+            artifact_bindings=bindings,
+            relations=[self._relation(subject, "depends_on", ref) for ref in refs],
             **kwargs,
         )
 
@@ -2118,6 +2118,7 @@ class CommonsManager:
         """Audit and tombstone an orphan receipt that cannot be retried."""
 
         normalized_reason = reason.strip()
+        self.events.idempotency.refresh_scope()
         if (
             not normalized_reason
             or len(normalized_reason) > 2048
@@ -2173,6 +2174,7 @@ class CommonsManager:
         return dict(abandonment)
 
     def receipt_status(self) -> dict[str, Any]:
+        self.events.idempotency.refresh_scope()
         records, _ = self._records_and_snapshot()
         return self.receipt_recovery.status(records)
 
@@ -2182,6 +2184,7 @@ class CommonsManager:
         adopt_legacy_orphans: Sequence[str] = (),
         prepare_rollback: bool = False,
     ) -> dict[str, Any]:
+        self.events.idempotency.refresh_scope()
         with self._canonical_write_lock():
             actor = self._actor()
             records, _ = self._records_and_snapshot()
@@ -2259,13 +2262,16 @@ class CommonsManager:
             return asdict(index.rebuild())
 
     def doctor(self) -> dict[str, Any]:
+        self.events.idempotency.refresh_scope()
         issues: list[str] = []
         warnings: list[str] = []
         event_count = 0
         manifest_count = 0
+        replay_metrics: dict[str, int] | None = None
         try:
             records, snapshot = self._records_and_snapshot()
             event_count = len(records)
+            replay_metrics = dict(snapshot.replay_metrics)
             warnings.extend(snapshot.warnings)
             if self.read_only:
                 warnings.append(
@@ -2281,7 +2287,7 @@ class CommonsManager:
             )
             issues.extend(manifest_issues)
             warnings.extend(manifest_warnings)
-            issues.extend(self._hard_projection_warnings(snapshot.warnings))
+            issues.extend(issue.message for issue in self._hard_projection_issues(snapshot))
         except Exception as exc:
             issues.append(f"events: {exc}")
         try:
@@ -2315,4 +2321,10 @@ class CommonsManager:
             "issues": issues,
             "warnings": sorted(set(warnings)),
             "index": index_result,
+            "performance": {
+                "canonical_write_index_policy": "deferred",
+                "projection": replay_metrics,
+                "receipt_scope_refreshes": self.events.idempotency.scope_refresh_count,
+                "receipt_scope_git_probes": self.events.idempotency.scope_git_probe_count,
+            },
         }

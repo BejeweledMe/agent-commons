@@ -21,10 +21,14 @@ from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 
 
 class TelemetryKind(StrEnum):
+    REQUEST_QUEUED = "request_queued"
     REQUEST_RESERVED = "request_reserved"
     PROCESS_STARTING = "process_starting"
     PROCESS_STARTED = "process_started"
     PROCESS_FINISHED = "process_finished"
+    CANONICAL_FINALIZATION_STARTED = "canonical_finalization_started"
+    CANONICAL_FINALIZATION_COMPLETED = "canonical_finalization_completed"
+    CANONICAL_FINALIZATION_FAILED = "canonical_finalization_failed"
     ATTEMPT_RECONCILED = "attempt_reconciled"
 
 
@@ -48,6 +52,15 @@ class TelemetryEvent:
     stdout_bytes_seen: int = 0
     stderr_bytes_seen: int = 0
     output_truncated: bool = False
+    canonical_state: str | None = None
+    canonical_reason_code: str | None = None
+    process_canonical_mismatch: bool | None = None
+    terminal_tool_calls: int = 0
+    terminal_tool_rejections: int = 0
+    terminal_tool_completions: int = 0
+    terminal_tool_audit_available: bool | None = None
+    queue_depth: int | None = None
+    queued_milliseconds: int | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "kind", TelemetryKind(self.kind))
@@ -59,6 +72,10 @@ class TelemetryEvent:
         _safe_identifier("attempt_id", self.attempt_id)
         _safe_identifier("telemetry state", self.state)
         _safe_identifier("telemetry reason", self.reason)
+        if self.canonical_state is not None:
+            _safe_identifier("telemetry canonical_state", self.canonical_state)
+        if self.canonical_reason_code is not None:
+            _safe_identifier("telemetry canonical_reason_code", self.canonical_reason_code)
         object.__setattr__(self, "diagnostic_code", DiagnosticCode(self.diagnostic_code))
         try:
             datetime.fromisoformat(self.recorded_at.replace("Z", "+00:00"))
@@ -72,18 +89,38 @@ class TelemetryEvent:
             isinstance(self.exit_code, bool) or not isinstance(self.exit_code, int)
         ):
             raise ValidationError("telemetry exit_code is invalid")
-        for name in ("stdout_bytes_seen", "stderr_bytes_seen"):
+        for name in (
+            "stdout_bytes_seen",
+            "stderr_bytes_seen",
+            "terminal_tool_calls",
+            "terminal_tool_rejections",
+            "terminal_tool_completions",
+        ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValidationError(f"{name} cannot be negative")
         if not isinstance(self.output_truncated, bool):
             raise ValidationError("telemetry output_truncated must be a boolean")
+        if self.process_canonical_mismatch is not None and not isinstance(
+            self.process_canonical_mismatch, bool
+        ):
+            raise ValidationError("telemetry process_canonical_mismatch must be a boolean")
+        if self.terminal_tool_audit_available is not None and not isinstance(
+            self.terminal_tool_audit_available, bool
+        ):
+            raise ValidationError("telemetry terminal_tool_audit_available must be a boolean")
         if self.duration_milliseconds is not None and (
             isinstance(self.duration_milliseconds, bool)
             or not isinstance(self.duration_milliseconds, int)
             or self.duration_milliseconds < 0
         ):
             raise ValidationError("telemetry duration cannot be negative")
+        for name in ("queue_depth", "queued_milliseconds"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+            ):
+                raise ValidationError(f"telemetry {name} cannot be negative")
 
     @classmethod
     def create(
@@ -116,7 +153,7 @@ class TelemetryEvent:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "schema": "agent_commons.runtime_telemetry.v1",
+            "schema": "agent_commons.runtime_telemetry.v2",
             "kind": self.kind.value,
             "recorded_at": self.recorded_at,
             "correlation": self.correlation.as_dict(),
@@ -133,6 +170,15 @@ class TelemetryEvent:
             "stdout_bytes_seen": self.stdout_bytes_seen,
             "stderr_bytes_seen": self.stderr_bytes_seen,
             "output_truncated": self.output_truncated,
+            "canonical_state": self.canonical_state,
+            "canonical_reason_code": self.canonical_reason_code,
+            "process_canonical_mismatch": self.process_canonical_mismatch,
+            "terminal_tool_calls": self.terminal_tool_calls,
+            "terminal_tool_rejections": self.terminal_tool_rejections,
+            "terminal_tool_completions": self.terminal_tool_completions,
+            "terminal_tool_audit_available": self.terminal_tool_audit_available,
+            "queue_depth": self.queue_depth,
+            "queued_milliseconds": self.queued_milliseconds,
         }
 
     def as_otel_attributes(self) -> dict[str, str | int | bool]:
@@ -157,6 +203,15 @@ class TelemetryEvent:
             "agent_commons.output.stdout_bytes_seen": self.stdout_bytes_seen,
             "agent_commons.output.stderr_bytes_seen": self.stderr_bytes_seen,
             "agent_commons.output.truncated": self.output_truncated,
+            "agent_commons.canonical.state": self.canonical_state,
+            "agent_commons.canonical.reason_code": self.canonical_reason_code,
+            "agent_commons.process_canonical_mismatch": self.process_canonical_mismatch,
+            "agent_commons.terminal_tool.calls": self.terminal_tool_calls,
+            "agent_commons.terminal_tool.rejections": self.terminal_tool_rejections,
+            "agent_commons.terminal_tool.completions": self.terminal_tool_completions,
+            "agent_commons.terminal_tool.audit_available": self.terminal_tool_audit_available,
+            "agent_commons.queue.depth": self.queue_depth,
+            "agent_commons.queue.wait_ms": self.queued_milliseconds,
             "agent_commons.capture_content": False,
         }
         return {key: value for key, value in values.items() if value is not None}

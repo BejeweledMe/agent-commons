@@ -7,7 +7,6 @@ blocks.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -24,6 +23,7 @@ import yaml
 
 from agent_commons.core.ids import is_typed_id, new_sortable_id
 from agent_commons.errors import ConfigurationError
+from agent_commons.platform_support import lock_exclusive, unlock
 
 MANAGED_BLOCK_START = "<!-- agent-commons:managed:start -->"
 MANAGED_BLOCK_END = "<!-- agent-commons:managed:end -->"
@@ -368,10 +368,10 @@ def _installation_lock(root: Path):
         raise ConfigurationError("installer lock file cannot be opened safely") from exc
     try:
         os.fchmod(descriptor, 0o600)
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        lock_exclusive(descriptor)
         yield
     finally:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        unlock(descriptor)
         os.close(descriptor)
 
 

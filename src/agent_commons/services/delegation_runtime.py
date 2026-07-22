@@ -8,13 +8,14 @@ project acceptance.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import stat
 import threading
+import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
+from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -38,17 +40,23 @@ from agent_commons.runtime import (
     BrokerResult,
     BuiltinProfileId,
     CorrelationIds,
+    DiagnosticCode,
     JsonlTelemetrySink,
     LocalBroker,
     NoopTelemetrySink,
     OpenTelemetrySink,
+    OperatorLimits,
     ProfileRegistry,
     Provider,
     RuntimePolicy,
     SubprocessRunner,
+    TelemetryEvent,
+    TelemetryKind,
     TelemetrySink,
+    TerminalToolAuditStore,
     default_profile_registry,
     diagnostic_hint,
+    diagnostic_safe_next_actions,
 )
 
 from .manager import CommonsManager
@@ -101,20 +109,26 @@ def _delegation_lock(state_root: Path, delegation_id: str) -> Iterator[None]:
         )
         try:
             os.fchmod(descriptor, 0o600)
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            lock_exclusive(descriptor)
             yield
         finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            unlock(descriptor)
             os.close(descriptor)
 
 
-def load_profile_registry(
+@dataclass(frozen=True, slots=True)
+class RuntimeConfiguration:
+    profiles: ProfileRegistry
+    limits: OperatorLimits
+
+
+def load_runtime_configuration(
     path: str | Path | None, *, workspace_root: str | Path | None = None
-) -> ProfileRegistry:
-    """Load strict operator-owned profile configuration or conservative defaults."""
+) -> RuntimeConfiguration:
+    """Load strict operator-owned profiles and shared admission limits."""
 
     if path is None:
-        return default_profile_registry()
+        return RuntimeConfiguration(default_profile_registry(), OperatorLimits())
     source = Path(path).expanduser()
     if workspace_root is not None:
         try:
@@ -155,7 +169,31 @@ def load_profile_registry(
         raise ConfigurationError("runtime profile config is not valid UTF-8 YAML") from exc
     if not isinstance(value, Mapping):
         raise ConfigurationError("runtime profile config must be a mapping")
-    return ProfileRegistry.from_mapping(value)
+    unknown = sorted(set(value) - {"profiles", "limits"})
+    if unknown or "profiles" not in value:
+        detail = ", ".join(unknown) if unknown else "profiles"
+        raise ConfigurationError(
+            "runtime config requires profiles and supports only profiles/limits; invalid: " + detail
+        )
+    raw_limits = value.get("limits")
+    if raw_limits is not None and not isinstance(raw_limits, Mapping):
+        raise ConfigurationError("runtime operator limits must be a mapping")
+    try:
+        limits = OperatorLimits.from_mapping(raw_limits)
+    except ValidationError as exc:
+        raise ConfigurationError("runtime operator limits are invalid") from exc
+    return RuntimeConfiguration(
+        ProfileRegistry.from_mapping({"profiles": value["profiles"]}),
+        limits,
+    )
+
+
+def load_profile_registry(
+    path: str | Path | None, *, workspace_root: str | Path | None = None
+) -> ProfileRegistry:
+    """Compatibility wrapper returning profiles from the full runtime config."""
+
+    return load_runtime_configuration(path, workspace_root=workspace_root).profiles
 
 
 def telemetry_sink(name: str, manager: CommonsManager) -> TelemetrySink:
@@ -170,10 +208,14 @@ def telemetry_sink(name: str, manager: CommonsManager) -> TelemetrySink:
     raise ConfigurationError("runtime telemetry must be one of: none, local, otel")
 
 
-def profile_summaries(profiles: ProfileRegistry) -> list[dict[str, Any]]:
+def profile_summaries(
+    profiles: ProfileRegistry,
+    limits: OperatorLimits | None = None,
+) -> list[dict[str, Any]]:
     """Describe launch capabilities without constructing writable runtime state."""
 
     values: list[dict[str, Any]] = []
+    effective_limits = limits or OperatorLimits()
     for profile_id in profiles.profile_ids:
         profile = profiles.get(profile_id)
         trusted_workspace = bool(getattr(profile, "trusted_workspace", False))
@@ -184,6 +226,7 @@ def profile_summaries(profiles: ProfileRegistry) -> list[dict[str, Any]]:
             {
                 "profile_id": profile_id.value,
                 "provider": profile.provider.value,
+                "release_stage": "experimental_manual_opt_in",
                 "independent_reviewer": profile_id.independent_reviewer,
                 "launch_mode": (
                     "scoped-reviewer"
@@ -199,6 +242,23 @@ def profile_summaries(profiles: ProfileRegistry) -> list[dict[str, Any]]:
                     if profile.supports_budget
                     else ["provider_units"]
                 ),
+                "operator_limits": {
+                    "global_concurrency": effective_limits.global_concurrency,
+                    "provider_concurrency": effective_limits.provider_concurrency_cap(
+                        profile.provider.value
+                    ),
+                    "profile_concurrency": effective_limits.profile_concurrency_cap(
+                        profile_id.value
+                    ),
+                    "parent_provider_units": effective_limits.provider_units_cap(
+                        profile.provider.value
+                    ),
+                    "parent_budget_microusd": effective_limits.budget_microusd_cap(
+                        profile.provider.value
+                    ),
+                    "queue_capacity": effective_limits.queue_capacity,
+                    "queue_wait_seconds": effective_limits.queue_wait_seconds,
+                },
             }
         )
     return values
@@ -245,31 +305,200 @@ class DelegationRuntimeService:
         manager: CommonsManager,
         *,
         profiles: ProfileRegistry | None = None,
+        operator_limits: OperatorLimits | None = None,
         attempts: AttemptStore | None = None,
         runner: SubprocessRunner | None = None,
         telemetry: TelemetrySink | None = None,
+        tool_audit: TerminalToolAuditStore | None = None,
     ) -> None:
         self.manager = manager
         self.profiles = profiles or default_profile_registry()
+        self.operator_limits = operator_limits or (
+            attempts.operator_limits if attempts is not None else OperatorLimits()
+        )
+        if attempts is not None and operator_limits is not None:
+            if attempts.operator_limits != operator_limits:
+                raise ConfigurationError(
+                    "injected attempt store and runtime service use different operator limits"
+                )
         self.attempts = attempts or AttemptStore(
             manager.paths.state_root,
+            operator_limits=self.operator_limits,
             security_policy=manager.policy,
             read_only=manager.read_only,
         )
         self.runner = runner or SubprocessRunner()
         self.telemetry = telemetry or NoopTelemetrySink()
+        self.tool_audit = tool_audit or TerminalToolAuditStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=manager.read_only,
+        )
 
     def profile_summaries(self) -> list[dict[str, Any]]:
         """Expose capabilities, never executable argv or hidden provider configuration."""
 
-        return profile_summaries(self.profiles)
+        return profile_summaries(self.profiles, self.operator_limits)
 
     def list_attempts(self, *, diagnostic: bool = False) -> list[dict[str, Any]]:
         values = [attempt.as_dict() for attempt in self.attempts.list_attempts()]
-        if diagnostic:
-            for value in values:
-                value["diagnostic_hint"] = diagnostic_hint(str(value["diagnostic_code"]))
+        canonical = {item["id"]: item for item in self.manager.list_delegations(state=None)}
+        for value in values:
+            delegation_id = str(value["correlation"]["delegation_id"])
+            delegation = canonical.get(delegation_id)
+            audit = self._tool_audit_metadata(delegation_id)
+            value.update(
+                {
+                    "canonical_state": delegation.get("state") if delegation else None,
+                    "canonical_reason_code": (
+                        self._canonical_reason_code(delegation) if delegation else None
+                    ),
+                    "process_canonical_mismatch": self._process_canonical_mismatch(
+                        AttemptState(str(value["state"])), delegation
+                    ),
+                    **audit,
+                }
+            )
+            if diagnostic:
+                workflow_code = self._workflow_diagnostic_code(value)
+                value["workflow_diagnostic_code"] = workflow_code.value
+                value["diagnostic_hint"] = diagnostic_hint(workflow_code)
+                value["safe_next_actions"] = diagnostic_safe_next_actions(workflow_code)
         return values
+
+    @staticmethod
+    def _workflow_diagnostic_code(value: Mapping[str, Any]) -> DiagnosticCode:
+        stored = DiagnosticCode(str(value["diagnostic_code"]))
+        if stored not in {DiagnosticCode.NONE, DiagnosticCode.LEGACY_UNCLASSIFIED}:
+            return stored
+        if value.get("process_canonical_mismatch") is True:
+            if int(value.get("terminal_tool_calls", 0)) == 0:
+                return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
+            if (
+                int(value.get("terminal_tool_rejections", 0)) > 0
+                and int(value.get("terminal_tool_completions", 0)) == 0
+            ):
+                return DiagnosticCode.TERMINAL_TOOL_REJECTED
+            return DiagnosticCode.PROCESS_CANONICAL_MISMATCH
+        return stored
+
+    @staticmethod
+    def _canonical_reason_code(canonical: Mapping[str, Any]) -> str:
+        return str(canonical.get("reason_code") or canonical.get("state") or "unknown")
+
+    @staticmethod
+    def _process_canonical_mismatch(
+        attempt_state: AttemptState,
+        canonical: Mapping[str, Any] | None,
+    ) -> bool | None:
+        if canonical is None or not attempt_state.terminal:
+            return None
+        expected = {
+            AttemptState.SUCCEEDED: "succeeded",
+            AttemptState.FAILED: "failed",
+            AttemptState.CANCELLED: "cancelled",
+            AttemptState.TIMED_OUT: "timed_out",
+            AttemptState.NEEDS_OPERATOR: "needs_operator",
+        }.get(attempt_state)
+        return expected != canonical.get("state")
+
+    def _emit(self, event: TelemetryEvent) -> int:
+        try:
+            self.telemetry.emit(event)
+        except Exception:
+            return 1
+        return 0
+
+    def _tool_audit_metadata(self, delegation_id: str) -> dict[str, int | bool]:
+        try:
+            audit = self.tool_audit.get(delegation_id)
+        except Exception:
+            return {
+                "terminal_tool_calls": 0,
+                "terminal_tool_rejections": 0,
+                "terminal_tool_completions": 0,
+                "terminal_tool_audit_available": False,
+            }
+        return {
+            "terminal_tool_calls": audit.terminal_tool_calls,
+            "terminal_tool_rejections": audit.terminal_tool_rejections,
+            "terminal_tool_completions": audit.terminal_tool_completions,
+            "terminal_tool_audit_available": True,
+        }
+
+    def _finalization_event(
+        self,
+        kind: TelemetryKind,
+        attempt: Attempt,
+        *,
+        canonical: Mapping[str, Any],
+        duration_milliseconds: int | None = None,
+    ) -> TelemetryEvent:
+        audit = self._tool_audit_metadata(attempt.correlation.delegation_id)
+        return TelemetryEvent.create(
+            kind=kind,
+            correlation=attempt.correlation,
+            request_id=attempt.request_id,
+            attempt_id=attempt.attempt_id,
+            provider=attempt.provider,
+            profile_id=attempt.profile_id,
+            state=attempt.state.value,
+            reason=(
+                "canonical_finalization_failed"
+                if kind is TelemetryKind.CANONICAL_FINALIZATION_FAILED
+                else "canonical_finalization_completed"
+                if kind is TelemetryKind.CANONICAL_FINALIZATION_COMPLETED
+                else "canonical_finalization_started"
+            ),
+            diagnostic_code=attempt.diagnostic_code,
+            pid=attempt.pid,
+            exit_code=attempt.exit_code,
+            duration_milliseconds=duration_milliseconds,
+            stdout_bytes_seen=attempt.stdout_bytes_seen,
+            stderr_bytes_seen=attempt.stderr_bytes_seen,
+            output_truncated=attempt.output_truncated,
+            canonical_state=str(canonical.get("state") or "unknown"),
+            canonical_reason_code=self._canonical_reason_code(canonical),
+            process_canonical_mismatch=(
+                None
+                if kind is TelemetryKind.CANONICAL_FINALIZATION_STARTED
+                else self._process_canonical_mismatch(attempt.state, canonical)
+            ),
+            **audit,
+        )
+
+    def _finalize_attempt(self, attempt: Attempt) -> tuple[dict[str, Any], int]:
+        before = self.manager.get_delegation(attempt.correlation.delegation_id)
+        failures = self._emit(
+            self._finalization_event(
+                TelemetryKind.CANONICAL_FINALIZATION_STARTED,
+                attempt,
+                canonical=before,
+            )
+        )
+        started = time.monotonic()
+        try:
+            canonical = self._transition_after_attempt(attempt)
+        except Exception:
+            current = self.manager.get_delegation(attempt.correlation.delegation_id)
+            failures += self._emit(
+                self._finalization_event(
+                    TelemetryKind.CANONICAL_FINALIZATION_FAILED,
+                    attempt,
+                    canonical=current,
+                    duration_milliseconds=round((time.monotonic() - started) * 1_000),
+                )
+            )
+            raise
+        failures += self._emit(
+            self._finalization_event(
+                TelemetryKind.CANONICAL_FINALIZATION_COMPLETED,
+                attempt,
+                canonical=canonical,
+                duration_milliseconds=round((time.monotonic() - started) * 1_000),
+            )
+        )
+        return canonical, failures
 
     @staticmethod
     def _policies(delegation: Mapping[str, Any]) -> tuple[RuntimePolicy, RuntimePolicy]:
@@ -294,6 +523,10 @@ class DelegationRuntimeService:
                 "provider_units budget must cover every permitted provider-process attempt"
             )
         monetary_budget = int(budget["limit"]) if budget_unit == "micro_usd" else None
+        if monetary_budget is not None and monetary_budget < int(limits["max_attempts"]):
+            raise ConfigurationError(
+                "micro_usd budget must allocate at least one unit to every permitted attempt"
+            )
         parent = RuntimePolicy(
             remaining_depth=remaining_depth,
             max_fanout=int(limits["max_concurrency"]),
@@ -303,7 +536,13 @@ class DelegationRuntimeService:
             max_output_bytes=1_048_576,
             max_budget_microusd=monetary_budget,
         )
-        child = parent.derive_child()
+        child = parent.derive_child(
+            max_budget_microusd=(
+                monetary_budget // int(limits["max_attempts"])
+                if monetary_budget is not None
+                else None
+            )
+        )
         return parent, child
 
     def _open_child_session(
@@ -538,18 +777,32 @@ acceptance.
         )
         return self.manager.get_delegation(str(current["id"]))
 
-    @staticmethod
     def _public_result(
+        self,
         *,
         canonical: Mapping[str, Any],
         result: BrokerResult,
     ) -> dict[str, Any]:
         process = result.process
+        attempt = result.attempt.as_dict()
+        attempt.update(
+            {
+                "canonical_state": canonical.get("state"),
+                "canonical_reason_code": self._canonical_reason_code(canonical),
+                "process_canonical_mismatch": self._process_canonical_mismatch(
+                    result.attempt.state, canonical
+                ),
+                **self._tool_audit_metadata(result.attempt.correlation.delegation_id),
+            }
+        )
+        workflow_code = self._workflow_diagnostic_code(attempt)
         return {
             "delegation": dict(canonical),
-            "attempt": result.attempt.as_dict(),
+            "attempt": attempt,
             "reused": result.reused,
             "telemetry_failures": result.telemetry_failures,
+            "workflow_diagnostic_code": workflow_code.value,
+            "safe_next_actions": diagnostic_safe_next_actions(workflow_code),
             "process": (
                 {
                     "outcome": process.outcome.value,
@@ -561,6 +814,7 @@ acceptance.
                     "output_truncated": process.output_truncated,
                     "diagnostic_code": result.attempt.diagnostic_code.value,
                     "diagnostic_hint": diagnostic_hint(result.attempt.diagnostic_code),
+                    "workflow_diagnostic_code": workflow_code.value,
                 }
                 if process is not None
                 else None
@@ -601,10 +855,15 @@ acceptance.
                             AttemptState.NEEDS_OPERATOR,
                             reason="broker_restart_ambiguous",
                         )
-                    canonical = self._transition_after_attempt(existing)
+                    canonical, telemetry_failures = self._finalize_attempt(existing)
                     return self._public_result(
                         canonical=canonical,
-                        result=BrokerResult(attempt=existing, process=None, reused=True),
+                        result=BrokerResult(
+                            attempt=existing,
+                            process=None,
+                            reused=True,
+                            telemetry_failures=telemetry_failures,
+                        ),
                     )
 
             if delegation.get("state") != "requested":
@@ -633,6 +892,7 @@ acceptance.
             profile.build_invocation(
                 instruction,
                 workspace_root=self.manager.repo_root,
+                state_root=self.manager.paths.state_root,
                 delegation_id=delegation_id,
                 max_budget_microusd=child_policy.max_budget_microusd,
                 worker_purpose=str(delegation["purpose"]),
@@ -640,6 +900,14 @@ acceptance.
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
             nonce = str(child["nonce"])
+            # Bind the exact child identity through the same effective state
+            # root before any paid provider process can start.
+            child_manager = CommonsManager(
+                self.manager.repo_root,
+                session_id=child_session_id,
+                state_root=self.manager.paths.state_root,
+            )
+            child_manager.sessions.require_active(child_session_id)
             target = delegation["target_ref"]
             trace_id = hashlib.sha256(
                 (
@@ -673,6 +941,7 @@ acceptance.
                         profile_id=profile_id,
                         instruction=instruction,
                         cwd=self.manager.repo_root,
+                        state_root=self.manager.paths.state_root,
                         correlation=correlation,
                         parent_policy=parent_policy,
                         child_policy=child_policy,
@@ -681,7 +950,11 @@ acceptance.
                         retry=retry,
                     )
                 )
-                canonical = self._transition_after_attempt(result.attempt)
+                canonical, finalization_failures = self._finalize_attempt(result.attempt)
+                result = replace(
+                    result,
+                    telemetry_failures=result.telemetry_failures + finalization_failures,
+                )
             finally:
                 current = canonical or self.manager.get_delegation(delegation_id)
                 attempt_terminal = result is not None and result.attempt.state.terminal
@@ -719,6 +992,12 @@ acceptance.
                         AttemptState.NEEDS_OPERATOR,
                         reason="broker_restart_ambiguous",
                     )
-                current = self._transition_after_attempt(attempt)
-                values.append({"attempt": attempt.as_dict(), "delegation": current})
+                current, telemetry_failures = self._finalize_attempt(attempt)
+                values.append(
+                    {
+                        "attempt": attempt.as_dict(),
+                        "delegation": current,
+                        "telemetry_failures": telemetry_failures,
+                    }
+                )
         return values

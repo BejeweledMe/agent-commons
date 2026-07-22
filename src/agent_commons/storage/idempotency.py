@@ -43,6 +43,9 @@ class IdempotencyStore:
         self.paths = paths
         self.schemas = schemas
         self._workspace_id = workspace_id
+        self._scope_cache: dict[str, str] | None = None
+        self.scope_refresh_count = 0
+        self.scope_git_probe_count = 0
 
     def bind_workspace(self, workspace_id: str) -> None:
         if not isinstance(workspace_id, str) or not workspace_id:
@@ -59,7 +62,23 @@ class IdempotencyStore:
 
     @property
     def scope(self) -> dict[str, str]:
-        return receipt_scope_descriptor(self.paths.repo_root, self.workspace_id)
+        if self._scope_cache is None:
+            self.refresh_scope()
+        assert self._scope_cache is not None
+        return dict(self._scope_cache)
+
+    def refresh_scope(self) -> dict[str, str]:
+        """Probe Git once per public operation, then reuse the stable descriptor."""
+
+        scope = receipt_scope_descriptor(self.paths.repo_root, self.workspace_id)
+        self._scope_cache = scope
+        self.scope_refresh_count += 1
+        self.scope_git_probe_count += {
+            "symbolic": 2,
+            "detached": 3,
+            "non-git": 1,
+        }[scope["ref_kind"]]
+        return dict(scope)
 
     @property
     def scope_root(self) -> Path:

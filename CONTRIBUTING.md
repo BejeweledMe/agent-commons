@@ -10,11 +10,17 @@ boundary need an explicit ADR.
 python -m venv .venv
 .venv/bin/pip install -e '.[test]'
 .venv/bin/pytest
-.venv/bin/ruff check src tests
-.venv/bin/ruff format --check src tests
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+python -m build
 ```
 
-The package supports Python 3.11 and later. Tests must not require network access.
+The full `test` extra includes MCP because the repository suite crosses real
+MCP stdio. Use `test-core` only for a deliberately core-only environment and
+`test-mcp` for the optional surface. CI runs the full suite from clean
+environments on macOS/Linux with Python 3.11, 3.12, 3.13, and 3.14, then installs and
+smoke-tests the built wheel. Tests must not require network access or provider
+credentials.
 
 ## Change boundaries
 
@@ -33,6 +39,8 @@ The package supports Python 3.11 and later. Tests must not require network acces
 Behavior changes need focused tests plus the complete suite. Storage or lifecycle
 changes also need crash/retry and concurrent-writer coverage. Integration changes
 must verify both Codex and Claude Code installations and wheel packaging.
+Runtime changes must keep the deterministic behavioral canary green and add
+content-free telemetry assertions when they cross a lifecycle boundary.
 
 Do not stage, commit, publish, or modify another project as a side effect of a
 test or initialization command.

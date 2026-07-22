@@ -57,6 +57,51 @@ def test_task_lifecycle_and_revision() -> None:
     assert snapshot.tasks[task_id]["work_author_session_ids"] == ["session.test"]
 
 
+def test_projection_indexes_corrections_by_target_and_reports_bounded_work() -> None:
+    roots = [
+        event(
+            number,
+            "objective.created",
+            {
+                "objective_id": f"objective.{number:026d}",
+                "title": f"Objective {number}",
+                "description": "bounded replay",
+                "acceptance_criteria": ["projected"],
+            },
+            "objective",
+            f"objective.{number:026d}",
+        )
+        for number in range(1, 101)
+    ]
+    corrections = [
+        event(
+            100 + offset,
+            "event.corrected",
+            {
+                "target_event_id": root["event_id"],
+                "expected_target_sha256": canonical_sha256(root),
+                "replacement_payload": {
+                    **root["payload"],
+                    "title": f"Corrected {offset}",
+                },
+            },
+            "event",
+            root["event_id"],
+        )
+        for offset, root in enumerate(roots[:20], start=1)
+    ]
+
+    snapshot = project_events([*roots, *corrections])
+
+    assert snapshot.replay_metrics == {
+        "events_replayed": 120,
+        "corrections_indexed": 20,
+        "correction_targets": 20,
+        "correction_candidates_examined": 20,
+        "fixed_point_passes": 1,
+    }
+
+
 def test_conflicting_accepted_decisions_warn_fail_closed() -> None:
     one = "decision.00000000000000000000000001"
     two = "decision.00000000000000000000000002"
@@ -452,6 +497,10 @@ def test_malformed_or_identity_changing_corrections_fail_closed() -> None:
     malformed_snapshot = project_events([created, missing_required])
     assert task_id not in malformed_snapshot.tasks
     assert any("missing required fields" in item for item in malformed_snapshot.warnings)
+    assert any(
+        issue.code == "domain_validation_rejected" and issue.severity == "error"
+        for issue in malformed_snapshot.issues
+    )
 
     changed_identity = event(
         3,
@@ -468,6 +517,8 @@ def test_malformed_or_identity_changing_corrections_fail_closed() -> None:
     assert task_id not in identity_snapshot.tasks
     assert other_task_id not in identity_snapshot.tasks
     assert any("cannot change task_id" in item for item in identity_snapshot.warnings)
+    assert [issue.code for issue in identity_snapshot.issues] == ["correction_identity_change"]
+    assert identity_snapshot.to_dict()["issues"][0]["repairable"] is True
 
 
 def test_artifact_preserves_content_hash_separately_from_event_revision() -> None:
@@ -489,6 +540,167 @@ def test_artifact_preserves_content_hash_separately_from_event_revision() -> Non
 
     assert artifact["revision"] == registered["event_id"]
     assert artifact["content_revision"] == "sha256:" + "2" * 64
+
+
+def test_artifact_change_or_manifest_loss_revokes_task_acceptance() -> None:
+    artifact_id = "artifact.00000000000000000000000001"
+    task_id = "task.00000000000000000000000001"
+    review_id = "review.00000000000000000000000001"
+    first_manifest = "mft.artifact.sha256." + "1" * 64
+    artifact = event(
+        1,
+        "artifact.registered",
+        {
+            "artifact_id": artifact_id,
+            "manifest_ref": first_manifest,
+            "revision": "sha256:" + "1" * 64,
+            "classification": "internal",
+        },
+        "artifact",
+        artifact_id,
+    )
+    created = event(
+        2,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Revision-bound result",
+            "description": "Acceptance depends on exact artifact bytes.",
+            "acceptance_criteria": ["artifact is current"],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    started = event(
+        3,
+        "task.started",
+        {"task_id": task_id, "expected_revision": created["event_id"]},
+        "task",
+        task_id,
+    )
+    binding = {
+        "ref": {"kind": "artifact", "id": artifact_id},
+        "revision": artifact["event_id"],
+    }
+    completed = event(
+        4,
+        "task.completed",
+        {
+            "task_id": task_id,
+            "expected_revision": started["event_id"],
+            "summary": "complete",
+            "artifact_refs": [binding["ref"]],
+            "artifact_bindings": [binding],
+        },
+        "task",
+        task_id,
+    )
+    submitted = event(
+        5,
+        "task.submitted",
+        {
+            "task_id": task_id,
+            "expected_revision": completed["event_id"],
+            "summary": "ready",
+            "artifact_refs": [binding["ref"]],
+            "artifact_bindings": [binding],
+        },
+        "task",
+        task_id,
+    )
+    requested = event(
+        6,
+        "review.requested",
+        {
+            "review_id": review_id,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": submitted["event_id"],
+            "criteria": ["artifact is current"],
+            "independent": True,
+        },
+        "review",
+        review_id,
+    )
+    approved = event(
+        7,
+        "review.completed",
+        {
+            "review_id": review_id,
+            "expected_revision": requested["event_id"],
+            "target_revision": submitted["event_id"],
+            "verdict": "approved",
+            "summary": "approved",
+        },
+        "review",
+        review_id,
+    )
+    approved["actor"] = {"session_id": "session.reviewer", "role_id": "reviewer"}
+    accepted = event(
+        8,
+        "task.accepted",
+        {
+            "task_id": task_id,
+            "expected_revision": submitted["event_id"],
+            "summary": "accepted",
+            "acceptance_review": {
+                "ref": {"kind": "review", "id": review_id},
+                "revision": approved["event_id"],
+            },
+        },
+        "task",
+        task_id,
+    )
+    base = [artifact, created, started, completed, submitted, requested, approved, accepted]
+    revised = event(
+        9,
+        "artifact.revised",
+        {
+            "artifact_id": artifact_id,
+            "expected_revision": artifact["event_id"],
+            "manifest_ref": "mft.artifact.sha256." + "2" * 64,
+            "revision": "sha256:" + "2" * 64,
+            "classification": "internal",
+        },
+        "artifact",
+        artifact_id,
+    )
+    corrected = event(
+        9,
+        "event.corrected",
+        {
+            "target_event_id": artifact["event_id"],
+            "expected_target_sha256": canonical_sha256(artifact),
+            "replacement_payload": {
+                **artifact["payload"],
+                "extensions": {"note": "metadata correction"},
+            },
+        },
+        "event",
+        artifact["event_id"],
+    )
+    invalidated = event(
+        9,
+        "event.invalidated",
+        {
+            "target_ref": {"kind": "event", "id": artifact["event_id"]},
+            "reason": "artifact registration invalid",
+        },
+        "event",
+        artifact["event_id"],
+    )
+
+    snapshots = (
+        project_events([*base, revised]),
+        project_events([*base, corrected]),
+        project_events([*base, invalidated]),
+        project_events(base, known_manifest_ids=()),
+    )
+    for snapshot in snapshots:
+        assert snapshot.tasks[task_id]["state"] == "review"
+        assert snapshot.tasks[task_id]["artifact_stale"] is True
+        assert snapshot.reviews[review_id]["stale"] is True
+        assert ("event", accepted["event_id"]) in snapshot.stale_refs
 
 
 def test_verification_and_pending_review_become_stale_after_target_revision() -> None:

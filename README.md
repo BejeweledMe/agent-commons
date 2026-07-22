@@ -1,136 +1,142 @@
 # Agent Commons
 
-![Agent Commons hero](assets/agent-commons-hero.png)
+![Agent Commons hero](https://raw.githubusercontent.com/BejeweledMe/agent-commons/main/assets/agent-commons-hero.png)
 
-Agent Commons is a project-local coordination layer for coding agents. Codex,
-Claude Code, and future clients share one durable view of tasks, claims,
-discussions, artifacts, exact-revision reviews, decisions, and handoffs without
-sharing chat transcripts or inventing a second source of truth beside Git.
+Agent Commons is a project-local coordination layer for coding agents. It gives
+Codex, Claude Code, and future clients one durable view of tasks, claims,
+discussion, exact artifacts, reviews, evidence, decisions, and handoffs without
+sharing chat transcripts or replacing Git.
 
-The CLI and `CommonsManager` are the business boundary. Immutable files are
-authoritative; SQLite, Markdown views, runtime status, and telemetry are
-rebuildable or disposable projections. An optional experimental broker can
-launch one already-recorded, bounded Codex or Claude delegation through a fixed
-profile. It is not a general shell, remote agent host, or autonomous swarm.
+Use it when work moves between agent windows or model families and you need to
+know exactly what was done, reviewed, superseded, or accepted. It is not an
+issue tracker, generic shell, remote agent host, permission broker, or autonomous
+swarm. The immutable file ledger is authoritative; SQLite, Markdown views,
+runtime journals, and telemetry are rebuildable or operational projections.
 
-## Five-minute start
+## First value: one manual author/reviewer cycle
 
-Install the CLI, initialize an existing Git project, and confirm the environment:
+The supported first path needs no MCP server, provider API key, or paid model
+launch. Clone and install from source:
 
 ```bash
-uv tool install .
-cd /path/to/your-project
-agent-commons init --integration codex --integration claude
+git clone https://github.com/BejeweledMe/agent-commons.git
+cd agent-commons
+python3 -m venv .venv
+.venv/bin/python -m pip install .
+export PATH="$PWD/.venv/bin:$PATH"
 agent-commons --version
+```
+
+In an existing Git project, choose one writable state root shared by all of its
+worktrees, initialize, and inspect the result:
+
+```bash
+cd /path/to/your-project
+export AGENT_COMMONS_STATE_ROOT=/absolute/operator-owned/path/agent-commons-state
+agent-commons init --integration codex --integration claude
 agent-commons --read-only --json support
 ```
 
-Start one explicit writer session. Keep the returned rotating `nonce` private;
-export only the `session_id`:
+Expected support output includes `"canonical_workspace_available":true`, the
+package/Python/platform versions, and whether the state root was explicit. `init`
+does not stage or commit anything.
+
+Start the author window, keep its rotating `nonce` private, and export only the
+returned session ID:
 
 ```bash
 agent-commons --json session start \
-  --stable-instance-id codex-window-01 \
+  --stable-instance-id author-window-01 \
   --principal local-operator \
   --client codex \
   --software codex-cli \
   --role implementation-author
 export AGENT_COMMONS_SESSION_ID='session.returned-by-session-start'
-
 agent-commons doctor
 agent-commons orient
 agent-commons inbox
 ```
 
-Open Codex in that project and ask it to use `commons-start` before creating or
-taking work. Open Claude Code with a different Agent Commons session and ask it
-to review the exact submitted revision. The complete copy-paste walkthrough is
-[Build Snake with Codex and Claude Code](docs/tutorials/CODEX_CLAUDE_SNAKE.md).
-For every command and expected output in the initial setup, use the
-[Quickstart](docs/QUICKSTART.md).
+Ask the author to use `commons-start` and `commons-coordinate`, create/take a
+small task, claim only its scope, implement and verify it, register exact
+evidence, and submit the current revision for independent review. Then open a
+second terminal with a different session and ask the reviewer to use
+`commons-start` and `commons-review` without editing the source. A healthy cycle
+ends with a current `approved` or `changes_requested` judgment tied to the exact
+submitted revision—not with a provider process exit.
 
-The core loop is deliberately small:
+The complete copy/paste flow, expected states, and session cleanup are in the
+[Quickstart](https://github.com/BejeweledMe/agent-commons/blob/main/docs/QUICKSTART.md).
+The larger worked example is
+[Build Snake with Codex and Claude Code](https://github.com/BejeweledMe/agent-commons/blob/main/docs/tutorials/CODEX_CLAUDE_SNAKE.md).
+
+## Core concepts
 
 ```text
-orient -> create/take + claim -> implement -> register exact evidence
-       -> submit -> independent review -> remediate/re-review -> accept
+orient → create/take + claim → implement → bind exact evidence
+       → complete → submit → independent review → remediate/re-review → accept
 ```
 
-A successful test run is author evidence, not independent verification. A
-provider process exit is not approval. A changed target revision makes the old
-review stale, and the work author cannot independently accept their own work.
+- Sessions identify one active client window; role/model labels coordinate work
+  but do not prove authority.
+- Claims are expiring overlap protection, not Git ownership.
+- Canonical writes are immutable, idempotent, and guarded by exact revision CAS.
+- Changed or invalidated evidence makes dependent judgments stale.
+- A completed task is an author report. `accepted` is a distinct governance
+  transition that always requires a current independent approved review.
+- Provider/model agreement never promotes a finding, decision, or task by
+  itself.
 
-## Optional automatic Codex ↔ Claude handoff
+## Explicit governance modes
 
-Install the optional MCP/observability extras from the Agent Commons source
-checkout, return to your project, and authenticate the provider CLIs yourself.
-Agent Commons never supplies API credentials or changes how a provider CLI is
-billed:
+The modes choose how far a team runs the same strict lifecycle; none weakens
+integrity rules or creates a hidden acceptance bypass.
+
+- `light`: coordinate a small/reversible change and end honestly at
+  `completed`. Review and accepted project truth are optional.
+- `standard`: submit the completed revision, obtain an independent current
+  review, and use the normal `accepted` boundary.
+- `governed`: standard plus reproducible verification, revision-bound evidence,
+  explicit decisions/dissent, and operator-controlled acceptance for high-risk
+  or externally visible work.
+
+## Diagnose and recover safely
 
 ```bash
-cd /path/to/agent-commons
-uv tool install --force '.[mcp,observability]'
-cd /path/to/your-project
-codex --version
-claude --version
-agent-commons broker profiles \
-  --profile-config /absolute/path/to/agent-commons-profiles.yaml
+agent-commons --read-only --json support
+agent-commons --read-only doctor
+agent-commons orient
+agent-commons receipt status
+```
+
+Machine-readable failures include `safe_next_actions`. Doctor validates the
+ledger and synchronizes the disposable SQLite projection; normal canonical
+writes deliberately do not pay that index cost. An in-flight receipt without an
+event requires the identical idempotent retry or an explicit audited abandon—it
+is never silently deleted.
+
+See
+[Troubleshooting](https://github.com/BejeweledMe/agent-commons/blob/main/docs/TROUBLESHOOTING.md)
+for diagnostic codes, read-only recovery, state-root checks, and the manual
+fallback. Share only the secret-free `support`/`doctor` output; prompts,
+responses, tool payloads, environment, and raw stdout/stderr are not retained.
+
+## Experimental local broker (manual opt-in)
+
+The broker is disabled by default and remains experimental. Enable it only by
+running `broker run` or starting the MCP server with `--enable-runtime`. The
+manual core workflow above remains the supported fallback.
+
+Install the optional surface, authenticate provider CLIs yourself, and use one
+operator-owned config file outside the delegated workspace:
+
+```bash
+python -m pip install 'agent-commons[mcp,observability]'
+agent-commons broker profiles --profile-config /absolute/path/runtime.yaml
 agent-commons broker preflight claude-independent-reviewer \
   --purpose independent_review \
-  --profile-config /absolute/path/to/agent-commons-profiles.yaml
+  --profile-config /absolute/path/runtime.yaml
 ```
-
-`broker preflight` is credential-free and non-consuming: it runs provider
-`--help`, validates the allowlisted flags, starts the generated MCP command in
-preflight mode, and does not create a delegation attempt or start model work.
-Run it after provider or Agent Commons upgrades.
-
-For a local Claude CLI already authenticated through a Claude Code subscription,
-the tutorial uses this launch budget:
-
-```json
-{"unit":"provider_units","limit":1}
-```
-
-One `provider_units` unit means one provider-process attempt. It is not a dollar
-or token cap, and Agent Commons does not silently fall back to API/usage credits.
-Use `micro_usd` only when you explicitly choose a provider-native monetary cap
-for a billable provider mode. Do not reuse the old `$0.50` tutorial value: field
-testing showed that it can terminate after analysis but before the canonical
-review outcome is recorded. Reserve enough room for finalization and choose the
-monetary limit from the current provider/model pricing you actually use.
-
-The safe automated default is `claude-independent-reviewer`: `dontAsk`, fixed
-allowed MCP tools, no native filesystem/edit/Bash/web/subagent tools, and a
-quiescent exact subject. Writable builders and current Codex runners are
-trusted-workspace-only and need explicit operator opt-in plus external OS
-isolation for untrusted content.
-
-To let both interactive clients see the same manager-space, configure the same
-project-scoped stdio server. Claude Code can create its project entry directly:
-
-```bash
-claude mcp add --scope project agent-commons -- \
-  agent-commons-mcp --repo . --enable-runtime --telemetry local \
-  --profile-config /absolute/path/to/agent-commons-profiles.yaml
-```
-
-The equivalent Codex project configuration is:
-
-```toml
-[mcp_servers.agent_commons]
-command = "agent-commons-mcp"
-args = ["--repo", ".", "--enable-runtime", "--telemetry", "local", "--profile-config", "/absolute/path/to/agent-commons-profiles.yaml"]
-env_vars = ["AGENT_COMMONS_SESSION_ID"]
-```
-
-Start a distinct Agent Commons session for each client and restart the client so
-its MCP child inherits that session ID. Never put the rotating nonce into MCP
-configuration. The broker creates another distinct child session for every
-launched provider worker.
-
-Machine-specific provider, MCP, and Git executable paths belong in a strict
-operator-owned profile file outside the delegated workspace:
 
 ```yaml
 profiles:
@@ -139,70 +145,61 @@ profiles:
     mcp_executable: /absolute/path/to/agent-commons-mcp
     git_executable: /absolute/path/to/git
     permission_mode: dontAsk
+limits:
+  global_concurrency: 2
+  queue_capacity: 8
+  queue_wait_seconds: 30
+  parent_provider_units: 4
+  parent_budget_microusd: 10000000
+  provider_concurrency:
+    claude: 2
+  profile_concurrency:
+    claude-independent-reviewer: 1
 ```
 
-The file must be owned by the operator or root and not group/world writable.
-Delegations may select only one of four closed profile IDs; they cannot inject
-argv, environment variables, commands, credentials, or prompts.
+Admission uses the most restrictive applicable operator, provider, profile,
+parent, and delegation limit. `provider_units` counts provider-process attempts
+across a parent/provider scope; `micro_usd` is an explicit provider-native cap
+and is partitioned across retries. The bounded shared queue reports wait/depth
+metadata and rejects excess work with backpressure.
 
-## Diagnose without exposing provider output
+Preflight checks static flags, source/catalog compatibility, and starts no model
+work. It is not proof that a provider will call the right tools. A deterministic
+real-stdio behavioral canary separately verifies child-session binding, a
+bounded MCP write, terminal result references, and canonical finalization.
 
-Raw prompts, responses, reasoning, environment, paths, tool payloads, and
-stdout/stderr are never persisted. Failed attempts retain a closed diagnostic
-code and a maintainer-authored hint:
+Broker telemetry distinguishes `process_finished` from
+`canonical_finalization_started/completed/failed`, joins canonical state/reason,
+and reports `process_canonical_mismatch` plus content-free terminal-tool
+counters. Attempts with ambiguous identity fail closed to `needs_operator` and
+are never blindly relaunched.
 
-```bash
-agent-commons --read-only --json support
-agent-commons broker preflight claude-independent-reviewer \
-  --purpose independent_review \
-  --profile-config /absolute/path/to/agent-commons-profiles.yaml
-agent-commons --read-only broker attempts --diagnostic
-agent-commons delegation list
-agent-commons doctor
-```
+The broker stays manual/experimental until macOS and Linux canaries pass, each
+supported provider completes 100 consecutive hermetic contract runs, and 20
+real local launches finish with zero process/canonical mismatches. Initial SLOs
+and the evidence policy are documented in
+[Broker operations](https://github.com/BejeweledMe/agent-commons/blob/main/docs/BROKER_OPERATIONS.md).
 
-See [Troubleshooting](docs/TROUBLESHOOTING.md) for the safe diagnostic codes,
-recovery order, read-only/state-root inspection, and the manual two-window
-fallback. `--state-root /operator/owned/path` makes operational state explicit;
-global `--read-only` guarantees inspection does not create cache, index,
-session, claim, or receipt state.
+## Platform and project status
 
-## Receipt recovery
+Agent Commons supports CPython 3.11–3.14 on macOS and Linux. Windows is not
+supported because durable coordination uses POSIX `fcntl.flock`; unsupported
+hosts fail before state mutation with an actionable message.
 
-After an upgrade, fresh clone, first visit to a branch, or Git merge, inspect and
-reconcile the current checkout with an active session:
+The project is alpha software under Apache-2.0. See the
+[changelog](https://github.com/BejeweledMe/agent-commons/blob/main/CHANGELOG.md),
+[support policy](https://github.com/BejeweledMe/agent-commons/blob/main/SUPPORT.md),
+and
+[contribution guide](https://github.com/BejeweledMe/agent-commons/blob/main/CONTRIBUTING.md).
+Agent Commons never authorizes staging, committing, pushing, merging,
+deploying, publishing, contacting people, or destructive external actions.
 
-```bash
-agent-commons receipt status
-agent-commons receipt reconcile
-agent-commons doctor
-```
+## Documentation
 
-An in-flight receipt without an event still requires the identical idempotent
-retry or an explicit audited abandon operation. Reconcile never silently deletes
-it. The crash, non-shrinking anchor, tombstone, migration, worktree, and rollback
-contract is in [ADR 0003](docs/adr/0003-ledger-derived-checkout-aware-receipt-recovery.md).
-
-## Documentation map
-
-- [Quickstart](docs/QUICKSTART.md) — install, initialize, first task, and first review.
-- [Snake tutorial](docs/tutorials/CODEX_CLAUDE_SNAKE.md) — concrete Codex author + Claude reviewer flow.
-- [Troubleshooting](docs/TROUBLESHOOTING.md) — support bundle, diagnostics, preflight, and recovery.
-- [Product vision](docs/VISION.md) and [roadmap](docs/ROADMAP.md) — why this exists and what remains.
-- [Protocol](docs/PROTOCOL.md) and [user workflows](docs/USER_WORKFLOWS.md) — durable operating rules.
-- [Architecture](docs/ARCHITECTURE.md) and [threat model](docs/THREAT_MODEL.md) — boundaries and risks.
-- [ADR 0004](docs/adr/0004-optional-local-delegation-runtime.md) — broker, MCP, privacy, and observability.
-- [Contributing](CONTRIBUTING.md) — development invariants and checks.
-
-## Current boundary
-
-Agent Commons currently coordinates processes sharing one local project
-filesystem. The broker is optional and experimental: no remote authentication,
-cross-machine synchronization, daemon, generic command tool, live IDE-pane
-takeover, or provider-session reattachment. Ambiguous restarts fail closed to
-`needs_operator`; only requested, unlaunched work can be cancelled canonically.
-
-Agent Commons never authorizes staging, committing, pushing, merging, deploying,
-publishing, messaging people, or other external/destructive actions. Disable the
-runtime by removing `--enable-runtime`; the canonical CLI workflow remains
-available.
+- [Protocol](https://github.com/BejeweledMe/agent-commons/blob/main/docs/PROTOCOL.md)
+  and [workflows](https://github.com/BejeweledMe/agent-commons/blob/main/docs/USER_WORKFLOWS.md)
+- [Architecture](https://github.com/BejeweledMe/agent-commons/blob/main/docs/ARCHITECTURE.md)
+  and [threat model](https://github.com/BejeweledMe/agent-commons/blob/main/docs/THREAT_MODEL.md)
+- [Vision](https://github.com/BejeweledMe/agent-commons/blob/main/docs/VISION.md)
+  and [roadmap](https://github.com/BejeweledMe/agent-commons/blob/main/docs/ROADMAP.md)
+- [Runtime ADR](https://github.com/BejeweledMe/agent-commons/blob/main/docs/adr/0004-optional-local-delegation-runtime.md)

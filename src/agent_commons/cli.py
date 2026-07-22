@@ -19,16 +19,19 @@ from agent_commons import __version__
 from agent_commons.config import CommonsPaths
 from agent_commons.core.refs import parse_ref
 from agent_commons.errors import CommonsError, ValidationError
+from agent_commons.platform_support import require_supported_platform
 from agent_commons.runtime import (
     ATTEMPT_SCHEMA,
     REQUEST_SCHEMA,
     BuiltinProfileId,
+    error_safe_next_actions,
     preflight_profile,
 )
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
     load_profile_registry,
+    load_runtime_configuration,
     profile_summaries,
     telemetry_sink,
 )
@@ -55,11 +58,13 @@ class CommonsGroup(click.Group):
                     "error": {
                         "type": type(exc).__name__,
                         "message": str(exc),
+                        "safe_next_actions": error_safe_next_actions(exc),
                     },
                 }
             )
             ctx.exit(1)
-        raise click.ClickException(str(exc)) from exc
+        actions = "\n".join(f"  - {action}" for action in error_safe_next_actions(exc))
+        raise click.ClickException(f"{exc}\nSafe next actions:\n{actions}") from exc
 
 
 @dataclass
@@ -162,6 +167,7 @@ def cli(
 ) -> None:
     """Coordinate heterogeneous coding agents through one immutable commons."""
 
+    require_supported_platform()
     ctx.obj = CLIState(
         repo.expanduser().resolve(),
         session_id,
@@ -216,6 +222,10 @@ def support_command(state: CLIState) -> None:
             "python_version": platform.python_version(),
             "python_implementation": platform.python_implementation(),
             "platform": sys.platform,
+            "supported_platform": True,
+            "supported_operating_systems": ["darwin", "linux"],
+            "core_release_stage": "alpha",
+            "broker_release_stage": "experimental_manual_opt_in",
             "canonical_workspace_available": paths.commons_root.is_dir(),
             "state_root_explicit": state.state_root is not None,
             "state_root_exists": paths.state_root.is_dir(),
@@ -986,9 +996,11 @@ def _runtime_service(
     telemetry: str = "none",
 ) -> DelegationRuntimeService:
     manager = state.manager()
+    config = load_runtime_configuration(profile_config, workspace_root=state.repo)
     return DelegationRuntimeService(
         manager,
-        profiles=load_profile_registry(profile_config, workspace_root=state.repo),
+        profiles=config.profiles,
+        operator_limits=config.limits,
         telemetry=telemetry_sink(telemetry, manager),
     )
 
@@ -1012,7 +1024,8 @@ def broker_group() -> None:
 def broker_profiles(state: CLIState, profile_config: Path | None) -> None:
     """List configured profile capabilities without exposing executable argv."""
 
-    state.emit(profile_summaries(load_profile_registry(profile_config, workspace_root=state.repo)))
+    config = load_runtime_configuration(profile_config, workspace_root=state.repo)
+    state.emit(profile_summaries(config.profiles, config.limits))
 
 
 @broker_group.command("preflight")
@@ -1037,6 +1050,10 @@ def broker_preflight(
         profiles,
         profile_id,
         workspace_root=state.repo,
+        state_root=CommonsPaths.for_workspace(
+            state.repo,
+            state_root=state.state_root,
+        ).state_root,
         purpose=purpose,
     )
     state.emit(result)

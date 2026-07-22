@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 from agent_commons.errors import ValidationError
@@ -126,3 +128,162 @@ class RuntimePolicy:
             raise PolicyViolationError("delegation attempt limit is exhausted")
         if usage.active_concurrency >= self.max_concurrency:
             raise PolicyViolationError("runtime concurrency limit is exhausted")
+
+
+_PROVIDERS = frozenset({"codex", "claude"})
+_PROFILES = frozenset(
+    {
+        "codex-builder",
+        "codex-independent-reviewer",
+        "claude-builder",
+        "claude-independent-reviewer",
+    }
+)
+
+
+def _validated_limits(
+    name: str,
+    value: Mapping[str, Any],
+    *,
+    allowed: frozenset[str],
+) -> Mapping[str, int]:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise PolicyViolationError(f"{name} has unsupported keys: {', '.join(unknown)}")
+    return MappingProxyType(
+        {str(key): _positive(f"{name}.{key}", raw) for key, raw in value.items()}
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorLimits:
+    """Operator-owned caps shared by every broker using one state root."""
+
+    global_concurrency: int = 2
+    queue_capacity: int = 8
+    queue_wait_seconds: int = 30
+    parent_provider_units: int = 4
+    parent_budget_microusd: int = 10_000_000
+    provider_concurrency: Mapping[str, int] = field(
+        default_factory=lambda: {"codex": 2, "claude": 2}
+    )
+    profile_concurrency: Mapping[str, int] = field(
+        default_factory=lambda: {
+            "codex-builder": 1,
+            "codex-independent-reviewer": 1,
+            "claude-builder": 1,
+            "claude-independent-reviewer": 1,
+        }
+    )
+    provider_parent_provider_units: Mapping[str, int] = field(default_factory=dict)
+    provider_parent_budget_microusd: Mapping[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        _positive("global_concurrency", self.global_concurrency)
+        _nonnegative("queue_capacity", self.queue_capacity)
+        _positive("queue_wait_seconds", self.queue_wait_seconds)
+        _positive("parent_provider_units", self.parent_provider_units)
+        _positive("parent_budget_microusd", self.parent_budget_microusd)
+        object.__setattr__(
+            self,
+            "provider_concurrency",
+            _validated_limits(
+                "provider_concurrency", self.provider_concurrency, allowed=_PROVIDERS
+            ),
+        )
+        object.__setattr__(
+            self,
+            "profile_concurrency",
+            _validated_limits("profile_concurrency", self.profile_concurrency, allowed=_PROFILES),
+        )
+        object.__setattr__(
+            self,
+            "provider_parent_provider_units",
+            _validated_limits(
+                "provider_parent_provider_units",
+                self.provider_parent_provider_units,
+                allowed=_PROVIDERS,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "provider_parent_budget_microusd",
+            _validated_limits(
+                "provider_parent_budget_microusd",
+                self.provider_parent_budget_microusd,
+                allowed=_PROVIDERS,
+            ),
+        )
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> OperatorLimits:
+        if value is None:
+            return cls()
+        defaults = cls()
+        allowed = {
+            "global_concurrency",
+            "queue_capacity",
+            "queue_wait_seconds",
+            "parent_provider_units",
+            "parent_budget_microusd",
+            "provider_concurrency",
+            "profile_concurrency",
+            "provider_parent_provider_units",
+            "provider_parent_budget_microusd",
+        }
+        unknown = sorted(set(value) - allowed)
+        if unknown:
+            raise PolicyViolationError(
+                "operator limits have unsupported fields: " + ", ".join(unknown)
+            )
+        mappings = {
+            "provider_concurrency",
+            "profile_concurrency",
+            "provider_parent_provider_units",
+            "provider_parent_budget_microusd",
+        }
+        normalized: dict[str, Any] = {}
+        for key, raw in value.items():
+            if key in mappings:
+                if not isinstance(raw, Mapping):
+                    raise PolicyViolationError(f"operator limit {key} must be a mapping")
+                normalized[key] = {**dict(getattr(defaults, key)), **dict(raw)}
+            else:
+                normalized[key] = raw
+        return cls(**normalized)
+
+    def provider_concurrency_cap(self, provider: str) -> int:
+        return min(self.global_concurrency, self.provider_concurrency.get(provider, 1))
+
+    def profile_concurrency_cap(self, profile_id: str) -> int:
+        provider = profile_id.partition("-")[0]
+        return min(
+            self.global_concurrency,
+            self.provider_concurrency_cap(provider),
+            self.profile_concurrency.get(profile_id, 1),
+        )
+
+    def provider_units_cap(self, provider: str) -> int:
+        return min(
+            self.parent_provider_units,
+            self.provider_parent_provider_units.get(provider, self.parent_provider_units),
+        )
+
+    def budget_microusd_cap(self, provider: str) -> int:
+        return min(
+            self.parent_budget_microusd,
+            self.provider_parent_budget_microusd.get(provider, self.parent_budget_microusd),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "global_concurrency": self.global_concurrency,
+            "queue_capacity": self.queue_capacity,
+            "queue_wait_seconds": self.queue_wait_seconds,
+            "parent_provider_units": self.parent_provider_units,
+            "parent_budget_microusd": self.parent_budget_microusd,
+            "provider_concurrency": dict(self.provider_concurrency),
+            "profile_concurrency": dict(self.profile_concurrency),
+            "provider_parent_provider_units": dict(self.provider_parent_provider_units),
+            "provider_parent_budget_microusd": dict(self.provider_parent_budget_microusd),
+        }

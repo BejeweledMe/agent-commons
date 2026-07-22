@@ -36,6 +36,7 @@ class BrokerRequest:
     profile_id: BuiltinProfileId
     instruction: str
     cwd: Path
+    state_root: Path
     correlation: CorrelationIds
     parent_policy: RuntimePolicy
     child_policy: RuntimePolicy
@@ -46,6 +47,7 @@ class BrokerRequest:
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile_id", BuiltinProfileId(self.profile_id))
         object.__setattr__(self, "cwd", Path(self.cwd).expanduser().resolve())
+        object.__setattr__(self, "state_root", Path(self.state_root).expanduser().resolve())
         if self.purpose not in {"implementation", "independent_review", "verification"}:
             raise ConfigurationError("broker request purpose is unsupported")
         self.child_policy.assert_reduction_of(self.parent_policy)
@@ -106,6 +108,8 @@ class LocalBroker:
         attempt: Attempt,
         *,
         duration_milliseconds: int | None = None,
+        queue_depth: int | None = None,
+        queued_milliseconds: int | None = None,
     ) -> TelemetryEvent:
         return TelemetryEvent.create(
             kind=kind,
@@ -120,6 +124,8 @@ class LocalBroker:
             pid=attempt.pid,
             exit_code=attempt.exit_code,
             duration_milliseconds=duration_milliseconds,
+            queue_depth=queue_depth,
+            queued_milliseconds=queued_milliseconds,
             stdout_bytes_seen=attempt.stdout_bytes_seen,
             stderr_bytes_seen=attempt.stderr_bytes_seen,
             output_truncated=attempt.output_truncated,
@@ -146,6 +152,7 @@ class LocalBroker:
         invocation = profile.build_invocation(
             request.instruction,
             workspace_root=request.cwd,
+            state_root=request.state_root,
             delegation_id=request.correlation.delegation_id,
             max_budget_microusd=request.child_policy.max_budget_microusd,
             worker_purpose=request.purpose,
@@ -180,8 +187,23 @@ class LocalBroker:
         if not reservation.created:
             return BrokerResult(attempt=reservation.attempt, process=None, reused=True)
 
-        telemetry_failures = self._emit(
-            self._event(TelemetryKind.REQUEST_RESERVED, reservation.attempt)
+        telemetry_failures = 0
+        if reservation.queue_depth > 0:
+            telemetry_failures += self._emit(
+                self._event(
+                    TelemetryKind.REQUEST_QUEUED,
+                    reservation.attempt,
+                    queue_depth=reservation.queue_depth,
+                    queued_milliseconds=reservation.queued_milliseconds,
+                )
+            )
+        telemetry_failures += self._emit(
+            self._event(
+                TelemetryKind.REQUEST_RESERVED,
+                reservation.attempt,
+                queue_depth=reservation.queue_depth,
+                queued_milliseconds=reservation.queued_milliseconds,
+            )
         )
         launching = self.attempts.transition(
             reservation.attempt.attempt_id,

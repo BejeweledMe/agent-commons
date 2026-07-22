@@ -127,12 +127,22 @@ def orientation(
             max_items,
         )
     )
-    pending_reviews = list(
+    requested_reviews = list(
         islice(
             (
                 item
                 for item in snapshot.reviews.values()
-                if item.get("state") == "requested" or item.get("stale")
+                if item.get("state") == "requested" and item.get("stale") is not True
+            ),
+            max_items,
+        )
+    )
+    stale_review_judgments = list(
+        islice(
+            (
+                item
+                for item in snapshot.reviews.values()
+                if item.get("state") != "requested" and item.get("stale") is True
             ),
             max_items,
         )
@@ -180,7 +190,8 @@ def orientation(
         "session": dict(session or {}),
         "objectives": objectives[:max_items],
         "work": task_groups,
-        "pending_reviews": pending_reviews,
+        "pending_reviews": requested_reviews,
+        "stale_review_judgments": stale_review_judgments,
         "delegations": delegation_groups,
         "inbox": inbox_threads,
         "handoffs": handoffs,
