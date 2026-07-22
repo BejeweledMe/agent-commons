@@ -13,6 +13,8 @@ from agent_commons.errors import (
     LifecycleConflictError,
 )
 from agent_commons.runtime import (
+    OperatorLimits,
+    PolicyViolationError,
     ProcessResult,
     ProfileRegistry,
     RunOutcome,
@@ -154,11 +156,13 @@ def _service(
     runner: FakeRunner,
     *,
     claude_executable: str = "/bin/echo",
+    operator_limits: OperatorLimits | None = None,
 ) -> DelegationRuntimeService:
     return DelegationRuntimeService(
         manager,
         runner=runner,  # type: ignore[arg-type]
         profiles=_profiles(claude_executable=claude_executable),
+        operator_limits=operator_limits,
     )
 
 
@@ -341,6 +345,135 @@ def test_unsupported_budget_fails_before_session_reservation_or_spawn(
     assert runner.calls == 0
     assert service.list_attempts() == []
     assert len(observer.show_session()) == sessions_before  # type: ignore[arg-type]
+
+
+def test_admission_rejection_closes_the_unbound_child_session(tmp_path: Path) -> None:
+    manager, task = _workspace(tmp_path)
+    limits = OperatorLimits(parent_provider_units=1)
+    runner = FakeRunner()
+    service = _service(manager, runner, operator_limits=limits)
+    first = _delegation(
+        manager,
+        task,
+        budget_unit="provider_units",
+        budget_limit=1,
+    )
+    service.run(
+        first["entity_ref"]["id"],
+        first["revision"],
+        idempotency_key="consume-parent-provider-unit",
+    )
+
+    second_task = manager.create_task(
+        title="Second bounded provider unit",
+        description="Prove rejected admission releases its unbound child identity.",
+        acceptance_criteria=("no session leak",),
+        idempotency_key="second-provider-unit-target",
+    )
+    second = manager.create_delegation(
+        target_ref=second_task["entity_ref"],
+        target_revision=second_task["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "provider_units", "limit": 1},
+        },
+        idempotency_key="second-provider-unit-delegation",
+    )
+    observer = CommonsManager(manager.repo_root, state_root=manager.paths.state_root)
+    sessions_before = len(observer.show_session())  # type: ignore[arg-type]
+
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        service.run(
+            second["entity_ref"]["id"],
+            second["revision"],
+            idempotency_key="rejected-parent-provider-unit",
+        )
+
+    assert runner.calls == 1
+    assert manager.get_delegation(second["entity_ref"]["id"])["state"] == "requested"
+    assert len(observer.show_session()) == sessions_before  # type: ignore[arg-type]
+
+
+def test_retry_admission_rejection_closes_only_the_new_unbound_child(tmp_path: Path) -> None:
+    manager, task = _workspace(tmp_path)
+    delegation = _delegation(
+        manager,
+        task,
+        max_attempts=2,
+        budget_unit="provider_units",
+        budget_limit=2,
+    )
+    runner = FakeRunner(reason=RunReason.START_FAILED)
+    initial = _service(manager, runner)
+    first = initial.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="retry-admission-child-cleanup",
+    )
+    retained_child = first["attempt"]["correlation"]["child_session_id"]
+    observer = CommonsManager(manager.repo_root, state_root=manager.paths.state_root)
+    sessions_before = len(observer.show_session())  # type: ignore[arg-type]
+
+    constrained = _service(
+        manager,
+        runner,
+        operator_limits=OperatorLimits(parent_provider_units=1),
+    )
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        constrained.run(
+            delegation["entity_ref"]["id"],
+            delegation["revision"],
+            idempotency_key="retry-admission-child-cleanup",
+            retry=True,
+        )
+
+    assert runner.calls == 1
+    assert manager.show_session(retained_child)["status"] == "active"  # type: ignore[index]
+    assert len(observer.show_session()) == sessions_before  # type: ignore[arg-type]
+
+
+def test_reconcile_surfaces_unavailable_foreign_owner_without_mutation(
+    tmp_path: Path,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    delegation = _delegation(manager, task, max_attempts=2)
+    service = _service(manager, FakeRunner(reason=RunReason.START_FAILED))
+    service.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="foreign-owner-prestart-attempt",
+    )
+
+    foreign_session = manager.start_session(
+        stable_instance_id="runtime-reconcile-foreign-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator-recovery",
+    )
+    foreign = CommonsManager(
+        manager.repo_root,
+        session_id=foreign_session["session_id"],
+        state_root=manager.paths.state_root,
+    )
+    foreign_service = _service(foreign, FakeRunner())
+    assert foreign_service.reconcile() == []
+
+    parent = manager.sessions.require_active(manager.session_id)
+    manager.sessions.close(parent.session_id, nonce=parent.nonce)
+    before = manager.get_delegation(delegation["entity_ref"]["id"])
+    visible = foreign_service.reconcile()
+
+    assert len(visible) == 1
+    assert visible[0]["reconciled"] is False
+    assert visible[0]["workflow_diagnostic_code"] == "requester_unavailable"
+    assert visible[0]["safe_next_actions"]
+    assert manager.get_delegation(delegation["entity_ref"]["id"]) == before
 
 
 def test_profile_drift_cannot_change_a_bound_retry_plan(tmp_path: Path) -> None:

@@ -10,6 +10,7 @@
     "delegation.succeeded",
     "delegation.failed",
     "delegation.cancelled",
+    "delegation.recovered",
     "delegation.timed_out",
     "delegation.needs_operator"
   ],

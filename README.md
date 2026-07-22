@@ -174,6 +174,14 @@ and reports `process_canonical_mismatch` plus content-free terminal-tool
 counters. Attempts with ambiguous identity fail closed to `needs_operator` and
 are never blindly relaunched.
 
+Independent reviewers are instructed to record both the exact review verdict
+and the delegation result; prose or process exit alone is invalid. If an
+unavailable requester leaves canonical `requested` work behind, an explicitly
+operator-authorized `delegation:recover` session can record the distinct
+recovery transition. Active work is never recovered this way. Session listing
+uses effective expiry, and normal session shutdown refuses outstanding
+non-terminal delegations.
+
 The broker stays manual/experimental until macOS and Linux canaries pass, each
 supported provider completes 100 consecutive hermetic contract runs, and 20
 real local launches finish with zero process/canonical mismatches. Initial SLOs

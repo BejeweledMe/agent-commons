@@ -56,6 +56,9 @@ _STATE_ALLOWED = {
     # started work must be stopped and classified through timeout/failure/
     # needs_operator reconciliation instead of merely changing ledger state.
     "delegation.cancelled": {"requested"},
+    # A distinct operator-authorized recovery path terminalizes only work that
+    # never reached the canonical provider-start boundary.
+    "delegation.recovered": {"requested"},
     "delegation.timed_out": {"requested", "active", "input_needed"},
     "delegation.needs_operator": {"requested", "active", "input_needed"},
 }

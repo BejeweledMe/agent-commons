@@ -360,6 +360,7 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     } == expected_tools
     assert "commons_request_delegation" not in server.tools
     assert "commons_cancel_delegation" not in server.tools
+    assert "commons_recover_delegation" not in server.tools
     assert "commons_run_delegation" not in server.tools
 
     assert [item["id"] for item in server.tools["commons_list_delegations"](None)] == [active_id]

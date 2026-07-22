@@ -267,6 +267,12 @@ that a process is alive or absent, it fails closed to `needs_operator` rather
 than creating a possible duplicate worker.
 
 For an unlaunched request, cancellation can transition directly to `cancelled`.
+Normal cancellation remains requester-owned. If that requester is unavailable,
+an operator-authorized `delegation:recover` session may append the distinct
+`delegation.recovered` event only from the exact `requested` revision; it also
+projects to `cancelled`. Mutable session liveness is checked only for the new
+write and is not consulted during canonical replay. Reconciliation exposes an
+unavailable foreign owner as an actionable diagnostic without mutating it.
 The process runner has a bounded stop primitive, but this protocol version does
 not yet expose authenticated active cancellation through CLI or MCP. Once work
 is active, the operator stops the provider, then reconciliation records

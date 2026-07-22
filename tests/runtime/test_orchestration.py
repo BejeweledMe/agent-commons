@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ import pytest
 
 from agent_commons.errors import LifecycleConflictError
 from agent_commons.runtime import (
+    BuiltinProfileId,
+    DiagnosticCode,
     ProcessResult,
     RunOutcome,
     RunReason,
@@ -250,6 +253,42 @@ def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> 
         )
 
 
+def test_independent_review_instruction_requires_both_canonical_terminal_calls(
+    tmp_path: Path,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(manager)
+
+    instruction = service._instruction(
+        manager.get_delegation(delegation["entity_ref"]["id"]),
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+    )
+
+    complete = instruction.index("commons_complete_review")
+    succeed = instruction.index("commons_succeed_delegation")
+    assert complete < succeed
+    assert "review:<id>" in instruction
+    assert "prose-only answer or successful process exit" in instruction
+    assert "commons_delegation_needs_operator" in instruction
+    assert "commons_delegation_input_needed" in instruction
+
+
+def test_missing_terminal_audit_does_not_claim_no_tool_was_called() -> None:
+    code = DelegationRuntimeService._workflow_diagnostic_code(
+        {
+            "diagnostic_code": "none",
+            "process_canonical_mismatch": True,
+            "terminal_tool_calls": 0,
+            "terminal_tool_rejections": 0,
+            "terminal_tool_completions": 0,
+            "terminal_tool_audit_available": False,
+        }
+    )
+
+    assert code is DiagnosticCode.PROCESS_CANONICAL_MISMATCH
+
+
 def test_successful_process_without_terminal_tool_gets_actionable_workflow_diagnostic(
     tmp_path: Path,
 ) -> None:
@@ -302,6 +341,7 @@ def test_reconcile_maps_ambiguous_running_attempt_to_canonical_needs_operator(
     assert manager.get_delegation(delegation_id)["state"] == "active"
 
     reconciled = service.reconcile()
+    assert reconciled[0]["reconciled"] is True
     assert reconciled[0]["attempt"]["state"] == "needs_operator"
     assert reconciled[0]["delegation"]["state"] == "needs_operator"
     assert reconciled[0]["delegation"]["reason_code"] == "orphaned"
@@ -328,3 +368,25 @@ def test_parent_session_ttl_must_cover_provider_and_finalization(tmp_path: Path)
 
     assert runner.calls == 0
     assert service.list_attempts() == []
+
+
+def test_parent_ttl_check_uses_the_session_registry_clock(tmp_path: Path) -> None:
+    manager, task = _workspace(tmp_path, parent_ttl_seconds=60)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(
+        manager,
+        profiles=default_profile_registry(
+            claude_executable="/bin/echo", mcp_executable="/bin/echo"
+        ),
+    )
+    parent = manager.sessions.require_active(manager.session_id)
+    parent_expiry = datetime.fromisoformat(parent.expires_at.replace("Z", "+00:00"))
+    manager.sessions.clock = lambda: parent_expiry.timestamp() - 180
+
+    child = service._open_child_session(
+        manager.get_delegation(delegation["entity_ref"]["id"]),
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+    )
+
+    child_expiry = datetime.fromisoformat(child["expires_at"].replace("Z", "+00:00"))
+    assert child_expiry > datetime.fromtimestamp(manager.sessions.clock(), tz=UTC)

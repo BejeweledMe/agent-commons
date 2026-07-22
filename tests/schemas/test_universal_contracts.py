@@ -281,6 +281,11 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "expected_revision": EVENT_ID,
         "reason": "Operator cancelled the requested work.",
     },
+    "delegation.recovered": {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": EVENT_ID,
+        "reason": "The requester session is unavailable.",
+    },
     "delegation.timed_out": {
         "delegation_id": DELEGATION_ID,
         "expected_revision": EVENT_ID,
@@ -425,6 +430,7 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "delegation.succeeded": "active",
         "delegation.failed": "active",
         "delegation.cancelled": "requested",
+        "delegation.recovered": "requested",
         "delegation.timed_out": "active",
         "delegation.needs_operator": "active",
     }

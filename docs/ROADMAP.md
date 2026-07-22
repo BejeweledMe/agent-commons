@@ -57,6 +57,12 @@ Delivery is staged and feature-gated:
 5. local status/watch UX, optional OpenTelemetry export, and an optional AHP
    adapter after its value and compatibility are independently validated.
 
+The long-running broker stage must also define an authenticated operator
+adjudication path for `active` or `input_needed` work whose requester becomes
+unavailable. It may classify that work only after provider termination and
+attempt identity are proven; the requested-only `delegation.recovered` path
+must never be widened to cover a possibly live process.
+
 Every stage must be usable or removable independently. Deterministic CI uses fake
 runners; real-provider tests are explicit and opt-in so credentials and network
 access are not build prerequisites.

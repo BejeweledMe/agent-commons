@@ -144,12 +144,20 @@ finding:  reported → verified | contested → resolved
 
 decision: proposed → accepted | rejected | deferred → superseded
 
-delegation: requested ─→ cancelled
+delegation: requested ─→ cancelled (requester cancel or authorized recovery)
                 │
                 └→ active ↔ input_needed
                        │
                        └→ succeeded | failed | timed_out | needs_operator
 ```
+
+`delegation.recovered` is an additive canonical event that projects to
+`cancelled` only from `requested`. New writes require a local
+`delegation:recover` capability and an absent, expired, or closed requester;
+replay uses only the immutable event and exact prior revision, never mutable
+session liveness. Normal `delegation.cancelled` ownership remains requester-only.
+Operational session views distinguish persisted status from effective expiry,
+and graceful session close refuses requester-owned non-terminal delegations.
 
 Task assignment is durable history; a claim is only a temporary coordination
 lease. `task.completed` means the author considers the work complete,

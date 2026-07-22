@@ -939,6 +939,30 @@ def delegation_cancel(
     )
 
 
+@delegation_group.command("recover")
+@_expected
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def delegation_recover(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Recover requested work after its requester becomes unavailable."""
+
+    _delegation_transition(
+        state,
+        "recover_delegation",
+        entity_id,
+        expected_revision,
+        idempotency_key,
+        reason=reason,
+    )
+
+
 @delegation_group.command("time-out")
 @_expected
 @click.option("--summary", required=True)

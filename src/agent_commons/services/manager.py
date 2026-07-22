@@ -88,9 +88,20 @@ def _optional_list(values: Sequence[str], label: str) -> list[str]:
     return result
 
 
-def _public_session(session: Session, *, include_nonce: bool = False) -> dict[str, Any]:
+def _public_session(
+    session: Session,
+    *,
+    include_nonce: bool = False,
+    effective_at: float | None = None,
+) -> dict[str, Any]:
     value = asdict(session)
     value["capabilities"] = list(session.capabilities)
+    effectively_active = (
+        not session.expired if effective_at is None else session.active_at(effective_at)
+    )
+    value["effective_status"] = (
+        "expired" if session.status == "active" and not effectively_active else session.status
+    )
     if not include_nonce:
         value.pop("nonce", None)
     return value
@@ -264,17 +275,37 @@ class CommonsManager:
 
     def show_session(self, session_id: str | None = None) -> dict[str, Any] | list[dict[str, Any]]:
         selected = session_id or self.session_id
-        sessions = self.sessions.list_sessions(active_only=False)
+        now = self.sessions.clock()
         if selected is None:
-            return [_public_session(item) for item in sessions if item.status == "active"]
+            return [
+                _public_session(item, effective_at=now)
+                for item in self.sessions.list_sessions(active_only=True)
+            ]
+        sessions = self.sessions.list_sessions(active_only=False)
         for item in sessions:
             if item.session_id == selected:
-                return _public_session(item)
+                return _public_session(item, effective_at=now)
         raise ValidationError(f"session does not exist: {selected}")
 
     def end_session(self, *, nonce: str) -> dict[str, Any]:
         self._require_writable()
         session = self._active_session()
+        nonterminal = sorted(
+            (
+                delegation
+                for delegation in self.snapshot().delegations.values()
+                if delegation.get("parent_session_id") == session.session_id
+                and delegation.get("state") in {"requested", "active", "input_needed"}
+            ),
+            key=lambda item: str(item.get("id", "")),
+        )
+        if nonterminal:
+            sample = ", ".join(f"{item['id']} ({item['state']})" for item in nonterminal[:5])
+            suffix = "" if len(nonterminal) <= 5 else f" and {len(nonterminal) - 5} more"
+            raise LifecycleConflictError(
+                "session owns non-terminal delegations; cancel requested work or stop and "
+                f"reconcile active work before closing: {sample}{suffix}"
+            )
         closed = self.sessions.close(session.session_id, nonce=nonce)
         return _public_session(closed)
 
@@ -620,6 +651,19 @@ class CommonsManager:
 
         if event_type == "delegation.started":
             self.sessions.require_active(str(payload["child_session_id"]))
+
+        if event_type == "delegation.recovered":
+            self.sessions.require_active(session.session_id, capability="delegation:recover")
+            delegation = entity(snapshot, "delegation", str(payload["delegation_id"])) or {}
+            requester_session_id = str(delegation.get("parent_session_id", ""))
+            if requester_session_id == session.session_id:
+                raise LifecycleConflictError(
+                    "the delegation requester must use normal cancellation, not recovery"
+                )
+            if self.sessions.is_available(requester_session_id):
+                raise LifecycleConflictError(
+                    "delegation recovery requires an absent, expired, or closed requester session"
+                )
 
         if event_type in {
             "event.corrected",
@@ -1423,6 +1467,24 @@ class CommonsManager:
             delegation_id,
             expected_revision,
             "cancelled",
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
+
+    def recover_delegation(
+        self,
+        delegation_id: str,
+        expected_revision: str,
+        *,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Terminalize requested work whose original requester is unavailable."""
+
+        return self._delegation_transition(
+            delegation_id,
+            expected_revision,
+            "recovered",
             reason=reason,
             idempotency_key=idempotency_key,
         )

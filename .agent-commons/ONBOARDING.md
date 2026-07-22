@@ -83,7 +83,12 @@ IDs, lifecycle transitions, or stored payloads.
 - Cancel only requested, unlaunched work through core `delegation cancel` or
   bounded MCP `commons_cancel_delegation`. Active cancellation is unavailable:
   stop the provider and reconcile instead of recording canonical cancellation
-  before termination is confirmed.
+  before termination is confirmed. A requester cannot end its session while it
+  owns requested, active, or input-needed work. If a requester is absent,
+  expired, or closed, an operator-authorized session declaring
+  `delegation:recover` may use `delegation recover` only on the exact current
+  `requested` revision; the capability is a coordination gate, not external
+  user authority.
 
 ## Project truth
 

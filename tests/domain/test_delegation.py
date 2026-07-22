@@ -170,6 +170,12 @@ def test_invalid_terminal_transition_is_rejected_during_replay() -> None:
         ),
         ("delegation.cancelled", {"reason": "Cancelled."}, "cancelled", False),
         (
+            "delegation.recovered",
+            {"reason": "Requester unavailable."},
+            "cancelled",
+            False,
+        ),
+        (
             "delegation.timed_out",
             {"summary": "Time limit elapsed."},
             "timed_out",
@@ -266,6 +272,48 @@ def test_child_session_must_be_distinct_and_attempt_is_hard_bounded() -> None:
             "delegation.started",
             {**payload, "child_session_id": CHILD_SESSION_ID, "attempt": 3},
             actor_session_id=PARENT_SESSION_ID,
+        )
+
+
+def test_recovery_is_distinct_from_requester_owned_cancellation() -> None:
+    revision = "evt.00000000000000000000000002"
+    snapshot = ProjectSnapshot(
+        delegations={
+            DELEGATION_ID: {
+                "id": DELEGATION_ID,
+                "state": "requested",
+                "revision": revision,
+                "parent_session_id": PARENT_SESSION_ID,
+            }
+        }
+    )
+    base = {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": revision,
+        "reason": "The requester is unavailable.",
+    }
+
+    validate_transition(
+        snapshot,
+        "delegation.recovered",
+        base,
+        actor_session_id=CHILD_SESSION_ID,
+    )
+    with pytest.raises(LifecycleConflictError, match="only the delegation requester"):
+        validate_transition(
+            snapshot,
+            "delegation.cancelled",
+            base,
+            actor_session_id=CHILD_SESSION_ID,
+        )
+
+    snapshot.delegations[DELEGATION_ID]["state"] = "active"
+    with pytest.raises(LifecycleConflictError, match="not allowed"):
+        validate_transition(
+            snapshot,
+            "delegation.recovered",
+            base,
+            actor_session_id=CHILD_SESSION_ID,
         )
 
 

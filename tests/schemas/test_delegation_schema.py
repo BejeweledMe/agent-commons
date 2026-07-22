@@ -88,3 +88,21 @@ def test_success_requires_at_least_one_typed_result_reference() -> None:
     malformed = {**payload, "result_refs": [{"kind": "task", "id": TASK_ID, "x": 1}]}
     with pytest.raises(ValidationError, match="Additional properties"):
         registry.validate("commons.payload.delegation.v1", malformed)
+
+
+def test_recovery_payload_reuses_the_closed_cancellation_shape() -> None:
+    registry = SchemaRegistry()
+    payload = {
+        "delegation_id": DELEGATION_ID,
+        "expected_revision": REVISION,
+        "reason": "The requester session expired before launch.",
+    }
+
+    registry.validate("commons.payload.delegation.v1", payload)
+    validate_payload("delegation.recovered", payload)
+
+    with pytest.raises(ValidationError, match="Additional properties"):
+        registry.validate(
+            "commons.payload.delegation.v1",
+            {**payload, "requester_was_active": False},
+        )

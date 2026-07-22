@@ -836,6 +836,26 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
+    @register(_DESTRUCTIVE_WRITE, root_only=True)
+    def commons_recover_delegation(
+        delegation_id: str,
+        expected_revision: str,
+        reason: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Recover requested work whose original requester is unavailable.
+
+        The active root session must declare ``delegation:recover``. The
+        manager rejects live requesters and every state beyond ``requested``.
+        """
+
+        return commons.recover_delegation(
+            delegation_id,
+            expected_revision,
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
+
     @register(_IDEMPOTENT_WRITE, worker_purposes=("independent_review",))
     def commons_complete_review(
         review_id: str,
@@ -846,7 +866,7 @@ def build_server(
         idempotency_key: str,
         evidence_refs: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Complete one existing exact-revision review through manager validation."""
+        """Complete one exact-revision review; then finish its delegation separately."""
 
         if worker is not None:
             if workspace is None:  # pragma: no cover - worker construction guarantees it

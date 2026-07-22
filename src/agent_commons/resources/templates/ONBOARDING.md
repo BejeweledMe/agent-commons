@@ -68,7 +68,11 @@ IDs, lifecycle transitions, or stored payloads.
   canonical input metadata.
 - Before launch, ensure the parent session TTL covers the requested wall time
   and finalization margin. Never record cancellation before process termination
-  is proven; use the documented reconcile path for ambiguous active work.
+  is proven; use the documented reconcile path for ambiguous active work. A
+  requester cannot end its session while it owns requested, active, or
+  input-needed work. If that requester is absent, expired, or closed, an
+  operator-authorized session declaring `delegation:recover` may recover only
+  the exact current `requested` revision.
 
 ## Project truth
 

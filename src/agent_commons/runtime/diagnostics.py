@@ -42,6 +42,7 @@ class DiagnosticCode(StrEnum):
     TERMINAL_TOOL_REJECTED = "terminal_tool_rejected"
     PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
     CANONICAL_FINALIZATION_FAILED = "canonical_finalization_failed"
+    REQUESTER_UNAVAILABLE = "requester_unavailable"
 
 
 _HINTS = {
@@ -79,6 +80,9 @@ _HINTS = {
     ),
     DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
         "Canonical finalization failed after the provider process became terminal."
+    ),
+    DiagnosticCode.REQUESTER_UNAVAILABLE: (
+        "The attempt owner is unavailable, so this session cannot reconcile it automatically."
     ),
 }
 
@@ -135,6 +139,12 @@ _SAFE_NEXT_ACTIONS = {
     ),
     DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
         "Run doctor, inspect the canonical delegation, and reconcile the terminal attempt.",
+    ),
+    DiagnosticCode.REQUESTER_UNAVAILABLE: (
+        "If the canonical delegation is still requested, use an operator-authorized "
+        "delegation:recover session.",
+        "For active or input-needed work, prove provider termination before any canonical "
+        "classification; never relaunch blindly.",
     ),
 }
 
