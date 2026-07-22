@@ -561,7 +561,7 @@ class DelegationRuntimeService:
             parent_expiry = datetime.fromisoformat(parent.expires_at.replace("Z", "+00:00"))
         except ValueError as exc:  # pragma: no cover - registry validation owns this shape
             raise IntegrityError("parent session expiry is invalid") from exc
-        required_expiry = datetime.now(tz=UTC) + timedelta(
+        required_expiry = datetime.fromtimestamp(self.manager.sessions.clock(), tz=UTC) + timedelta(
             seconds=int(limits["wall_time_seconds"]) + 60
         )
         if parent_expiry < required_expiry:
@@ -965,11 +965,16 @@ alone is not task acceptance.
                     result.attempt if result is not None else self._latest_attempt(delegation_id)
                 )
                 attempt_terminal = latest_attempt is not None and latest_attempt.state.terminal
-                # No request document means admission failed before a retry
-                # identity existed, so the freshly opened child is unbound.
-                # A terminal pre-start attempt may remain requested for an
-                # explicit retry and must retain the same child correlation.
-                safe_pre_start_exit = current.get("state") == "requested" and latest_attempt is None
+                # Admission may fail before reserving a new attempt. Close the
+                # freshly opened child unless the latest attempt is actually
+                # bound to it. A terminal pre-start attempt may remain
+                # requested for an explicit retry and must retain its own child
+                # correlation, but it does not bind a later prospective child.
+                child_bound = (
+                    latest_attempt is not None
+                    and latest_attempt.correlation.child_session_id == child_session_id
+                )
+                safe_pre_start_exit = current.get("state") == "requested" and not child_bound
                 if (
                     current.get("state") in _TERMINAL_DELEGATION_STATES and attempt_terminal
                 ) or safe_pre_start_exit:
@@ -1024,6 +1029,7 @@ alone is not task acceptance.
                         "attempt": attempt.as_dict(),
                         "delegation": current,
                         "telemetry_failures": telemetry_failures,
+                        "reconciled": True,
                     }
                 )
         return values

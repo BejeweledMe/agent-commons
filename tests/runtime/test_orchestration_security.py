@@ -399,6 +399,44 @@ def test_admission_rejection_closes_the_unbound_child_session(tmp_path: Path) ->
     assert len(observer.show_session()) == sessions_before  # type: ignore[arg-type]
 
 
+def test_retry_admission_rejection_closes_only_the_new_unbound_child(tmp_path: Path) -> None:
+    manager, task = _workspace(tmp_path)
+    delegation = _delegation(
+        manager,
+        task,
+        max_attempts=2,
+        budget_unit="provider_units",
+        budget_limit=2,
+    )
+    runner = FakeRunner(reason=RunReason.START_FAILED)
+    initial = _service(manager, runner)
+    first = initial.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="retry-admission-child-cleanup",
+    )
+    retained_child = first["attempt"]["correlation"]["child_session_id"]
+    observer = CommonsManager(manager.repo_root, state_root=manager.paths.state_root)
+    sessions_before = len(observer.show_session())  # type: ignore[arg-type]
+
+    constrained = _service(
+        manager,
+        runner,
+        operator_limits=OperatorLimits(parent_provider_units=1),
+    )
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        constrained.run(
+            delegation["entity_ref"]["id"],
+            delegation["revision"],
+            idempotency_key="retry-admission-child-cleanup",
+            retry=True,
+        )
+
+    assert runner.calls == 1
+    assert manager.show_session(retained_child)["status"] == "active"  # type: ignore[index]
+    assert len(observer.show_session()) == sessions_before  # type: ignore[arg-type]
+
+
 def test_reconcile_surfaces_unavailable_foreign_owner_without_mutation(
     tmp_path: Path,
 ) -> None:
