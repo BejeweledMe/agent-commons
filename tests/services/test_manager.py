@@ -8,7 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 import agent_commons.services.manager as manager_module
-from agent_commons.domain.projection import ProjectSnapshot
+import agent_commons.storage.idempotency as idempotency_module
+from agent_commons.domain.projection import ProjectionIssue, ProjectSnapshot
 from agent_commons.errors import (
     IdempotencyConflictError,
     IntegrityError,
@@ -77,7 +78,7 @@ def _transition_process(
         results.put((type(exc).__name__, str(exc)))  # type: ignore[attr-defined]
 
 
-def test_idempotency_repairs_missing_receipt_and_keeps_index_synced(
+def test_idempotency_repairs_missing_receipt_and_defers_optional_index_sync(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
 ) -> None:
     _, _, manager, _ = workspace
@@ -109,9 +110,40 @@ def test_idempotency_repairs_missing_receipt_and_keeps_index_synced(
         namespace=namespace,
         key="objective-service",
     )
+    assert repeated["index"]["mode"] == "deferred"
+    report = manager.doctor()
+    assert report["ok"] is True
+    assert report["performance"]["canonical_write_index_policy"] == "deferred"
     with sqlite3.connect(manager.paths.index_db) as connection:
         assert connection.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 1
-    assert manager.doctor()["ok"] is True
+
+
+def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, manager, _ = workspace
+    real_descriptor = idempotency_module.receipt_scope_descriptor
+    refreshes = 0
+
+    def counted_descriptor(repo_root: str | Path, workspace_id: str) -> dict[str, str]:
+        nonlocal refreshes
+        refreshes += 1
+        return real_descriptor(repo_root, workspace_id)
+
+    monkeypatch.setattr(idempotency_module, "receipt_scope_descriptor", counted_descriptor)
+    manager.create_objective(
+        title="Bound Git probes",
+        description="Reuse one receipt scope within the full write transaction.",
+        acceptance_criteria=("scope probe count stays bounded",),
+        idempotency_key="bounded-scope-probes",
+    )
+
+    assert refreshes == 2
+    report = manager.doctor()
+    assert refreshes == 3
+    assert report["performance"]["receipt_scope_refreshes"] == 3
+    assert report["performance"]["receipt_scope_git_probes"] <= 9
 
 
 def test_orphan_receipt_blocks_competing_write_and_identical_retry_repairs(
@@ -374,6 +406,87 @@ def test_task_acceptance_requires_current_independent_review(
     assert invalidated_snapshot.tasks[task_id]["state"] == "review"
     assert ("event", reaccepted["event_id"]) in invalidated_snapshot.stale_refs
     assert reviewer.doctor()["ok"] is True
+
+
+def test_task_artifacts_are_revision_bound_and_revision_stales_acceptance(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    repo, _, builder, reviewer = workspace
+    source = repo / "task-result.txt"
+    source.write_text("first result", encoding="utf-8")
+    artifact = builder.register_artifact(
+        source,
+        media_type="text/plain",
+        idempotency_key="task-bound-artifact",
+    )
+    artifact_ref = artifact["entity_ref"]
+    expected_binding = {"ref": artifact_ref, "revision": artifact["revision"]}
+    created = builder.create_task(
+        title="Ship bound artifact",
+        description="The accepted task depends on exact artifact bytes.",
+        acceptance_criteria=("artifact remains current",),
+        idempotency_key="bound-artifact-task",
+    )
+    started = builder.start_task(
+        created["entity_ref"]["id"],
+        created["revision"],
+        idempotency_key="bound-artifact-task-start",
+    )
+    completed = builder.complete_task(
+        created["entity_ref"]["id"],
+        started["revision"],
+        summary="result recorded",
+        artifact_refs=(artifact_ref,),
+        idempotency_key="bound-artifact-task-complete",
+    )
+    submitted = builder.submit_task(
+        created["entity_ref"]["id"],
+        completed["revision"],
+        summary="ready for independent review",
+        artifact_refs=(artifact_ref,),
+        idempotency_key="bound-artifact-task-submit",
+    )
+    for result in (completed, submitted):
+        payload = builder.show_event(result["event_id"])["event"]["payload"]
+        assert payload["artifact_refs"] == [artifact_ref]
+        assert payload["artifact_bindings"] == [expected_binding]
+
+    requested = builder.request_review(
+        target_ref=created["entity_ref"],
+        target_revision=submitted["revision"],
+        criteria=("artifact is current",),
+        idempotency_key="bound-artifact-review",
+    )
+    reviewer.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=submitted["revision"],
+        verdict="approved",
+        summary="exact artifact approved",
+        idempotency_key="bound-artifact-review-complete",
+    )
+    accepted = reviewer.accept_task(
+        created["entity_ref"]["id"],
+        submitted["revision"],
+        summary="accepted with exact artifact",
+        idempotency_key="bound-artifact-task-accept",
+    )
+    assert reviewer.snapshot().tasks[created["entity_ref"]["id"]]["state"] == "accepted"
+
+    source.write_text("second result", encoding="utf-8")
+    builder.revise_artifact(
+        artifact_ref["id"],
+        artifact["revision"],
+        source,
+        media_type="text/plain",
+        idempotency_key="task-bound-artifact-revise",
+    )
+
+    snapshot = reviewer.snapshot()
+    assert snapshot.tasks[created["entity_ref"]["id"]]["state"] == "review"
+    assert snapshot.tasks[created["entity_ref"]["id"]]["artifact_stale"] is True
+    assert snapshot.reviews[requested["entity_ref"]["id"]]["stale"] is True
+    assert ("event", accepted["event_id"]) in snapshot.stale_refs
 
 
 def test_task_author_cannot_review_after_another_session_submits(
@@ -1018,24 +1131,105 @@ def test_invalidation_can_recover_merged_accepted_decision_conflict(
 
 
 @pytest.mark.parametrize(
-    "warning",
+    ("code", "message"),
     (
-        "conflicting accepted decisions for scope api",
-        "event rejected by lifecycle: stale revision",
-        "event rejected by domain validation: malformed payload",
+        ("decision_scope_conflict", "conflicting accepted decisions for scope api"),
+        ("lifecycle_rejected", "event rejected by lifecycle: stale revision"),
+        ("correction_identity_change", "event correction cannot change task_id"),
     ),
 )
-def test_doctor_and_write_guard_fail_on_hard_projection_warnings(
+def test_doctor_and_write_guard_fail_on_structured_projection_issues(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
     monkeypatch: pytest.MonkeyPatch,
-    warning: str,
+    code: str,
+    message: str,
 ) -> None:
     _, _, manager, _ = workspace
-    snapshot = ProjectSnapshot(workspace_id=manager.workspace_id, warnings=[warning])
+    snapshot = ProjectSnapshot(
+        workspace_id=manager.workspace_id,
+        warnings=[message],
+        issues=[ProjectionIssue(code, "error", message)],
+    )
     monkeypatch.setattr(manager, "_records_and_snapshot", lambda: ([], snapshot))
     assert manager.doctor()["ok"] is False
-    with pytest.raises(IntegrityError, match="rejected|conflict"):
+    with pytest.raises(IntegrityError, match="rejected|conflict|cannot change"):
         manager._guard_integrity()
+
+
+def test_warning_wording_does_not_control_integrity_status(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, manager, _ = workspace
+    snapshot = ProjectSnapshot(
+        workspace_id=manager.workspace_id,
+        warnings=["informational conflict wording is not a projection error"],
+    )
+    monkeypatch.setattr(manager, "_records_and_snapshot", lambda: ([], snapshot))
+
+    assert manager.doctor()["ok"] is True
+    assert manager._guard_integrity() is snapshot
+
+
+def test_identity_changing_imported_correction_blocks_writes_until_superseded(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    _, _, manager, _ = workspace
+    created = manager.create_objective(
+        title="Immutable identity",
+        description="Imported corrections must preserve the subject.",
+        acceptance_criteria=("doctor fails closed",),
+        idempotency_key="identity-correction-root",
+    )
+    shown = manager.show_event(created["event_id"])
+    invalid_payload = {
+        **shown["event"]["payload"],
+        "objective_id": "objective.00000000000000000000000000",
+    }
+    bad = manager.events.append_event(
+        workspace_id=manager.workspace_id,
+        event_type="event.corrected",
+        payload_schema="commons.payload.maintenance.v1",
+        payload={
+            "target_event_id": created["event_id"],
+            "expected_target_sha256": shown["canonical_sha256"],
+            "replacement_payload": invalid_payload,
+        },
+        actor=manager._actor(),
+        subject_refs=({"kind": "event", "id": created["event_id"]},),
+        idempotency_namespace="imported-history",
+        idempotency_key="identity-changing-correction",
+        provenance={
+            "writer": "merge-test",
+            "writer_version": "1",
+            "source_kind": "manual",
+            "source_refs": [],
+        },
+        tags=("maintenance", "correction"),
+    )
+
+    report = manager.doctor()
+    assert report["ok"] is False
+    assert any("cannot change objective_id" in issue for issue in report["issues"])
+    with pytest.raises(IntegrityError, match="cannot change objective_id"):
+        manager.create_objective(
+            title="Blocked unrelated write",
+            description="The invalid projection must be repaired first.",
+            acceptance_criteria=("blocked",),
+            idempotency_key="blocked-by-identity-correction",
+        )
+
+    replacement = {**shown["event"]["payload"], "title": "Repaired identity"}
+    manager.correct_event(
+        created["event_id"],
+        expected_target_sha256=shown["canonical_sha256"],
+        replacement_payload=replacement,
+        superseded_correction_event_ids=(bad.event_id,),
+        idempotency_key="supersede-identity-changing-correction",
+    )
+
+    assert manager.list_objectives()[0]["title"] == "Repaired identity"
+    assert manager.doctor()["ok"] is True
 
 
 def test_security_rejection_leaves_no_event_or_receipt(

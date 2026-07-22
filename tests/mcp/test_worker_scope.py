@@ -12,6 +12,7 @@ from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
     ClaudeRunnerProfile,
+    TerminalToolAuditStore,
 )
 from agent_commons.services import CommonsManager
 
@@ -251,6 +252,47 @@ def test_worker_snapshot_accepts_an_operator_configured_trusted_git(tmp_path: Pa
     )
 
 
+def test_worker_snapshot_never_follows_a_symlinked_parent_component(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "canary.txt").write_text("outside secret\n", encoding="utf-8")
+    (workspace["repo"] / "linked").symlink_to(outside, target_is_directory=True)
+    blob = (
+        subprocess.run(
+            ("/usr/bin/git", "-C", str(workspace["repo"]), "hash-object", "-w", "--stdin"),
+            input=b"indexed placeholder\n",
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode("ascii")
+        .strip()
+    )
+    subprocess.run(
+        (
+            "/usr/bin/git",
+            "-C",
+            str(workspace["repo"]),
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "100644",
+            blob,
+            "linked/canary.txt",
+        ),
+        check=True,
+        capture_output=True,
+    )
+
+    server = _worker_server(workspace)
+
+    assert "linked/canary.txt" not in {
+        item["path"] for item in server.tools["commons_workspace_files"]("", 500)
+    }
+    with pytest.raises(LifecycleConflictError, match="outside the delegated snapshot"):
+        server.tools["commons_workspace_read"]("linked/canary.txt", None)
+
+
 def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     tmp_path: Path,
 ) -> None:
@@ -309,6 +351,7 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     invocation = profile.build_invocation(
         "Review the exact worker contract",
         workspace_root=workspace["repo"],
+        state_root=workspace["parent"].paths.state_root,
         delegation_id=active_id,
     )
     allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
@@ -562,6 +605,10 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
     )
     assert ended["event_type"] == "delegation.needs_operator"
     assert workspace["parent"].get_delegation(delegation_id)["state"] == "needs_operator"
+    audit = TerminalToolAuditStore(workspace["parent"].paths.state_root).get(delegation_id)
+    assert audit.terminal_tool_calls == 1
+    assert audit.terminal_tool_completions == 1
+    assert audit.terminal_tool_rejections == 0
 
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
         server.tools["commons_workspace_read"]("src/app.py", None)

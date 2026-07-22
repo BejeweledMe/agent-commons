@@ -322,6 +322,15 @@ def _validate_evidence_ref_list(value: Any) -> None:
         _validate_revision_bound_ref(item, f"evidence_refs[{index}]")
 
 
+def _validate_artifact_binding_list(value: Any) -> None:
+    if not isinstance(value, list):
+        raise ValidationError("artifact_bindings must be a list")
+    for index, item in enumerate(value):
+        _validate_revision_bound_ref(item, f"artifact_bindings[{index}]")
+        if item["ref"].get("kind") != "artifact":
+            raise ValidationError(f"artifact_bindings[{index}].ref.kind must be artifact")
+
+
 def _validate_objective_changes(value: Any) -> None:
     if not isinstance(value, Mapping) or not value:
         raise ValidationError("changes must be a non-empty object")
@@ -407,6 +416,8 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         _validate_ref_list(payload[field], field)
     if "evidence_refs" in payload:
         _validate_evidence_ref_list(payload["evidence_refs"])
+    if "artifact_bindings" in payload:
+        _validate_artifact_binding_list(payload["artifact_bindings"])
     if "acceptance_review" in payload:
         _validate_revision_bound_ref(payload["acceptance_review"], "acceptance_review")
         if payload["acceptance_review"]["ref"].get("kind") != "review":

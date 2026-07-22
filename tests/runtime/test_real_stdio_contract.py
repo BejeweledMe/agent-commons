@@ -10,9 +10,21 @@ from agent_commons.runtime import (
     ClaudePermissionMode,
     ClaudeRunnerProfile,
     ProfileRegistry,
+    TelemetryEvent,
+    TelemetryKind,
 )
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
+
+
+class CollectingTelemetry:
+    capture_content = False
+
+    def __init__(self) -> None:
+        self.events: list[TelemetryEvent] = []
+
+    def emit(self, event: TelemetryEvent) -> None:
+        self.events.append(event)
 
 
 def _executable(path: Path, body: str) -> Path:
@@ -21,7 +33,7 @@ def _executable(path: Path, body: str) -> Path:
     return path
 
 
-def test_generated_claude_argv_crosses_real_mcp_stdio_and_records_terminal_outcome(
+def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canonically(
     tmp_path: Path,
 ) -> None:
     repo = tmp_path / "repo"
@@ -45,7 +57,8 @@ def test_generated_claude_argv_crosses_real_mcp_stdio_and_records_terminal_outco
         "from agent_commons.mcp.server import main\nraise SystemExit(main())\n",
     )
 
-    manager = CommonsManager(repo)
+    external_state_root = tmp_path / "external-state"
+    manager = CommonsManager(repo, state_root=external_state_root)
     parent = manager.start_session(
         stable_instance_id="real-stdio-parent-session",
         principal="operator",
@@ -96,7 +109,9 @@ def test_generated_claude_argv_crosses_real_mcp_stdio_and_records_terminal_outco
         }
     )
 
-    result = DelegationRuntimeService(manager, profiles=profiles).run(
+    telemetry = CollectingTelemetry()
+    service = DelegationRuntimeService(manager, profiles=profiles, telemetry=telemetry)
+    result = service.run(
         delegation["entity_ref"]["id"],
         delegation["revision"],
         idempotency_key="real-stdio-launch",
@@ -104,6 +119,19 @@ def test_generated_claude_argv_crosses_real_mcp_stdio_and_records_terminal_outco
 
     assert result["process"]["outcome"] == "succeeded"
     assert result["delegation"]["state"] == "succeeded"
+    assert result["delegation"]["result_refs"] == [review["entity_ref"]]
     assert manager.list_reviews(state="approved")[0]["id"] == review["entity_ref"]["id"]
     assert result["attempt"]["diagnostic_code"] == "none"
     assert "canonical outcome recorded" not in str(result)
+    joined = service.list_attempts(diagnostic=True)
+    assert joined[0]["canonical_state"] == "succeeded"
+    assert joined[0]["process_canonical_mismatch"] is False
+    assert joined[0]["terminal_tool_calls"] == 1
+    assert joined[0]["terminal_tool_rejections"] == 0
+    assert joined[0]["terminal_tool_completions"] == 1
+    assert [event.kind for event in telemetry.events][-2:] == [
+        TelemetryKind.CANONICAL_FINALIZATION_STARTED,
+        TelemetryKind.CANONICAL_FINALIZATION_COMPLETED,
+    ]
+    assert telemetry.events[-1].terminal_tool_calls == 1
+    assert telemetry.events[-1].process_canonical_mismatch is False

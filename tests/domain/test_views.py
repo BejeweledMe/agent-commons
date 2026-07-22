@@ -95,6 +95,22 @@ def test_orientation_bounds_nested_messages_without_mutating_snapshot() -> None:
     assert snapshot.threads[thread_id]["messages"][0]["body"] == huge_body
 
 
+def test_orientation_separates_requested_reviews_from_stale_judgments() -> None:
+    requested = "review.00000000000000000000000001"
+    stale = "review.00000000000000000000000002"
+    snapshot = ProjectSnapshot(
+        reviews={
+            requested: {"id": requested, "state": "requested", "stale": False},
+            stale: {"id": stale, "state": "approved", "stale": True},
+        }
+    )
+
+    result = orientation(snapshot)
+
+    assert [item["id"] for item in result["pending_reviews"]] == [requested]
+    assert [item["id"] for item in result["stale_review_judgments"]] == [stale]
+
+
 def test_current_view_excludes_stale_effective_truth_but_keeps_fresh_truth(tmp_path) -> None:
     stale_decision = "decision.00000000000000000000000001"
     fresh_decision = "decision.00000000000000000000000002"

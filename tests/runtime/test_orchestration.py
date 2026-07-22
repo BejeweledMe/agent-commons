@@ -8,7 +8,14 @@ from typing import Any
 import pytest
 
 from agent_commons.errors import LifecycleConflictError
-from agent_commons.runtime import ProcessResult, RunOutcome, RunReason, default_profile_registry
+from agent_commons.runtime import (
+    ProcessResult,
+    RunOutcome,
+    RunReason,
+    TelemetryEvent,
+    TelemetryKind,
+    default_profile_registry,
+)
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 
@@ -107,6 +114,16 @@ class FakeRunner:
         )
 
 
+class CollectingTelemetry:
+    capture_content = False
+
+    def __init__(self) -> None:
+        self.events: list[TelemetryEvent] = []
+
+    def emit(self, event: TelemetryEvent) -> None:
+        self.events.append(event)
+
+
 def test_child_review_and_delegation_result_are_canonical_but_output_is_not(
     tmp_path: Path,
 ) -> None:
@@ -139,12 +156,14 @@ def test_child_review_and_delegation_result_are_canonical_but_output_is_not(
         assert completed["revision"]
 
     runner = FakeRunner(after_start=complete_as_child)
+    telemetry = CollectingTelemetry()
     service = DelegationRuntimeService(
         manager,
         runner=runner,  # type: ignore[arg-type]
         profiles=default_profile_registry(
             claude_executable="/bin/echo", mcp_executable="/bin/echo"
         ),
+        telemetry=telemetry,
     )
     result = service.run(
         delegation_id,
@@ -165,6 +184,15 @@ def test_child_review_and_delegation_result_are_canonical_but_output_is_not(
     child_session = result["attempt"]["correlation"]["child_session_id"]
     assert len(result["attempt"]["correlation"]["trace_id"]) == 32
     assert manager.show_session(child_session)["status"] == "closed"
+    assert [event.kind for event in telemetry.events][-2:] == [
+        TelemetryKind.CANONICAL_FINALIZATION_STARTED,
+        TelemetryKind.CANONICAL_FINALIZATION_COMPLETED,
+    ]
+    final = telemetry.events[-1]
+    assert final.canonical_state == "succeeded"
+    assert final.canonical_reason_code == "succeeded"
+    assert final.process_canonical_mismatch is False
+    assert final.terminal_tool_calls == 0
 
 
 def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> None:
@@ -220,6 +248,34 @@ def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> 
             idempotency_key="runtime-launch-retry",
             retry=True,
         )
+
+
+def test_successful_process_without_terminal_tool_gets_actionable_workflow_diagnostic(
+    tmp_path: Path,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(
+        manager,
+        runner=FakeRunner(),  # type: ignore[arg-type]
+        profiles=default_profile_registry(
+            claude_executable="/bin/echo", mcp_executable="/bin/echo"
+        ),
+    )
+
+    result = service.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="runtime-missing-terminal-tool",
+    )
+    diagnostic = service.list_attempts(diagnostic=True)[0]
+
+    assert result["delegation"]["state"] == "needs_operator"
+    assert result["workflow_diagnostic_code"] == "terminal_tool_not_called"
+    assert result["safe_next_actions"]
+    assert diagnostic["diagnostic_code"] == "none"
+    assert diagnostic["workflow_diagnostic_code"] == "terminal_tool_not_called"
+    assert diagnostic["safe_next_actions"]
 
 
 def test_reconcile_maps_ambiguous_running_attempt_to_canonical_needs_operator(

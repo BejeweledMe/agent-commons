@@ -13,6 +13,7 @@ from agent_commons.runtime import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     CodexSandbox,
+    OperatorLimits,
     PolicyViolationError,
     ProfileRegistry,
     RuntimePolicy,
@@ -63,6 +64,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     invocation = claude.build_invocation(
         "Review it",
         workspace_root=tmp_path,
+        state_root=tmp_path / "external-state",
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
         max_budget_microusd=250_000,
     )
@@ -75,6 +77,8 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     mcp_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
     assert '"command":"/bin/echo"' in mcp_config
     assert '"--git-executable","/usr/bin/true"' in mcp_config
+    assert '"--state-root"' in mcp_config
+    assert str(tmp_path / "external-state") in mcp_config
     assert str(tmp_path.resolve()) in mcp_config
     assert "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ" in mcp_config
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
@@ -172,6 +176,23 @@ def test_profiles_are_immutable_and_only_fixed_ids_are_accepted() -> None:
         profile.executable = "other"  # type: ignore[misc]
     with pytest.raises(ConfigurationError, match="unsupported runner profile"):
         ProfileRegistry.from_mapping({"profiles": {"custom-shell": {}}})
+
+
+def test_operator_limits_apply_partial_overrides_without_dropping_safe_defaults() -> None:
+    limits = OperatorLimits.from_mapping(
+        {
+            "global_concurrency": 3,
+            "provider_concurrency": {"claude": 1},
+            "profile_concurrency": {"claude-independent-reviewer": 1},
+        }
+    )
+
+    assert limits.global_concurrency == 3
+    assert limits.provider_concurrency_cap("claude") == 1
+    assert limits.provider_concurrency_cap("codex") == 2
+    assert limits.profile_concurrency_cap("codex-builder") == 1
+    with pytest.raises(PolicyViolationError, match="unsupported fields"):
+        OperatorLimits.from_mapping({"shell_command": 1})
 
 
 def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(

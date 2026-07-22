@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import stat
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from agent_commons.runtime import (
     BuiltinProfileId,
     CorrelationIds,
     DiagnosticCode,
+    OperatorLimits,
     PolicyViolationError,
     ProcessResult,
     Provider,
@@ -181,6 +184,83 @@ def test_only_one_writable_worker_can_be_active_per_checkout(tmp_path: Path) -> 
         parent_policy=parent,
     )
     assert reviewer.created
+
+
+def test_shared_operator_queue_is_bounded_and_admits_in_order(tmp_path: Path) -> None:
+    limits = OperatorLimits(
+        global_concurrency=1,
+        queue_capacity=1,
+        queue_wait_seconds=2,
+        provider_concurrency={"codex": 1},
+        profile_concurrency={"codex-independent-reviewer": 1},
+    )
+    store = AttemptStore(tmp_path / "state", operator_limits=limits)
+    parent, _ = policies()
+    first = store.reserve(
+        spec(
+            tmp_path,
+            key="queued-first-reviewer",
+            profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        ),
+        parent_policy=parent,
+    ).attempt
+    result: list[object] = []
+
+    def reserve_second() -> None:
+        result.append(
+            store.reserve(
+                spec(
+                    tmp_path,
+                    key="queued-second-reviewer",
+                    profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+                    child_session_id="session.child00000000000000000000000002",
+                ),
+                parent_policy=parent,
+            )
+        )
+
+    thread = threading.Thread(target=reserve_second)
+    thread.start()
+    deadline = time.monotonic() + 1
+    while not store.queue_path.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert store.queue_path.exists()
+
+    with pytest.raises(PolicyViolationError, match="queue is full"):
+        store.reserve(
+            spec(
+                tmp_path,
+                key="queued-third-reviewer",
+                profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+                child_session_id="session.child00000000000000000000000003",
+            ),
+            parent_policy=parent,
+        )
+
+    store.transition(first.attempt_id, AttemptState.CANCELLED, reason="cancelled")
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    reservation = result[0]
+    assert reservation.queue_depth == 1
+    assert reservation.queued_milliseconds > 0
+
+
+def test_operator_provider_units_are_aggregate_across_requests(tmp_path: Path) -> None:
+    limits = OperatorLimits(parent_provider_units=1)
+    store = AttemptStore(tmp_path / "state", operator_limits=limits)
+    parent, _ = policies()
+    first = store.reserve(spec(tmp_path, key="budget-first"), parent_policy=parent).attempt
+    store.transition(first.attempt_id, AttemptState.FAILED, reason="start_failed")
+
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        store.reserve(
+            spec(
+                tmp_path,
+                key="budget-second",
+                child_session_id="session.child00000000000000000000000002",
+            ),
+            parent_policy=parent,
+        )
 
 
 def test_tampered_request_body_is_detected(tmp_path: Path) -> None:

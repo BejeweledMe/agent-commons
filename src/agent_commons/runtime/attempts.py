@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -25,16 +24,18 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
+from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
 
 from .diagnostics import DiagnosticCode, classify_process_result
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
-from .policy import PolicyViolationError, RuntimePolicy, RuntimeUsage
+from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .subprocess_runner import ProcessResult, RunOutcome
 
 REQUEST_SCHEMA = "agent_commons.runtime_request.v3"
 ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v3"
+QUEUE_SCHEMA = "agent_commons.runtime_queue.v1"
 _LEGACY_REQUEST_SCHEMA = "agent_commons.runtime_request.v2"
 _LEGACY_ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v2"
 _REQUEST_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
@@ -145,10 +146,10 @@ def _exclusive_lock(path: Path) -> Iterator[None]:
         )
         try:
             os.fchmod(descriptor, 0o600)
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            lock_exclusive(descriptor)
             yield
         finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            unlock(descriptor)
             os.close(descriptor)
 
 
@@ -260,6 +261,8 @@ class Attempt:
 class AttemptReservation:
     attempt: Attempt
     created: bool
+    queue_depth: int = 0
+    queued_milliseconds: int = 0
 
 
 def _correlation_from_mapping(value: Mapping[str, Any]) -> CorrelationIds:
@@ -378,6 +381,10 @@ class AttemptStore:
         state_root: str | Path,
         *,
         clock: Callable[[], float] = time.time,
+        wall_clock: Callable[[], float] = time.time,
+        wait_clock: Callable[[], float] = time.monotonic,
+        sleeper: Callable[[float], None] = time.sleep,
+        operator_limits: OperatorLimits | None = None,
         security_policy: SecurityPolicy | None = None,
         read_only: bool = False,
     ) -> None:
@@ -385,7 +392,12 @@ class AttemptStore:
         self.root = self.state_root / "runtime"
         self.request_root = self.root / "requests"
         self.lock_path = self.root / "attempts.lock"
+        self.queue_path = self.root / "queue.json"
         self.clock = clock
+        self.wall_clock = wall_clock
+        self.wait_clock = wait_clock
+        self.sleeper = sleeper
+        self.operator_limits = operator_limits or OperatorLimits()
         self.security_policy = security_policy or SecurityPolicy()
         self.read_only = read_only
         if not read_only:
@@ -529,6 +541,62 @@ class AttemptStore:
             documents.append((path, document))
         return documents
 
+    def _read_queue(self) -> list[dict[str, Any]]:
+        if not self.queue_path.exists():
+            return []
+        if self.queue_path.is_symlink():
+            raise IntegrityError("runtime queue must not be a symlink")
+        descriptor = -1
+        try:
+            descriptor = os.open(
+                self.queue_path,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise IntegrityError("runtime queue must be a regular file")
+            with os.fdopen(descriptor, "rb", closefd=True) as handle:
+                raw = handle.read()
+            descriptor = -1
+            value = json.loads(raw)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise IntegrityError("runtime queue is unreadable") from exc
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"schema", "entries"}
+            or value.get("schema") != QUEUE_SCHEMA
+            or not isinstance(value.get("entries"), list)
+            or raw != _canonical_bytes(value)
+        ):
+            raise IntegrityError("runtime queue has an invalid shape")
+        entries: list[dict[str, Any]] = []
+        identities: set[str] = set()
+        for entry in value["entries"]:
+            if (
+                not isinstance(entry, dict)
+                or set(entry) != {"request_id", "semantic_sha256", "enqueued_at"}
+                or _REQUEST_KEY.fullmatch(str(entry.get("request_id", ""))) is None
+                or _SHA256.fullmatch(str(entry.get("semantic_sha256", ""))) is None
+                or isinstance(entry.get("enqueued_at"), bool)
+                or not isinstance(entry.get("enqueued_at"), (int, float))
+                or float(entry["enqueued_at"]) < 0
+            ):
+                raise IntegrityError("runtime queue has an invalid entry")
+            request_id = str(entry["request_id"])
+            if request_id in identities:
+                raise IntegrityError("runtime queue has duplicate requests")
+            identities.add(request_id)
+            entries.append(dict(entry))
+        self.security_policy.assert_safe(value, context="runtime admission queue")
+        return entries
+
+    def _write_queue(self, entries: list[dict[str, Any]]) -> None:
+        body = {"schema": QUEUE_SCHEMA, "entries": entries}
+        self.security_policy.assert_safe(body, context="runtime admission queue")
+        atomic_write_replace(self.queue_path, _canonical_bytes(body), mode=0o600)
+
     @staticmethod
     def _latest(document: Mapping[str, Any]) -> Attempt:
         return _attempt_from_mapping(document["attempts"][-1])
@@ -545,13 +613,75 @@ class AttemptStore:
             for _, document in documents
             if not AttemptStore._latest(document).state.terminal
         ]
-        return RuntimeUsage(
-            active_fanout=sum(
-                attempt.correlation.parent_session_id == parent_session_id for attempt in active
-            ),
-            attempts_started=attempts_started,
-            active_concurrency=len(active),
+        parent_active = sum(
+            attempt.correlation.parent_session_id == parent_session_id for attempt in active
         )
+        return RuntimeUsage(
+            active_fanout=parent_active,
+            attempts_started=attempts_started,
+            active_concurrency=parent_active,
+        )
+
+    def _capacity_reason(
+        self,
+        documents: list[tuple[Path, dict[str, Any]]],
+        spec: AttemptSpec,
+        parent_policy: RuntimePolicy,
+    ) -> str | None:
+        active = [
+            self._latest(document)
+            for _, document in documents
+            if not self._latest(document).state.terminal
+        ]
+        parent_active = sum(
+            attempt.correlation.parent_session_id == spec.correlation.parent_session_id
+            for attempt in active
+        )
+        provider_active = sum(attempt.provider is spec.provider for attempt in active)
+        profile_active = sum(attempt.profile_id is spec.profile_id for attempt in active)
+        if len(active) >= self.operator_limits.global_concurrency:
+            return "global_concurrency"
+        if provider_active >= self.operator_limits.provider_concurrency_cap(spec.provider.value):
+            return "provider_concurrency"
+        if profile_active >= self.operator_limits.profile_concurrency_cap(spec.profile_id.value):
+            return "profile_concurrency"
+        if parent_active >= min(parent_policy.max_fanout, parent_policy.max_concurrency):
+            return "parent_concurrency"
+        return None
+
+    def _assert_budget_available(
+        self,
+        documents: list[tuple[Path, dict[str, Any]]],
+        spec: AttemptSpec,
+        *,
+        attempts_started: int,
+    ) -> None:
+        if attempts_started >= spec.parent_policy.max_attempts:
+            raise PolicyViolationError("delegation attempt limit is exhausted")
+        attempts = [
+            _attempt_from_mapping(raw_attempt)
+            for _, document in documents
+            for raw_attempt in document["attempts"]
+            if str((document["spec"]["correlation"])["parent_session_id"])
+            == spec.correlation.parent_session_id
+            and str(document["spec"]["provider"]) == spec.provider.value
+        ]
+        monetary = spec.child_policy.max_budget_microusd
+        if monetary is None:
+            used = sum(attempt.child_policy.max_budget_microusd is None for attempt in attempts)
+            if used >= self.operator_limits.provider_units_cap(spec.provider.value):
+                raise PolicyViolationError("operator provider_units budget is exhausted")
+            return
+        request_committed = attempts_started * monetary
+        if request_committed + monetary > int(spec.parent_policy.max_budget_microusd or 0):
+            raise PolicyViolationError("delegation monetary budget is exhausted")
+        operator_committed = sum(
+            int(attempt.child_policy.max_budget_microusd or 0) for attempt in attempts
+        )
+        if operator_committed + monetary > self.operator_limits.budget_microusd_cap(
+            spec.provider.value
+        ):
+            raise PolicyViolationError("operator monetary budget is exhausted")
 
     @staticmethod
     def _assert_checkout_writer_available(
@@ -607,53 +737,125 @@ class AttemptStore:
         if spec.parent_policy != parent_policy:
             raise IdempotencyConflictError("runtime request parent policy does not match")
         spec.child_policy.assert_reduction_of(parent_policy)
-        with _exclusive_lock(self.lock_path):
-            documents = self._documents()
-            path = self._path(spec.request_id)
-            matching = next((value for candidate, value in documents if candidate == path), None)
-            if matching is not None:
-                if matching["semantic_sha256"] != spec.semantic_sha256:
-                    raise IdempotencyConflictError(
-                        "runtime idempotency key was reused for a different request"
-                    )
-                latest = self._latest(matching)
-                if not retry:
-                    return AttemptReservation(latest, False)
-                if not latest.state.terminal or latest.state is AttemptState.SUCCEEDED:
-                    raise LifecycleConflictError("only an unsuccessful terminal request can retry")
+        wait_started = self.wait_clock()
+        deadline = wait_started + self.operator_limits.queue_wait_seconds
+        maximum_queue_depth = 0
+        while True:
+            with _exclusive_lock(self.lock_path):
+                documents = self._documents()
+                path = self._path(spec.request_id)
+                matching = next(
+                    (value for candidate, value in documents if candidate == path), None
+                )
+                if matching is not None:
+                    if matching["semantic_sha256"] != spec.semantic_sha256:
+                        raise IdempotencyConflictError(
+                            "runtime idempotency key was reused for a different request"
+                        )
+                    latest = self._latest(matching)
+                    if not retry:
+                        return AttemptReservation(latest, False)
+                    if not latest.state.terminal or latest.state is AttemptState.SUCCEEDED:
+                        raise LifecycleConflictError(
+                            "only an unsuccessful terminal request can retry"
+                        )
+                    attempts_started = len(matching["attempts"])
+                else:
+                    attempts_started = 0
+
                 usage = self._usage(
                     documents,
                     parent_session_id=spec.correlation.parent_session_id,
-                    attempts_started=len(matching["attempts"]),
+                    attempts_started=attempts_started,
                 )
-                parent_policy.assert_launch_allowed(usage)
-                self._assert_checkout_writer_available(documents, spec)
-                attempt = self._new_attempt(
+                if parent_policy.remaining_depth < 1:
+                    raise PolicyViolationError("delegation depth is exhausted")
+                self._assert_budget_available(
+                    documents,
                     spec,
-                    number=len(matching["attempts"]) + 1,
-                    timestamp=_iso(self.clock()),
+                    attempts_started=usage.attempts_started,
                 )
-                updated = {**matching, "attempts": [*matching["attempts"], attempt.as_dict()]}
-                self._write_document(path, updated)
-                return AttemptReservation(attempt, True)
+                self._assert_checkout_writer_available(documents, spec)
 
-            usage = self._usage(
-                documents,
-                parent_session_id=spec.correlation.parent_session_id,
-                attempts_started=0,
-            )
-            parent_policy.assert_launch_allowed(usage)
-            self._assert_checkout_writer_available(documents, spec)
-            attempt = self._new_attempt(spec, number=1, timestamp=_iso(self.clock()))
-            document = {
-                "schema": REQUEST_SCHEMA,
-                "request_id": spec.request_id,
-                "semantic_sha256": spec.semantic_sha256,
-                "spec": spec.semantic_body(),
-                "attempts": [attempt.as_dict()],
-            }
-            self._write_document(path, document)
-            return AttemptReservation(attempt, True)
+                queue = self._read_queue()
+                live_queue = [
+                    item
+                    for item in queue
+                    if self.wall_clock() - float(item["enqueued_at"])
+                    <= self.operator_limits.queue_wait_seconds
+                ]
+                if live_queue != queue:
+                    queue = live_queue
+                    self._write_queue(queue)
+                entry = next(
+                    (item for item in queue if item["request_id"] == spec.request_id), None
+                )
+                if entry is not None and entry["semantic_sha256"] != spec.semantic_sha256:
+                    raise IdempotencyConflictError(
+                        "runtime queue identity belongs to different request content"
+                    )
+                capacity_reason = self._capacity_reason(documents, spec, parent_policy)
+                has_predecessor = bool(queue and queue[0]["request_id"] != spec.request_id)
+                if capacity_reason is not None or has_predecessor:
+                    if entry is None:
+                        if len(queue) >= self.operator_limits.queue_capacity:
+                            raise PolicyViolationError(
+                                "runtime admission queue is full; backpressure rejected request"
+                            )
+                        if self.operator_limits.queue_capacity == 0:
+                            raise PolicyViolationError(
+                                "runtime capacity is exhausted and queuing is disabled"
+                            )
+                        entry = {
+                            "request_id": spec.request_id,
+                            "semantic_sha256": spec.semantic_sha256,
+                            "enqueued_at": self.wall_clock(),
+                        }
+                        queue.append(entry)
+                        self._write_queue(queue)
+                    maximum_queue_depth = max(maximum_queue_depth, queue.index(entry) + 1)
+                else:
+                    if entry is not None:
+                        queue.remove(entry)
+                        self._write_queue(queue)
+                    attempt = self._new_attempt(
+                        spec,
+                        number=attempts_started + 1,
+                        timestamp=_iso(self.clock()),
+                    )
+                    if matching is not None:
+                        updated = {
+                            **matching,
+                            "attempts": [*matching["attempts"], attempt.as_dict()],
+                        }
+                        self._write_document(path, updated)
+                    else:
+                        document = {
+                            "schema": REQUEST_SCHEMA,
+                            "request_id": spec.request_id,
+                            "semantic_sha256": spec.semantic_sha256,
+                            "spec": spec.semantic_body(),
+                            "attempts": [attempt.as_dict()],
+                        }
+                        self._write_document(path, document)
+                    return AttemptReservation(
+                        attempt,
+                        True,
+                        queue_depth=maximum_queue_depth,
+                        queued_milliseconds=round((self.wait_clock() - wait_started) * 1_000),
+                    )
+
+            remaining = deadline - self.wait_clock()
+            if remaining <= 0:
+                with _exclusive_lock(self.lock_path):
+                    queue = self._read_queue()
+                    reduced = [item for item in queue if item["request_id"] != spec.request_id]
+                    if reduced != queue:
+                        self._write_queue(reduced)
+                raise PolicyViolationError(
+                    "runtime admission queue wait expired; backpressure rejected request"
+                )
+            self.sleeper(min(0.05, remaining))
 
     def list_attempts(self) -> tuple[Attempt, ...]:
         if self.read_only:

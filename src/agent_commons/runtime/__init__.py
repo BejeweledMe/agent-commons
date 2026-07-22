@@ -23,7 +23,14 @@ from .broker import (
     LocalBroker,
     NoopBrokerLifecycleHook,
 )
-from .diagnostics import DiagnosticCode, SafeDiagnostic, classify_process_result, diagnostic_hint
+from .diagnostics import (
+    DiagnosticCode,
+    SafeDiagnostic,
+    classify_process_result,
+    diagnostic_hint,
+    diagnostic_safe_next_actions,
+    error_safe_next_actions,
+)
 from .model import (
     BuiltinProfileId,
     ClaudePermissionMode,
@@ -39,7 +46,7 @@ from .model import (
     default_profile_registry,
     resolve_trusted_executable,
 )
-from .policy import PolicyViolationError, RuntimePolicy, RuntimeUsage
+from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .preflight import preflight_profile
 from .subprocess_runner import (
     CancellationToken,
@@ -59,6 +66,12 @@ from .telemetry import (
     TelemetryEvent,
     TelemetryKind,
     TelemetrySink,
+)
+from .tool_audit import (
+    TERMINAL_TOOL_NAMES,
+    TOOL_AUDIT_SCHEMA,
+    TerminalToolAudit,
+    TerminalToolAuditStore,
 )
 
 __all__ = [
@@ -87,6 +100,7 @@ __all__ = [
     "NoopBrokerLifecycleHook",
     "NoopTelemetrySink",
     "OpenTelemetrySink",
+    "OperatorLimits",
     "PolicyViolationError",
     "ProcessFactory",
     "ProcessGroupTerminator",
@@ -106,10 +120,16 @@ __all__ = [
     "TelemetryEvent",
     "TelemetryKind",
     "TelemetrySink",
+    "TERMINAL_TOOL_NAMES",
+    "TOOL_AUDIT_SCHEMA",
+    "TerminalToolAudit",
+    "TerminalToolAuditStore",
     "checkout_fingerprint",
     "classify_process_result",
     "default_profile_registry",
     "diagnostic_hint",
+    "diagnostic_safe_next_actions",
+    "error_safe_next_actions",
     "preflight_profile",
     "resolve_trusted_executable",
 ]

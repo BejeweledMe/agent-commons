@@ -72,6 +72,12 @@ through symlinks. Writers normalize and scope paths, reject traversal and
 unexpected symlinks, create files atomically in known directories, and do not
 derive storage paths directly from display names.
 
+Delegated source reads open the repository and every relative parent component
+with descriptor-relative no-follow semantics before opening the final regular
+file. A tracked path whose final component or any parent is a symlink is omitted
+from the frozen review snapshot. Prefix checks on a fully resolved pathname are
+not treated as a sufficient boundary.
+
 ### Identity and authority spoofing
 
 An agent may claim a trusted model, role, or capability. Such metadata never
@@ -107,6 +113,12 @@ credential/PII-shaped line is replaced with a stable marker plus safe category
 metadata instead of exposing the line or quarantining unrelated code; line
 numbers remain stable and a final whole-document scan still fails closed.
 
+The broker passes the manager's effective state root to the child MCP as fixed
+argv and fingerprints it with the rest of the launch plan. It validates the
+new child session through that same root before starting provider code, which
+prevents external-state deployments from binding the provider to an unrelated
+repository-local session store.
+
 Purpose/profile pairing is also fixed: implementation uses a builder profile,
 while independent review and verification use an independent-reviewer profile.
 Relabeling a writable builder as a reviewer is rejected before publication.
@@ -134,6 +146,9 @@ Agent count alone never establishes truth.
 An approved artifact may change later. Reviews, verifications, findings, and
 decisions bind an immutable revision. Dependency changes derive a stale state
 and exclude stale conclusions from effective truth until rechecked.
+Task artifact bindings use the same rule: changed, corrected, or invalidated
+artifacts and missing manifests stale the task review and make its prior
+acceptance ineffective.
 
 ### Concurrent corruption and duplicate writes
 

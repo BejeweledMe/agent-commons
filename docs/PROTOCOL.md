@@ -105,10 +105,24 @@ its manifest ID, while an event binds to its current effective correction head.
 Stale reviews, verifications, verified findings, and accepted decisions remain
 visible as history but are excluded from effective truth.
 
+Task completion and submission retain the compatibility field `artifact_refs`
+and also record `artifact_bindings` with each artifact's current effective
+revision. Legacy events without bindings remain readable. For bound events, an
+artifact revision or correction, invalidation of its effective event, or loss of
+its content-addressed manifest makes the task artifact dependency stale. Any
+review and acceptance derived from that task revision then becomes stale too.
+
 If the review completion bound by `task.accepted` is corrected or invalidated,
 that acceptance event is no longer effective and the task projects back to
 `review`. The immutable event remains in the ledger, and a new acceptance can
 bind the current effective review revision.
+
+Replay reports machine-readable projection issues with stable codes, severity,
+related event IDs, and repairability. `doctor` and the write guard fail closed
+on issue severity, never on wording found in human-readable warnings. A
+maintenance write is allowed through a damaged projection only when replaying
+that exact correction or invalidation strictly reduces the structured error set
+without introducing or worsening another error.
 
 Task completion means the author believes the work is ready. It does not imply
 review approval, requirement satisfaction, or acceptance.
@@ -173,11 +187,21 @@ provider prompt. `implementation` uses a builder profile, while
 `independent_review` and `verification` use an independent-reviewer profile.
 
 Every launch binds a newly registered child session distinct from the requester.
+The effective operational state root is passed as fixed child-MCP argv and is
+included in the launch-plan fingerprint; the child session is re-opened through
+that same root before provider startup. An external `--state-root` therefore
+cannot silently fall back to repository-local operational state.
 The delegation carries hard depth, wall-time, attempt, concurrency, and budget
 limits. Descendants can only reduce those limits, an active child may create
 only correctly linked descendants, and the default operating depth is one.
 Do not create recursive Codex/Claude ping-pong or use a second client to escape
 lineage and budget accounting.
+
+Those request limits never define their own global authority. Every broker using
+one state root shares operator-owned global, per-provider, per-profile,
+aggregate parent budget, and bounded queue limits. Admission applies the most
+restrictive operator/profile/parent/delegation value and rejects a full or
+expired queue with backpressure before allocating an attempt.
 
 The current experimental broker enforces two units. `provider_units` is a
 coarse launch budget: one unit equals one provider-process attempt, and
@@ -252,13 +276,16 @@ outside those markers remains untouched.
 
 ## 11. Use the lightest adequate governance
 
-- `light`: orientation, task/claim, communication, review, and handoff.
-- `standard`: adds durable findings, decisions, and acceptance workflows.
-- `governed`: requires independent review, verification, and operator-controlled
-  authority for high-impact changes.
+- `light`: coordination for small/reversible work may stop honestly at
+  `completed`; review and accepted project truth are optional.
+- `standard`: submits the exact completed revision and uses the existing
+  independent-review boundary before `accepted`.
+- `governed`: adds reproducible verification, revision-bound evidence,
+  explicit decisions/dissent, and operator-controlled acceptance for
+  high-impact changes.
 
 Small changes should not require ceremonial records. High-impact, irreversible,
 security-sensitive, or externally visible decisions should not bypass governed
-promotion. MVP-0 ships the `standard` mechanics and independent task-acceptance
-guard. Named policy presets and authenticated operator authority are roadmap
-items; local principal/model labels are not an authority mechanism.
+promotion. These modes choose where the same lifecycle stops; they do not
+weaken integrity rules or create a hidden acceptance bypass. Local
+principal/model labels are not an authority mechanism.

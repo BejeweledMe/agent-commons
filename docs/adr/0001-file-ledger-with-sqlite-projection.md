@@ -22,11 +22,18 @@ worktrees coordinate with each other without committing operational leases.
 
 All business writes use one supported service layer. SQLite can always be deleted
 and rebuilt from canonical files; it must never become the only copy of meaning.
+Normal reads currently replay the ledger rather than querying SQLite, so
+canonical writes do not synchronously maintain an index that cannot shorten
+their user journey. `doctor` verifies/synchronizes it and `index rebuild`
+reconstructs it explicitly. A future indexed read path must prove equivalent
+projection semantics before synchronous maintenance is reconsidered.
 
 ## Consequences
 
 - The project remains inspectable, diffable, portable, and recoverable offline.
-- Query latency stays bounded without weakening file authority.
+- Replay work is exposed through deterministic counters and a 10,000-event /
+  1,000-correction benchmark; correction lookup is indexed by target rather
+  than scanning every correction for every event.
 - Atomic publication, idempotency, strict schemas, and interprocess locking are
   mandatory because a broker is not serializing writes for us.
 - Same-filesystem operation is the MVP boundary. Remote multi-host use needs a

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import re
@@ -19,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_commons.errors import IntegrityError, LifecycleConflictError, ValidationError
+from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
 
 SESSION_SCHEMA = "agent_commons.session.v1"
@@ -95,11 +95,11 @@ def _fsync_directory(path: Path) -> None:
 def _exclusive_lock(path: Path) -> Iterator[None]:
     _ensure_private_directory(path.parent)
     with open(path, "a+b", opener=lambda name, flags: os.open(name, flags, 0o600)) as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        lock_exclusive(handle.fileno())
         try:
             yield
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            unlock(handle.fileno())
 
 
 def _canonical_bytes(value: Mapping[str, Any]) -> bytes:

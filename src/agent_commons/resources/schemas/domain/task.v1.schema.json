@@ -18,6 +18,7 @@
     "resolution": {"type": "string", "minLength": 1},
     "summary": {"type": "string", "minLength": 1},
     "artifact_refs": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"}},
+    "artifact_bindings": {"type": "array", "items": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"}},
     "acceptance_review": {"$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"},
     "extensions": {"type": "object"}
   }

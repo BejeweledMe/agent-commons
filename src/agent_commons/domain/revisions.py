@@ -10,6 +10,7 @@ from agent_commons.core.canonical import canonical_sha256
 CORRECTION_IMMUTABLE_FIELDS = frozenset(
     {
         "artifact_refs",
+        "artifact_bindings",
         "acceptance_review",
         "attempt",
         "classification",

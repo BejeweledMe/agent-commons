@@ -49,26 +49,14 @@ IDs, lifecycle transitions, or stored payloads.
   not persist private reasoning, routine progress chatter, or complete logs.
 - Give retryable canonical writes a stable, operation-specific
   `--idempotency-key`. Reuse that key only for an identical operation.
-- Use `commons-delegate` only after the core CLI, target, exact target revision,
-  matching profile, enforced budget, other limits, claims, and local broker
-  configuration are known. Run `broker preflight` after provider/runtime
-  upgrades; it validates provider help and the generated MCP contract without
-  consuming an attempt or starting model work. For a local Claude CLI already
-  authenticated through an operator-selected subscription, prefer
-  `provider_units: 1` with one attempt; this is a process-launch bound, not a
-  dollar cap, and Commons never switches credentials or billing modes.
-  `micro_usd` is explicit opt-in to a provider-native monetary cap: choose it
-  from current pricing with room for canonical finalization, not the obsolete
-  `$0.50` tutorial value. `tokens` fails before reservation. If the core CLI
-  is missing, stop and install/initialize it; if only the optional
-  broker/provider is missing, use the Quickstart's manual two-window flow. Creation
-  and launch use distinct
-  idempotency keys. A child session is always distinct, receives no new
-  authority, and must not create recursive Codex/Claude ping-pong.
-- Prefer the worker-scoped independent-reviewer profile. Writable builders and
-  current Codex runners are trusted-workspace-only; Codex also requires a
-  `provider_units` budget. Untrusted work needs an explicitly opted-in profile
-  plus an externally OS-isolated worktree.
+- Use `commons-delegate` only for an exact recorded target/revision with an
+  operator-owned fixed profile, enforced budget/limits, compatible claims, and
+  distinct child session. Creation and launch use different idempotency keys;
+  descendants never gain authority or create recursive agent ping-pong.
+- The optional broker is experimental and manually enabled. Run static
+  `broker preflight` after upgrades, keep the manual two-window flow available,
+  and follow the versioned runtime/budget/recovery contract in the installed
+  documentation rather than copying provider-specific flags into onboarding.
 - Before every review in a shared checkout, stop all writes and confirm the
   bytes match the exact registered artifacts/evidence bound to the subject
   revision; otherwise use a quiescent operator-provisioned worktree or immutable
@@ -78,12 +66,9 @@ IDs, lifecycle transitions, or stored payloads.
   headless MVP cannot resume or reattach an exited `input_needed` attempt; it
   becomes `needs_operator`. Never blind-retry or place answers or secrets in
   canonical input metadata.
-- Before launch, heartbeat the parent session so its TTL covers the requested
-  `wall_time_seconds` plus the broker's 60-second finalization margin.
-- Cancel only requested, unlaunched work through core `delegation cancel` or
-  bounded MCP `commons_cancel_delegation`. Active cancellation is unavailable:
-  stop the provider and reconcile instead of recording canonical cancellation
-  before termination is confirmed.
+- Before launch, ensure the parent session TTL covers the requested wall time
+  and finalization margin. Never record cancellation before process termination
+  is proven; use the documented reconcile path for ambiguous active work.
 
 ## Project truth
 

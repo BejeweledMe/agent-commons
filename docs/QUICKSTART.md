@@ -6,10 +6,14 @@ provider call.
 
 ## 1. Install and initialize
 
-From the Agent Commons source checkout:
+Clone and install from the Agent Commons source checkout:
 
 ```bash
-uv tool install .
+git clone https://github.com/BejeweledMe/agent-commons.git
+cd agent-commons
+python3 -m venv .venv
+.venv/bin/python -m pip install .
+export PATH="$PWD/.venv/bin:$PATH"
 agent-commons --version
 ```
 
@@ -17,9 +21,15 @@ Then move to the project the agents will share:
 
 ```bash
 cd /path/to/your-project
+export AGENT_COMMONS_STATE_ROOT=/absolute/operator-owned/path/agent-commons-state
 agent-commons init --integration codex --integration claude
 agent-commons --read-only --json support
 ```
+
+Expected JSON includes `"canonical_workspace_available":true`,
+`"state_root_explicit":true`, and the installed package/Python/platform
+versions. If `agent-commons` is not found, confirm the source checkout's
+`.venv/bin` remains on `PATH` in every terminal.
 
 `init` publishes the canonical onboarding contract, workspace configuration,
 small managed blocks in `AGENTS.md`/`CLAUDE.md`, and matching workflow skills.
@@ -107,6 +117,19 @@ agent-commons orient
 agent-commons task list --state review
 git status --short
 ```
+
+When a window is genuinely finished, close its own session with the private
+nonce returned by `session start`; never reuse or share that nonce:
+
+```bash
+agent-commons session end --nonce 'private-nonce-for-this-session'
+unset AGENT_COMMONS_SESSION_ID
+```
+
+To remove Agent Commons from a disposable test project, first end every session
+and confirm no claims or runtime attempts remain. Remove generated integration
+blocks and state only under explicit operator control; do not delete canonical
+events from a real project as “cleanup.”
 
 ## Optional automation
 

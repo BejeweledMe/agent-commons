@@ -11,6 +11,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from agent_commons.errors import (
+    ClaimConflictError,
+    ConfigurationError,
+    IdempotencyConflictError,
+    IntegrityError,
+    LifecycleConflictError,
+    SecurityPolicyError,
+    ValidationError,
+)
+
 from .subprocess_runner import ProcessResult, RunOutcome, RunReason
 
 
@@ -28,6 +38,10 @@ class DiagnosticCode(StrEnum):
     MCP_TOOL_CONTRACT_FAILED = "mcp_tool_contract_failed"
     BROKER_CONTROL_ERROR = "broker_control_error"
     PROVIDER_NONZERO_UNKNOWN = "provider_nonzero_unknown"
+    TERMINAL_TOOL_NOT_CALLED = "terminal_tool_not_called"
+    TERMINAL_TOOL_REJECTED = "terminal_tool_rejected"
+    PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
+    CANONICAL_FINALIZATION_FAILED = "canonical_finalization_failed"
 
 
 _HINTS = {
@@ -54,6 +68,74 @@ _HINTS = {
     DiagnosticCode.PROVIDER_NONZERO_UNKNOWN: (
         "The provider exited nonzero without a recognized safe classification."
     ),
+    DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
+        "The provider exited without calling a bounded terminal outcome tool."
+    ),
+    DiagnosticCode.TERMINAL_TOOL_REJECTED: (
+        "A bounded terminal outcome tool call was rejected before canonical completion."
+    ),
+    DiagnosticCode.PROCESS_CANONICAL_MISMATCH: (
+        "The terminal provider-process state disagrees with the canonical delegation state."
+    ),
+    DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
+        "Canonical finalization failed after the provider process became terminal."
+    ),
+}
+
+_SAFE_NEXT_ACTIONS = {
+    DiagnosticCode.NONE: (),
+    DiagnosticCode.LEGACY_UNCLASSIFIED: (
+        "Inspect the canonical delegation and retry only from an explicit safe state.",
+    ),
+    DiagnosticCode.PROVIDER_START_FAILED: (
+        "Run broker preflight for the selected profile.",
+        "Verify the operator-owned executable path and installation.",
+    ),
+    DiagnosticCode.PROVIDER_AUTH_FAILED: (
+        "Authenticate with the provider outside Agent Commons, then rerun preflight.",
+    ),
+    DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED: (
+        "Inspect the operator and delegation budget before authorizing new work.",
+    ),
+    DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG: (
+        "Run broker preflight and update the provider CLI or profile compatibility.",
+    ),
+    DiagnosticCode.MCP_CONFIG_INVALID: (
+        "Run broker preflight and inspect only the operator-owned profile configuration.",
+    ),
+    DiagnosticCode.MCP_SPAWN_FAILED: ("Install the MCP extra and rerun broker preflight.",),
+    DiagnosticCode.MCP_HANDSHAKE_FAILED: (
+        "Verify provider and Agent Commons MCP versions with broker preflight.",
+    ),
+    DiagnosticCode.MCP_BINDING_TIMEOUT: (
+        "Confirm every process uses the same explicit operational state root.",
+        "Reconcile the attempt instead of relaunching it blindly.",
+    ),
+    DiagnosticCode.MCP_TOOL_CONTRACT_FAILED: (
+        "Run broker preflight and compare the fixed worker tool catalog.",
+    ),
+    DiagnosticCode.BROKER_CONTROL_ERROR: (
+        "Reconcile the attempt and inspect the canonical delegation before retrying.",
+    ),
+    DiagnosticCode.PROVIDER_NONZERO_UNKNOWN: (
+        "Inspect provider-local logs outside Agent Commons without copying secrets into state.",
+        "Mark the delegation needs_operator if process identity or outcome is ambiguous.",
+    ),
+    DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
+        "Inspect the exact delegation and worker tool catalog before creating new work.",
+        "Do not treat the successful provider exit as a successful workflow.",
+    ),
+    DiagnosticCode.TERMINAL_TOOL_REJECTED: (
+        "Refresh the canonical delegation revision and inspect terminal-tool audit counters.",
+        "Reconcile instead of blindly retrying an ambiguous worker.",
+    ),
+    DiagnosticCode.PROCESS_CANONICAL_MISMATCH: (
+        "Join the attempt with its canonical delegation and inspect finalization telemetry.",
+        "Reconcile the attempt; never promote process success to approval.",
+    ),
+    DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
+        "Run doctor, inspect the canonical delegation, and reconcile the terminal attempt.",
+    ),
 }
 
 
@@ -61,10 +143,15 @@ _HINTS = {
 class SafeDiagnostic:
     code: DiagnosticCode
     hint: str
+    safe_next_actions: tuple[str, ...]
 
     @classmethod
     def create(cls, code: DiagnosticCode) -> SafeDiagnostic:
-        return cls(code=code, hint=_HINTS[code])
+        return cls(
+            code=code,
+            hint=_HINTS[code],
+            safe_next_actions=_SAFE_NEXT_ACTIONS[code],
+        )
 
 
 def _contains_any(value: str, patterns: tuple[str, ...]) -> bool:
@@ -145,3 +232,48 @@ def diagnostic_hint(code: str | DiagnosticCode) -> str:
     """Return the fixed allowlisted operator hint for a stored code."""
 
     return _HINTS[DiagnosticCode(code)]
+
+
+def diagnostic_safe_next_actions(code: str | DiagnosticCode) -> list[str]:
+    """Return fixed, content-free recovery actions for a diagnostic code."""
+
+    return list(_SAFE_NEXT_ACTIONS[DiagnosticCode(code)])
+
+
+def error_safe_next_actions(exc: Exception) -> list[str]:
+    """Map a public failure class to fixed recovery actions."""
+
+    if isinstance(exc, SecurityPolicyError):
+        return [
+            "Remove or redact secret-bearing content before retrying.",
+            "Do not paste the rejected content into diagnostics or canonical state.",
+        ]
+    if isinstance(exc, ClaimConflictError):
+        return [
+            "List active claims and coordinate with the current owner.",
+            "Break a claim only with explicit operator authority and a recorded reason.",
+        ]
+    if isinstance(exc, IdempotencyConflictError):
+        return [
+            "Reuse the idempotency key only with identical content.",
+            "Choose a new stable key for materially different work.",
+        ]
+    if isinstance(exc, LifecycleConflictError):
+        return [
+            "Refresh the entity and retry against its current exact revision.",
+            "Do not bypass the lifecycle transition or independent-review boundary.",
+        ]
+    if isinstance(exc, IntegrityError):
+        return [
+            "Run doctor in read-only mode before attempting another write.",
+            "Use an explicit maintenance event for repair; do not edit ledger files directly.",
+        ]
+    if isinstance(exc, ConfigurationError):
+        return [
+            "Inspect the operator-owned configuration and run the support command.",
+        ]
+    if isinstance(exc, ValidationError):
+        return ["Correct the bounded input using the command help, then retry."]
+    if isinstance(exc, FileNotFoundError):
+        return ["Verify the requested path or install the optional component, then retry."]
+    return ["Run the support and doctor commands, then inspect the reported safe metadata."]

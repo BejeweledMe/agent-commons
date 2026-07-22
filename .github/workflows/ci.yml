@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[test]'
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - run: python -m pytest
+
+  wheel-smoke:
+    name: Wheel smoke / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build
+      - name: Install and smoke-test built wheel
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-smoke"
+          WHEEL_PATH="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip install "$WHEEL_PATH[mcp]"
+          "$RUNNER_TEMP/wheel-smoke/bin/agent-commons" --help
+          "$RUNNER_TEMP/wheel-smoke/bin/agent-commons-mcp" --help
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -c "import agent_commons; print(agent_commons.__version__)"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: agent-commons-${{ matrix.os }}-dist
+          path: dist/*

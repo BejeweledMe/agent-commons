@@ -191,6 +191,7 @@ def test_broker_runs_once_with_distinct_child_and_keeps_content_ephemeral(tmp_pa
         profile_id=BuiltinProfileId.CODEX_BUILDER,
         instruction="Sensitive work instruction that must remain ephemeral",
         cwd=tmp_path,
+        state_root=state_root,
         correlation=correlation(),
         parent_policy=parent,
         child_policy=child,

@@ -61,11 +61,35 @@ stderr.
 | `mcp_tool_contract_failed` | Required bounded MCP tools are missing/incompatible; reinstall matching Agent Commons code and run preflight. |
 | `broker_control_error` | Broker lifecycle control failed; inspect canonical state and reconcile. |
 | `provider_nonzero_unknown` | No safe classifier matched. Share `support`, versions, attempt ID, closed code, and byte/truncation counters—not raw output. |
+| `terminal_tool_not_called` | Provider exit is not workflow success. Inspect the exact delegation and fixed worker catalog; do not promote or blindly retry it. |
+| `terminal_tool_rejected` | Refresh the canonical revision, inspect content-free terminal-tool counters, and reconcile the ambiguous attempt. |
+| `process_canonical_mismatch` | Join the attempt to its canonical delegation and finalization telemetry, then reconcile; never infer approval from process exit. |
+| `canonical_finalization_failed` | Run `doctor`, inspect canonical state, and reconcile the terminal attempt before creating replacement work. |
 | `legacy_unclassified` | Attempt predates sanitized diagnostics. Do not infer a cause from it. |
 
 `agent-commons --read-only broker attempts --diagnostic` adds only
 maintainer-authored fixed
 hints to the stored metadata.
+
+## Admission backpressure or budget rejection
+
+The experimental broker applies the effective minimum of global, provider,
+profile, parent-session, and delegation limits. Processes using the same state
+root share one bounded FIFO admission queue and aggregate parent/provider
+budgets. A queue-full, queue-expired, concurrency, `provider_units`, or monetary
+budget rejection happens before a new attempt is allocated.
+
+Inspect the operator-owned `limits` section in the runtime profile YAML and the
+effective caps reported by:
+
+```bash
+agent-commons --json broker profiles --profile-config /absolute/path/to/profiles.yaml
+agent-commons --read-only --json broker attempts --diagnostic
+```
+
+Do not raise a cap until canonical state proves the earlier work is terminal.
+Use a separate explicit state root only when isolation is intentional; it is a
+separate admission and budget domain, not a way to bypass operator policy.
 
 ## Common recovery paths
 
