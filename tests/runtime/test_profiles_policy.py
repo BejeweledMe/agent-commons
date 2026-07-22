@@ -75,7 +75,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     assert "--strict-mcp-config" in invocation.argv
     assert "--setting-sources" in invocation.argv
     mcp_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
-    assert '"command":"/bin/echo"' in mcp_config
+    assert f'"command":"{Path("/bin/echo").resolve()}"' in mcp_config
     assert '"--git-executable","/usr/bin/true"' in mcp_config
     assert '"--state-root"' in mcp_config
     assert str(tmp_path / "external-state") in mcp_config
