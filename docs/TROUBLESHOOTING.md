@@ -24,21 +24,21 @@ only; remove the flag when an explicitly authorized repair must write.
 ## Updating an exact source checkout
 
 Unreleased commits can intentionally retain the same semantic package version.
-For a global uv tool, force a cache-free rebuild and then inspect the installed
-source fingerprint:
+For a global uv tool, refresh and reinstall the local package without forcing a
+cold dependency-cache rebuild, then inspect the installed source fingerprint:
 
 ```bash
 cd /path/to/agent-commons
-uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+uv tool install -q --force --reinstall-package agent-commons --python 3.13 '.[mcp]'
 export PATH="$(uv tool dir --bin):$PATH"
 agent-commons --read-only --json support
 ```
 
 `agent_commons_source_sha256` hashes every Python path and byte in the installed
 package. A separately installed MCP with a different fingerprint fails
-preflight before provider work. Quiet uv output suppresses warnings from
-obsolete third-party index artifacts; it does not weaken resolution or
-verification. Use `[mcp,observability]` only when OpenTelemetry export is
+preflight before provider work. Refreshing only `agent-commons` avoids a forced
+cold scan of obsolete third-party index artifacts without weakening resolution
+or verification. Use `[mcp,observability]` only when OpenTelemetry export is
 required.
 
 ## Provider/MCP preflight

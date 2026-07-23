@@ -17,7 +17,7 @@ Install the optional runtime and validate compatibility before creating work:
 
 ```bash
 cd /path/to/agent-commons
-uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+uv tool install -q --force --reinstall-package agent-commons --python 3.13 '.[mcp]'
 export PATH="$(uv tool dir --bin):$PATH"
 agent-commons --read-only --json support
 cd /path/to/browser-snake

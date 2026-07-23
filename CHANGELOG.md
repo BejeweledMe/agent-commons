@@ -8,6 +8,9 @@ Versioning once a stable release line is declared.
 - Added an MCP-specific unavailable-executable preflight diagnostic, safe
   installed-source fingerprints in support/preflight output, and a cache-safe
   uv source reinstall path.
+- Documented a package-scoped uv refresh for same-version source reinstalls,
+  avoiding noisy cold dependency-index scans while replacing stale local
+  wheels.
 - Added an explicit isolated real-Claude compatibility canary that reports
   provider/model/catalog metadata and fails unless the terminal MCP result and
   canonical delegation agree.

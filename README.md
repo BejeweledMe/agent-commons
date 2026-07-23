@@ -135,7 +135,7 @@ delegated workspace:
 
 ```bash
 cd /path/to/agent-commons
-uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+uv tool install -q --force --reinstall-package agent-commons --python 3.13 '.[mcp]'
 export PATH="$(uv tool dir --bin):$PATH"
 agent-commons --read-only --json support
 agent-commons broker profiles --profile-config /absolute/path/runtime.yaml
@@ -144,11 +144,11 @@ agent-commons broker preflight claude-independent-reviewer \
   --profile-config /absolute/path/runtime.yaml
 ```
 
-`--reinstall --no-cache` prevents a same-version wheel from an earlier source
-commit from being reused. Quiet mode suppresses resolver warnings from obsolete
-third-party index artifacts; the explicit PATH command replaces the installer
-warning with a deterministic setup step. Add the `observability` extra only
-when using OpenTelemetry export.
+`--reinstall-package agent-commons` rebuilds the same-version local source and
+implies a refresh of that package only, preserving the dependency cache instead
+of forcing a noisy cold resolution of every third-party package. The explicit
+PATH command replaces the installer warning with a deterministic setup step.
+Add the `observability` extra only when using OpenTelemetry export.
 
 ```yaml
 profiles:
