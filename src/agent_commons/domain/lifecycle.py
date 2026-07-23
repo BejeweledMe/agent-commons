@@ -454,6 +454,33 @@ def _validate_delegation_request(
     delegation_id = str(payload["delegation_id"])
     if payload.get("parent_session_id") != actor_session_id:
         raise LifecycleConflictError("delegation parent_session_id must match its requester")
+    if payload.get("purpose") == "independent_review":
+        # A delegated reviewer can only record its verdict into an existing open
+        # independent review request; without one the child burns its attempt
+        # and budget, then exits input_needed (finding.3XK0XP1RGRJSNFQJKKRT4TX9FF).
+        # The target may be the open review itself, or an entity that an open
+        # review is bound to at this exact revision.
+        target = dict(payload.get("target_ref") or {})
+        target_revision = payload.get("target_revision")
+        if target.get("kind") == "review":
+            review = snapshot.reviews.get(str(target.get("id"))) or {}
+            has_open_independent_review = (
+                review.get("state") == "requested" and review.get("independent") is True
+            )
+        else:
+            has_open_independent_review = any(
+                review.get("state") == "requested"
+                and review.get("independent") is True
+                and review.get("target_ref") == target
+                and review.get("target_revision") == target_revision
+                for review in snapshot.reviews.values()
+            )
+        if not has_open_independent_review:
+            raise LifecycleConflictError(
+                "an independent_review delegation requires an open independent review"
+                " request bound to its exact target revision; create one with"
+                " review request first"
+            )
     depth = int(payload["depth"])
     limits = payload["limits"]
     if depth > int(limits["max_depth"]):

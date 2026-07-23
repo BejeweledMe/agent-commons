@@ -14,6 +14,8 @@ from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
     ClaudeRunnerProfile,
+    CodexRunnerProfile,
+    CodexSandbox,
     DiagnosticCode,
     ProcessResult,
     ProfileRegistry,
@@ -354,3 +356,101 @@ def test_preflight_rejects_worker_catalog_drift(tmp_path: Path, mutation: str) -
     )
 
     assert result["ok"] is False
+
+
+_CODEX_ROOT_HELP = (
+    b"-m, --model <MODEL>\n-s, --sandbox <SANDBOX_MODE>\n"
+    b"-a, --ask-for-approval <APPROVAL_POLICY>"
+)
+_CODEX_EXEC_HELP = b"-s, --sandbox <SANDBOX_MODE>\n--color <COLOR>\n--json"
+
+
+class CodexProbeRunner:
+    """Serve distinct root and exec help texts like a real codex CLI."""
+
+    def __init__(
+        self,
+        *,
+        root_help: bytes = _CODEX_ROOT_HELP,
+        exec_help: bytes = _CODEX_EXEC_HELP,
+    ) -> None:
+        self.calls: list[tuple[str, ...]] = []
+        self.root_help = root_help
+        self.exec_help = exec_help
+
+    def run(self, invocation, **_kwargs) -> ProcessResult:
+        self.calls.append(invocation.argv)
+        assert "--help" in invocation.argv
+        output = self.exec_help if "exec" in invocation.argv else self.root_help
+        return _result(output=output)
+
+
+def _codex_profiles() -> ProfileRegistry:
+    profile_id = BuiltinProfileId.CODEX_BUILDER
+    return ProfileRegistry(
+        {
+            profile_id: CodexRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                sandbox=CodexSandbox.WORKSPACE_WRITE,
+                trusted_workspace=True,
+            )
+        }
+    )
+
+
+def test_codex_preflight_accepts_root_only_approval_flag(tmp_path: Path) -> None:
+    """Real codex builds list --ask-for-approval only in root help; that must pass."""
+
+    runner = CodexProbeRunner()
+
+    result = preflight_profile(
+        _codex_profiles(),
+        BuiltinProfileId.CODEX_BUILDER,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is True
+    assert result["checks"]["provider_help"] == {"ok": True, "required_flags": "present"}
+    assert result["provider_help_process_started"] is True
+    assert runner.calls == [("/bin/echo", "--help"), ("/bin/echo", "exec", "--help")]
+
+
+def test_codex_preflight_fails_closed_when_root_scope_lacks_a_launch_flag(
+    tmp_path: Path,
+) -> None:
+    """A flag present only outside the scope where the argv places it must not count."""
+
+    runner = CodexProbeRunner(
+        root_help=b"-m, --model <MODEL>\n-s, --sandbox <SANDBOX_MODE>",
+        exec_help=_CODEX_EXEC_HELP + b"\n-a, --ask-for-approval <APPROVAL_POLICY>",
+    )
+
+    result = preflight_profile(
+        _codex_profiles(),
+        BuiltinProfileId.CODEX_BUILDER,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert (
+        result["checks"]["provider_help"]["diagnostic_code"]
+        == DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG.value
+    )
+    assert result["checks"]["provider_help"]["missing_flag_count"] == 1
+
+
+def test_codex_preflight_fails_closed_when_exec_scope_lacks_json(tmp_path: Path) -> None:
+    runner = CodexProbeRunner(exec_help=b"-s, --sandbox <SANDBOX_MODE>\n--color <COLOR>")
+
+    result = preflight_profile(
+        _codex_profiles(),
+        BuiltinProfileId.CODEX_BUILDER,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert result["checks"]["provider_help"]["missing_flag_count"] == 1

@@ -56,6 +56,12 @@ def _delegation(
     budget_unit: str = "micro_usd",
     budget_limit: int = 50_000,
 ) -> dict[str, Any]:
+    manager.request_review(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        criteria=("Inspect the exact task revision",),
+        idempotency_key=f"open-review-{task['entity_ref']['id']}",
+    )
     return manager.create_delegation(
         target_ref=task["entity_ref"],
         target_revision=task["revision"],
@@ -369,6 +375,12 @@ def test_admission_rejection_closes_the_unbound_child_session(tmp_path: Path) ->
         description="Prove rejected admission releases its unbound child identity.",
         acceptance_criteria=("no session leak",),
         idempotency_key="second-provider-unit-target",
+    )
+    manager.request_review(
+        target_ref=second_task["entity_ref"],
+        target_revision=second_task["revision"],
+        criteria=("Inspect the exact task revision",),
+        idempotency_key="second-provider-unit-review",
     )
     second = manager.create_delegation(
         target_ref=second_task["entity_ref"],

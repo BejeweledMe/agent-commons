@@ -53,7 +53,20 @@ def _task(manager: CommonsManager, *, key: str = "delegation-target") -> dict:
     )
 
 
-def _create(manager: CommonsManager, task: dict, *, key: str = "delegate-review") -> dict:
+def _create(
+    manager: CommonsManager,
+    task: dict,
+    *,
+    key: str = "delegate-review",
+    request_review: bool = True,
+) -> dict:
+    if request_review:
+        manager.request_review(
+            target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+            target_revision=task["revision"],
+            criteria=("Inspect the exact task revision",),
+            idempotency_key=f"{key}-open-review",
+        )
     return manager.create_delegation(
         target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
         target_revision=task["revision"],
@@ -73,8 +86,8 @@ def test_manager_delegation_lifecycle_uses_exact_cas_and_result_refs(tmp_path: P
         criteria=("Inspect the exact task revision",),
         idempotency_key="delegate-review-request",
     )
-    requested = _create(parent, task)
-    repeated = _create(parent, task)
+    requested = _create(parent, task, request_review=False)
+    repeated = _create(parent, task, request_review=False)
     assert repeated["event_id"] == requested["event_id"]
     delegation_id = requested["entity_ref"]["id"]
 
@@ -119,6 +132,32 @@ def test_manager_delegation_lifecycle_uses_exact_cas_and_result_refs(tmp_path: P
     assert parent.list_delegations(state="succeeded")[0]["id"] == delegation_id
 
 
+def test_independent_review_delegation_requires_an_open_review_request(
+    tmp_path: Path,
+) -> None:
+    """Fail fast at create instead of burning the child's attempt and budget."""
+
+    parent, _, _, _ = _workspace(tmp_path)
+    task = _task(parent, key="missing-review-target")
+
+    with pytest.raises(LifecycleConflictError, match="open independent review"):
+        _create(parent, task, key="missing-review-request", request_review=False)
+
+    completed = parent.request_review(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        criteria=("Inspect the exact task revision",),
+        independent=False,
+        idempotency_key="missing-review-not-independent",
+    )
+    assert completed["entity_ref"]["id"]
+    with pytest.raises(LifecycleConflictError, match="open independent review"):
+        _create(parent, task, key="missing-review-request-2", request_review=False)
+
+    requested = _create(parent, task, key="missing-review-request-3")
+    assert requested["entity_ref"]["id"]
+
+
 def test_stale_target_is_rejected_at_request_and_again_before_start(tmp_path: Path) -> None:
     parent, _, _, child_session = _workspace(tmp_path)
     task = _task(parent)
@@ -129,7 +168,7 @@ def test_stale_target_is_rejected_at_request_and_again_before_start(tmp_path: Pa
         idempotency_key="move-target-before-request",
     )
     with pytest.raises(LifecycleConflictError, match="target_revision"):
-        _create(parent, task, key="stale-target-request")
+        _create(parent, task, key="stale-target-request", request_review=False)
 
     current_target = {**task, "revision": moved["revision"]}
     requested = _create(parent, current_target, key="current-target-request")

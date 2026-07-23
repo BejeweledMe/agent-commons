@@ -398,6 +398,16 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
             "state": "registered",
             "revision": TARGET_REVISION,
         }
+        if event_type == "delegation.requested":
+            # An independent_review delegation requires an open independent
+            # review request bound to its exact target revision.
+            snapshot.reviews[REVIEW_ID] = {
+                "id": REVIEW_ID,
+                "state": "requested",
+                "independent": True,
+                "target_ref": dict(TYPED_ARTIFACT_REF),
+                "target_revision": TARGET_REVISION,
+            }
         return snapshot
 
     current_states = {

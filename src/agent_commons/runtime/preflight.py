@@ -54,13 +54,14 @@ _HELP_FLAGS = {
         "--tools",
         "--max-budget-usd",
     ),
-    BuiltinProfileId.CODEX_BUILDER: ("--sandbox", "--ask-for-approval", "--json"),
-    BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER: (
-        "--sandbox",
-        "--ask-for-approval",
-        "--json",
-    ),
 }
+
+# The codex launch argv places --ask-for-approval and --sandbox before the
+# `exec` subcommand, so each flag must be validated against the help scope
+# that actually parses it; current codex builds list --ask-for-approval only
+# in root help.
+_CODEX_ROOT_HELP_FLAGS = ("--ask-for-approval", "--sandbox")
+_CODEX_EXEC_HELP_FLAGS = ("--json",)
 
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 
@@ -163,29 +164,38 @@ def preflight_profile(
             "provider_work_process_started": False,
         }
 
-    help_argv = (
-        (invocation.argv[0], "exec", "--help")
-        if isinstance(profile, CodexRunnerProfile)
-        else (invocation.argv[0], "--help")
-    )
-    help_result = _run_probe(
-        probe,
-        RunnerInvocation(
-            provider=invocation.provider,
-            profile_id=invocation.profile_id,
-            argv=help_argv,
-            stdin=b"",
-        ),
-        cwd=root,
-    )
-    help_text = (help_result.stdout + b"\n" + help_result.stderr).decode("utf-8", "replace")
-    missing_flags = sorted(
-        flag for flag in _HELP_FLAGS[normalized] if not _help_has_flag(help_text, flag)
-    )
+    if isinstance(profile, CodexRunnerProfile):
+        scoped_probes: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+            ((invocation.argv[0], "--help"), _CODEX_ROOT_HELP_FLAGS),
+            ((invocation.argv[0], "exec", "--help"), _CODEX_EXEC_HELP_FLAGS),
+        )
+    else:
+        scoped_probes = (((invocation.argv[0], "--help"), _HELP_FLAGS[normalized]),)
+    help_process_started = False
+    help_probes_succeeded = True
+    missing: list[str] = []
+    for help_argv, required_flags in scoped_probes:
+        help_result = _run_probe(
+            probe,
+            RunnerInvocation(
+                provider=invocation.provider,
+                profile_id=invocation.profile_id,
+                argv=help_argv,
+                stdin=b"",
+            ),
+            cwd=root,
+        )
+        help_process_started = help_process_started or help_result.pid is not None
+        help_probes_succeeded = (
+            help_probes_succeeded and help_result.outcome is RunOutcome.SUCCEEDED
+        )
+        help_text = (help_result.stdout + b"\n" + help_result.stderr).decode("utf-8", "replace")
+        missing.extend(flag for flag in required_flags if not _help_has_flag(help_text, flag))
+    missing_flags = sorted(missing)
     checks: dict[str, Any] = {
         "provider_help": (
             {"ok": True, "required_flags": "present"}
-            if help_result.outcome is RunOutcome.SUCCEEDED and not missing_flags
+            if help_probes_succeeded and not missing_flags
             else {
                 **_safe_failure(DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG),
                 "missing_flag_count": len(missing_flags),
@@ -286,6 +296,6 @@ def preflight_profile(
         "ok": ok,
         "checks": checks,
         "consumed_delegation_attempt": False,
-        "provider_help_process_started": help_result.pid is not None,
+        "provider_help_process_started": help_process_started,
         "provider_work_process_started": False,
     }
