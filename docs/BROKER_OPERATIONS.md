@@ -26,6 +26,31 @@ is not canonical completion.
 CI runs this contract without credentials or network access. Static preflight
 and the behavioral canary are intentionally separate signals.
 
+Before calling one real provider build compatible, run the explicit canary from
+the exact installed Agent Commons source:
+
+```bash
+agent-commons --json broker canary \
+  --confirm-provider-run \
+  --wall-time-seconds 300 \
+  --profile-config /absolute/path/to/agent-commons-profiles.yaml
+```
+
+This command may consume subscription or billable provider capacity, so the
+confirmation flag is mandatory. It creates and removes its own temporary Git
+workspace and operational state, permits one `provider_units` attempt, and uses
+the configured `claude-independent-reviewer` model and any configured native
+budget ceiling. It never reviews or mutates the current project.
+
+The JSON report records the sanitized Claude CLI version, configured model,
+Agent Commons source fingerprint, MCP catalog digest/count, process byte and
+duration counters, child-session closure, canonical state, mismatch flag, and
+terminal-tool counters. Exit status 0 requires exactly one completed terminal
+tool, zero rejected terminal calls, a typed review result, and canonical
+`succeeded`. Preflight failure or prose-only provider exit returns status 2.
+Use separate operator-owned profile files to qualify Fable, Opus, or another
+explicit model; one model's pass is not evidence for another.
+
 ## Operator caps and backpressure
 
 The operator-owned runtime YAML may lower global, per-provider, per-profile,

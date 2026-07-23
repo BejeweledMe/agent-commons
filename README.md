@@ -38,8 +38,10 @@ agent-commons --read-only --json support
 ```
 
 Expected support output includes `"canonical_workspace_available":true`, the
-package/Python/platform versions, and whether the state root was explicit. `init`
-does not stage or commit anything.
+package/Python/platform versions, `agent_commons_source_sha256`, and whether the
+state root was explicit. The source fingerprint distinguishes different
+checkouts that intentionally share one unreleased package version. `init` does
+not stage or commit anything.
 
 Start the author window, keep its rotating `nonce` private, and export only the
 returned session ID:
@@ -127,16 +129,26 @@ The broker is disabled by default and remains experimental. Enable it only by
 running `broker run` or starting the MCP server with `--enable-runtime`. The
 manual core workflow above remains the supported fallback.
 
-Install the optional surface, authenticate provider CLIs yourself, and use one
-operator-owned config file outside the delegated workspace:
+Install the optional surface from an exact source checkout, authenticate
+provider CLIs yourself, and use one operator-owned config file outside the
+delegated workspace:
 
 ```bash
-python -m pip install 'agent-commons[mcp,observability]'
+cd /path/to/agent-commons
+uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+export PATH="$(uv tool dir --bin):$PATH"
+agent-commons --read-only --json support
 agent-commons broker profiles --profile-config /absolute/path/runtime.yaml
 agent-commons broker preflight claude-independent-reviewer \
   --purpose independent_review \
   --profile-config /absolute/path/runtime.yaml
 ```
+
+`--reinstall --no-cache` prevents a same-version wheel from an earlier source
+commit from being reused. Quiet mode suppresses resolver warnings from obsolete
+third-party index artifacts; the explicit PATH command replaces the installer
+warning with a deterministic setup step. Add the `observability` extra only
+when using OpenTelemetry export.
 
 ```yaml
 profiles:
@@ -164,9 +176,13 @@ and is partitioned across retries. The bounded shared queue reports wait/depth
 metadata and rejects excess work with backpressure.
 
 Preflight checks static flags, source/catalog compatibility, and starts no model
-work. It is not proof that a provider will call the right tools. A deterministic
-real-stdio behavioral canary separately verifies child-session binding, a
-bounded MCP write, terminal result references, and canonical finalization.
+work. A missing MCP helper is reported as
+`mcp_executable_unavailable`, before the provider starts. Static success is not
+proof that a provider will call the right tools. The explicit paid-provider
+compatibility canary described in
+[broker operations](https://github.com/BejeweledMe/agent-commons/blob/main/docs/BROKER_OPERATIONS.md)
+separately verifies child-session binding, a bounded MCP write, terminal result
+references, and canonical finalization.
 
 Broker telemetry distinguishes `process_finished` from
 `canonical_finalization_started/completed/failed`, joins canonical state/reason,

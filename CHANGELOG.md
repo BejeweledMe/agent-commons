@@ -5,6 +5,12 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- Added an MCP-specific unavailable-executable preflight diagnostic, safe
+  installed-source fingerprints in support/preflight output, and a cache-safe
+  uv source reinstall path.
+- Added an explicit isolated real-Claude compatibility canary that reports
+  provider/model/catalog metadata and fails unless the terminal MCP result and
+  canonical delegation agree.
 - Added capability-gated recovery for requested delegations whose requester is
   unavailable, effective session-expiry reporting, requester shutdown guards,
   pre-admission child cleanup, and visible foreign-owner reconcile diagnostics.

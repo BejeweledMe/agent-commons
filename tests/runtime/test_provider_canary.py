@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+import stat
+import sys
+from pathlib import Path
+
+from agent_commons.runtime import (
+    BuiltinProfileId,
+    ClaudePermissionMode,
+    ClaudeRunnerProfile,
+    ProfileRegistry,
+)
+from agent_commons.services.provider_canary import (
+    CANARY_SCHEMA,
+    run_claude_compatibility_canary,
+)
+
+
+def _executable(path: Path, body: str) -> Path:
+    path.write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    return path
+
+
+def _mcp_executable(tmp_path: Path) -> Path:
+    return _executable(
+        tmp_path / "agent-commons-mcp",
+        "from agent_commons.mcp.server import main\nraise SystemExit(main())\n",
+    )
+
+
+def _profiles(provider: Path, mcp: Path) -> ProfileRegistry:
+    profile_id = BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
+    return ProfileRegistry(
+        {
+            profile_id: ClaudeRunnerProfile(
+                profile_id=profile_id,
+                executable=str(provider),
+                mcp_executable=str(mcp),
+                git_executable="/usr/bin/git",
+                model="canary-model",
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+            )
+        }
+    )
+
+
+def test_provider_canary_proves_one_real_terminal_mcp_completion(tmp_path: Path) -> None:
+    provider_source = (
+        Path(__file__).parents[1] / "fixtures" / "fake_claude_mcp_provider.py"
+    ).read_text(encoding="utf-8")
+    provider = _executable(tmp_path / "fake-claude", provider_source)
+
+    report = run_claude_compatibility_canary(
+        _profiles(provider, _mcp_executable(tmp_path)),
+        wall_time_seconds=60,
+    )
+
+    assert report["schema"] == CANARY_SCHEMA
+    assert report["ok"] is True, report
+    assert report["provider_version"] == "0.0.0 (Hermetic Claude Fixture)"
+    assert report["model"] == "canary-model"
+    assert report["preflight"]["ok"] is True
+    assert report["provider_work_process_started"] is True
+    assert report["canonical_state"] == "succeeded"
+    assert report["workflow_diagnostic_code"] == "none"
+    assert report["process_canonical_mismatch"] is False
+    assert report["terminal_tool_calls"] == 1
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+    assert report["child_session_closed"] is True
+
+
+def test_provider_canary_fails_when_process_exits_without_terminal_tool(
+    tmp_path: Path,
+) -> None:
+    provider = _executable(
+        tmp_path / "fake-claude-no-tool",
+        """
+import json
+import sys
+
+if "--version" in sys.argv:
+    print("0.0.0 (No Tool Fixture)")
+elif "--help" in sys.argv:
+    print(
+        "--print --verbose --output-format --permission-mode "
+        "--no-session-persistence --disable-slash-commands --setting-sources "
+        "--mcp-config --strict-mcp-config --allowed-tools --disallowed-tools "
+        "--tools --max-budget-usd"
+    )
+else:
+    print(json.dumps({"type": "result", "result": "prose only"}))
+""".lstrip(),
+    )
+
+    report = run_claude_compatibility_canary(
+        _profiles(provider, _mcp_executable(tmp_path)),
+        wall_time_seconds=60,
+    )
+
+    assert report["ok"] is False
+    assert report["process"]["outcome"] == "succeeded", report
+    assert report["canonical_state"] == "needs_operator"
+    assert report["workflow_diagnostic_code"] == "terminal_tool_not_called"
+    assert report["process_canonical_mismatch"] is True
+    assert report["terminal_tool_calls"] == 0
+    assert report["child_session_closed"] is True

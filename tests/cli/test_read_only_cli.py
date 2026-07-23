@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from agent_commons import __version__
 from agent_commons.cli import cli
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
 
 
@@ -39,6 +40,7 @@ def test_support_report_is_secret_free_and_does_not_disclose_paths(tmp_path: Pat
     body = json.loads(result.output)
     assert body["schema"] == "agent_commons.support.v1"
     assert body["agent_commons_version"] == __version__
+    assert body["agent_commons_source_sha256"] == agent_commons_source_sha256()
     assert body["supported_platform"] is True
     assert body["supported_operating_systems"] == ["darwin", "linux"]
     assert body["core_release_stage"] == "alpha"

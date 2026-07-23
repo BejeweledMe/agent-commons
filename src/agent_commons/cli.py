@@ -27,6 +27,7 @@ from agent_commons.runtime import (
     error_safe_next_actions,
     preflight_profile,
 )
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
@@ -35,6 +36,7 @@ from agent_commons.services.delegation_runtime import (
     profile_summaries,
     telemetry_sink,
 )
+from agent_commons.services.provider_canary import run_claude_compatibility_canary
 
 
 class CommonsGroup(click.Group):
@@ -216,6 +218,7 @@ def support_command(state: CLIState) -> None:
         {
             "schema": "agent_commons.support.v1",
             "agent_commons_version": __version__,
+            "agent_commons_source_sha256": agent_commons_source_sha256(),
             "workspace_schema": "agent-commons.workspace.v1",
             "runtime_request_schema": REQUEST_SCHEMA,
             "runtime_attempt_schema": ATTEMPT_SCHEMA,
@@ -1079,6 +1082,42 @@ def broker_preflight(
             state_root=state.state_root,
         ).state_root,
         purpose=purpose,
+    )
+    state.emit(result)
+    if not result["ok"]:
+        raise click.exceptions.Exit(2)
+
+
+@broker_group.command("canary")
+@click.option(
+    "--confirm-provider-run",
+    is_flag=True,
+    required=True,
+    help="Confirm one real provider attempt that may use subscription or billable capacity.",
+)
+@click.option(
+    "--wall-time-seconds",
+    type=click.IntRange(min=30, max=1800),
+    default=300,
+    show_default=True,
+)
+@_profile_config
+@click.pass_obj
+def broker_canary(
+    state: CLIState,
+    confirm_provider_run: bool,
+    wall_time_seconds: int,
+    profile_config: Path | None,
+) -> None:
+    """Run one isolated real-Claude terminal-tool compatibility canary."""
+
+    if not confirm_provider_run:  # pragma: no cover - Click enforces the required flag.
+        raise ValidationError("provider canary requires explicit provider-run confirmation")
+    config = load_runtime_configuration(profile_config, workspace_root=state.repo)
+    result = run_claude_compatibility_canary(
+        config.profiles,
+        operator_limits=config.limits,
+        wall_time_seconds=wall_time_seconds,
     )
     state.emit(result)
     if not result["ok"]:

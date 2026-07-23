@@ -21,6 +21,26 @@ Global `--read-only` never creates operational directories, cache, SQLite,
 sessions, claims, receipts, or recovery anchors. It validates canonical state
 only; remove the flag when an explicitly authorized repair must write.
 
+## Updating an exact source checkout
+
+Unreleased commits can intentionally retain the same semantic package version.
+For a global uv tool, force a cache-free rebuild and then inspect the installed
+source fingerprint:
+
+```bash
+cd /path/to/agent-commons
+uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+export PATH="$(uv tool dir --bin):$PATH"
+agent-commons --read-only --json support
+```
+
+`agent_commons_source_sha256` hashes every Python path and byte in the installed
+package. A separately installed MCP with a different fingerprint fails
+preflight before provider work. Quiet uv output suppresses warnings from
+obsolete third-party index artifacts; it does not weaken resolution or
+verification. Use `[mcp,observability]` only when OpenTelemetry export is
+required.
+
 ## Provider/MCP preflight
 
 After upgrading Claude Code, Codex, Agent Commons, or MCP dependencies, run:
@@ -41,6 +61,10 @@ therefore fails before reservation even when its tool names happen to match.
 Reinstall it from the same Agent Commons build and repeat preflight instead of
 spending the one real provider attempt. A failed preflight exits with status 2.
 
+Static success does not prove model tool use. The explicit paid-provider canary
+in [Broker operations](BROKER_OPERATIONS.md) records provider/model/version and
+returns status 2 when a process exits without the exact terminal MCP result.
+
 ## Closed diagnostic codes
 
 Agent Commons inspects only its bounded in-memory provider buffers and persists
@@ -55,6 +79,7 @@ stderr.
 | `provider_budget_exhausted` | Inspect the canonical state before any retry. Choose a new explicit budget/delegation only after proving no child remains live. |
 | `unsupported_provider_flag` | Provider CLI drift; run preflight and compare the installed provider version with supported docs. |
 | `mcp_config_invalid` | The provider rejected the generated strict MCP config; run preflight and report the safe support bundle. |
+| `mcp_executable_unavailable` | Add `uv tool dir --bin` to PATH or configure an absolute matching MCP executable, then rerun preflight. |
 | `mcp_spawn_failed` | Check the configured `agent-commons-mcp` executable and optional MCP installation. |
 | `mcp_handshake_failed` | Provider/MCP protocol startup failed; run preflight after checking dependency versions. |
 | `mcp_binding_timeout` | The worker did not observe its canonical child binding; reconcile instead of blind relaunch. |
@@ -155,6 +180,7 @@ Include:
 
 - `agent-commons --version` and provider CLI version;
 - the JSON from `agent-commons --read-only --json support`;
+- the installed `agent_commons_source_sha256`;
 - the closed diagnostic code, attempt/delegation IDs, exit classification,
   byte counters, and truncation flag;
 - whether `broker preflight` passed;

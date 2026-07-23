@@ -16,6 +16,8 @@ from .model import (
     BuiltinProfileId,
     ClaudeRunnerProfile,
     CodexRunnerProfile,
+    ExecutableResolutionError,
+    ExecutableRole,
     ProfileRegistry,
     RunnerInvocation,
 )
@@ -131,6 +133,25 @@ def preflight_profile(
             max_budget_microusd=1 if profile.supports_budget else None,
             worker_purpose=effective_purpose,
         )
+    except ExecutableResolutionError as exc:
+        if exc.role is ExecutableRole.MCP:
+            check_name = "mcp_executable"
+            code = DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE
+        elif exc.role is ExecutableRole.GIT:
+            check_name = "git_executable"
+            code = DiagnosticCode.MCP_CONFIG_INVALID
+        else:
+            check_name = "provider_executable"
+            code = DiagnosticCode.PROVIDER_START_FAILED
+        return {
+            "profile_id": normalized.value,
+            "provider": profile.provider.value,
+            "ok": False,
+            "checks": {check_name: _safe_failure(code)},
+            "consumed_delegation_attempt": False,
+            "provider_help_process_started": False,
+            "provider_work_process_started": False,
+        }
     except ConfigurationError:
         return {
             "profile_id": normalized.value,
@@ -239,7 +260,13 @@ def preflight_profile(
             ):
                 mcp_ok = False
         checks["mcp_contract"] = (
-            {"ok": True, "catalog": "available"}
+            {
+                "ok": True,
+                "catalog": "available",
+                "agent_commons_source_sha256": agent_commons_source_sha256(),
+                "tool_catalog_sha256": catalog_digest,
+                "tool_count": len(actual_tools),
+            }
             if mcp_ok
             else {
                 **_safe_failure(

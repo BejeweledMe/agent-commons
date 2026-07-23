@@ -11,6 +11,13 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+_HELP_FLAGS = (
+    "--print --verbose --output-format --permission-mode "
+    "--no-session-persistence --disable-slash-commands --setting-sources "
+    "--mcp-config --strict-mcp-config --allowed-tools --disallowed-tools "
+    "--tools --max-budget-usd"
+)
+
 
 def _value(result: Any) -> Any:
     if getattr(result, "isError", False):
@@ -123,5 +130,10 @@ async def _run() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(_run())
-    print(json.dumps({"type": "result", "result": "canonical outcome recorded"}))
+    if "--version" in sys.argv:
+        print("0.0.0 (Hermetic Claude Fixture)")
+    elif "--help" in sys.argv:
+        print(_HELP_FLAGS)
+    else:
+        asyncio.run(_run())
+        print(json.dumps({"type": "result", "result": "canonical outcome recorded"}))

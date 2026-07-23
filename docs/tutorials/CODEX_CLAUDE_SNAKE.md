@@ -17,7 +17,9 @@ Install the optional runtime and validate compatibility before creating work:
 
 ```bash
 cd /path/to/agent-commons
-uv tool install --force '.[mcp,observability]'
+uv tool install -q --force --reinstall --no-cache --python 3.13 '.[mcp]'
+export PATH="$(uv tool dir --bin):$PATH"
+agent-commons --read-only --json support
 cd /path/to/browser-snake
 claude --version
 agent-commons broker profiles \
@@ -27,8 +29,28 @@ agent-commons broker preflight claude-independent-reviewer \
   --profile-config /absolute/path/to/agent-commons-profiles.yaml
 ```
 
+The explicit reinstall avoids reusing a cached same-version wheel from an older
+source commit. Compare `agent_commons_source_sha256` with the intended source
+checkout before a paid launch. Add `observability` to the extras only when this
+tutorial is run with OpenTelemetry export.
+
 Preflight starts no model work and consumes no delegation attempt. Configure the
-project MCP as shown in the [README](../../README.md#optional-automatic-codex--claude-handoff).
+project MCP as shown in the
+[README](../../README.md#experimental-local-broker-manual-opt-in).
+Before relying on that exact Claude model, run the isolated real-provider gate:
+
+```bash
+cd /path/to/browser-snake
+agent-commons --json broker canary \
+  --confirm-provider-run \
+  --wall-time-seconds 300 \
+  --profile-config /absolute/path/to/agent-commons-profiles.yaml
+```
+
+The canary may consume provider capacity but cannot edit Snake: it uses a
+temporary fixture and succeeds only after the configured model completes the
+review and terminal delegation MCP tools. Repeat with separate profile configs
+for every model you intend to qualify.
 
 ## 2. Start the Codex author
 

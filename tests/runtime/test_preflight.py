@@ -142,11 +142,55 @@ def test_preflight_validates_provider_flags_and_mcp_without_an_attempt(tmp_path:
     assert result["provider_work_process_started"] is False
     assert result["checks"] == {
         "provider_help": {"ok": True, "required_flags": "present"},
-        "mcp_contract": {"ok": True, "catalog": "available"},
+        "mcp_contract": {
+            "ok": True,
+            "catalog": "available",
+            "agent_commons_source_sha256": agent_commons_source_sha256(),
+            "tool_catalog_sha256": hashlib.sha256(
+                "\n".join(sorted(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)).encode("utf-8")
+            ).hexdigest(),
+            "tool_count": len(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+        },
     }
     assert len(runner.calls) == 2
     assert "--preflight" in runner.calls[1]
     assert "--delegation-id" not in runner.calls[1]
+
+
+def test_preflight_identifies_a_missing_mcp_executable_before_provider_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    profile_id = BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
+    profiles = ProfileRegistry(
+        {
+            profile_id: ClaudeRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                mcp_executable="agent-commons-mcp-missing-for-test",
+                git_executable="/usr/bin/git",
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+            )
+        }
+    )
+    runner = ProbeRunner()
+
+    result = preflight_profile(
+        profiles,
+        profile_id,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert result["checks"]["mcp_executable"]["diagnostic_code"] == (
+        DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE.value
+    )
+    assert "PATH" in " ".join(result["checks"]["mcp_executable"]["safe_next_actions"])
+    assert result["provider_help_process_started"] is False
+    assert result["consumed_delegation_attempt"] is False
+    assert runner.calls == []
 
 
 def test_preflight_returns_closed_code_for_provider_flag_drift(tmp_path: Path) -> None:

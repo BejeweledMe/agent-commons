@@ -32,6 +32,7 @@ class DiagnosticCode(StrEnum):
     PROVIDER_BUDGET_EXHAUSTED = "provider_budget_exhausted"
     UNSUPPORTED_PROVIDER_FLAG = "unsupported_provider_flag"
     MCP_CONFIG_INVALID = "mcp_config_invalid"
+    MCP_EXECUTABLE_UNAVAILABLE = "mcp_executable_unavailable"
     MCP_SPAWN_FAILED = "mcp_spawn_failed"
     MCP_HANDSHAKE_FAILED = "mcp_handshake_failed"
     MCP_BINDING_TIMEOUT = "mcp_binding_timeout"
@@ -55,6 +56,9 @@ _HINTS = {
     ),
     DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG: "The provider rejected an allowlisted launch flag.",
     DiagnosticCode.MCP_CONFIG_INVALID: "The provider rejected the generated MCP configuration.",
+    DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE: (
+        "The configured Agent Commons MCP executable is unavailable."
+    ),
     DiagnosticCode.MCP_SPAWN_FAILED: "The configured Agent Commons MCP process did not start.",
     DiagnosticCode.MCP_HANDSHAKE_FAILED: (
         "The provider and MCP server did not complete startup negotiation."
@@ -106,6 +110,11 @@ _SAFE_NEXT_ACTIONS = {
     ),
     DiagnosticCode.MCP_CONFIG_INVALID: (
         "Run broker preflight and inspect only the operator-owned profile configuration.",
+    ),
+    DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE: (
+        "Add the uv tool executable directory to PATH or configure an absolute "
+        "mcp_executable path.",
+        "Install the matching agent-commons[mcp] source and rerun broker preflight.",
     ),
     DiagnosticCode.MCP_SPAWN_FAILED: ("Install the MCP extra and rerun broker preflight.",),
     DiagnosticCode.MCP_HANDSHAKE_FAILED: (

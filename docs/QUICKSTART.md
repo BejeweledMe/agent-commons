@@ -27,9 +27,11 @@ agent-commons --read-only --json support
 ```
 
 Expected JSON includes `"canonical_workspace_available":true`,
-`"state_root_explicit":true`, and the installed package/Python/platform
-versions. If `agent-commons` is not found, confirm the source checkout's
-`.venv/bin` remains on `PATH` in every terminal.
+`"state_root_explicit":true`, the installed package/Python/platform versions,
+and `agent_commons_source_sha256`. That fingerprint distinguishes installed
+source builds even while unreleased commits share one package version. If
+`agent-commons` is not found, confirm the source checkout's `.venv/bin` remains
+on `PATH` in every terminal.
 
 `init` publishes the canonical onboarding contract, workspace configuration,
 small managed blocks in `AGENTS.md`/`CLAUDE.md`, and matching workflow skills.

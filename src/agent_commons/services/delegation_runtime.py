@@ -620,9 +620,11 @@ commit, push, merge, deploy, publish, contact anyone, expose secrets, or perform
 unrelated work.
 
 For independent_review, do not edit source. Find the existing review request for
-the exact target. After analysis, first call commons_complete_review with the
-bounded verdict, then call commons_succeed_delegation with that review as the
-typed result reference (review:<id>). Completing the review alone does not finish
+the exact target. After analysis, first call the injected
+mcp__agent-commons__commons_complete_review tool with the bounded verdict, then
+call mcp__agent-commons__commons_succeed_delegation with that review as the typed
+result reference (review:<id>). These exact tool calls are the required result
+protocol, not optional suggestions. Completing the review alone does not finish
 the delegation. A prose-only answer or successful process exit without both
 canonical calls is invalid. Record verification only for facts you genuinely
 reproduced and can bind to existing evidence. For implementation, follow the

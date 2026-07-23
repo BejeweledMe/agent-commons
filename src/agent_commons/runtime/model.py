@@ -31,6 +31,20 @@ class Provider(StrEnum):
     CLAUDE = "claude"
 
 
+class ExecutableRole(StrEnum):
+    PROVIDER = "provider"
+    MCP = "mcp"
+    GIT = "git"
+
+
+class ExecutableResolutionError(ConfigurationError):
+    """Trusted executable resolution failed for one fixed profile component."""
+
+    def __init__(self, role: ExecutableRole, message: str) -> None:
+        super().__init__(message)
+        self.role = role
+
+
 class BuiltinProfileId(StrEnum):
     CODEX_BUILDER = "codex-builder"
     CODEX_INDEPENDENT_REVIEWER = "codex-independent-reviewer"
@@ -132,7 +146,12 @@ def _safe_executable(value: object) -> str:
     return value
 
 
-def resolve_trusted_executable(value: str, *, workspace_root: Path) -> str:
+def resolve_trusted_executable(
+    value: str,
+    *,
+    workspace_root: Path,
+    role: ExecutableRole = ExecutableRole.PROVIDER,
+) -> str:
     """Resolve a provider once, rejecting workspace/PATH and mode hijacks."""
 
     candidate = Path(value).expanduser()
@@ -146,22 +165,40 @@ def resolve_trusted_executable(value: str, *, workspace_root: Path) -> str:
             if path.is_file() and os.access(path, os.X_OK):
                 matches.append(path)
         if not matches:
-            raise ConfigurationError(f"profile executable is unavailable: {value}")
+            raise ExecutableResolutionError(
+                role,
+                f"profile executable is unavailable: {value}",
+            )
         candidate = matches[0]
     try:
         resolved = candidate.resolve(strict=True)
         root = workspace_root.expanduser().resolve(strict=True)
         metadata = resolved.stat()
     except OSError as exc:
-        raise ConfigurationError("profile executable cannot be resolved safely") from exc
+        raise ExecutableResolutionError(
+            role,
+            "profile executable cannot be resolved safely",
+        ) from exc
     if resolved == root or root in resolved.parents:
-        raise ConfigurationError("profile executable must be outside the delegated workspace")
+        raise ExecutableResolutionError(
+            role,
+            "profile executable must be outside the delegated workspace",
+        )
     if not stat.S_ISREG(metadata.st_mode) or not os.access(resolved, os.X_OK):
-        raise ConfigurationError("profile executable must be an executable regular file")
+        raise ExecutableResolutionError(
+            role,
+            "profile executable must be an executable regular file",
+        )
     if metadata.st_mode & 0o022:
-        raise ConfigurationError("profile executable must not be group/world writable")
+        raise ExecutableResolutionError(
+            role,
+            "profile executable must not be group/world writable",
+        )
     if hasattr(os, "getuid") and metadata.st_uid not in {0, os.getuid()}:
-        raise ConfigurationError("profile executable must be owned by the operator or root")
+        raise ExecutableResolutionError(
+            role,
+            "profile executable must be owned by the operator or root",
+        )
     return str(resolved)
 
 
@@ -393,13 +430,19 @@ class ClaudeRunnerProfile:
                 else min(effective_budget, max_budget_microusd)
             )
         provider_executable = resolve_trusted_executable(
-            self.executable, workspace_root=workspace_root
+            self.executable,
+            workspace_root=workspace_root,
+            role=ExecutableRole.PROVIDER,
         )
         mcp_executable = resolve_trusted_executable(
-            self.mcp_executable, workspace_root=workspace_root
+            self.mcp_executable,
+            workspace_root=workspace_root,
+            role=ExecutableRole.MCP,
         )
         git_executable = resolve_trusted_executable(
-            self.git_executable, workspace_root=workspace_root
+            self.git_executable,
+            workspace_root=workspace_root,
+            role=ExecutableRole.GIT,
         )
         effective_state_root = (
             Path(state_root if state_root is not None else workspace_root / ".agent-commons")
