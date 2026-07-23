@@ -131,7 +131,7 @@ async def _run() -> None:
 
 if __name__ == "__main__":
     if "--version" in sys.argv:
-        print("0.0.0 (Hermetic Claude Fixture)")
+        print("0.0.0 (Claude Code)")
     elif "--help" in sys.argv:
         print(_HELP_FLAGS)
     else:

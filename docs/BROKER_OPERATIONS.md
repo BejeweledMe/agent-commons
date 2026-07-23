@@ -42,14 +42,16 @@ workspace and operational state, permits one `provider_units` attempt, and uses
 the configured `claude-independent-reviewer` model and any configured native
 budget ceiling. It never reviews or mutates the current project.
 
-The JSON report records the sanitized Claude CLI version, configured model,
-Agent Commons source fingerprint, MCP catalog digest/count, process byte and
-duration counters, child-session closure, canonical state, mismatch flag, and
-terminal-tool counters. Exit status 0 requires exactly one completed terminal
-tool, zero rejected terminal calls, a typed review result, and canonical
-`succeeded`. Preflight failure or prose-only provider exit returns status 2.
-Use separate operator-owned profile files to qualify Fable, Opus, or another
-explicit model; one model's pass is not evidence for another.
+The JSON report records the Claude CLI version only when it matches the strict
+numeric `N.N.N (Claude Code)` grammar; every other provider-controlled line
+becomes `null`. It also records the configured model, Agent Commons source
+fingerprint, MCP catalog digest/count, process byte and duration counters,
+child-session closure, canonical state, mismatch flag, and terminal-tool
+counters. Exit status 0 requires exactly one completed terminal tool, zero
+rejected terminal calls, a typed review result, and canonical `succeeded`.
+Preflight failure or prose-only provider exit returns status 2. Use separate
+operator-owned profile files to qualify Fable, Opus, or another explicit model;
+one model's pass is not evidence for another.
 
 ## Operator caps and backpressure
 

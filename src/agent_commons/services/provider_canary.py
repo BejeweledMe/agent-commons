@@ -29,7 +29,12 @@ from .delegation_runtime import DelegationRuntimeService
 from .manager import CommonsManager
 
 CANARY_SCHEMA = "agent_commons.provider_compatibility_canary.v1"
-_SAFE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .()+_/-]{0,127}$")
+_NUMERIC_VERSION_COMPONENT = r"(?:0|[1-9][0-9]{0,5})"
+_CLAUDE_CODE_VERSION = re.compile(
+    rf"^(?P<major>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT}) \(Claude Code\)$"
+)
 
 
 def _run_git(git_executable: str, *args: str, cwd: Path | None = None) -> None:
@@ -76,7 +81,10 @@ def _provider_version(
         return None
     value = (result.stdout + b"\n" + result.stderr).decode("utf-8", "replace").strip()
     first_line = value.splitlines()[0].strip() if value else ""
-    return first_line if _SAFE_VERSION.fullmatch(first_line) is not None else None
+    match = _CLAUDE_CODE_VERSION.fullmatch(first_line)
+    if match is None:
+        return None
+    return f"{match.group('major')}.{match.group('minor')}.{match.group('patch')} (Claude Code)"
 
 
 def run_claude_compatibility_canary(

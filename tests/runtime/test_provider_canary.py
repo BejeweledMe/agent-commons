@@ -4,14 +4,18 @@ import stat
 import sys
 from pathlib import Path
 
+import pytest
+
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
     ClaudeRunnerProfile,
     ProfileRegistry,
+    SubprocessRunner,
 )
 from agent_commons.services.provider_canary import (
     CANARY_SCHEMA,
+    _provider_version,
     run_claude_compatibility_canary,
 )
 
@@ -58,7 +62,7 @@ def test_provider_canary_proves_one_real_terminal_mcp_completion(tmp_path: Path)
 
     assert report["schema"] == CANARY_SCHEMA
     assert report["ok"] is True, report
-    assert report["provider_version"] == "0.0.0 (Hermetic Claude Fixture)"
+    assert report["provider_version"] == "0.0.0 (Claude Code)"
     assert report["model"] == "canary-model"
     assert report["preflight"]["ok"] is True
     assert report["provider_work_process_started"] is True
@@ -106,3 +110,39 @@ else:
     assert report["process_canonical_mismatch"] is True
     assert report["terminal_tool_calls"] == 0
     assert report["child_session_closed"] is True
+
+
+@pytest.mark.parametrize(
+    "reported",
+    (
+        "Claude Code 2.1.0 /Users/example/project",
+        "token-shaped-placeholder",
+        "provider diagnostics are not a version",
+        "2.1.0+token-shaped-placeholder (Claude Code)",
+        "02.1.0 (Claude Code)",
+        "1000000.1.0 (Claude Code)",
+    ),
+)
+def test_provider_version_drops_noncanonical_provider_content(
+    tmp_path: Path,
+    reported: str,
+) -> None:
+    provider = _executable(
+        tmp_path / "fake-claude-version",
+        f"print({reported!r})\n",
+    )
+    profile = _profiles(provider, _mcp_executable(tmp_path)).get(
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
+    )
+    assert isinstance(profile, ClaudeRunnerProfile)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    assert (
+        _provider_version(
+            profile,
+            workspace_root=workspace,
+            runner=SubprocessRunner(),
+        )
+        is None
+    )
