@@ -410,8 +410,7 @@ class CodexRunnerProfile:
             git_executable=self.git_executable,
         )
         enabled_tools = tuple(
-            tool.removeprefix(_MCP_TOOL_PREFIX)
-            for tool in _worker_tools(self.profile_id, purpose)
+            tool.removeprefix(_MCP_TOOL_PREFIX) for tool in _worker_tools(self.profile_id, purpose)
         )
         config_prefix = f"mcp_servers.{_CODEX_MCP_SERVER}"
         argv = [

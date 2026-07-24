@@ -120,9 +120,9 @@ def _codex_mcp_config(invocation: RunnerInvocation) -> tuple[str, list[str], set
         key, separator, raw_value = raw_override.partition("=")
         if not separator or not key.startswith(_CODEX_MCP_PREFIX):
             continue
-        overrides[key.removeprefix(_CODEX_MCP_PREFIX)] = tomllib.loads(
-            f"value = {raw_value}"
-        )["value"]
+        overrides[key.removeprefix(_CODEX_MCP_PREFIX)] = tomllib.loads(f"value = {raw_value}")[
+            "value"
+        ]
 
     command = overrides["command"]
     args = overrides["args"]

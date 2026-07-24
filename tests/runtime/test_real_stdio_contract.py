@@ -136,9 +136,7 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
             trusted_workspace=True,
         )
     )
-    profiles = ProfileRegistry(
-        {profile_id: profile}
-    )
+    profiles = ProfileRegistry({profile_id: profile})
 
     telemetry = CollectingTelemetry()
     service = DelegationRuntimeService(manager, profiles=profiles, telemetry=telemetry)

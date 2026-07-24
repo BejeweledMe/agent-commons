@@ -361,12 +361,9 @@ def test_preflight_rejects_worker_catalog_drift(tmp_path: Path, mutation: str) -
 
 
 _CODEX_ROOT_HELP = (
-    b"-m, --model <MODEL>\n-s, --sandbox <SANDBOX_MODE>\n"
-    b"-a, --ask-for-approval <APPROVAL_POLICY>"
+    b"-m, --model <MODEL>\n-s, --sandbox <SANDBOX_MODE>\n-a, --ask-for-approval <APPROVAL_POLICY>"
 )
-_CODEX_EXEC_HELP = (
-    b"-c, --config <key=value>\n--ignore-user-config\n--strict-config\n--json"
-)
+_CODEX_EXEC_HELP = b"-c, --config <key=value>\n--ignore-user-config\n--strict-config\n--json"
 
 
 class CodexProbeRunner:

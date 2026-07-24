@@ -40,9 +40,9 @@ def _config(arguments: list[str]) -> dict[str, Any]:
             continue
         key, separator, raw_value = arguments[index + 1].partition("=")
         if separator and key.startswith(_CONFIG_PREFIX):
-            values[key.removeprefix(_CONFIG_PREFIX)] = tomllib.loads(
-                f"value = {raw_value}"
-            )["value"]
+            values[key.removeprefix(_CONFIG_PREFIX)] = tomllib.loads(f"value = {raw_value}")[
+                "value"
+            ]
     return values
 
 

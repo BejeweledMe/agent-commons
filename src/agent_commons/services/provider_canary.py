@@ -87,9 +87,7 @@ def _provider_version(
         return None
     value = (result.stdout + b"\n" + result.stderr).decode("utf-8", "replace").strip()
     first_line = value.splitlines()[0].strip() if value else ""
-    pattern = (
-        _CLAUDE_CODE_VERSION if profile.provider is Provider.CLAUDE else _CODEX_CLI_VERSION
-    )
+    pattern = _CLAUDE_CODE_VERSION if profile.provider is Provider.CLAUDE else _CODEX_CLI_VERSION
     match = pattern.fullmatch(first_line)
     if match is None:
         return None
