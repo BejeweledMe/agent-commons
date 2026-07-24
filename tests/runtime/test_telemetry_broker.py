@@ -180,7 +180,11 @@ def test_broker_runs_once_with_distinct_child_and_keeps_content_ephemeral(tmp_pa
     lifecycle = CollectingLifecycleHook()
     state_root = tmp_path / "state"
     broker = LocalBroker(
-        profiles=default_profile_registry(codex_executable="/bin/echo", trusted_workspace=True),
+        profiles=default_profile_registry(
+            codex_executable="/bin/echo",
+            mcp_executable="/bin/echo",
+            trusted_workspace=True,
+        ),
         attempts=AttemptStore(state_root),
         runner=runner,  # type: ignore[arg-type]
         telemetry=telemetry,

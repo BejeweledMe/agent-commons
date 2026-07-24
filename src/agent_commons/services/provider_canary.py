@@ -13,6 +13,7 @@ from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudeRunnerProfile,
+    CodexRunnerProfile,
     ExecutableRole,
     OperatorLimits,
     ProfileRegistry,
@@ -35,6 +36,11 @@ _CLAUDE_CODE_VERSION = re.compile(
     rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
     rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT}) \(Claude Code\)$"
 )
+_CODEX_CLI_VERSION = re.compile(
+    rf"^codex-cli (?P<major>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT})$"
+)
 
 
 def _run_git(git_executable: str, *args: str, cwd: Path | None = None) -> None:
@@ -55,7 +61,7 @@ def _run_git(git_executable: str, *args: str, cwd: Path | None = None) -> None:
 
 
 def _provider_version(
-    profile: ClaudeRunnerProfile,
+    profile: ClaudeRunnerProfile | CodexRunnerProfile,
     *,
     workspace_root: Path,
     runner: SubprocessRunner,
@@ -67,7 +73,7 @@ def _provider_version(
     )
     result = runner.run(
         RunnerInvocation(
-            provider=Provider.CLAUDE,
+            provider=profile.provider,
             profile_id=profile.profile_id,
             argv=(executable, "--version"),
             stdin=b"",
@@ -81,27 +87,37 @@ def _provider_version(
         return None
     value = (result.stdout + b"\n" + result.stderr).decode("utf-8", "replace").strip()
     first_line = value.splitlines()[0].strip() if value else ""
-    match = _CLAUDE_CODE_VERSION.fullmatch(first_line)
+    pattern = (
+        _CLAUDE_CODE_VERSION if profile.provider is Provider.CLAUDE else _CODEX_CLI_VERSION
+    )
+    match = pattern.fullmatch(first_line)
     if match is None:
         return None
-    return f"{match.group('major')}.{match.group('minor')}.{match.group('patch')} (Claude Code)"
+    version = f"{match.group('major')}.{match.group('minor')}.{match.group('patch')}"
+    return (
+        f"{version} (Claude Code)"
+        if profile.provider is Provider.CLAUDE
+        else f"codex-cli {version}"
+    )
 
 
-def run_claude_compatibility_canary(
+def _run_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    profile_id: BuiltinProfileId,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
 ) -> dict[str, Any]:
-    """Run one fixed, isolated Claude review and grade canonical terminal behavior."""
+    """Run one fixed, isolated provider review and grade canonical terminal behavior."""
 
     if not 30 <= wall_time_seconds <= 1800:
         raise ConfigurationError("provider canary wall time must be between 30 and 1800 seconds")
-    profile_id = BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
     profile = profiles.get(profile_id)
-    if not isinstance(profile, ClaudeRunnerProfile):
-        raise ConfigurationError("provider canary requires the Claude independent-review profile")
+    if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile)) or (
+        not profile_id.independent_reviewer
+    ):
+        raise ConfigurationError("provider canary requires an independent-review profile")
 
     process_runner = runner or SubprocessRunner()
     with tempfile.TemporaryDirectory(prefix="agent-commons-provider-canary-") as temporary:
@@ -259,3 +275,39 @@ def run_claude_compatibility_canary(
             "terminal_tool_rejections": joined["terminal_tool_rejections"],
             "child_session_closed": child_session["effective_status"] == "closed",
         }
+
+
+def run_claude_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+) -> dict[str, Any]:
+    """Run one fixed, isolated Claude review and grade canonical terminal behavior."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+    )
+
+
+def run_codex_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+) -> dict[str, Any]:
+    """Run one fixed, isolated Codex review and grade canonical terminal behavior."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+    )

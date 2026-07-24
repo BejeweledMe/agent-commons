@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 
 from agent_commons.errors import ConfigurationError
+from agent_commons.mcp.server import (
+    IMPLEMENTATION_WORKER_TOOL_NAMES,
+    INDEPENDENT_REVIEW_WORKER_TOOL_NAMES,
+    VERIFICATION_WORKER_TOOL_NAMES,
+)
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
@@ -22,6 +28,18 @@ from agent_commons.runtime import (
 )
 
 
+def _codex_overrides(argv: tuple[str, ...]) -> dict[str, object]:
+    prefix = "mcp_servers.agent-commons."
+    values: dict[str, object] = {}
+    for index, argument in enumerate(argv):
+        if argument != "-c":
+            continue
+        key, separator, raw_value = argv[index + 1].partition("=")
+        if separator and key.startswith(prefix):
+            values[key.removeprefix(prefix)] = tomllib.loads(f"value = {raw_value}")["value"]
+    return values
+
+
 def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> None:
     registry = default_profile_registry()
     assert registry.profile_ids == tuple(sorted(BuiltinProfileId, key=lambda item: item.value))
@@ -33,22 +51,40 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     trusted_codex = CodexRunnerProfile(
         profile_id=BuiltinProfileId.CODEX_BUILDER,
         executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
         trusted_workspace=True,
     )
     invocation = trusted_codex.build_invocation(
-        "Implement the exact submitted task", workspace_root=tmp_path
+        "Implement the exact submitted task",
+        workspace_root=tmp_path,
+        state_root=tmp_path / "external-state",
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
     )
-    assert invocation.argv[1:] == (
+    assert invocation.argv[1:5] == (
         "--ask-for-approval",
         "never",
         "--sandbox",
         "workspace-write",
-        "exec",
-        "--json",
-        "--color",
-        "never",
-        "-",
     )
+    assert "exec" in invocation.argv
+    assert "--ignore-user-config" in invocation.argv
+    assert "--strict-config" in invocation.argv
+    assert invocation.argv[-4:] == ("--json", "--color", "never", "-")
+    overrides = _codex_overrides(invocation.argv)
+    assert overrides["command"] == str(Path("/bin/echo").resolve())
+    assert overrides["required"] is True
+    assert set(overrides["enabled_tools"]) == IMPLEMENTATION_WORKER_TOOL_NAMES
+    assert overrides["args"] == [
+        "--repo",
+        str(tmp_path.resolve()),
+        "--state-root",
+        str(tmp_path / "external-state"),
+        "--delegation-id",
+        "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        "--git-executable",
+        "/usr/bin/true",
+    ]
     assert invocation.stdin == b"Implement the exact submitted task"
     assert "Implement" not in " ".join(invocation.argv)
 
@@ -131,8 +167,13 @@ def test_profile_executables_reject_workspace_path_hijack_and_writable_targets(
         CodexRunnerProfile(
             profile_id=BuiltinProfileId.CODEX_BUILDER,
             executable="codex",
+            mcp_executable="/bin/echo",
             trusted_workspace=True,
-        ).build_invocation("Implement", workspace_root=workspace)
+        ).build_invocation(
+            "Implement",
+            workspace_root=workspace,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        )
 
     unsafe = tmp_path / "unsafe-provider"
     unsafe.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
@@ -141,8 +182,13 @@ def test_profile_executables_reject_workspace_path_hijack_and_writable_targets(
         CodexRunnerProfile(
             profile_id=BuiltinProfileId.CODEX_BUILDER,
             executable=str(unsafe),
+            mcp_executable="/bin/echo",
             trusted_workspace=True,
-        ).build_invocation("Implement", workspace_root=workspace)
+        ).build_invocation(
+            "Implement",
+            workspace_root=workspace,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        )
 
     with pytest.raises(ConfigurationError, match="outside the delegated workspace"):
         ClaudeRunnerProfile(
@@ -282,6 +328,50 @@ def test_claude_verifier_receives_only_the_verification_write_tool(tmp_path: Pat
 
     assert "mcp__agent-commons__commons_record_verification" in allowed
     assert "mcp__agent-commons__commons_complete_review" not in allowed
+
+
+def test_codex_reviewer_matches_the_claude_worker_scope(tmp_path: Path) -> None:
+    profile = CodexRunnerProfile(
+        profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        sandbox=CodexSandbox.READ_ONLY,
+        trusted_workspace=True,
+    )
+
+    invocation = profile.build_invocation(
+        "Review the exact target",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+    )
+    enabled_tools = set(_codex_overrides(invocation.argv)["enabled_tools"])
+
+    assert enabled_tools == INDEPENDENT_REVIEW_WORKER_TOOL_NAMES
+    assert "commons_request_delegation" not in enabled_tools
+    assert "commons_cancel_delegation" not in enabled_tools
+
+
+def test_codex_verifier_receives_only_the_verification_write_tool(tmp_path: Path) -> None:
+    profile = CodexRunnerProfile(
+        profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        sandbox=CodexSandbox.READ_ONLY,
+        trusted_workspace=True,
+    )
+
+    invocation = profile.build_invocation(
+        "Verify the exact target",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        worker_purpose="verification",
+    )
+    enabled_tools = set(_codex_overrides(invocation.argv)["enabled_tools"])
+
+    assert enabled_tools == VERIFICATION_WORKER_TOOL_NAMES
+    assert "commons_complete_review" not in enabled_tools
 
 
 def test_runtime_policy_can_only_shrink_and_consumes_depth() -> None:

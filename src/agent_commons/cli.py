@@ -36,7 +36,10 @@ from agent_commons.services.delegation_runtime import (
     profile_summaries,
     telemetry_sink,
 )
-from agent_commons.services.provider_canary import run_claude_compatibility_canary
+from agent_commons.services.provider_canary import (
+    run_claude_compatibility_canary,
+    run_codex_compatibility_canary,
+)
 
 
 class CommonsGroup(click.Group):
@@ -1090,6 +1093,18 @@ def broker_preflight(
 
 @broker_group.command("canary")
 @click.option(
+    "--profile",
+    "profile_id",
+    type=click.Choice(
+        [
+            BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value,
+            BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value,
+        ]
+    ),
+    default=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value,
+    show_default=True,
+)
+@click.option(
     "--confirm-provider-run",
     is_flag=True,
     required=True,
@@ -1105,16 +1120,22 @@ def broker_preflight(
 @click.pass_obj
 def broker_canary(
     state: CLIState,
+    profile_id: str,
     confirm_provider_run: bool,
     wall_time_seconds: int,
     profile_config: Path | None,
 ) -> None:
-    """Run one isolated real-Claude terminal-tool compatibility canary."""
+    """Run one isolated real-provider terminal-tool compatibility canary."""
 
     if not confirm_provider_run:  # pragma: no cover - Click enforces the required flag.
         raise ValidationError("provider canary requires explicit provider-run confirmation")
     config = load_runtime_configuration(profile_config, workspace_root=state.repo)
-    result = run_claude_compatibility_canary(
+    canary = (
+        run_codex_compatibility_canary
+        if profile_id == BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value
+        else run_claude_compatibility_canary
+    )
+    result = canary(
         config.profiles,
         operator_limits=config.limits,
         wall_time_seconds=wall_time_seconds,

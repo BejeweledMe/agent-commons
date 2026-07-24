@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from agent_commons.mcp.server import (
+    IMPLEMENTATION_WORKER_TOOL_NAMES,
     INDEPENDENT_REVIEW_WORKER_TOOL_NAMES,
     VERIFICATION_WORKER_TOOL_NAMES,
 )
@@ -59,6 +60,28 @@ _CLAUDE_HELP_FLAGS = (
 _DEFAULT_MCP_BODY = object()
 
 
+def _worker_catalog(tool_names: frozenset[str]) -> dict[str, object]:
+    names = sorted(tool_names)
+    return {
+        "tool_names": names,
+        "tool_catalog_sha256": hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest(),
+    }
+
+
+def _mcp_preflight_body() -> dict[str, object]:
+    return {
+        "schema": "agent_commons.mcp_preflight.v2",
+        "agent_commons_source_sha256": agent_commons_source_sha256(),
+        "tool_count": 14,
+        "tool_catalog_sha256": "a" * 64,
+        "worker_catalogs": {
+            "implementation": _worker_catalog(IMPLEMENTATION_WORKER_TOOL_NAMES),
+            "independent_review": _worker_catalog(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+            "verification": _worker_catalog(VERIFICATION_WORKER_TOOL_NAMES),
+        },
+    }
+
+
 class ProbeRunner:
     def __init__(
         self,
@@ -88,28 +111,7 @@ class ProbeRunner:
                 "tool_catalog_sha256": "a" * 64,
             }
         else:
-            names = sorted(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
-            verification_names = sorted(VERIFICATION_WORKER_TOOL_NAMES)
-            body = {
-                "schema": "agent_commons.mcp_preflight.v2",
-                "agent_commons_source_sha256": agent_commons_source_sha256(),
-                "tool_count": 14,
-                "tool_catalog_sha256": "a" * 64,
-                "worker_catalogs": {
-                    "independent_review": {
-                        "tool_names": names,
-                        "tool_catalog_sha256": hashlib.sha256(
-                            "\n".join(names).encode("utf-8")
-                        ).hexdigest(),
-                    },
-                    "verification": {
-                        "tool_names": verification_names,
-                        "tool_catalog_sha256": hashlib.sha256(
-                            "\n".join(verification_names).encode("utf-8")
-                        ).hexdigest(),
-                    },
-                },
-            }
+            body = _mcp_preflight_body()
         return _result(output=json.dumps(body).encode())
 
 
@@ -362,7 +364,9 @@ _CODEX_ROOT_HELP = (
     b"-m, --model <MODEL>\n-s, --sandbox <SANDBOX_MODE>\n"
     b"-a, --ask-for-approval <APPROVAL_POLICY>"
 )
-_CODEX_EXEC_HELP = b"-s, --sandbox <SANDBOX_MODE>\n--color <COLOR>\n--json"
+_CODEX_EXEC_HELP = (
+    b"-c, --config <key=value>\n--ignore-user-config\n--strict-config\n--json"
+)
 
 
 class CodexProbeRunner:
@@ -380,9 +384,10 @@ class CodexProbeRunner:
 
     def run(self, invocation, **_kwargs) -> ProcessResult:
         self.calls.append(invocation.argv)
-        assert "--help" in invocation.argv
-        output = self.exec_help if "exec" in invocation.argv else self.root_help
-        return _result(output=output)
+        if "--help" in invocation.argv:
+            output = self.exec_help if "exec" in invocation.argv else self.root_help
+            return _result(output=output)
+        return _result(output=json.dumps(_mcp_preflight_body()).encode())
 
 
 def _codex_profiles() -> ProfileRegistry:
@@ -392,6 +397,8 @@ def _codex_profiles() -> ProfileRegistry:
             profile_id: CodexRunnerProfile(
                 profile_id=profile_id,
                 executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                git_executable="/usr/bin/git",
                 sandbox=CodexSandbox.WORKSPACE_WRITE,
                 trusted_workspace=True,
             )
@@ -414,7 +421,9 @@ def test_codex_preflight_accepts_root_only_approval_flag(tmp_path: Path) -> None
     assert result["ok"] is True
     assert result["checks"]["provider_help"] == {"ok": True, "required_flags": "present"}
     assert result["provider_help_process_started"] is True
-    assert runner.calls == [("/bin/echo", "--help"), ("/bin/echo", "exec", "--help")]
+    assert runner.calls[:2] == [("/bin/echo", "--help"), ("/bin/echo", "exec", "--help")]
+    assert "--preflight" in runner.calls[2]
+    assert "--delegation-id" not in runner.calls[2]
 
 
 def test_codex_preflight_fails_closed_when_root_scope_lacks_a_launch_flag(
@@ -443,7 +452,7 @@ def test_codex_preflight_fails_closed_when_root_scope_lacks_a_launch_flag(
 
 
 def test_codex_preflight_fails_closed_when_exec_scope_lacks_json(tmp_path: Path) -> None:
-    runner = CodexProbeRunner(exec_help=b"-s, --sandbox <SANDBOX_MODE>\n--color <COLOR>")
+    runner = CodexProbeRunner(exec_help=_CODEX_EXEC_HELP.replace(b"--json", b""))
 
     result = preflight_profile(
         _codex_profiles(),

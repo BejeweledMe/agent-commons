@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,12 @@ from click.testing import CliRunner
 
 from agent_commons.cli import cli
 from agent_commons.services import CommonsManager
+
+
+def _executable(path: Path, body: str) -> Path:
+    path.write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    return path
 
 
 def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: Path) -> None:
@@ -31,6 +39,7 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
     canary_help = runner.invoke(cli, ["broker", "canary", "--help"])
     assert canary_help.exit_code == 0
     assert "--confirm-provider-run" in canary_help.output
+    assert "--profile" in canary_help.output
     assert "--wall-time-seconds" in canary_help.output
     for forbidden in ("--command", "--prompt", "--environment", "--executable", "--model"):
         assert forbidden not in canary_help.output
@@ -96,6 +105,55 @@ def test_broker_preflight_exits_nonzero_for_an_incompatible_runtime(tmp_path: Pa
     body = json.loads(result.output)
     assert body["ok"] is False
     assert body["consumed_delegation_attempt"] is False
+
+
+def test_broker_preflight_validates_the_generated_codex_mcp_contract(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-codex-preflight")
+    provider_source = (
+        Path(__file__).parents[1] / "fixtures" / "fake_codex_mcp_provider.py"
+    ).read_text(encoding="utf-8")
+    provider = _executable(tmp_path / "fake-codex", provider_source)
+    mcp = _executable(
+        tmp_path / "agent-commons-mcp",
+        "from agent_commons.mcp.server import main\nraise SystemExit(main())\n",
+    )
+    config = tmp_path / "profiles.yaml"
+    config.write_text(
+        "profiles:\n"
+        "  codex-builder:\n"
+        f"    executable: {provider}\n"
+        f"    mcp_executable: {mcp}\n"
+        "    git_executable: /usr/bin/git\n"
+        "    sandbox: workspace-write\n"
+        "    trusted_workspace: true\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "preflight",
+            "codex-builder",
+            "--purpose",
+            "implementation",
+            "--profile-config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)
+    assert body["ok"] is True
+    assert body["checks"]["mcp_contract"]["ok"] is True
+    assert body["provider_work_process_started"] is False
 
 
 def test_broker_preflight_reports_a_missing_mcp_executable_precisely(
@@ -172,6 +230,44 @@ def test_broker_canary_emits_its_safe_failure_before_status_two(
     body = json.loads(result.output)
     assert body["ok"] is False
     assert body["workflow_diagnostic_code"] == "terminal_tool_not_called"
+
+
+def test_broker_canary_selects_the_codex_compatibility_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-codex-canary")
+    monkeypatch.setattr(
+        "agent_commons.cli.run_claude_compatibility_canary",
+        lambda *_args, **_kwargs: pytest.fail("Claude canary should not run"),
+    )
+    monkeypatch.setattr(
+        "agent_commons.cli.run_codex_compatibility_canary",
+        lambda *_args, **_kwargs: {
+            "schema": "agent_commons.provider_compatibility_canary.v1",
+            "ok": True,
+            "profile_id": "codex-independent-reviewer",
+        },
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "canary",
+            "--profile",
+            "codex-independent-reviewer",
+            "--confirm-provider-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["profile_id"] == "codex-independent-reviewer"
 
 
 def test_broker_profile_config_rejects_unknown_authority_fields(tmp_path: Path) -> None:

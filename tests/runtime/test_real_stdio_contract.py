@@ -5,10 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
     ClaudeRunnerProfile,
+    CodexRunnerProfile,
+    CodexSandbox,
     ProfileRegistry,
     TelemetryEvent,
     TelemetryKind,
@@ -33,8 +37,26 @@ def _executable(path: Path, body: str) -> Path:
     return path
 
 
+@pytest.mark.parametrize(
+    ("profile_id", "provider_fixture", "budget"),
+    (
+        (
+            BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+            "fake_claude_mcp_provider.py",
+            {"unit": "micro_usd", "limit": 50_000},
+        ),
+        (
+            BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+            "fake_codex_mcp_provider.py",
+            {"unit": "provider_units", "limit": 1},
+        ),
+    ),
+)
 def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canonically(
     tmp_path: Path,
+    profile_id: BuiltinProfileId,
+    provider_fixture: str,
+    budget: dict[str, int | str],
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -48,10 +70,10 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
     source.write_text("def answer() -> int:\n    return 42\n", encoding="utf-8")
     CommonsManager.initialize(repo, integrations=(), workspace_name="real-stdio-contract")
 
-    provider_source = (
-        Path(__file__).parents[1] / "fixtures" / "fake_claude_mcp_provider.py"
-    ).read_text(encoding="utf-8")
-    provider = _executable(tmp_path / "fake-claude", provider_source)
+    provider_source = (Path(__file__).parents[1] / "fixtures" / provider_fixture).read_text(
+        encoding="utf-8"
+    )
+    provider = _executable(tmp_path / f"fake-{profile_id.provider.value}", provider_source)
     mcp = _executable(
         tmp_path / "agent-commons-mcp",
         "from agent_commons.mcp.server import main\nraise SystemExit(main())\n",
@@ -84,29 +106,38 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
     delegation = manager.create_delegation(
         target_ref=review["entity_ref"],
         target_revision=review["revision"],
-        target_profile="claude-independent-reviewer",
+        target_profile=profile_id.value,
         purpose="independent_review",
         limits={
             "max_depth": 0,
             "wall_time_seconds": 60,
             "max_attempts": 1,
             "max_concurrency": 1,
-            "budget": {"unit": "micro_usd", "limit": 50_000},
+            "budget": budget,
         },
         idempotency_key="real-stdio-delegation",
     )
-    profile_id = BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
+    profile = (
+        ClaudeRunnerProfile(
+            profile_id=profile_id,
+            executable=str(provider),
+            mcp_executable=str(mcp),
+            git_executable="/usr/bin/git",
+            permission_mode=ClaudePermissionMode.DONT_ASK,
+            max_budget_microusd=1_000_000,
+        )
+        if profile_id.provider.value == "claude"
+        else CodexRunnerProfile(
+            profile_id=profile_id,
+            executable=str(provider),
+            mcp_executable=str(mcp),
+            git_executable="/usr/bin/git",
+            sandbox=CodexSandbox.READ_ONLY,
+            trusted_workspace=True,
+        )
+    )
     profiles = ProfileRegistry(
-        {
-            profile_id: ClaudeRunnerProfile(
-                profile_id=profile_id,
-                executable=str(provider),
-                mcp_executable=str(mcp),
-                git_executable="/usr/bin/git",
-                permission_mode=ClaudePermissionMode.DONT_ASK,
-                max_budget_microusd=1_000_000,
-            )
-        }
+        {profile_id: profile}
     )
 
     telemetry = CollectingTelemetry()

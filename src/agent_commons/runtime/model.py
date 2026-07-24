@@ -104,6 +104,8 @@ _CLAUDE_COMMONS_REVIEW_TOOLS = (
 )
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 _WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verification"})
+_MCP_TOOL_PREFIX = "mcp__agent-commons__"
+_CODEX_MCP_SERVER = "agent-commons"
 
 
 def _profile_worker_purpose(
@@ -121,6 +123,59 @@ def _profile_worker_purpose(
     elif purpose != "implementation":
         raise ConfigurationError("builder profile requires an implementation purpose")
     return purpose
+
+
+def _worker_tools(
+    profile_id: BuiltinProfileId,
+    purpose: str,
+) -> tuple[str, ...]:
+    tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
+    if profile_id.independent_reviewer:
+        tools += (
+            _CLAUDE_COMMONS_REVIEW_TOOLS
+            if purpose == "independent_review"
+            else _CLAUDE_COMMONS_VERIFICATION_TOOLS
+        )
+    return tools
+
+
+def _resolved_worker_mcp(
+    *,
+    workspace_root: Path,
+    state_root: Path | None,
+    delegation_id: str,
+    mcp_executable: str,
+    git_executable: str,
+) -> tuple[str, tuple[str, ...]]:
+    resolved_mcp = resolve_trusted_executable(
+        mcp_executable,
+        workspace_root=workspace_root,
+        role=ExecutableRole.MCP,
+    )
+    resolved_git = resolve_trusted_executable(
+        git_executable,
+        workspace_root=workspace_root,
+        role=ExecutableRole.GIT,
+    )
+    effective_state_root = (
+        Path(state_root if state_root is not None else workspace_root / ".agent-commons")
+        .expanduser()
+        .resolve()
+    )
+    return resolved_mcp, (
+        "--repo",
+        str(workspace_root.resolve()),
+        "--state-root",
+        str(effective_state_root),
+        "--delegation-id",
+        delegation_id,
+        "--git-executable",
+        resolved_git,
+    )
+
+
+def _toml_literal(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _safe_identifier(name: str, value: str, *, pattern: re.Pattern[str] = _SAFE_IDENTIFIER) -> str:
@@ -295,6 +350,8 @@ class RunnerProfile(Protocol):
 class CodexRunnerProfile:
     profile_id: BuiltinProfileId
     executable: str = "codex"
+    mcp_executable: str = "agent-commons-mcp"
+    git_executable: str = "/usr/bin/git"
     model: str | None = None
     sandbox: CodexSandbox = CodexSandbox.WORKSPACE_WRITE
     approval_policy: CodexApprovalPolicy = CodexApprovalPolicy.NEVER
@@ -304,6 +361,8 @@ class CodexRunnerProfile:
         if self.profile_id.provider is not Provider.CODEX:
             raise ConfigurationError("Codex profile requires a Codex profile identifier")
         object.__setattr__(self, "executable", _safe_executable(self.executable))
+        object.__setattr__(self, "mcp_executable", _safe_executable(self.mcp_executable))
+        object.__setattr__(self, "git_executable", _safe_executable(self.git_executable))
         object.__setattr__(self, "model", _safe_optional_identifier("model", self.model))
         try:
             object.__setattr__(self, "sandbox", CodexSandbox(self.sandbox))
@@ -333,16 +392,28 @@ class CodexRunnerProfile:
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
     ) -> RunnerInvocation:
-        del state_root
-        _profile_worker_purpose(self.profile_id, worker_purpose)
-        if delegation_id is not None:
-            _safe_identifier("delegation_id", delegation_id)
         if not self.trusted_workspace:
             raise ConfigurationError(
                 "Codex runtime requires explicit trusted_workspace opt-in or external isolation"
             )
+        if delegation_id is None:
+            raise ConfigurationError("Codex runtime requires an exact delegation binding")
+        _safe_identifier("delegation_id", delegation_id)
+        purpose = _profile_worker_purpose(self.profile_id, worker_purpose)
         if max_budget_microusd is not None:
             raise ConfigurationError("Codex CLI cannot enforce a monetary launch budget")
+        mcp_executable, mcp_args = _resolved_worker_mcp(
+            workspace_root=workspace_root,
+            state_root=state_root,
+            delegation_id=delegation_id,
+            mcp_executable=self.mcp_executable,
+            git_executable=self.git_executable,
+        )
+        enabled_tools = tuple(
+            tool.removeprefix(_MCP_TOOL_PREFIX)
+            for tool in _worker_tools(self.profile_id, purpose)
+        )
+        config_prefix = f"mcp_servers.{_CODEX_MCP_SERVER}"
         argv = [
             resolve_trusted_executable(self.executable, workspace_root=workspace_root),
             "--ask-for-approval",
@@ -352,7 +423,25 @@ class CodexRunnerProfile:
         ]
         if self.model is not None:
             argv.extend(("--model", self.model))
-        argv.extend(("exec", "--json", "--color", "never", "-"))
+        argv.extend(
+            (
+                "exec",
+                "--ignore-user-config",
+                "--strict-config",
+                "-c",
+                f"{config_prefix}.command={_toml_literal(mcp_executable)}",
+                "-c",
+                f"{config_prefix}.args={_toml_literal(mcp_args)}",
+                "-c",
+                f"{config_prefix}.enabled_tools={_toml_literal(enabled_tools)}",
+                "-c",
+                f"{config_prefix}.required=true",
+                "--json",
+                "--color",
+                "never",
+                "-",
+            )
+        )
         return RunnerInvocation(
             provider=self.provider,
             profile_id=self.profile_id,
@@ -434,20 +523,12 @@ class ClaudeRunnerProfile:
             workspace_root=workspace_root,
             role=ExecutableRole.PROVIDER,
         )
-        mcp_executable = resolve_trusted_executable(
-            self.mcp_executable,
+        mcp_executable, mcp_args = _resolved_worker_mcp(
             workspace_root=workspace_root,
-            role=ExecutableRole.MCP,
-        )
-        git_executable = resolve_trusted_executable(
-            self.git_executable,
-            workspace_root=workspace_root,
-            role=ExecutableRole.GIT,
-        )
-        effective_state_root = (
-            Path(state_root if state_root is not None else workspace_root / ".agent-commons")
-            .expanduser()
-            .resolve()
+            state_root=state_root,
+            delegation_id=delegation_id,
+            mcp_executable=self.mcp_executable,
+            git_executable=self.git_executable,
         )
         # Pass the sole MCP server as immutable argv material.  Strict mode
         # excludes ambient user/project MCP configuration, while the server
@@ -458,16 +539,7 @@ class ClaudeRunnerProfile:
                     "agent-commons": {
                         "type": "stdio",
                         "command": mcp_executable,
-                        "args": [
-                            "--repo",
-                            str(workspace_root.resolve()),
-                            "--state-root",
-                            str(effective_state_root),
-                            "--delegation-id",
-                            delegation_id,
-                            "--git-executable",
-                            git_executable,
-                        ],
+                        "args": list(mcp_args),
                     }
                 }
             },
@@ -498,13 +570,8 @@ class ClaudeRunnerProfile:
         # request/cancel tools and provider-internal subagents would bypass the
         # canonical parent/depth lineage, so neither worker profile receives
         # them.  Interactive parent sessions remain free to use those MCP tools.
-        allowed_tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
+        allowed_tools = _worker_tools(self.profile_id, purpose)
         if self.profile_id.independent_reviewer:
-            allowed_tools += (
-                _CLAUDE_COMMONS_REVIEW_TOOLS
-                if purpose == "independent_review"
-                else _CLAUDE_COMMONS_VERIFICATION_TOOLS
-            )
             argv.extend(
                 (
                     "--tools",
@@ -525,7 +592,15 @@ class ClaudeRunnerProfile:
 
 
 _CODEX_FIELDS = frozenset(
-    {"executable", "model", "sandbox", "approval_policy", "trusted_workspace"}
+    {
+        "executable",
+        "mcp_executable",
+        "git_executable",
+        "model",
+        "sandbox",
+        "approval_policy",
+        "trusted_workspace",
+    }
 )
 _CLAUDE_FIELDS = frozenset(
     {
@@ -614,12 +689,16 @@ def default_profile_registry(
             BuiltinProfileId.CODEX_BUILDER: CodexRunnerProfile(
                 profile_id=BuiltinProfileId.CODEX_BUILDER,
                 executable=codex_executable,
+                mcp_executable=mcp_executable,
+                git_executable=git_executable,
                 sandbox=CodexSandbox.WORKSPACE_WRITE,
                 trusted_workspace=trusted_workspace,
             ),
             BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER: CodexRunnerProfile(
                 profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
                 executable=codex_executable,
+                mcp_executable=mcp_executable,
+                git_executable=git_executable,
                 sandbox=CodexSandbox.READ_ONLY,
                 trusted_workspace=trusted_workspace,
             ),

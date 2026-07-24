@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -61,9 +62,10 @@ _HELP_FLAGS = {
 # that actually parses it; current codex builds list --ask-for-approval only
 # in root help.
 _CODEX_ROOT_HELP_FLAGS = ("--ask-for-approval", "--sandbox")
-_CODEX_EXEC_HELP_FLAGS = ("--json",)
+_CODEX_EXEC_HELP_FLAGS = ("--config", "--ignore-user-config", "--strict-config", "--json")
 
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
+_CODEX_MCP_PREFIX = "mcp_servers.agent-commons."
 
 
 def _help_has_flag(help_text: str, flag: str) -> bool:
@@ -100,6 +102,43 @@ def _safe_failure(code: DiagnosticCode) -> dict[str, Any]:
         "hint": diagnostic_hint(code),
         "safe_next_actions": diagnostic_safe_next_actions(code),
     }
+
+
+def _without_delegation_binding(arguments: list[str]) -> list[str]:
+    if "--delegation-id" in arguments:
+        position = arguments.index("--delegation-id")
+        del arguments[position : position + 2]
+    return arguments
+
+
+def _codex_mcp_config(invocation: RunnerInvocation) -> tuple[str, list[str], set[str]]:
+    overrides: dict[str, object] = {}
+    for index, argument in enumerate(invocation.argv):
+        if argument not in {"-c", "--config"} or index + 1 >= len(invocation.argv):
+            continue
+        raw_override = invocation.argv[index + 1]
+        key, separator, raw_value = raw_override.partition("=")
+        if not separator or not key.startswith(_CODEX_MCP_PREFIX):
+            continue
+        overrides[key.removeprefix(_CODEX_MCP_PREFIX)] = tomllib.loads(
+            f"value = {raw_value}"
+        )["value"]
+
+    command = overrides["command"]
+    args = overrides["args"]
+    enabled_tools = overrides["enabled_tools"]
+    required = overrides["required"]
+    if not isinstance(command, str) or not command:
+        raise TypeError("Codex MCP command is invalid")
+    if not isinstance(args, list) or any(not isinstance(value, str) for value in args):
+        raise TypeError("Codex MCP args are invalid")
+    if not isinstance(enabled_tools, list) or any(
+        not isinstance(value, str) or not value for value in enabled_tools
+    ):
+        raise TypeError("Codex MCP enabled tools are invalid")
+    if required is not True:
+        raise TypeError("Codex MCP server must be required")
+    return command, _without_delegation_binding(list(args)), set(enabled_tools)
 
 
 def preflight_profile(
@@ -203,21 +242,37 @@ def preflight_profile(
         )
     }
 
-    if isinstance(profile, ClaudeRunnerProfile):
-        raw_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
-        config = json.loads(raw_config)
-        mcp = config["mcpServers"]["agent-commons"]
-        args = list(mcp["args"])
-        if "--delegation-id" in args:
-            position = args.index("--delegation-id")
-            del args[position : position + 2]
-        args.append("--preflight")
+    try:
+        if isinstance(profile, ClaudeRunnerProfile):
+            raw_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
+            config = json.loads(raw_config)
+            mcp = config["mcpServers"]["agent-commons"]
+            mcp_command = str(mcp["command"])
+            mcp_args = _without_delegation_binding(list(mcp["args"]))
+            allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
+            expected_tools = {
+                name.removeprefix(_MCP_TOOL_PREFIX)
+                for name in allowed.split(",")
+                if name.startswith(_MCP_TOOL_PREFIX)
+            }
+        else:
+            mcp_command, mcp_args, expected_tools = _codex_mcp_config(invocation)
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        tomllib.TOMLDecodeError,
+    ):
+        checks["mcp_contract"] = _safe_failure(DiagnosticCode.MCP_CONFIG_INVALID)
+    else:
+        mcp_args.append("--preflight")
         mcp_result = _run_probe(
             probe,
             RunnerInvocation(
                 provider=invocation.provider,
                 profile_id=invocation.profile_id,
-                argv=(str(mcp["command"]), *args),
+                argv=(mcp_command, *mcp_args),
                 stdin=b"",
             ),
             cwd=root,
@@ -242,12 +297,6 @@ def preflight_profile(
                 ):
                     raise TypeError("MCP worker tool names are invalid")
                 actual_tools = set(tool_names)
-                allowed = invocation.argv[invocation.argv.index("--allowed-tools") + 1]
-                expected_tools = {
-                    name.removeprefix(_MCP_TOOL_PREFIX)
-                    for name in allowed.split(",")
-                    if name.startswith(_MCP_TOOL_PREFIX)
-                }
                 missing_tool_count = len(expected_tools - actual_tools)
                 unexpected_tool_count = len(actual_tools - expected_tools)
                 catalog_digest = hashlib.sha256(
