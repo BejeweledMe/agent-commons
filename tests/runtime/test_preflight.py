@@ -418,7 +418,8 @@ def test_codex_preflight_accepts_root_only_approval_flag(tmp_path: Path) -> None
     assert result["ok"] is True
     assert result["checks"]["provider_help"] == {"ok": True, "required_flags": "present"}
     assert result["provider_help_process_started"] is True
-    assert runner.calls[:2] == [("/bin/echo", "--help"), ("/bin/echo", "exec", "--help")]
+    executable = str(Path("/bin/echo").resolve())
+    assert runner.calls[:2] == [(executable, "--help"), (executable, "exec", "--help")]
     assert "--preflight" in runner.calls[2]
     assert "--delegation-id" not in runner.calls[2]
 
