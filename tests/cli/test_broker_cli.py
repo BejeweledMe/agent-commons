@@ -156,6 +156,45 @@ def test_broker_preflight_validates_the_generated_codex_mcp_contract(
     assert body["provider_work_process_started"] is False
 
 
+def test_broker_preflight_passes_the_workspace_bound_state_base_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    initialized = CommonsManager.initialize(
+        repo,
+        integrations=(),
+        workspace_name="broker-state-base",
+    )
+    state_base = tmp_path / "operator-state"
+    captured: dict[str, object] = {}
+
+    def capture_preflight(*_args: object, **kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"ok": True, "consumed_delegation_attempt": False}
+
+    monkeypatch.setattr("agent_commons.cli.preflight_profile", capture_preflight)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--state-base",
+            str(state_base),
+            "--json",
+            "broker",
+            "preflight",
+            "claude-independent-reviewer",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["state_root"] == (state_base / "workspaces" / initialized["workspace_id"])
+    assert not state_base.exists()
+
+
 def test_broker_preflight_reports_a_missing_mcp_executable_precisely(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

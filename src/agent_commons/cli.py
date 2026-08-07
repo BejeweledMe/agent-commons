@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import platform
+import shlex
 import sys
 from dataclasses import dataclass
 from importlib import metadata
@@ -14,9 +15,11 @@ from typing import Any
 
 import click
 import yaml
+from click.core import ParameterSource
 
 from agent_commons import __version__
 from agent_commons.config import CommonsPaths
+from agent_commons.core.ids import is_typed_id
 from agent_commons.core.refs import parse_ref
 from agent_commons.errors import CommonsError, ValidationError
 from agent_commons.platform_support import require_supported_platform
@@ -56,19 +59,25 @@ class CommonsGroup(click.Group):
     @staticmethod
     def _render_error(ctx: click.Context, exc: Exception) -> Any:
         state = ctx.obj
+        safe_actions = list(getattr(exc, "safe_next_actions", error_safe_next_actions(exc)))
         if isinstance(state, CLIState) and state.json_output:
+            error: dict[str, Any] = {
+                "type": type(exc).__name__,
+                "message": str(exc),
+                "safe_next_actions": safe_actions,
+            }
+            if code := getattr(exc, "code", None):
+                error["code"] = code
+            if details := getattr(exc, "details", None):
+                error["details"] = details
             state.emit(
                 {
                     "ok": False,
-                    "error": {
-                        "type": type(exc).__name__,
-                        "message": str(exc),
-                        "safe_next_actions": error_safe_next_actions(exc),
-                    },
+                    "error": error,
                 }
             )
             ctx.exit(1)
-        actions = "\n".join(f"  - {action}" for action in error_safe_next_actions(exc))
+        actions = "\n".join(f"  - {action}" for action in safe_actions)
         raise click.ClickException(f"{exc}\nSafe next actions:\n{actions}") from exc
 
 
@@ -78,6 +87,8 @@ class CLIState:
     session_id: str | None
     json_output: bool
     state_root: Path | None
+    state_base: Path | None
+    state_source: str
     read_only: bool
 
     def manager(self) -> CommonsManager:
@@ -85,6 +96,8 @@ class CLIState:
             self.repo,
             session_id=self.session_id,
             state_root=self.state_root,
+            state_base=self.state_base,
+            state_source=self.state_source,
             read_only=self.read_only,
         )
 
@@ -105,8 +118,67 @@ def _json_object(value: str, label: str) -> dict[str, Any]:
     return parsed
 
 
-def _refs(values: tuple[str, ...]) -> list[dict[str, str]]:
-    return [parse_ref(value).as_dict() for value in values]
+_REFERENCE_KINDS = (
+    "artifact",
+    "decision",
+    "delegation",
+    "event",
+    "finding",
+    "handoff",
+    "manifest",
+    "objective",
+    "review",
+    "task",
+    "thread",
+    "verification",
+)
+
+
+def _input_error(
+    message: str, *, code: str, field: str, allowed_kinds: tuple[str, ...]
+) -> ValidationError:
+    error = ValidationError(message)
+    error.code = code  # type: ignore[attr-defined]
+    error.details = {  # type: ignore[attr-defined]
+        "field": field,
+        "allowed_kinds": list(allowed_kinds),
+        "example": f"{allowed_kinds[0]}:<id>",
+    }
+    return error
+
+
+def _ref(
+    value: str,
+    *,
+    field: str,
+    allowed_kinds: tuple[str, ...] = _REFERENCE_KINDS,
+) -> dict[str, str]:
+    try:
+        parsed = parse_ref(value)
+    except ValidationError as exc:
+        raise _input_error(
+            f"{field} must use '<kind>:<id>' syntax; example: {allowed_kinds[0]}:<id>",
+            code="invalid_typed_ref",
+            field=field,
+            allowed_kinds=allowed_kinds,
+        ) from exc
+    if parsed.kind not in allowed_kinds:
+        raise _input_error(
+            f"{field} kind must be one of: {', '.join(allowed_kinds)}",
+            code="unsupported_ref_kind",
+            field=field,
+            allowed_kinds=allowed_kinds,
+        )
+    return parsed.as_dict()
+
+
+def _refs(
+    values: tuple[str, ...],
+    *,
+    field: str = "reference",
+    allowed_kinds: tuple[str, ...] = _REFERENCE_KINDS,
+) -> list[dict[str, str]]:
+    return [_ref(value, field=field, allowed_kinds=allowed_kinds) for value in values]
 
 
 def _idem(function: Any) -> Any:
@@ -157,6 +229,12 @@ def _module_available(module: str) -> bool:
     help="Explicit operator-authorized operational state directory.",
 )
 @click.option(
+    "--state-base",
+    type=click.Path(path_type=Path, file_okay=False),
+    envvar="AGENT_COMMONS_STATE_BASE",
+    help="Operator state base; each workspace uses a workspace-ID namespace.",
+)
+@click.option(
     "--read-only",
     is_flag=True,
     help="Inspect existing state without creating cache, index, session, or claim files.",
@@ -168,16 +246,42 @@ def cli(
     session_id: str | None,
     json_output: bool,
     state_root: Path | None,
+    state_base: Path | None,
     read_only: bool,
 ) -> None:
     """Coordinate heterogeneous coding agents through one immutable commons."""
 
     require_supported_platform()
+    root_source = ctx.get_parameter_source("state_root")
+    base_source = ctx.get_parameter_source("state_base")
+    root_rank = 2 if root_source is ParameterSource.COMMANDLINE else 1
+    base_rank = 2 if base_source is ParameterSource.COMMANDLINE else 1
+    if state_root is not None and state_base is not None:
+        if base_rank > root_rank:
+            state_root = None
+        else:
+            state_base = None
+    if state_root is not None:
+        selected_source = (
+            "flag:state-root"
+            if root_source is ParameterSource.COMMANDLINE
+            else "env:AGENT_COMMONS_STATE_ROOT"
+        )
+    elif state_base is not None:
+        selected_source = (
+            "flag:state-base"
+            if base_source is ParameterSource.COMMANDLINE
+            else "env:AGENT_COMMONS_STATE_BASE"
+        )
+    else:
+        selected_source = "default"
     ctx.obj = CLIState(
         repo.expanduser().resolve(),
         session_id,
         json_output,
         state_root.expanduser().resolve() if state_root is not None else None,
+        state_base.expanduser().resolve() if state_base is not None else None,
+        selected_source,
         read_only,
     )
 
@@ -212,40 +316,64 @@ def init_command(
 
 
 @cli.command("support")
+@click.option("--show-paths", is_flag=True, help="Include resolved local paths explicitly.")
 @click.pass_obj
-def support_command(state: CLIState) -> None:
+def support_command(state: CLIState, show_paths: bool) -> None:
     """Report secret-free component and state availability for support requests."""
 
-    paths = CommonsPaths.for_workspace(state.repo, state_root=state.state_root)
-    state.emit(
-        {
-            "schema": "agent_commons.support.v1",
-            "agent_commons_version": __version__,
-            "agent_commons_source_sha256": agent_commons_source_sha256(),
-            "workspace_schema": "agent-commons.workspace.v1",
-            "runtime_request_schema": REQUEST_SCHEMA,
-            "runtime_attempt_schema": ATTEMPT_SCHEMA,
-            "python_version": platform.python_version(),
-            "python_implementation": platform.python_implementation(),
-            "platform": sys.platform,
-            "supported_platform": True,
-            "supported_operating_systems": ["darwin", "linux"],
-            "core_release_stage": "alpha",
-            "broker_release_stage": "experimental_manual_opt_in",
-            "canonical_workspace_available": paths.commons_root.is_dir(),
-            "state_root_explicit": state.state_root is not None,
-            "state_root_exists": paths.state_root.is_dir(),
-            "state_root_readable": paths.state_root.is_dir()
-            and os.access(paths.state_root, os.R_OK),
-            "state_root_writable": paths.state_root.is_dir()
-            and os.access(paths.state_root, os.W_OK),
-            "mcp_extra_available": _module_available("mcp.server.fastmcp"),
-            "mcp_package_version": _installed_version("mcp"),
-            "opentelemetry_api_available": _module_available("opentelemetry.trace"),
-            "opentelemetry_api_version": _installed_version("opentelemetry-api"),
-            "read_only": state.read_only,
-        }
+    paths = CommonsPaths.for_workspace(
+        state.repo,
+        state_root=state.state_root,
+        state_base=state.state_base,
+        state_source=state.state_source,
     )
+    workspace_id: str | None = None
+    config_path = paths.commons_root / "workspace.yaml"
+    if config_path.is_file() and not config_path.is_symlink():
+        try:
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, yaml.YAMLError):
+            config = None
+        if isinstance(config, dict) and is_typed_id(config.get("workspace_id"), "workspace"):
+            workspace_id = config["workspace_id"]
+            paths = paths.for_workspace_id(workspace_id)
+    ownership = paths.ownership_report(workspace_id) if workspace_id is not None else None
+    report = {
+        "schema": "agent_commons.support.v1",
+        "agent_commons_version": __version__,
+        "agent_commons_source_sha256": agent_commons_source_sha256(),
+        "workspace_schema": "agent-commons.workspace.v1",
+        "runtime_request_schema": REQUEST_SCHEMA,
+        "runtime_attempt_schema": ATTEMPT_SCHEMA,
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "platform": sys.platform,
+        "supported_platform": True,
+        "supported_operating_systems": ["darwin", "linux"],
+        "core_release_stage": "alpha",
+        "broker_release_stage": "experimental_manual_opt_in",
+        "canonical_workspace_available": paths.commons_root.is_dir(),
+        "state_root_explicit": paths.state_mode == "exact",
+        "state_config_source": paths.state_source,
+        "state_mode": paths.state_mode,
+        "workspace_id": workspace_id,
+        "state_owner_status": ownership["status"] if ownership else "workspace-unavailable",
+        "state_owner_match": ownership["match"] if ownership else None,
+        "state_root_exists": paths.state_root.is_dir(),
+        "state_root_readable": paths.state_root.is_dir() and os.access(paths.state_root, os.R_OK),
+        "state_root_writable": paths.state_root.is_dir() and os.access(paths.state_root, os.W_OK),
+        "mcp_extra_available": _module_available("mcp.server.fastmcp"),
+        "mcp_package_version": _installed_version("mcp"),
+        "opentelemetry_api_available": _module_available("opentelemetry.trace"),
+        "opentelemetry_api_version": _installed_version("opentelemetry-api"),
+        "read_only": state.read_only,
+    }
+    if show_paths:
+        report["resolved_repo"] = str(paths.repo_root)
+        report["resolved_commons_root"] = str(paths.commons_root)
+        report["resolved_state_root"] = str(paths.state_root)
+        report["resolved_state_base"] = str(paths.state_base) if paths.state_base else None
+    state.emit(report)
 
 
 @cli.group("session")
@@ -264,6 +392,7 @@ def session_group() -> None:
 @click.option("--model")
 @click.option("--source-producer-json")
 @click.option("--ttl-seconds", type=click.IntRange(min=1), default=8 * 3600, show_default=True)
+@click.option("--shell-export", type=click.Choice(("zsh", "bash", "fish")))
 @click.pass_obj
 def session_start(
     state: CLIState,
@@ -277,26 +406,38 @@ def session_start(
     model: str | None,
     source_producer_json: str | None,
     ttl_seconds: int,
+    shell_export: str | None,
 ) -> None:
     """Open an explicit session; preserve the returned nonce privately."""
 
+    if shell_export is not None and state.json_output:
+        raise ValidationError("--shell-export cannot be combined with --json")
     producer = (
         _json_object(source_producer_json, "source_producer_json") if source_producer_json else None
     )
-    state.emit(
-        state.manager().start_session(
-            stable_instance_id=stable_instance_id,
-            principal=principal,
-            client=client,
-            software=software,
-            role=role,
-            capabilities=capability,
-            model_family=model_family,
-            model=model,
-            source_producer=producer,
-            ttl_seconds=ttl_seconds,
-        )
+    result = state.manager().start_session(
+        stable_instance_id=stable_instance_id,
+        principal=principal,
+        client=client,
+        software=software,
+        role=role,
+        capabilities=capability,
+        model_family=model_family,
+        model=model,
+        source_producer=producer,
+        ttl_seconds=ttl_seconds,
     )
+    if shell_export is None:
+        state.emit(result)
+        return
+    session_id = shlex.quote(str(result["session_id"]))
+    nonce = shlex.quote(str(result["nonce"]))
+    if shell_export == "fish":
+        click.echo(f"set -gx AGENT_COMMONS_SESSION_ID {session_id}")
+        click.echo(f"set -gx AGENT_COMMONS_SESSION_NONCE {nonce}")
+    else:
+        click.echo(f"export AGENT_COMMONS_SESSION_ID={session_id}")
+        click.echo(f"export AGENT_COMMONS_SESSION_NONCE={nonce}")
 
 
 @session_group.command("show")
@@ -306,6 +447,19 @@ def session_show(state: CLIState, target_session_id: str | None) -> None:
     """Show one session, or active sessions when no identity is selected."""
 
     state.emit(state.manager().show_session(target_session_id))
+
+
+@session_group.command("current")
+@click.pass_obj
+def session_current(state: CLIState) -> None:
+    """Show only the explicitly selected session, without its ownership nonce."""
+
+    if state.session_id is None:
+        error = ValidationError("no Agent Commons session is explicitly selected")
+        error.code = "session_not_selected"  # type: ignore[attr-defined]
+        error.details = {"selection": "AGENT_COMMONS_SESSION_ID or --session-id"}  # type: ignore[attr-defined]
+        raise error
+    state.emit(state.manager().show_session(state.session_id))
 
 
 @session_group.command("heartbeat")
@@ -329,20 +483,28 @@ def session_end(state: CLIState, nonce: str) -> None:
 
 @cli.command("orient")
 @click.option("--max-items", type=click.IntRange(min=1), default=20, show_default=True)
+@click.option("--verbose", is_flag=True, help="Include detailed projected records.")
+@click.option(
+    "--fresh", is_flag=True, help="Replay and validate canonical files instead of SQLite."
+)
 @click.pass_obj
-def orient_command(state: CLIState, max_items: int) -> None:
+def orient_command(state: CLIState, max_items: int, verbose: bool, fresh: bool) -> None:
     """Read the role-filtered current workspace brief."""
 
-    state.emit(state.manager().orient(max_items=max_items))
+    state.emit(state.manager().orient(max_items=max_items, verbose=verbose, fresh=fresh))
 
 
 @cli.command("inbox")
 @click.option("--max-items", type=click.IntRange(min=1), default=20, show_default=True)
+@click.option("--verbose", is_flag=True, help="Include detailed projected records.")
+@click.option(
+    "--fresh", is_flag=True, help="Replay and validate canonical files instead of SQLite."
+)
 @click.pass_obj
-def inbox_command(state: CLIState, max_items: int) -> None:
+def inbox_command(state: CLIState, max_items: int, verbose: bool, fresh: bool) -> None:
     """Read open discussions and handoffs addressed to this session."""
 
-    state.emit(state.manager().inbox(max_items=max_items))
+    state.emit(state.manager().inbox(max_items=max_items, verbose=verbose, fresh=fresh))
 
 
 @cli.group("objective")
@@ -578,7 +740,7 @@ def _task_with_artifacts(
             entity_id,
             expected_revision,
             summary=summary,
-            artifact_refs=_refs(artifact_ref),
+            artifact_refs=_refs(artifact_ref, field="artifact_ref", allowed_kinds=("artifact",)),
             idempotency_key=idempotency_key,
         )
     )
@@ -745,7 +907,7 @@ def delegation_create(
 
     state.emit(
         state.manager().create_delegation(
-            target_ref=parse_ref(target_ref).as_dict(),
+            target_ref=_ref(target_ref, field="target_ref"),
             target_revision=target_revision,
             target_profile=target_profile,
             purpose=purpose,
@@ -890,7 +1052,7 @@ def delegation_succeed(
         expected_revision,
         idempotency_key,
         summary=summary,
-        result_refs=_refs(result_ref),
+        result_refs=_refs(result_ref, field="result_ref"),
     )
 
 
@@ -1076,14 +1238,18 @@ def broker_preflight(
     """Check fixed provider flags and MCP startup without consuming a delegation attempt."""
 
     profiles = load_profile_registry(profile_config, workspace_root=state.repo)
+    manager = CommonsManager(
+        state.repo,
+        state_root=state.state_root,
+        state_base=state.state_base,
+        state_source=state.state_source,
+        read_only=True,
+    )
     result = preflight_profile(
         profiles,
         profile_id,
         workspace_root=state.repo,
-        state_root=CommonsPaths.for_workspace(
-            state.repo,
-            state_root=state.state_root,
-        ).state_root,
+        state_root=manager.paths.state_root,
         purpose=purpose,
     )
     state.emit(result)
@@ -1270,7 +1436,7 @@ def thread_open(
             subject=subject,
             desired_outcome=desired_outcome,
             to=to,
-            related_refs=_refs(related_ref),
+            related_refs=_refs(related_ref, field="related_ref"),
             idempotency_key=idempotency_key,
         )
     )
@@ -1450,7 +1616,7 @@ def review_request(
 
     state.emit(
         state.manager().request_review(
-            target_ref=parse_ref(target_ref).as_dict(),
+            target_ref=_ref(target_ref, field="target_ref"),
             target_revision=target_revision,
             criteria=criterion,
             independent=independent,
@@ -1491,7 +1657,7 @@ def review_complete(
             target_revision=target_revision,
             verdict=verdict,
             summary=summary,
-            evidence_refs=_refs(evidence_ref),
+            evidence_refs=_refs(evidence_ref, field="evidence_ref"),
             idempotency_key=idempotency_key,
         )
     )
@@ -1533,10 +1699,10 @@ def verification_record(
 
     state.emit(
         state.manager().record_verification(
-            target_ref=parse_ref(target_ref).as_dict(),
+            target_ref=_ref(target_ref, field="target_ref"),
             target_revision=target_revision,
             claim=claim,
-            evidence_refs=_refs(evidence_ref),
+            evidence_refs=_refs(evidence_ref, field="evidence_ref"),
             method=method,
             outcome=outcome,
             idempotency_key=idempotency_key,
@@ -1577,7 +1743,7 @@ def finding_report(
         state.manager().report_finding(
             summary=summary,
             severity=severity,
-            evidence_refs=_refs(evidence_ref),
+            evidence_refs=_refs(evidence_ref, field="evidence_ref"),
             idempotency_key=idempotency_key,
         )
     )
@@ -1605,7 +1771,7 @@ def finding_promote(
             finding_id,
             expected_revision,
             summary=summary,
-            evidence_refs=_refs(evidence_ref),
+            evidence_refs=_refs(evidence_ref, field="evidence_ref"),
             idempotency_key=idempotency_key,
         )
     )
@@ -1724,7 +1890,7 @@ def decision_accept(
             decision_id,
             expected_revision,
             rationale=rationale,
-            evidence_refs=_refs(evidence_ref),
+            evidence_refs=_refs(evidence_ref, field="evidence_ref"),
             dissent=dissent,
             idempotency_key=idempotency_key,
         )
@@ -1878,7 +2044,7 @@ def handoff_create(
             blockers=blocker,
             risks=risk,
             open_questions=open_question,
-            related_refs=_refs(related_ref),
+            related_refs=_refs(related_ref, field="related_ref"),
             idempotency_key=idempotency_key,
         )
     )

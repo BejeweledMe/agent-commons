@@ -37,6 +37,7 @@ from agent_commons.runtime import (
 )
 from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
+from agent_commons.services.communication import CommunicationRuntimeService
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
     load_runtime_configuration,
@@ -67,6 +68,28 @@ class RuntimeService(Protocol):
     ) -> dict[str, Any]: ...
 
     def reconcile(self) -> list[dict[str, Any]]: ...
+
+
+class CommunicationService(Protocol):
+    def request_input(self, delegation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def check_input(self, operation_id: str) -> dict[str, Any]: ...
+
+    def reply_to_input(self, operation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def share_progress(self, delegation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def report_blocker(self, delegation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def send_guidance(self, delegation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def request_checkpoint(self, delegation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def acknowledge(self, operation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def acknowledge_control(self, operation_id: str, **values: Any) -> dict[str, Any]: ...
+
+    def inbox(self) -> tuple[dict[str, Any], ...]: ...
 
 
 ServerT = TypeVar("ServerT", bound=MCPServer)
@@ -128,6 +151,12 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_workspace_files",
         "commons_workspace_read",
         "commons_workspace_search",
+        "commons_request_input",
+        "commons_check_input",
+        "commons_share_progress",
+        "commons_report_blocker",
+        "commons_ack_input",
+        "commons_ack_control",
     }
 )
 IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES
@@ -456,6 +485,8 @@ def build_server(
     session_id: str | None = None,
     manager: CommonsManager | None = None,
     runtime: RuntimeService | None = None,
+    communication: CommunicationService | None = None,
+    enable_controls: bool = True,
     delegation_id: str | None = None,
     binding_wait_seconds: float = 5.0,
     git_executable: str = "/usr/bin/git",
@@ -464,6 +495,9 @@ def build_server(
     """Build a local stdio server with an intentionally bounded tool set."""
 
     commons = manager or CommonsManager(repo_root, session_id=session_id)
+    communication_service = communication
+    if communication_service is None and isinstance(commons, CommonsManager):
+        communication_service = CommunicationRuntimeService(commons)
     factory = server_factory or _fastmcp_factory
     server = factory("agent-commons")
     active_session_id = getattr(commons, "session_id", None)
@@ -532,15 +566,21 @@ def build_server(
             raise LifecycleConflictError("worker MCP authority ended with its canonical delegation")
         return current
 
+    def require_communication() -> CommunicationService:
+        if communication_service is None:
+            raise ConfigurationError("task-scoped communication service is unavailable")
+        return communication_service
+
     def register(
         annotations: dict[str, bool],
         *,
         root_only: bool = False,
         worker_only: bool = False,
         worker_purposes: tuple[str, ...] = (),
+        enabled: bool = True,
     ) -> Callable[[Callable[..., Any]], Any]:
         def decorator(function: Callable[..., Any]) -> Any:
-            if (
+            if not enabled or (
                 (root_only and worker is not None)
                 or (worker_only and worker is None)
                 or (
@@ -670,8 +710,174 @@ def build_server(
         """Return open discussions and handoffs addressed to this session."""
 
         if worker is not None:
-            return {"delegation": worker, "threads": [], "handoffs": []}
-        return commons.inbox(max_items=max_items)
+            operations = (
+                list(require_communication().inbox())[:max_items]
+                if communication_service is not None
+                else []
+            )
+            return {
+                "delegation": worker,
+                "threads": [],
+                "handoffs": [],
+                "operations": operations,
+            }
+        result = commons.inbox(max_items=max_items)
+        return {
+            **result,
+            "operations": (
+                list(require_communication().inbox())[:max_items]
+                if communication_service is not None
+                else []
+            ),
+        }
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True)
+    def commons_request_input(
+        delegation_id: str,
+        idempotency_key: str,
+        question: str,
+        why_needed: str,
+        safe_context: dict[str, Any],
+        desired_outcome: str,
+        blocking: bool = True,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Ask the canonical parent one bounded, correlated task question."""
+
+        if worker is not None and delegation_id != worker.get("id"):
+            raise LifecycleConflictError("worker input request is outside its delegation scope")
+        return require_communication().request_input(
+            delegation_id,
+            idempotency_key=idempotency_key,
+            question=question,
+            why_needed=why_needed,
+            safe_context=safe_context,
+            desired_outcome=desired_outcome,
+            blocking=blocking,
+            deadline_seconds=deadline_seconds,
+        )
+
+    @register(_READ_ONLY)
+    def commons_check_input(operation_id: str) -> dict[str, Any]:
+        """Check one visible correlated operation without an existence oracle."""
+
+        return require_communication().check_input(operation_id)
+
+    @register(_IDEMPOTENT_WRITE, root_only=True)
+    def commons_reply_to_input(
+        operation_id: str,
+        idempotency_key: str,
+        answer: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Reply as the canonical parent; answer content stays operational-only."""
+
+        return require_communication().reply_to_input(
+            operation_id,
+            idempotency_key=idempotency_key,
+            answer=answer,
+        )
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True)
+    def commons_share_progress(
+        delegation_id: str,
+        idempotency_key: str,
+        summary: str,
+        completed_units: int | None = None,
+        total_units: int | None = None,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Share a bounded task-relevant progress record with the parent."""
+
+        if worker is not None and delegation_id != worker.get("id"):
+            raise LifecycleConflictError("worker progress is outside its delegation scope")
+        return require_communication().share_progress(
+            delegation_id,
+            idempotency_key=idempotency_key,
+            summary=summary,
+            completed_units=completed_units,
+            total_units=total_units,
+            deadline_seconds=deadline_seconds,
+        )
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True)
+    def commons_report_blocker(
+        delegation_id: str,
+        idempotency_key: str,
+        summary: str,
+        impact: str,
+        safe_next_action: str,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Report one bounded blocker without creating accepted truth."""
+
+        if worker is not None and delegation_id != worker.get("id"):
+            raise LifecycleConflictError("worker blocker is outside its delegation scope")
+        return require_communication().report_blocker(
+            delegation_id,
+            idempotency_key=idempotency_key,
+            summary=summary,
+            impact=impact,
+            safe_next_action=safe_next_action,
+            deadline_seconds=deadline_seconds,
+        )
+
+    @register(_IDEMPOTENT_WRITE, root_only=True, enabled=enable_controls)
+    def commons_send_guidance(
+        delegation_id: str,
+        idempotency_key: str,
+        instruction: str,
+        rationale: str,
+        expected_effect: str,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Send one bounded tactical instruction to the exact delegated child."""
+
+        return require_communication().send_guidance(
+            delegation_id,
+            idempotency_key=idempotency_key,
+            instruction=instruction,
+            rationale=rationale,
+            expected_effect=expected_effect,
+            deadline_seconds=deadline_seconds,
+        )
+
+    @register(_IDEMPOTENT_WRITE, root_only=True, enabled=enable_controls)
+    def commons_request_checkpoint(
+        delegation_id: str,
+        idempotency_key: str,
+        reason: str,
+        safe_boundary: str,
+        expected_ack: str,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Ask the exact delegated child to acknowledge a safe checkpoint."""
+
+        return require_communication().request_checkpoint(
+            delegation_id,
+            idempotency_key=idempotency_key,
+            reason=reason,
+            safe_boundary=safe_boundary,
+            expected_ack=expected_ack,
+            deadline_seconds=deadline_seconds,
+        )
+
+    @register(_IDEMPOTENT_WRITE)
+    def commons_ack_input(operation_id: str, idempotency_key: str) -> dict[str, Any]:
+        """Acknowledge a visible reply, progress update, or blocker exactly once."""
+
+        return require_communication().acknowledge(
+            operation_id,
+            idempotency_key=idempotency_key,
+        )
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=enable_controls)
+    def commons_ack_control(operation_id: str, idempotency_key: str) -> dict[str, Any]:
+        """Acknowledge one parent guidance or checkpoint exactly once."""
+
+        return require_communication().acknowledge_control(
+            operation_id,
+            idempotency_key=idempotency_key,
+        )
 
     @register(_READ_ONLY)
     def commons_list_tasks(state: str | None = None) -> list[dict[str, Any]]:
@@ -1091,6 +1297,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Expose bounded broker run/status/reconcile tools to this MCP client.",
     )
     parser.add_argument(
+        "--disable-controls",
+        action="store_true",
+        help="Hide parent guidance/checkpoint control tools from this MCP client.",
+    )
+    parser.add_argument(
         "--profile-config",
         type=Path,
         help="Operator-owned strict YAML profile configuration.",
@@ -1124,6 +1335,7 @@ def main(argv: list[str] | None = None) -> int:
                 arguments.repo.expanduser().resolve(),
                 manager=manager,
                 git_executable=git,
+                enable_controls=not arguments.disable_controls,
             )
             if not hasattr(server, "list_tools"):
                 raise ConfigurationError("FastMCP server does not expose its tool catalog")
@@ -1171,6 +1383,7 @@ def main(argv: list[str] | None = None) -> int:
             runtime=runtime,
             delegation_id=arguments.delegation_id,
             git_executable=arguments.git_executable,
+            enable_controls=not arguments.disable_controls,
         )
         server.run(transport="stdio")
     except (CommonsError, FileNotFoundError) as exc:

@@ -38,7 +38,7 @@ from agent_commons.platform_support import lock_exclusive, require_supported_pla
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage import EventRecord, EventStore, ManifestStore, ReceiptRecovery
 from agent_commons.storage.events import semantic_event_body
-from agent_commons.views import orientation, render_views
+from agent_commons.views import inbox_view, orientation, render_views
 
 PAYLOAD_SCHEMAS = {
     "objective": "commons.payload.objective.v1",
@@ -124,14 +124,22 @@ class CommonsManager:
         *,
         session_id: str | None = None,
         state_root: str | Path | None = None,
+        state_base: str | Path | None = None,
+        state_source: str | None = None,
         read_only: bool = False,
     ) -> None:
         require_supported_platform()
         self.repo_root = Path(repo_root).expanduser().resolve()
         self.read_only = read_only
-        self.paths = CommonsPaths.for_workspace(self.repo_root, state_root=state_root)
+        self.paths = CommonsPaths.for_workspace(
+            self.repo_root,
+            state_root=state_root,
+            state_base=state_base,
+            state_source=state_source,
+        )
         self.workspace_config = self._load_workspace_config()
         self.workspace_id = str(self.workspace_config["workspace_id"])
+        self.paths = self.paths.for_workspace_id(self.workspace_id)
         security_config = self.workspace_config.get("security", {})
         if not isinstance(security_config, Mapping):
             raise ConfigurationError("workspace security configuration must be a mapping")
@@ -140,6 +148,8 @@ class CommonsManager:
         except (TypeError, ValueError) as exc:
             raise ConfigurationError("workspace security configuration is invalid") from exc
         self.policy.assert_safe(self.workspace_config, context="workspace configuration")
+        # Ownership must be established before any session, claim, receipt, or
+        # index service can observe or mutate operational state.
         self.paths.ensure_layout(read_only=read_only)
         self.schemas = SchemaRegistry()
         self.sessions = SessionRegistry(
@@ -332,6 +342,59 @@ class CommonsManager:
 
     def snapshot(self) -> ProjectSnapshot:
         return self._records_and_snapshot()[1]
+
+    def _read_snapshot(self, *, fresh: bool = False) -> tuple[ProjectSnapshot, dict[str, Any]]:
+        """Read through the disposable projection, with explicit canonical fallbacks."""
+
+        if fresh or self.read_only:
+            snapshot = self.snapshot()
+            return snapshot, {
+                "source": "canonical",
+                "reason": "fresh" if fresh else "read_only",
+                "canonical_content_files_read": len(snapshot.known_event_ids)
+                + len(snapshot.known_manifest_ids),
+                "index_sync": None,
+                "projection": dict(snapshot.replay_metrics),
+            }
+        try:
+            rebuilt = False
+            with SQLiteIndex(self.paths, self.events, self.manifests) as index:
+                sync = index.sync()
+                try:
+                    projected = index.read_projection(workspace_id=self.workspace_id)
+                except IntegrityError:
+                    sync = index.rebuild()
+                    projected = index.read_projection(workspace_id=self.workspace_id)
+                    rebuilt = True
+            snapshot = project_events(
+                projected.events,
+                known_manifest_ids=projected.manifest_ids,
+            )
+            if snapshot.workspace_id not in {None, self.workspace_id}:
+                raise IntegrityError("SQLite projection replay belongs to a different workspace")
+            return snapshot, {
+                "source": "sqlite",
+                "reason": "incremental_verified_head",
+                "cache_hit": sync.indexed == 0 and sync.removed == 0,
+                "canonical_content_files_read": sync.indexed,
+                "index_rebuilt": rebuilt,
+                "index_sync": asdict(sync),
+                "verified_source_count": projected.source_count,
+                "verified_head_sha256": projected.verified_head_sha256,
+                "projection": dict(snapshot.replay_metrics),
+            }
+        except IntegrityError as exc:
+            snapshot = self.snapshot()
+            return snapshot, {
+                "source": "canonical",
+                "reason": "index_fallback",
+                "fallback_error": type(exc).__name__,
+                "fallback_message": str(exc)[:512],
+                "canonical_content_files_read": len(snapshot.known_event_ids)
+                + len(snapshot.known_manifest_ids),
+                "index_sync": None,
+                "projection": dict(snapshot.replay_metrics),
+            }
 
     def _receipt_issues(
         self,
@@ -910,19 +973,41 @@ class CommonsManager:
             },
         }
 
-    def orient(self, *, max_items: int = 20) -> dict[str, Any]:
+    def orient(
+        self,
+        *,
+        max_items: int = 20,
+        verbose: bool = False,
+        fresh: bool = False,
+    ) -> dict[str, Any]:
         session = self._active_session()
         claims = [_public_claim(value) for value in self.claims.list_claims(active_only=True)]
+        snapshot, diagnostics = self._read_snapshot(fresh=fresh)
         return orientation(
-            self.snapshot(),
+            snapshot,
             session=session.actor_context(),
             claims=claims,
             max_items=max_items,
+            verbose=verbose,
+            read_diagnostics=diagnostics,
         )
 
-    def inbox(self, *, max_items: int = 20) -> dict[str, Any]:
-        brief = self.orient(max_items=max_items)
-        return {"threads": brief["inbox"], "handoffs": brief["handoffs"]}
+    def inbox(
+        self,
+        *,
+        max_items: int = 20,
+        verbose: bool = False,
+        fresh: bool = False,
+    ) -> dict[str, Any]:
+        session = self._active_session()
+        snapshot, diagnostics = self._read_snapshot(fresh=fresh)
+        return inbox_view(
+            snapshot,
+            session=session.actor_context(),
+            max_items=max_items,
+            verbose=verbose,
+            read_diagnostics=diagnostics,
+        )
 
     def _list(self, kind: str, *, state: str | None = None) -> list[dict[str, Any]]:
         snapshot = self.snapshot()

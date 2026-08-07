@@ -274,11 +274,17 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_workspace_files",
         "mcp__agent-commons__commons_workspace_read",
         "mcp__agent-commons__commons_workspace_search",
+        "mcp__agent-commons__commons_check_input",
         "mcp__agent-commons__commons_complete_review",
         "mcp__agent-commons__commons_record_verification",
         "mcp__agent-commons__commons_delegation_input_needed",
         "mcp__agent-commons__commons_succeed_delegation",
         "mcp__agent-commons__commons_delegation_needs_operator",
+        "mcp__agent-commons__commons_request_input",
+        "mcp__agent-commons__commons_share_progress",
+        "mcp__agent-commons__commons_report_blocker",
+        "mcp__agent-commons__commons_ack_input",
+        "mcp__agent-commons__commons_ack_control",
     }
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
         invocation.argv

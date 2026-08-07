@@ -92,11 +92,17 @@ _CLAUDE_COMMONS_READ_TOOLS = (
     "mcp__agent-commons__commons_workspace_files",
     "mcp__agent-commons__commons_workspace_read",
     "mcp__agent-commons__commons_workspace_search",
+    "mcp__agent-commons__commons_check_input",
 )
 _CLAUDE_COMMONS_OUTCOME_TOOLS = (
     "mcp__agent-commons__commons_delegation_input_needed",
     "mcp__agent-commons__commons_succeed_delegation",
     "mcp__agent-commons__commons_delegation_needs_operator",
+    "mcp__agent-commons__commons_request_input",
+    "mcp__agent-commons__commons_share_progress",
+    "mcp__agent-commons__commons_report_blocker",
+    "mcp__agent-commons__commons_ack_input",
+    "mcp__agent-commons__commons_ack_control",
 )
 _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_complete_review",

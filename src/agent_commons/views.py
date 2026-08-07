@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import tempfile
 from collections.abc import Iterable, Mapping
@@ -13,6 +14,8 @@ from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.errors import IntegrityError
 
 _TRUNCATION_MARKER = " …[truncated]"
+_COMPACT_TEXT_BYTES = 384
+_DEFAULT_COMPACT_BYTES = 20 * 1024
 
 
 def _truncate_utf8(value: str, max_bytes: int) -> str:
@@ -67,7 +70,104 @@ def _bounded_copy(value: Any, budget: _CopyBudget, *, depth: int = 0) -> Any:
     return _bounded_copy(str(value), budget, depth=depth)
 
 
-def orientation(
+def _addressed_items(
+    values: Iterable[Mapping[str, Any]],
+    *,
+    addressed: set[str],
+    max_items: int,
+) -> list[Mapping[str, Any]]:
+    return list(
+        islice(
+            (
+                item
+                for item in sorted(values, key=lambda value: str(value.get("id", "")))
+                if item.get("state") == "open" and addressed.intersection(set(item.get("to") or []))
+            ),
+            max_items,
+        )
+    )
+
+
+def _compact_record(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a stable, action-oriented entity summary without actor or prose payloads."""
+
+    result: dict[str, Any] = {}
+    for key in (
+        "id",
+        "claim_id",
+        "state",
+        "title",
+        "subject",
+        "summary",
+        "proposal",
+        "target_profile",
+        "priority",
+        "revision",
+        "effective_revision",
+        "stale",
+        "target_ref",
+        "target_revision",
+        "from_session_id",
+        "owner_session_id",
+        "to",
+        "resources",
+    ):
+        value = item.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            result[key] = _truncate_utf8(value, _COMPACT_TEXT_BYTES)
+        elif isinstance(value, Mapping):
+            result[key] = {
+                str(child_key): _truncate_utf8(str(child), _COMPACT_TEXT_BYTES)
+                for child_key, child in islice(value.items(), 8)
+            }
+        elif isinstance(value, (list, tuple)):
+            result[key] = [
+                _truncate_utf8(str(child), _COMPACT_TEXT_BYTES) for child in islice(value, 8)
+            ]
+        elif isinstance(value, (bool, int, float)):
+            result[key] = value
+    return result
+
+
+def _count_states(values: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in values:
+        state = str(item.get("state", "unknown"))
+        counts[state] = counts.get(state, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _encoded_size(value: Mapping[str, Any]) -> int:
+    return len(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+
+
+def _fit_compact_result(
+    result: dict[str, Any],
+    *,
+    collections: Iterable[list[Any]],
+    max_total_bytes: int,
+) -> dict[str, Any]:
+    """Fit records exactly while preserving every documented container type."""
+
+    mutable = list(collections)
+    truncated = False
+    while _encoded_size(result) > max_total_bytes:
+        target = next((items for items in mutable if items), None)
+        if target is None:
+            break
+        target.pop()
+        truncated = True
+    limits = result.get("limits")
+    if isinstance(limits, dict):
+        limits["truncated"] = truncated
+    return result
+
+
+def _verbose_orientation(
     snapshot: ProjectSnapshot,
     *,
     session: Mapping[str, Any] | None = None,
@@ -77,10 +177,6 @@ def orientation(
     max_nested_items: int = 32,
     max_total_bytes: int = 131_072,
 ) -> dict[str, Any]:
-    if min(max_items, max_text_bytes, max_nested_items, max_total_bytes) < 1:
-        raise ValueError("orientation bounds must be positive")
-    if max_text_bytes < len(_TRUNCATION_MARKER.encode("utf-8")):
-        raise ValueError("max_text_bytes is too small for the truncation marker")
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
     addressed = {"*", role, session_id}
@@ -215,6 +311,259 @@ def orientation(
     if not isinstance(bounded, dict):  # pragma: no cover - root is fixed above
         raise AssertionError("orientation root must remain an object")
     return bounded
+
+
+def orientation(
+    snapshot: ProjectSnapshot,
+    *,
+    session: Mapping[str, Any] | None = None,
+    claims: Iterable[Mapping[str, Any]] = (),
+    max_items: int = 20,
+    max_text_bytes: int = 4096,
+    max_nested_items: int = 32,
+    max_total_bytes: int = 131_072,
+    verbose: bool = False,
+    read_diagnostics: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a bounded workspace brief; detailed legacy records require ``verbose``."""
+
+    if min(max_items, max_text_bytes, max_nested_items, max_total_bytes) < 1:
+        raise ValueError("orientation bounds must be positive")
+    if max_text_bytes < len(_TRUNCATION_MARKER.encode("utf-8")):
+        raise ValueError("max_text_bytes is too small for the truncation marker")
+    if verbose:
+        result = _verbose_orientation(
+            snapshot,
+            session=session,
+            claims=claims,
+            max_items=max_items,
+            max_text_bytes=max_text_bytes,
+            max_nested_items=max_nested_items,
+            max_total_bytes=max_total_bytes,
+        )
+        if read_diagnostics is not None:
+            result["read_diagnostics"] = dict(read_diagnostics)
+        return result
+
+    compact_limit = min(max_total_bytes, _DEFAULT_COMPACT_BYTES)
+    claims_all = list(claims)
+    role = str((session or {}).get("role_id", ""))
+    session_id = str((session or {}).get("session_id", ""))
+    addressed = {"*", role, session_id}
+    objectives_all = sorted(snapshot.objectives.values(), key=lambda item: str(item.get("id", "")))
+    objectives = [
+        _compact_record(item)
+        for item in islice(
+            (item for item in objectives_all if item.get("state") == "active"), max_items
+        )
+    ]
+    task_states = ("ready", "assigned", "active", "blocked", "completed", "review", "accepted")
+    tasks_all = sorted(snapshot.tasks.values(), key=lambda item: str(item.get("id", "")))
+    work = {
+        state: [
+            _compact_record(item)
+            for item in islice(
+                (item for item in tasks_all if item.get("state") == state), max_items
+            )
+        ]
+        for state in task_states
+    }
+    reviews_all = sorted(snapshot.reviews.values(), key=lambda item: str(item.get("id", "")))
+    pending_reviews = [
+        _compact_record(item)
+        for item in islice(
+            (
+                item
+                for item in reviews_all
+                if item.get("state") == "requested" and item.get("stale") is not True
+            ),
+            max_items,
+        )
+    ]
+    stale_reviews = [
+        _compact_record(item)
+        for item in islice(
+            (
+                item
+                for item in reviews_all
+                if item.get("state") != "requested" and item.get("stale") is True
+            ),
+            max_items,
+        )
+    ]
+    delegation_states = (
+        "requested",
+        "active",
+        "input_needed",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+        "needs_operator",
+    )
+    delegations_all = sorted(
+        snapshot.delegations.values(), key=lambda item: str(item.get("id", ""))
+    )
+    delegations = {
+        state: [
+            _compact_record(item)
+            for item in islice(
+                (item for item in delegations_all if item.get("state") == state), max_items
+            )
+        ]
+        for state in delegation_states
+    }
+    inbox = [
+        _compact_record(item)
+        for item in _addressed_items(
+            snapshot.threads.values(), addressed=addressed, max_items=max_items
+        )
+    ]
+    handoffs = [
+        _compact_record(item)
+        for item in _addressed_items(
+            snapshot.handoffs.values(), addressed=addressed, max_items=max_items
+        )
+    ]
+    decisions = [
+        _compact_record(item)
+        for item in islice(
+            (
+                item
+                for item in sorted(
+                    snapshot.decisions.values(), key=lambda value: str(value.get("id", ""))
+                )
+                if item.get("state") == "accepted" and item.get("stale") is not True
+            ),
+            max_items,
+        )
+    ]
+    findings = [
+        _compact_record(item)
+        for item in islice(
+            (
+                item
+                for item in sorted(
+                    snapshot.findings.values(), key=lambda value: str(value.get("id", ""))
+                )
+                if item.get("state") == "verified" and item.get("stale") is not True
+            ),
+            max_items,
+        )
+    ]
+    compact_claims = [
+        _compact_record(item)
+        for item in islice(
+            sorted(claims_all, key=lambda value: str(value.get("claim_id", ""))), max_items
+        )
+    ]
+    warnings = [
+        _truncate_utf8(value, _COMPACT_TEXT_BYTES)
+        for value in sorted(set(snapshot.warnings))[:max_items]
+    ]
+    compact_session = {
+        key: (session or {})[key]
+        for key in ("session_id", "role_id", "client")
+        if key in (session or {})
+    }
+    result: dict[str, Any] = {
+        "schema": "agent_commons.orientation.v1",
+        "workspace_id": snapshot.workspace_id,
+        "session": compact_session,
+        "counts": {
+            "objectives": _count_states(objectives_all),
+            "tasks": _count_states(tasks_all),
+            "threads": _count_states(snapshot.threads.values()),
+            "reviews": _count_states(reviews_all),
+            "delegations": _count_states(delegations_all),
+            "handoffs": _count_states(snapshot.handoffs.values()),
+            "decisions": _count_states(snapshot.decisions.values()),
+            "findings": _count_states(snapshot.findings.values()),
+            "active_claims": len(claims_all),
+        },
+        "objectives": objectives,
+        "work": work,
+        "pending_reviews": pending_reviews,
+        "stale_review_judgments": stale_reviews,
+        "delegations": delegations,
+        "inbox": inbox,
+        "handoffs": handoffs,
+        "effective_truth": {"decisions": decisions, "findings": findings},
+        "claims": compact_claims,
+        "warnings": warnings,
+        "read_diagnostics": dict(read_diagnostics or {}),
+        "limits": {
+            "max_items_per_section": max_items,
+            "max_total_bytes": compact_limit,
+            "truncated": False,
+        },
+    }
+    trim_order = [
+        work["accepted"],
+        work["completed"],
+        delegations["succeeded"],
+        delegations["failed"],
+        delegations["cancelled"],
+        decisions,
+        findings,
+        stale_reviews,
+        objectives,
+        work["ready"],
+        work["assigned"],
+        work["active"],
+        work["blocked"],
+        work["review"],
+        *[delegations[state] for state in delegation_states],
+        compact_claims,
+        warnings,
+        inbox,
+        handoffs,
+        pending_reviews,
+    ]
+    return _fit_compact_result(result, collections=trim_order, max_total_bytes=compact_limit)
+
+
+def inbox_view(
+    snapshot: ProjectSnapshot,
+    *,
+    session: Mapping[str, Any] | None = None,
+    max_items: int = 20,
+    max_total_bytes: int = 131_072,
+    verbose: bool = False,
+    read_diagnostics: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build the addressed inbox directly, without constructing orientation."""
+
+    role = str((session or {}).get("role_id", ""))
+    session_id = str((session or {}).get("session_id", ""))
+    addressed = {"*", role, session_id}
+    all_threads = _addressed_items(
+        snapshot.threads.values(), addressed=addressed, max_items=max(1, len(snapshot.threads))
+    )
+    all_handoffs = _addressed_items(
+        snapshot.handoffs.values(), addressed=addressed, max_items=max(1, len(snapshot.handoffs))
+    )
+    threads = all_threads[:max_items]
+    handoffs = all_handoffs[:max_items]
+    effective_limit = max_total_bytes if verbose else min(max_total_bytes, _DEFAULT_COMPACT_BYTES)
+    result: dict[str, Any] = {
+        "schema": "agent_commons.inbox.v1",
+        "workspace_id": snapshot.workspace_id,
+        "counts": {"threads": len(all_threads), "handoffs": len(all_handoffs)},
+        "threads": [dict(item) if verbose else _compact_record(item) for item in threads],
+        "handoffs": [dict(item) if verbose else _compact_record(item) for item in handoffs],
+        "read_diagnostics": dict(read_diagnostics or {}),
+        "limits": {
+            "max_items_per_section": max_items,
+            "max_total_bytes": effective_limit,
+            "truncated": False,
+        },
+    }
+    return _fit_compact_result(
+        result,
+        collections=(result["threads"], result["handoffs"]),
+        max_total_bytes=effective_limit,
+    )
 
 
 def _markdown_inline(value: Any, *, max_bytes: int = 4096) -> str:
