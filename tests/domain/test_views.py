@@ -6,7 +6,7 @@ import pytest
 
 from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.errors import IntegrityError
-from agent_commons.views import orientation, render_views
+from agent_commons.views import inbox_view, orientation, render_views
 
 
 def test_render_views_rejects_symlink_destination_and_target(tmp_path) -> None:
@@ -109,6 +109,84 @@ def test_orientation_separates_requested_reviews_from_stale_judgments() -> None:
 
     assert [item["id"] for item in result["pending_reviews"]] == [requested]
     assert [item["id"] for item in result["stale_review_judgments"]] == [stale]
+
+
+def test_compact_orientation_has_counts_stable_containers_and_exact_size_bound() -> None:
+    tasks = {
+        f"task.{index:026d}": {
+            "id": f"task.{index:026d}",
+            "state": "active",
+            "title": "T" * 2_000,
+            "description": "omitted-description" * 100,
+            "acceptance_criteria": ["omitted-criterion" * 100],
+            "actor": {"principal_id": "must-not-appear"},
+            "revision": f"evt.{index:026d}",
+        }
+        for index in range(1_000)
+    }
+    snapshot = ProjectSnapshot(tasks=tasks)
+
+    compact = orientation(
+        snapshot,
+        session={
+            "session_id": "session.viewer",
+            "role_id": "builder",
+            "principal_id": "omitted-principal",
+        },
+        max_items=200,
+    )
+    encoded = json.dumps(compact, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+    assert len(encoded) <= 20 * 1024
+    assert compact["schema"] == "agent_commons.orientation.v1"
+    assert compact["counts"]["tasks"] == {"active": 1_000}
+    assert isinstance(compact["work"]["active"], list)
+    assert isinstance(compact["inbox"], list)
+    assert isinstance(compact["handoffs"], list)
+    assert compact["limits"]["truncated"] is True
+    assert compact["session"] == {
+        "session_id": "session.viewer",
+        "role_id": "builder",
+    }
+    assert b"acceptance_criteria" not in encoded
+    assert b"omitted-criterion" not in encoded
+    assert b"must-not-appear" not in encoded
+
+    verbose = orientation(snapshot, max_items=1, verbose=True)
+    assert verbose["work"]["active"][0]["acceptance_criteria"]
+    assert verbose["work"]["active"][0]["actor"]["principal_id"] == "must-not-appear"
+
+
+def test_inbox_view_never_degrades_lists_to_truncation_scalars() -> None:
+    huge = "message" * 10_000
+    snapshot = ProjectSnapshot(
+        threads={
+            "thread.00000000000000000000000001": {
+                "id": "thread.00000000000000000000000001",
+                "state": "open",
+                "to": ["*"],
+                "subject": huge,
+                "messages": [{"body": huge}],
+            }
+        },
+        handoffs={
+            "handoff.00000000000000000000000001": {
+                "id": "handoff.00000000000000000000000001",
+                "state": "open",
+                "to": ["builder"],
+                "summary": huge,
+            }
+        },
+    )
+
+    result = inbox_view(snapshot, session={"role_id": "builder"}, max_total_bytes=4096)
+
+    assert isinstance(result["threads"], list)
+    assert isinstance(result["handoffs"], list)
+    assert result["counts"] == {"threads": 1, "handoffs": 1}
+    assert "messages" not in result["threads"][0]
 
 
 def test_current_view_excludes_stale_effective_truth_but_keeps_fresh_truth(tmp_path) -> None:

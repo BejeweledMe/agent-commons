@@ -17,6 +17,15 @@ public extension ABI.
 
 ## MVP-1 — daily ergonomics
 
+- delivered: workspace-namespaced state bases, fail-closed exact-root ownership,
+  source-aware support diagnostics, linked-worktree compatibility, and no
+  automatic legacy migration;
+- delivered: compact bounded `orient`/`inbox`, verified SQLite warm reads with
+  canonical fallback, plus `--verbose` and `--fresh` escape hatches;
+- delivered: explicit `session current`, one-time shell exports, and
+  field-aware typed-reference diagnostics;
+- delivered: a 25-case privacy-safe offline orchestration eval catalog, with
+  unsupported capabilities reported as non-passing rather than simulated;
 - per-session inbox cursors and acknowledgement state;
 - duplicate-work suggestions and stale-work cleanup;
 - richer dependency and decision graph views;
@@ -56,6 +65,15 @@ Delivery is staged and feature-gated:
    cancellation, and budget enforcement;
 5. local status/watch UX, optional OpenTelemetry export, and an optional AHP
    adapter after its value and compatibility are independently validated.
+
+The task-scoped operational communication slice is now implemented for a live
+task-target worker: bounded request/progress/blocker records, parent reply,
+parent guidance and safe-boundary checkpoints, child polling/acknowledgement,
+fixed canonical lifecycle summaries, exact attempt/participant binding,
+deadlines, HMAC integrity, and two-phase operation cancellation. Provider reattachment after process exit, proof-driven active
+provider cancellation, changed-path attestation, DAG scheduling, model routing,
+council templates, cursor subscriptions, and OpenTelemetry metrics remain
+explicitly deferred; no release claim depends on them.
 
 The long-running broker stage must also define an authenticated operator
 adjudication path for `active` or `input_needed` work whose requester becomes

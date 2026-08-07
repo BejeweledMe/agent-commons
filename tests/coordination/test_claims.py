@@ -23,6 +23,7 @@ from agent_commons.errors import (
     SecurityPolicyError,
     ValidationError,
 )
+from agent_commons.services import CommonsManager
 
 
 class Clock:
@@ -236,6 +237,31 @@ def test_sensitive_claim_metadata_is_rejected_before_audit_write(tmp_path: Path)
 
     assert secret not in str(caught.value)
     assert list(claims.event_root.glob("*.json")) == before
+
+
+def test_same_resource_in_two_workspace_namespaces_does_not_conflict(tmp_path: Path) -> None:
+    base = tmp_path / "operator-state"
+    managers: list[CommonsManager] = []
+    for name in ("alpha", "beta"):
+        repo = tmp_path / name
+        repo.mkdir()
+        CommonsManager.initialize(repo, integrations=(), workspace_name=name)
+        manager = CommonsManager(repo, state_base=base)
+        session = manager.start_session(
+            stable_instance_id=f"{name}-claim-window-12345678",
+            principal="operator",
+            client="codex",
+            software="codex-cli",
+            role="builder",
+        )
+        manager.session_id = session["session_id"]
+        managers.append(manager)
+
+    first = managers[0].acquire_claim(("path:src/shared.py",))
+    second = managers[1].acquire_claim(("path:src/shared.py",))
+
+    assert first["claim_id"] != second["claim_id"]
+    assert managers[0].paths.state_root != managers[1].paths.state_root
 
 
 def test_concurrent_conflicting_acquisition_has_exactly_one_winner(tmp_path: Path) -> None:

@@ -4,11 +4,99 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-from agent_commons.errors import ConfigurationError
+from agent_commons.core.canonical import canonical_json_file_bytes, loads_json_strict
+from agent_commons.core.ids import is_typed_id
+from agent_commons.core.schema_registry import SchemaRegistry
+from agent_commons.errors import ConfigurationError, ValidationError
+
+STATE_OWNER_SCHEMA = "agent_commons.state_owner.v1"
+STATE_OWNER_FILENAME = "workspace-owner.json"
+
+
+@lru_cache(maxsize=1)
+def _packaged_schemas() -> SchemaRegistry:
+    """Load immutable packaged schemas lazily for legacy ownership proof."""
+
+    return SchemaRegistry()
+
+
+def _configuration_error(
+    message: str,
+    *,
+    code: str,
+    details: dict[str, Any],
+    safe_next_actions: tuple[str, ...],
+) -> ConfigurationError:
+    error = ConfigurationError(message)
+    error.code = code  # type: ignore[attr-defined]
+    error.details = details  # type: ignore[attr-defined]
+    error.safe_next_actions = safe_next_actions  # type: ignore[attr-defined]
+    return error
+
+
+def _canonical_bytes(value: dict[str, str]) -> bytes:
+    return (
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+
+
+def _publish_owner_marker(path: Path, value: dict[str, str]) -> None:
+    data = _canonical_bytes(value)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb", closefd=True) as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        descriptor = -1
+        published = False
+        try:
+            os.link(temporary, path)
+            published = True
+        except FileExistsError:
+            descriptor = -1
+            try:
+                descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise OSError("owner marker is not a regular file")
+                with os.fdopen(descriptor, "rb", closefd=True) as handle:
+                    existing = handle.read()
+                descriptor = -1
+            except OSError:
+                existing = None
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+            if existing != data:
+                raise _configuration_error(
+                    "operational state ownership changed while it was being established",
+                    code="state_owner_race",
+                    details={"expected_workspace_id": value["workspace_id"]},
+                    safe_next_actions=(
+                        "Stop concurrent Agent Commons processes and inspect support --show-paths.",
+                    ),
+                ) from None
+        if published:
+            directory_descriptor = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
 
 
 def _git_common_directory(repo_root: Path) -> Path | None:
@@ -91,6 +179,10 @@ class CommonsPaths:
     repo_root: Path
     commons_root: Path
     state_root: Path
+    state_base: Path | None = None
+    state_mode: str = "exact"
+    state_source: str = "default"
+    workspace_id: str | None = None
 
     @classmethod
     def for_workspace(
@@ -99,21 +191,90 @@ class CommonsPaths:
         *,
         commons_root: str | Path | None = None,
         state_root: str | Path | None = None,
+        state_base: str | Path | None = None,
+        state_source: str | None = None,
+        workspace_id: str | None = None,
     ) -> CommonsPaths:
         repo = Path(repo_root).expanduser().resolve()
         canonical = (
             _resolve_override(commons_root, repo) if commons_root else repo / ".agent-commons"
         )
+        if state_root is not None and state_base is not None:
+            raise ConfigurationError("state_root and state_base are mutually exclusive")
+        environment_root = os.environ.get("AGENT_COMMONS_STATE_ROOT")
+        environment_base = os.environ.get("AGENT_COMMONS_STATE_BASE")
         if state_root is not None:
             state = _resolve_override(state_root, repo)
+            base = None
+            mode = "exact"
+            source = state_source or "argument:state-root"
+        elif state_base is not None:
+            base = _resolve_override(state_base, repo)
+            state = base
+            mode = "base"
+            source = state_source or "argument:state-base"
+        elif environment_root:
+            state = _resolve_override(environment_root, repo)
+            base = None
+            mode = "exact"
+            source = state_source or "env:AGENT_COMMONS_STATE_ROOT"
+        elif environment_base:
+            base = _resolve_override(environment_base, repo)
+            state = base
+            mode = "base"
+            source = state_source or "env:AGENT_COMMONS_STATE_BASE"
         else:
             git_common = _git_common_directory(repo)
-            state = (
+            base = (
                 git_common / "agent-commons-state"
                 if git_common is not None
                 else canonical / ".state"
             )
-        return cls(repo, canonical, state)
+            state = base
+            mode = "base"
+            source = state_source or "default"
+        paths = cls(repo, canonical, state, base, mode, source, None)
+        return paths.for_workspace_id(workspace_id) if workspace_id is not None else paths
+
+    def for_workspace_id(self, workspace_id: str) -> CommonsPaths:
+        if self.workspace_id is not None and self.workspace_id != workspace_id:
+            raise ConfigurationError("operational paths are already bound to another workspace")
+        if self.state_mode == "exact":
+            return CommonsPaths(
+                self.repo_root,
+                self.commons_root,
+                self.state_root,
+                None,
+                "exact",
+                self.state_source,
+                workspace_id,
+            )
+        assert self.state_base is not None
+        namespaced = self.state_base / "workspaces" / workspace_id
+        legacy_owner = self._legacy_owner_id(self.state_base)
+        base_is_unsafe = self.state_base.is_symlink() or (
+            self.state_base.exists() and not self.state_base.is_dir()
+        )
+        base_has_legacy_material = (
+            self.state_base.is_dir()
+            and not self.state_base.is_symlink()
+            and any(item.name != "workspaces" for item in self.state_base.iterdir())
+        )
+        if base_is_unsafe or legacy_owner is not None or base_has_legacy_material:
+            effective = self.state_base
+            mode = "legacy-exact"
+        else:
+            effective = namespaced
+            mode = "base"
+        return CommonsPaths(
+            self.repo_root,
+            self.commons_root,
+            effective,
+            self.state_base,
+            mode,
+            self.state_source,
+            workspace_id,
+        )
 
     @classmethod
     def discover(cls, start: str | Path | None = None) -> CommonsPaths:
@@ -157,6 +318,137 @@ class CommonsPaths:
     def index_db(self) -> Path:
         return self.state_root / "index.sqlite3"
 
+    @property
+    def owner_marker(self) -> Path:
+        return self.state_root / STATE_OWNER_FILENAME
+
+    @staticmethod
+    def _legacy_owner_id(root: Path) -> str | None:
+        directory = root / "idempotency-v2"
+        migration = directory / "migration.json"
+        if directory.is_symlink() or not directory.is_dir() or migration.is_symlink():
+            return None
+        descriptor = -1
+        try:
+            descriptor = os.open(migration, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                return None
+            with os.fdopen(descriptor, "rb", closefd=True) as handle:
+                raw = handle.read()
+            descriptor = -1
+            value = loads_json_strict(raw)
+            if not isinstance(value, dict) or raw != canonical_json_file_bytes(value):
+                return None
+            _packaged_schemas().validate("commons.idempotency_migration.v2", value)
+        except (OSError, ValidationError):
+            return None
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+        workspace_id = value.get("workspace_id")
+        return workspace_id if is_typed_id(workspace_id, "workspace") else None
+
+    def ownership_report(self, workspace_id: str | None = None) -> dict[str, Any]:
+        expected = workspace_id or self.workspace_id
+        report: dict[str, Any] = {
+            "mode": self.state_mode,
+            "source": self.state_source,
+            "workspace_id": expected,
+            "state_exists": self.state_root.is_dir(),
+            "match": None,
+            "status": "absent",
+        }
+        if not self.state_root.exists():
+            return report
+        if self.state_root.is_symlink() or not self.state_root.is_dir():
+            report.update(status="unsafe", match=False)
+            return report
+        marker = self.owner_marker
+        if marker.is_file() and not marker.is_symlink():
+            try:
+                raw = marker.read_bytes()
+                value = json.loads(raw)
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                report.update(status="invalid-marker", match=False)
+                return report
+            canonical = isinstance(value, dict) and raw == _canonical_bytes(value)
+            valid = (
+                canonical
+                and set(value) == {"schema", "workspace_id"}
+                and value.get("schema") == STATE_OWNER_SCHEMA
+                and isinstance(value.get("workspace_id"), str)
+                and bool(value["workspace_id"])
+            )
+            owner = value.get("workspace_id") if valid else None
+            report.update(
+                owner_workspace_id=owner,
+                status="owned" if valid else "invalid-marker",
+                match=bool(valid and expected is not None and owner == expected),
+            )
+            return report
+        legacy_owner = self._legacy_owner_id(self.state_root)
+        if legacy_owner is not None:
+            report.update(
+                owner_workspace_id=legacy_owner,
+                status="legacy-owned",
+                match=bool(expected is not None and legacy_owner == expected),
+            )
+            return report
+        material = [item for item in self.state_root.iterdir() if item.name != "workspaces"]
+        report.update(status="empty" if not material else "ambiguous-legacy")
+        report["match"] = True if not material and expected is not None else None
+        return report
+
+    def validate_state_ownership(self, *, read_only: bool = False) -> dict[str, Any]:
+        if self.workspace_id is None:
+            raise ConfigurationError("workspace_id is required before opening operational state")
+        report = self.ownership_report()
+        if report["status"] in {"absent", "empty"}:
+            if read_only:
+                return report
+            _ensure_real_directory(self.state_root, label="operational state")
+            _publish_owner_marker(
+                self.owner_marker,
+                {"schema": STATE_OWNER_SCHEMA, "workspace_id": self.workspace_id},
+            )
+            return self.ownership_report()
+        if report["status"] == "legacy-owned" and report["match"] is True:
+            if not read_only:
+                _publish_owner_marker(
+                    self.owner_marker,
+                    {"schema": STATE_OWNER_SCHEMA, "workspace_id": self.workspace_id},
+                )
+            return report
+        if report["status"] == "owned" and report["match"] is True:
+            return report
+        if report["status"] in {"owned", "legacy-owned"}:
+            raise _configuration_error(
+                "operational state belongs to a different Agent Commons workspace",
+                code="state_owner_mismatch",
+                details={
+                    "expected_workspace_id": self.workspace_id,
+                    "owner_workspace_id": report.get("owner_workspace_id"),
+                    "mode": self.state_mode,
+                    "source": self.state_source,
+                    "resolved_repo_root": str(self.repo_root),
+                    "resolved_state_root": str(self.state_root),
+                },
+                safe_next_actions=(
+                    "Use AGENT_COMMONS_STATE_BASE for automatic per-workspace isolation.",
+                    "Choose an empty exact AGENT_COMMONS_STATE_ROOT; do not move or delete "
+                    "state automatically.",
+                ),
+            )
+        raise _configuration_error(
+            "operational state ownership is missing or invalid",
+            code="state_owner_unproven",
+            details={"expected_workspace_id": self.workspace_id, "status": report["status"]},
+            safe_next_actions=(
+                "Inspect support --show-paths and choose an empty exact state root.",
+                "Do not move, delete, or adopt legacy operational state without operator review.",
+            ),
+        )
+
     def ensure_layout(self, *, read_only: bool = False) -> None:
         if read_only:
             for label, path in (
@@ -167,6 +459,8 @@ class CommonsPaths:
             ):
                 if path.is_symlink() or not path.is_dir():
                     raise ConfigurationError(f"read-only {label} is unavailable: {path}")
+            if self.workspace_id is not None:
+                self.validate_state_ownership(read_only=True)
             return
         _ensure_real_directory(self.repo_root, label="repository root")
         _ensure_real_directory(self.commons_root, label="canonical workspace")
@@ -178,7 +472,10 @@ class CommonsPaths:
             ("cache directory", self.cache),
         ):
             _ensure_real_directory(path, label=label)
-        _ensure_real_directory(self.state_root, label="operational state")
+        if self.workspace_id is None:
+            _ensure_real_directory(self.state_root, label="operational state")
+        else:
+            self.validate_state_ownership()
         _ensure_real_directory(self.idempotency_v2, label="idempotency v2 directory")
 
     def canonical_relative(self, path: str | Path) -> str:

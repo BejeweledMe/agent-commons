@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
 from click.testing import CliRunner
 
 from agent_commons import __version__
@@ -46,10 +47,97 @@ def test_support_report_is_secret_free_and_does_not_disclose_paths(tmp_path: Pat
     assert body["core_release_stage"] == "alpha"
     assert body["broker_release_stage"] == "experimental_manual_opt_in"
     assert body["state_root_explicit"] is True
+    assert body["state_config_source"] == "flag:state-root"
+    assert body["state_mode"] == "exact"
+    assert body["state_owner_status"] == "workspace-unavailable"
     assert body["state_root_exists"] is False
     assert body["read_only"] is True
     assert str(tmp_path) not in result.output
     assert not state_root.exists()
+
+
+def test_support_paths_are_opt_in_and_command_line_base_overrides_root_env(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "private-repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="support")
+    environment_root = tmp_path / "environment-root"
+    command_base = tmp_path / "command-base"
+    runner = CliRunner()
+
+    hidden = runner.invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--state-base",
+            str(command_base),
+            "--read-only",
+            "--json",
+            "support",
+        ],
+        env={"AGENT_COMMONS_STATE_ROOT": str(environment_root)},
+    )
+    shown = runner.invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--state-base",
+            str(command_base),
+            "--read-only",
+            "--json",
+            "support",
+            "--show-paths",
+        ],
+        env={"AGENT_COMMONS_STATE_ROOT": str(environment_root)},
+    )
+
+    hidden_body = json.loads(hidden.output)
+    shown_body = json.loads(shown.output)
+    assert hidden_body["state_config_source"] == "flag:state-base"
+    assert hidden_body["state_mode"] == "base"
+    assert "resolved_state_root" not in hidden_body
+    assert str(tmp_path) not in hidden.output
+    assert shown_body["resolved_state_base"] == str(command_base)
+    assert shown_body["resolved_state_root"].startswith(str(command_base / "workspaces"))
+    assert not environment_root.exists()
+    assert not command_base.exists()
+
+
+def test_support_does_not_build_state_paths_from_an_invalid_workspace_id(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "private-repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="support")
+    workspace_config = repo / ".agent-commons" / "workspace.yaml"
+    config = yaml.safe_load(workspace_config.read_text(encoding="utf-8"))
+    config["workspace_id"] = "../../outside"
+    workspace_config.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    state_base = tmp_path / "operator-state"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--state-base",
+            str(state_base),
+            "--read-only",
+            "--json",
+            "support",
+            "--show-paths",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)
+    assert body["workspace_id"] is None
+    assert body["state_owner_status"] == "workspace-unavailable"
+    assert body["resolved_state_root"] == str(state_base)
+    assert "outside" not in body["resolved_state_root"]
 
 
 def test_read_only_inspection_never_creates_operational_state(tmp_path: Path) -> None:

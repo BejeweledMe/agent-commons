@@ -70,14 +70,27 @@ the gate; the gate then replaces itself with the fixed provider process and only
 that provider receives the instruction. This prevents a slow ledger write from
 consuming the provider's own stdin/startup timeout while preserving the same PID
 and process group for cancellation and recovery. The child works only on the
-recorded target. It may return `input_needed` with a
-sanitized requirement summary, but secrets and interactive input remain outside
-the canonical ledger. The current headless MVP cannot resume or reattach an
-exited `input_needed` provider session, so the broker classifies it
-`needs_operator` rather than promising continuation. On success it records typed
-result references. The parent then inspects those exact results and applies the
-ordinary review and acceptance rules; process success is never automatic
-acceptance.
+recorded task revision. While its provider process is still live, it can open a
+bounded request, progress report, or blocker in the authenticated operational
+channel. The fixed parent/child graph, deadline, depth, size, idempotency, and
+HMAC checks prevent generic chat or rebinding. A blocking request moves the
+canonical delegation to `input_needed`; a parent reply resumes that exact
+delegation, and the child polls and acknowledges the operational answer.
+Question, context, answer, and caller-provided summaries never enter canonical
+history: the two lifecycle events use fixed maintainer-defined status text. The
+current broker still cannot reattach an already exited provider process, so an
+exit without a terminal tool remains `needs_operator` rather than a promised
+continuation. On success it records typed result references. The parent then
+inspects those exact results and applies the ordinary review and acceptance
+rules; process success is never automatic acceptance.
+
+The parent can also use the control slice to send one bounded tactical guidance
+item or request acknowledgement at a named safe checkpoint. These are private
+`guidance`/`checkpoint` operations, not peer chat or hard cancellation; the
+exact child acknowledges each once through `commons_ack_control`. Disable the
+slice with `--disable-controls` without changing canonical history. Track
+acknowledgement latency and stale/foreign-operation rejection alongside the
+existing progress and blocker signals.
 
 If the broker loses certainty after start, it records `needs_operator` and does
 not relaunch. A new delegation is safe only after the old attempt is terminal
@@ -103,6 +116,33 @@ Claude-to-Codex implementation remains trusted-workspace-only because current
 Codex runners and writable builders lack host OS isolation; require explicit
 operator profile opt-in, a `provider_units` budget, plus an externally isolated
 worktree for untrusted content, or use the manual flow.
+
+## 2a. Migrate or roll back operational-state selection
+
+For a shell that previously exported one global exact root, do not move or
+delete that directory. Start from a clean shell, inspect the project, and then
+select a base:
+
+```bash
+unset AGENT_COMMONS_STATE_ROOT
+export AGENT_COMMONS_STATE_BASE=/absolute/operator-owned/agent-commons-state
+agent-commons --read-only --json support --show-paths
+agent-commons --read-only doctor
+```
+
+The effective location is namespaced by the canonical workspace ID. Existing
+exact roots remain exact: a writable open adds an ownership marker only when
+existing receipt metadata already proves the same workspace. Ambiguous legacy
+material fails as `state_owner_unproven`; another workspace fails as
+`state_owner_mismatch`. Resolve either by selecting a new empty exact root or a
+base after operator review—never by deleting or rewriting the old state.
+
+Rollback changes configuration, not data: unset `AGENT_COMMONS_STATE_BASE` and
+select a previously proven exact root if one exists. For read-path diagnosis,
+`orient --fresh --verbose` and `inbox --fresh --verbose` bypass the disposable
+SQLite fast path without changing canonical history. Disabling the optional
+runtime removes communication tools; let in-flight operations finish or expire
+before removing any private operational communication directory.
 
 ## 3. Prototype a product design
 

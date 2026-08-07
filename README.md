@@ -27,37 +27,50 @@ export PATH="$PWD/.venv/bin:$PATH"
 agent-commons --version
 ```
 
-In an existing Git project, choose one writable state root shared by all of its
-worktrees, initialize, and inspect the result:
+In an existing Git project, prefer one operator-owned state **base**. Agent
+Commons derives an isolated `<base>/workspaces/<workspace_id>` root while linked
+worktrees of that workspace continue to share it:
 
 ```bash
 cd /path/to/your-project
-export AGENT_COMMONS_STATE_ROOT=/absolute/operator-owned/path/agent-commons-state
+unset AGENT_COMMONS_STATE_ROOT
+export AGENT_COMMONS_STATE_BASE=/absolute/operator-owned/path/agent-commons-state
 agent-commons init --integration codex --integration claude
-agent-commons --read-only --json support
+agent-commons --read-only --json support --show-paths
 ```
 
 Expected support output includes `"canonical_workspace_available":true`, the
-package/Python/platform versions, `agent_commons_source_sha256`, and whether the
-state root was explicit. The source fingerprint distinguishes different
-checkouts that intentionally share one unreleased package version. `init` does
-not stage or commit anything.
+package/Python/platform versions, `agent_commons_source_sha256`, the selected
+configuration source, workspace ID, and ownership match. `AGENT_COMMONS_STATE_ROOT`
+remains a backward-compatible **exact workspace root**; reusing it for another
+workspace fails before sessions, claims, receipts, runtime, or SQLite are
+opened. No state is moved or deleted automatically. The source fingerprint
+distinguishes different checkouts that intentionally share one unreleased
+package version. `init` does not stage or commit anything.
 
 Start the author window, keep its rotating `nonce` private, and export only the
 returned session ID:
 
 ```bash
-agent-commons --json session start \
+eval "$(agent-commons session start \
   --stable-instance-id author-window-01 \
   --principal local-operator \
   --client codex \
   --software codex-cli \
-  --role implementation-author
-export AGENT_COMMONS_SESSION_ID='session.returned-by-session-start'
+  --role implementation-author \
+  --shell-export zsh)"
+agent-commons session current
 agent-commons doctor
 agent-commons orient
 agent-commons inbox
 ```
+
+The one-time shell export contains the rotating nonce and must remain private;
+`session current`, later status, and errors never repeat it and never
+auto-select another active session. Compact `orient` and `inbox` are the
+default. Use `--verbose` for expanded entities and `--fresh` when a full
+canonical replay is required instead of the verified disposable SQLite read
+path.
 
 Ask the author to use `commons-start` and `commons-coordinate`, create/take a
 small task, claim only its scope, implement and verify it, register exact

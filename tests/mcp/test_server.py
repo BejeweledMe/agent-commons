@@ -163,11 +163,56 @@ class FakeRuntime:
         return [{"state": "needs_operator"}]
 
 
+class FakeCommunication:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def request_input(self, delegation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("request", {"delegation_id": delegation_id, **values}))
+        return {"operation": {"operation_id": "operation.01K00000000000000000000000"}}
+
+    def check_input(self, operation_id: str) -> dict[str, Any]:
+        return {"operation_id": operation_id, "state": "open"}
+
+    def reply_to_input(self, operation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("reply", {"operation_id": operation_id, **values}))
+        return {"operation": {"operation_id": operation_id, "state": "replied"}}
+
+    def share_progress(self, delegation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("progress", {"delegation_id": delegation_id, **values}))
+        return {"operation": {"kind": "progress"}}
+
+    def report_blocker(self, delegation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("blocker", {"delegation_id": delegation_id, **values}))
+        return {"operation": {"kind": "blocker"}}
+
+    def send_guidance(self, delegation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("guidance", {"delegation_id": delegation_id, **values}))
+        return {"operation": {"kind": "guidance"}}
+
+    def request_checkpoint(self, delegation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("checkpoint", {"delegation_id": delegation_id, **values}))
+        return {"operation": {"kind": "checkpoint"}}
+
+    def acknowledge(self, operation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("ack", {"operation_id": operation_id, **values}))
+        return {"operation_id": operation_id, "state": "acked"}
+
+    def acknowledge_control(self, operation_id: str, **values: Any) -> dict[str, Any]:
+        self.calls.append(("control_ack", {"operation_id": operation_id, **values}))
+        return {"operation_id": operation_id, "state": "acked"}
+
+    def inbox(self) -> tuple[dict[str, Any], ...]:
+        return ({"operation_id": "operation.01K00000000000000000000000"},)
+
+
 def test_bounded_tools_delegate_to_the_manager() -> None:
     manager = FakeManager()
+    communication = FakeCommunication()
     server = build_server(
         Path("."),
         manager=manager,  # type: ignore[arg-type]
+        communication=communication,
         server_factory=FakeServer,
     )
 
@@ -189,8 +234,44 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "commons_delegation_input_needed",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
+        "commons_check_input",
+        "commons_reply_to_input",
+        "commons_ack_input",
+        "commons_send_guidance",
+        "commons_request_checkpoint",
     }
     assert server.tools["commons_orient"](7) == {"kind": "orient", "max_items": 7}
+    assert server.tools["commons_inbox"](7)["operations"][0]["operation_id"].startswith(
+        "operation."
+    )
+    assert (
+        server.tools["commons_send_guidance"](
+            "delegation.01K00000000000000000000000",
+            "guidance-key",
+            "Keep the patch narrow.",
+            "The fallback must remain easy to use.",
+            "Only the intended files change.",
+            300,
+        )["operation"]["kind"]
+        == "guidance"
+    )
+    assert (
+        server.tools["commons_request_checkpoint"](
+            "delegation.01K00000000000000000000000",
+            "checkpoint-key",
+            "Pause before review.",
+            "After focused tests.",
+            "Acknowledge the boundary.",
+            300,
+        )["operation"]["kind"]
+        == "checkpoint"
+    )
+    replied_input = server.tools["commons_reply_to_input"](
+        "operation.01K00000000000000000000000",
+        "reply-key",
+        {"choice": "bounded"},
+    )
+    assert replied_input["operation"]["state"] == "replied"
     assert server.tools["commons_list_delegations"]("active") == [
         {"kind": "delegation", "state": "active"}
     ]
@@ -294,6 +375,11 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
         "commons_delegation_input_needed",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
+        "commons_check_input",
+        "commons_reply_to_input",
+        "commons_ack_input",
+        "commons_send_guidance",
+        "commons_request_checkpoint",
     }
     request_schema = by_name["commons_request_delegation"].model_dump()["inputSchema"]
     assert set(request_schema["required"]) == {
@@ -306,12 +392,25 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
     assert "command" not in request_schema["properties"]
     assert "environment" not in request_schema["properties"]
     assert "prompt" not in request_schema["properties"]
+    reply_schema = by_name["commons_reply_to_input"].model_dump()["inputSchema"]
+    assert set(reply_schema["required"]) == {
+        "operation_id",
+        "idempotency_key",
+        "answer",
+    }
+    assert "resolution_summary" not in reply_schema["properties"]
     assert by_name["commons_orient"].annotations.readOnlyHint is True
     assert by_name["commons_request_delegation"].annotations.idempotentHint is True
     assert by_name["commons_cancel_delegation"].annotations.destructiveHint is True
     assert by_name["commons_recover_delegation"].annotations.destructiveHint is True
     assert by_name["commons_complete_review"].annotations.idempotentHint is True
     assert by_name["commons_show_review"].annotations.readOnlyHint is True
+
+    disabled = build_server(
+        Path("."), manager=FakeManager(), enable_controls=False, server_factory=FakeServer
+    )
+    assert "commons_send_guidance" not in disabled.tools
+    assert "commons_request_checkpoint" not in disabled.tools
 
 
 def test_runtime_tools_are_explicitly_feature_gated_and_bounded() -> None:

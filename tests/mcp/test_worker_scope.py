@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,33 @@ class FakeRuntime:
 
     def reconcile(self) -> list[dict[str, Any]]:
         raise AssertionError("worker-scope test must not reconcile runtime state")
+
+
+class FakeCommunication:
+    def __init__(self) -> None:
+        self.requested: list[str] = []
+
+    def request_input(self, delegation_id: str, **_values: Any) -> dict[str, Any]:
+        self.requested.append(delegation_id)
+        return {"operation": {"operation_id": "operation.01K00000000000000000000000"}}
+
+    def check_input(self, operation_id: str) -> dict[str, Any]:
+        return {"operation_id": operation_id, "state": "open"}
+
+    def share_progress(self, delegation_id: str, **_values: Any) -> dict[str, Any]:
+        return {"delegation_id": delegation_id, "kind": "progress"}
+
+    def report_blocker(self, delegation_id: str, **_values: Any) -> dict[str, Any]:
+        return {"delegation_id": delegation_id, "kind": "blocker"}
+
+    def acknowledge(self, operation_id: str, **_values: Any) -> dict[str, Any]:
+        return {"operation_id": operation_id, "state": "acked"}
+
+    def acknowledge_control(self, operation_id: str, **_values: Any) -> dict[str, Any]:
+        return {"operation_id": operation_id, "state": "acked"}
+
+    def inbox(self) -> tuple[dict[str, Any], ...]:
+        return ({"operation_id": "operation.01K00000000000000000000000"},)
 
 
 def _workspace(tmp_path: Path) -> dict[str, Any]:
@@ -224,12 +252,16 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
 
 
 def _worker_server(
-    workspace: dict[str, Any], *, git_executable: str = "/usr/bin/git"
+    workspace: dict[str, Any],
+    *,
+    git_executable: str = "/usr/bin/git",
+    communication: Any = None,
 ) -> FakeServer:
     server = build_server(
         workspace["repo"],
         manager=workspace["child"],
         runtime=FakeRuntime(),
+        communication=communication,
         delegation_id=workspace["delegation"]["entity_ref"]["id"],
         binding_wait_seconds=0,
         git_executable=git_executable,
@@ -237,6 +269,44 @@ def _worker_server(
     )
     assert isinstance(server, FakeServer)
     return server
+
+
+def test_worker_communication_tools_are_bound_to_exact_delegation(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    communication = FakeCommunication()
+    server = _worker_server(workspace, communication=communication)
+    delegation_id = workspace["delegation"]["entity_ref"]["id"]
+
+    opened = server.tools["commons_request_input"](
+        delegation_id,
+        "question-key",
+        "Which bounded option should I use?",
+        "The exact task permits two options.",
+        {"options": ["a", "b"]},
+        "Select one listed option.",
+        True,
+        300,
+    )
+    assert opened["operation"]["operation_id"].startswith("operation.")
+    assert communication.requested == [delegation_id]
+    assert server.tools["commons_inbox"](20)["operations"]
+    assert "commons_reply_to_input" not in server.tools
+    assert (
+        "requirement_summary"
+        not in inspect.signature(server.tools["commons_request_input"]).parameters
+    )
+
+    with pytest.raises(LifecycleConflictError, match="outside its delegation scope"):
+        server.tools["commons_request_input"](
+            "delegation.01K00000000000000000000000",
+            "foreign-question-key",
+            "Question",
+            "Reason",
+            {},
+            "Outcome",
+            False,
+            300,
+        )
 
 
 def test_worker_snapshot_accepts_an_operator_configured_trusted_git(tmp_path: Path) -> None:
@@ -338,6 +408,12 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_workspace_files",
         "commons_workspace_read",
         "commons_workspace_search",
+        "commons_request_input",
+        "commons_check_input",
+        "commons_share_progress",
+        "commons_report_blocker",
+        "commons_ack_input",
+        "commons_ack_control",
     }
     assert expected_tools == set(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
     assert set(server.tools) == expected_tools

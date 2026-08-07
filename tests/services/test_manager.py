@@ -1290,3 +1290,104 @@ def test_conflicting_transitions_have_one_winner_across_processes(
     assert sum(outcome[0] == "LifecycleConflictError" for outcome in outcomes) == 1
     assert len(list(manager.events.iter_events())) == 2
     assert manager.list_tasks()[0]["state"] in {"active", "cancelled"}
+
+
+def test_warm_orient_and_inbox_use_verified_projection_without_canonical_reads(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, manager, _ = workspace
+    manager.create_objective(
+        title="Fast brief",
+        description="Prime the projection",
+        acceptance_criteria=("warm reads avoid canonical contents",),
+        idempotency_key="fast-brief-objective",
+    )
+    first = manager.orient()
+    assert first["read_diagnostics"]["source"] == "sqlite"
+    assert first["read_diagnostics"]["canonical_content_files_read"] == 1
+
+    def unexpected_read(_: object) -> object:
+        raise AssertionError("warm read must not load canonical file contents")
+
+    monkeypatch.setattr(manager.events, "read_path", unexpected_read)
+    warm = manager.orient()
+    inbox = manager.inbox()
+
+    assert warm["read_diagnostics"]["cache_hit"] is True
+    assert warm["read_diagnostics"]["canonical_content_files_read"] == 0
+    assert inbox["read_diagnostics"]["cache_hit"] is True
+    assert inbox["read_diagnostics"]["canonical_content_files_read"] == 0
+    with pytest.raises(AssertionError, match="warm read"):
+        manager.orient(fresh=True)
+
+
+def test_orient_rebuilds_internally_inconsistent_disposable_projection(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    _, _, manager, _ = workspace
+    manager.create_objective(
+        title="Repair cache",
+        description="Canonical history remains authoritative",
+        acceptance_criteria=("projection rebuilds",),
+        idempotency_key="repair-cache-objective",
+    )
+    manager.orient()
+    with sqlite3.connect(manager.paths.index_db) as connection:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("DELETE FROM events")
+        connection.commit()
+
+    repaired = manager.orient()
+
+    assert repaired["read_diagnostics"]["source"] == "sqlite", repaired["read_diagnostics"]
+    assert repaired["read_diagnostics"]["index_rebuilt"] is True
+    assert repaired["counts"]["objectives"] == {"active": 1}
+
+
+def test_read_only_orient_uses_canonical_fallback_without_creating_index(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    state_root = tmp_path / "state"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="read-only-fast-path")
+    writer, session = _open(repo, state_root, name="reader", role="builder")
+    writer.create_objective(
+        title="Read only",
+        description="Do not mutate disposable state",
+        acceptance_criteria=("no SQLite file",),
+        idempotency_key="read-only-objective",
+    )
+    assert not writer.paths.index_db.exists()
+    reader = CommonsManager(
+        repo,
+        state_root=state_root,
+        session_id=session["session_id"],
+        read_only=True,
+    )
+
+    brief = reader.orient()
+
+    assert brief["read_diagnostics"]["source"] == "canonical"
+    assert brief["read_diagnostics"]["reason"] == "read_only"
+    assert not reader.paths.index_db.exists()
+
+
+def test_unreadable_sqlite_projection_falls_back_to_canonical_history(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    _, _, manager, _ = workspace
+    manager.create_objective(
+        title="Corrupt cache",
+        description="The disposable database is never authoritative",
+        acceptance_criteria=("canonical replay succeeds",),
+        idempotency_key="corrupt-cache-objective",
+    )
+    manager.orient()
+    manager.paths.index_db.write_bytes(b"not a sqlite database")
+
+    brief = manager.orient()
+
+    assert brief["read_diagnostics"]["source"] == "canonical"
+    assert brief["read_diagnostics"]["reason"] == "index_fallback"
+    assert brief["read_diagnostics"]["fallback_error"] == "IntegrityError"
+    assert brief["counts"]["objectives"] == {"active": 1}

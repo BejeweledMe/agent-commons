@@ -50,7 +50,7 @@ def test_cli_exposes_complete_manager_surface() -> None:
         assert name in top.output
 
     expected = {
-        "session": {"start", "show", "heartbeat", "end"},
+        "session": {"start", "show", "current", "heartbeat", "end"},
         "objective": {"create", "list", "revise", "close"},
         "task": {
             "create",
@@ -100,6 +100,11 @@ def test_cli_exposes_complete_manager_surface() -> None:
     assert claim_help.exit_code == 0
     assert "exclusive|advisory" in claim_help.output
     assert "exclusive|shared" not in claim_help.output
+    for command in ("orient", "inbox"):
+        help_result = runner.invoke(cli, [command, "--help"])
+        assert help_result.exit_code == 0
+        assert "--verbose" in help_result.output
+        assert "--fresh" in help_result.output
 
 
 def test_cli_init_session_objective_heartbeat_and_read_flow(tmp_path: Path) -> None:
@@ -163,6 +168,15 @@ def test_cli_init_session_objective_heartbeat_and_read_flow(tmp_path: Path) -> N
     assert listed[0]["title"] == "Universal manager"  # type: ignore[index]
     shown = _json(_invoke(runner, repo, "event", "show", event_id))
     assert len(shown["canonical_sha256"]) == 64  # type: ignore[index]
+    compact = _json(_invoke(runner, repo, "--session-id", session_id, "orient"))
+    assert compact["schema"] == "agent_commons.orientation.v1"  # type: ignore[index]
+    assert compact["read_diagnostics"]["source"] == "sqlite"  # type: ignore[index]
+    assert "acceptance_criteria" not in json.dumps(compact)
+    verbose = _json(
+        _invoke(runner, repo, "--session-id", session_id, "orient", "--verbose", "--fresh")
+    )
+    assert verbose["read_diagnostics"]["source"] == "canonical"  # type: ignore[index]
+    assert verbose["objectives"][0]["acceptance_criteria"] == ["works"]  # type: ignore[index]
 
     heartbeat = _json(
         _invoke(
@@ -246,14 +260,92 @@ def test_cli_artifact_is_metadata_only_and_invalid_ref_is_concise(tmp_path: Path
     assert "<kind>:<id>" in invalid.output
     assert "Traceback" not in invalid.output
     error = json.loads(invalid.output)
-    assert error == {
-        "error": {
-            "message": "reference must use '<kind>:<id>' syntax",
-            "safe_next_actions": ["Correct the bounded input using the command help, then retry."],
-            "type": "ValidationError",
-        },
-        "ok": False,
-    }
+    assert error["ok"] is False
+    assert error["error"]["type"] == "ValidationError"
+    assert error["error"]["code"] == "invalid_typed_ref"
+    assert error["error"]["details"]["field"] == "target_ref"
+    assert "task" in error["error"]["details"]["allowed_kinds"]
+    assert error["error"]["details"]["example"] == "artifact:<id>"
+
+
+def test_session_current_requires_selection_and_never_returns_nonce(tmp_path: Path) -> None:
+    runner = CliRunner()
+    repo = tmp_path / "project"
+    repo.mkdir()
+    _json(_invoke(runner, repo, "init", "--integration", "codex"))
+    started = _json(
+        _invoke(
+            runner,
+            repo,
+            "session",
+            "start",
+            "--stable-instance-id",
+            "session-current-window-12345678",
+            "--principal",
+            "operator",
+            "--client",
+            "codex",
+            "--software",
+            "codex-cli",
+            "--role",
+            "builder",
+        )
+    )
+
+    missing = _invoke(runner, repo, "session", "current")
+    assert missing.exit_code == 1
+    assert json.loads(missing.output)["error"]["code"] == "session_not_selected"
+
+    current = _json(
+        _invoke(
+            runner,
+            repo,
+            "--session-id",
+            started["session_id"],  # type: ignore[index]
+            "session",
+            "current",
+        )
+    )
+    assert current["session_id"] == started["session_id"]  # type: ignore[index]
+    assert "nonce" not in current
+
+
+def test_session_start_can_emit_one_shell_export_without_auto_selection(tmp_path: Path) -> None:
+    runner = CliRunner()
+    repo = tmp_path / "project"
+    repo.mkdir()
+    _json(_invoke(runner, repo, "init", "--integration", "codex"))
+
+    exported = runner.invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "session",
+            "start",
+            "--stable-instance-id",
+            "session-export-window-12345678",
+            "--principal",
+            "operator",
+            "--client",
+            "codex",
+            "--software",
+            "codex-cli",
+            "--role",
+            "builder",
+            "--shell-export",
+            "zsh",
+        ],
+    )
+
+    assert exported.exit_code == 0, exported.output
+    assert exported.output.count("AGENT_COMMONS_SESSION_ID") == 1
+    assert exported.output.count("AGENT_COMMONS_SESSION_NONCE") == 1
+    assert "export AGENT_COMMONS_SESSION_ID=" in exported.output
+    assert "nonce:" not in exported.output
+
+    current = _invoke(runner, repo, "session", "current")
+    assert json.loads(current.output)["error"]["code"] == "session_not_selected"
 
 
 def test_cli_doctor_exits_two_for_missing_receipt(tmp_path: Path) -> None:

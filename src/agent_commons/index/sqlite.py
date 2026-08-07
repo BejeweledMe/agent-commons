@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -25,6 +26,14 @@ class IndexSyncResult:
     unchanged: int
 
 
+@dataclass(frozen=True)
+class ProjectionReadResult:
+    events: tuple[Mapping[str, Any], ...]
+    manifest_ids: tuple[str, ...]
+    source_count: int
+    verified_head_sha256: str
+
+
 class SQLiteIndex:
     """A disposable query accelerator; canonical files always win."""
 
@@ -40,21 +49,26 @@ class SQLiteIndex:
         self.events = events
         self.manifests = manifests
         self.database_path = Path(database_path or paths.index_db)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.database_path, timeout=30)
-        self.connection.row_factory = sqlite3.Row
-        self.connection.execute("PRAGMA busy_timeout = 30000")
-        self.connection.execute("PRAGMA foreign_keys = ON")
-        journal_mode = str(
-            self.connection.execute("PRAGMA journal_mode = WAL").fetchone()[0]
-        ).lower()
-        if journal_mode != "wal":
-            self.connection.close()
-            raise IntegrityError(f"SQLite projection requires WAL mode, got {journal_mode!r}")
         try:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+            self.connection = sqlite3.connect(self.database_path, timeout=30)
+            self.connection.row_factory = sqlite3.Row
+            self.connection.execute("PRAGMA busy_timeout = 30000")
+            self.connection.execute("PRAGMA foreign_keys = ON")
+            journal_mode = str(
+                self.connection.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+            ).lower()
+            if journal_mode != "wal":
+                raise IntegrityError(f"SQLite projection requires WAL mode, got {journal_mode!r}")
             self._initialize()
-        except Exception:
-            self.connection.close()
+        except Exception as exc:
+            connection = getattr(self, "connection", None)
+            if connection is not None:
+                connection.close()
+            if isinstance(exc, IntegrityError):
+                raise
+            if isinstance(exc, (sqlite3.Error, OSError)):
+                raise IntegrityError(f"SQLite projection could not be opened: {exc}") from exc
             raise
 
     def __enter__(self) -> SQLiteIndex:
@@ -141,8 +155,31 @@ class SQLiteIndex:
             );
             CREATE INDEX IF NOT EXISTS explicit_ref_lookup
                 ON explicit_refs(ref_kind, ref_id, owner_kind, owner_id);
+
+            CREATE TABLE IF NOT EXISTS projection_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
+        expected_workspace_id = self.paths.workspace_id
+        if expected_workspace_id is not None:
+            row = self.connection.execute(
+                "SELECT value FROM projection_metadata WHERE key = 'workspace_id'"
+            ).fetchone()
+            if row is not None and str(row["value"]) != expected_workspace_id:
+                raise IntegrityError("SQLite projection belongs to a different workspace")
+            projected = {
+                str(item["workspace_id"])
+                for item in self.connection.execute("SELECT DISTINCT workspace_id FROM events")
+            }
+            if projected and projected != {expected_workspace_id}:
+                raise IntegrityError("SQLite projection contains a different workspace")
+            if row is None:
+                self.connection.execute(
+                    "INSERT INTO projection_metadata(key, value) VALUES ('workspace_id', ?)",
+                    (expected_workspace_id,),
+                )
         self.connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         self.connection.commit()
 
@@ -185,6 +222,10 @@ class SQLiteIndex:
             self.connection.execute("BEGIN IMMEDIATE")
             if reset:
                 self.connection.execute("DELETE FROM explicit_refs")
+                self.connection.execute("DELETE FROM event_subjects")
+                self.connection.execute("DELETE FROM relations")
+                self.connection.execute("DELETE FROM events")
+                self.connection.execute("DELETE FROM manifests")
                 self.connection.execute("DELETE FROM source_files")
                 known = {}
                 removed_paths = []
@@ -397,6 +438,105 @@ class SQLiteIndex:
                 (kind,),
             )
         return [_json_object(row["document_json"]) for row in rows]
+
+    def read_projection(self, *, workspace_id: str) -> ProjectionReadResult:
+        """Verify and load a complete disposable projection for domain replay.
+
+        This verifies database structure, one-to-one source coverage, document
+        hashes, identities, and workspace ownership. It never reads canonical
+        file contents; ``sync`` remains responsible for validating changed files.
+        """
+
+        quick_check = self.connection.execute("PRAGMA quick_check").fetchone()
+        if quick_check is None or str(quick_check[0]).lower() != "ok":
+            raise IntegrityError("SQLite projection failed quick_check")
+        orphan = self.connection.execute(
+            """
+            SELECT 1 FROM events AS child
+            LEFT JOIN source_files AS source ON source.path = child.source_path
+            WHERE source.path IS NULL
+            UNION ALL
+            SELECT 1 FROM manifests AS child
+            LEFT JOIN source_files AS source ON source.path = child.source_path
+            WHERE source.path IS NULL
+            LIMIT 1
+            """
+        ).fetchone()
+        if orphan is not None:
+            raise IntegrityError("SQLite projection contains an orphaned document")
+
+        event_rows = list(
+            self.connection.execute(
+                """
+                SELECT source.identity, source.sha256, child.event_id,
+                       child.workspace_id, child.document_json
+                FROM source_files AS source
+                LEFT JOIN events AS child ON child.source_path = source.path
+                WHERE source.file_kind = 'event'
+                ORDER BY child.recorded_at, child.event_id
+                """
+            )
+        )
+        manifest_rows = list(
+            self.connection.execute(
+                """
+                SELECT source.identity, source.sha256, child.manifest_id,
+                       child.document_json
+                FROM source_files AS source
+                LEFT JOIN manifests AS child ON child.source_path = source.path
+                WHERE source.file_kind = 'manifest'
+                ORDER BY child.kind, child.manifest_id
+                """
+            )
+        )
+        events: list[Mapping[str, Any]] = []
+        manifest_ids: list[str] = []
+        head_rows: list[dict[str, str]] = []
+        for row in event_rows:
+            if row["event_id"] is None or str(row["identity"]) != str(row["event_id"]):
+                raise IntegrityError("SQLite projection event source coverage is incomplete")
+            if str(row["workspace_id"]) != workspace_id:
+                raise IntegrityError("SQLite projection contains a different workspace")
+            document_text = str(row["document_json"])
+            if hashlib.sha256(document_text.encode("utf-8")).hexdigest() != str(row["sha256"]):
+                raise IntegrityError("SQLite projection event document hash mismatch")
+            document = _json_object(document_text)
+            if (
+                document.get("event_id") != row["event_id"]
+                or document.get("workspace_id") != workspace_id
+            ):
+                raise IntegrityError("SQLite projection event identity mismatch")
+            events.append(document)
+            head_rows.append(
+                {"kind": "event", "id": str(row["identity"]), "sha256": str(row["sha256"])}
+            )
+        for row in manifest_rows:
+            if row["manifest_id"] is None or str(row["identity"]) != str(row["manifest_id"]):
+                raise IntegrityError("SQLite projection manifest source coverage is incomplete")
+            document_text = str(row["document_json"])
+            if hashlib.sha256(document_text.encode("utf-8")).hexdigest() != str(row["sha256"]):
+                raise IntegrityError("SQLite projection manifest document hash mismatch")
+            _json_object(document_text)
+            manifest_ids.append(str(row["manifest_id"]))
+            head_rows.append(
+                {
+                    "kind": "manifest",
+                    "id": str(row["identity"]),
+                    "sha256": str(row["sha256"]),
+                }
+            )
+        source_count = int(
+            self.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0]
+        )
+        if source_count != len(events) + len(manifest_ids):
+            raise IntegrityError("SQLite projection source coverage is inconsistent")
+        verified_head = hashlib.sha256(canonical_json_bytes(head_rows)).hexdigest()
+        return ProjectionReadResult(
+            events=tuple(events),
+            manifest_ids=tuple(manifest_ids),
+            source_count=source_count,
+            verified_head_sha256=verified_head,
+        )
 
     def references_to(self, kind: str, identifier: str) -> list[tuple[str, str]]:
         return [
