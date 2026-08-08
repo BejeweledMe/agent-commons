@@ -89,9 +89,9 @@ _CLAUDE_COMMONS_READ_TOOLS = (
     "mcp__agent-commons__commons_show_verification",
     "mcp__agent-commons__commons_show_artifact",
     "mcp__agent-commons__commons_read_artifact",
-    "mcp__agent-commons__commons_workspace_files",
-    "mcp__agent-commons__commons_workspace_read",
-    "mcp__agent-commons__commons_workspace_search",
+    "mcp__agent-commons__commons_repo_files",
+    "mcp__agent-commons__commons_repo_read",
+    "mcp__agent-commons__commons_repo_search",
     "mcp__agent-commons__commons_check_input",
 )
 _CLAUDE_COMMONS_OUTCOME_TOOLS = (

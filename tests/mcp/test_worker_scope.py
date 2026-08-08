@@ -318,7 +318,7 @@ def test_worker_snapshot_accepts_an_operator_configured_trusted_git(tmp_path: Pa
     server = _worker_server(workspace, git_executable=str(wrapper))
 
     assert any(
-        item["path"] == "src/app.py" for item in server.tools["commons_workspace_files"]("src", 10)
+        item["path"] == "src/app.py" for item in server.tools["commons_repo_files"]("src", 10)
     )
 
 
@@ -357,10 +357,10 @@ def test_worker_snapshot_never_follows_a_symlinked_parent_component(tmp_path: Pa
     server = _worker_server(workspace)
 
     assert "linked/canary.txt" not in {
-        item["path"] for item in server.tools["commons_workspace_files"]("", 500)
+        item["path"] for item in server.tools["commons_repo_files"]("", 500)
     }
     with pytest.raises(LifecycleConflictError, match="outside the delegated snapshot"):
-        server.tools["commons_workspace_read"]("linked/canary.txt", None)
+        server.tools["commons_repo_read"]("linked/canary.txt", None)
 
 
 def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
@@ -405,9 +405,9 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_delegation_input_needed",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
-        "commons_workspace_files",
-        "commons_workspace_read",
-        "commons_workspace_search",
+        "commons_repo_files",
+        "commons_repo_read",
+        "commons_repo_search",
         "commons_request_input",
         "commons_check_input",
         "commons_share_progress",
@@ -482,21 +482,21 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
 ) -> None:
     workspace = _workspace(tmp_path)
     server = _worker_server(workspace)
-    files = server.tools["commons_workspace_files"]("", 500)
+    files = server.tools["commons_repo_files"]("", 500)
     visible_paths = {item["path"] for item in files}
 
     assert "src/app.py" in visible_paths
     assert ".env" not in visible_paths
     assert "private.pem" not in visible_paths
     source_item = next(item for item in files if item["path"] == "src/app.py")
-    source = server.tools["commons_workspace_read"]("src/app.py", source_item["sha256"])
+    source = server.tools["commons_repo_read"]("src/app.py", source_item["sha256"])
     assert "return 42" in source["content"]
     assert source["redactions"] == []
-    assert server.tools["commons_workspace_search"]("return 42", "src", 10) == [
+    assert server.tools["commons_repo_search"]("return 42", "src", 10) == [
         {"path": "src/app.py", "line": 2, "text": "    return 42"}
     ]
     reviewable_item = next(item for item in files if item["path"] == "src/reviewable_gate.py")
-    reviewable = server.tools["commons_workspace_read"](
+    reviewable = server.tools["commons_repo_read"](
         "src/reviewable_gate.py", reviewable_item["sha256"]
     )
     assert "gated_argv(provider_argv)" in reviewable["content"]
@@ -508,7 +508,7 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
             "classifications": ["secret"],
         }
     ]
-    assert server.tools["commons_workspace_search"]("gated_argv", "src", 10) == [
+    assert server.tools["commons_repo_search"]("gated_argv", "src", 10) == [
         {
             "path": "src/reviewable_gate.py",
             "line": 2,
@@ -516,9 +516,9 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
         }
     ]
     with pytest.raises(ValidationError, match="remain relative"):
-        server.tools["commons_workspace_read"]("../canary.txt", None)
+        server.tools["commons_repo_read"]("../canary.txt", None)
     with pytest.raises(LifecycleConflictError, match="outside the delegated snapshot"):
-        server.tools["commons_workspace_read"](".env", None)
+        server.tools["commons_repo_read"](".env", None)
 
     child: CommonsManager = workspace["child"]
     unrelated_review = workspace["unrelated_review"]
@@ -620,7 +620,7 @@ def test_snapshot_mutation_and_active_cancel_both_fail_closed(tmp_path: Path) ->
     worker_server = _worker_server(workspace)
     source_item = next(
         item
-        for item in worker_server.tools["commons_workspace_files"]("src", 10)
+        for item in worker_server.tools["commons_repo_files"]("src", 10)
         if item["path"] == "src/app.py"
     )
     workspace["source"].write_text(
@@ -629,7 +629,7 @@ def test_snapshot_mutation_and_active_cancel_both_fail_closed(tmp_path: Path) ->
     )
 
     with pytest.raises(LifecycleConflictError, match="changed after reviewer snapshot"):
-        worker_server.tools["commons_workspace_read"]("src/app.py", source_item["sha256"])
+        worker_server.tools["commons_repo_read"]("src/app.py", source_item["sha256"])
     with pytest.raises(LifecycleConflictError, match="workspace changed"):
         worker_server.tools["commons_complete_review"](
             workspace["review"]["entity_ref"]["id"],
@@ -688,7 +688,7 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
     assert audit.terminal_tool_rejections == 0
 
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
-        server.tools["commons_workspace_read"]("src/app.py", None)
+        server.tools["commons_repo_read"]("src/app.py", None)
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
         server.tools["commons_complete_review"](
             workspace["review"]["entity_ref"]["id"],

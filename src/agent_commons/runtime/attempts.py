@@ -498,7 +498,16 @@ class AttemptStore:
             "launch_plan_sha256": first.launch_plan_sha256,
             "launch_key_sha256": first.launch_key_sha256,
         }
-        if dict(spec) != attempt_semantics:
+        # Normalize the stored spec through the current policy shape before
+        # comparing.  A document written before a policy field with a default
+        # existed still round-trips; without this, adding any defaulted field
+        # would reject every previously stored request on the next read.
+        normalized_spec = {
+            **dict(spec),
+            "parent_policy": parent_policy.as_dict(),
+            "child_policy": RuntimePolicy.from_mapping(dict(spec["child_policy"])).as_dict(),
+        }
+        if normalized_spec != attempt_semantics:
             raise IntegrityError("runtime request spec does not match its attempts")
         if any(
             (

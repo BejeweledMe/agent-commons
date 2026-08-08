@@ -35,7 +35,7 @@ def test_mcp_preflight_builds_real_fastmcp_catalog_without_state_writes(
     assert len(body["tool_catalog_sha256"]) == 64
     reviewer = body["worker_catalogs"]["independent_review"]
     assert reviewer["tool_names"] == sorted(reviewer["tool_names"])
-    assert "commons_workspace_read" in reviewer["tool_names"]
+    assert "commons_repo_read" in reviewer["tool_names"]
     assert "commons_record_verification" in reviewer["tool_names"]
     assert len(reviewer["tool_catalog_sha256"]) == 64
     assert not absent_state.exists()

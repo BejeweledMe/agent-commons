@@ -21,7 +21,7 @@ from agent_commons import __version__
 from agent_commons.config import CommonsPaths
 from agent_commons.core.ids import is_typed_id
 from agent_commons.core.refs import parse_ref
-from agent_commons.errors import CommonsError, ValidationError
+from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
 from agent_commons.platform_support import require_supported_platform
 from agent_commons.runtime import (
     ATTEMPT_SCHEMA,
@@ -43,6 +43,7 @@ from agent_commons.services.provider_canary import (
     run_claude_compatibility_canary,
     run_codex_compatibility_canary,
 )
+from agent_commons.ui import STARTED_SCHEMA
 
 
 class CommonsGroup(click.Group):
@@ -313,6 +314,62 @@ def init_command(
             replace_skills=replace_skills,
         )
     )
+
+
+@cli.command("ui")
+@click.option(
+    "--port",
+    type=click.IntRange(0, 65535),
+    default=0,
+    show_default=True,
+    help="Loopback port; 0 selects an ephemeral port.",
+)
+@click.option("--no-browser", is_flag=True, help="Do not open a browser automatically.")
+@click.pass_obj
+def ui_command(state: CLIState, port: int, no_browser: bool) -> None:
+    """Serve a read-only local view of this workspace on loopback.
+
+    The server never records a canonical event.  It binds 127.0.0.1 only; there
+    is deliberately no --host flag.
+    """
+
+    try:
+        from agent_commons.ui.context import UIContext
+        from agent_commons.ui.server import serve
+    except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
+        raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
+
+    context = UIContext(
+        state.repo,
+        state_root=state.state_root,
+        state_base=state.state_base,
+        state_source=state.state_source,
+    )
+
+    def emit(bound_port: int, token: str) -> None:
+        url = f"http://127.0.0.1:{bound_port}/#t={token}"
+        if state.json_output:
+            state.emit(
+                {
+                    "schema": STARTED_SCHEMA,
+                    "url": url,
+                    "port": bound_port,
+                    "token": token,
+                    "repo": str(state.repo),
+                    "read_only": True,
+                }
+            )
+            return
+        click.echo("Agent Commons UI — read-only")
+        click.echo(f"  url     {url}")
+        click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
+        click.echo("  writes  disabled — this server records no canonical event")
+        click.echo("  trust   loopback reachability alone is not authentication")
+        click.echo("  note    the token is not stored on disk; opening a browser exposes")
+        click.echo("          the URL to other processes of this user via the process list")
+        click.echo("  stop    Ctrl-C")
+
+    serve(context, port=port, open_browser=not no_browser, emit=emit)
 
 
 @cli.command("support")

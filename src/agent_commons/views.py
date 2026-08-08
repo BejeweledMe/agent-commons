@@ -70,6 +70,36 @@ def _bounded_copy(value: Any, budget: _CopyBudget, *, depth: int = 0) -> Any:
     return _bounded_copy(str(value), budget, depth=depth)
 
 
+def truncate_utf8(value: str, max_bytes: int) -> str:
+    """Public wrapper so other surfaces truncate exactly like the CLI views."""
+
+    return _truncate_utf8(value, max_bytes)
+
+
+def bounded_copy(
+    value: Any,
+    *,
+    max_total_bytes: int = 65_536,
+    max_text_bytes: int = 4_096,
+    max_children: int = 32,
+    max_depth: int = 8,
+) -> Any:
+    """Bound an arbitrary projected record for display.
+
+    Shared with the local UI so a record can never be rendered under one set of
+    truncation rules here and a different set there.
+    """
+
+    budget = _CopyBudget(
+        remaining_bytes=max_total_bytes,
+        remaining_nodes=4_096,
+        max_text_bytes=max_text_bytes,
+        max_children=max_children,
+        max_depth=max_depth,
+    )
+    return _bounded_copy(value, budget)
+
+
 def _addressed_items(
     values: Iterable[Mapping[str, Any]],
     *,

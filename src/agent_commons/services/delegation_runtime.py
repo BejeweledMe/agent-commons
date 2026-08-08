@@ -585,7 +585,7 @@ class DelegationRuntimeService:
         reviewer_entry = (
             "Use only the injected worker-scoped Agent Commons MCP tools. Start with "
             "commons_orient, commons_show_delegation, and commons_show_review; inspect source "
-            "only through commons_workspace_files/read/search. Do not invoke a CLI, skill, "
+            "only through commons_repo_files/read/search. Do not invoke a CLI, skill, "
             "native filesystem tool, shell, web tool, or subagent."
             if profile_id.independent_reviewer
             else (

@@ -148,9 +148,9 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_delegation_input_needed",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
-        "commons_workspace_files",
-        "commons_workspace_read",
-        "commons_workspace_search",
+        "commons_repo_files",
+        "commons_repo_read",
+        "commons_repo_search",
         "commons_request_input",
         "commons_check_input",
         "commons_share_progress",
@@ -164,7 +164,7 @@ VERIFICATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_record_ve
 INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = VERIFICATION_WORKER_TOOL_NAMES | {"commons_complete_review"}
 
 
-class ScopedWorkspaceReader:
+class ScopedRepoReader:
     """Immutable, bounded, no-symlink text view for delegated reviewers."""
 
     def __init__(self, manager: CommonsManager, *, git_executable: str = "/usr/bin/git") -> None:
@@ -229,7 +229,7 @@ class ScopedWorkspaceReader:
     def assert_unchanged(self) -> None:
         """Fail before a canonical result if any visible subject file moved."""
 
-        current = ScopedWorkspaceReader(
+        current = ScopedRepoReader(
             self.manager,
             git_executable=self.git_executable,
         )
@@ -541,9 +541,7 @@ def build_server(
             raise ConfigurationError("one child session cannot own multiple active delegations")
         worker = worker_matches[0] if worker_matches else None
     workspace = (
-        ScopedWorkspaceReader(commons, git_executable=git_executable)
-        if worker is not None
-        else None
+        ScopedRepoReader(commons, git_executable=git_executable) if worker is not None else None
     )
     terminal_audit = (
         TerminalToolAuditStore(
@@ -1195,7 +1193,7 @@ def build_server(
         )
 
     @register(_READ_ONLY, worker_only=True)
-    def commons_workspace_files(prefix: str = "", max_items: int = 200) -> list[dict[str, Any]]:
+    def commons_repo_files(prefix: str = "", max_items: int = 200) -> list[dict[str, Any]]:
         """List immutable UTF-8 review-snapshot paths with hashes and sizes."""
 
         if workspace is None:  # pragma: no cover - tool is registered only for workers
@@ -1203,7 +1201,7 @@ def build_server(
         return workspace.list_files(prefix=prefix, max_items=max_items)
 
     @register(_READ_ONLY, worker_only=True)
-    def commons_workspace_read(path: str, expected_sha256: str | None = None) -> dict[str, Any]:
+    def commons_repo_read(path: str, expected_sha256: str | None = None) -> dict[str, Any]:
         """Read one unchanged, bounded UTF-8 file from the reviewer snapshot."""
 
         if workspace is None:  # pragma: no cover - tool is registered only for workers
@@ -1211,7 +1209,7 @@ def build_server(
         return workspace.read(path, expected_sha256=expected_sha256)
 
     @register(_READ_ONLY, worker_only=True)
-    def commons_workspace_search(
+    def commons_repo_search(
         query: str, prefix: str = "", max_matches: int = 100
     ) -> list[dict[str, Any]]:
         """Literal-search unchanged snapshot text without exposing native filesystem tools."""

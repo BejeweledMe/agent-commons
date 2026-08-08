@@ -1,0 +1,127 @@
+"""Stream framing, resume honesty, and the self-contained frontend asset."""
+
+from __future__ import annotations
+
+import asyncio
+import re
+from typing import Any
+
+import pytest
+
+from agent_commons.ui import read_spa
+from agent_commons.ui.context import UIContext, ledger_fingerprint
+from agent_commons.ui.server import _events, _parse_last_event_id, create_app
+from tests.ui.conftest import PORT
+
+
+def drive(context: UIContext, last_event_id: str | None, count: int) -> list[bytes]:
+    async def run() -> list[bytes]:
+        frames: list[bytes] = []
+        generator = _events(context, last_event_id)
+        try:
+            for _ in range(count):
+                frames.append(await anext(generator))
+        finally:
+            await generator.aclose()
+        return frames
+
+    return asyncio.run(run())
+
+
+def test_stream_opens_with_hello_then_a_self_contained_snapshot(context: UIContext) -> None:
+    frames = drive(context, None, 2)
+    assert b"event: hello" in frames[0]
+    assert b"event: snapshot" in frames[1]
+    assert b'"graph"' in frames[1]
+
+
+def test_a_last_event_id_from_another_instance_reports_a_restart(context: UIContext) -> None:
+    frames = drive(context, "some-other-instance:4", 3)
+    assert b"event: resume_gap" in frames[2]
+    assert b'"server_restarted"' in frames[2]
+
+
+def test_a_behind_client_is_told_about_the_gap_explicitly(context: UIContext) -> None:
+    context.rebuild_graph()
+    context.rebuild_graph()
+    frames = drive(context, f"{context.server_instance_id}:1", 3)
+    assert b"event: resume_gap" in frames[2]
+    assert b'"no_event_history"' in frames[2]
+
+
+def test_a_caught_up_client_receives_no_gap(context: UIContext) -> None:
+    context.rebuild_graph()
+    frames = drive(context, f"{context.server_instance_id}:{context.seq}", 2)
+    assert not any(b"resume_gap" in frame for frame in frames)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, None),
+        ("", None),
+        ("7", None),
+        ("instance:notanumber", None),
+        ("instance:7", ("instance", 7)),
+    ],
+)
+def test_last_event_id_parsing(value: str | None, expected: tuple[str, int] | None) -> None:
+    assert _parse_last_event_id(value) == expected
+
+
+def test_the_stream_route_requires_a_token(client) -> None:  # type: ignore[no-untyped-def]
+    with client.stream("GET", "/api/stream") as response:
+        assert response.status_code == 401
+
+
+def test_fingerprint_is_stable_until_the_ledger_changes(
+    context: UIContext, workspace: dict[str, Any]
+) -> None:
+    paths = context.paths()
+    first = ledger_fingerprint(paths)
+    assert first == ledger_fingerprint(paths)
+    (paths.events / "2026" / "01" / "01").mkdir(parents=True, exist_ok=True)
+    (paths.events / "2026" / "01" / "01" / "evt.probe.json").write_text("{}", encoding="utf-8")
+    assert ledger_fingerprint(paths) != first
+
+
+def test_the_app_registers_only_read_routes(context: UIContext) -> None:
+    app = create_app(context, token="t", port=PORT)
+    paths = {getattr(route, "path", "") for route in app.routes}
+    assert "/api/graph" in paths
+    for route in app.routes:
+        assert (getattr(route, "methods", set()) or set()) <= {"GET", "HEAD"}
+
+
+def test_the_spa_is_readable_as_a_package_resource() -> None:
+    body = read_spa()
+    assert "__CSP_NONCE__" in body
+    assert len(body) > 1000
+
+
+def test_the_spa_has_no_external_references() -> None:
+    body = read_spa()
+    for forbidden in ("http://", "https://", "//cdn", "<script src", '<link rel="stylesheet"'):
+        if forbidden in ("http://", "https://"):
+            # The XML namespace literal is a URI, not a fetched resource.
+            occurrences = [
+                match
+                for match in re.findall(r"https?://[^\"'\s]+", body)
+                if match != "http://www.w3.org/2000/svg"
+            ]
+            assert occurrences == [], occurrences
+            continue
+        assert forbidden not in body, forbidden
+
+
+def test_the_spa_never_uses_an_unsafe_dom_api() -> None:
+    body = read_spa()
+    for forbidden in (
+        "innerHTML",
+        "outerHTML",
+        "insertAdjacentHTML",
+        "document.write",
+        "eval(",
+        "new Function",
+    ):
+        assert forbidden not in body, forbidden

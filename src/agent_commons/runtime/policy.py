@@ -31,11 +31,17 @@ class RuntimeUsage:
     active_fanout: int = 0
     attempts_started: int = 0
     active_concurrency: int = 0
+    subtree_delegations: int = 0
+    wave_index: int = 0
+    context_tokens: int = 0
 
     def __post_init__(self) -> None:
         _nonnegative("active_fanout", self.active_fanout)
         _nonnegative("attempts_started", self.attempts_started)
         _nonnegative("active_concurrency", self.active_concurrency)
+        _nonnegative("subtree_delegations", self.subtree_delegations)
+        _nonnegative("wave_index", self.wave_index)
+        _nonnegative("context_tokens", self.context_tokens)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +61,9 @@ class RuntimePolicy:
     timeout_seconds: int = 1_800
     max_output_bytes: int = 1_048_576
     max_budget_microusd: int | None = None
+    max_delegations_total: int = 1
+    max_wave_count: int = 1
+    max_context_tokens: int | None = None
 
     def __post_init__(self) -> None:
         _nonnegative("remaining_depth", self.remaining_depth)
@@ -65,6 +74,10 @@ class RuntimePolicy:
         _positive("max_output_bytes", self.max_output_bytes)
         if self.max_budget_microusd is not None:
             _positive("max_budget_microusd", self.max_budget_microusd)
+        _positive("max_delegations_total", self.max_delegations_total)
+        _positive("max_wave_count", self.max_wave_count)
+        if self.max_context_tokens is not None:
+            _positive("max_context_tokens", self.max_context_tokens)
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> RuntimePolicy:
@@ -76,6 +89,9 @@ class RuntimePolicy:
             "timeout_seconds",
             "max_output_bytes",
             "max_budget_microusd",
+            "max_delegations_total",
+            "max_wave_count",
+            "max_context_tokens",
         }
         unknown = sorted(set(value) - allowed)
         if unknown:
@@ -110,6 +126,8 @@ class RuntimePolicy:
             "max_concurrency",
             "timeout_seconds",
             "max_output_bytes",
+            "max_delegations_total",
+            "max_wave_count",
         ):
             if getattr(self, name) > getattr(parent, name):
                 raise PolicyViolationError(f"child {name} exceeds the parent limit")
@@ -118,19 +136,46 @@ class RuntimePolicy:
             or self.max_budget_microusd > parent.max_budget_microusd
         ):
             raise PolicyViolationError("child monetary budget exceeds the parent limit")
+        if parent.max_context_tokens is not None and (
+            self.max_context_tokens is None or self.max_context_tokens > parent.max_context_tokens
+        ):
+            raise PolicyViolationError("child context token limit exceeds the parent limit")
 
-    def assert_launch_allowed(self, usage: RuntimeUsage) -> None:
+    def assert_admission_allowed(self, usage: RuntimeUsage) -> None:
+        """Guards that waiting in the admission queue can never satisfy.
+
+        Depth, attempts, subtree totals, planning waves, and assembled context
+        are permanent facts about the request: queueing cannot repair them, so
+        they must fail closed instead of consuming a queue slot.
+        """
+
         if self.remaining_depth < 1:
             raise PolicyViolationError("delegation depth is exhausted")
-        if usage.active_fanout >= self.max_fanout:
-            raise PolicyViolationError("delegation fanout limit is exhausted")
         if usage.attempts_started >= self.max_attempts:
             raise PolicyViolationError("delegation attempt limit is exhausted")
+        if usage.subtree_delegations >= self.max_delegations_total:
+            raise PolicyViolationError("delegation subtree total limit is exhausted")
+        if usage.wave_index >= self.max_wave_count:
+            raise PolicyViolationError("delegation planning wave limit is exhausted")
+        self.assert_context_allowed(usage.context_tokens)
+
+    def assert_context_allowed(self, estimated_tokens: int) -> None:
+        """A size ceiling, not an occupied slot: an exactly-sized context passes."""
+
+        _nonnegative("context_tokens", estimated_tokens)
+        if self.max_context_tokens is not None and estimated_tokens > self.max_context_tokens:
+            raise PolicyViolationError("assembled child context exceeds the context token limit")
+
+    def assert_launch_allowed(self, usage: RuntimeUsage) -> None:
+        self.assert_admission_allowed(usage)
+        if usage.active_fanout >= self.max_fanout:
+            raise PolicyViolationError("delegation fanout limit is exhausted")
         if usage.active_concurrency >= self.max_concurrency:
             raise PolicyViolationError("runtime concurrency limit is exhausted")
 
 
 _PROVIDERS = frozenset({"codex", "claude"})
+_INDEPENDENT_REVIEWER_SUFFIX = "-independent-reviewer"
 _PROFILES = frozenset(
     {
         "codex-builder",
@@ -164,6 +209,9 @@ class OperatorLimits:
     queue_wait_seconds: int = 30
     parent_provider_units: int = 4
     parent_budget_microusd: int = 10_000_000
+    max_delegations_total: int = 1
+    max_wave_count: int = 1
+    max_context_tokens: int | None = None
     provider_concurrency: Mapping[str, int] = field(
         default_factory=lambda: {"codex": 2, "claude": 2}
     )
@@ -184,6 +232,10 @@ class OperatorLimits:
         _positive("queue_wait_seconds", self.queue_wait_seconds)
         _positive("parent_provider_units", self.parent_provider_units)
         _positive("parent_budget_microusd", self.parent_budget_microusd)
+        _positive("max_delegations_total", self.max_delegations_total)
+        _positive("max_wave_count", self.max_wave_count)
+        if self.max_context_tokens is not None:
+            _positive("max_context_tokens", self.max_context_tokens)
         object.__setattr__(
             self,
             "provider_concurrency",
@@ -214,6 +266,26 @@ class OperatorLimits:
                 allowed=_PROVIDERS,
             ),
         )
+        self._assert_writable_concurrency_preconditions()
+
+    def _assert_writable_concurrency_preconditions(self) -> None:
+        """Refuse an unsafe ceiling at configuration load, not after a fan-out.
+
+        Raising concurrency for a writable profile puts two processes in one
+        working tree.  Worktree isolation is the missing guard, so the failure
+        names it here rather than surfacing as a corrupted checkout later.
+        """
+
+        writable = sorted(
+            name
+            for name, value in self.profile_concurrency.items()
+            if value > 1 and not name.endswith(_INDEPENDENT_REVIEWER_SUFFIX)
+        )
+        if writable:
+            raise PolicyViolationError(
+                "raising profile_concurrency above 1 for a writable profile requires "
+                "worktree isolation, which is not implemented: " + ", ".join(writable)
+            )
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any] | None) -> OperatorLimits:
@@ -226,6 +298,9 @@ class OperatorLimits:
             "queue_wait_seconds",
             "parent_provider_units",
             "parent_budget_microusd",
+            "max_delegations_total",
+            "max_wave_count",
+            "max_context_tokens",
             "provider_concurrency",
             "profile_concurrency",
             "provider_parent_provider_units",
@@ -282,8 +357,50 @@ class OperatorLimits:
             "queue_wait_seconds": self.queue_wait_seconds,
             "parent_provider_units": self.parent_provider_units,
             "parent_budget_microusd": self.parent_budget_microusd,
+            "max_delegations_total": self.max_delegations_total,
+            "max_wave_count": self.max_wave_count,
+            "max_context_tokens": self.max_context_tokens,
             "provider_concurrency": dict(self.provider_concurrency),
             "profile_concurrency": dict(self.profile_concurrency),
             "provider_parent_provider_units": dict(self.provider_parent_provider_units),
             "provider_parent_budget_microusd": dict(self.provider_parent_budget_microusd),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RunRetentionLimits:
+    """Operator-owned retention for the disposable run-observability store.
+
+    Three independent tiers; whichever threshold is reached first applies.
+    Active and ``needs_operator`` runs are never candidates -- that exclusion
+    lives in the store, not here, because it is a correctness invariant rather
+    than a tunable.
+    """
+
+    full_run_limit: int = 20
+    digest_age_days: int = 30
+    max_total_bytes: int = 500 * 1024 * 1024
+
+    def __post_init__(self) -> None:
+        _positive("full_run_limit", self.full_run_limit)
+        _positive("digest_age_days", self.digest_age_days)
+        _positive("max_total_bytes", self.max_total_bytes)
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> RunRetentionLimits:
+        if value is None:
+            return cls()
+        allowed = {"full_run_limit", "digest_age_days", "max_total_bytes"}
+        unknown = sorted(set(value) - allowed)
+        if unknown:
+            raise PolicyViolationError(
+                "run retention limits have unsupported fields: " + ", ".join(unknown)
+            )
+        return cls(**dict(value))
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "full_run_limit": self.full_run_limit,
+            "digest_age_days": self.digest_age_days,
+            "max_total_bytes": self.max_total_bytes,
         }

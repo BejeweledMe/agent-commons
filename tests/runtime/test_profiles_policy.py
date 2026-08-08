@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import os
+import random
 import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -271,9 +273,9 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_show_verification",
         "mcp__agent-commons__commons_show_artifact",
         "mcp__agent-commons__commons_read_artifact",
-        "mcp__agent-commons__commons_workspace_files",
-        "mcp__agent-commons__commons_workspace_read",
-        "mcp__agent-commons__commons_workspace_search",
+        "mcp__agent-commons__commons_repo_files",
+        "mcp__agent-commons__commons_repo_read",
+        "mcp__agent-commons__commons_repo_search",
         "mcp__agent-commons__commons_check_input",
         "mcp__agent-commons__commons_complete_review",
         "mcp__agent-commons__commons_record_verification",
@@ -418,3 +420,123 @@ def test_runtime_policy_can_only_shrink_and_consumes_depth() -> None:
 def test_runtime_policy_rejects_exhausted_launch_limits(usage: RuntimeUsage, message: str) -> None:
     with pytest.raises(PolicyViolationError, match=message):
         RuntimePolicy().assert_launch_allowed(usage)
+
+
+def test_new_runtime_guards_are_inert_at_their_defaults() -> None:
+    """A fresh policy must not refuse the very first delegation."""
+
+    policy = RuntimePolicy()
+    assert policy.max_delegations_total == 1
+    assert policy.max_wave_count == 1
+    assert policy.max_context_tokens is None
+    policy.assert_launch_allowed(RuntimeUsage())
+
+
+@pytest.mark.parametrize(
+    ("usage", "message"),
+    [
+        (RuntimeUsage(subtree_delegations=1), "subtree"),
+        (RuntimeUsage(wave_index=1), "wave"),
+    ],
+)
+def test_runtime_policy_rejects_exhausted_subtree_guards(usage: RuntimeUsage, message: str) -> None:
+    with pytest.raises(PolicyViolationError, match=message):
+        RuntimePolicy().assert_launch_allowed(usage)
+
+
+def test_context_ceiling_is_a_size_not_an_occupied_slot() -> None:
+    policy = RuntimePolicy(max_context_tokens=100)
+    policy.assert_context_allowed(100)
+    with pytest.raises(PolicyViolationError, match="context token"):
+        policy.assert_context_allowed(101)
+
+
+def test_admission_guards_exclude_queueable_capacity() -> None:
+    """Fanout and concurrency are transient: the admission queue exists to
+    absorb them, so they must not fail closed here."""
+
+    policy = RuntimePolicy()
+    policy.assert_admission_allowed(RuntimeUsage(active_fanout=5, active_concurrency=5))
+    with pytest.raises(PolicyViolationError, match="fanout"):
+        policy.assert_launch_allowed(RuntimeUsage(active_fanout=5))
+
+
+def test_no_policy_field_can_widen_in_any_generated_child() -> None:
+    """Reflective over the dataclass, so a field added later and forgotten in
+    assert_reduction_of fails here rather than silently amplifying authority."""
+
+    optional = {"max_budget_microusd", "max_context_tokens"}
+    names = [
+        item.name for item in dataclasses.fields(RuntimePolicy) if item.name != "remaining_depth"
+    ]
+    rng = random.Random(20260809)
+    for _ in range(200):
+        values = {name: rng.randint(2, 4096) for name in names}
+        parent = RuntimePolicy(remaining_depth=rng.randint(1, 4), **values)
+        child = parent.derive_child()
+        child.assert_reduction_of(parent)
+        assert child.remaining_depth == parent.remaining_depth - 1
+        for name in names:
+            assert getattr(child, name) <= getattr(parent, name)
+        widened = rng.choice(names)
+        with pytest.raises(PolicyViolationError):
+            parent.derive_child(**{widened: getattr(parent, widened) + 1})
+        for name in optional:
+            with pytest.raises(PolicyViolationError):
+                parent.derive_child(**{name: None})
+
+
+def test_runtime_policy_round_trips_through_from_mapping() -> None:
+    policy = RuntimePolicy(
+        remaining_depth=3,
+        max_fanout=4,
+        max_attempts=2,
+        max_concurrency=2,
+        timeout_seconds=600,
+        max_output_bytes=2048,
+        max_budget_microusd=500,
+        max_delegations_total=9,
+        max_wave_count=5,
+        max_context_tokens=60_000,
+    )
+    assert RuntimePolicy.from_mapping(policy.as_dict()) == policy
+
+
+def test_operator_limits_round_trip_and_reject_unknown_fields() -> None:
+    limits = OperatorLimits(max_delegations_total=6, max_wave_count=3, max_context_tokens=1024)
+    restored = OperatorLimits.from_mapping(limits.as_dict())
+    assert restored.max_delegations_total == 6
+    assert restored.max_wave_count == 3
+    assert restored.max_context_tokens == 1024
+    with pytest.raises(PolicyViolationError, match="unsupported fields"):
+        OperatorLimits.from_mapping({"max_waves": 3})
+
+
+def test_raising_writable_profile_concurrency_fails_at_configuration_load() -> None:
+    """The operator learns the guard is missing before a run starts, not after
+    two processes are already writing to one checkout."""
+
+    with pytest.raises(PolicyViolationError, match="worktree isolation"):
+        OperatorLimits(profile_concurrency={"claude-builder": 2})
+    with pytest.raises(PolicyViolationError, match="codex-builder"):
+        OperatorLimits.from_mapping({"profile_concurrency": {"codex-builder": 3}})
+
+
+def test_raising_read_only_profile_concurrency_is_allowed() -> None:
+    """Independent reviewers never write, so they need no worktree isolation.
+    The cap is still the minimum across all three operator tiers."""
+
+    limits = OperatorLimits(
+        global_concurrency=4,
+        provider_concurrency={"claude": 3},
+        profile_concurrency={"claude-independent-reviewer": 3},
+    )
+    assert limits.profile_concurrency_cap("claude-independent-reviewer") == 3
+    assert limits.profile_concurrency_cap("claude-builder") == 1
+
+    narrowed = OperatorLimits(
+        global_concurrency=4,
+        provider_concurrency={"claude": 2},
+        profile_concurrency={"claude-independent-reviewer": 3},
+    )
+    assert narrowed.profile_concurrency_cap("claude-independent-reviewer") == 2

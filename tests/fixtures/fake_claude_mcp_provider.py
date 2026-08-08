@@ -57,8 +57,8 @@ async def _run() -> None:
                 "commons_list_reviews",
                 "commons_show_review",
                 "commons_show_delegation",
-                "commons_workspace_files",
-                "commons_workspace_read",
+                "commons_repo_files",
+                "commons_repo_read",
                 "commons_complete_review",
                 "commons_succeed_delegation",
             }
@@ -78,14 +78,14 @@ async def _run() -> None:
             )
             files = _value(
                 await session.call_tool(
-                    "commons_workspace_files",
+                    "commons_repo_files",
                     {"prefix": "src", "max_items": 50},
                 )
             )
             source = next(item for item in files if item["path"].endswith(".py"))
             read = _value(
                 await session.call_tool(
-                    "commons_workspace_read",
+                    "commons_repo_read",
                     {"path": source["path"], "expected_sha256": source["sha256"]},
                 )
             )
