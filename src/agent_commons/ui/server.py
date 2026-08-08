@@ -61,10 +61,14 @@ def _error(status: int, code: str, message: str, actions: list[str] | None = Non
     return response
 
 
-def _sse(event: str, data: Any, *, event_id: int | None = None) -> bytes:
+def _sse(
+    event: str, data: Any, *, event_id: int | None = None, instance: str | None = None
+) -> bytes:
     lines = []
     if event_id is not None:
-        lines.append(f"id: {event_id}")
+        # The id is composite so a reconnect after a restart is detectable: a
+        # bare counter would make a stale client look caught up.
+        lines.append(f"id: {instance}:{event_id}" if instance else f"id: {event_id}")
     lines.append(f"event: {event}")
     lines.append("data: " + json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     return ("\n".join(lines) + "\n\n").encode("utf-8")
@@ -164,10 +168,16 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
             "poll_seconds": _POLL_SECONDS,
         },
         event_id=context.seq,
+        instance=context.server_instance_id,
     )
     await asyncio.to_thread(context.refresh_if_changed)
     graph = await asyncio.to_thread(context.graph)
-    yield _sse("snapshot", {"seq": context.seq, "graph": graph}, event_id=context.seq)
+    yield _sse(
+        "snapshot",
+        {"seq": context.seq, "graph": graph},
+        event_id=context.seq,
+        instance=context.server_instance_id,
+    )
 
     parsed = _parse_last_event_id(last_event_id)
     if parsed is not None:
@@ -177,6 +187,7 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
                 "resume_gap",
                 {"from": seq, "to": context.seq, "reason": "server_restarted"},
                 event_id=context.seq,
+                instance=context.server_instance_id,
             )
         elif seq < context.seq:
             # There is no durable event history yet, so a caught-up client is
@@ -185,6 +196,7 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
                 "resume_gap",
                 {"from": seq, "to": context.seq, "reason": "no_event_history"},
                 event_id=context.seq,
+                instance=context.server_instance_id,
             )
 
     since_heartbeat = 0.0
@@ -194,7 +206,12 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
         changed = await asyncio.to_thread(context.refresh_if_changed)
         if changed:
             graph = await asyncio.to_thread(context.graph)
-            yield _sse("snapshot", {"seq": context.seq, "graph": graph}, event_id=context.seq)
+            yield _sse(
+                "snapshot",
+                {"seq": context.seq, "graph": graph},
+                event_id=context.seq,
+                instance=context.server_instance_id,
+            )
             since_heartbeat = 0.0
         elif since_heartbeat >= _HEARTBEAT_SECONDS:
             # A comment carries no id, so it cannot disturb Last-Event-ID.

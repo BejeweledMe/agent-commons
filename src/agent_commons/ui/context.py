@@ -48,7 +48,23 @@ def ledger_fingerprint(paths: CommonsPaths) -> str:
                 info = path.stat()
             except OSError:  # pragma: no cover - file vanished mid-scan
                 continue
-            digest.update(f"{path.name}\0{info.st_size}\0{info.st_mtime_ns}\n".encode())
+            digest.update(
+                f"{path.relative_to(root)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
+            )
+    # Sessions are graph nodes but live in operational state, so a ledger-only
+    # fingerprint would leave a closed or newly opened session on screen forever.
+    sessions = paths.state_root / "sessions"
+    if sessions.exists():
+        for path in sorted(sessions.rglob("*")):
+            if not path.is_file():
+                continue
+            try:
+                info = path.stat()
+            except OSError:  # pragma: no cover - file vanished mid-scan
+                continue
+            digest.update(
+                f"{path.relative_to(sessions)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
+            )
     return "sha256:" + digest.hexdigest()
 
 

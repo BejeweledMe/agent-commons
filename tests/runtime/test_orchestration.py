@@ -390,3 +390,27 @@ def test_parent_ttl_check_uses_the_session_registry_clock(tmp_path: Path) -> Non
 
     child_expiry = datetime.fromisoformat(child["expires_at"].replace("Z", "+00:00"))
     assert child_expiry > datetime.fromtimestamp(manager.sessions.clock(), tz=UTC)
+
+
+def test_operator_limits_reach_the_runtime_policy(tmp_path: Path) -> None:
+    """Regression: the new ceilings were validated and serialized but never
+    handed to the policy, so they were dead configuration."""
+
+    from agent_commons.runtime import OperatorLimits
+
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(
+        manager,
+        profiles=default_profile_registry(),
+        operator_limits=OperatorLimits(
+            max_delegations_total=7, max_wave_count=4, max_context_tokens=64_000
+        ),
+    )
+    parent, child = service._policies(manager.get_delegation(delegation["entity_ref"]["id"]))
+    assert parent.max_delegations_total == 7
+    assert parent.max_wave_count == 4
+    assert parent.max_context_tokens == 64_000
+    # The child inherits them and can only narrow.
+    assert child.max_delegations_total == 7
+    assert child.max_context_tokens == 64_000

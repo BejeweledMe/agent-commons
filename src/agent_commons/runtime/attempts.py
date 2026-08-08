@@ -502,10 +502,16 @@ class AttemptStore:
         # comparing.  A document written before a policy field with a default
         # existed still round-trips; without this, adding any defaulted field
         # would reject every previously stored request on the next read.
+        try:
+            stored_child_policy = RuntimePolicy.from_mapping(dict(spec["child_policy"]))
+        except (PolicyViolationError, TypeError, ValueError) as exc:
+            # A corrupt document must surface as an integrity fault like every
+            # other malformed field here, not as a raw container error.
+            raise IntegrityError(f"runtime request child policy is unreadable: {exc}") from exc
         normalized_spec = {
             **dict(spec),
             "parent_policy": parent_policy.as_dict(),
-            "child_policy": RuntimePolicy.from_mapping(dict(spec["child_policy"])).as_dict(),
+            "child_policy": stored_child_policy.as_dict(),
         }
         if normalized_spec != attempt_semantics:
             raise IntegrityError("runtime request spec does not match its attempts")
@@ -777,8 +783,10 @@ class AttemptStore:
                     parent_session_id=spec.correlation.parent_session_id,
                     attempts_started=attempts_started,
                 )
-                if parent_policy.remaining_depth < 1:
-                    raise PolicyViolationError("delegation depth is exhausted")
+                # Admission guards only: fanout and concurrency are transient
+                # and belong to the queue below, so they are deliberately not
+                # evaluated here.
+                parent_policy.assert_admission_allowed(usage)
                 self._assert_budget_available(
                     documents,
                     spec,

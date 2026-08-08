@@ -352,11 +352,17 @@ class RunEventStore:
         self._guard = threading.RLock()
         self._lock_descriptor = -1
         self._closed = False
+        self._readers = threading.local()
+        self._reader_pool: list[sqlite3.Connection] = []
         try:
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
             if writer:
                 self._acquire_writer_lock()
             fresh = not self.database_path.exists()
+            # The write connection is only ever touched under ``_guard``.  Readers
+            # get their own connections: sharing one across threads corrupts
+            # cursor state and exposes rows from a transaction that later rolls
+            # back.
             self.connection = sqlite3.connect(
                 self.database_path, timeout=30, check_same_thread=False
             )
@@ -392,10 +398,41 @@ class RunEventStore:
             if self._closed:
                 return
             self._closed = True
+            for reader in self._reader_pool:
+                try:
+                    reader.close()
+                except sqlite3.Error:  # pragma: no cover - best effort teardown
+                    pass
+            self._reader_pool.clear()
             try:
                 self.connection.close()
             finally:
                 self._release_writer_lock()
+
+    def _assert_open(self) -> None:
+        if self._closed:
+            raise IntegrityError("run observability store is closed")
+
+    @property
+    def _read(self) -> sqlite3.Connection:
+        """A per-thread read connection.
+
+        Reads never share the write connection: a concurrent writer would
+        otherwise reset cursor state under the reader and expose uncommitted
+        rows that a rollback then removes.
+        """
+
+        self._assert_open()
+        connection = getattr(self._readers, "connection", None)
+        if connection is None:
+            connection = sqlite3.connect(self.database_path, timeout=30)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA busy_timeout = 30000")
+            connection.execute("PRAGMA query_only = ON")
+            self._readers.connection = connection
+            with self._guard:
+                self._reader_pool.append(connection)
+        return connection
 
     def _lock_path(self) -> Path:
         return self.database_path.with_name(self.database_path.name + ".lock")
@@ -548,19 +585,19 @@ class RunEventStore:
             self.sweep(reason="run_finished")
 
     def get_run(self, run_id: str) -> RunRow | None:
-        row = self.connection.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        row = self._read.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return self._run_row(row) if row is not None else None
 
     def list_runs(self, *, states: Sequence[str] | None = None, limit: int = 100) -> list[RunRow]:
         if states:
             placeholders = ",".join("?" for _ in states)
-            rows = self.connection.execute(
+            rows = self._read.execute(
                 f"SELECT * FROM runs WHERE state IN ({placeholders}) "
                 "ORDER BY created_at DESC LIMIT ?",
                 (*states, int(limit)),
             ).fetchall()
         else:
-            rows = self.connection.execute(
+            rows = self._read.execute(
                 "SELECT * FROM runs ORDER BY created_at DESC LIMIT ?", (int(limit),)
             ).fetchall()
         return [self._run_row(row) for row in rows]
@@ -677,6 +714,13 @@ class RunEventStore:
             return
         state = self._replay_locked(connection, run_id, upto_seq=head_seq)
         self._write_snapshot(connection, run_id, state)
+        # Only the newest snapshot can serve a replay, and an active run is
+        # excluded from every retention tier, so stale ones would accumulate
+        # for the whole life of the run.
+        connection.execute(
+            "DELETE FROM run_snapshots WHERE run_id = ? AND upto_seq < ?",
+            (run_id, state.upto_seq),
+        )
 
     def _write_snapshot(self, connection: sqlite3.Connection, run_id: str, state: RunState) -> None:
         connection.execute(
@@ -712,7 +756,7 @@ class RunEventStore:
             clauses.append("node_id = ?")
             params.append(node_id)
         params.append(int(limit))
-        rows = self.connection.execute(
+        rows = self._read.execute(
             f"SELECT * FROM run_events WHERE {' AND '.join(clauses)} ORDER BY seq LIMIT ?",
             params,
         ).fetchall()
@@ -729,9 +773,7 @@ class RunEventStore:
         ]
 
     def head_seq(self, run_id: str) -> int:
-        row = self.connection.execute(
-            "SELECT head_seq FROM runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
+        row = self._read.execute("SELECT head_seq FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return int(row["head_seq"]) if row is not None else 0
 
     def can_replay_from(self, run_id: str, seq: int) -> bool:
@@ -744,12 +786,12 @@ class RunEventStore:
 
     def latest_snapshot(self, run_id: str, *, upto_seq: int | None = None) -> SnapshotRow | None:
         if upto_seq is None:
-            row = self.connection.execute(
+            row = self._read.execute(
                 "SELECT * FROM run_snapshots WHERE run_id = ? ORDER BY upto_seq DESC LIMIT 1",
                 (run_id,),
             ).fetchone()
         else:
-            row = self.connection.execute(
+            row = self._read.execute(
                 "SELECT * FROM run_snapshots WHERE run_id = ? AND upto_seq <= ? "
                 "ORDER BY upto_seq DESC LIMIT 1",
                 (run_id, int(upto_seq)),
@@ -764,8 +806,9 @@ class RunEventStore:
         )
 
     def replay_state(self, run_id: str) -> RunState:
-        with self._guard:
-            return self._replay_locked(self.connection, run_id)
+        # Reads go through the per-thread connection so a replay never blocks
+        # the writer and never observes an uncommitted batch.
+        return self._replay_locked(self._read, run_id)
 
     def _replay_locked(
         self, connection: sqlite3.Connection, run_id: str, *, upto_seq: int | None = None
@@ -820,7 +863,7 @@ class RunEventStore:
             params.append(node_id)
         if open_only:
             clauses.append("ended_seq IS NULL")
-        rows = self.connection.execute(
+        rows = self._read.execute(
             f"SELECT * FROM spans WHERE {' AND '.join(clauses)} ORDER BY started_seq", params
         ).fetchall()
         return [
@@ -838,7 +881,7 @@ class RunEventStore:
         ]
 
     def get_layout(self, org_ref: str) -> dict[str, LayoutEntry]:
-        rows = self.connection.execute(
+        rows = self._read.execute(
             "SELECT * FROM canvas_layout WHERE org_ref = ?", (org_ref,)
         ).fetchall()
         return {
@@ -881,9 +924,9 @@ class RunEventStore:
         fall would keep finding victims and eventually delete every run.
         """
 
-        page_count = int(self.connection.execute("PRAGMA page_count").fetchone()[0])
-        freelist = int(self.connection.execute("PRAGMA freelist_count").fetchone()[0])
-        page_size = int(self.connection.execute("PRAGMA page_size").fetchone()[0])
+        page_count = int(self._read.execute("PRAGMA page_count").fetchone()[0])
+        freelist = int(self._read.execute("PRAGMA freelist_count").fetchone()[0])
+        page_size = int(self._read.execute("PRAGMA page_size").fetchone()[0])
         return max(0, page_count - freelist) * page_size
 
     def retained_bytes(self) -> int:
@@ -893,10 +936,10 @@ class RunEventStore:
         which is exactly what a retention loop needs to make progress.
         """
 
-        row = self.connection.execute(
+        row = self._read.execute(
             "SELECT COALESCE(SUM(approx_bytes), 0) AS events FROM runs"
         ).fetchone()
-        snapshots = self.connection.execute(
+        snapshots = self._read.execute(
             "SELECT COALESCE(SUM(LENGTH(state_json)), 0) AS total FROM run_snapshots"
         ).fetchone()
         return int(row["events"]) + int(snapshots["total"])
@@ -936,33 +979,36 @@ class RunEventStore:
                 digested.append(row["run_id"])
 
             low_water = int(self.retention.max_total_bytes * _LOW_WATER_RATIO)
-            retained = self.retained_bytes()
-            while retained > self.retention.max_total_bytes:
-                victim = self.connection.execute(
-                    f"SELECT run_id FROM runs WHERE state IN ({placeholders}) "
-                    "AND retention_tier = 'full' ORDER BY finished_at LIMIT 1",
-                    _PRUNABLE_STATES,
-                ).fetchone()
+            # The newest finished run is never a size-cap victim: a store that
+            # answers "what just happened" with nothing is worse than one that
+            # sits slightly over its ceiling.
+            newest = self._read.execute(
+                f"SELECT run_id FROM runs WHERE state IN ({placeholders}) "
+                "ORDER BY finished_at DESC LIMIT 1",
+                _PRUNABLE_STATES,
+            ).fetchone()
+            protected = {newest["run_id"]} if newest is not None else set()
+            attempted: set[str] = set()
+            while self.retained_bytes() > self.retention.max_total_bytes:
+                victim = self._next_size_victim(
+                    placeholders, tier="full", skip=protected | attempted
+                )
                 if victim is not None:
-                    self._digest_run(victim["run_id"])
-                    digested.append(victim["run_id"])
+                    self._digest_run(victim)
+                    digested.append(victim)
                 else:
-                    victim = self.connection.execute(
-                        f"SELECT run_id FROM runs WHERE state IN ({placeholders}) "
-                        "AND retention_tier = 'digest' ORDER BY finished_at LIMIT 1",
-                        _PRUNABLE_STATES,
-                    ).fetchone()
+                    victim = self._next_size_victim(
+                        placeholders, tier="digest", skip=protected | attempted
+                    )
                     if victim is None:
                         break
-                    self._purge_run(victim["run_id"])
-                    purged.append(victim["run_id"])
-                remaining = self.retained_bytes()
-                if remaining >= retained:
-                    # No progress: stop rather than keep consuming victims for a
-                    # measurement that will not move.
-                    break
-                retained = remaining
-                if retained <= low_water:
+                    self._purge_run(victim)
+                    purged.append(victim)
+                # A victim that did not shrink the store is skipped rather than
+                # ending the sweep: stopping at the first one left the ceiling
+                # unenforced for every run behind it.
+                attempted.add(victim)
+                if self.retained_bytes() <= low_water:
                     break
 
             if digested or purged:
@@ -974,6 +1020,17 @@ class RunEventStore:
                 bytes_before=before,
                 bytes_after=self.retained_bytes(),
             )
+
+    def _next_size_victim(self, placeholders: str, *, tier: str, skip: set[str]) -> str | None:
+        rows = self._read.execute(
+            f"SELECT run_id FROM runs WHERE state IN ({placeholders}) "
+            "AND retention_tier = ? ORDER BY finished_at",
+            (*_PRUNABLE_STATES, tier),
+        ).fetchall()
+        for row in rows:
+            if row["run_id"] not in skip:
+                return str(row["run_id"])
+        return None
 
     def _reclaim(self) -> None:
         try:

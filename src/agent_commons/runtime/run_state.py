@@ -72,6 +72,15 @@ DIGEST_DROP_KINDS = frozenset(
 
 RUN_LEVEL_NODE_ID = "run"
 
+#: Guardrail trips and milestones are unbounded over a long run, and the folded
+#: state is serialized into every snapshot.  Keeping only the most recent
+#: entries stops a snapshot from growing past the stream it summarises.
+MAX_STATE_ENTRIES = 100
+
+
+def _bounded(entries: tuple[dict[str, Any], ...]) -> tuple[dict[str, Any], ...]:
+    return entries[-MAX_STATE_ENTRIES:]
+
 
 def _int(value: Any) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
@@ -422,10 +431,10 @@ def fold_event(state: RunState, event: Any) -> RunState:
         return _advance(state, seq, pending_inputs=pending)
     if kind is RunEventKind.GUARDRAIL_TRIPPED:
         entry = {"seq": seq, "guard": str(body.get("guard", "")), "action": body.get("action")}
-        return _advance(state, seq, guardrails=state.guardrails + (entry,))
+        return _advance(state, seq, guardrails=_bounded(state.guardrails + (entry,)))
     if kind is RunEventKind.MILESTONE:
         entry = {"seq": seq, "event_id": body.get("event_id")}
-        return _advance(state, seq, milestones=state.milestones + (entry,))
+        return _advance(state, seq, milestones=_bounded(state.milestones + (entry,)))
     if kind is RunEventKind.ERROR:
         error = {"seq": seq, "code": body.get("diagnostic_code") or body.get("code")}
         return _advance(

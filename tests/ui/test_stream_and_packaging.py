@@ -125,3 +125,48 @@ def test_the_spa_never_uses_an_unsafe_dom_api() -> None:
         "new Function",
     ):
         assert forbidden not in body, forbidden
+
+
+def test_stream_ids_round_trip_through_the_parser(context: UIContext) -> None:
+    """Regression: the server emitted a bare counter while the parser required
+    instance:seq, so the resume_gap branch was unreachable for any client that
+    did not reassemble the id itself."""
+
+    frames = drive(context, None, 2)
+    first_line = frames[0].split(b"\n")[0].decode()
+    assert first_line.startswith("id: ")
+    parsed = _parse_last_event_id(first_line.removeprefix("id: "))
+    assert parsed is not None
+    assert parsed[0] == context.server_instance_id
+
+
+def test_a_replayed_stream_id_produces_a_resume_gap(context: UIContext) -> None:
+    context.rebuild_graph()
+    context.rebuild_graph()
+    frames = drive(context, None, 1)
+    stale = frames[0].split(b"\n")[0].decode().removeprefix("id: ")
+    instance, _ = _parse_last_event_id(stale)
+    resumed = drive(context, f"{instance}:1", 3)
+    assert b"resume_gap" in resumed[2]
+
+
+def test_the_fingerprint_notices_a_new_session(populated, context: UIContext) -> None:  # type: ignore[no-untyped-def]
+    """Regression: sessions are graph nodes but the fingerprint only covered the
+    ledger, so a session opening or expiring never refreshed the view."""
+
+    from agent_commons.services import CommonsManager
+
+    context.rebuild_graph()
+    before = context.fingerprint()
+    manager = CommonsManager(populated["repo"], state_root=populated["state_root"])
+    manager.sessions.open_session(
+        stable_instance_id="second-window",
+        principal="local-operator",
+        client="codex",
+        software="codex-cli",
+        role="independent-reviewer",
+    )
+    assert context.fingerprint() != before
+    assert context.refresh_if_changed() is True
+    sessions = [node for node in context.graph()["nodes"] if node["kind"] == "session"]
+    assert len(sessions) == 2
