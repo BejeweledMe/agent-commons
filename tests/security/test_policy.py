@@ -153,3 +153,42 @@ def test_pseudonyms_are_keyed_deterministic_and_namespace_bound() -> None:
 def test_security_config_parsing_is_strict(config: dict[str, object]) -> None:
     with pytest.raises(ValueError):
         SecurityPolicy.from_mapping(config)
+
+
+def test_a_private_key_block_is_redacted_whole_not_just_its_header() -> None:
+    """Regression: the pattern matched only the BEGIN line.  Redacting that line
+    removed the only marker, so the fail-closed rescan that follows saw nothing
+    and the key body was handed to the worker."""
+
+    key = (
+        "prelude\n"
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gt\n"
+        "UNIQUEKEYBODYTHATMUSTNEVERREACHAWORKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+        "epilogue\n"
+    )
+    policy = SecurityPolicy()
+    spans = policy.scan_text_lines(key)
+    assert spans, "a private key block must be detected"
+    start, end, finding = spans[0]
+    assert finding.category == "pem_private_key"
+    assert (start, end) == (2, 5), "the finding must span the whole block"
+
+    blocked: set[int] = set()
+    for first, last, item in spans:
+        if item.classification in policy.blocked_classifications:
+            blocked.update(range(first, last + 1))
+    redacted = "".join(
+        "[redacted]\n" if number in blocked else line
+        for number, line in enumerate(key.splitlines(keepends=True), start=1)
+    )
+    assert "UNIQUEKEYBODYTHATMUSTNEVERREACHAWORKER" not in redacted
+    assert "prelude" in redacted and "epilogue" in redacted
+    policy.assert_safe(redacted, context="redacted review content")
+
+
+def test_a_truncated_private_key_header_still_fails_closed() -> None:
+    policy = SecurityPolicy()
+    with pytest.raises(SecurityPolicyError):
+        policy.assert_safe("-----BEGIN RSA PRIVATE KEY-----\nno end marker\n")

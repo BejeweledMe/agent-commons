@@ -93,11 +93,17 @@ _UNQUOTED_ASSIGNMENT = re.compile(
 
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
+        # Spans the whole block, not just its header.  Redaction replaces the
+        # lines a finding covers, so a header-only match would strip the marker
+        # and let the key body through the fail-closed rescan that follows.
+        # The trailing group is optional so a truncated block still trips.
         "pem_private_key",
         re.compile(
             r"-----BEGIN (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY"
-            r"(?: BLOCK)?-----",
-            re.IGNORECASE,
+            r"(?: BLOCK)?-----"
+            r"(?:.*?-----END (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY"
+            r"(?: BLOCK)?-----)?",
+            re.IGNORECASE | re.DOTALL,
         ),
     ),
     (
