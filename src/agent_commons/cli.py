@@ -351,12 +351,17 @@ def run_export_command(state: CLIState, run_id: str, output: str | None) -> None
     configured tier.
     """
 
-    from agent_commons.runtime.observability import RunEventStore
+    from agent_commons.runtime.observability import RunEventStore, StoreNotFound
 
     paths = state.manager().paths
     destination = Path(output) if output else Path.cwd() / f"{run_id}.jsonl"
-    with RunEventStore(paths, writer=False) as store:
-        state.emit(store.export_run(run_id, destination).as_dict())
+    try:
+        with RunEventStore(paths, writer=False) as store:
+            state.emit(store.export_run(run_id, destination).as_dict())
+    except StoreNotFound as exc:
+        raise ValidationError(
+            "this workspace has no run observability store, so there is nothing to export"
+        ) from exc
 
 
 @cli.command("ui")

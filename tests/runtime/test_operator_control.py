@@ -330,3 +330,90 @@ def test_an_ambiguous_restart_is_still_reported_as_one(tmp_path: Path) -> None:
     )
     reconciled = store.reconcile()
     assert [attempt.reason for attempt in reconciled] == ["broker_restart_ambiguous"]
+
+
+def _live_delegation(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """A delegation whose recorded provider is a real, running process."""
+
+    from agent_commons.runtime import default_profile_registry
+    from agent_commons.services.delegation_runtime import DelegationRuntimeService, _request_key
+    from tests.runtime.test_orchestration import _delegation, _workspace
+
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    delegation_id = delegation["entity_ref"]["id"]
+    service = DelegationRuntimeService(manager, profiles=default_profile_registry())
+    reserved = service.attempts.reserve(
+        spec(
+            tmp_path,
+            key=_request_key(delegation_id),
+            delegation=delegation_id,
+            parent_session=manager.session_id,
+        ),
+        parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+    )
+    service.attempts.transition(
+        reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching"
+    )
+    provider = subprocess.Popen(["/bin/sleep", "30"], start_new_session=True)
+    service.attempts.transition(
+        reserved.attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="running",
+        pid=provider.pid,
+    )
+    return manager, service, delegation_id, provider
+
+
+def test_broker_stop_terminates_the_provider_and_records_why(tmp_path: Path) -> None:
+    """The headline command of its own commit had no test at all: both existing
+    ones drove AttemptStore.reconcile with a hand-set state."""
+
+    manager, service, delegation_id, provider = _live_delegation(tmp_path)
+    try:
+        report = service.stop_provider(delegation_id)
+        assert [entry["signal"] for entry in report["stopped"]] == ["SIGTERM"]
+        assert report["stopped"][0]["terminated"] is True
+
+        # Intent is recorded before the process is gone, so a reconcile that
+        # arrives later cannot mistake this for a broker restart.
+        assert service.attempts.list_attempts()[0].state is AttemptState.CANCEL_REQUESTED
+        provider.wait(timeout=15)
+
+        reported = service.reconcile()
+        assert reported[0]["reconciled"] is True
+        assert service.attempts.list_attempts()[0].reason == "operator_stop_requested"
+    finally:
+        if provider.poll() is None:  # pragma: no cover - defensive cleanup
+            provider.kill()
+            provider.wait(timeout=5)
+
+
+def test_broker_stop_refuses_a_session_that_does_not_own_the_delegation(
+    tmp_path: Path,
+) -> None:
+    from agent_commons.errors import LifecycleConflictError
+
+    manager, service, delegation_id, provider = _live_delegation(tmp_path)
+    try:
+        manager.session_id = "session." + "f" * 32
+        with pytest.raises(LifecycleConflictError, match="requested this delegation"):
+            service.stop_provider(delegation_id)
+        assert provider.poll() is None, "a foreign session must not signal the process"
+    finally:
+        provider.kill()
+        provider.wait(timeout=5)
+
+
+def test_stopping_a_delegation_with_no_live_provider_is_not_an_error(
+    tmp_path: Path,
+) -> None:
+    from agent_commons.runtime import default_profile_registry
+    from agent_commons.services.delegation_runtime import DelegationRuntimeService
+    from tests.runtime.test_orchestration import _delegation, _workspace
+
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    service = DelegationRuntimeService(manager, profiles=default_profile_registry())
+    report = service.stop_provider(delegation["entity_ref"]["id"])
+    assert report["stopped"] == []

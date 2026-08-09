@@ -377,16 +377,16 @@ class DelegationRuntimeService:
             pid = attempt.pid
             if pid is None:
                 continue
-            terminated = terminate_process_group(pid, force=force)
-            # Record the intent before the outcome exists.  Without it a later
-            # reconcile cannot tell a deliberate stop from a broker restart, and
-            # would file this under a reason that never happened.
+            # Record the intent before signalling.  A kill that lands first
+            # leaves a window where the process is gone and nothing says why,
+            # so a concurrent reconcile would file it as a broker restart.
             if attempt.state is AttemptState.RUNNING:
                 self.attempts.transition(
                     attempt.attempt_id,
                     AttemptState.CANCEL_REQUESTED,
                     reason="operator_stop_requested",
                 )
+            terminated = terminate_process_group(pid, force=force)
             stopped.append(
                 {
                     "attempt_id": attempt.attempt_id,

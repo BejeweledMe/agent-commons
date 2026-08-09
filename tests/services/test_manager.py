@@ -306,7 +306,7 @@ def test_task_acceptance_requires_current_independent_review(
         criteria=("correctness",),
         idempotency_key="self-review-request",
     )
-    with pytest.raises(LifecycleConflictError, match="work-author session"):
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
         builder.complete_review(
             self_review_request["entity_ref"]["id"],
             self_review_request["revision"],
@@ -527,7 +527,7 @@ def test_task_author_cannot_review_after_another_session_submits(
         criteria=("correctness",),
         idempotency_key="handoff-review-request",
     )
-    with pytest.raises(LifecycleConflictError, match="work-author session"):
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
         author.complete_review(
             requested["entity_ref"]["id"],
             requested["revision"],

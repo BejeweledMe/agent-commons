@@ -142,13 +142,16 @@ class UIContext:
             for session in manager.sessions.list_sessions()
         ]
         after = ledger_fingerprint(manager.paths)
+        # Disagreement means the ledger moved while it was being read, so this
+        # graph is already behind: record nothing as seen and let the next check
+        # rebuild.
         fingerprint = before if before == after else ""
         graph = build_graph(
             snapshot,
             sessions=sessions,
             workspace_id=manager.workspace_id,
             generated_at=_iso_now(),
-            ledger_fingerprint=before,
+            ledger_fingerprint=fingerprint,
             server_instance_id=self.server_instance_id,
             seq=self._seq + 1,
             read_diagnostics={
@@ -180,8 +183,9 @@ class UIContext:
             if self._graph is not None:
                 return self._seq, self._graph
         graph = self.rebuild_graph()
-        with self._guard:
-            return self._seq, graph
+        # Read the sequence off the graph, not off the context: a concurrent
+        # rebuild may already have moved the counter past this graph.
+        return int(graph["seq"]), graph
 
     def refresh_if_changed(self) -> bool:
         with self._guard:

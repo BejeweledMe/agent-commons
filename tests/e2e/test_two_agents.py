@@ -221,7 +221,7 @@ def test_work_author_cannot_approve_after_submitter_handoff(tmp_path: Path) -> N
         criteria=("correctness",),
         idempotency_key="handoff-e2e-review-request",
     )
-    with pytest.raises(LifecycleConflictError, match="work-author session"):
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
         author.complete_review(
             requested["entity_ref"]["id"],
             requested["revision"],
@@ -315,7 +315,7 @@ def test_an_artifact_author_cannot_close_the_independent_review_of_its_own_work(
         idempotency_key="evidence-review-request",
     )
 
-    with pytest.raises(LifecycleConflictError, match="authored the artifacts"):
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
         writer.complete_review(
             requested["entity_ref"]["id"],
             requested["revision"],
@@ -368,7 +368,7 @@ def test_an_artifact_author_cannot_approve_a_review_aimed_straight_at_the_artifa
         idempotency_key="direct-artifact-review",
     )
 
-    with pytest.raises(LifecycleConflictError, match="authored the artifact"):
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
         writer.complete_review(
             requested["entity_ref"]["id"],
             requested["revision"],
@@ -388,3 +388,56 @@ def test_an_artifact_author_cannot_approve_a_review_aimed_straight_at_the_artifa
         summary="independent verdict",
         idempotency_key="direct-artifact-independent-review",
     )
+
+
+@pytest.mark.parametrize("kind", ["decision", "finding", "artifact"])
+def test_no_subject_kind_lets_its_author_close_its_own_independent_review(
+    tmp_path: Path, kind: str
+) -> None:
+    """Closing this per kind failed twice: first only tasks were covered, then
+    only tasks and artifacts.  Independence belongs to the subject, so every
+    reviewable kind is checked here rather than the two that were reported."""
+
+    repo = tmp_path / "project"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=())
+    author = start_agent(
+        repo, stable_instance_id=f"author-{kind}-12345678", client="claude", role="builder"
+    )
+    requester = start_agent(
+        repo, stable_instance_id=f"requester-{kind}-1234", client="codex", role="coordinator"
+    )
+
+    if kind == "artifact":
+        source = repo / "feature.py"
+        source.write_text("def feature():\n    return 1\n", encoding="utf-8")
+        subject = author.register_artifact(source, idempotency_key=f"{kind}-subject")
+    elif kind == "decision":
+        subject = author.propose_decision(
+            scope="runtime admission",
+            proposal="Use a bounded FIFO queue",
+            idempotency_key=f"{kind}-subject",
+        )
+    else:
+        subject = author.report_finding(
+            summary="Two writers can reserve the same slot",
+            severity="high",
+            idempotency_key=f"{kind}-subject",
+        )
+
+    requested = requester.request_review(
+        target_ref=subject["entity_ref"],
+        target_revision=subject["revision"],
+        criteria=("correctness",),
+        independent=True,
+        idempotency_key=f"{kind}-review-request",
+    )
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
+        author.complete_review(
+            requested["entity_ref"]["id"],
+            requested["revision"],
+            target_revision=subject["revision"],
+            verdict="approved",
+            summary="approving my own work",
+            idempotency_key=f"{kind}-self-review",
+        )

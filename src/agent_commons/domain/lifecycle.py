@@ -141,38 +141,11 @@ def validate_transition(
             )
         target_ref = current.get("target_ref") or {}
         target_kind = str(target_ref.get("kind", ""))
-        target_id = str(target_ref.get("id", ""))
-        if target_kind == "task":
-            target_task = require_entity(snapshot, "task", target_id)
-            work_author_sessions = {
-                str(session_id)
-                for session_id in target_task.get("work_author_session_ids", [])
-                if str(session_id)
-            }
-            if actor_session_id in work_author_sessions:
-                raise LifecycleConflictError(
-                    "an independent task review cannot be completed by a work-author session"
-                )
-            if actor_session_id in _evidence_author_sessions(snapshot, target_task):
-                raise LifecycleConflictError(
-                    "an independent task review cannot be completed by a session that "
-                    "authored the artifacts bound to the task"
-                )
-        elif target_kind == "artifact":
-            # Independence is a property of the subject, not of one target kind:
-            # a review requested straight on an artifact bypassed the check
-            # entirely while the same work reviewed through a task was refused.
-            artifact = snapshot.artifacts.get(target_id) or {}
-            authors = {
-                str(session_id)
-                for session_id in artifact.get("evidence_author_session_ids", [])
-                if str(session_id)
-            }
-            if actor_session_id in authors:
-                raise LifecycleConflictError(
-                    "an independent artifact review cannot be completed by a session "
-                    "that authored the artifact"
-                )
+        if actor_session_id in _subject_author_sessions(snapshot, target_ref):
+            raise LifecycleConflictError(
+                f"an independent {target_kind or 'subject'} review cannot be completed "
+                "by a session that authored the subject"
+            )
     if event_type == "review.completed":
         bound = _bound_delegations(snapshot, actor_session_id)
         if bound and not any(
@@ -414,6 +387,41 @@ def _delegation_ancestor_ids(
         current = require_entity(snapshot, "delegation", current_id)
         current_id = str(current.get("parent_delegation_id") or "")
     return tuple(ancestors)
+
+
+def _subject_author_sessions(snapshot: ProjectSnapshot, target_ref: Mapping[str, Any]) -> set[str]:
+    """Every session that authored the subject of a review, whatever its kind.
+
+    Independence is a property of the subject, not of one target kind.  Closing
+    this per kind has already failed twice: a task review was refused while the
+    same work reviewed straight as an artifact was approved, and once artifacts
+    were covered a decision or a finding was still open.  The default here is
+    the recording actor, so a kind added later is covered before anyone
+    remembers to extend this function.
+    """
+
+    kind = str(target_ref.get("kind", ""))
+    identifier = str(target_ref.get("id", ""))
+    attribute = _COLLECTIONS.get(kind)
+    if attribute is None:
+        return set()
+    record = getattr(snapshot, attribute).get(identifier)
+    if not record:
+        return set()
+
+    authors: set[str] = set()
+    for field in ("work_author_session_ids", "evidence_author_session_ids"):
+        authors.update(str(session_id) for session_id in record.get(field, []) if str(session_id))
+    if kind == "task":
+        # A task's evidence is authored elsewhere: the session that produced the
+        # bound artifacts never has to touch a task event.  Recording the task
+        # is not authoring its work, so the actor alone does not count here.
+        authors.update(_evidence_author_sessions(snapshot, record))
+        return authors
+    actor_session = str((record.get("actor") or {}).get("session_id", ""))
+    if actor_session:
+        authors.add(actor_session)
+    return authors
 
 
 def _evidence_author_sessions(snapshot: ProjectSnapshot, task: Mapping[str, Any]) -> set[str]:

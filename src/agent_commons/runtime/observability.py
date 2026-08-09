@@ -40,8 +40,13 @@ from agent_commons.runtime.run_state import (
 from agent_commons.security.policy import SecurityPolicy
 
 
-class StoreNotFound(IntegrityError):
-    """A read-only caller asked for a store that has never been created."""
+class StoreNotFound(ValidationError):
+    """A read-only caller asked for a store that has never been created.
+
+    Deliberately not an integrity fault: nothing is damaged and there is nothing
+    to repair, so this must not inherit remediation advice about running doctor
+    or writing maintenance events.
+    """
 
 
 _SCHEMA_VERSION = 1

@@ -476,6 +476,17 @@ class AttemptStore:
                     for attempt in value["attempts"]
                 ],
             }
+        if value["schema"] != REQUEST_SCHEMA:
+            # Older readable versions upgrade in memory too.  Without this a v3
+            # document that gains a v4 attempt stays mixed forever, and an older
+            # reader then blames the attempt's provider rather than the version.
+            return {
+                **value,
+                "schema": REQUEST_SCHEMA,
+                "attempts": [
+                    {**attempt, "schema": ATTEMPT_SCHEMA} for attempt in value["attempts"]
+                ],
+            }
         return value
 
     def _validate_document(self, value: Mapping[str, Any]) -> None:
