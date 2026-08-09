@@ -699,3 +699,51 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
             "worker-scope-review-after-terminal",
             None,
         )
+
+
+def _repo_reader(tmp_path, body: str):
+    """Build a scoped reviewer reader over a one-file committed repository."""
+
+    import subprocess
+
+    from agent_commons.mcp.server import ScopedRepoReader
+    from agent_commons.services import CommonsManager
+
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True)
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(repo),
+        "GIT_AUTHOR_NAME": "T",
+        "GIT_AUTHOR_EMAIL": "t@e.invalid",
+        "GIT_COMMITTER_NAME": "T",
+        "GIT_COMMITTER_EMAIL": "t@e.invalid",
+    }
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, env=env, capture_output=True)
+    (repo / "id_rsa").write_text(body, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, env=env, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "seed"], cwd=repo, check=True, env=env, capture_output=True
+    )
+    CommonsManager.initialize(repo, integrations=())
+    return ScopedRepoReader(CommonsManager(repo), git_executable="/usr/bin/git")
+
+
+def test_a_reviewer_never_receives_a_private_key_body(tmp_path) -> None:
+    """Exercised through the real reader, not through assert_safe alone.
+
+    Redaction removes the lines a finding covers and only then rescans, so a
+    test that checks the raw content cannot see a leak that redaction itself
+    creates.  Both earlier attempts at this fix passed exactly such a test.
+    """
+
+    secret = "UNIQUEKEYBODYTHATMUSTNEVERREACHAWORKER"
+    for body in (
+        f"-----BEGIN OPENSSH PRIVATE KEY-----\n{secret}\nrest==\n"
+        "-----END OPENSSH PRIVATE KEY-----\n",
+        f"-----BEGIN RSA PRIVATE KEY-----\n{secret}\nrest==\n",  # no closing marker
+        f"prelude\n-----BEGIN EC PRIVATE KEY-----\n{secret}\n",  # truncated mid-file
+    ):
+        reader = _repo_reader(tmp_path / f"case{hash(body) & 0xFFFF}", body)
+        content = reader.read("id_rsa")["content"]
+        assert secret not in content, body

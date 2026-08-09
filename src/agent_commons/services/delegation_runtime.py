@@ -904,6 +904,12 @@ alone is not task acceptance.
                         "delegation already belongs to a different runtime launch key"
                     )
                 if not retry:
+                    if not existing.state.terminal and self.attempts.process_is_live(existing.pid):
+                        raise LifecycleConflictError(
+                            "the provider process for this delegation is still running; "
+                            f"stop it with `agent-commons broker stop {delegation_id}` "
+                            "before recording an outcome"
+                        )
                     if not existing.state.terminal:
                         existing = self.attempts.transition(
                             existing.attempt_id,
@@ -1068,6 +1074,25 @@ alone is not task acceptance.
                                     "safe_next_actions": diagnostic_safe_next_actions(code),
                                 }
                             )
+                    continue
+                if not attempt.state.terminal and self.attempts.process_is_live(attempt.pid):
+                    # Recording an outcome now would make the ledger claim the
+                    # work stopped while the provider is still writing.  Report
+                    # the live process instead and let the operator stop it.
+                    values.append(
+                        {
+                            "attempt": attempt.as_dict(),
+                            "delegation": self.manager.get_delegation(delegation_id),
+                            "telemetry_failures": 0,
+                            "reconciled": False,
+                            "provider_still_running": True,
+                            "pid": attempt.pid,
+                            "safe_next_actions": (
+                                f"Stop the provider with `agent-commons broker stop "
+                                f"{delegation_id}`, then reconcile again.",
+                            ),
+                        }
+                    )
                     continue
                 if not attempt.state.terminal:
                     attempt = self.attempts.transition(

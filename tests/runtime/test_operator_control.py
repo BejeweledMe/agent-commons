@@ -182,3 +182,48 @@ def test_reconcile_still_terminalizes_a_dead_process(tmp_path: Path) -> None:
     reconciled = store.reconcile()
     assert [attempt.state for attempt in reconciled] == [AttemptState.NEEDS_OPERATOR]
     assert store.live_attempts() == ()
+
+
+def test_service_reconcile_reports_a_live_provider_instead_of_terminalizing_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the liveness probe lived in AttemptStore.reconcile, but the
+    CLI calls DelegationRuntimeService.reconcile, which had its own path and
+    terminalized any non-terminal attempt regardless."""
+
+    from agent_commons.runtime import default_profile_registry
+    from agent_commons.services.delegation_runtime import DelegationRuntimeService, _request_key
+    from tests.runtime.test_orchestration import _delegation, _workspace
+
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    delegation_id = delegation["entity_ref"]["id"]
+    service = DelegationRuntimeService(manager, profiles=default_profile_registry())
+
+    reserved = service.attempts.reserve(
+        spec(
+            tmp_path,
+            # The service binds exactly one operational request per delegation.
+            key=_request_key(delegation_id),
+            delegation=delegation_id,
+            parent_session=manager.session_id,
+        ),
+        parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+    )
+    service.attempts.transition(
+        reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching"
+    )
+    service.attempts.transition(
+        reserved.attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="running",
+        pid=os.getpid(),
+    )
+
+    reported = service.reconcile()
+    entry = next(item for item in reported if item["attempt"]["correlation"]["delegation_id"])
+    assert entry["reconciled"] is False
+    assert entry["provider_still_running"] is True
+    assert "broker stop" in " ".join(entry["safe_next_actions"])
+    # The attempt is untouched: no outcome was invented for a running process.
+    assert service.attempts.list_attempts()[0].state is AttemptState.RUNNING

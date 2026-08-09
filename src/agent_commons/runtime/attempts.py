@@ -1019,7 +1019,7 @@ class AttemptStore:
         )
 
     @staticmethod
-    def _process_is_live(pid: int | None) -> bool:
+    def process_is_live(pid: int | None) -> bool:
         """Best-effort liveness probe for a recorded provider process."""
 
         if pid is None or pid <= 0:
@@ -1052,7 +1052,7 @@ class AttemptStore:
                 latest = self._latest(document)
                 if latest.state.terminal:
                     continue
-                if self._process_is_live(latest.pid):
+                if self.process_is_live(latest.pid):
                     continue
                 updated = replace(
                     latest,
@@ -1073,5 +1073,5 @@ class AttemptStore:
             latest
             for _, document in self._documents()
             for latest in (self._latest(document),)
-            if not latest.state.terminal and self._process_is_live(latest.pid)
+            if not latest.state.terminal and self.process_is_live(latest.pid)
         )

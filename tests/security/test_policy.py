@@ -192,3 +192,19 @@ def test_a_truncated_private_key_header_still_fails_closed() -> None:
     policy = SecurityPolicy()
     with pytest.raises(SecurityPolicyError):
         policy.assert_safe("-----BEGIN RSA PRIVATE KEY-----\nno end marker\n")
+
+
+def test_a_private_key_without_a_closing_marker_is_redacted_to_the_end() -> None:
+    """Regression: making the closing marker optional let a truncated block fall
+    back to a header-only match.  Redaction then removed the only marker and the
+    body passed the rescan -- the same leak the block fix was meant to close."""
+
+    key = (
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "TRUNCATEDKEYBODYTHATMUSTNEVERREACHAWORKER\n"
+        "moretruncatedbody==\n"
+    )
+    policy = SecurityPolicy()
+    start, end, finding = policy.scan_text_lines(key)[0]
+    assert finding.category == "pem_private_key"
+    assert (start, end) == (1, 3), "a block with no END must run to the end of the input"
