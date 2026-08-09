@@ -60,8 +60,24 @@ footer{
 .node text{fill:var(--fg); font-size:11px}
 .node text.meta{fill:var(--muted); font-size:10px}
 .node.sel rect{stroke:var(--info); stroke-width:2.5}
+.node.neighbour rect{stroke:var(--info); stroke-width:2}
+/* Focus mode keeps unrelated work visible but clearly secondary, so the graph
+   stays readable when a node has many edges. */
+.node.faded{opacity:.14}
 .edge{fill:none; stroke:var(--edge); stroke-width:1.4}
 .edge.comm{stroke-dasharray:4 3}
+.edge.faded{opacity:.07}
+.edge.incident{stroke:var(--info); stroke-width:2.2; opacity:1}
+button{
+  font:12px/1 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:6px; padding:5px 9px; cursor:pointer;
+}
+button:hover{border-color:var(--info)}
+button:focus-visible{outline:2px solid var(--info); outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
+.actions{display:flex; gap:8px; align-items:center; margin:0 0 10px}
+.pill.focus{color:var(--info); border-color:var(--info)}
 .band-label{fill:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em}
 .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .info{fill:var(--info)}
 .muted{fill:var(--muted)}
@@ -80,6 +96,10 @@ footer{
   <svg id="canvas" role="img" aria-label="workspace graph"></svg>
   <aside id="inspector">
     <h2 id="inspector-title">—</h2>
+    <div class="actions">
+      <button type="button" id="focus-toggle" aria-pressed="false">Isolate connections</button>
+      <span class="pill" id="focus-count"></span>
+    </div>
     <pre id="inspector-body"></pre>
   </aside>
 </main>
@@ -110,6 +130,10 @@ async function api(path) {
 }
 
 // --- status glyphs --------------------------------------------------------
+// A green tick means "a human accepted this", never "a process exited zero".
+// Conflating the two turns the graph into a false-consensus channel, which is
+// the exact failure the surrounding protocol is built to prevent.
+const ACCEPTED_STATES = new Set(["accepted", "approved"]);
 const GLYPHS = {
   idle: ["○", "muted"], ready: ["○", "muted"], requested: ["○", "muted"],
   created: ["○", "muted"], registered: ["○", "muted"],
@@ -117,14 +141,28 @@ const GLYPHS = {
   working: ["◑", "info"], review: ["◑", "info"], submitted: ["◑", "info"],
   input_needed: ["◐", "warn"], blocked: ["◐", "warn"], waiting: ["◐", "warn"],
   changes_requested: ["◐", "warn"], stopping: ["◐", "warn"],
-  succeeded: ["✓", "ok"], completed: ["✓", "ok"], accepted: ["✓", "ok"],
-  approved: ["✓", "ok"], done: ["✓", "ok"],
+  succeeded: ["●", "info"], completed: ["●", "info"], done: ["●", "info"],
+  accepted: ["✓", "ok"], approved: ["✓", "ok"],
   failed: ["✕", "bad"], rejected: ["✕", "bad"],
   timed_out: ["⏱", "warn"], needs_operator: ["⚠", "bad"],
   cancelled: ["⊘", "muted"], closed: ["⊘", "muted"], expired: ["⊘", "muted"],
   abstained: ["–", "muted"]
 };
-function glyphFor(state) { return GLYPHS[state] || ["·", "muted"]; }
+function glyphFor(node) {
+  const [glyph, tone] = GLYPHS[node.state] || ["·", "muted"];
+  // Stale evidence is not a border decoration: an approval that no longer binds
+  // must stop looking like an approval.
+  if (node.stale && tone === "ok") { return ["▨", "warn"]; }
+  return [glyph, tone];
+}
+function stateLabel(node) {
+  const base = node.state || "—";
+  if (node.stale && ACCEPTED_STATES.has(node.state)) { return base + " (stale)"; }
+  if (node.state === "succeeded" || node.state === "completed") {
+    return base + " · not accepted";
+  }
+  return base;
+}
 
 // --- rendering ------------------------------------------------------------
 const canvas = document.getElementById("canvas");
@@ -132,6 +170,20 @@ const viewport = document.createElementNS(SVGNS, "g");
 canvas.appendChild(viewport);
 let view = { x: 40, y: 40, scale: 1 };
 let selected = null;
+let focused = null;      // node id whose direct connections are isolated
+let lastGraph = null;
+
+// Direct neighbours only: one hop in either direction. Anything deeper stops
+// being an answer to "who does this node actually talk to".
+function neighboursOf(graph, nodeId) {
+  const near = new Set([nodeId]);
+  const edges = new Set();
+  for (const edge of graph.edges) {
+    if (edge.from === nodeId) { near.add(edge.to); edges.add(edge.id); }
+    else if (edge.to === nodeId) { near.add(edge.from); edges.add(edge.id); }
+  }
+  return { nodes: near, edges: edges };
+}
 
 function applyView() {
   viewport.setAttribute(
@@ -167,8 +219,11 @@ function layout(nodes) {
 }
 
 function render(graph) {
+  lastGraph = graph;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
   const positions = layout(graph.nodes);
+  const focus = focused ? neighboursOf(graph, focused) : null;
+  paintFocusChrome(focus);
 
   if (!graph.nodes.length) {
     viewport.appendChild(text(0, 20, "No canonical entities in this workspace yet.", "empty"));
@@ -205,15 +260,22 @@ function render(graph) {
       "M " + x1 + " " + y1 + " C " + x1 + " " + (y1 + 44) + ", " + x2 + " " + (y2 - 44) +
       ", " + x2 + " " + y2
     );
-    path.setAttribute("class", communication.has(edge.kind) ? "edge comm" : "edge");
+    let edgeClass = communication.has(edge.kind) ? "edge comm" : "edge";
+    if (focus) { edgeClass += focus.edges.has(edge.id) ? " incident" : " faded"; }
+    path.setAttribute("class", edgeClass);
     edgeLayer.appendChild(path);
   }
 
   for (const node of graph.nodes) {
     const position = positions.get(node.id);
     const group = document.createElementNS(SVGNS, "g");
-    group.setAttribute("class", "node" + (node.stale ? " stale" : "") +
-      (selected === node.id ? " sel" : ""));
+    let nodeClass = "node" + (node.stale ? " stale" : "") +
+      (selected === node.id ? " sel" : "");
+    if (focus) {
+      if (!focus.nodes.has(node.id)) { nodeClass += " faded"; }
+      else if (node.id !== focused) { nodeClass += " neighbour"; }
+    }
+    group.setAttribute("class", nodeClass);
     group.setAttribute("transform", "translate(" + position.x + "," + position.y + ")");
 
     const rect = document.createElementNS(SVGNS, "rect");
@@ -222,12 +284,12 @@ function render(graph) {
     rect.setAttribute("rx", 6);
     group.appendChild(rect);
 
-    const [glyph, tone] = glyphFor(node.state);
+    const [glyph, tone] = glyphFor(node);
     const content = document.createElementNS(SVGNS, "g");
     content.setAttribute("clip-path", "url(#nodeclip)");
     content.appendChild(text(10, 18, glyph, tone));
     content.appendChild(text(26, 18, node.label || node.id, null));
-    content.appendChild(text(10, 34, node.kind + " · " + (node.state || "—"), "meta"));
+    content.appendChild(text(10, 34, node.kind + " · " + stateLabel(node), "meta"));
     content.appendChild(text(10, 50, node.stale ? node.id + "  ▨ stale" : node.id, "meta"));
     group.appendChild(content);
 
@@ -238,6 +300,9 @@ function render(graph) {
     group.addEventListener("click", () => {
       if (suppressClick) { return; }
       selected = node.id;
+      // Once isolating, selecting another node moves the isolation with it
+      // rather than silently leaving the previous node focused.
+      if (focused !== null) { focused = node.id; }
       inspect(node);
       render(graph);
     });
@@ -245,6 +310,40 @@ function render(graph) {
   }
   applyView();
 }
+
+function paintFocusChrome(focus) {
+  const toggle = document.getElementById("focus-toggle");
+  const count = document.getElementById("focus-count");
+  const isolating = Boolean(focus) && focused === selected;
+  toggle.setAttribute("aria-pressed", isolating ? "true" : "false");
+  toggle.textContent = isolating ? "Show all" : "Isolate connections";
+  if (focus && focused) {
+    const direct = focus.nodes.size - 1;
+    count.textContent = direct + (direct === 1 ? " direct link" : " direct links");
+    count.className = "pill focus";
+  } else {
+    count.textContent = "";
+    count.className = "pill";
+  }
+}
+
+function setFocus(nodeId) {
+  focused = nodeId;
+  if (lastGraph) { render(lastGraph); }
+}
+
+document.getElementById("focus-toggle").addEventListener("click", () => {
+  setFocus(focused === selected ? null : selected);
+});
+
+// Esc and a click on empty canvas both leave focus mode, so nobody gets stuck
+// looking at a mostly faded graph without an obvious way out.
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && focused) { setFocus(null); }
+});
+canvas.addEventListener("click", (event) => {
+  if (event.target === canvas && !suppressClick && focused) { setFocus(null); }
+});
 
 async function inspect(node) {
   const inspector = document.getElementById("inspector");
@@ -368,14 +467,12 @@ function handleFrame(frame) {
   }
   if (event === "hello" && data) {
     const payload = JSON.parse(data);
-    if (id !== null) { lastEventId = payload.server_instance_id + ":" + id; }
+    if (id !== null) { lastEventId = id; }
     return;
   }
   if (event === "snapshot" && data) {
     const payload = JSON.parse(data);
-    if (id !== null && payload.graph) {
-      lastEventId = payload.graph.server_instance_id + ":" + id;
-    }
+    if (id !== null) { lastEventId = id; }
     paintChrome(payload.graph);
     render(payload.graph);
     setStream("live", "live");

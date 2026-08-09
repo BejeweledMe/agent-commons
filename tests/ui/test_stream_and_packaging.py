@@ -170,3 +170,43 @@ def test_the_fingerprint_notices_a_new_session(populated, context: UIContext) ->
     assert context.refresh_if_changed() is True
     sessions = [node for node in context.graph()["nodes"] if node["kind"] == "session"]
     assert len(sessions) == 2
+
+
+def test_only_acceptance_may_render_as_a_green_tick() -> None:
+    """The plan states this as a rule: a tick means a human accepted the work,
+    never that a process exited zero.  Parsed from the asset so a frontend edit
+    cannot quietly reintroduce the conflation."""
+
+    body = read_spa()
+    table = body.split("const GLYPHS = {", 1)[1].split("};", 1)[0]
+    ok_states = set(re.findall(r"(\w+):\s*\[\"[^\"]+\",\s*\"ok\"\]", table))
+    assert ok_states == {"accepted", "approved"}, ok_states
+    for state in ("succeeded", "completed", "done"):
+        assert re.search(rf"{state}:\s*\[\"[^\"]+\",\s*\"info\"\]", table), state
+
+
+def test_stale_acceptance_loses_its_acceptance_tone() -> None:
+    body = read_spa()
+    assert 'if (node.stale && tone === "ok") { return ["▨", "warn"]; }' in body
+
+
+def test_the_client_does_not_re_prefix_the_event_id() -> None:
+    """Regression: the id already carries instance:seq, so re-prefixing produced
+    instance:instance:seq, which never matched and made every reconnect report a
+    server restart -- draining the only staleness signal of meaning."""
+
+    body = read_spa()
+    assert 'server_instance_id + ":" + id' not in body
+    assert body.count("lastEventId = id;") == 2
+
+
+def test_the_spa_offers_a_way_to_isolate_a_node_and_to_leave_it() -> None:
+    body = read_spa()
+    assert 'id="focus-toggle"' in body
+    assert "function neighboursOf(" in body
+    # Faded, not hidden: unrelated work stays on screen as context.
+    assert ".node.faded{opacity:" in body
+    assert ".edge.faded{opacity:" in body
+    # Two independent exits so nobody is stranded in a mostly faded graph.
+    assert 'event.key === "Escape"' in body
+    assert "event.target === canvas" in body
