@@ -140,8 +140,10 @@ def validate_transition(
                 "an independent review cannot be completed by its requester session"
             )
         target_ref = current.get("target_ref") or {}
-        if target_ref.get("kind") == "task":
-            target_task = require_entity(snapshot, "task", str(target_ref.get("id", "")))
+        target_kind = str(target_ref.get("kind", ""))
+        target_id = str(target_ref.get("id", ""))
+        if target_kind == "task":
+            target_task = require_entity(snapshot, "task", target_id)
             work_author_sessions = {
                 str(session_id)
                 for session_id in target_task.get("work_author_session_ids", [])
@@ -155,6 +157,21 @@ def validate_transition(
                 raise LifecycleConflictError(
                     "an independent task review cannot be completed by a session that "
                     "authored the artifacts bound to the task"
+                )
+        elif target_kind == "artifact":
+            # Independence is a property of the subject, not of one target kind:
+            # a review requested straight on an artifact bypassed the check
+            # entirely while the same work reviewed through a task was refused.
+            artifact = snapshot.artifacts.get(target_id) or {}
+            authors = {
+                str(session_id)
+                for session_id in artifact.get("evidence_author_session_ids", [])
+                if str(session_id)
+            }
+            if actor_session_id in authors:
+                raise LifecycleConflictError(
+                    "an independent artifact review cannot be completed by a session "
+                    "that authored the artifact"
                 )
     if event_type == "review.completed":
         bound = _bound_delegations(snapshot, actor_session_id)

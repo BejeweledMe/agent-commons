@@ -324,3 +324,67 @@ def test_an_artifact_author_cannot_close_the_independent_review_of_its_own_work(
             summary="self review of my own evidence",
             idempotency_key="evidence-self-review",
         )
+
+
+def test_an_artifact_author_cannot_approve_a_review_aimed_straight_at_the_artifact(
+    tmp_path: Path,
+) -> None:
+    """Regression: the authorship check sat under `if target_ref.kind == "task"`,
+    so the same work refused through a task was approved when the review was
+    requested directly on the artifact.  Independence is a property of the
+    subject, not of one target kind.
+    """
+
+    repo = tmp_path / "project"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=())
+    writer = start_agent(
+        repo,
+        stable_instance_id="artifact-writer-1234567890",
+        client="claude",
+        role="builder",
+    )
+    requester = start_agent(
+        repo,
+        stable_instance_id="artifact-requester-123456",
+        client="codex",
+        role="coordinator",
+    )
+    reviewer = start_agent(
+        repo,
+        stable_instance_id="artifact-reviewer-1234567",
+        client="claude",
+        role="independent-reviewer",
+    )
+
+    source = repo / "feature.py"
+    source.write_text("def feature():\n    return 1\n", encoding="utf-8")
+    artifact = writer.register_artifact(source, idempotency_key="direct-artifact")
+    requested = requester.request_review(
+        target_ref=artifact["entity_ref"],
+        target_revision=artifact["revision"],
+        criteria=("correctness",),
+        independent=True,
+        idempotency_key="direct-artifact-review",
+    )
+
+    with pytest.raises(LifecycleConflictError, match="authored the artifact"):
+        writer.complete_review(
+            requested["entity_ref"]["id"],
+            requested["revision"],
+            target_revision=artifact["revision"],
+            verdict="approved",
+            summary="approving my own artifact",
+            idempotency_key="direct-artifact-self-review",
+        )
+
+    # A session that did not author it is still allowed: the check must bound
+    # the author, not the review.
+    reviewer.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=artifact["revision"],
+        verdict="approved",
+        summary="independent verdict",
+        idempotency_key="direct-artifact-independent-review",
+    )
