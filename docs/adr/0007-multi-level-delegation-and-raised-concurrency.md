@@ -72,15 +72,34 @@ while every node stays individually within limits.
 
 ## New guards
 
-Three monotonic fields are added to `RuntimePolicy`. Being members of the field
-set, they are automatically covered by `assert_reduction_of()` — a child can
-only inherit them equal or narrower, like every existing limit.
+**Amended after implementation.** The first attempt put these on
+`RuntimePolicy`, which was wrong twice over: that object is the authority
+granted to one delegation, it is stored in the request document, and it is
+hashed into the request identity. Operator ceilings there broke rollback — an
+older reader rejects the unknown fields — and made an operator editing config
+invalidate the retry key of every in-flight request. They live on
+`OperatorLimits` and are checked at admission.
 
-| Field | Bounds | Default |
-|---|---|---|
-| `max_delegations_total` | delegations in the whole subtree rooted at this policy holder | `1` |
-| `max_wave_count` | planning rounds a supervisor may run | `1` |
-| `max_context_tokens` | assembled context handed to one child | operator-set |
+| Field | Bounds | Default | Status |
+|---|---|---|---|
+| `max_delegations_total` | delegations in the whole subtree | `16` | implemented |
+| `max_wave_count` | planning rounds a supervisor may run | — | **not implemented** |
+| `max_context_tokens` | assembled context handed to one child | — | **not implemented** |
+
+The last two are removed rather than shipped inert. Nothing produces a wave
+index or a context estimate, and configuration that reads as enforced while it
+cannot fire is worse than configuration that is absent: it is the shape of a
+guarantee without the guarantee.
+
+The default for `max_delegations_total` is `16`, not `1`. Spend is already
+bounded per tree by `provider_units`, so this is a structural backstop that
+begins to matter when an operator raises the other limits. A default of `1`
+would not bound amplification; it would forbid delegation trees.
+
+Because the tree is now recorded in the stored correlation, the request and
+attempt schemas move to **v4**. v3 and v2 remain readable, but the change is
+one-way: an older build refuses a v4 document by envelope. Rolling back to a
+release that predates v4 requires clearing `runtime/requests` in the state root.
 
 A fourth guard is not a policy field because it is stateful rather than
 inherited — a repeat-pair counter keyed on
@@ -99,8 +118,11 @@ All four guards fail closed and escalate to the operator. None of them retries.
 
 ### Depth > 1
 
-1. `max_delegations_total`, `max_wave_count`, and the repeat-pair guard exist
-   and are enforced in `assert_launch_allowed()`.
+1. `max_delegations_total` is enforced at admission (**done**), and the
+   repeat-pair guard exists (**not started**). Note that fanout and concurrency
+   are deliberately *not* checked there: they are transient and belong to the
+   admission queue, so `assert_launch_allowed()` has no production caller by
+   design.
 2. Every delegation carries a handoff packet with revision-bound `artifacts`;
    a packet missing them blocks the launch. Depth > 1 means a grandchild acts on
    a parent's conclusions it never observed being formed, so the carry-over must

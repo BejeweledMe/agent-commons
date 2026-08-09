@@ -117,6 +117,17 @@ and makes no canonical change. Only canonical `requested` work may then use the
 explicit `delegation:recover` operator path; active work still requires proven
 provider termination and owner-aware reconciliation.
 
+## Upgrading and rolling back operational state
+
+Runtime request and attempt documents are at schema **v4**, which records the
+delegation tree a launch belongs to. v3 and v2 are read and upgraded in memory,
+so upgrading needs no migration.
+
+Rolling back does. A build older than v4 refuses a v4 document by envelope and
+its `reserve` and `reconcile` both fail. If you must go back, finish or abandon
+in-flight work first, then remove `runtime/requests` under the state root. That
+directory is operational, not canonical: nothing in the ledger depends on it.
+
 ## Stopping a running provider
 
 `broker stop <delegation-id>` signals the recorded provider process group,

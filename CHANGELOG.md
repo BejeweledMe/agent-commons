@@ -5,6 +5,27 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **Runtime request/attempt schemas move to v4** so a launch records the
+  delegation tree it belongs to, which lets provider budget and the new subtree
+  ceiling be charged against the tree rather than the requesting session. v3 and
+  v2 remain readable. The change is one-way: a build that predates v4 refuses a
+  v4 document by envelope, so rolling back requires clearing `runtime/requests`
+  under the state root.
+- Added `agent-commons broker stop <delegation-id>`, the operator action that
+  terminates a live provider. It writes no canonical outcome; a following
+  `broker reconcile` refuses to record one while the process is alive and then
+  records `operator_stop_requested` rather than a broker restart that never
+  happened. Only the requesting session may stop a delegation.
+- Added `agent-commons ui`, a loopback-only read-only view of the workspace with
+  bearer-token auth, and `agent-commons run list` / `run export` over the
+  disposable run-observability projection. No producer writes to that projection
+  yet, so both run commands currently operate on an empty store.
+- Independent review now refuses any session that authored the subject, for
+  every reviewable kind rather than tasks alone.
+- Renamed the worker MCP tools `commons_workspace_*` to `commons_repo_*`, since
+  they read repository files and the workspace name belongs to the communication
+  channel it describes.
+
 - Added workspace-namespaced state bases and fail-closed exact-root ownership
   checks before operational registries open, with source-aware/path-opt-in
   support diagnostics and non-destructive legacy compatibility. Legacy receipt
