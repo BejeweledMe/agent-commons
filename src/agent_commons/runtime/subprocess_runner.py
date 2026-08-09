@@ -160,6 +160,24 @@ def _spawn_process(
     )
 
 
+def terminate_process_group(pid: int, *, force: bool = False) -> bool:
+    """Signal a recorded provider process group by pid.
+
+    Used by the operator stop path, where the broker that launched the process
+    is long gone and only its pid survives in the attempt journal.
+    """
+
+    if os.name != "posix" or pid <= 0:
+        return False
+    try:
+        os.killpg(pid, signal.SIGKILL if force else signal.SIGTERM)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return False
+    return True
+
+
 def _terminate_process_group(process: ProcessHandle, *, force: bool) -> None:
     if os.name == "posix":
         try:
@@ -230,7 +248,9 @@ class SubprocessRunner:
         monotonic: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
         poll_interval_seconds: float = 0.05,
-        termination_grace_seconds: float = 2.0,
+        # Provider CLIs close their own session on SIGTERM; two seconds is not
+        # enough for that, and the shortfall turns a clean stop into a kill.
+        termination_grace_seconds: float = 8.0,
     ) -> None:
         if poll_interval_seconds <= 0 or termination_grace_seconds < 0:
             raise ValueError("runner polling and termination intervals are invalid")
@@ -379,24 +399,32 @@ class SubprocessRunner:
             outcome = RunOutcome.FAILED
             reason = RunReason.NONZERO_EXIT
             deadline = started_at + timeout_seconds
-            while True:
-                return_code = process.poll()
-                if return_code is not None:
-                    if return_code == 0:
-                        outcome = RunOutcome.SUCCEEDED
-                        reason = RunReason.COMPLETED
-                    break
-                if token.cancelled:
-                    self._stop(process)
-                    outcome = RunOutcome.CANCELLED
-                    reason = RunReason.CANCELLED
-                    break
-                if self.monotonic() >= deadline:
-                    self._stop(process)
-                    outcome = RunOutcome.TIMED_OUT
-                    reason = RunReason.TIMEOUT
-                    break
-                self.sleeper(self.poll_interval_seconds)
+            try:
+                while True:
+                    return_code = process.poll()
+                    if return_code is not None:
+                        if return_code == 0:
+                            outcome = RunOutcome.SUCCEEDED
+                            reason = RunReason.COMPLETED
+                        break
+                    if token.cancelled:
+                        self._stop(process)
+                        outcome = RunOutcome.CANCELLED
+                        reason = RunReason.CANCELLED
+                        break
+                    if self.monotonic() >= deadline:
+                        self._stop(process)
+                        outcome = RunOutcome.TIMED_OUT
+                        reason = RunReason.TIMEOUT
+                        break
+                    self.sleeper(self.poll_interval_seconds)
+            except BaseException:
+                # The provider runs in its own session, so an interrupt aimed at
+                # this process never reaches it.  Leaving here without stopping
+                # the group abandons a writer that keeps editing the checkout
+                # while the ledger is about to call the work finished.
+                self._stop(process)
+                raise
 
         if writer is not None:
             writer.join(timeout=1.0)

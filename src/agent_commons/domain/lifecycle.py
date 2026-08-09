@@ -151,6 +151,11 @@ def validate_transition(
                 raise LifecycleConflictError(
                     "an independent task review cannot be completed by a work-author session"
                 )
+            if actor_session_id in _evidence_author_sessions(snapshot, target_task):
+                raise LifecycleConflictError(
+                    "an independent task review cannot be completed by a session that "
+                    "authored the artifacts bound to the task"
+                )
     if event_type == "review.completed":
         bound = _bound_delegations(snapshot, actor_session_id)
         if bound and not any(
@@ -392,6 +397,32 @@ def _delegation_ancestor_ids(
         current = require_entity(snapshot, "delegation", current_id)
         current_id = str(current.get("parent_delegation_id") or "")
     return tuple(ancestors)
+
+
+def _evidence_author_sessions(snapshot: ProjectSnapshot, task: Mapping[str, Any]) -> set[str]:
+    """Sessions that produced the artifacts bound to a task.
+
+    Task lifecycle events are not the only way to author work: a session can
+    write all of the code, register it as the artifact under review, and never
+    touch a task event.  Without this, that session counts as independent.
+    """
+
+    authors: set[str] = set()
+    for bound in task.get("artifact_bindings") or []:
+        if not isinstance(bound, Mapping):
+            continue
+        ref = bound.get("ref")
+        if not isinstance(ref, Mapping) or ref.get("kind") != "artifact":
+            continue
+        artifact = snapshot.artifacts.get(str(ref.get("id", "")))
+        if not artifact:
+            continue
+        authors.update(
+            str(session_id)
+            for session_id in artifact.get("evidence_author_session_ids", [])
+            if str(session_id)
+        )
+    return authors
 
 
 def _bound_delegations(

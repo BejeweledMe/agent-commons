@@ -71,6 +71,7 @@ from .subprocess_runner import (
     RunReason,
     SafeEnvironment,
     SubprocessRunner,
+    terminate_process_group,
 )
 from .telemetry import (
     JsonlTelemetrySink,
@@ -141,6 +142,7 @@ __all__ = [
     "SafeDiagnostic",
     "SafeEnvironment",
     "SubprocessRunner",
+    "terminate_process_group",
     "TelemetryEvent",
     "TelemetryKind",
     "TelemetrySink",

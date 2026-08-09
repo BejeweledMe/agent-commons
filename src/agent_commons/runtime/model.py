@@ -290,6 +290,10 @@ class CorrelationIds:
     parent_session_id: str
     child_session_id: str
     trace_id: str | None = None
+    #: Identifies the delegation tree this launch belongs to.  Budget is charged
+    #: against the tree, so a child session cannot start a fresh allowance by
+    #: virtue of being new.  Optional so stored documents keep their shape.
+    root_delegation_id: str | None = None
 
     def __post_init__(self) -> None:
         _safe_identifier("delegation_id", self.delegation_id)
@@ -302,6 +306,8 @@ class CorrelationIds:
             raise ValidationError("delegated work requires a distinct child session")
         if self.trace_id is not None:
             _safe_identifier("trace_id", self.trace_id, pattern=_TRACE_ID)
+        if self.root_delegation_id is not None:
+            _safe_identifier("root_delegation_id", self.root_delegation_id)
 
     def as_dict(self) -> dict[str, str]:
         result = {
@@ -314,7 +320,15 @@ class CorrelationIds:
         }
         if self.trace_id is not None:
             result["trace_id"] = self.trace_id
+        if self.root_delegation_id is not None:
+            result["root_delegation_id"] = self.root_delegation_id
         return result
+
+    @property
+    def budget_scope(self) -> str:
+        """The tree a launch is charged against; a lone delegation is its own root."""
+
+        return self.root_delegation_id or self.delegation_id
 
 
 @dataclass(frozen=True, slots=True)

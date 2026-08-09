@@ -274,6 +274,7 @@ def _correlation_from_mapping(value: Mapping[str, Any]) -> CorrelationIds:
         "parent_session_id",
         "child_session_id",
         "trace_id",
+        "root_delegation_id",
     }
     if not isinstance(value, Mapping) or set(value) - allowed:
         raise IntegrityError("stored runtime correlation has unknown fields")
@@ -281,6 +282,17 @@ def _correlation_from_mapping(value: Mapping[str, Any]) -> CorrelationIds:
         return CorrelationIds(**value)
     except (TypeError, ValueError, ValidationError) as exc:
         raise IntegrityError("stored runtime correlation is invalid") from exc
+
+
+def _budget_scope_of(correlation: Mapping[str, Any]) -> str:
+    """Budget scope of a stored launch.
+
+    Documents written before the tree was recorded fall back to their own
+    delegation id, which is what a root delegation would have carried anyway.
+    """
+
+    root = correlation.get("root_delegation_id")
+    return str(root) if root else str(correlation["delegation_id"])
 
 
 def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
@@ -673,12 +685,21 @@ class AttemptStore:
     ) -> None:
         if attempts_started >= spec.parent_policy.max_attempts:
             raise PolicyViolationError("delegation attempt limit is exhausted")
+        # Charged against the union of the delegation tree and the requesting
+        # session, because the two bound different amplifications and neither
+        # alone is enough.  Tree scope stops a deeper generation from claiming a
+        # fresh allowance just by opening a new child session; session scope
+        # stops one session from opening unlimited separate root delegations.
+        scope = spec.correlation.budget_scope
         attempts = [
             _attempt_from_mapping(raw_attempt)
             for _, document in documents
             for raw_attempt in document["attempts"]
-            if str((document["spec"]["correlation"])["parent_session_id"])
-            == spec.correlation.parent_session_id
+            if (
+                _budget_scope_of(document["spec"]["correlation"]) == scope
+                or str((document["spec"]["correlation"])["parent_session_id"])
+                == spec.correlation.parent_session_id
+            )
             and str(document["spec"]["provider"]) == spec.provider.value
         ]
         monetary = spec.child_policy.max_budget_microusd
@@ -997,8 +1018,32 @@ class AttemptStore:
             diagnostic_code=diagnostic.code,
         )
 
+    @staticmethod
+    def _process_is_live(pid: int | None) -> bool:
+        """Best-effort liveness probe for a recorded provider process."""
+
+        if pid is None or pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            # The pid exists and belongs to somebody else; treat it as live
+            # rather than declaring work finished on a process we cannot see.
+            return True
+        except OSError:  # pragma: no cover - platform specific
+            return True
+        return True
+
     def reconcile(self) -> tuple[Attempt, ...]:
-        """Fail closed after a broker restart; live pipes cannot be reattached safely."""
+        """Fail closed after a broker restart; live pipes cannot be reattached safely.
+
+        A recorded process that is still running is never terminalized here.
+        Writing ``needs_operator`` over a live writer would make the ledger claim
+        the work stopped while the provider keeps editing the checkout, which is
+        worse than reporting nothing: it is false evidence of completion.
+        """
 
         self._require_writable()
         reconciled: list[Attempt] = []
@@ -1006,6 +1051,8 @@ class AttemptStore:
             for path, document in self._documents():
                 latest = self._latest(document)
                 if latest.state.terminal:
+                    continue
+                if self._process_is_live(latest.pid):
                     continue
                 updated = replace(
                     latest,
@@ -1018,3 +1065,13 @@ class AttemptStore:
                 self._write_document(path, {**document, "attempts": attempts})
                 reconciled.append(updated)
         return tuple(reconciled)
+
+    def live_attempts(self) -> tuple[Attempt, ...]:
+        """Non-terminal attempts whose recorded process is still running."""
+
+        return tuple(
+            latest
+            for _, document in self._documents()
+            for latest in (self._latest(document),)
+            if not latest.state.terminal and self._process_is_live(latest.pid)
+        )

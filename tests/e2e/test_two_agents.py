@@ -250,3 +250,77 @@ def test_work_author_cannot_approve_after_submitter_handoff(tmp_path: Path) -> N
     )
     assert task["state"] == "accepted"
     assert task["work_author_session_ids"] == [author.session_id]
+
+
+def test_an_artifact_author_cannot_close_the_independent_review_of_its_own_work(
+    tmp_path: Path,
+) -> None:
+    """Regression: authorship was derived from task lifecycle events only, so a
+    session could write all of the code, register it as the artifact under
+    review, never touch a task event, and still count as independent.
+
+    This is exactly the shape a supervisor architecture produces: the supervisor
+    drives the task while workers produce the evidence.
+    """
+
+    repo = tmp_path / "project"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=())
+    supervisor = start_agent(
+        repo,
+        stable_instance_id="supervisor-window-1234567890",
+        client="codex",
+        role="coordinator",
+    )
+    writer = start_agent(
+        repo,
+        stable_instance_id="writer-window-123456789012",
+        client="claude",
+        role="builder",
+    )
+
+    source = repo / "feature.py"
+    source.write_text("def feature():\n    return 1\n", encoding="utf-8")
+    # The writer produces the evidence and nothing else.
+    artifact = writer.register_artifact(source, idempotency_key="evidence-artifact")
+
+    created = supervisor.create_task(
+        title="Ship the feature",
+        description="Supervisor drives the task; the worker produces the artifact",
+        acceptance_criteria=("the artifact is reviewed independently",),
+        idempotency_key="evidence-task-create",
+    )
+    started = supervisor.start_task(
+        created["entity_ref"]["id"], created["revision"], idempotency_key="evidence-task-start"
+    )
+    completed = supervisor.complete_task(
+        created["entity_ref"]["id"],
+        started["revision"],
+        summary="worker produced the artifact",
+        artifact_refs=({"kind": "artifact", "id": artifact["entity_ref"]["id"]},),
+        idempotency_key="evidence-task-complete",
+    )
+    submitted = supervisor.submit_task(
+        created["entity_ref"]["id"],
+        completed["revision"],
+        summary="ready for independent review",
+        artifact_refs=({"kind": "artifact", "id": artifact["entity_ref"]["id"]},),
+        idempotency_key="evidence-task-submit",
+    )
+    requested = supervisor.request_review(
+        target_ref={"kind": "task", "id": created["entity_ref"]["id"]},
+        target_revision=submitted["revision"],
+        criteria=("correctness",),
+        independent=True,
+        idempotency_key="evidence-review-request",
+    )
+
+    with pytest.raises(LifecycleConflictError, match="authored the artifacts"):
+        writer.complete_review(
+            requested["entity_ref"]["id"],
+            requested["revision"],
+            target_revision=submitted["revision"],
+            verdict="approved",
+            summary="self review of my own evidence",
+            idempotency_key="evidence-self-review",
+        )

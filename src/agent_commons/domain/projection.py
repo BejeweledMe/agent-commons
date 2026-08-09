@@ -259,9 +259,24 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
     elif event_type in {"artifact.registered", "artifact.revised"}:
         artifact_payload = deepcopy(dict(payload))
         artifact_payload["content_revision"] = artifact_payload.pop("revision")
+        artifact_id = str(payload["artifact_id"])
+        # Every session that produced a revision of this evidence, not just the
+        # most recent one.  Independence is decided against this set, so losing
+        # earlier authors would let the original writer review its own work.
+        evidence_authors = {
+            str(session_id)
+            for session_id in (snapshot.artifacts.get(artifact_id) or {}).get(
+                "evidence_author_session_ids", []
+            )
+            if str(session_id)
+        }
+        actor_session_id = str((event.get("actor") or {}).get("session_id", ""))
+        if actor_session_id:
+            evidence_authors.add(actor_session_id)
+        artifact_payload["evidence_author_session_ids"] = sorted(evidence_authors)
         _apply(
             snapshot.artifacts,
-            str(payload["artifact_id"]),
+            artifact_id,
             {**event, "payload": artifact_payload},
             "registered",
         )

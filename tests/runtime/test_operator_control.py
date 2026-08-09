@@ -1,0 +1,184 @@
+"""Regressions from the safety review: honest stop, and budget by tree."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from agent_commons.runtime import (
+    AttemptState,
+    AttemptStore,
+    BuiltinProfileId,
+    CorrelationIds,
+    PolicyViolationError,
+    Provider,
+    RuntimePolicy,
+)
+from agent_commons.runtime.attempts import AttemptSpec, checkout_fingerprint
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 1_800_000_000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def spec(
+    tmp_path: Path,
+    *,
+    key: str = "req-1",
+    delegation: str = "delegation.01KXAAAAAAAAAAAAAAAAAAAAAA",
+    root: str | None = None,
+    parent_session: str = "session.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    child_session: str = "session.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    provider_units: bool = True,
+) -> AttemptSpec:
+    parent = RuntimePolicy(remaining_depth=1, max_attempts=2)
+    child = parent.derive_child(
+        max_budget_microusd=None if provider_units else 1_000,
+    )
+    return AttemptSpec(
+        idempotency_key=key,
+        # A reviewer profile: writable builders are additionally capped at one
+        # per checkout, which would mask the budget behaviour under test.
+        profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        provider=Provider.CODEX,
+        correlation=CorrelationIds(
+            delegation_id=delegation,
+            target_kind="task",
+            target_id="task.01KXAAAAAAAAAAAAAAAAAAAAAA",
+            target_revision="evt.01KXAAAAAAAAAAAAAAAAAAAAAA",
+            parent_session_id=parent_session,
+            child_session_id=child_session,
+            root_delegation_id=root,
+        ),
+        parent_policy=parent,
+        child_policy=child,
+        checkout_fingerprint=checkout_fingerprint(tmp_path),
+    )
+
+
+def test_provider_units_are_charged_against_the_delegation_tree(tmp_path: Path) -> None:
+    """Regression: accounting keyed on parent_session_id handed every generation
+    a fresh allowance, because a child session is new by construction."""
+
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    root = "delegation.01KXROOTROOTROOTROOTROOTRO"
+    cap = store.operator_limits.provider_units_cap(Provider.CODEX.value)
+
+    for index in range(cap):
+        reserved = store.reserve(
+            spec(
+                tmp_path,
+                key=f"req-{index}",
+                delegation=f"delegation.01KXCHILD{index:017d}",
+                root=root,
+                # Each generation runs under its own freshly opened child session.
+                parent_session=f"session.{index:032d}",
+                child_session=f"session.{index + 100:032d}",
+            ),
+            parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+        )
+        # Finish each one so concurrency never masks the budget under test; a
+        # spent unit stays spent.
+        store.transition(reserved.attempt.attempt_id, AttemptState.FAILED, reason="done")
+
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        store.reserve(
+            spec(
+                tmp_path,
+                key="req-overflow",
+                delegation="delegation.01KXCHILDOVERFLOWOVERFLOW",
+                root=root,
+                parent_session="session." + "f" * 32,
+                child_session="session." + "e" * 32,
+            ),
+            parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+        )
+
+
+def test_one_session_still_cannot_open_unlimited_separate_trees(tmp_path: Path) -> None:
+    """The tree scope must not replace the session scope: they bound different
+    amplifications, and dropping either one opens the other."""
+
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    cap = store.operator_limits.provider_units_cap(Provider.CODEX.value)
+    session = "session." + "a" * 32
+
+    for index in range(cap):
+        root = f"delegation.01KXROOT{index:018d}"
+        reserved = store.reserve(
+            spec(
+                tmp_path,
+                key=f"flat-{index}",
+                delegation=root,
+                root=root,
+                parent_session=session,
+                child_session=f"session.{index + 200:032d}",
+            ),
+            parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+        )
+        store.transition(reserved.attempt.attempt_id, AttemptState.FAILED, reason="done")
+
+    with pytest.raises(PolicyViolationError, match="provider_units budget"):
+        root = "delegation.01KXROOTOVERFLOWOVERFLOWO"
+        store.reserve(
+            spec(
+                tmp_path,
+                key="flat-overflow",
+                delegation=root,
+                root=root,
+                parent_session=session,
+                child_session="session." + "d" * 32,
+            ),
+            parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2),
+        )
+
+
+def test_reconcile_refuses_to_terminalize_a_live_process(tmp_path: Path) -> None:
+    """Regression: reconcile wrote needs_operator without checking liveness, so
+    the ledger claimed the work had stopped while the provider kept writing."""
+
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    reserved = store.reserve(
+        spec(tmp_path), parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2)
+    )
+    store.transition(reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching")
+    # This interpreter is certainly alive, which is the point of the probe.
+    store.transition(
+        reserved.attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="running",
+        pid=os.getpid(),
+    )
+
+    assert store.reconcile() == ()
+    live = store.live_attempts()
+    assert [attempt.attempt_id for attempt in live] == [reserved.attempt.attempt_id]
+    assert store.list_attempts()[0].state is AttemptState.RUNNING
+
+
+def test_reconcile_still_terminalizes_a_dead_process(tmp_path: Path) -> None:
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    reserved = store.reserve(
+        spec(tmp_path), parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2)
+    )
+    store.transition(reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching")
+    # A pid that has certainly exited and been reaped.
+    finished = subprocess.Popen(["/usr/bin/true"])
+    finished.wait()
+    store.transition(
+        reserved.attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="running",
+        pid=finished.pid,
+    )
+
+    reconciled = store.reconcile()
+    assert [attempt.state for attempt in reconciled] == [AttemptState.NEEDS_OPERATOR]
+    assert store.live_attempts() == ()

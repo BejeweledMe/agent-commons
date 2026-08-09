@@ -1408,6 +1408,28 @@ def broker_canary(
         raise click.exceptions.Exit(2)
 
 
+@broker_group.command("stop")
+@click.argument("delegation_id")
+@click.option("--force", is_flag=True, help="Send SIGKILL instead of SIGTERM.")
+@_profile_config
+@click.pass_obj
+def broker_stop(
+    state: CLIState,
+    delegation_id: str,
+    force: bool,
+    profile_config: Path | None,
+) -> None:
+    """Terminate the live provider process group for one delegation.
+
+    No canonical outcome is written here.  Run `broker reconcile` afterwards; it
+    refuses to record an outcome while the process is still alive, so the ledger
+    never claims work stopped before it actually did.
+    """
+
+    service = _runtime_service(state, profile_config)
+    state.emit(service.stop_provider(delegation_id, force=force))
+
+
 @broker_group.command("attempts")
 @click.option(
     "--diagnostic",

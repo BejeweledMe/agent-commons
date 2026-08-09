@@ -57,6 +57,7 @@ from agent_commons.runtime import (
     default_profile_registry,
     diagnostic_hint,
     diagnostic_safe_next_actions,
+    terminate_process_group,
 )
 
 from .manager import CommonsManager
@@ -339,6 +340,49 @@ class DelegationRuntimeService:
         """Expose capabilities, never executable argv or hidden provider configuration."""
 
         return profile_summaries(self.profiles, self.operator_limits)
+
+    def stop_provider(self, delegation_id: str, *, force: bool = False) -> dict[str, Any]:
+        """Terminate a live provider process group for one delegation.
+
+        This is the operator action that makes a later reconcile honest: the
+        canonical outcome is only written once the process is proven gone, never
+        before.  Cancelling the canonical record while the writer is still
+        running is exactly the false evidence the protocol forbids.
+        """
+
+        live = [
+            attempt
+            for attempt in self.attempts.live_attempts()
+            if attempt.correlation.delegation_id == delegation_id
+        ]
+        if not live:
+            return {
+                "delegation_id": delegation_id,
+                "stopped": [],
+                "detail": "no live provider process is recorded for this delegation",
+            }
+        stopped: list[dict[str, Any]] = []
+        for attempt in live:
+            pid = attempt.pid
+            if pid is None:
+                continue
+            terminated = terminate_process_group(pid, force=force)
+            stopped.append(
+                {
+                    "attempt_id": attempt.attempt_id,
+                    "pid": pid,
+                    "signal": "SIGKILL" if force else "SIGTERM",
+                    "terminated": terminated,
+                }
+            )
+        return {
+            "delegation_id": delegation_id,
+            "stopped": stopped,
+            "detail": (
+                "run `broker reconcile` once the process is gone; it refuses to "
+                "record an outcome while the process is still alive"
+            ),
+        }
 
     def list_attempts(self, *, diagnostic: bool = False) -> list[dict[str, Any]]:
         values = [attempt.as_dict() for attempt in self.attempts.list_attempts()]
@@ -934,6 +978,7 @@ alone is not task acceptance.
                 parent_session_id=str(delegation["parent_session_id"]),
                 child_session_id=child_session_id,
                 trace_id=trace_id,
+                root_delegation_id=str(delegation.get("root_delegation_id") or delegation_id),
             )
             hook = _CanonicalStartHook(
                 self.manager,
