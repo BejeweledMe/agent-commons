@@ -219,3 +219,15 @@ def test_using_a_closed_store_reports_a_typed_error(tmp_path: Path) -> None:
     store.close()
     with pytest.raises(IntegrityError, match="closed"):
         store.head_seq("run.1")
+
+
+def test_a_read_only_open_never_creates_the_store(tmp_path: Path) -> None:
+    """Regression: `run list` on a workspace that never ran anything answered
+    "nothing" and left a database behind to prove it."""
+
+    from agent_commons.runtime.observability import StoreNotFound
+
+    paths = paths_for(tmp_path)
+    with pytest.raises(StoreNotFound):
+        RunEventStore(paths, writer=False)
+    assert not paths.orchestrator_db.exists()

@@ -261,7 +261,26 @@ routine logs and private reasoning are excluded.
 - A broker or provider process compromised under the same operating-system user
   can bypass local grants and tamper with non-authoritative runtime state.
 - Provider read-only or sandbox modes may reduce accidental writes but are not a
-  security boundary unless enforced by the operating system.
+  security boundary unless enforced by the operating system. The two builder
+  profiles differ here and the single `trusted_workspace` opt-in does not say
+  so: the Codex builder runs under an OS sandbox (`--sandbox workspace-write`),
+  while the Claude builder has no OS-enforced boundary and retains shell and
+  file-write tools. For the Claude builder, external isolation is the only
+  boundary, not a recommendation.
+- The local UI (`agent-commons ui`) opens a loopback listening socket. It is
+  read-only, registers only `GET` routes, requires a bearer token, pins the
+  `Host` header, and emits no CORS headers, but it is still a new network
+  surface on the host. Its token is held in memory and printed once; launching a
+  browser automatically exposes that URL to other processes of the same user
+  through the process list.
+- The UI renders agent-written text — task titles, delegation purposes,
+  self-declared session roles — as ordinary graph nodes. It is injection-safe
+  (rendered as text, never markup), but a node label is still attacker-chosen
+  prose and can be written to look like a verdict.
+- `broker stop` terminates by recorded pid. A pid may have been reused by an
+  unrelated process of the same user, and checking that the pid still exists
+  cannot distinguish the two, so a stale attempt can signal a foreign process
+  group.
 - Process cancellation cannot guarantee that an external API call, spawned
   descendant, or provider-side job was undone.
 - Optional telemetry exporters extend metadata to another trust domain whose

@@ -21,10 +21,18 @@ Then move to the project the agents will share:
 
 ```bash
 cd /path/to/your-project
-export AGENT_COMMONS_STATE_ROOT=/absolute/operator-owned/path/agent-commons-state
+unset AGENT_COMMONS_STATE_ROOT
+export AGENT_COMMONS_STATE_BASE=/absolute/operator-owned/path/agent-commons-state
 agent-commons init --integration codex --integration claude
 agent-commons --read-only --json support
 ```
+
+Use `AGENT_COMMONS_STATE_BASE`, not `AGENT_COMMONS_STATE_ROOT`. The base holds
+one derived root per workspace, so the same value works for every project you
+add. `AGENT_COMMONS_STATE_ROOT` names one **exact** workspace root and is kept
+only for backward compatibility: pointing a second project at it fails before
+any state is opened, which is correct but surprising if you copied the line from
+a first project.
 
 Expected JSON includes `"canonical_workspace_available":true`,
 `"state_root_explicit":true`, the installed package/Python/platform versions,

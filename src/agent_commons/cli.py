@@ -328,13 +328,16 @@ def run_group() -> None:
 def run_list_command(state: CLIState, run_state: tuple[str, ...], limit: int) -> None:
     """List runs held by the observability projection."""
 
-    from agent_commons.runtime.observability import RunEventStore
+    from agent_commons.runtime.observability import RunEventStore, StoreNotFound
 
     paths = state.manager().paths
-    with RunEventStore(paths, writer=False) as store:
-        state.emit(
-            [row.as_dict() for row in store.list_runs(states=run_state or None, limit=limit)]
-        )
+    try:
+        with RunEventStore(paths, writer=False) as store:
+            state.emit(
+                [row.as_dict() for row in store.list_runs(states=run_state or None, limit=limit)]
+            )
+    except StoreNotFound:
+        state.emit([])
 
 
 @run_group.command("export")

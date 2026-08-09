@@ -116,3 +116,45 @@ unavailable, reconcile returns `requester_unavailable` with safe next actions
 and makes no canonical change. Only canonical `requested` work may then use the
 explicit `delegation:recover` operator path; active work still requires proven
 provider termination and owner-aware reconciliation.
+
+## Stopping a running provider
+
+`broker stop <delegation-id>` signals the recorded provider process group,
+`--force` sends `SIGKILL` instead of `SIGTERM`. Only the session that requested
+the delegation may stop it.
+
+The command writes no canonical outcome. It records intent by moving the attempt
+to `cancel_requested`, then you run `broker reconcile`, which refuses to record
+an outcome while the process is still alive and reports it with its pid instead.
+Once the process is gone, reconcile records `operator_stop_requested` — not
+`broker_restart_ambiguous`, which would name a cause that never happened.
+
+Termination is signalled by recorded pid. After a long-idle attempt the pid may
+have been reused by an unrelated process of the same user, and checking that the
+pid still exists cannot tell the two apart. Check `broker attempts --diagnostic`
+before forcing a stop.
+
+## Run observability projection
+
+`run list` and `run export <run-id>` read the disposable run store under the
+state root. Both are read-only and never create it: on a workspace that has
+never produced run events, `run list` answers with nothing and leaves no file
+behind.
+
+Retention never exports on your behalf. `run export` is how a run is kept beyond
+its configured tier, and it must be run before the tier expires.
+
+Note the current limitation plainly: no producer writes to this store yet. The
+broker does not emit run events, so these commands operate on an empty
+projection until the streaming runner exists.
+
+## Local read-only UI
+
+`agent-commons ui` serves a read-only view of the workspace. It binds
+`127.0.0.1` only — there is deliberately no `--host` flag — requires a bearer
+token printed at startup, pins the `Host` header to loopback, and registers only
+`GET` routes. It records no canonical event.
+
+Opening a browser automatically puts the token in the URL, which is visible to
+other processes of the same user through the process list. Use `--no-browser`
+and paste the URL yourself where that matters.

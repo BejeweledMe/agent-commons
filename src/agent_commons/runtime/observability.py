@@ -39,6 +39,11 @@ from agent_commons.runtime.run_state import (
 )
 from agent_commons.security.policy import SecurityPolicy
 
+
+class StoreNotFound(IntegrityError):
+    """A read-only caller asked for a store that has never been created."""
+
+
 _SCHEMA_VERSION = 1
 _EXPORT_SCHEMA = "agent_commons.run_export.v1"
 _SNAPSHOT_INTERVAL = 1000
@@ -355,6 +360,11 @@ class RunEventStore:
         self._readers = threading.local()
         self._reader_pool: list[sqlite3.Connection] = []
         try:
+            if not writer and not self.database_path.exists():
+                # A read-only caller must not bring the store into existence.
+                # `run list` on a workspace that never ran anything answered
+                # "nothing" and left a database behind to prove it.
+                raise StoreNotFound("no run observability store exists for this workspace yet")
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
             if writer:
                 self._acquire_writer_lock()
