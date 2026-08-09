@@ -32,16 +32,12 @@ class RuntimeUsage:
     attempts_started: int = 0
     active_concurrency: int = 0
     subtree_delegations: int = 0
-    wave_index: int = 0
-    context_tokens: int = 0
 
     def __post_init__(self) -> None:
         _nonnegative("active_fanout", self.active_fanout)
         _nonnegative("attempts_started", self.attempts_started)
         _nonnegative("active_concurrency", self.active_concurrency)
         _nonnegative("subtree_delegations", self.subtree_delegations)
-        _nonnegative("wave_index", self.wave_index)
-        _nonnegative("context_tokens", self.context_tokens)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,9 +57,6 @@ class RuntimePolicy:
     timeout_seconds: int = 1_800
     max_output_bytes: int = 1_048_576
     max_budget_microusd: int | None = None
-    max_delegations_total: int = 1
-    max_wave_count: int = 1
-    max_context_tokens: int | None = None
 
     def __post_init__(self) -> None:
         _nonnegative("remaining_depth", self.remaining_depth)
@@ -74,10 +67,6 @@ class RuntimePolicy:
         _positive("max_output_bytes", self.max_output_bytes)
         if self.max_budget_microusd is not None:
             _positive("max_budget_microusd", self.max_budget_microusd)
-        _positive("max_delegations_total", self.max_delegations_total)
-        _positive("max_wave_count", self.max_wave_count)
-        if self.max_context_tokens is not None:
-            _positive("max_context_tokens", self.max_context_tokens)
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> RuntimePolicy:
@@ -89,9 +78,6 @@ class RuntimePolicy:
             "timeout_seconds",
             "max_output_bytes",
             "max_budget_microusd",
-            "max_delegations_total",
-            "max_wave_count",
-            "max_context_tokens",
         }
         unknown = sorted(set(value) - allowed)
         if unknown:
@@ -126,8 +112,6 @@ class RuntimePolicy:
             "max_concurrency",
             "timeout_seconds",
             "max_output_bytes",
-            "max_delegations_total",
-            "max_wave_count",
         ):
             if getattr(self, name) > getattr(parent, name):
                 raise PolicyViolationError(f"child {name} exceeds the parent limit")
@@ -136,35 +120,19 @@ class RuntimePolicy:
             or self.max_budget_microusd > parent.max_budget_microusd
         ):
             raise PolicyViolationError("child monetary budget exceeds the parent limit")
-        if parent.max_context_tokens is not None and (
-            self.max_context_tokens is None or self.max_context_tokens > parent.max_context_tokens
-        ):
-            raise PolicyViolationError("child context token limit exceeds the parent limit")
 
     def assert_admission_allowed(self, usage: RuntimeUsage) -> None:
         """Guards that waiting in the admission queue can never satisfy.
 
-        Depth, attempts, subtree totals, planning waves, and assembled context
-        are permanent facts about the request: queueing cannot repair them, so
-        they must fail closed instead of consuming a queue slot.
+        Depth and attempts are permanent facts about this request: queueing
+        cannot repair them, so they fail closed instead of taking a queue slot.
+        Operator-owned ceilings are checked separately, by OperatorLimits.
         """
 
         if self.remaining_depth < 1:
             raise PolicyViolationError("delegation depth is exhausted")
         if usage.attempts_started >= self.max_attempts:
             raise PolicyViolationError("delegation attempt limit is exhausted")
-        if usage.subtree_delegations >= self.max_delegations_total:
-            raise PolicyViolationError("delegation subtree total limit is exhausted")
-        if usage.wave_index >= self.max_wave_count:
-            raise PolicyViolationError("delegation planning wave limit is exhausted")
-        self.assert_context_allowed(usage.context_tokens)
-
-    def assert_context_allowed(self, estimated_tokens: int) -> None:
-        """A size ceiling, not an occupied slot: an exactly-sized context passes."""
-
-        _nonnegative("context_tokens", estimated_tokens)
-        if self.max_context_tokens is not None and estimated_tokens > self.max_context_tokens:
-            raise PolicyViolationError("assembled child context exceeds the context token limit")
 
     def assert_launch_allowed(self, usage: RuntimeUsage) -> None:
         self.assert_admission_allowed(usage)
@@ -209,9 +177,12 @@ class OperatorLimits:
     queue_wait_seconds: int = 30
     parent_provider_units: int = 4
     parent_budget_microusd: int = 10_000_000
-    max_delegations_total: int = 1
-    max_wave_count: int = 1
-    max_context_tokens: int | None = None
+    # A structural backstop, not the primary bound.  Spend is already capped by
+    # provider_units/budget per tree, so under default configuration this never
+    # binds; it starts to matter exactly when an operator raises those, which is
+    # when a runaway supervisor becomes affordable.  A default of 1 would not
+    # bound amplification -- it would forbid delegation trees outright.
+    max_delegations_total: int = 16
     provider_concurrency: Mapping[str, int] = field(
         default_factory=lambda: {"codex": 2, "claude": 2}
     )
@@ -233,9 +204,6 @@ class OperatorLimits:
         _positive("parent_provider_units", self.parent_provider_units)
         _positive("parent_budget_microusd", self.parent_budget_microusd)
         _positive("max_delegations_total", self.max_delegations_total)
-        _positive("max_wave_count", self.max_wave_count)
-        if self.max_context_tokens is not None:
-            _positive("max_context_tokens", self.max_context_tokens)
         object.__setattr__(
             self,
             "provider_concurrency",
@@ -268,6 +236,18 @@ class OperatorLimits:
         )
         self._assert_writable_concurrency_preconditions()
 
+    def assert_subtree_allowed(self, usage: RuntimeUsage) -> None:
+        """Bound the whole delegation tree, which depth and fanout never did.
+
+        Depth bounds how deep a tree grows and fanout how wide one node is;
+        neither bounds the total, so a supervisor could keep opening compliant
+        delegations forever.  This ceiling is operator-owned, so it is checked
+        here rather than carried in the stored per-delegation policy.
+        """
+
+        if usage.subtree_delegations >= self.max_delegations_total:
+            raise PolicyViolationError("delegation subtree total limit is exhausted")
+
     def _assert_writable_concurrency_preconditions(self) -> None:
         """Refuse an unsafe ceiling at configuration load, not after a fan-out.
 
@@ -299,8 +279,6 @@ class OperatorLimits:
             "parent_provider_units",
             "parent_budget_microusd",
             "max_delegations_total",
-            "max_wave_count",
-            "max_context_tokens",
             "provider_concurrency",
             "profile_concurrency",
             "provider_parent_provider_units",
@@ -358,8 +336,6 @@ class OperatorLimits:
             "parent_provider_units": self.parent_provider_units,
             "parent_budget_microusd": self.parent_budget_microusd,
             "max_delegations_total": self.max_delegations_total,
-            "max_wave_count": self.max_wave_count,
-            "max_context_tokens": self.max_context_tokens,
             "provider_concurrency": dict(self.provider_concurrency),
             "profile_concurrency": dict(self.profile_concurrency),
             "provider_parent_provider_units": dict(self.provider_parent_provider_units),

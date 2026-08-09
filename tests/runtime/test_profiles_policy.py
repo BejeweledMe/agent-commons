@@ -422,33 +422,36 @@ def test_runtime_policy_rejects_exhausted_launch_limits(usage: RuntimeUsage, mes
         RuntimePolicy().assert_launch_allowed(usage)
 
 
-def test_new_runtime_guards_are_inert_at_their_defaults() -> None:
-    """A fresh policy must not refuse the very first delegation."""
+def test_a_fresh_policy_refuses_nothing() -> None:
+    """A default policy must not refuse the very first delegation."""
 
-    policy = RuntimePolicy()
-    assert policy.max_delegations_total == 1
-    assert policy.max_wave_count == 1
-    assert policy.max_context_tokens is None
-    policy.assert_launch_allowed(RuntimeUsage())
+    RuntimePolicy().assert_launch_allowed(RuntimeUsage())
 
 
-@pytest.mark.parametrize(
-    ("usage", "message"),
-    [
-        (RuntimeUsage(subtree_delegations=1), "subtree"),
-        (RuntimeUsage(wave_index=1), "wave"),
-    ],
-)
-def test_runtime_policy_rejects_exhausted_subtree_guards(usage: RuntimeUsage, message: str) -> None:
-    with pytest.raises(PolicyViolationError, match=message):
-        RuntimePolicy().assert_launch_allowed(usage)
+def test_the_stored_policy_shape_is_unchanged_by_operator_ceilings() -> None:
+    """Operator ceilings are not granted authority: they must stay out of the
+    stored request document and out of its semantic digest, or an operator
+    editing config would both break rollback and invalidate every retry key."""
+
+    assert set(RuntimePolicy().as_dict()) == {
+        "remaining_depth",
+        "max_fanout",
+        "max_attempts",
+        "max_concurrency",
+        "timeout_seconds",
+        "max_output_bytes",
+        "max_budget_microusd",
+    }
 
 
-def test_context_ceiling_is_a_size_not_an_occupied_slot() -> None:
-    policy = RuntimePolicy(max_context_tokens=100)
-    policy.assert_context_allowed(100)
-    with pytest.raises(PolicyViolationError, match="context token"):
-        policy.assert_context_allowed(101)
+def test_operator_limits_bound_the_delegation_tree() -> None:
+    """Depth bounds how deep a tree grows and fanout how wide one node is;
+    neither bounds the total, which is what this ceiling is for."""
+
+    limits = OperatorLimits(max_delegations_total=2)
+    limits.assert_subtree_allowed(RuntimeUsage(subtree_delegations=1))
+    with pytest.raises(PolicyViolationError, match="subtree"):
+        limits.assert_subtree_allowed(RuntimeUsage(subtree_delegations=2))
 
 
 def test_admission_guards_exclude_queueable_capacity() -> None:
@@ -465,7 +468,7 @@ def test_no_policy_field_can_widen_in_any_generated_child() -> None:
     """Reflective over the dataclass, so a field added later and forgotten in
     assert_reduction_of fails here rather than silently amplifying authority."""
 
-    optional = {"max_budget_microusd", "max_context_tokens"}
+    optional = {"max_budget_microusd"}
     names = [
         item.name for item in dataclasses.fields(RuntimePolicy) if item.name != "remaining_depth"
     ]
@@ -495,19 +498,14 @@ def test_runtime_policy_round_trips_through_from_mapping() -> None:
         timeout_seconds=600,
         max_output_bytes=2048,
         max_budget_microusd=500,
-        max_delegations_total=9,
-        max_wave_count=5,
-        max_context_tokens=60_000,
     )
     assert RuntimePolicy.from_mapping(policy.as_dict()) == policy
 
 
 def test_operator_limits_round_trip_and_reject_unknown_fields() -> None:
-    limits = OperatorLimits(max_delegations_total=6, max_wave_count=3, max_context_tokens=1024)
+    limits = OperatorLimits(max_delegations_total=6)
     restored = OperatorLimits.from_mapping(limits.as_dict())
     assert restored.max_delegations_total == 6
-    assert restored.max_wave_count == 3
-    assert restored.max_context_tokens == 1024
     with pytest.raises(PolicyViolationError, match="unsupported fields"):
         OperatorLimits.from_mapping({"max_waves": 3})
 

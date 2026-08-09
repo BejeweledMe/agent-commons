@@ -571,9 +571,6 @@ class DelegationRuntimeService:
             raise ConfigurationError(
                 "micro_usd budget must allocate at least one unit to every permitted attempt"
             )
-        # The subtree, wave, and context ceilings are operator-owned: the
-        # canonical delegation schema fixes its own ``limits`` object, so they
-        # cannot travel with the event.
         parent = RuntimePolicy(
             remaining_depth=remaining_depth,
             max_fanout=int(limits["max_concurrency"]),
@@ -582,9 +579,6 @@ class DelegationRuntimeService:
             timeout_seconds=int(limits["wall_time_seconds"]),
             max_output_bytes=1_048_576,
             max_budget_microusd=monetary_budget,
-            max_delegations_total=self.operator_limits.max_delegations_total,
-            max_wave_count=self.operator_limits.max_wave_count,
-            max_context_tokens=self.operator_limits.max_context_tokens,
         )
         child = parent.derive_child(
             max_budget_microusd=(

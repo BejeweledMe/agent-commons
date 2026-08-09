@@ -33,8 +33,23 @@ from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .subprocess_runner import ProcessResult, RunOutcome
 
-REQUEST_SCHEMA = "agent_commons.runtime_request.v3"
-ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v3"
+# v4 records the delegation tree (``root_delegation_id``) so budget and subtree
+# ceilings can be charged against the tree rather than the requesting session.
+# The version is bumped because that field genuinely changes the stored shape:
+# an older reader must refuse the document with a diagnosable schema error
+# rather than a confusing complaint about an unknown field.
+REQUEST_SCHEMA = "agent_commons.runtime_request.v4"
+ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v4"
+_READABLE_REQUEST_SCHEMAS = (
+    REQUEST_SCHEMA,
+    "agent_commons.runtime_request.v3",
+    "agent_commons.runtime_request.v2",
+)
+_READABLE_ATTEMPT_SCHEMAS = (
+    ATTEMPT_SCHEMA,
+    "agent_commons.runtime_attempt.v3",
+    "agent_commons.runtime_attempt.v2",
+)
 QUEUE_SCHEMA = "agent_commons.runtime_queue.v1"
 _LEGACY_REQUEST_SCHEMA = "agent_commons.runtime_request.v2"
 _LEGACY_ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v2"
@@ -352,7 +367,7 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
         )
     except (KeyError, TypeError, ValueError, ValidationError) as exc:
         raise IntegrityError("stored runtime attempt is invalid") from exc
-    if attempt.schema not in {ATTEMPT_SCHEMA, _LEGACY_ATTEMPT_SCHEMA} or (
+    if attempt.schema not in _READABLE_ATTEMPT_SCHEMAS or (
         attempt.profile_id.provider is not attempt.provider
     ):
         raise IntegrityError("stored runtime attempt schema/provider is invalid")
@@ -461,10 +476,7 @@ class AttemptStore:
 
     def _validate_document(self, value: Mapping[str, Any]) -> None:
         expected = {"schema", "request_id", "semantic_sha256", "spec", "attempts"}
-        if set(value) != expected or value.get("schema") not in {
-            REQUEST_SCHEMA,
-            _LEGACY_REQUEST_SCHEMA,
-        }:
+        if set(value) != expected or value.get("schema") not in _READABLE_REQUEST_SCHEMAS:
             raise IntegrityError("runtime request document has an invalid envelope")
         if _SHA256.fullmatch(str(value.get("semantic_sha256", ""))) is None:
             raise IntegrityError("runtime request semantic digest is invalid")
@@ -629,11 +641,35 @@ class AttemptStore:
         return _attempt_from_mapping(document["attempts"][-1])
 
     @staticmethod
+    def _subtree_delegations(
+        documents: list[tuple[Path, dict[str, Any]]], spec: AttemptSpec
+    ) -> int:
+        """Distinct delegations already launched in this tree, excluding this one.
+
+        Counted by delegation rather than by attempt, so a retry of the same
+        delegation never consumes a slot in the tree's total.  A document that
+        predates tree recording falls back to its own delegation id, which is
+        what a root would have carried anyway, so legacy state reads as a
+        collection of single-delegation trees rather than one merged tree.
+        """
+
+        scope = spec.correlation.budget_scope
+        peers = {
+            str(correlation["delegation_id"])
+            for _, document in documents
+            for correlation in (document["spec"]["correlation"],)
+            if _budget_scope_of(correlation) == scope
+        }
+        peers.discard(spec.correlation.delegation_id)
+        return len(peers)
+
+    @staticmethod
     def _usage(
         documents: list[tuple[Path, dict[str, Any]]],
         *,
         parent_session_id: str,
         attempts_started: int,
+        subtree_delegations: int = 0,
     ) -> RuntimeUsage:
         active = [
             AttemptStore._latest(document)
@@ -647,6 +683,7 @@ class AttemptStore:
             active_fanout=parent_active,
             attempts_started=attempts_started,
             active_concurrency=parent_active,
+            subtree_delegations=subtree_delegations,
         )
 
     def _capacity_reason(
@@ -803,11 +840,13 @@ class AttemptStore:
                     documents,
                     parent_session_id=spec.correlation.parent_session_id,
                     attempts_started=attempts_started,
+                    subtree_delegations=self._subtree_delegations(documents, spec),
                 )
                 # Admission guards only: fanout and concurrency are transient
                 # and belong to the queue below, so they are deliberately not
                 # evaluated here.
                 parent_policy.assert_admission_allowed(usage)
+                self.operator_limits.assert_subtree_allowed(usage)
                 self._assert_budget_available(
                     documents,
                     spec,

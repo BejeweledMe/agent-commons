@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import stat
 import threading
@@ -26,6 +27,7 @@ from agent_commons.runtime import (
     checkout_fingerprint,
     classify_process_result,
 )
+from agent_commons.runtime.attempts import ATTEMPT_SCHEMA, REQUEST_SCHEMA
 
 
 class Clock:
@@ -338,13 +340,13 @@ def test_v2_attempt_is_upgraded_in_memory_and_rewritten_on_next_transition(
     )
 
     loaded = store.list_attempts()[0]
-    assert loaded.schema == "agent_commons.runtime_attempt.v3"
+    assert loaded.schema == ATTEMPT_SCHEMA
     assert loaded.diagnostic_code is DiagnosticCode.LEGACY_UNCLASSIFIED
 
     store.transition(reserved.attempt_id, AttemptState.FAILED, reason="start_failed")
     rewritten = json.loads(path.read_text())
-    assert rewritten["schema"] == "agent_commons.runtime_request.v3"
-    assert rewritten["attempts"][0]["schema"] == "agent_commons.runtime_attempt.v3"
+    assert rewritten["schema"] == REQUEST_SCHEMA
+    assert rewritten["attempts"][0]["schema"] == ATTEMPT_SCHEMA
     assert rewritten["attempts"][0]["diagnostic_code"] == "legacy_unclassified"
 
 
@@ -388,3 +390,41 @@ def test_provider_failure_corpus_maps_only_to_closed_codes(
 
     assert diagnostic.code is expected
     assert "sk-secret" not in diagnostic.hint
+
+
+def test_state_written_before_the_tree_was_recorded_still_reads(tmp_path: Path) -> None:
+    """Forward compatibility: a v3 document has no root_delegation_id, so every
+    delegation reads back as its own tree -- which is what a root carried anyway.
+
+    The paired direction is deliberately not compatible: v4 adds a stored field,
+    so an older reader refuses the envelope by schema instead of misreading it.
+    """
+
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    parent, _ = policies()
+    store.reserve(spec(tmp_path), parent_policy=parent)
+
+    document_path = next((tmp_path / "state" / "runtime" / "requests").glob("*.json"))
+    document = json.loads(document_path.read_text(encoding="utf-8"))
+
+    # Rewrite it in the v3 shape: no tree recorded anywhere.
+    document["schema"] = "agent_commons.runtime_request.v3"
+    document["spec"]["correlation"].pop("root_delegation_id", None)
+    for attempt in document["attempts"]:
+        attempt["schema"] = "agent_commons.runtime_attempt.v3"
+        attempt["correlation"].pop("root_delegation_id", None)
+    document["semantic_sha256"] = hashlib.sha256(
+        (
+            json.dumps(document["spec"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            + "\n"
+        ).encode("utf-8")
+    ).hexdigest()
+    document_path.write_text(
+        json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    reopened = AttemptStore(tmp_path / "state", clock=Clock())
+    loaded = reopened.list_attempts()
+    assert [attempt.correlation.root_delegation_id for attempt in loaded] == [None]
+    assert loaded[0].correlation.budget_scope == loaded[0].correlation.delegation_id

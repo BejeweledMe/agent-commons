@@ -227,3 +227,65 @@ def test_service_reconcile_reports_a_live_provider_instead_of_terminalizing_it(
     assert "broker stop" in " ".join(entry["safe_next_actions"])
     # The attempt is untouched: no outcome was invented for a running process.
     assert service.attempts.list_attempts()[0].state is AttemptState.RUNNING
+
+
+def test_the_subtree_ceiling_refuses_a_real_reservation(tmp_path: Path) -> None:
+    """Driven through AttemptStore.reserve, not through a hand-built usage
+    object.  The counter this guard reads was never produced, so a test that
+    constructed RuntimeUsage itself confirmed a guard that could not fire."""
+
+    from agent_commons.runtime import OperatorLimits
+
+    store = AttemptStore(
+        tmp_path / "state",
+        clock=Clock(),
+        operator_limits=OperatorLimits(max_delegations_total=2),
+    )
+    root = "delegation.01KXTREEROOTTREEROOTTREERO"
+    parent = RuntimePolicy(remaining_depth=1, max_attempts=2)
+
+    for index in range(2):
+        reserved = store.reserve(
+            spec(
+                tmp_path,
+                key=f"tree-{index}",
+                delegation=f"delegation.01KXNODE{index:018d}",
+                root=root,
+                parent_session=f"session.{index:032d}",
+                child_session=f"session.{index + 400:032d}",
+            ),
+            parent_policy=parent,
+        )
+        store.transition(reserved.attempt.attempt_id, AttemptState.FAILED, reason="done")
+
+    with pytest.raises(PolicyViolationError, match="subtree"):
+        store.reserve(
+            spec(
+                tmp_path,
+                key="tree-overflow",
+                delegation="delegation.01KXNODEOVERFLOWOVERFLOWX",
+                root=root,
+                parent_session="session." + "c" * 32,
+                child_session="session." + "9" * 32,
+            ),
+            parent_policy=parent,
+        )
+
+
+def test_a_retry_does_not_consume_a_slot_in_the_tree_total(tmp_path: Path) -> None:
+    """The ceiling counts delegations, not attempts: retrying one delegation
+    must not exhaust the tree it belongs to."""
+
+    from agent_commons.runtime import OperatorLimits
+
+    store = AttemptStore(
+        tmp_path / "state",
+        clock=Clock(),
+        operator_limits=OperatorLimits(max_delegations_total=1),
+    )
+    only = spec(tmp_path, key="solo", root="delegation.01KXAAAAAAAAAAAAAAAAAAAAAA")
+    parent = only.parent_policy
+    reserved = store.reserve(only, parent_policy=parent)
+    store.transition(reserved.attempt.attempt_id, AttemptState.FAILED, reason="failed")
+    again = store.reserve(only, parent_policy=parent, retry=True)
+    assert again.attempt.number == 2
