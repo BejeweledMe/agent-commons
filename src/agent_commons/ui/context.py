@@ -8,6 +8,7 @@ top of a writable manager.
 from __future__ import annotations
 
 import hashlib
+import threading
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -84,6 +85,9 @@ class UIContext:
         self._state_base = state_base
         self._state_source = state_source
         self.server_instance_id = uuid.uuid4().hex
+        # One poller runs per SSE connection, so sequence and graph are shared
+        # mutable state across worker threads.
+        self._guard = threading.RLock()
         self._seq = 0
         self._fingerprint = ""
         self._graph: dict[str, Any] | None = None
@@ -126,37 +130,63 @@ class UIContext:
 
     def rebuild_graph(self) -> dict[str, Any]:
         manager = self.manager()
+        # Sample the fingerprint *before* reading, and keep the earlier of the
+        # two samples.  Taking it afterwards records a change the graph does not
+        # contain, so the next comparison sees no difference and the view stays
+        # frozen for as long as the ledger is quiet -- while the stream keeps
+        # reporting itself live.
+        before = ledger_fingerprint(manager.paths)
         snapshot = manager.snapshot()
         sessions = [
             session.actor_context() | {"state": _session_state(session)}
             for session in manager.sessions.list_sessions()
         ]
-        fingerprint = ledger_fingerprint(manager.paths)
-        self._seq += 1
-        self._fingerprint = fingerprint
-        self._graph = build_graph(
+        after = ledger_fingerprint(manager.paths)
+        fingerprint = before if before == after else ""
+        graph = build_graph(
             snapshot,
             sessions=sessions,
             workspace_id=manager.workspace_id,
             generated_at=_iso_now(),
-            ledger_fingerprint=fingerprint,
+            ledger_fingerprint=before,
             server_instance_id=self.server_instance_id,
-            seq=self._seq,
+            seq=self._seq + 1,
             read_diagnostics={
                 "source": "canonical",
                 "reason": "read_only",
                 "projection": dict(snapshot.replay_metrics),
             },
         )
-        return self._graph
+        with self._guard:
+            self._seq += 1
+            graph["seq"] = self._seq
+            self._fingerprint = fingerprint
+            self._graph = graph
+            return graph
 
     def graph(self) -> dict[str, Any]:
-        if self._graph is None:
-            return self.rebuild_graph()
-        return self._graph
+        with self._guard:
+            graph = self._graph
+        return graph if graph is not None else self.rebuild_graph()
+
+    def snapshot_frame(self) -> tuple[int, dict[str, Any]]:
+        """Sequence and graph as one consistent pair.
+
+        Reading them separately lets a concurrent rebuild pair a sequence with a
+        different graph, which is exactly what the resume contract relies on.
+        """
+
+        with self._guard:
+            if self._graph is not None:
+                return self._seq, self._graph
+        graph = self.rebuild_graph()
+        with self._guard:
+            return self._seq, graph
 
     def refresh_if_changed(self) -> bool:
-        if self.fingerprint() != self._fingerprint:
+        with self._guard:
+            known = self._fingerprint
+        if self.fingerprint() != known:
             self.rebuild_graph()
             return True
         return False

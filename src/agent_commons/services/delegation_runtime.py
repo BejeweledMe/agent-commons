@@ -361,12 +361,32 @@ class DelegationRuntimeService:
                 "stopped": [],
                 "detail": "no live provider process is recorded for this delegation",
             }
+        # Stopping somebody else's provider is an operator action on their work,
+        # so it needs the same ownership check the launch path already applies.
+        foreign = [
+            attempt
+            for attempt in live
+            if attempt.correlation.parent_session_id != self.manager.session_id
+        ]
+        if foreign:
+            raise LifecycleConflictError(
+                "only the session that requested this delegation may stop its provider"
+            )
         stopped: list[dict[str, Any]] = []
         for attempt in live:
             pid = attempt.pid
             if pid is None:
                 continue
             terminated = terminate_process_group(pid, force=force)
+            # Record the intent before the outcome exists.  Without it a later
+            # reconcile cannot tell a deliberate stop from a broker restart, and
+            # would file this under a reason that never happened.
+            if attempt.state is AttemptState.RUNNING:
+                self.attempts.transition(
+                    attempt.attempt_id,
+                    AttemptState.CANCEL_REQUESTED,
+                    reason="operator_stop_requested",
+                )
             stopped.append(
                 {
                     "attempt_id": attempt.attempt_id,
@@ -380,7 +400,8 @@ class DelegationRuntimeService:
             "stopped": stopped,
             "detail": (
                 "run `broker reconcile` once the process is gone; it refuses to "
-                "record an outcome while the process is still alive"
+                "record an outcome while the process is still alive, and records "
+                "this stop as operator_stop_requested rather than a broker restart"
             ),
         }
 
@@ -1092,7 +1113,11 @@ alone is not task acceptance.
                     attempt = self.attempts.transition(
                         attempt.attempt_id,
                         AttemptState.NEEDS_OPERATOR,
-                        reason="broker_restart_ambiguous",
+                        reason=(
+                            "operator_stop_requested"
+                            if attempt.state is AttemptState.CANCEL_REQUESTED
+                            else "broker_restart_ambiguous"
+                        ),
                     )
                 current, telemetry_failures = self._finalize_attempt(attempt)
                 values.append(

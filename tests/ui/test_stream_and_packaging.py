@@ -210,3 +210,38 @@ def test_the_spa_offers_a_way_to_isolate_a_node_and_to_leave_it() -> None:
     # Two independent exits so nobody is stranded in a mostly faded graph.
     assert 'event.key === "Escape"' in body
     assert "event.target === canvas" in body
+
+
+def test_a_graph_built_while_the_ledger_moves_does_not_freeze_the_view(
+    context: UIContext,
+) -> None:
+    """Regression: the fingerprint was sampled after the snapshot, so a write
+    landing in between was recorded as seen but not rendered.  The next
+    comparison then matched and the view stayed frozen while the stream kept
+    reporting itself live."""
+
+    import agent_commons.ui.context as module
+
+    original = module.ledger_fingerprint
+    samples = iter(["sha256:before", "sha256:after"])
+
+    def moving(target: Any) -> str:
+        try:
+            return next(samples)
+        except StopIteration:
+            return original(target)
+
+    module.ledger_fingerprint = moving
+    try:
+        context.rebuild_graph()
+    finally:
+        module.ledger_fingerprint = original
+
+    # The two samples disagreed, so nothing was recorded as seen and the very
+    # next check rebuilds rather than trusting a graph that missed the write.
+    assert context.refresh_if_changed() is True
+
+
+def test_the_stream_pairs_a_sequence_with_the_graph_it_describes(context: UIContext) -> None:
+    seq, graph = context.snapshot_frame()
+    assert graph["seq"] == seq

@@ -171,11 +171,11 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
         instance=context.server_instance_id,
     )
     await asyncio.to_thread(context.refresh_if_changed)
-    graph = await asyncio.to_thread(context.graph)
+    seq, graph = await asyncio.to_thread(context.snapshot_frame)
     yield _sse(
         "snapshot",
-        {"seq": context.seq, "graph": graph},
-        event_id=context.seq,
+        {"seq": seq, "graph": graph},
+        event_id=seq,
         instance=context.server_instance_id,
     )
 
@@ -205,11 +205,11 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
         since_heartbeat += _POLL_SECONDS
         changed = await asyncio.to_thread(context.refresh_if_changed)
         if changed:
-            graph = await asyncio.to_thread(context.graph)
+            seq, graph = await asyncio.to_thread(context.snapshot_frame)
             yield _sse(
                 "snapshot",
-                {"seq": context.seq, "graph": graph},
-                event_id=context.seq,
+                {"seq": seq, "graph": graph},
+                event_id=seq,
                 instance=context.server_instance_id,
             )
             since_heartbeat = 0.0

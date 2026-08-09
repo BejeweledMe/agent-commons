@@ -84,6 +84,10 @@ class AttemptState(StrEnum):
 class AttemptReason(StrEnum):
     RESERVED = "reserved"
     BROKER_RESTART_AMBIGUOUS = "broker_restart_ambiguous"
+    #: The operator deliberately stopped this provider.  Recording it as a
+    #: broker restart would be a plain lie about why the work ended, in the one
+    #: record an incident review reads first.
+    OPERATOR_STOP_REQUESTED = "operator_stop_requested"
 
 
 _TRANSITIONS: dict[AttemptState, frozenset[AttemptState]] = {
@@ -1093,10 +1097,15 @@ class AttemptStore:
                     continue
                 if self.process_is_live(latest.pid):
                     continue
+                reason = (
+                    AttemptReason.OPERATOR_STOP_REQUESTED
+                    if latest.state is AttemptState.CANCEL_REQUESTED
+                    else AttemptReason.BROKER_RESTART_AMBIGUOUS
+                )
                 updated = replace(
                     latest,
                     state=AttemptState.NEEDS_OPERATOR,
-                    reason=AttemptReason.BROKER_RESTART_AMBIGUOUS.value,
+                    reason=reason.value,
                     updated_at=_iso(self.clock()),
                 )
                 attempts = list(document["attempts"])

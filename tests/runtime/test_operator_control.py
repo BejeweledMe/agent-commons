@@ -289,3 +289,44 @@ def test_a_retry_does_not_consume_a_slot_in_the_tree_total(tmp_path: Path) -> No
     store.transition(reserved.attempt.attempt_id, AttemptState.FAILED, reason="failed")
     again = store.reserve(only, parent_policy=parent, retry=True)
     assert again.attempt.number == 2
+
+
+def test_a_deliberate_stop_is_not_recorded_as_a_broker_restart(tmp_path: Path) -> None:
+    """Regression: the documented stop path told the operator to reconcile, and
+    reconcile filed the result under broker_restart_ambiguous -- a reason that
+    never happened, in the record an incident review reads first."""
+
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    reserved = store.reserve(
+        spec(tmp_path), parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2)
+    )
+    store.transition(reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching")
+    finished = subprocess.Popen(["/usr/bin/true"])
+    finished.wait()
+    store.transition(
+        reserved.attempt.attempt_id, AttemptState.RUNNING, reason="running", pid=finished.pid
+    )
+    # The operator asked for the stop; the intent is recorded before the outcome.
+    store.transition(
+        reserved.attempt.attempt_id,
+        AttemptState.CANCEL_REQUESTED,
+        reason="operator_stop_requested",
+    )
+
+    reconciled = store.reconcile()
+    assert [attempt.reason for attempt in reconciled] == ["operator_stop_requested"]
+
+
+def test_an_ambiguous_restart_is_still_reported_as_one(tmp_path: Path) -> None:
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    reserved = store.reserve(
+        spec(tmp_path), parent_policy=RuntimePolicy(remaining_depth=1, max_attempts=2)
+    )
+    store.transition(reserved.attempt.attempt_id, AttemptState.LAUNCHING, reason="launching")
+    finished = subprocess.Popen(["/usr/bin/true"])
+    finished.wait()
+    store.transition(
+        reserved.attempt.attempt_id, AttemptState.RUNNING, reason="running", pid=finished.pid
+    )
+    reconciled = store.reconcile()
+    assert [attempt.reason for attempt in reconciled] == ["broker_restart_ambiguous"]
