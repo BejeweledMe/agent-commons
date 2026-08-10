@@ -55,6 +55,7 @@ _ENTITY_KINDS = frozenset(
 #: `CommonsManager` method; the UI is a third adapter beside the CLI and MCP,
 #: not a second write path.
 MUTATING_ROUTES = (
+    ("POST", "/api/operations/{operation_id}/answer"),
     ("POST", "/api/chat"),
     ("POST", "/api/chat/{thread_id}/messages"),
     ("POST", "/api/agents"),
@@ -185,6 +186,10 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             await asyncio.to_thread(context.search, query=query, limit=limit, subject_kind=kind)
         )
 
+    @app.get("/api/operations")
+    async def operations() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.pending_operations))
+
     @app.get("/api/chat")
     async def chat() -> Response:
         return JSONResponse(await asyncio.to_thread(context.engagements))
@@ -245,6 +250,16 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
 
     async def _body(request: Request) -> dict[str, Any]:
         return await _json_body(request)
+
+    @app.post("/api/operations/{operation_id}/answer")
+    async def answer_operation(operation_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.answer_operation,
+            operation_id=operation_id,
+            answer=body.get("answer") or {},
+            idempotency_key=body.get("idempotency_key"),
+        )
 
     @app.post("/api/chat")
     async def open_chat(request: Request) -> Response:

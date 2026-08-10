@@ -131,6 +131,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
       <button type="button" data-panel="record" aria-selected="false">Record</button>
       <button type="button" data-panel="proposals" aria-selected="false" hidden>Proposals</button>
+      <button type="button" data-panel="blockers" aria-selected="false" hidden>Blocked</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
       <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
@@ -150,6 +151,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="panel" id="panel-record">
       <pre id="inspector-body"></pre>
+    </section>
+
+    <section class="panel" id="panel-blockers">
+      <p class="note">Runs waiting on a person. An answer is bounded metadata —
+        never a password, key, or token.</p>
+      <div id="blocker-list"></div>
+      <p class="result" id="blocker-result"></p>
     </section>
 
     <section class="panel" id="panel-proposals">
@@ -721,6 +729,65 @@ async function retire(cascade) {
 document.getElementById("settings-retire").addEventListener("click", () => retire(false));
 document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
 
+let operations = [];
+
+async function loadOperations() {
+  try { operations = (await api("/api/operations")) || []; } catch (error) { operations = []; }
+  const tab = document.querySelector('#tabs button[data-panel="blockers"]');
+  tab.hidden = operations.length === 0;
+  tab.textContent = "Blocked (" + operations.length + ")";
+  const host = document.getElementById("blocker-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  for (const item of operations) {
+    const card = document.createElement("div");
+    card.className = "field";
+    const head = document.createElement("span");
+    head.textContent = item.kind + " · " + item.delegation_id +
+      (item.deadline ? " · until " + item.deadline : "");
+    card.appendChild(head);
+    const detail = document.createElement("pre");
+    // Agent-written prose, written as text.
+    detail.textContent = JSON.stringify(item.metadata, null, 2);
+    card.appendChild(detail);
+    if (item.answerable_here && writesEnabled) {
+      const field = document.createElement("input");
+      field.type = "text";
+      field.placeholder = "Your answer";
+      field.className = "answer";
+      card.appendChild(field);
+      const send = document.createElement("button");
+      send.type = "button";
+      send.textContent = "Answer";
+      send.addEventListener("click", () => answerOperation(item.operation_id, field.value));
+      card.appendChild(send);
+    } else {
+      const why = document.createElement("p");
+      why.className = "note warn";
+      // Say which window can answer instead of showing a button that fails.
+      why.textContent = writesEnabled
+        ? "Answer from the session that owns this run: " +
+          (item.answer_from_session || []).join(", ")
+        : "Read-only. Start the UI with --enable-writes as the owning session.";
+      card.appendChild(why);
+    }
+    host.appendChild(card);
+  }
+}
+
+async function answerOperation(operationId, text) {
+  const result = document.getElementById("blocker-result");
+  try {
+    await post("/api/operations/" + encodeURIComponent(operationId) + "/answer",
+               { answer: { answer: text } });
+    result.className = "result ok";
+    result.textContent = "answered";
+    await loadOperations();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
 let engagement = null;
 
 async function loadChat() {
@@ -779,6 +846,7 @@ async function sendChat() {
     result.className = "result ok";
     result.textContent = "recorded";
     await loadChat();
+    await loadOperations();
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -1124,6 +1192,7 @@ async function boot() {
     paintCatalog();
     await loadProposals();
     await loadChat();
+    await loadOperations();
     // The main chat is where work starts, so it is what the panel shows before
     // anybody clicks a node.  A node chat is for stepping in on one role.
     document.getElementById("inspector").classList.add("open");

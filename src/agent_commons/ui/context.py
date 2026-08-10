@@ -18,7 +18,7 @@ from typing import Any
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
-from agent_commons.errors import ConfigurationError, ValidationError
+from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
@@ -345,6 +345,52 @@ class UIContext:
 
         return self.manager().search_history(query, limit=limit, subject_kind=subject_kind)
 
+    def pending_operations(self) -> list[dict[str, Any]]:
+        """Live requests waiting on a person, and who can answer each one.
+
+        The communication channel authorizes by participant, so this server can
+        answer only the requests whose delegation it owns.  Rather than hide the
+        rest, it lists them and names the session that must answer -- a blocker
+        you cannot see is worse than one you cannot yet act on.
+        """
+
+        from agent_commons.services.communication import (
+            CommunicationRuntimeService,
+            _participant_id,
+        )
+
+        manager = self.writer() if self.writes_enabled else self.manager()
+        try:
+            operations = CommunicationRuntimeService(manager).inbox()
+        except (CommonsError, OSError):
+            # No runtime state yet, or none this session participates in.
+            operations = ()
+        # Scopes store a deterministic pseudonym, not the registry session id,
+        # so the comparison has to be made in the same space.
+        answerable = (
+            _participant_id(str(self.writer_session_id)) if self.writer_session_id else ""
+        )
+        found = []
+        for record in operations:
+            if record.get("state") not in {"open", "replied"}:
+                continue
+            scope = record.get("scope") or {}
+            recipients = {str(item) for item in scope.get("allowed_recipient_session_ids") or ()}
+            found.append(
+                {
+                    "operation_id": record.get("operation_id"),
+                    "kind": record.get("kind"),
+                    "state": record.get("state"),
+                    "delegation_id": scope.get("delegation_id"),
+                    "task_id": scope.get("task_id"),
+                    "metadata": record.get("metadata"),
+                    "deadline": record.get("deadline"),
+                    "answerable_here": bool(answerable) and answerable in recipients,
+                    "answer_from_session": sorted(recipients),
+                }
+            )
+        return found
+
     def engagements(self) -> list[dict[str, Any]]:
         """The main chats, readable whether or not this server writes."""
 
@@ -370,6 +416,22 @@ class UIContext:
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
         return manager.create_agent(**fields)
+
+    def answer_operation(
+        self, *, operation_id: str, answer: Mapping[str, Any], idempotency_key: str | None = None
+    ) -> dict[str, Any]:
+        """Answer a live request. Bounded metadata only; never a secret."""
+
+        from agent_commons.services.communication import CommunicationRuntimeService
+
+        if not isinstance(answer, Mapping) or not answer:
+            raise ValidationError("an answer needs at least one field")
+        service = CommunicationRuntimeService(self.writer())
+        return service.reply_to_input(
+            operation_id,
+            idempotency_key=idempotency_key or f"ui-reply-{operation_id}",
+            answer=dict(answer),
+        )
 
     def open_engagement(self, **fields: Any) -> dict[str, Any]:
         return self.writer().open_engagement(**fields)

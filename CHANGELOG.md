@@ -84,6 +84,12 @@ Versioning once a stable release line is declared.
   exactly one MCP server, so narrowing a set of one meant nothing and widening
   it is a separate change. The panel now shows the profile's actual servers
   read-only instead of offering a control with no effect.
+- **Blocked runs are answerable from the panel.** A live request for input is
+  listed with its bounded metadata and answered in place; answering also resumes
+  the run, so the ring clears on the canvas. The communication channel
+  authorizes by participant, so the panel answers only requests its own session
+  owns — the rest are still listed, naming the session that can answer, because
+  an invisible blocker is worse than one you cannot yet act on.
 - **A main chat**, where a person states the work and hears back. It is a
   canonical thread of the new type `engagement`, addressed to every role that
   answers to the operator, optionally bound to the objective it is about. The
