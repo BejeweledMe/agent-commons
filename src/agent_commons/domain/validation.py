@@ -191,6 +191,46 @@ EVENT_SPECS: dict[str, EventSpec] = {
         "delegation",
         "delegation_id",
     ),
+    "agent.created": EventSpec(
+        (
+            "agent_id",
+            "name",
+            "profile_id",
+            "grants",
+            "context_mode",
+            "origin",
+            "approval",
+            "rationale",
+            "lifetime",
+        ),
+        "agent",
+        "agent_id",
+        "policy",
+    ),
+    "agent.reconfigured": EventSpec(
+        ("agent_id", "expected_revision", "changes", "reason"),
+        "agent",
+        "agent_id",
+        "policy",
+    ),
+    "agent.retired": EventSpec(
+        ("agent_id", "expected_revision", "reason", "retired_by"),
+        "agent",
+        "agent_id",
+        "policy",
+    ),
+    "agent.link_opened": EventSpec(
+        ("link_id", "from_agent_id", "to_agent_id", "allowed_action", "deadline_seconds", "reason"),
+        "agent_link",
+        "link_id",
+        "policy",
+    ),
+    "agent.link_closed": EventSpec(
+        ("link_id", "expected_revision", "reason"),
+        "agent_link",
+        "link_id",
+        "policy",
+    ),
     "event.corrected": EventSpec(
         ("target_event_id", "expected_target_sha256", "replacement_payload"),
         "event",
@@ -244,6 +284,16 @@ _STRING_FIELDS = {
     "root_delegation_id",
     "child_session_id",
     "reason_code",
+    "agent_id",
+    "link_id",
+    "profile_id",
+    "context_mode",
+    "origin",
+    "approval",
+    "retired_by",
+    "from_agent_id",
+    "to_agent_id",
+    "allowed_action",
 }
 
 _STRING_LIST_FIELDS = {
@@ -260,6 +310,9 @@ _STRING_LIST_FIELDS = {
     "open_questions",
     "dependencies",
     "superseded_correction_event_ids",
+    "skills",
+    "tool_allowlist",
+    "mcp_allowlist",
 }
 
 _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
@@ -287,6 +340,112 @@ _DELEGATION_REASON_CODES = {
     "unknown",
 }
 _DELEGATION_BUDGET_UNITS = {"tokens", "micro_usd", "provider_units"}
+_AGENT_GRANT_LEVELS = {"deny", "ask", "auto"}
+_AGENT_GRANT_NAMES = ("create_roles", "retire_roles", "open_links")
+_AGENT_CONTEXT_MODES = {"fresh", "accumulated"}
+_AGENT_ORIGINS = {"human", "agent"}
+_AGENT_AUTHORIZATIONS = {"human", "human_confirmed", "automatic"}
+_AGENT_RETIRED_BY = {"human", "agent", "cascade"}
+_AGENT_LINK_ACTIONS = {"ask"}
+_AGENT_MUTABLE_FIELDS = {
+    "name",
+    "grants",
+    "context_mode",
+    "skills",
+    "tool_allowlist",
+    "mcp_allowlist",
+}
+
+
+def _validate_agent_grants(value: Any, field: str) -> None:
+    if not isinstance(value, Mapping) or set(value) != set(_AGENT_GRANT_NAMES):
+        raise ValidationError(f"{field} must contain exactly {', '.join(_AGENT_GRANT_NAMES)}")
+    for name in _AGENT_GRANT_NAMES:
+        if value[name] not in _AGENT_GRANT_LEVELS:
+            raise ValidationError(f"{field}.{name} must be deny, ask, or auto")
+
+
+def _validate_agent_lifetime(value: Any) -> None:
+    if not isinstance(value, Mapping) or "kind" not in value:
+        raise ValidationError("lifetime must be an object with a kind")
+    kind = value["kind"]
+    if kind == "persistent":
+        if set(value) != {"kind"}:
+            raise ValidationError("a persistent lifetime carries no other field")
+        return
+    if kind != "task_scoped":
+        raise ValidationError("lifetime.kind must be persistent or task_scoped")
+    if set(value) != {"kind", "task_id"} or not is_typed_id(value.get("task_id"), "task"):
+        raise ValidationError("a task_scoped lifetime requires exactly a task_id")
+
+
+def _validate_agent_created(payload: Mapping[str, Any]) -> None:
+    _validate_agent_grants(payload["grants"], "grants")
+    _validate_agent_lifetime(payload["lifetime"])
+    if payload["profile_id"] not in _DELEGATION_TARGET_PROFILES:
+        raise ValidationError("invalid agent profile_id")
+    if payload["context_mode"] not in _AGENT_CONTEXT_MODES:
+        raise ValidationError("context_mode must be fresh or accumulated")
+    if payload["origin"] not in _AGENT_ORIGINS:
+        raise ValidationError("origin must be human or agent")
+    if payload["approval"] not in _AGENT_AUTHORIZATIONS:
+        raise ValidationError("approval must be human, human_confirmed, or automatic")
+    creator = payload.get("created_by_agent_id")
+    if payload["origin"] == "agent":
+        if not is_typed_id(creator, "agent"):
+            raise ValidationError("an agent-created role must name its creating role")
+        if payload["approval"] == "human":
+            raise ValidationError(
+                "an agent-created role is authorized automatically or human_confirmed"
+            )
+    else:
+        if creator is not None:
+            raise ValidationError("a human-created role has no creating role")
+        if payload["approval"] != "human":
+            raise ValidationError("a human-created role records human approval")
+    budget = payload.get("turnover_budget")
+    needs_budget = any(
+        payload["grants"][name] != "deny" for name in ("create_roles", "retire_roles")
+    )
+    if needs_budget and (isinstance(budget, bool) or not isinstance(budget, int)):
+        raise ValidationError(
+            "a role that may create or retire roles requires an integer turnover_budget"
+        )
+    if budget is not None and (isinstance(budget, bool) or not isinstance(budget, int)):
+        raise ValidationError("turnover_budget must be an integer or null")
+    if "template" in payload and not isinstance(payload["template"], bool):
+        raise ValidationError("template must be a boolean")
+
+
+def _validate_agent_reconfigured(payload: Mapping[str, Any]) -> None:
+    changes = payload["changes"]
+    if not isinstance(changes, Mapping) or not changes:
+        raise ValidationError("changes must be a non-empty object")
+    unsupported = sorted(set(changes) - _AGENT_MUTABLE_FIELDS)
+    if unsupported:
+        raise ValidationError("changes contains immutable agent fields: " + ", ".join(unsupported))
+    if "grants" in changes:
+        _validate_agent_grants(changes["grants"], "changes.grants")
+    if "context_mode" in changes and changes["context_mode"] not in _AGENT_CONTEXT_MODES:
+        raise ValidationError("changes.context_mode must be fresh or accumulated")
+    if "name" in changes and (not isinstance(changes["name"], str) or not changes["name"].strip()):
+        raise ValidationError("changes.name must be a non-empty string")
+    for field in ("skills", "tool_allowlist", "mcp_allowlist"):
+        if field in changes:
+            _validate_string_list(changes[field], f"changes.{field}")
+    downgrade = payload.get("isolation_downgrade")
+    if downgrade is not None:
+        if not isinstance(downgrade, Mapping) or set(downgrade) != {
+            "reason",
+            "operator_capability",
+        }:
+            raise ValidationError(
+                "isolation_downgrade must contain exactly reason and operator_capability"
+            )
+        if downgrade["operator_capability"] != "agent:isolation_downgrade":
+            raise ValidationError("isolation_downgrade names the agent:isolation_downgrade gate")
+        if not isinstance(downgrade["reason"], str) or not downgrade["reason"].strip():
+            raise ValidationError("isolation_downgrade.reason must be a non-empty string")
 
 
 def _validate_ref(value: Any, field: str) -> None:
@@ -498,4 +657,22 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         and payload["reason_code"] not in _DELEGATION_REASON_CODES
     ):
         raise ValidationError("invalid delegation reason_code")
+    if event_type == "agent.created":
+        _validate_agent_created(payload)
+    if event_type == "agent.reconfigured":
+        _validate_agent_reconfigured(payload)
+    if event_type == "agent.retired":
+        if payload["retired_by"] not in _AGENT_RETIRED_BY:
+            raise ValidationError("retired_by must be human, agent, or cascade")
+        cascade_of = payload.get("cascade_of")
+        if cascade_of is not None and not is_typed_id(cascade_of, "agent"):
+            raise ValidationError("cascade_of must be an agent identifier or null")
+    if event_type == "agent.link_opened":
+        if payload["allowed_action"] not in _AGENT_LINK_ACTIONS:
+            raise ValidationError("invalid link allowed_action")
+        if payload["from_agent_id"] == payload["to_agent_id"]:
+            raise ValidationError("a link requires two distinct roles")
+        _bounded_integer(
+            payload["deadline_seconds"], "deadline_seconds", minimum=1, maximum=604_800
+        )
     return spec

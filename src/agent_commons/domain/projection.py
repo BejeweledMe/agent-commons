@@ -59,6 +59,19 @@ DELEGATION_STATES = {
     "delegation.timed_out": "timed_out",
     "delegation.needs_operator": "needs_operator",
 }
+AGENT_STATES = {
+    "agent.created": "active",
+    "agent.reconfigured": "active",
+    "agent.retired": "retired",
+}
+AGENT_LINK_STATES = {
+    "agent.link_opened": "open",
+    "agent.link_closed": "closed",
+}
+
+#: A task-scoped role leaves service when its task does.  Deriving that beats
+#: recording it: there is no writer to forget, and no path that can skip it.
+_LIFETIME_CLOSING_TASK_STATES = frozenset({"accepted", "cancelled"})
 
 
 @dataclass(frozen=True)
@@ -94,6 +107,8 @@ class ProjectSnapshot:
     artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
     handoffs: dict[str, dict[str, Any]] = field(default_factory=dict)
     delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
+    agents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    agent_links: dict[str, dict[str, Any]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     issues: list[ProjectionIssue] = field(default_factory=list)
     invalid_event_ids: set[str] = field(default_factory=set)
@@ -117,6 +132,8 @@ class ProjectSnapshot:
                 "artifact": "artifacts",
                 "handoff": "handoffs",
                 "delegation": "delegations",
+                "agent": "agents",
+                "agent_link": "agent_links",
             }.get(kind, ""),
             None,
         )
@@ -137,6 +154,8 @@ class ProjectSnapshot:
             "artifacts": list(self.artifacts.values()),
             "handoffs": list(self.handoffs.values()),
             "delegations": list(self.delegations.values()),
+            "agents": list(self.agents.values()),
+            "agent_links": list(self.agent_links.values()),
             "warnings": sorted(set(self.warnings)),
             "issues": [issue.as_dict() for issue in self.issues],
             "invalid_event_ids": sorted(self.invalid_event_ids),
@@ -182,6 +201,44 @@ def _apply(
         "recorded_at": event.get("recorded_at"),
         "actor": event.get("actor"),
     }
+
+
+def _relation_object(
+    event: Mapping[str, Any], subject_id: str, predicate: str, object_kind: str
+) -> str | None:
+    """Read one typed relation off the immutable envelope."""
+
+    for relation in event.get("relations") or ():
+        if not isinstance(relation, Mapping) or relation.get("predicate") != predicate:
+            continue
+        subject = relation.get("subject")
+        target = relation.get("object")
+        if not isinstance(subject, Mapping) or not isinstance(target, Mapping):
+            continue
+        if subject.get("id") == subject_id and target.get("kind") == object_kind:
+            return str(target.get("id"))
+    return None
+
+
+def _apply_derived_agent_retirement(snapshot: ProjectSnapshot) -> None:
+    """Retire task-scoped roles when their task reaches a terminal state.
+
+    Derived rather than recorded on purpose: an event would have to be written
+    by whoever accepts or cancels the task, and a path that forgets it leaves a
+    role collecting work forever.
+    """
+
+    for record in snapshot.agents.values():
+        if record.get("state") != "active":
+            continue
+        lifetime = record.get("lifetime")
+        if not isinstance(lifetime, Mapping) or lifetime.get("kind") != "task_scoped":
+            continue
+        task = snapshot.tasks.get(str(lifetime.get("task_id", "")))
+        if task is not None and task.get("state") in _LIFETIME_CLOSING_TASK_STATES:
+            record["state"] = "retired"
+            record["retired_by"] = "lifetime"
+            record["retired_with_task_id"] = task.get("id")
 
 
 def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) -> None:
@@ -306,11 +363,45 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
             "acknowledged" if event_type == "handoff.acknowledged" else "open",
         )
     elif event_type in DELEGATION_STATES:
+        delegation_id = str(payload["delegation_id"])
+        delegation_payload = dict(payload)
+        # The role a run acts for is carried as an event relation, not a payload
+        # field: `relation.predicate` and `typedRef.kind` are open patterns, so
+        # this binding costs no schema change and an older reader ignores it.
+        # Widening the delegation payload would have made every delegation event
+        # in every workspace unreadable to the previous binary.
+        bound_agent = _relation_object(event, delegation_id, "on_behalf_of", "agent")
+        if bound_agent:
+            delegation_payload["agent_id"] = bound_agent
         _apply(
             snapshot.delegations,
-            str(payload["delegation_id"]),
-            event,
+            delegation_id,
+            {**event, "payload": delegation_payload},
             DELEGATION_STATES[event_type],
+        )
+    elif event_type in AGENT_STATES:
+        agent_id = str(payload["agent_id"])
+        agent_payload = dict(payload)
+        if event_type == "agent.reconfigured":
+            agent_payload = {**agent_payload, **deepcopy(dict(payload["changes"]))}
+            agent_payload.pop("changes", None)
+        _apply(
+            snapshot.agents,
+            agent_id,
+            {**event, "payload": agent_payload},
+            AGENT_STATES[event_type],
+        )
+        if event_type == "agent.created":
+            snapshot.agents[agent_id].setdefault("created_by_agent_id", None)
+            snapshot.agents[agent_id].setdefault("turnover_budget", None)
+            snapshot.agents[agent_id].setdefault("template", False)
+            snapshot.agents[agent_id]["created_event_id"] = str(event["event_id"])
+    elif event_type in AGENT_LINK_STATES:
+        _apply(
+            snapshot.agent_links,
+            str(payload["link_id"]),
+            event,
+            AGENT_LINK_STATES[event_type],
         )
     else:  # pragma: no cover - kept defensive if the registry is extended incorrectly
         raise ValidationError(f"unsupported projection event type: {event_type}")
@@ -432,6 +523,8 @@ def _current_evidence_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]
         "artifact": "artifacts",
         "handoff": "handoffs",
         "delegation": "delegations",
+        "agent": "agents",
+        "agent_link": "agent_links",
     }.get(kind)
     if collection_name is None:
         return None
@@ -727,6 +820,7 @@ def _project_events_once(
             )
 
     _mark_bound_evidence_stale(snapshot)
+    _apply_derived_agent_retirement(snapshot)
     _fail_closed_decision_conflicts(snapshot)
     snapshot.replay_metrics = {
         "events_replayed": len(raw),

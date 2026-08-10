@@ -948,6 +948,11 @@ def delegation_group() -> None:
 @click.option("--purpose", type=click.Choice(_DELEGATION_PURPOSES), required=True)
 @click.option("--limits-json", required=True)
 @click.option("--parent-delegation-id")
+@click.option(
+    "--on-behalf-of",
+    "on_behalf_of_agent_id",
+    help="Standing role this run acts for; the run itself stays terminal and unnamed.",
+)
 @_idem
 @click.pass_obj
 def delegation_create(
@@ -958,6 +963,7 @@ def delegation_create(
     purpose: str,
     limits_json: str,
     parent_delegation_id: str | None,
+    on_behalf_of_agent_id: str | None,
     idempotency_key: str | None,
 ) -> None:
     """Create a requested delegation bound to one exact target revision."""
@@ -970,6 +976,241 @@ def delegation_create(
             purpose=purpose,
             limits=_json_object(limits_json, "limits_json"),
             parent_delegation_id=parent_delegation_id,
+            on_behalf_of_agent_id=on_behalf_of_agent_id,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+_GRANT_LEVELS = ("deny", "ask", "auto")
+
+
+@cli.group("agent")
+def agent_group() -> None:
+    """Manage standing roles: the staff index behind the situational runs."""
+
+
+@agent_group.command("create")
+@click.option("--name", required=True, help="Job title shown in the staff index.")
+@click.option("--profile", "profile_id", type=click.Choice(_DELEGATION_PROFILES), required=True)
+@click.option("--rationale", required=True, help="Why this role exists; kept forever.")
+@click.option(
+    "--context-mode",
+    type=click.Choice(("fresh", "accumulated")),
+    default="fresh",
+    show_default=True,
+    help="'fresh' never hands the role its own earlier verdict on the same subject.",
+)
+@click.option("--create-roles", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option("--retire-roles", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option("--open-links", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option(
+    "--turnover-budget",
+    type=int,
+    help="Creations plus retirements allowed below this role. Required to grant either.",
+)
+@click.option(
+    "--retire-with-task",
+    "retire_with_task",
+    help="Retire this role automatically when that task is accepted or cancelled.",
+)
+@click.option("--skill", "skills", multiple=True, help="Operator catalogue skill id.")
+@click.option("--tool", "tools", multiple=True, help="Narrow the profile's tools to these ids.")
+@click.option("--mcp", "mcp", multiple=True, help="Narrow the profile's MCP servers to these ids.")
+@click.option("--template", is_flag=True, help="Store as a reusable preset that never runs.")
+@click.option("--created-by-agent", "created_by_agent_id", help="Proposing role, when confirming.")
+@_idem
+@click.pass_obj
+def agent_create(
+    state: CLIState,
+    name: str,
+    profile_id: str,
+    rationale: str,
+    context_mode: str,
+    create_roles: str,
+    retire_roles: str,
+    open_links: str,
+    turnover_budget: int | None,
+    retire_with_task: str | None,
+    skills: tuple[str, ...],
+    tools: tuple[str, ...],
+    mcp: tuple[str, ...],
+    template: bool,
+    created_by_agent_id: str | None,
+    idempotency_key: str | None,
+) -> None:
+    """Create a standing role. Grants default to deny; a lifetime beats a grant."""
+
+    lifetime = (
+        {"kind": "task_scoped", "task_id": retire_with_task}
+        if retire_with_task
+        else {"kind": "persistent"}
+    )
+    state.emit(
+        state.manager().create_agent(
+            name=name,
+            profile_id=profile_id,
+            rationale=rationale,
+            context_mode=context_mode,
+            grants={
+                "create_roles": create_roles,
+                "retire_roles": retire_roles,
+                "open_links": open_links,
+            },
+            turnover_budget=turnover_budget,
+            lifetime=lifetime,
+            skills=skills,
+            tool_allowlist=tools,
+            mcp_allowlist=mcp,
+            template=template,
+            created_by_agent_id=created_by_agent_id,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@agent_group.command("list")
+@click.option("--include-retired", is_flag=True, help="Show roles that have left service.")
+@click.pass_obj
+def agent_list(state: CLIState, include_retired: bool) -> None:
+    """List standing roles with their effective authority and provenance."""
+
+    state.emit(state.manager().list_agents(include_retired=include_retired))
+
+
+@agent_group.command("show")
+@click.argument("agent_id")
+@click.pass_obj
+def agent_show(state: CLIState, agent_id: str) -> None:
+    """Show one role, its lineage, effective grants, and what blocks retirement."""
+
+    state.emit(state.manager().get_agent(agent_id))
+
+
+@agent_group.command("reconfigure")
+@click.argument("agent_id")
+@click.argument("expected_revision")
+@click.option("--changes-json", required=True, help="Mutable fields only; identity is immutable.")
+@click.option("--reason", required=True)
+@click.option(
+    "--isolation-downgrade-reason",
+    help="Required to weaken context isolation; needs the agent:isolation_downgrade capability.",
+)
+@_idem
+@click.pass_obj
+def agent_reconfigure(
+    state: CLIState,
+    agent_id: str,
+    expected_revision: str,
+    changes_json: str,
+    reason: str,
+    isolation_downgrade_reason: str | None,
+    idempotency_key: str | None,
+) -> None:
+    """Change a role's mutable settings. Isolation may be strengthened freely."""
+
+    state.emit(
+        state.manager().reconfigure_agent(
+            agent_id,
+            expected_revision,
+            changes=_json_object(changes_json, "changes_json"),
+            reason=reason,
+            isolation_downgrade_reason=isolation_downgrade_reason,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@agent_group.command("retire")
+@click.argument("agent_id")
+@click.option("--expected-revision")
+@click.option("--reason", required=True)
+@click.option(
+    "--cascade",
+    is_flag=True,
+    help="Also retire every role this one created, transitively, or refuse as a whole.",
+)
+@_idem
+@click.pass_obj
+def agent_retire(
+    state: CLIState,
+    agent_id: str,
+    expected_revision: str | None,
+    reason: str,
+    cascade: bool,
+    idempotency_key: str | None,
+) -> None:
+    """Take a role out of service. Nothing is deleted; the history stays."""
+
+    state.emit(
+        state.manager().retire_agent(
+            agent_id,
+            expected_revision,
+            reason=reason,
+            cascade=cascade,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@agent_group.command("link")
+@click.option("--from-agent", "from_agent_id", required=True)
+@click.option("--to-agent", "to_agent_id", required=True)
+@click.option(
+    "--action",
+    "allowed_action",
+    type=click.Choice(("ask",)),
+    default="ask",
+    show_default=True,
+    help="What the link permits. A typed action, not an open/closed flag.",
+)
+@click.option("--deadline-seconds", type=int, required=True)
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def agent_link(
+    state: CLIState,
+    from_agent_id: str,
+    to_agent_id: str,
+    allowed_action: str,
+    deadline_seconds: int,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Open a bounded temporary link between two roles."""
+
+    state.emit(
+        state.manager().open_agent_link(
+            from_agent_id=from_agent_id,
+            to_agent_id=to_agent_id,
+            allowed_action=allowed_action,
+            deadline_seconds=deadline_seconds,
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@agent_group.command("unlink")
+@click.argument("link_id")
+@click.argument("expected_revision")
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def agent_unlink(
+    state: CLIState,
+    link_id: str,
+    expected_revision: str,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Close a temporary link before its deadline."""
+
+    state.emit(
+        state.manager().close_agent_link(
+            link_id,
+            expected_revision,
+            reason=reason,
             idempotency_key=idempotency_key,
         )
     )

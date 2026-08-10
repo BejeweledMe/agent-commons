@@ -1,0 +1,834 @@
+"""Standing roles, exercised through the command a user actually types.
+
+Every assertion here enters through the CLI rather than a helper, because a
+guarantee proved one layer beside the real path has been green over a broken
+product four times in this branch.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from click.testing import CliRunner, Result
+
+from agent_commons.cli import cli
+from agent_commons.services import CommonsManager
+
+LIMITS = {
+    "max_depth": 1,
+    "wall_time_seconds": 600,
+    "max_attempts": 1,
+    "max_concurrency": 1,
+    "budget": {"unit": "tokens", "limit": 8000},
+}
+
+
+def _invoke(runner: CliRunner, repo: Path, session_id: str, *args: str) -> Result:
+    return runner.invoke(cli, ["--repo", str(repo), "--session-id", session_id, "--json", *args])
+
+
+def _json(result: Result) -> Any:
+    assert result.exit_code == 0, result.output
+    return json.loads(result.output)
+
+
+def _refused(result: Result, fragment: str) -> None:
+    assert result.exit_code != 0, result.output
+    assert fragment in result.output, result.output
+
+
+@pytest.fixture
+def workspace(tmp_path: Path) -> dict[str, Any]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="agent-cli")
+    manager = CommonsManager(repo)
+    human = manager.start_session(
+        stable_instance_id="agent-cli-human-1234567890",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="operator",
+    )
+    manager.session_id = human["session_id"]
+    return {"repo": repo, "manager": manager, "human": human, "runner": CliRunner()}
+
+
+def _create(
+    workspace: dict[str, Any],
+    key: str,
+    *extra: str,
+    session_id: str | None = None,
+    name: str | None = None,
+) -> dict[str, Any]:
+    result = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        session_id or workspace["human"]["session_id"],
+        "agent",
+        "create",
+        "--name",
+        name or key,
+        "--profile",
+        "claude-builder",
+        "--rationale",
+        f"seam coverage for {key}",
+        "--idempotency-key",
+        key,
+        *extra,
+    )
+    return _json(result)
+
+
+def _new_session(workspace: dict[str, Any], suffix: str) -> str:
+    manager = CommonsManager(workspace["repo"])
+    session = manager.start_session(
+        stable_instance_id=f"agent-cli-{suffix}".ljust(24, "0")[:40],
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="builder",
+    )
+    return str(session["session_id"])
+
+
+def _run_as(workspace: dict[str, Any], agent_id: str, key: str) -> str:
+    """Start a delegation bound to a role and return its child session id.
+
+    This is the only way a session comes to act for a role, so tests that check
+    an agent's authority have to go through it rather than assert on a helper.
+    """
+
+    manager: CommonsManager = workspace["manager"]
+    task = manager.create_task(
+        title=f"work for {key}",
+        description="target for a role-bound run",
+        acceptance_criteria=("bound",),
+        idempotency_key=f"{key}-task",
+    )
+    delegation = manager.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        on_behalf_of_agent_id=agent_id,
+        idempotency_key=f"{key}-delegation",
+    )
+    child_session_id = _new_session(workspace, key)
+    started = manager.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=child_session_id,
+        idempotency_key=f"{key}-start",
+    )
+    workspace.setdefault("runs", {})[key] = started
+    return child_session_id
+
+
+def _finish_run(workspace: dict[str, Any], key: str) -> None:
+    """End the run so the role stops owing live work."""
+
+    started = workspace["runs"][key]
+    workspace["manager"].fail_delegation(
+        started["entity_ref"]["id"],
+        started["revision"],
+        reason_code="runtime_error",
+        summary="ended for the purposes of this test",
+        idempotency_key=f"{key}-fail",
+    )
+
+
+# -- shape and provenance ----------------------------------------------------
+
+
+def test_a_human_created_role_is_marked_as_such_and_denies_everything_by_default(
+    workspace: dict[str, Any],
+) -> None:
+    created = _create(workspace, "plain-role")
+    shown = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "show",
+            created["entity_ref"]["id"],
+        )
+    )
+    assert shown["origin"] == "human"
+    assert shown["approval"] == "human"
+    assert shown["effective_grants"] == {
+        "create_roles": "deny",
+        "retire_roles": "deny",
+        "open_links": "deny",
+    }
+    assert shown["rationale"] == "seam coverage for plain-role"
+
+
+def test_granting_creation_without_a_turnover_budget_is_refused(
+    workspace: dict[str, Any],
+) -> None:
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "create",
+            "--name",
+            "unbounded",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "no ceiling",
+            "--create-roles",
+            "auto",
+            "--idempotency-key",
+            "unbounded",
+        ),
+        "turnover_budget",
+    )
+
+
+# -- guarantee 3: the level strictly decreases -------------------------------
+
+
+def test_an_automatic_generation_narrows_and_the_third_is_refused(
+    workspace: dict[str, Any],
+) -> None:
+    root = _create(
+        workspace,
+        "root-auto",
+        "--create-roles",
+        "auto",
+        "--turnover-budget",
+        "8",
+    )
+    root_id = root["entity_ref"]["id"]
+    root_session = _run_as(workspace, root_id, "gen1")
+
+    second = _create(
+        workspace,
+        "gen2",
+        "--create-roles",
+        "ask",
+        "--turnover-budget",
+        "4",
+        "--created-by-agent",
+        root_id,
+        session_id=root_session,
+    )
+    assert second["event_type"] == "agent.created"
+
+    # Same level again would let one grant produce generations without end.
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            root_session,
+            "agent",
+            "create",
+            "--name",
+            "gen2-clone",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "same level again",
+            "--create-roles",
+            "auto",
+            "--turnover-budget",
+            "4",
+            "--created-by-agent",
+            root_id,
+            "--idempotency-key",
+            "gen2-clone",
+        ),
+        "strictly narrower",
+    )
+
+
+def test_a_created_role_cannot_hold_a_wider_grant_than_its_creator(
+    workspace: dict[str, Any],
+) -> None:
+    root = _create(
+        workspace,
+        "narrow-root",
+        "--create-roles",
+        "auto",
+        "--open-links",
+        "deny",
+        "--turnover-budget",
+        "8",
+    )
+    root_id = root["entity_ref"]["id"]
+    session = _run_as(workspace, root_id, "widen")
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "create",
+            "--name",
+            "wider",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "wants more",
+            "--create-roles",
+            "ask",
+            "--open-links",
+            "auto",
+            "--turnover-budget",
+            "4",
+            "--created-by-agent",
+            root_id,
+            "--idempotency-key",
+            "wider",
+        ),
+        "wider open_links grant",
+    )
+
+
+def test_a_created_role_cannot_hold_a_wider_provider_profile(
+    workspace: dict[str, Any],
+) -> None:
+    root = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "create",
+            "--name",
+            "reviewer-root",
+            "--profile",
+            "claude-independent-reviewer",
+            "--rationale",
+            "reviews only",
+            "--create-roles",
+            "auto",
+            "--turnover-budget",
+            "8",
+            "--idempotency-key",
+            "reviewer-root",
+        )
+    )
+    root_id = root["entity_ref"]["id"]
+    manager: CommonsManager = workspace["manager"]
+    task = manager.create_task(
+        title="reviewer work",
+        description="target",
+        acceptance_criteria=("bound",),
+        idempotency_key="reviewer-task",
+    )
+    review = manager.request_review(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        criteria=("independent",),
+        independent=True,
+        idempotency_key="reviewer-review",
+    )
+    delegation = manager.create_delegation(
+        target_ref={"kind": "review", "id": review["entity_ref"]["id"]},
+        target_revision=review["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits=LIMITS,
+        on_behalf_of_agent_id=root_id,
+        idempotency_key="reviewer-delegation",
+    )
+    session = _new_session(workspace, "reviewer-child")
+    manager.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=session,
+        idempotency_key="reviewer-start",
+    )
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "create",
+            "--name",
+            "builder-child",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "wants write access",
+            "--turnover-budget",
+            "1",
+            "--created-by-agent",
+            root_id,
+            "--idempotency-key",
+            "builder-child",
+        ),
+        "wider provider profile",
+    )
+
+
+# -- guarantee 1: the turnover ceiling counts both directions ----------------
+
+
+def test_the_turnover_budget_counts_creations_and_retirements_together(
+    workspace: dict[str, Any],
+) -> None:
+    root = _create(
+        workspace,
+        "budget-root",
+        "--create-roles",
+        "auto",
+        "--retire-roles",
+        "auto",
+        "--turnover-budget",
+        "3",
+    )
+    root_id = root["entity_ref"]["id"]
+    session = _run_as(workspace, root_id, "budget")
+
+    first = _create(
+        workspace,
+        "budget-child-1",
+        "--create-roles",
+        "ask",
+        "--retire-roles",
+        "ask",
+        "--turnover-budget",
+        "1",
+        "--created-by-agent",
+        root_id,
+        session_id=session,
+    )
+    retired = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "retire",
+            first["entity_ref"]["id"],
+            "--reason",
+            "scope changed",
+            "--idempotency-key",
+            "budget-retire-1",
+        )
+    )
+    assert retired["count"] == 1
+
+    # One create plus one retire is two units of a three-unit budget; a second
+    # create is the third, and the fourth step has to fail.
+    _create(
+        workspace,
+        "budget-child-2",
+        "--turnover-budget",
+        "1",
+        "--created-by-agent",
+        root_id,
+        session_id=session,
+    )
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "create",
+            "--name",
+            "budget-child-3",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "one too many",
+            "--turnover-budget",
+            "1",
+            "--created-by-agent",
+            root_id,
+            "--idempotency-key",
+            "budget-child-3",
+        ),
+        "turnover budget is exhausted",
+    )
+
+
+# -- guarantee 7: a downgrade reaches work already running -------------------
+
+
+def test_lowering_an_ancestor_grant_stops_a_running_descendant_immediately(
+    workspace: dict[str, Any],
+) -> None:
+    root = _create(
+        workspace,
+        "downgrade-root",
+        "--create-roles",
+        "auto",
+        "--turnover-budget",
+        "8",
+    )
+    root_id = root["entity_ref"]["id"]
+    session = _run_as(workspace, root_id, "downgrade")
+    _create(
+        workspace,
+        "downgrade-child-1",
+        "--create-roles",
+        "ask",
+        "--turnover-budget",
+        "4",
+        "--created-by-agent",
+        root_id,
+        session_id=session,
+    )
+
+    current = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "show",
+            root_id,
+        )
+    )
+    _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "reconfigure",
+            root_id,
+            current["revision"],
+            "--changes-json",
+            json.dumps(
+                {
+                    "grants": {
+                        "create_roles": "deny",
+                        "retire_roles": "deny",
+                        "open_links": "deny",
+                    }
+                }
+            ),
+            "--reason",
+            "the org stopped growing",
+            "--idempotency-key",
+            "downgrade",
+        )
+    )
+
+    # The delegation opened before the downgrade is still live.
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "create",
+            "--name",
+            "downgrade-child-2",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "after the downgrade",
+            "--turnover-budget",
+            "1",
+            "--created-by-agent",
+            root_id,
+            "--idempotency-key",
+            "downgrade-child-2",
+        ),
+        "may not create roles",
+    )
+
+
+# -- guarantee 5 and the retirement invariants -------------------------------
+
+
+def test_a_cascade_retires_a_whole_lineage_in_one_command(
+    workspace: dict[str, Any],
+) -> None:
+    root = _create(
+        workspace,
+        "cascade-root",
+        "--create-roles",
+        "auto",
+        "--turnover-budget",
+        "16",
+    )
+    root_id = root["entity_ref"]["id"]
+    session = _run_as(workspace, root_id, "cascade")
+    child = _create(
+        workspace,
+        "cascade-child",
+        "--create-roles",
+        "ask",
+        "--turnover-budget",
+        "4",
+        "--created-by-agent",
+        root_id,
+        session_id=session,
+    )
+    _create(
+        workspace,
+        "cascade-grandchild",
+        "--created-by-agent",
+        child["entity_ref"]["id"],
+        session_id=workspace["human"]["session_id"],
+    )
+
+    # A live run blocks retirement whoever asks, so the cascade only becomes
+    # possible once the work it owes is over.
+    _finish_run(workspace, "cascade")
+    retired = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "retire",
+            root_id,
+            "--cascade",
+            "--reason",
+            "the programme ended",
+            "--idempotency-key",
+            "cascade-retire",
+        )
+    )
+    assert retired["count"] == 3
+    remaining = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "list",
+        )
+    )
+    assert [item["id"] for item in remaining] == []
+
+
+def test_a_role_owing_a_live_delegation_cannot_be_retired_by_anyone(
+    workspace: dict[str, Any],
+) -> None:
+    role = _create(workspace, "busy-role")
+    role_id = role["entity_ref"]["id"]
+    _run_as(workspace, role_id, "busy")
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "retire",
+            role_id,
+            "--reason",
+            "no longer needed",
+            "--idempotency-key",
+            "busy-retire",
+        ),
+        "owing live work",
+    )
+
+
+def test_a_role_never_retires_a_human_created_role(workspace: dict[str, Any]) -> None:
+    root = _create(
+        workspace,
+        "polite-root",
+        "--retire-roles",
+        "auto",
+        "--turnover-budget",
+        "8",
+    )
+    peer = _create(workspace, "human-peer")
+    session = _run_as(workspace, root["entity_ref"]["id"], "polite")
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            session,
+            "agent",
+            "retire",
+            peer["entity_ref"]["id"],
+            "--reason",
+            "tidying up",
+            "--idempotency-key",
+            "polite-retire",
+        ),
+        "never retires a human-created role",
+    )
+
+
+def test_a_task_scoped_role_leaves_service_when_its_task_is_cancelled(
+    workspace: dict[str, Any],
+) -> None:
+    manager: CommonsManager = workspace["manager"]
+    task = manager.create_task(
+        title="short-lived work",
+        description="the role exists only for this",
+        acceptance_criteria=("done",),
+        idempotency_key="ephemeral-task",
+    )
+    task_id = task["entity_ref"]["id"]
+    created = _create(workspace, "ephemeral", "--retire-with-task", task_id)
+
+    listed = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "list",
+        )
+    )
+    assert created["entity_ref"]["id"] in [item["id"] for item in listed]
+
+    manager.cancel_task(task_id, task["revision"], reason="descoped")
+    after = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "show",
+            created["entity_ref"]["id"],
+        )
+    )
+    assert after["state"] == "retired"
+    assert after["retired_by"] == "lifetime"
+
+
+# -- context isolation -------------------------------------------------------
+
+
+def test_weakening_context_isolation_is_refused_without_a_recorded_downgrade(
+    workspace: dict[str, Any],
+) -> None:
+    created = _create(workspace, "isolated", "--context-mode", "fresh")
+    _refused(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "reconfigure",
+            created["entity_ref"]["id"],
+            created["revision"],
+            "--changes-json",
+            json.dumps({"context_mode": "accumulated"}),
+            "--reason",
+            "a small optimisation",
+            "--idempotency-key",
+            "weaken",
+        ),
+        "isolation_downgrade",
+    )
+
+
+def test_strengthening_context_isolation_needs_no_ceremony(
+    workspace: dict[str, Any],
+) -> None:
+    created = _create(workspace, "loose", "--context-mode", "accumulated")
+    result = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "reconfigure",
+            created["entity_ref"]["id"],
+            created["revision"],
+            "--changes-json",
+            json.dumps({"context_mode": "fresh"}),
+            "--reason",
+            "reviews must start clean",
+            "--idempotency-key",
+            "tighten",
+        )
+    )
+    assert result["event_type"] == "agent.reconfigured"
+
+
+# -- links -------------------------------------------------------------------
+
+
+def test_a_link_records_the_action_it_permits_rather_than_an_open_flag(
+    workspace: dict[str, Any],
+) -> None:
+    left = _create(workspace, "link-left")
+    right = _create(workspace, "link-right")
+    opened = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "link",
+            "--from-agent",
+            left["entity_ref"]["id"],
+            "--to-agent",
+            right["entity_ref"]["id"],
+            "--deadline-seconds",
+            "600",
+            "--reason",
+            "one bounded question",
+            "--idempotency-key",
+            "link-open",
+        )
+    )
+    assert opened["entity_ref"]["kind"] == "agent_link"
+    link = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "unlink",
+            opened["entity_ref"]["id"],
+            opened["revision"],
+            "--reason",
+            "answered",
+            "--idempotency-key",
+            "link-close",
+        )
+    )
+    assert link["event_type"] == "agent.link_closed"
+
+
+def test_a_retired_role_cannot_take_new_work(workspace: dict[str, Any]) -> None:
+    manager: CommonsManager = workspace["manager"]
+    created = _create(workspace, "gone")
+    agent_id = created["entity_ref"]["id"]
+    _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "retire",
+            agent_id,
+            "--reason",
+            "team disbanded",
+            "--idempotency-key",
+            "gone-retire",
+        )
+    )
+    task = manager.create_task(
+        title="late work",
+        description="arrives after retirement",
+        acceptance_criteria=("none",),
+        idempotency_key="late-task",
+    )
+    with pytest.raises(Exception, match="retired role cannot take new work"):
+        manager.create_delegation(
+            target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+            target_revision=task["revision"],
+            target_profile="claude-builder",
+            purpose="implementation",
+            limits=LIMITS,
+            on_behalf_of_agent_id=agent_id,
+            idempotency_key="late-delegation",
+        )

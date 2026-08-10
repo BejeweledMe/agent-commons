@@ -35,6 +35,9 @@ DECISION_ID = f"decision.{ULID_0}"
 REPLACEMENT_DECISION_ID = f"decision.{ULID_1}"
 HANDOFF_ID = f"handoff.{ULID_0}"
 DELEGATION_ID = f"delegation.{ULID_0}"
+AGENT_ID = f"agent.{ULID_0}"
+OTHER_AGENT_ID = f"agent.{ULID_1}"
+AGENT_LINK_ID = f"agent_link.{ULID_0}"
 PARENT_SESSION_ID = "session." + "a" * 32
 CHILD_SESSION_ID = "session." + "b" * 32
 MANIFEST_REF = "mft.artifact.sha256." + "a" * 64
@@ -297,6 +300,42 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "reason_code": "orphaned",
         "summary": "Runtime state could not be reconciled automatically.",
     },
+    "agent.created": {
+        "agent_id": AGENT_ID,
+        "name": "Senior Node.js backend",
+        "profile_id": "claude-builder",
+        "grants": {"create_roles": "deny", "retire_roles": "deny", "open_links": "deny"},
+        "context_mode": "fresh",
+        "origin": "human",
+        "approval": "human",
+        "rationale": "The backend work needs a standing owner between tasks.",
+        "lifetime": {"kind": "persistent"},
+    },
+    "agent.reconfigured": {
+        "agent_id": AGENT_ID,
+        "expected_revision": EVENT_ID,
+        "changes": {"name": "Staff Node.js backend"},
+        "reason": "Title corrected after the scope review.",
+    },
+    "agent.retired": {
+        "agent_id": AGENT_ID,
+        "expected_revision": EVENT_ID,
+        "reason": "The backend surface moved to another team.",
+        "retired_by": "human",
+    },
+    "agent.link_opened": {
+        "link_id": AGENT_LINK_ID,
+        "from_agent_id": AGENT_ID,
+        "to_agent_id": OTHER_AGENT_ID,
+        "allowed_action": "ask",
+        "deadline_seconds": 900,
+        "reason": "One bounded question about the payment schema.",
+    },
+    "agent.link_closed": {
+        "link_id": AGENT_LINK_ID,
+        "expected_revision": EVENT_ID,
+        "reason": "The question was answered.",
+    },
     "event.corrected": {
         "target_event_id": EVENT_ID,
         "expected_target_sha256": "a" * 64,
@@ -443,11 +482,26 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "delegation.recovered": "requested",
         "delegation.timed_out": "active",
         "delegation.needs_operator": "active",
+        "agent.reconfigured": "active",
+        "agent.retired": "active",
+        "agent.link_closed": "open",
     }
+    if event_type == "agent.link_opened":
+        for identifier in (AGENT_ID, OTHER_AGENT_ID):
+            snapshot.agents[identifier] = {
+                "id": identifier,
+                "state": "active",
+                "revision": EVENT_ID,
+                "profile_id": "claude-builder",
+                "origin": "human",
+            }
     state = current_states.get(event_type)
     if state is None:
         return snapshot
-    family = event_type.split(".", 1)[0]
+    # Kind and identity come from the registry, not from the text before the
+    # dot: `agent.link_closed` belongs to `agent_link`.
+    spec = EVENT_SPECS[event_type]
+    family = spec.entity_kind or event_type.split(".", 1)[0]
     collection_name = {
         "objective": "objectives",
         "task": "tasks",
@@ -458,8 +512,10 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "decision": "decisions",
         "handoff": "handoffs",
         "delegation": "delegations",
+        "agent": "agents",
+        "agent_link": "agent_links",
     }[family]
-    identifier = str(payload[f"{family}_id"])
+    identifier = str(payload[spec.entity_id_field or f"{family}_id"])
     current: dict[str, Any] = {
         "id": identifier,
         "state": state,
@@ -475,6 +531,8 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         )
     if family == "decision":
         current["scope"] = "architecture.persistence"
+    if family == "agent":
+        current.update({"origin": "human", "profile_id": "claude-builder"})
     if family == "delegation":
         current.update(
             {

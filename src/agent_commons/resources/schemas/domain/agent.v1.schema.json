@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:agent:v1",
+  "x-schema-name": "commons.payload.agent.v1",
+  "x-event-types": [
+    "agent.created",
+    "agent.reconfigured",
+    "agent.retired",
+    "agent.link_opened",
+    "agent.link_closed"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "link_id": {
+      "type": "string",
+      "pattern": "^agent_link\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "profile_id": {
+      "enum": [
+        "codex-builder",
+        "codex-independent-reviewer",
+        "claude-builder",
+        "claude-independent-reviewer"
+      ]
+    },
+    "grants": {
+      "$ref": "#/$defs/grants"
+    },
+    "context_mode": {
+      "enum": ["fresh", "accumulated"]
+    },
+    "template": {
+      "type": "boolean"
+    },
+    "origin": {
+      "enum": ["human", "agent"]
+    },
+    "approval": {
+      "enum": ["human", "human_confirmed", "automatic"]
+    },
+    "created_by_agent_id": {
+      "type": ["string", "null"],
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "turnover_budget": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "lifetime": {
+      "$ref": "#/$defs/lifetime"
+    },
+    "skills": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/catalogId" }
+    },
+    "tool_allowlist": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/catalogId" }
+    },
+    "mcp_allowlist": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/catalogId" }
+    },
+    "changes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "grants": { "$ref": "#/$defs/grants" },
+        "context_mode": { "enum": ["fresh", "accumulated"] },
+        "skills": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/catalogId" }
+        },
+        "tool_allowlist": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/catalogId" }
+        },
+        "mcp_allowlist": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/catalogId" }
+        }
+      }
+    },
+    "isolation_downgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "operator_capability"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1, "maxLength": 8192 },
+        "operator_capability": { "const": "agent:isolation_downgrade" }
+      }
+    },
+    "retired_by": {
+      "enum": ["human", "agent", "cascade"]
+    },
+    "cascade_of": {
+      "type": ["string", "null"],
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "from_agent_id": {
+      "type": "string",
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "to_agent_id": {
+      "type": "string",
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "allowed_action": {
+      "enum": ["ask"]
+    },
+    "deadline_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 604800
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "catalogId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+    },
+    "grantLevel": {
+      "enum": ["deny", "ask", "auto"]
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["create_roles", "retire_roles", "open_links"],
+      "properties": {
+        "create_roles": { "$ref": "#/$defs/grantLevel" },
+        "retire_roles": { "$ref": "#/$defs/grantLevel" },
+        "open_links": { "$ref": "#/$defs/grantLevel" }
+      }
+    },
+    "lifetime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["persistent", "task_scoped"] },
+        "task_id": {
+          "type": "string",
+          "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"
+        }
+      }
+    }
+  }
+}

@@ -20,8 +20,22 @@ from agent_commons.core.canonical import canonical_sha256
 from agent_commons.core.ids import is_typed_id, stable_id
 from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
+from agent_commons.domain.agents import (
+    GRANT_NAMES,
+    NON_TERMINAL_DELEGATION_STATES,
+    agent_delegations,
+    descendants,
+    effective_grants,
+    retirement_blockers,
+    turnover_used,
+)
 from agent_commons.domain.invalidations import derive_invalidation_state
-from agent_commons.domain.lifecycle import entity, validate_transition
+from agent_commons.domain.lifecycle import (
+    acting_agent_id,
+    entity,
+    require_entity,
+    validate_transition,
+)
 from agent_commons.domain.projection import ProjectionIssue, ProjectSnapshot, project_events
 from agent_commons.domain.revisions import resolve_revision, structural_correction_changes
 from agent_commons.domain.validation import validate_payload
@@ -51,6 +65,7 @@ PAYLOAD_SCHEMAS = {
     "decision": "commons.payload.decision.v1",
     "handoff": "commons.payload.handoff.v1",
     "delegation": "commons.payload.delegation.v1",
+    "agent": "commons.payload.agent.v1",
     "event": "commons.payload.maintenance.v1",
 }
 
@@ -65,6 +80,8 @@ _COLLECTIONS = {
     "decision": "decisions",
     "handoff": "handoffs",
     "delegation": "delegations",
+    "agent": "agents",
+    "agent_link": "agent_links",
 }
 
 
@@ -1375,6 +1392,7 @@ class CommonsManager:
         purpose: str,
         limits: Mapping[str, Any],
         parent_delegation_id: str | None = None,
+        on_behalf_of_agent_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("delegation.requested", idempotency_key)
@@ -1402,6 +1420,29 @@ class CommonsManager:
                     {"kind": "delegation", "id": parent_id},
                 )
             )
+        if on_behalf_of_agent_id:
+            # Which standing role this run acts for.  Carried as a relation
+            # rather than a payload field so the delegation schema -- and every
+            # delegation event already in every workspace -- stays readable by
+            # the previous binary.
+            role = require_entity(snapshot, "agent", on_behalf_of_agent_id)
+            if role.get("state") != "active":
+                raise LifecycleConflictError(
+                    f"a retired role cannot take new work: {on_behalf_of_agent_id}"
+                )
+            if role.get("template"):
+                raise LifecycleConflictError("a role preset is a template and is never employed")
+            if role.get("profile_id") != target_profile:
+                raise LifecycleConflictError(
+                    "a delegation on behalf of a role must use that role's profile"
+                )
+            relations.append(
+                self._relation(
+                    subject,
+                    "on_behalf_of",
+                    {"kind": "agent", "id": on_behalf_of_agent_id},
+                )
+            )
         payload: dict[str, Any] = {
             "delegation_id": delegation_id,
             "target_ref": target,
@@ -1421,6 +1462,280 @@ class CommonsManager:
             idempotency_key=key,
             relations=relations,
             tags=("delegation", purpose),
+        )
+
+    # -- standing roles -------------------------------------------------------
+
+    def list_agents(self, *, include_retired: bool = False) -> list[dict[str, Any]]:
+        snapshot = self.snapshot()
+        return [
+            self._agent_view(snapshot, record)
+            for _, record in sorted(snapshot.agents.items())
+            if include_retired or record.get("state") == "active"
+        ]
+
+    def get_agent(self, agent_id: str) -> dict[str, Any]:
+        snapshot = self.snapshot()
+        return self._agent_view(snapshot, require_entity(snapshot, "agent", agent_id))
+
+    @staticmethod
+    def _agent_view(snapshot: ProjectSnapshot, record: Mapping[str, Any]) -> dict[str, Any]:
+        """A role plus the authority it actually has right now.
+
+        Effective grants are recomputed on every read, so a level lowered on an
+        ancestor shows here -- and applies -- without a propagation pass.
+        """
+
+        agent_id = str(record["id"])
+        return {
+            **dict(record),
+            "effective_grants": effective_grants(snapshot.agents, agent_id),
+            "created_roles": list(descendants(snapshot.agents, agent_id)),
+            "turnover_used": turnover_used(snapshot.agents, agent_id),
+            "live_delegations": sorted(
+                str(item.get("id"))
+                for item in agent_delegations(snapshot.delegations, agent_id)
+                if item.get("state") in NON_TERMINAL_DELEGATION_STATES
+            ),
+            "retirement_blockers": retirement_blockers(
+                agents=snapshot.agents,
+                delegations=snapshot.delegations,
+                reviews=snapshot.reviews,
+                agent_id=agent_id,
+            ),
+        }
+
+    def create_agent(
+        self,
+        *,
+        name: str,
+        profile_id: str,
+        grants: Mapping[str, str] | None = None,
+        context_mode: str = "fresh",
+        rationale: str,
+        lifetime: Mapping[str, Any] | None = None,
+        skills: Sequence[str] = (),
+        tool_allowlist: Sequence[str] = (),
+        mcp_allowlist: Sequence[str] = (),
+        turnover_budget: int | None = None,
+        template: bool = False,
+        created_by_agent_id: str | None = None,
+        approval: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        key = self._idempotency_key("agent.created", idempotency_key)
+        agent_id = self._new_entity_id("agent", "agent.created", key)
+        snapshot = self.snapshot()
+        session = self._active_session()
+        acting = acting_agent_id(snapshot, session.session_id)
+        # A role recorded by a session that is itself running as a role is an
+        # agent-created role whatever the caller says.  Deriving origin from the
+        # ledger keeps `agent list` honest about where staff came from.
+        creator = created_by_agent_id or acting
+        origin = "agent" if creator else "human"
+        if approval is None:
+            approval = (
+                "human"
+                if origin == "human"
+                else ("automatic" if acting == creator else "human_confirmed")
+            )
+        payload: dict[str, Any] = {
+            "agent_id": agent_id,
+            "name": name,
+            "profile_id": profile_id,
+            # Denied by default in every path: a standing right to change the
+            # staff is the exception, and a declared lifetime covers the common
+            # "made for this task, gone when it lands" case without one.
+            "grants": dict(grants or dict.fromkeys(GRANT_NAMES, "deny")),
+            "context_mode": context_mode,
+            "origin": origin,
+            "approval": approval,
+            "rationale": rationale,
+            "lifetime": dict(lifetime or {"kind": "persistent"}),
+            "created_by_agent_id": creator,
+            "turnover_budget": turnover_budget,
+            "template": bool(template),
+        }
+        for field_name, values in (
+            ("skills", skills),
+            ("tool_allowlist", tool_allowlist),
+            ("mcp_allowlist", mcp_allowlist),
+        ):
+            if values:
+                payload[field_name] = _optional_list(list(values), field_name)
+        relations = []
+        if creator:
+            relations.append(
+                self._relation(
+                    {"kind": "agent", "id": agent_id},
+                    "created_by",
+                    {"kind": "agent", "id": str(creator)},
+                )
+            )
+        return self.record_event(
+            "agent.created",
+            payload,
+            idempotency_key=key,
+            relations=relations,
+            tags=("agent", origin),
+        )
+
+    def reconfigure_agent(
+        self,
+        agent_id: str,
+        expected_revision: str,
+        *,
+        changes: Mapping[str, Any],
+        reason: str,
+        isolation_downgrade_reason: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        key = self._idempotency_key("agent.reconfigured", idempotency_key)
+        payload: dict[str, Any] = {
+            "agent_id": agent_id,
+            "expected_revision": expected_revision,
+            "changes": dict(changes),
+            "reason": reason,
+        }
+        if isolation_downgrade_reason is not None:
+            self.sessions.require_active(
+                self._active_session().session_id,
+                capability="agent:isolation_downgrade",
+            )
+            payload["isolation_downgrade"] = {
+                "reason": isolation_downgrade_reason,
+                "operator_capability": "agent:isolation_downgrade",
+            }
+        return self.record_event(
+            "agent.reconfigured",
+            payload,
+            idempotency_key=key,
+            tags=("agent",),
+        )
+
+    def retire_agent(
+        self,
+        agent_id: str,
+        expected_revision: str | None = None,
+        *,
+        reason: str,
+        cascade: bool = False,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Take a role out of service, optionally with everything it created.
+
+        Nothing is deleted; the ledger keeps the whole history.  A cascade is
+        checked in full before its first write, because a half-applied cascade
+        leaves exactly the orphaned authority it exists to remove.
+        """
+
+        snapshot = self.snapshot()
+        require_entity(snapshot, "agent", agent_id)
+        order = [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
+        targets = [identifier for identifier in order if identifier in snapshot.agents]
+        pending = [
+            identifier
+            for identifier in targets
+            if snapshot.agents[identifier].get("state") == "active"
+        ]
+        blocked = {
+            identifier: retirement_blockers(
+                agents=snapshot.agents,
+                delegations=snapshot.delegations,
+                reviews=snapshot.reviews,
+                agent_id=identifier,
+            )
+            for identifier in pending
+        }
+        refusals = {key_: value for key_, value in blocked.items() if value}
+        if refusals:
+            detail = "; ".join(f"{name}: {', '.join(items)}" for name, items in refusals.items())
+            # Say what was actually attempted.  Reporting a plain retire as a
+            # refused cascade is a small lie in the record, and this branch has
+            # already paid for one of those.
+            scope = "cascade retire is refused as a whole" if cascade else "retire is refused"
+            raise LifecycleConflictError(f"{scope}: a role owing live work: {detail}")
+        base_key = self._idempotency_key("agent.retired", idempotency_key)
+        session = self._active_session()
+        retired_by = "agent" if acting_agent_id(snapshot, session.session_id) else "human"
+        results = []
+        for identifier in pending:
+            record = snapshot.agents[identifier]
+            revision = (
+                expected_revision
+                if identifier == agent_id and expected_revision
+                else str(record.get("effective_revision") or record["revision"])
+            )
+            payload: dict[str, Any] = {
+                "agent_id": identifier,
+                "expected_revision": revision,
+                "reason": reason,
+                "retired_by": "cascade" if identifier != agent_id else retired_by,
+            }
+            if identifier != agent_id:
+                payload["cascade_of"] = agent_id
+            results.append(
+                self.record_event(
+                    "agent.retired",
+                    payload,
+                    idempotency_key=f"{base_key}:{identifier}",
+                    tags=("agent",),
+                )
+            )
+        if not results:
+            raise LifecycleConflictError(f"agent is already retired: {agent_id}")
+        return {"retired": results, "count": len(results)}
+
+    def open_agent_link(
+        self,
+        *,
+        from_agent_id: str,
+        to_agent_id: str,
+        allowed_action: str = "ask",
+        deadline_seconds: int,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        key = self._idempotency_key("agent.link_opened", idempotency_key)
+        link_id = self._new_entity_id("agent_link", "agent.link_opened", key)
+        return self.record_event(
+            "agent.link_opened",
+            {
+                "link_id": link_id,
+                "from_agent_id": from_agent_id,
+                "to_agent_id": to_agent_id,
+                # A typed action, never an open/closed flag: adding
+                # `handoff_work` later extends this enum instead of reshaping
+                # the record.
+                "allowed_action": allowed_action,
+                "deadline_seconds": deadline_seconds,
+                "reason": reason,
+            },
+            idempotency_key=key,
+            relations=[
+                self._relation(
+                    {"kind": "agent_link", "id": link_id},
+                    "links",
+                    {"kind": "agent", "id": to_agent_id},
+                )
+            ],
+            tags=("agent_link", allowed_action),
+        )
+
+    def close_agent_link(
+        self,
+        link_id: str,
+        expected_revision: str,
+        *,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        key = self._idempotency_key("agent.link_closed", idempotency_key)
+        return self.record_event(
+            "agent.link_closed",
+            {"link_id": link_id, "expected_revision": expected_revision, "reason": reason},
+            idempotency_key=key,
+            tags=("agent_link",),
         )
 
     def _delegation_transition(
