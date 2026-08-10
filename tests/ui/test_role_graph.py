@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
 from tests.ui.conftest import authorized
@@ -16,6 +18,12 @@ LIMITS = {
     "budget": {"unit": "tokens", "limit": 8000},
 }
 
+
+_AUTOMATIC_LEVEL_WITHHELD = (
+    "the automatic grant level is withheld until its guarantees hold "
+    "(docs/audits/2026-08-10-standing-roles-review.md, remediation step 1); "
+    "restored later in this branch"
+)
 
 def _writer(workspace: dict[str, Any], suffix: str) -> CommonsManager:
     manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
@@ -60,6 +68,7 @@ def _run_as(
     return child
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_roles_are_nodes_and_their_lineage_is_the_reporting_edge(
     workspace: dict[str, Any],
 ) -> None:

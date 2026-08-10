@@ -26,6 +26,12 @@ LIMITS = {
 }
 
 
+_AUTOMATIC_LEVEL_WITHHELD = (
+    "the automatic grant level is withheld until its guarantees hold "
+    "(docs/audits/2026-08-10-standing-roles-review.md, remediation step 1); "
+    "restored later in this branch"
+)
+
 def _invoke(runner: CliRunner, repo: Path, session_id: str, *args: str) -> Result:
     return runner.invoke(cli, ["--repo", str(repo), "--session-id", session_id, "--json", *args])
 
@@ -197,6 +203,7 @@ def test_granting_creation_without_a_turnover_budget_is_refused(
 # -- guarantee 3: the level strictly decreases -------------------------------
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_an_automatic_generation_narrows_and_the_third_is_refused(
     workspace: dict[str, Any],
 ) -> None:
@@ -251,6 +258,7 @@ def test_an_automatic_generation_narrows_and_the_third_is_refused(
     )
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_a_created_role_cannot_hold_a_wider_grant_than_its_creator(
     workspace: dict[str, Any],
 ) -> None:
@@ -294,6 +302,7 @@ def test_a_created_role_cannot_hold_a_wider_grant_than_its_creator(
     )
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_a_created_role_cannot_hold_a_wider_provider_profile(
     workspace: dict[str, Any],
 ) -> None:
@@ -376,6 +385,7 @@ def test_a_created_role_cannot_hold_a_wider_provider_profile(
 # -- guarantee 1: the turnover ceiling counts both directions ----------------
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_the_turnover_budget_counts_creations_and_retirements_together(
     workspace: dict[str, Any],
 ) -> None:
@@ -459,6 +469,7 @@ def test_the_turnover_budget_counts_creations_and_retirements_together(
 # -- guarantee 7: a downgrade reaches work already running -------------------
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_lowering_an_ancestor_grant_stops_a_running_descendant_immediately(
     workspace: dict[str, Any],
 ) -> None:
@@ -548,6 +559,7 @@ def test_lowering_an_ancestor_grant_stops_a_running_descendant_immediately(
 # -- guarantee 5 and the retirement invariants -------------------------------
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_a_cascade_retires_a_whole_lineage_in_one_command(
     workspace: dict[str, Any],
 ) -> None:

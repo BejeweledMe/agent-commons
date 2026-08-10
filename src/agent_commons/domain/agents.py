@@ -15,6 +15,16 @@ from typing import Any
 #: Ordered because the whole model is "narrower or equal, never wider".
 GRANT_LEVELS: dict[str, int] = {"deny": 0, "ask": 1, "auto": 2}
 
+#: The automatic level is withheld: the 2026-08-10 review defeated the
+#: guarantees ADR 0009 claims for it (C1, C2, H1, H2 in
+#: docs/audits/2026-08-10-standing-roles-review.md), and the original brief's
+#: rule applies -- do not ship the automatic level partially, because an inert
+#: brake is worse than an absent one.  A stored ``auto`` stays valid in the
+#: ledger but is *effective* at ``ask``: every automatic action asks a person
+#: instead.  Lifting this requires the defeat paths to be closed and covered by
+#: tests that enter through the same seams a user does.
+AUTOMATIC_LEVEL_WITHHELD = True
+
 GRANT_NAMES = ("create_roles", "retire_roles", "open_links")
 
 DENY_ALL: dict[str, str] = dict.fromkeys(GRANT_NAMES, "deny")
@@ -81,7 +91,8 @@ def effective_grants(agents: Mapping[str, Mapping[str, Any]], agent_id: str) -> 
     chain = lineage(agents, agent_id)
     if not chain:
         return dict(DENY_ALL)
-    effective = {name: GRANT_LEVELS["auto"] for name in GRANT_NAMES}
+    ceiling = GRANT_LEVELS["ask"] if AUTOMATIC_LEVEL_WITHHELD else GRANT_LEVELS["auto"]
+    effective = {name: ceiling for name in GRANT_NAMES}
     for record in chain:
         if record.get("state") != "active":
             return dict(DENY_ALL)

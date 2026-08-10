@@ -30,6 +30,12 @@ LIMITS = {
 }
 
 
+_AUTOMATIC_LEVEL_WITHHELD = (
+    "the automatic grant level is withheld until its guarantees hold "
+    "(docs/audits/2026-08-10-standing-roles-review.md, remediation step 1); "
+    "restored later in this branch"
+)
+
 class FakeServer:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -128,6 +134,7 @@ def test_an_ask_role_gets_the_proposing_tool_and_not_the_recording_one(
     assert "commons_create_agent" not in tools
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_an_auto_role_gets_the_recording_tool_and_not_the_proposing_one(
     tmp_path: Path,
 ) -> None:

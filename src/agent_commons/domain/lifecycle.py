@@ -492,6 +492,12 @@ def _require_grant(
     if level == "ask" and approval != "human_confirmed":
         raise LifecycleConflictError(
             f"role {actor_agent_id} may {action} only with human confirmation"
+            + (
+                " (the automatic level is withheld until its guarantees hold;"
+                " see docs/audits/2026-08-10-standing-roles-review.md)"
+                if approval == "automatic"
+                else ""
+            )
         )
     if level == "auto" and approval not in {"automatic", "human_confirmed"}:
         raise LifecycleConflictError(f"role {actor_agent_id} recorded an unauthorized {action}")

@@ -29,6 +29,12 @@ LIMITS = {
 }
 
 
+_AUTOMATIC_LEVEL_WITHHELD = (
+    "the automatic grant level is withheld until its guarantees hold "
+    "(docs/audits/2026-08-10-standing-roles-review.md, remediation step 1); "
+    "restored later in this branch"
+)
+
 class FakeServer:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -123,6 +129,46 @@ def _server(workspace: dict[str, Any]) -> FakeServer:
     return server
 
 
+def test_a_stored_auto_grant_is_effective_at_ask_while_the_level_is_withheld(
+    tmp_path: Path,
+) -> None:
+    """The automatic level is withheld (remediation step 1), so a stored `auto`
+    behaves exactly like `ask`: the worker receives the proposing tool, never
+    the recording one, and an automatic action refuses naming the withhold."""
+
+    workspace = _workspace(
+        tmp_path,
+        grants={"create_roles": "auto", "retire_roles": "deny", "open_links": "deny"},
+        budget=4,
+    )
+    tools = _server(workspace).tools
+    assert "commons_create_agent" not in tools
+    assert "commons_propose_agent" in tools
+
+    with pytest.raises(LifecycleConflictError, match="withheld"):
+        workspace["child"].create_agent(
+            name="Backend",
+            profile_id="claude-builder",
+            rationale="an automatic hire under a stored auto grant",
+            idempotency_key="withheld-automatic-create",
+        )
+
+    proposed = tools["commons_propose_agent"](
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="the payments surface needs its own owner",
+        idempotency_key="withheld-proposal",
+    )
+    approved = workspace["parent"].approve_agent_proposal(
+        proposed["entity_ref"]["id"],
+        idempotency_key="withheld-approve",
+    )
+    record = workspace["parent"].get_agent(approved["entity_ref"]["id"])
+    assert record["origin"] == "agent"
+    assert record["approval"] == "human_confirmed"
+    assert record["created_by_agent_id"] == workspace["role"]["entity_ref"]["id"]
+
+
 def test_a_role_without_the_grant_never_sees_the_staff_tools(tmp_path: Path) -> None:
     workspace = _workspace(
         tmp_path,
@@ -134,6 +180,7 @@ def test_a_role_without_the_grant_never_sees_the_staff_tools(tmp_path: Path) -> 
         assert name not in tools
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_the_grant_brings_exactly_its_own_tool(tmp_path: Path) -> None:
     workspace = _workspace(
         tmp_path,
@@ -146,6 +193,7 @@ def test_the_grant_brings_exactly_its_own_tool(tmp_path: Path) -> None:
     assert "commons_open_agent_link" not in tools
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_the_worker_tool_creates_a_narrower_role_with_its_lineage(tmp_path: Path) -> None:
     workspace = _workspace(
         tmp_path,
@@ -169,6 +217,7 @@ def test_the_worker_tool_creates_a_narrower_role_with_its_lineage(tmp_path: Path
     assert record["rationale"] == "the payments surface needs its own owner"
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_the_worker_tool_cannot_reach_past_its_own_authority(tmp_path: Path) -> None:
     workspace = _workspace(
         tmp_path,
@@ -187,6 +236,7 @@ def test_the_worker_tool_cannot_reach_past_its_own_authority(tmp_path: Path) -> 
         )
 
 
+@pytest.mark.skip(reason=_AUTOMATIC_LEVEL_WITHHELD)
 def test_a_granted_tool_reaches_the_launched_argv(tmp_path: Path) -> None:
     """The grant has to change what the provider is actually allowed to call."""
 
