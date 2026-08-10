@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Protocol
 
 from agent_commons.errors import ConfigurationError
@@ -43,9 +45,17 @@ class BrokerRequest:
     purpose: str = "implementation"
     launch_key_sha256: str = "0" * 64
     retry: bool = False
+    #: Tool names the standing role this run acts for is allowed to use.  Empty
+    #: means the profile's own fixed set; a non-empty value can only narrow it.
+    role_tools: tuple[str, ...] = ()
+    #: Standing permissions of that role.  A staff-changing tool reaches argv
+    #: only when its grant is above `deny`, so a run with no role gets none.
+    role_grants: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile_id", BuiltinProfileId(self.profile_id))
+        object.__setattr__(self, "role_tools", tuple(self.role_tools))
+        object.__setattr__(self, "role_grants", MappingProxyType(dict(self.role_grants)))
         object.__setattr__(self, "cwd", Path(self.cwd).expanduser().resolve())
         object.__setattr__(self, "state_root", Path(self.state_root).expanduser().resolve())
         if self.purpose not in {"implementation", "independent_review", "verification"}:
@@ -156,6 +166,8 @@ class LocalBroker:
             delegation_id=request.correlation.delegation_id,
             max_budget_microusd=request.child_policy.max_budget_microusd,
             worker_purpose=request.purpose,
+            role_tools=request.role_tools,
+            role_grants=request.role_grants,
         )
         launch_plan_sha256 = hashlib.sha256(
             json.dumps(

@@ -382,6 +382,74 @@ def test_codex_verifier_receives_only_the_verification_write_tool(tmp_path: Path
     assert "commons_complete_review" not in enabled_tools
 
 
+def test_a_role_tool_selection_narrows_the_launched_argv(tmp_path: Path) -> None:
+    """The narrowing has to reach argv, not just a settings object.
+
+    A role selection that stopped at configuration would be the exact shape of
+    a guarantee without the guarantee.
+    """
+
+    profile = ClaudeRunnerProfile(
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+    invocation = profile.build_invocation(
+        "Review the exact target",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        role_tools=("commons_repo_read", "commons_complete_review"),
+    )
+    allowed = set(
+        invocation.argv[invocation.argv.index("--allowed-tools") + 1].split(",")
+    )
+
+    assert "mcp__agent-commons__commons_repo_read" in allowed
+    assert "mcp__agent-commons__commons_complete_review" in allowed
+    assert "mcp__agent-commons__commons_repo_search" not in allowed
+    # A role that cannot report a terminal outcome is broken, not narrower.
+    assert "mcp__agent-commons__commons_succeed_delegation" in allowed
+
+
+def test_a_role_cannot_select_a_tool_the_profile_never_had(tmp_path: Path) -> None:
+    profile = ClaudeRunnerProfile(
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+    with pytest.raises(ConfigurationError, match="not part of this profile"):
+        profile.build_invocation(
+            "Review the exact target",
+            workspace_root=tmp_path,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+            role_tools=("commons_request_delegation",),
+        )
+
+
+def test_a_codex_role_selection_narrows_the_enabled_mcp_tools(tmp_path: Path) -> None:
+    profile = CodexRunnerProfile(
+        profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        sandbox=CodexSandbox.READ_ONLY,
+        trusted_workspace=True,
+    )
+    invocation = profile.build_invocation(
+        "Review the exact target",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        role_tools=("commons_repo_read", "commons_complete_review"),
+    )
+    enabled = set(_codex_overrides(invocation.argv)["enabled_tools"])
+
+    assert enabled < INDEPENDENT_REVIEW_WORKER_TOOL_NAMES
+    assert "commons_repo_search" not in enabled
+    assert "commons_succeed_delegation" in enabled
+
+
 def test_runtime_policy_can_only_shrink_and_consumes_depth() -> None:
     parent = RuntimePolicy(
         remaining_depth=2,

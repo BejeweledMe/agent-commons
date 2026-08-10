@@ -11,7 +11,7 @@ import json
 import os
 import re
 import stat
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -109,6 +109,15 @@ _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_record_verification",
 )
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
+#: Staff-changing tools, keyed by the standing grant that switches each one on.
+#: A run acting for no role, or for a role at `deny`, never receives them: the
+#: grant is the switch, so least privilege is the default rather than a check
+#: the tool performs on itself.
+_CLAUDE_COMMONS_GOVERNANCE_TOOLS = {
+    "create_roles": "mcp__agent-commons__commons_create_agent",
+    "retire_roles": "mcp__agent-commons__commons_retire_agent",
+    "open_links": "mcp__agent-commons__commons_open_agent_link",
+}
 _WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verification"})
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_SERVER = "agent-commons"
@@ -134,7 +143,21 @@ def _profile_worker_purpose(
 def _worker_tools(
     profile_id: BuiltinProfileId,
     purpose: str,
+    role_tools: Sequence[str] | None = None,
+    role_grants: Mapping[str, str] | None = None,
 ) -> tuple[str, ...]:
+    """The profile's fixed tool set, optionally narrowed by a standing role.
+
+    Narrowing only.  A role selection is intersected with what the profile
+    already grants, so no role setting can turn a delegation tool into a wider
+    capability -- the confused-deputy boundary from ADR 0004 is untouched.
+
+    The outcome tools are exempt.  Narrowing away the ability to report a
+    terminal result would produce a role that consumes its budget and exits
+    without ever closing its delegation, which is a broken role rather than a
+    narrower one.
+    """
+
     tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
     if profile_id.independent_reviewer:
         tools += (
@@ -142,7 +165,27 @@ def _worker_tools(
             if purpose == "independent_review"
             else _CLAUDE_COMMONS_VERIFICATION_TOOLS
         )
-    return tools
+    tools += tuple(
+        tool
+        for grant, tool in sorted(_CLAUDE_COMMONS_GOVERNANCE_TOOLS.items())
+        if str((role_grants or {}).get(grant, "deny")) != "deny"
+    )
+    if not role_tools:
+        return tools
+    allowed = {str(name) for name in role_tools}
+    unknown = sorted(
+        allowed - {tool.removeprefix(_MCP_TOOL_PREFIX) for tool in tools}
+    )
+    if unknown:
+        raise ConfigurationError(
+            "role tool selection is not part of this profile: " + ", ".join(unknown)
+        )
+    return tuple(
+        tool
+        for tool in tools
+        if tool in _CLAUDE_COMMONS_OUTCOME_TOOLS
+        or tool.removeprefix(_MCP_TOOL_PREFIX) in allowed
+    )
 
 
 def _resolved_worker_mcp(
@@ -363,6 +406,8 @@ class RunnerProfile(Protocol):
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
+        role_tools: Sequence[str] | None = None,
+        role_grants: Mapping[str, str] | None = None,
     ) -> RunnerInvocation: ...
 
 
@@ -411,6 +456,8 @@ class CodexRunnerProfile:
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
+        role_tools: Sequence[str] | None = None,
+        role_grants: Mapping[str, str] | None = None,
     ) -> RunnerInvocation:
         if not self.trusted_workspace:
             raise ConfigurationError(
@@ -430,7 +477,8 @@ class CodexRunnerProfile:
             git_executable=self.git_executable,
         )
         enabled_tools = tuple(
-            tool.removeprefix(_MCP_TOOL_PREFIX) for tool in _worker_tools(self.profile_id, purpose)
+            tool.removeprefix(_MCP_TOOL_PREFIX)
+            for tool in _worker_tools(self.profile_id, purpose, role_tools, role_grants)
         )
         config_prefix = f"mcp_servers.{_CODEX_MCP_SERVER}"
         argv = [
@@ -520,6 +568,8 @@ class ClaudeRunnerProfile:
         delegation_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
+        role_tools: Sequence[str] | None = None,
+        role_grants: Mapping[str, str] | None = None,
     ) -> RunnerInvocation:
         if delegation_id is None:
             raise ConfigurationError("Claude runtime requires an exact delegation binding")
@@ -589,7 +639,7 @@ class ClaudeRunnerProfile:
         # request/cancel tools and provider-internal subagents would bypass the
         # canonical parent/depth lineage, so neither worker profile receives
         # them.  Interactive parent sessions remain free to use those MCP tools.
-        allowed_tools = _worker_tools(self.profile_id, purpose)
+        allowed_tools = _worker_tools(self.profile_id, purpose, role_tools, role_grants)
         if self.profile_id.independent_reviewer:
             argv.extend(
                 (

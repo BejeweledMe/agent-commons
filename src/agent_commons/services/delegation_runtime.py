@@ -60,6 +60,7 @@ from agent_commons.runtime import (
     terminate_process_group,
 )
 
+from ..domain.agents import effective_grants
 from .manager import CommonsManager
 
 _TERMINAL_DELEGATION_STATES = {
@@ -653,6 +654,30 @@ class DelegationRuntimeService:
             ttl_seconds=min(int(limits["wall_time_seconds"]) + 300, 86_400),
         )
 
+    def _role_scope(self, delegation: Mapping[str, Any]) -> tuple[tuple[str, ...], dict[str, str]]:
+        """Tool narrowing and standing grants of the role this run acts for.
+
+        Read at launch, not carried in the request document: a role narrowed or
+        downgraded a moment ago binds the next run rather than the one after
+        somebody remembers to restart something.  Grants come back *effective*,
+        so a level lowered on an ancestor removes the staff-changing tool from
+        this launch's argv.
+        """
+
+        agent_id = str(delegation.get("agent_id") or "")
+        if not agent_id:
+            return (), {}
+        snapshot = self.manager.snapshot()
+        role = snapshot.agents.get(agent_id)
+        if role is None:
+            raise LifecycleConflictError(f"delegation names a role that does not exist: {agent_id}")
+        if role.get("state") != "active":
+            raise LifecycleConflictError(f"a retired role cannot start new work: {agent_id}")
+        return (
+            tuple(str(name) for name in role.get("tool_allowlist") or ()),
+            effective_grants(snapshot.agents, agent_id),
+        )
+
     @staticmethod
     def _instruction(delegation: Mapping[str, Any], *, profile_id: BuiltinProfileId) -> str:
         target = delegation["target_ref"]
@@ -976,6 +1001,10 @@ alone is not task acceptance.
             # Validate executable, trust mode, argv, and budget support before
             # allocating a child session or durable operational reservation.
             instruction = self._instruction(delegation, profile_id=profile_id)
+            # A standing role may narrow the profile's fixed tool set.  Resolved
+            # here, at launch, against the role's current record: a narrowing
+            # recorded a minute ago applies to this run.
+            role_tools, role_grants = self._role_scope(delegation)
             profile.build_invocation(
                 instruction,
                 workspace_root=self.manager.repo_root,
@@ -983,6 +1012,8 @@ alone is not task acceptance.
                 delegation_id=delegation_id,
                 max_budget_microusd=child_policy.max_budget_microusd,
                 worker_purpose=str(delegation["purpose"]),
+                role_tools=role_tools,
+                role_grants=role_grants,
             )
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
@@ -1036,6 +1067,8 @@ alone is not task acceptance.
                         purpose=str(delegation["purpose"]),
                         launch_key_sha256=launch_key_sha256,
                         retry=retry,
+                        role_tools=role_tools,
+                        role_grants=role_grants,
                     )
                 )
                 canonical, finalization_failures = self._finalize_attempt(result.attempt)

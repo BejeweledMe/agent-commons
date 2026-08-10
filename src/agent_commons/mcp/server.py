@@ -23,6 +23,7 @@ from typing import Any, Protocol, TypeVar
 
 from agent_commons import __version__
 from agent_commons.core.refs import parse_ref
+from agent_commons.domain.agents import effective_grants
 from agent_commons.errors import (
     CommonsError,
     ConfigurationError,
@@ -553,6 +554,16 @@ def build_server(
         else None
     )
 
+    acting_agent_id = str((worker or {}).get("agent_id") or "") or None
+    # Effective, so a level lowered on any creator above this role also removes
+    # the tool from this session rather than only failing when it is called.
+    acting_grants = (
+        effective_grants(commons.snapshot().agents, acting_agent_id) if acting_agent_id else {}
+    )
+
+    def acting_grant(name: str) -> bool:
+        return acting_grants.get(name, "deny") != "deny"
+
     def require_live_worker() -> dict[str, Any] | None:
         if worker is None:
             return None
@@ -977,6 +988,96 @@ def build_server(
             source_path=str(source.get("path", "")),
             expected_revision=str(manifest.get("revision", "")),
             expected_size=int(manifest.get("size_bytes", -1)),
+        )
+
+    # -- staff changes ------------------------------------------------------
+    # Each of the three tools below is registered only when the standing role
+    # this run acts for holds the matching grant above `deny`.  The grant is the
+    # switch, so a run with no role -- or a role that may not change staff --
+    # never sees the tool at all.  The domain still refuses on its own; this is
+    # least privilege in front of that, not instead of it.
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("create_roles"))
+    def commons_create_agent(
+        name: str,
+        profile_id: str,
+        rationale: str,
+        idempotency_key: str,
+        context_mode: str = "fresh",
+        create_roles: str = "deny",
+        retire_roles: str = "deny",
+        open_links: str = "deny",
+        turnover_budget: int | None = None,
+        retire_with_task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a standing role below this one, with strictly narrower authority.
+
+        Records the rationale, the creating role, and the lineage permanently:
+        somebody has to be able to ask where a role came from months later.
+        """
+
+        lifetime = (
+            {"kind": "task_scoped", "task_id": retire_with_task_id}
+            if retire_with_task_id
+            else {"kind": "persistent"}
+        )
+        return commons.create_agent(
+            name=name,
+            profile_id=profile_id,
+            rationale=rationale,
+            context_mode=context_mode,
+            grants={
+                "create_roles": create_roles,
+                "retire_roles": retire_roles,
+                "open_links": open_links,
+            },
+            turnover_budget=turnover_budget,
+            lifetime=lifetime,
+            created_by_agent_id=acting_agent_id,
+            idempotency_key=idempotency_key,
+        )
+
+    @register(_DESTRUCTIVE_WRITE, worker_only=True, enabled=acting_grant("retire_roles"))
+    def commons_retire_agent(
+        agent_id: str,
+        reason: str,
+        idempotency_key: str,
+        cascade: bool = False,
+    ) -> dict[str, Any]:
+        """Take a role below this one out of service; nothing is deleted.
+
+        Refused for a human-created role at any level, and for any role that
+        still owes a live delegation or an unfinished review.
+        """
+
+        return commons.retire_agent(
+            agent_id,
+            reason=reason,
+            cascade=cascade,
+            idempotency_key=idempotency_key,
+        )
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("open_links"))
+    def commons_open_agent_link(
+        to_agent_id: str,
+        reason: str,
+        idempotency_key: str,
+        deadline_seconds: int = 900,
+    ) -> dict[str, Any]:
+        """Open a bounded temporary link to another role.
+
+        The link records the action it permits -- today, one bounded question --
+        rather than an open/closed flag, so a later "hand over work" mode
+        extends the enum instead of reshaping the record.
+        """
+
+        return commons.open_agent_link(
+            from_agent_id=str(acting_agent_id),
+            to_agent_id=to_agent_id,
+            allowed_action="ask",
+            deadline_seconds=deadline_seconds,
+            reason=reason,
+            idempotency_key=idempotency_key,
         )
 
     @register(_IDEMPOTENT_WRITE, root_only=True)

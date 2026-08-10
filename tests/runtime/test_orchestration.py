@@ -198,6 +198,97 @@ def test_child_review_and_delegation_result_are_canonical_but_output_is_not(
     assert final.terminal_tool_calls == 0
 
 
+def test_a_roles_tool_narrowing_reaches_the_launched_process(tmp_path: Path) -> None:
+    """From `agent create` to argv, through the path a broker run really takes.
+
+    A narrowing verified only against the profile object would leave the run
+    itself unnarrowed and the test green, which is the failure mode this branch
+    has hit four times.
+    """
+
+    manager, task = _workspace(tmp_path)
+    role = manager.create_agent(
+        name="Scoped reviewer",
+        profile_id="claude-independent-reviewer",
+        rationale="reads the repository but does not grep it",
+        tool_allowlist=("commons_repo_read", "commons_complete_review"),
+        idempotency_key="runtime-role",
+    )
+    review = manager.request_review(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        criteria=("Inspect exact target",),
+        independent=True,
+        idempotency_key="runtime-role-review",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "micro_usd", "limit": 50_000},
+        },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="runtime-role-delegation",
+    )
+    delegation_id = delegation["entity_ref"]["id"]
+    seen: list[tuple[str, ...]] = []
+
+    class CapturingRunner(FakeRunner):
+        def run(self, invocation: Any, **values: Any) -> ProcessResult:
+            seen.append(tuple(invocation.argv))
+            return super().run(invocation, **values)
+
+    def complete_as_child(child_session_id: str) -> None:
+        child = CommonsManager(
+            manager.repo_root,
+            session_id=child_session_id,
+            state_root=manager.paths.state_root,
+        )
+        child.complete_review(
+            review["entity_ref"]["id"],
+            review["revision"],
+            target_revision=task["revision"],
+            verdict="approved",
+            summary="The exact target satisfies the requested criterion.",
+            idempotency_key="runtime-role-child-review",
+        )
+        current = child.get_delegation(delegation_id)
+        child.succeed_delegation(
+            delegation_id,
+            current["revision"],
+            summary="Independent expert review recorded.",
+            result_refs=({"kind": "review", "id": review["entity_ref"]["id"]},),
+            idempotency_key="runtime-role-child-succeed",
+        )
+
+    service = DelegationRuntimeService(
+        manager,
+        runner=CapturingRunner(after_start=complete_as_child),  # type: ignore[arg-type]
+        profiles=default_profile_registry(
+            claude_executable="/bin/echo", mcp_executable="/bin/echo"
+        ),
+        telemetry=CollectingTelemetry(),
+    )
+    result = service.run(
+        delegation_id,
+        delegation["revision"],
+        idempotency_key="runtime-role-launch",
+    )
+
+    assert result["delegation"]["state"] == "succeeded"
+    argv = seen[0]
+    allowed = set(argv[argv.index("--allowed-tools") + 1].split(","))
+    assert "mcp__agent-commons__commons_repo_read" in allowed
+    assert "mcp__agent-commons__commons_repo_search" not in allowed
+    assert "mcp__agent-commons__commons_succeed_delegation" in allowed
+
+
 def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> None:
     manager, task = _workspace(tmp_path)
     _, delegation = _delegation(manager, task, max_attempts=2)
