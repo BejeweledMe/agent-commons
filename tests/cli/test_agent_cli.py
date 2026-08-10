@@ -871,3 +871,111 @@ def test_a_retired_role_cannot_take_new_work(workspace: dict[str, Any]) -> None:
             on_behalf_of_agent_id=agent_id,
             idempotency_key="late-delegation",
         )
+
+
+# -- the binding survives the run (C1) ----------------------------------------
+
+
+def test_a_worker_that_reported_success_is_still_its_role(
+    workspace: dict[str, Any],
+) -> None:
+    """The happy-path escape from the 2026-08-10 review, closed.
+
+    A worker records its own `delegation.succeeded` and its process keeps
+    running until the parent reaps it.  In that gap it used to become an
+    unbound human window: role creation succeeded, and the ledger recorded the
+    result as human-created.  The binding now survives terminalization, so the
+    same refusals apply after success as before it.
+    """
+
+    manager: CommonsManager = workspace["manager"]
+    created = _create(workspace, "sticky-role")
+    agent_id = created["entity_ref"]["id"]
+    child_session_id = _run_as(workspace, agent_id, "sticky-run")
+    started = workspace["runs"]["sticky-run"]
+
+    refusal = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        child_session_id,
+        "agent",
+        "create",
+        "--name",
+        "helper while bound",
+        "--profile",
+        "claude-builder",
+        "--rationale",
+        "a deny-all role hires while bound",
+        "--idempotency-key",
+        "sticky-bound-create",
+    )
+    _refused(refusal, "may not create roles")
+
+    delegation = manager.get_delegation(started["entity_ref"]["id"])
+    succeeded = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        child_session_id,
+        "delegation",
+        "succeed",
+        started["entity_ref"]["id"],
+        str(delegation["revision"]),
+        "--summary",
+        "done",
+        "--result-ref",
+        "task:" + str((delegation["target_ref"] or {}).get("id")),
+        "--idempotency-key",
+        "sticky-succeed",
+    )
+    _json(succeeded)
+
+    # Still the role: creating under a wider grant refuses exactly as while
+    # bound, instead of landing as an all-auto human-created record.
+    after = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        child_session_id,
+        "agent",
+        "create",
+        "--name",
+        "helper after success",
+        "--profile",
+        "claude-builder",
+        "--rationale",
+        "the happy-path escape",
+        "--create-roles",
+        "auto",
+        "--turnover-budget",
+        "8",
+        "--idempotency-key",
+        "sticky-after-create",
+    )
+    _refused(after, "may not create roles")
+
+    # And it cannot commission fresh work as if it were a person either.
+    task = manager.create_task(
+        title="post-run work",
+        description="a spent worker tries to open a new root delegation",
+        acceptance_criteria=("none",),
+        idempotency_key="sticky-late-task",
+    )
+    escape = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        child_session_id,
+        "delegation",
+        "create",
+        "--target-ref",
+        "task:" + task["entity_ref"]["id"],
+        "--target-revision",
+        task["revision"],
+        "--target-profile",
+        "claude-builder",
+        "--purpose",
+        "implementation",
+        "--limits-json",
+        json.dumps(LIMITS),
+        "--idempotency-key",
+        "sticky-escape-delegation",
+    )
+    _refused(escape, "cannot escape its lineage")

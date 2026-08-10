@@ -180,7 +180,7 @@ def validate_transition(
                 "by a principal that authored the subject: " + ", ".join(sorted(overlap))
             )
     if event_type == "review.completed":
-        bound = _bound_delegations(snapshot, actor_session_id)
+        bound = _child_delegations(snapshot, actor_session_id)
         if bound and not any(
             delegation.get("purpose") == "independent_review"
             and _delegation_matches_review(delegation, current)
@@ -266,8 +266,10 @@ def validate_transition(
     if event_type == "thread.replied":
         # A delegated worker speaks where it was spoken to.  Without this, the
         # reply tool it now carries would let one bounded run write into every
-        # conversation in the workspace.
-        bound = _bound_delegations(snapshot, actor_session_id)
+        # conversation in the workspace.  Terminal bindings keep the rule: a
+        # worker that already reported its outcome does not graduate into a
+        # session that may write anywhere.
+        bound = _child_delegations(snapshot, actor_session_id)
         if bound:
             addressed = {str(item) for item in current.get("to") or ()}
             reachable = {"*", actor_session_id} | {
@@ -397,7 +399,7 @@ def _validate_creation(
                 "target_revision is not the current immutable target revision"
             )
     if event_type == "verification.recorded":
-        bound = _bound_delegations(snapshot, actor_session_id)
+        bound = _child_delegations(snapshot, actor_session_id)
         if bound and not any(
             _delegation_allows_verification(snapshot, delegation, payload) for delegation in bound
         ):
@@ -458,18 +460,36 @@ def _delegation_ancestor_ids(
 
 
 def acting_agent_id(snapshot: ProjectSnapshot, actor_session_id: str) -> str | None:
-    """The standing role a session is currently running as, if any.
+    """The standing role a session runs as -- for the life of the session.
 
     Only a delegated child session acts for a role.  A parent that requested the
     delegation keeps its own identity: it commissioned the work, it did not
     perform it.
+
+    Terminal delegations count.  The child process outlives its own
+    `delegation.succeeded` until the parent reaps it, and a session that ran as
+    a role must not become an unbound human window in that gap: independence
+    already treats it as the role forever (`session_agent_map`), so authority
+    does too, or the same session is "was role R" for one check and "nobody"
+    for the other -- the C1 escape.  A live binding wins over a finished one;
+    among equals the most recently opened delegation (ULID order) decides,
+    which replay derives from the ledger alone.
     """
 
-    for delegation in _bound_delegations(snapshot, actor_session_id):
-        agent_id = delegation.get("agent_id")
-        if agent_id:
-            return str(agent_id)
-    return None
+    bound = [
+        delegation
+        for delegation in _child_delegations(snapshot, actor_session_id)
+        if delegation.get("agent_id")
+    ]
+    if not bound:
+        return None
+    live = [
+        delegation
+        for delegation in bound
+        if delegation.get("state") in {"active", "input_needed"}
+    ]
+    latest = max(live or bound, key=lambda delegation: str(delegation.get("id", "")))
+    return str(latest["agent_id"])
 
 
 def _require_grant(
@@ -813,16 +833,21 @@ def _evidence_author_sessions(snapshot: ProjectSnapshot, task: Mapping[str, Any]
     return authors
 
 
-def _bound_delegations(
+def _child_delegations(
     snapshot: ProjectSnapshot, actor_session_id: str
 ) -> tuple[Mapping[str, Any], ...]:
-    """Return non-terminal delegations whose worker is the current actor."""
+    """Every delegation, in any state, whose worker is the current actor.
+
+    A binding does not end with the run: the worker process outlives its own
+    terminal event, and its session keeps the identity and the restrictions it
+    worked under.  Checks that specifically need a *live* run -- a child
+    delegation under an active parent -- filter on state themselves.
+    """
 
     return tuple(
         delegation
         for delegation in snapshot.delegations.values()
         if delegation.get("child_session_id") == actor_session_id
-        and delegation.get("state") in {"active", "input_needed"}
     )
 
 
@@ -976,9 +1001,12 @@ def _validate_delegation_request(
 
     parent_id = str(payload.get("parent_delegation_id") or "")
     if not parent_id:
-        if _bound_delegations(snapshot, actor_session_id):
+        # Ever bound, not currently bound: a worker whose run just terminalized
+        # still holds its lineage, or reporting success would be the one step
+        # that turns a bounded child into an unbounded commissioner.
+        if _child_delegations(snapshot, actor_session_id):
             raise LifecycleConflictError(
-                "a bound delegation child cannot escape its lineage with a new root delegation"
+                "a delegation child session cannot escape its lineage with a new root delegation"
             )
         if depth != 0 or payload.get("root_delegation_id") != delegation_id:
             raise LifecycleConflictError(
