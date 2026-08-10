@@ -388,3 +388,69 @@ single fix with the widest blast radius lands first.
 
 Steps 7 and 8 change the product's shape rather than repairing it, and should
 be confirmed with the operator before they start.
+
+## Seventh pass: OpenCodeReview (`ocr` v1.9.0), delegation mode
+
+Run after the six reviewers, on the same range (`52dc577..HEAD`), using
+`alibaba/open-code-review` in delegation mode — the tool selects files and
+supplies the rule set, the host agent performs the review. Delegation mode was
+chosen deliberately: the tool's normal mode sends changed files to a configured
+LLM endpoint, and nothing in this repository should leave the machine to be
+reviewed. The commands are installed manually under `.claude/commands/`; the
+marketplace install (`/plugin marketplace add …`) is an interactive flow this
+session cannot run.
+
+The tool selected 38 of 47 changed files (documentation excluded as
+unsupported extensions) and returned one Python rule group covering typos, dead
+code, mutable default arguments and shared state, boundary handling, error
+handling, identity comparison, resource management, performance, and
+concurrency — explicitly biased toward precision over recall.
+
+**Result: two new findings, both minor-to-medium, and a clean bill on
+everything mechanical.**
+
+### O1. `pending_operations` swallows a real failure into "nothing needs you" — medium
+
+`src/agent_commons/ui/context.py:363-367` catches `CommonsError` and `OSError`
+around `CommunicationRuntimeService(manager).inbox()` and substitutes an empty
+tuple. A corrupt or unreadable communication store is therefore
+indistinguishable from "no blockers", with nothing logged. Against the rule
+"exceptions caught and silently discarded without logging or re-raising", and
+it directly compounds **H4**: the surface that already disagrees with the
+canonical ring also hides the reason it is empty.
+
+### O2. A type-narrowing `assert` guards the catalogue path — low
+
+`ui/context.py:2958` (`_require_catalog_editing`) uses
+`assert self._catalog_path is not None` after an explicit `ConfigurationError`
+guard. Under `python -O` the assertion is stripped, `None` reaches
+`load_role_catalog` (which returns an empty catalogue) and `write_role_catalog`
+(which raises `TypeError` on `Path(None)`), turning a clean refusal into a
+confusing failure. Against the rule "assert used for runtime validation —
+assertions are stripped under `python -O`".
+
+### What the pass cleared
+
+Checked against added lines only, as the workflow prescribes: no mutable
+default arguments, no bare or blanket `except`, no `except: pass`, no
+`== True/False` or `is` against literals, no unclosed sqlite connections
+(`search_existing_projection` closes in `finally`), and every `raise` inside an
+`except` chains with `from exc`. One initial hit at `catalog.py:136` was a
+false positive of the author's own grep — the `from exc` sits on the line after
+the multi-line call.
+
+### What this pass could not see, and why that matters
+
+The tool is a diff-level defect finder tuned for precision. Every critical and
+high finding above it — a worker losing its role on the happy path, corrections
+bypassing governance, reconfiguration skipping a ceiling, two sources for one
+signal — is invisible to it, because each is a **claim not matching behaviour**
+rather than a defect visible in a hunk. Nothing in a diff says "the ADR asserts
+this is checked."
+
+That is the useful negative result: the branch's Python hygiene is sound, and
+its problems live in a layer no line-level reviewer reaches. The tool's own
+workflow ends with "automatically fix High and Medium issues"; that step was
+not taken here, because a remediation plan for the larger findings is open and
+unapproved, and fixing O1/O2 in isolation would touch code that plan is about
+to restructure.
