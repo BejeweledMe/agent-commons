@@ -201,6 +201,12 @@ function text(x, y, value, className) {
   return element;
 }
 
+// A band is a rank in the chain of command: 0 answers to the operator, each
+// step down is one delegation further away.  Wide ranks wrap onto further rows
+// rather than running off to the right, which is what made 328 nodes read as
+// one endless horizontal strip.
+const PER_ROW = 8;
+
 function layout(nodes) {
   const bands = new Map();
   for (const node of nodes) {
@@ -210,18 +216,26 @@ function layout(nodes) {
   }
   const placed = new Map();
   const ordered = [...bands.keys()].sort((a, b) => a - b);
-  ordered.forEach((band, rowIndex) => {
-    bands.get(band).forEach((node, columnIndex) => {
-      placed.set(node.id, { x: columnIndex * COLUMN, y: rowIndex * ROW, band: band });
+  let row = 0;
+  for (const band of ordered) {
+    const members = bands.get(band);
+    members.forEach((node, index) => {
+      placed.set(node.id, {
+        x: (index % PER_ROW) * COLUMN,
+        y: (row + Math.floor(index / PER_ROW)) * ROW,
+        band: band
+      });
     });
-  });
-  return placed;
+    row += Math.max(1, Math.ceil(members.length / PER_ROW)) + 0.35;
+  }
+  return { placed: placed, bands: ordered, rows: row };
 }
 
 function render(graph) {
   lastGraph = graph;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
-  const positions = layout(graph.nodes);
+  const layoutResult = layout(graph.nodes);
+  const positions = layoutResult.placed;
   const focus = focused ? neighboursOf(graph, focused) : null;
   paintFocusChrome(focus);
 
@@ -247,7 +261,21 @@ function render(graph) {
   viewport.appendChild(edgeLayer);
   viewport.appendChild(nodeLayer);
 
-  const communication = new Set(["requested_by", "runs_as", "owns"]);
+  // Rank captions, so the hierarchy is legible without reading node contents.
+  const captions = document.createElementNS(SVGNS, "g");
+  viewport.appendChild(captions);
+  const seenBands = new Set();
+  for (const node of graph.nodes) {
+    const position = positions.get(node.id);
+    if (!position || seenBands.has(position.band)) { continue; }
+    seenBands.add(position.band);
+    const caption = position.band === 0
+      ? "reports to operator"
+      : "delegated · depth " + position.band;
+    // Above the rank, not beside it: to the left it collided with the first node.
+    captions.appendChild(text(0, position.y - 10, caption, "band-label"));
+  }
+
   for (const edge of graph.edges) {
     const from = positions.get(edge.from);
     const to = positions.get(edge.to);
@@ -260,7 +288,9 @@ function render(graph) {
       "M " + x1 + " " + y1 + " C " + x1 + " " + (y1 + 44) + ", " + x2 + " " + (y2 - 44) +
       ", " + x2 + " " + y2
     );
-    let edgeClass = communication.has(edge.kind) ? "edge comm" : "edge";
+    // Permanent: standing structure, who reports to whom.  Temporary: one
+    // exchange bound to a single attempt.  The projection decides which.
+    let edgeClass = edge.relation === "temporary" ? "edge comm" : "edge";
     if (focus) { edgeClass += focus.edges.has(edge.id) ? " incident" : " faded"; }
     path.setAttribute("class", edgeClass);
     edgeLayer.appendChild(path);

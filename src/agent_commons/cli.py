@@ -316,54 +316,6 @@ def init_command(
     )
 
 
-@cli.group("run")
-def run_group() -> None:
-    """Inspect the disposable run-observability projection."""
-
-
-@run_group.command("list")
-@click.option("--run-state", multiple=True, help="Filter by run state; repeatable.")
-@click.option("--limit", type=click.IntRange(1, 1000), default=50, show_default=True)
-@click.pass_obj
-def run_list_command(state: CLIState, run_state: tuple[str, ...], limit: int) -> None:
-    """List runs held by the observability projection."""
-
-    from agent_commons.runtime.observability import RunEventStore, StoreNotFound
-
-    paths = state.manager().paths
-    try:
-        with RunEventStore(paths, writer=False) as store:
-            state.emit(
-                [row.as_dict() for row in store.list_runs(states=run_state or None, limit=limit)]
-            )
-    except StoreNotFound:
-        state.emit([])
-
-
-@run_group.command("export")
-@click.argument("run_id")
-@click.option("--output", type=click.Path(dir_okay=False), help="Destination JSONL path.")
-@click.pass_obj
-def run_export_command(state: CLIState, run_id: str, output: str | None) -> None:
-    """Export one run to JSONL so it survives retention.
-
-    Retention never exports on your behalf; this is how a run is kept beyond its
-    configured tier.
-    """
-
-    from agent_commons.runtime.observability import RunEventStore, StoreNotFound
-
-    paths = state.manager().paths
-    destination = Path(output) if output else Path.cwd() / f"{run_id}.jsonl"
-    try:
-        with RunEventStore(paths, writer=False) as store:
-            state.emit(store.export_run(run_id, destination).as_dict())
-    except StoreNotFound as exc:
-        raise ValidationError(
-            "this workspace has no run observability store, so there is nothing to export"
-        ) from exc
-
-
 @cli.command("ui")
 @click.option(
     "--port",

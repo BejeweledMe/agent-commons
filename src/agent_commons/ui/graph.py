@@ -20,7 +20,11 @@ MAX_NODES = 2_000
 MAX_EDGES = 4_000
 _LABEL_BYTES = 120
 
-#: Layer hints so the frontend never owns the layering model.
+#: Fallback layer for a node that has no place in the reporting hierarchy.
+#: A band is a *rank in the chain of command*, not a category of record: a
+#: session nobody delegated to sits at the top because it answers to the human,
+#: and everything it started sits under it.  Grouping by record kind instead put
+#: 300 unrelated nodes in one row and showed no hierarchy at all.
 _BANDS = {
     "objective": 0,
     "session": 1,
@@ -30,6 +34,12 @@ _BANDS = {
     "review": 4,
     "verification": 4,
 }
+
+#: A permanent edge is standing structure: who reports to whom, who owns what.
+#: A temporary edge is one exchange bound to a single attempt.  The distinction
+#: is real in the ledger, not a visual convention, so the projection carries it
+#: rather than leaving the frontend to guess from edge kinds.
+_PERMANENT_EDGES = frozenset({"spawned", "requested_by", "runs_as", "owns", "depends_on"})
 
 #: Nodes are dropped in this order when the graph exceeds its bounds; terminal
 #: work is the least useful thing on screen when there is too much to draw.
@@ -71,7 +81,12 @@ def _state(kind: str, record: Mapping[str, Any]) -> str:
     return ""
 
 
-def _node(kind: str, identifier: str, record: Mapping[str, Any]) -> dict[str, Any]:
+def _node(
+    kind: str,
+    identifier: str,
+    record: Mapping[str, Any],
+    rank: int | None = None,
+) -> dict[str, Any]:
     attrs: dict[str, Any] = {}
     for key in (
         "purpose",
@@ -97,7 +112,8 @@ def _node(kind: str, identifier: str, record: Mapping[str, Any]) -> dict[str, An
         "revision": record.get("revision"),
         "effective_revision": record.get("effective_revision"),
         "recorded_at": record.get("recorded_at"),
-        "band": _BANDS.get(kind, 5),
+        "band": rank if rank is not None else _BANDS.get(kind, 5),
+        "reports_to_operator": rank == 0,
         "attrs": attrs,
     }
 
@@ -108,6 +124,7 @@ def _edge(kind: str, source: str, target: str, **attrs: Any) -> dict[str, Any]:
         "kind": kind,
         "from": source,
         "to": target,
+        "relation": "permanent" if kind in _PERMANENT_EDGES else "temporary",
         "attrs": {key: value for key, value in attrs.items() if value is not None},
     }
 
@@ -148,6 +165,55 @@ def _shed(
     return kept, surviving, True
 
 
+def _reporting_ranks(snapshot: ProjectSnapshot, session_ids: set[str]) -> dict[str, int]:
+    """Rank every node by its distance from the human, along real ledger links.
+
+    A session nobody delegated to answers to the operator, so it ranks 0.  A
+    delegation ranks one below the session that requested it, the child session
+    it opened ranks below that, and so on down the tree.  Work hangs off the
+    session that owns it.  This is the organisation chart the ledger already
+    contains; nothing here is inferred.
+    """
+
+    ranks: dict[str, int] = {}
+    delegations = snapshot.delegations
+
+    # A session is delegated-to when some delegation opened it as its child.
+    delegated_sessions = {
+        str(record.get("child_session_id"))
+        for record in delegations.values()
+        if record.get("child_session_id")
+    }
+    for session_id in session_ids:
+        if session_id not in delegated_sessions:
+            ranks[session_id] = 0
+
+    # Walk the delegation tree outward from the sessions that answer to a human.
+    # Bounded by the node count: every pass must settle at least one node or the
+    # remainder is unreachable and keeps its fallback band.
+    for _ in range(len(delegations) + 1):
+        settled = False
+        for identifier, record in delegations.items():
+            if identifier in ranks:
+                continue
+            requester = str(record.get("parent_session_id", ""))
+            if requester in ranks:
+                ranks[identifier] = ranks[requester] + 1
+                child = str(record.get("child_session_id", ""))
+                if child:
+                    ranks[child] = ranks[identifier] + 1
+                settled = True
+        if not settled:
+            break
+
+    # Work sits one level below whoever owns it; unowned work stays at the top,
+    # where an operator can see that nobody has picked it up.
+    for identifier, record in snapshot.tasks.items():
+        owner = str(record.get("owner_session_id", ""))
+        ranks[identifier] = ranks.get(owner, 0) + 1 if owner in ranks else 0
+    return ranks
+
+
 def build_graph(
     snapshot: ProjectSnapshot,
     *,
@@ -161,23 +227,26 @@ def build_graph(
 ) -> dict[str, Any]:
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
+    session_ids = {str(session.get("session_id", "")) for session in sessions}
+    session_ids.discard("")
+    ranks = _reporting_ranks(snapshot, session_ids)
 
     for identifier, record in sorted(snapshot.objectives.items()):
-        nodes.append(_node("objective", identifier, record))
+        nodes.append(_node("objective", identifier, record, ranks.get(identifier)))
     for session in sessions:
         identifier = str(session.get("session_id", ""))
         if identifier:
-            nodes.append(_node("session", identifier, session))
+            nodes.append(_node("session", identifier, session, ranks.get(identifier)))
     for identifier, record in sorted(snapshot.tasks.items()):
-        nodes.append(_node("task", identifier, record))
+        nodes.append(_node("task", identifier, record, ranks.get(identifier)))
     for identifier, record in sorted(snapshot.artifacts.items()):
-        nodes.append(_node("artifact", identifier, record))
+        nodes.append(_node("artifact", identifier, record, ranks.get(identifier)))
     for identifier, record in sorted(snapshot.delegations.items()):
-        nodes.append(_node("delegation", identifier, record))
+        nodes.append(_node("delegation", identifier, record, ranks.get(identifier)))
     for identifier, record in sorted(snapshot.reviews.items()):
-        nodes.append(_node("review", identifier, record))
+        nodes.append(_node("review", identifier, record, ranks.get(identifier)))
     for identifier, record in sorted(snapshot.verifications.items()):
-        nodes.append(_node("verification", identifier, record))
+        nodes.append(_node("verification", identifier, record, ranks.get(identifier)))
 
     known = {node["id"] for node in nodes}
 

@@ -319,12 +319,6 @@ class CommonsPaths:
         return self.state_root / "index.sqlite3"
 
     @property
-    def orchestrator_db(self) -> Path:
-        """Disposable run-observability projection; never a source of truth."""
-
-        return self.state_root / "orchestrator.sqlite3"
-
-    @property
     def owner_marker(self) -> Path:
         return self.state_root / STATE_OWNER_FILENAME
 

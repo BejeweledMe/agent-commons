@@ -194,3 +194,61 @@ def test_a_populated_workspace_serves_a_graph_over_http(populated, client) -> No
     kinds = {node["kind"] for node in payload["nodes"]}
     assert "session" in kinds
     assert "task" in kinds
+
+
+def test_bands_are_a_chain_of_command_not_a_kind_grouping() -> None:
+    """Grouping by record kind put every session in one row and showed no
+    hierarchy at all.  A band is now distance from the operator, walked along
+    real ledger links: an undelegated session answers to the human, a delegation
+    sits under the session that requested it, and its child session under that.
+    """
+
+    snapshot = ProjectSnapshot(
+        tasks={"task.1": {"state": "active", "title": "Work", "owner_session_id": "session.b"}},
+        delegations={
+            "delegation.1": {
+                "state": "active",
+                "target_profile": "claude-builder",
+                "parent_session_id": "session.a",
+                "child_session_id": "session.b",
+            }
+        },
+    )
+    sessions = [{"session_id": "session.a"}, {"session_id": "session.b"}]
+    graph = graph_of(snapshot, sessions=sessions)
+    bands = {node["id"]: node["band"] for node in graph["nodes"]}
+
+    assert bands["session.a"] == 0, "nobody delegated to it, so it answers to the operator"
+    assert bands["delegation.1"] == 1
+    assert bands["session.b"] == 2, "the child session is one step further from the human"
+    assert bands["task.1"] == 3, "work hangs off the session that owns it"
+
+    top = {node["id"] for node in graph["nodes"] if node["reports_to_operator"]}
+    assert top == {"session.a"}
+
+
+def test_unowned_work_stays_at_the_top_where_it_is_visible() -> None:
+    snapshot = ProjectSnapshot(tasks={"task.1": {"state": "ready", "title": "Nobody took it"}})
+    graph = graph_of(snapshot)
+    assert graph["nodes"][0]["band"] == 0
+
+
+def test_edges_declare_whether_a_relationship_is_standing_or_one_off() -> None:
+    """Reporting lines are standing structure; a review is one exchange bound to
+    a revision.  The projection carries the distinction so the frontend does not
+    have to infer it from a list of edge kinds."""
+
+    snapshot = ProjectSnapshot(
+        tasks={"task.1": {"state": "review", "title": "T", "owner_session_id": "session.a"}},
+        reviews={
+            "review.1": {
+                "verdict": "approved",
+                "target_ref": {"kind": "task", "id": "task.1"},
+                "target_revision": "evt.1",
+            }
+        },
+    )
+    graph = graph_of(snapshot, sessions=[{"session_id": "session.a"}])
+    relations = {edge["kind"]: edge["relation"] for edge in graph["edges"]}
+    assert relations["owns"] == "permanent"
+    assert relations["reviews"] == "temporary"

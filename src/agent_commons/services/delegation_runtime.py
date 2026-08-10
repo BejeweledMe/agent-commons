@@ -238,6 +238,17 @@ def profile_summaries(
                         else "trusted-workspace-opt-in-required"
                     )
                 ),
+                # One `trusted_workspace` opt-in means different things per
+                # provider: Codex runs under an OS sandbox, Claude has no
+                # OS-enforced boundary and keeps shell and file-write tools.
+                # An operator deciding who gets a writable profile needs to see
+                # that at the point of choosing, not in a threat model.
+                "os_enforced_sandbox": profile.provider is Provider.CODEX,
+                "isolation_note": (
+                    "operating-system sandbox enforced by the provider"
+                    if profile.provider is Provider.CODEX
+                    else "no operating-system boundary; external isolation is the only one"
+                ),
                 "supported_budget_units": (
                     ["micro_usd", "provider_units"]
                     if profile.supports_budget
