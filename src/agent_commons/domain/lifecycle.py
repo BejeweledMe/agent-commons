@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from agent_commons.domain.agents import (
@@ -9,6 +9,7 @@ from agent_commons.domain.agents import (
     PROFILE_NARROWING,
     effective_grants,
     grant_level,
+    lineage,
     principals,
     retirement_blockers,
     session_agent_map,
@@ -119,6 +120,7 @@ def validate_transition(
     payload: Mapping[str, Any],
     *,
     actor_session_id: str,
+    relations: Sequence[Mapping[str, Any]] = (),
 ) -> None:
     if event_type.endswith(".created") or event_type in {
         "thread.opened",
@@ -140,6 +142,7 @@ def validate_transition(
             event_type,
             payload,
             actor_session_id=actor_session_id,
+            relations=relations,
         )
         return
 
@@ -341,6 +344,7 @@ def _validate_creation(
     payload: Mapping[str, Any],
     *,
     actor_session_id: str,
+    relations: Sequence[Mapping[str, Any]] = (),
 ) -> None:
     created_kind = {
         "objective.created": "objective",
@@ -392,6 +396,7 @@ def _validate_creation(
             require_entity(snapshot, "task", str(dependency))
     if event_type == "delegation.requested":
         _validate_delegation_request(snapshot, payload, actor_session_id=actor_session_id)
+        _validate_role_binding(snapshot, payload, relations, actor_session_id=actor_session_id)
     if event_type == "agent.created":
         _validate_agent_creation(snapshot, payload, actor_session_id=actor_session_id)
     if event_type == "agent.link_opened":
@@ -836,6 +841,61 @@ def _delegation_allows_verification(
         and review.get("target_revision") == target_revision
         for review in snapshot.reviews.values()
     )
+
+
+def _validate_role_binding(
+    snapshot: ProjectSnapshot,
+    payload: Mapping[str, Any],
+    relations: Sequence[Mapping[str, Any]],
+    *,
+    actor_session_id: str,
+) -> None:
+    """Who may put a run under a standing role.
+
+    Acting for a role *is* holding its authority: a session bound to a role
+    receives that role's effective grants and its staff-changing tools.  Without
+    this check anyone able to open a delegation could name any role and hand a
+    session of their choosing everything that role may do.
+
+    The rule mirrors retirement.  A human window -- one running as no role --
+    may staff any active role, because that is the ordinary way work starts and
+    every local session is equally trusted in MVP-0 anyway.  A session already
+    running as a role may staff only itself or a role below it in its own
+    lineage.  Widening that is exactly what a temporary link is for.
+    """
+
+    delegation_id = str(payload.get("delegation_id", ""))
+    agent_id = ""
+    for relation in relations:
+        subject = relation.get("subject")
+        target = relation.get("object")
+        if (
+            relation.get("predicate") == "on_behalf_of"
+            and isinstance(subject, Mapping)
+            and isinstance(target, Mapping)
+            and subject.get("id") == delegation_id
+            and target.get("kind") == "agent"
+        ):
+            agent_id = str(target.get("id", ""))
+    if not agent_id:
+        return
+
+    role = require_entity(snapshot, "agent", agent_id)
+    if role.get("state") != "active":
+        raise LifecycleConflictError(f"a retired role cannot take new work: {agent_id}")
+    if role.get("template"):
+        raise LifecycleConflictError("a role preset is a template and is never employed")
+    if role.get("profile_id") != payload.get("target_profile"):
+        raise LifecycleConflictError(
+            "a delegation on behalf of a role must use that role's profile"
+        )
+    acting = acting_agent_id(snapshot, actor_session_id)
+    if acting is None or acting == agent_id:
+        return
+    if acting not in {str(record["id"]) for record in lineage(snapshot.agents, agent_id)}:
+        raise LifecycleConflictError(
+            f"role {acting} may staff only itself or a role it created, not {agent_id}"
+        )
 
 
 def _validate_delegation_request(

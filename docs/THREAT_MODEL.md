@@ -160,6 +160,27 @@ Residual: this is coordination, not authentication. A process running as the
 same operating-system user can write agent events directly. The mechanisms bound
 what the protocol does, not what the filesystem allows.
 
+### Acting for a role without being entitled to
+
+Acting for a role *is* holding its authority: a session bound to one receives
+that role's effective grants and its staff-changing tools. Naming a role on a
+delegation is therefore a privileged operation, and until it was checked, any
+session able to open a delegation could name the most privileged role in the
+workspace and hand a session of its choosing everything that role may do.
+
+A session running as no role — a human window — may staff any active role,
+because that is the ordinary way work starts and every local session is equally
+trusted in MVP-0 regardless. A session already running as a role may staff only
+itself or a role below it in its own lineage. The check lives in the domain
+lifecycle and reads the run/role relation off the event envelope, so replay
+revalidates it rather than trusting that the write path checked once.
+
+The narrower reach this closed was not live: worker profiles receive no
+delegation-creation tools, and a caller with direct manager access already holds
+the state root, which is a standing residual risk. It is checked anyway, because
+the check did not exist at all and would have become live the moment any profile
+gained delegation creation.
+
 ### Role settings widening a worker's authority
 
 An agent could try to reach new capability by naming a tool or a model on a

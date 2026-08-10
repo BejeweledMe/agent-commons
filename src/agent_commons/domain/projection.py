@@ -790,6 +790,10 @@ def _project_events_once(
                 event_type,
                 payload,
                 actor_session_id=str((event.get("actor") or {}).get("session_id", "")),
+                # Relations carry the run/role binding, so replay revalidates
+                # who was allowed to staff that role rather than trusting that
+                # the write path checked it once.
+                relations=event.get("relations") or (),
             )
             _apply_effective_event(snapshot, event)
             snapshot.effective_event_revisions[event_id] = str(

@@ -60,6 +60,13 @@ Versioning once a stable release line is declared.
   `POST /api/agents/proposals/{thread_id}/approve` and a Proposals tab in the
   panel. An open proposal rings its role on the graph like any other blocker
   waiting on a person.
+- **Naming a role on a delegation is now an authorized operation.** Acting for a
+  role means holding its effective grants and its staff-changing tools, and that
+  binding was unchecked: any session able to open a delegation could name the
+  most privileged role and hand a session of its choosing everything it may do.
+  A human window may still staff any active role; a session already running as a
+  role may staff only itself or a role below it in its own lineage. Checked in
+  the domain lifecycle against the event relation, so replay revalidates it.
 - The operator catalogue is editable from the panel as a form, not a YAML box,
   behind its own gate: `agent-commons ui --enable-catalog-editing` additionally
   requires `--role-catalog`. It is separate from `--enable-writes` because

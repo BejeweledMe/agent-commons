@@ -969,6 +969,7 @@ class CommonsManager:
                     event_type,
                     payload_value,
                     actor_session_id=session.session_id,
+                    relations=normalized_relations,
                 )
                 self._enforce_workspace_policy(
                     snapshot,
@@ -1485,18 +1486,8 @@ class CommonsManager:
             # Which standing role this run acts for.  Carried as a relation
             # rather than a payload field so the delegation schema -- and every
             # delegation event already in every workspace -- stays readable by
-            # the previous binary.
-            role = require_entity(snapshot, "agent", on_behalf_of_agent_id)
-            if role.get("state") != "active":
-                raise LifecycleConflictError(
-                    f"a retired role cannot take new work: {on_behalf_of_agent_id}"
-                )
-            if role.get("template"):
-                raise LifecycleConflictError("a role preset is a template and is never employed")
-            if role.get("profile_id") != target_profile:
-                raise LifecycleConflictError(
-                    "a delegation on behalf of a role must use that role's profile"
-                )
+            # the previous binary.  Whether this caller *may* name that role is
+            # decided by the lifecycle, on the same path replay takes.
             relations.append(
                 self._relation(
                     subject,

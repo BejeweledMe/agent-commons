@@ -60,7 +60,7 @@ def _bind_run(
     profile: str,
     purpose: str,
     key: str,
-) -> None:
+) -> dict[str, Any]:
     """Put `worker`'s session under `agent_id` for the rest of the test."""
 
     operator: CommonsManager = workspace["operator"]
@@ -79,6 +79,7 @@ def _bind_run(
         child_session_id=str(worker.session_id),
         idempotency_key=f"{key}-start",
     )
+    return delegation
 
 
 def test_one_role_cannot_approve_the_task_it_authored_in_an_earlier_session(
@@ -360,3 +361,108 @@ def test_acceptance_refuses_a_review_from_the_role_that_did_the_work(
             summary="accepting a review from the authoring role",
             idempotency_key="accept-task-accept",
         )
+
+
+def test_a_role_cannot_staff_a_run_with_a_role_it_did_not_create(
+    workspace: dict[str, Any],
+) -> None:
+    """Acting for a role is holding its authority, so naming one is a privilege.
+
+    Without this, any session able to open a delegation could name the most
+    privileged role in the workspace and hand a session of its choosing
+    everything that role may do.
+    """
+
+    operator: CommonsManager = workspace["operator"]
+    privileged = operator.create_agent(
+        name="Tech lead",
+        profile_id="claude-builder",
+        rationale="high authority",
+        grants={"create_roles": "auto", "retire_roles": "auto", "open_links": "auto"},
+        turnover_budget=8,
+        idempotency_key="staff-privileged",
+    )
+    modest = operator.create_agent(
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="ordinary authority",
+        idempotency_key="staff-modest",
+    )
+    worker = _open(workspace["repo"], workspace["state_root"], name="worker", role="builder")
+    task = worker.create_task(
+        title="Ordinary work",
+        description="run for the modest role",
+        acceptance_criteria=("done",),
+        idempotency_key="staff-task",
+    )
+    parent = _bind_run(
+        workspace,
+        agent_id=modest["entity_ref"]["id"],
+        worker=worker,
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        profile="claude-builder",
+        purpose="implementation",
+        key="staff-modest-run",
+    )
+
+    # The worker now acts as the modest role and, from inside its own lineage,
+    # reaches for the privileged one.
+    follow_on = worker.create_task(
+        title="Follow-on work",
+        description="the target of the reach",
+        acceptance_criteria=("done",),
+        idempotency_key="staff-follow-task",
+    )
+    with pytest.raises(LifecycleConflictError, match="may staff only itself or a role it created"):
+        worker.create_delegation(
+            target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
+            target_revision=follow_on["revision"],
+            target_profile="claude-builder",
+            purpose="implementation",
+            limits=LIMITS,
+            parent_delegation_id=parent["entity_ref"]["id"],
+            on_behalf_of_agent_id=privileged["entity_ref"]["id"],
+            idempotency_key="staff-reach",
+        )
+
+    # Its own role is still fine, which is what keeps multi-step work possible.
+    allowed = worker.create_delegation(
+        target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
+        target_revision=follow_on["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        parent_delegation_id=parent["entity_ref"]["id"],
+        on_behalf_of_agent_id=modest["entity_ref"]["id"],
+        idempotency_key="staff-own",
+    )
+    assert allowed["event_type"] == "delegation.requested"
+
+
+def test_a_human_window_may_still_staff_any_active_role(workspace: dict[str, Any]) -> None:
+    """The ordinary way work starts must keep working."""
+
+    operator: CommonsManager = workspace["operator"]
+    role = operator.create_agent(
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="staffed by a person",
+        idempotency_key="staff-human",
+    )
+    task = operator.create_task(
+        title="Work",
+        description="staffed from a human window",
+        acceptance_criteria=("done",),
+        idempotency_key="staff-human-task",
+    )
+    created = operator.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="staff-human-delegation",
+    )
+    assert created["event_type"] == "delegation.requested"
