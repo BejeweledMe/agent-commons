@@ -91,6 +91,36 @@ def client(context: UIContext):  # type: ignore[no-untyped-def]
         yield test_client
 
 
+@pytest.fixture
+def writable(workspace: dict[str, Any]) -> UIContext:
+    """A UI opened for writes, bound to a real operator session."""
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="ui-writer-window-1234",
+        principal="local-operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    return UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(session["session_id"]),
+    )
+
+
+@pytest.fixture
+def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
+    from fastapi.testclient import TestClient
+
+    from agent_commons.ui.server import create_app
+
+    app = create_app(writable, token="test-token", port=PORT)
+    with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
+        yield test_client
+
+
 def authorized() -> dict[str, str]:
     return {"Authorization": "Bearer test-token"}
 

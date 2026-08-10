@@ -325,12 +325,29 @@ def init_command(
     help="Loopback port; 0 selects an ephemeral port.",
 )
 @click.option("--no-browser", is_flag=True, help="Do not open a browser automatically.")
+@click.option(
+    "--enable-writes",
+    is_flag=True,
+    help="Allow the role panel to record canonical events under the active session.",
+)
+@click.option(
+    "--role-catalog",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Operator-owned catalogue of selectable skills, MCP servers, and tools.",
+)
 @click.pass_obj
-def ui_command(state: CLIState, port: int, no_browser: bool) -> None:
-    """Serve a read-only local view of this workspace on loopback.
+def ui_command(
+    state: CLIState,
+    port: int,
+    no_browser: bool,
+    enable_writes: bool,
+    role_catalog: Path | None,
+) -> None:
+    """Serve a local view of this workspace on loopback; read-only by default.
 
-    The server never records a canonical event.  It binds 127.0.0.1 only; there
-    is deliberately no --host flag.
+    With --enable-writes the role panel records through the same
+    ``CommonsManager`` the CLI and MCP adapter use.  There is no second write
+    path.  It binds 127.0.0.1 only; there is deliberately no --host flag.
     """
 
     try:
@@ -339,11 +356,26 @@ def ui_command(state: CLIState, port: int, no_browser: bool) -> None:
     except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
         raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
 
+    writer_session_id = None
+    if enable_writes:
+        # Writes need the operator's own session, resolved and checked exactly
+        # as the CLI resolves it, so the UI cannot record under a nameless actor.
+        # Refuse here rather than at the first POST: the failure belongs where
+        # the operator is still watching, not in a browser tab an hour later.
+        if state.session_id is None:
+            error = ValidationError("--enable-writes requires an explicitly selected session")
+            error.code = "session_not_selected"  # type: ignore[attr-defined]
+            error.details = {"selection": "AGENT_COMMONS_SESSION_ID or --session-id"}  # type: ignore[attr-defined]
+            raise error
+        writer_session_id = str(state.manager().show_session(state.session_id)["session_id"])
+
     context = UIContext(
         state.repo,
         state_root=state.state_root,
         state_base=state.state_base,
         state_source=state.state_source,
+        writer_session_id=writer_session_id,
+        catalog_path=role_catalog,
     )
 
     def emit(bound_port: int, token: str) -> None:
@@ -356,14 +388,21 @@ def ui_command(state: CLIState, port: int, no_browser: bool) -> None:
                     "port": bound_port,
                     "token": token,
                     "repo": str(state.repo),
-                    "read_only": True,
+                    "read_only": not enable_writes,
+                    "writer_session_id": writer_session_id,
                 }
             )
             return
-        click.echo("Agent Commons UI — read-only")
+        click.echo(
+            "Agent Commons UI — read-only" if not enable_writes else "Agent Commons UI — writable"
+        )
         click.echo(f"  url     {url}")
         click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
-        click.echo("  writes  disabled — this server records no canonical event")
+        if enable_writes:
+            click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
+            click.echo("          anyone holding this token writes as that session")
+        else:
+            click.echo("  writes  disabled — this server records no canonical event")
         click.echo("  trust   loopback reachability alone is not authentication")
         click.echo("  note    the token is not stored on disk; opening a browser exposes")
         click.echo("          the URL to other processes of this user via the process list")

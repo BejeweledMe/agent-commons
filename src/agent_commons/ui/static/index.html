@@ -57,6 +57,11 @@ footer{
 }
 .node rect{fill:var(--surface); stroke:var(--border); stroke-width:1.5}
 .node.stale rect{stroke-dasharray:5 3}
+/* A node nobody but the human can unblock.  On the graph itself, because the
+   whole point is not having to open a list to find out what is stuck. */
+.node.awaits rect{stroke:var(--warn); stroke-width:3}
+.node.awaits text.meta{fill:var(--warn)}
+.node.role rect{fill:var(--surface-2)}
 .node text{fill:var(--fg); font-size:11px}
 .node text.meta{fill:var(--muted); font-size:10px}
 .node.sel rect{stroke:var(--info); stroke-width:2.5}
@@ -76,8 +81,25 @@ button{
 button:hover{border-color:var(--info)}
 button:focus-visible{outline:2px solid var(--info); outline-offset:2px}
 button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
-.actions{display:flex; gap:8px; align-items:center; margin:0 0 10px}
+.actions{display:flex; gap:8px; align-items:center; margin:0 0 10px; flex-wrap:wrap}
 .pill.focus{color:var(--info); border-color:var(--info)}
+.pill.blocked{color:var(--warn); border-color:var(--warn)}
+.tabs{display:flex; gap:6px; margin:0 0 10px}
+.tabs button[aria-selected="true"]{border-color:var(--info); color:var(--info)}
+.panel{display:none}
+.panel.open{display:block}
+.field{display:block; margin:0 0 8px}
+.field span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px}
+.field input,.field select,.field textarea{
+  width:100%; font:12px/1.4 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
+  background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:6px;
+}
+.field textarea{min-height:96px; resize:vertical}
+.note{font-size:11px; color:var(--muted); margin:8px 0}
+.note.warn{color:var(--warn)}
+.result{font-size:11px; margin:8px 0 0; word-break:break-word}
+.result.ok{color:var(--ok)} .result.bad{color:var(--bad)}
+.grants{display:grid; grid-template-columns:1fr 1fr; gap:6px}
 .band-label{fill:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em}
 .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .info{fill:var(--info)}
 .muted{fill:var(--muted)}
@@ -99,8 +121,61 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="actions">
       <button type="button" id="focus-toggle" aria-pressed="false">Isolate connections</button>
       <span class="pill" id="focus-count"></span>
+      <span class="pill blocked" id="blocked-pill" hidden>waiting on you</span>
     </div>
-    <pre id="inspector-body"></pre>
+    <div class="tabs" id="tabs">
+      <button type="button" data-panel="record" aria-selected="true">Record</button>
+      <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
+      <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
+    </div>
+
+    <section class="panel open" id="panel-record">
+      <pre id="inspector-body"></pre>
+    </section>
+
+    <section class="panel" id="panel-message">
+      <p class="note" id="message-note"></p>
+      <label class="field"><span>Subject (new thread only)</span>
+        <input type="text" id="message-subject" autocomplete="off"></label>
+      <label class="field"><span>Message to this role</span>
+        <textarea id="message-body"></textarea></label>
+      <button type="button" id="message-send">Send</button>
+      <p class="result" id="message-result"></p>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <p class="note" id="settings-note"></p>
+      <div class="grants">
+        <label class="field"><span>Create roles</span>
+          <select id="grant-create_roles"></select></label>
+        <label class="field"><span>Retire roles</span>
+          <select id="grant-retire_roles"></select></label>
+        <label class="field"><span>Open links</span>
+          <select id="grant-open_links"></select></label>
+        <label class="field"><span>Context</span>
+          <select id="setting-context_mode"></select></label>
+      </div>
+      <label class="field"><span>Display name</span>
+        <input type="text" id="setting-name" autocomplete="off"></label>
+      <label class="field"><span>Required skills (operator catalogue)</span>
+        <select id="setting-skills" multiple size="4"></select></label>
+      <label class="field"><span>MCP servers (narrows the profile, never widens)</span>
+        <select id="setting-mcp" multiple size="4"></select></label>
+      <label class="field"><span>Tools (narrows the profile, never widens)</span>
+        <select id="setting-tools" multiple size="4"></select></label>
+      <label class="field"><span>Reason for this change</span>
+        <input type="text" id="setting-reason" autocomplete="off"></label>
+      <label class="field" id="downgrade-field" hidden>
+        <span>Weakening isolation — recorded reason (needs agent:isolation_downgrade)</span>
+        <input type="text" id="setting-downgrade" autocomplete="off"></label>
+      <div class="actions">
+        <button type="button" id="settings-save">Save</button>
+        <button type="button" id="settings-retire">Retire…</button>
+        <button type="button" id="settings-retire-cascade">Retire with everything it created…</button>
+      </div>
+      <p class="result" id="settings-result"></p>
+      <p class="note" id="settings-model"></p>
+    </section>
   </aside>
 </main>
 <footer>
@@ -123,6 +198,20 @@ function authHeaders(extra) {
   const headers = Object.assign({ "Authorization": "Bearer " + TOKEN }, extra || {});
   return headers;
 }
+async function post(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // Refusals name the guard they tripped; that string is the useful part.
+    throw new Error((payload.error && payload.error.message) || ("request " + response.status));
+  }
+  return payload;
+}
+
 async function api(path) {
   const response = await fetch(path, { headers: authHeaders() });
   if (!response.ok) { throw new Error("request failed: " + response.status); }
@@ -305,6 +394,8 @@ function render(graph) {
       if (!focus.nodes.has(node.id)) { nodeClass += " faded"; }
       else if (node.id !== focused) { nodeClass += " neighbour"; }
     }
+    if (node.awaits_human) { nodeClass += " awaits"; }
+    if (node.kind === "agent") { nodeClass += " role"; }
     group.setAttribute("class", nodeClass);
     group.setAttribute("transform", "translate(" + position.x + "," + position.y + ")");
 
@@ -319,7 +410,9 @@ function render(graph) {
     content.setAttribute("clip-path", "url(#nodeclip)");
     content.appendChild(text(10, 18, glyph, tone));
     content.appendChild(text(26, 18, node.label || node.id, null));
-    content.appendChild(text(10, 34, node.kind + " · " + stateLabel(node), "meta"));
+    const line = node.kind + " · " + stateLabel(node) +
+      (node.awaits_human ? "  ⏳ waiting on you" : "");
+    content.appendChild(text(10, 34, line, "meta"));
     content.appendChild(text(10, 50, node.stale ? node.id + "  ▨ stale" : node.id, "meta"));
     group.appendChild(content);
 
@@ -375,6 +468,89 @@ canvas.addEventListener("click", (event) => {
   if (event.target === canvas && !suppressClick && focused) { setFocus(null); }
 });
 
+// --- role panel -----------------------------------------------------------
+// Everything below writes agent-supplied text with textContent or as an option
+// value; nothing reaches the DOM as markup.
+
+let writesEnabled = false;
+let catalog = null;
+let currentRole = null;
+
+function showPanel(name) {
+  for (const button of document.querySelectorAll("#tabs button")) {
+    const active = button.dataset.panel === name;
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    document.getElementById("panel-" + button.dataset.panel)
+      .classList.toggle("open", active);
+  }
+}
+
+document.getElementById("tabs").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (button && !button.hidden) { showPanel(button.dataset.panel); }
+});
+
+function fillSelect(element, values, selected, multiple) {
+  while (element.firstChild) { element.removeChild(element.firstChild); }
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = typeof value === "string" ? value : value.id;
+    option.textContent = typeof value === "string" ? value : (value.title || value.id);
+    if (multiple) { option.selected = (selected || []).indexOf(option.value) >= 0; }
+    else if (option.value === selected) { option.selected = true; }
+    element.appendChild(option);
+  }
+}
+
+function selectedValues(element) {
+  return Array.from(element.selectedOptions).map((option) => option.value);
+}
+
+function paintSettings(record) {
+  const levels = (catalog && catalog.grant_levels) || ["deny", "ask", "auto"];
+  const grants = record.effective_grants || record.grants || {};
+  for (const name of ["create_roles", "retire_roles", "open_links"]) {
+    fillSelect(document.getElementById("grant-" + name), levels, grants[name] || "deny", false);
+  }
+  fillSelect(
+    document.getElementById("setting-context_mode"),
+    (catalog && catalog.context_modes) || ["fresh", "accumulated"],
+    record.context_mode || "fresh",
+    false
+  );
+  document.getElementById("setting-name").value = record.name || "";
+  fillSelect(document.getElementById("setting-skills"),
+    (catalog && catalog.skills) || [], record.skills || [], true);
+  fillSelect(document.getElementById("setting-mcp"),
+    (catalog && catalog.mcp_servers) || [], record.mcp_allowlist || [], true);
+  fillSelect(document.getElementById("setting-tools"),
+    (catalog && catalog.tools) || [], record.tool_allowlist || [], true);
+  document.getElementById("setting-reason").value = "";
+  document.getElementById("setting-downgrade").value = "";
+  document.getElementById("downgrade-field").hidden = record.context_mode !== "fresh";
+  // The model is a property of the operator-owned profile, not of the role: a
+  // role that could name a model would be editing argv.
+  document.getElementById("settings-model").textContent =
+    "profile " + (record.profile_id || "—") +
+    " — the profile fixes the executable, model, sandbox, and tool set. " +
+    "Selections here can only narrow it. Catalogue entries are added by the " +
+    "operator outside this UI" +
+    (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
+  const note = document.getElementById("settings-note");
+  const blockers = record.retirement_blockers || [];
+  note.className = blockers.length ? "note warn" : "note";
+  note.textContent = blockers.length
+    ? "cannot be retired yet — " + blockers.join("; ")
+    : (record.origin === "agent"
+        ? "created by " + (record.created_by_agent_id || "another role") +
+          " · " + (record.approval || "") + " · " + (record.rationale || "")
+        : "created by a human · " + (record.rationale || ""));
+}
+
+async function loadCatalog() {
+  try { catalog = await api("/api/catalog"); } catch (error) { catalog = null; }
+}
+
 async function inspect(node) {
   const inspector = document.getElementById("inspector");
   const title = document.getElementById("inspector-title");
@@ -382,14 +558,119 @@ async function inspect(node) {
   inspector.classList.add("open");
   title.textContent = node.kind + " " + node.id;
   body.textContent = "loading…";
+  document.getElementById("blocked-pill").hidden = !node.awaits_human;
+
+  const isRole = node.kind === "agent";
+  const messageTab = document.querySelector('#tabs button[data-panel="message"]');
+  const settingsTab = document.querySelector('#tabs button[data-panel="settings"]');
+  messageTab.hidden = !(isRole && writesEnabled);
+  settingsTab.hidden = !(isRole && writesEnabled);
+  if (!isRole || !writesEnabled) { showPanel("record"); }
+  currentRole = null;
+  document.getElementById("message-result").textContent = "";
+  document.getElementById("settings-result").textContent = "";
+  document.getElementById("message-note").textContent = isRole
+    ? "You are writing to this role. Agents talk to each other through delegation; " +
+      "this channel carries human direction only."
+    : "";
+
   try {
     const payload = await api("/api/entities/" + encodeURIComponent(node.kind) + "/" +
       encodeURIComponent(node.id));
     body.textContent = JSON.stringify(payload.record, null, 2);
+    if (isRole) {
+      currentRole = payload.record;
+      if (writesEnabled) { paintSettings(payload.record); }
+    }
   } catch (error) {
     body.textContent = String(error);
   }
 }
+
+document.getElementById("message-send").addEventListener("click", async () => {
+  const result = document.getElementById("message-result");
+  if (!currentRole) { return; }
+  const bodyText = document.getElementById("message-body").value;
+  try {
+    await post("/api/agents/" + encodeURIComponent(currentRole.id) + "/messages", {
+      body: bodyText,
+      subject: document.getElementById("message-subject").value || null,
+    });
+    document.getElementById("message-body").value = "";
+    result.className = "result ok";
+    result.textContent = "recorded as a canonical thread message";
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+});
+
+document.getElementById("setting-context_mode").addEventListener("change", (event) => {
+  const weakening = currentRole && currentRole.context_mode === "fresh" &&
+    event.target.value === "accumulated";
+  document.getElementById("downgrade-field").hidden = !weakening;
+});
+
+document.getElementById("settings-save").addEventListener("click", async () => {
+  const result = document.getElementById("settings-result");
+  if (!currentRole) { return; }
+  const changes = {
+    name: document.getElementById("setting-name").value,
+    context_mode: document.getElementById("setting-context_mode").value,
+    grants: {
+      create_roles: document.getElementById("grant-create_roles").value,
+      retire_roles: document.getElementById("grant-retire_roles").value,
+      open_links: document.getElementById("grant-open_links").value,
+    },
+    skills: selectedValues(document.getElementById("setting-skills")),
+    mcp_allowlist: selectedValues(document.getElementById("setting-mcp")),
+    tool_allowlist: selectedValues(document.getElementById("setting-tools")),
+  };
+  const downgrade = document.getElementById("setting-downgrade");
+  try {
+    await post("/api/agents/" + encodeURIComponent(currentRole.id) + "/reconfigure", {
+      expected_revision: currentRole.revision,
+      changes: changes,
+      reason: document.getElementById("setting-reason").value,
+      isolation_downgrade_reason:
+        document.getElementById("downgrade-field").hidden ? null : (downgrade.value || null),
+    });
+    result.className = "result ok";
+    result.textContent = "recorded";
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+});
+
+async function retire(cascade) {
+  const result = document.getElementById("settings-result");
+  if (!currentRole) { return; }
+  const reason = document.getElementById("setting-reason").value;
+  if (!reason) {
+    result.className = "result bad";
+    result.textContent = "a retirement needs a reason; it stays in the ledger forever";
+    return;
+  }
+  const question = cascade
+    ? "Retire this role and every role it created? Nothing is deleted; they stop taking work."
+    : "Retire this role? Nothing is deleted; it stops taking work.";
+  if (!window.confirm(question)) { return; }
+  try {
+    const payload = await post(
+      "/api/agents/" + encodeURIComponent(currentRole.id) + "/retire",
+      { reason: reason, cascade: cascade }
+    );
+    result.className = "result ok";
+    result.textContent = "retired " + payload.count + " role(s); history retained";
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById("settings-retire").addEventListener("click", () => retire(false));
+document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
 
 function paintChrome(graph) {
   const counts = [];
@@ -404,6 +685,10 @@ function paintChrome(graph) {
     "issues: " + issues + "   stale warnings: " + warnings;
   document.getElementById("truncation").textContent =
     graph.limits && graph.limits.truncated ? "graph truncated to fit display bounds" : "";
+  const waiting = (graph.awaiting_human || []).length;
+  if (waiting) {
+    document.getElementById("issues").textContent += "   waiting on you: " + waiting;
+  }
   if (graph.workspace_id) {
     document.getElementById("workspace").textContent = graph.workspace_id;
   }
@@ -517,6 +802,11 @@ async function boot() {
   try {
     const meta = await api("/api/meta");
     document.getElementById("workspace").textContent = meta.workspace_id;
+    writesEnabled = Boolean(meta.writes_enabled);
+    document.getElementById("writes").textContent = writesEnabled
+      ? "writes enabled as " + meta.writer_session_id
+      : "writes disabled";
+    if (writesEnabled) { await loadCatalog(); }
     document.getElementById("layers").textContent =
       meta.truth_layers.join(" › ") + " — " + meta.trust_note +
       ". No prompts, transcripts, or tool arguments are retained by design.";

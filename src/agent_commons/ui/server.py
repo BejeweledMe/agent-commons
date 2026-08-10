@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from agent_commons.errors import CommonsError
 from agent_commons.ui import ENTITY_SCHEMA, read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.security import (
@@ -44,7 +45,20 @@ _ENTITY_KINDS = frozenset(
         "handoff",
         "delegation",
         "session",
+        "agent",
+        "agent_link",
     }
+)
+
+#: The complete mutating surface, named once so a route cannot be added without
+#: the invariant test noticing.  Every one of these is a thin adapter over a
+#: `CommonsManager` method; the UI is a third adapter beside the CLI and MCP,
+#: not a second write path.
+MUTATING_ROUTES = (
+    ("POST", "/api/agents"),
+    ("POST", "/api/agents/{agent_id}/reconfigure"),
+    ("POST", "/api/agents/{agent_id}/retire"),
+    ("POST", "/api/agents/{agent_id}/messages"),
 )
 
 _HEARTBEAT_SECONDS = 15.0
@@ -146,6 +160,13 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             }
         )
 
+    @app.get("/api/catalog")
+    async def catalog() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.catalog))
+
+    if context.writes_enabled:
+        _register_writes(app, context)
+
     @app.get("/api/stream")
     async def stream(request: Request) -> Response:
         last_event_id = request.headers.get("last-event-id")
@@ -156,6 +177,88 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         )
 
     return app
+
+
+def _register_writes(app: FastAPI, context: UIContext) -> None:
+    """Attach the mutating surface. Every handler ends in ``CommonsManager``."""
+
+    async def _record(action: Callable[..., Any], **kwargs: Any) -> Response:
+        try:
+            result = await asyncio.to_thread(action, **kwargs)
+        except CommonsError as exc:
+            # Refusals are the interesting output here: the guard that fired is
+            # what the operator needs on the node, not a generic failure.
+            return _error(409, type(exc).__name__, str(exc))
+        except (TypeError, ValueError, KeyError) as exc:
+            return _error(400, "invalid_request", str(exc))
+        context.invalidate()
+        return JSONResponse(result)
+
+    async def _body(request: Request) -> dict[str, Any]:
+        try:
+            value = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    @app.post("/api/agents")
+    async def create_agent(request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.create_agent,
+            name=str(body.get("name", "")),
+            profile_id=str(body.get("profile_id", "")),
+            rationale=str(body.get("rationale", "")),
+            context_mode=str(body.get("context_mode", "fresh")),
+            grants=body.get("grants"),
+            turnover_budget=body.get("turnover_budget"),
+            lifetime=body.get("lifetime"),
+            skills=tuple(body.get("skills") or ()),
+            tool_allowlist=tuple(body.get("tool_allowlist") or ()),
+            mcp_allowlist=tuple(body.get("mcp_allowlist") or ()),
+            template=bool(body.get("template", False)),
+            created_by_agent_id=body.get("created_by_agent_id"),
+            from_preset_id=body.get("from_preset_id"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agents/{agent_id}/reconfigure")
+    async def reconfigure_agent(agent_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.reconfigure_agent,
+            agent_id=agent_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            changes=body.get("changes") or {},
+            reason=str(body.get("reason", "")),
+            isolation_downgrade_reason=body.get("isolation_downgrade_reason"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agents/{agent_id}/retire")
+    async def retire_agent(agent_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.retire_agent,
+            agent_id=agent_id,
+            expected_revision=body.get("expected_revision"),
+            reason=str(body.get("reason", "")),
+            cascade=bool(body.get("cascade", False)),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agents/{agent_id}/messages")
+    async def message_agent(agent_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.message_agent,
+            agent_id=agent_id,
+            body_text=str(body.get("body", "")),
+            subject=body.get("subject"),
+            thread_id=body.get("thread_id"),
+            expected_revision=body.get("expected_revision"),
+            idempotency_key=body.get("idempotency_key"),
+        )
 
 
 async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterator[bytes]:

@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from agent_commons.domain.agents import effective_grants, session_agent_map
 from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.ui import GRAPH_SCHEMA
 from agent_commons.views import truncate_utf8
@@ -27,23 +28,39 @@ _LABEL_BYTES = 120
 #: 300 unrelated nodes in one row and showed no hierarchy at all.
 _BANDS = {
     "objective": 0,
+    "agent": 1,
     "session": 1,
     "task": 2,
     "artifact": 2,
     "delegation": 3,
     "review": 4,
     "verification": 4,
+    "agent_link": 4,
 }
 
 #: A permanent edge is standing structure: who reports to whom, who owns what.
 #: A temporary edge is one exchange bound to a single attempt.  The distinction
 #: is real in the ledger, not a visual convention, so the projection carries it
 #: rather than leaving the frontend to guess from edge kinds.
-_PERMANENT_EDGES = frozenset({"spawned", "requested_by", "runs_as", "owns", "depends_on"})
+_PERMANENT_EDGES = frozenset(
+    {"spawned", "requested_by", "runs_as", "owns", "depends_on", "reports_to"}
+)
 
 #: Nodes are dropped in this order when the graph exceeds its bounds; terminal
 #: work is the least useful thing on screen when there is too much to draw.
-_SHED_ORDER = ("delegation", "task", "session", "review", "verification", "artifact", "objective")
+#: Roles are last: they are the standing structure the rest of the graph hangs
+#: off, so shedding one orphans everything below it.
+_SHED_ORDER = (
+    "delegation",
+    "task",
+    "session",
+    "review",
+    "verification",
+    "artifact",
+    "agent_link",
+    "objective",
+    "agent",
+)
 
 _TERMINAL_STATES = frozenset(
     {"succeeded", "failed", "cancelled", "timed_out", "accepted", "completed", "closed", "expired"}
@@ -86,6 +103,8 @@ def _node(
     identifier: str,
     record: Mapping[str, Any],
     rank: int | None = None,
+    *,
+    awaits_human: bool = False,
 ) -> dict[str, Any]:
     attrs: dict[str, Any] = {}
     for key in (
@@ -96,6 +115,13 @@ def _node(
         "priority",
         "client",
         "role_id",
+        "profile_id",
+        "origin",
+        "context_mode",
+        "template",
+        "agent_id",
+        "allowed_action",
+        "retired_by",
     ):
         value = record.get(key)
         if value is not None and isinstance(value, (str, int, float, bool)):
@@ -103,12 +129,22 @@ def _node(
     if kind == "objective":
         # The ledger has no objective->task link; say so instead of drawing one.
         attrs["attached"] = False
+    if kind == "agent":
+        grants = record.get("effective_grants")
+        if isinstance(grants, Mapping):
+            attrs["effective_grants"] = {
+                str(name): _clean(level) for name, level in sorted(grants.items())
+            }
     return {
         "id": identifier,
         "kind": kind,
         "label": _label(kind, record),
         "state": _state(kind, record),
         "stale": bool(record.get("stale") or record.get("artifact_stale")),
+        # A node the human has to answer before anything moves.  Carried on the
+        # node so a blocker is visible on the graph itself rather than only to
+        # someone who opened the right list.
+        "awaits_human": awaits_human,
         "revision": record.get("revision"),
         "effective_revision": record.get("effective_revision"),
         "recorded_at": record.get("recorded_at"),
@@ -165,6 +201,46 @@ def _shed(
     return kept, surviving, True
 
 
+#: Thread kinds that are an agent asking a human to decide something, rather
+#: than agents talking among themselves.
+_HUMAN_DECISION_THREADS = frozenset({"decision_request", "question", "help_request"})
+
+
+def blocked_on_human(snapshot: ProjectSnapshot) -> set[str]:
+    """Node identifiers waiting on a person, derived from real ledger state.
+
+    Two producers exist today and both are already wired: a delegation enters
+    `input_needed` when a worker asks for input, and an open decision-request
+    thread is a role addressing a human directly.  Nothing here is speculative;
+    a source with no producer would be a yellow ring that never lights.
+    """
+
+    blocked: set[str] = set()
+    for identifier, record in snapshot.delegations.items():
+        if record.get("state") != "input_needed":
+            continue
+        blocked.add(identifier)
+        agent_id = record.get("agent_id")
+        if agent_id:
+            blocked.add(str(agent_id))
+        session_id = record.get("child_session_id")
+        if session_id:
+            blocked.add(str(session_id))
+    for identifier, record in snapshot.threads.items():
+        if record.get("state") != "open":
+            continue
+        if str(record.get("thread_type", "")) not in _HUMAN_DECISION_THREADS:
+            continue
+        blocked.add(identifier)
+        session_id = str((record.get("actor") or {}).get("session_id", ""))
+        if session_id:
+            blocked.add(session_id)
+    bindings = session_agent_map(snapshot.delegations)
+    for session_id in list(blocked):
+        blocked.update(bindings.get(session_id, ()))
+    return blocked
+
+
 def _reporting_ranks(snapshot: ProjectSnapshot, session_ids: set[str]) -> dict[str, int]:
     """Rank every node by its distance from the human, along real ledger links.
 
@@ -177,6 +253,23 @@ def _reporting_ranks(snapshot: ProjectSnapshot, session_ids: set[str]) -> dict[s
 
     ranks: dict[str, int] = {}
     delegations = snapshot.delegations
+
+    # Standing roles are the chain of command itself: a role a human created
+    # answers to the human, and a role an agent created sits under its creator.
+    for _ in range(len(snapshot.agents) + 1):
+        settled = False
+        for identifier, record in snapshot.agents.items():
+            if identifier in ranks:
+                continue
+            creator = record.get("created_by_agent_id")
+            if not creator:
+                ranks[identifier] = 0
+                settled = True
+            elif str(creator) in ranks:
+                ranks[identifier] = ranks[str(creator)] + 1
+                settled = True
+        if not settled:
+            break
 
     # A session is delegated-to when some delegation opened it as its child.
     delegated_sessions = {
@@ -196,9 +289,13 @@ def _reporting_ranks(snapshot: ProjectSnapshot, session_ids: set[str]) -> dict[s
         for identifier, record in delegations.items():
             if identifier in ranks:
                 continue
+            # A run performed for a role hangs under that role, not under the
+            # session that happened to commission it.
+            role = str(record.get("agent_id", ""))
             requester = str(record.get("parent_session_id", ""))
-            if requester in ranks:
-                ranks[identifier] = ranks[requester] + 1
+            anchor = role if role in ranks else requester
+            if anchor in ranks:
+                ranks[identifier] = ranks[anchor] + 1
                 child = str(record.get("child_session_id", ""))
                 if child:
                     ranks[child] = ranks[identifier] + 1
@@ -230,25 +327,62 @@ def build_graph(
     session_ids = {str(session.get("session_id", "")) for session in sessions}
     session_ids.discard("")
     ranks = _reporting_ranks(snapshot, session_ids)
+    blocked = blocked_on_human(snapshot)
+
+    def add(kind: str, identifier: str, record: Mapping[str, Any]) -> None:
+        nodes.append(
+            _node(
+                kind,
+                identifier,
+                record,
+                ranks.get(identifier),
+                awaits_human=identifier in blocked,
+            )
+        )
 
     for identifier, record in sorted(snapshot.objectives.items()):
-        nodes.append(_node("objective", identifier, record, ranks.get(identifier)))
+        add("objective", identifier, record)
+    for identifier, record in sorted(snapshot.agents.items()):
+        add(
+            "agent",
+            identifier,
+            {**record, "effective_grants": effective_grants(snapshot.agents, identifier)},
+        )
     for session in sessions:
         identifier = str(session.get("session_id", ""))
         if identifier:
-            nodes.append(_node("session", identifier, session, ranks.get(identifier)))
+            add("session", identifier, session)
     for identifier, record in sorted(snapshot.tasks.items()):
-        nodes.append(_node("task", identifier, record, ranks.get(identifier)))
+        add("task", identifier, record)
     for identifier, record in sorted(snapshot.artifacts.items()):
-        nodes.append(_node("artifact", identifier, record, ranks.get(identifier)))
+        add("artifact", identifier, record)
     for identifier, record in sorted(snapshot.delegations.items()):
-        nodes.append(_node("delegation", identifier, record, ranks.get(identifier)))
+        add("delegation", identifier, record)
     for identifier, record in sorted(snapshot.reviews.items()):
-        nodes.append(_node("review", identifier, record, ranks.get(identifier)))
+        add("review", identifier, record)
     for identifier, record in sorted(snapshot.verifications.items()):
-        nodes.append(_node("verification", identifier, record, ranks.get(identifier)))
+        add("verification", identifier, record)
+    for identifier, record in sorted(snapshot.agent_links.items()):
+        add("agent_link", identifier, record)
 
     known = {node["id"] for node in nodes}
+
+    for identifier, record in sorted(snapshot.agents.items()):
+        creator = record.get("created_by_agent_id")
+        if creator and str(creator) in known:
+            edges.append(_edge("reports_to", identifier, str(creator)))
+    for identifier, record in sorted(snapshot.agent_links.items()):
+        for predicate, key in (("link_from", "from_agent_id"), ("link_to", "to_agent_id")):
+            other = record.get(key)
+            if other and str(other) in known:
+                edges.append(
+                    _edge(
+                        predicate,
+                        identifier,
+                        str(other),
+                        allowed_action=record.get("allowed_action"),
+                    )
+                )
 
     for identifier, record in sorted(snapshot.delegations.items()):
         parent = record.get("parent_delegation_id")
@@ -272,6 +406,11 @@ def build_graph(
         child = record.get("child_session_id")
         if child and child in known:
             edges.append(_edge("runs_as", identifier, str(child)))
+        role = record.get("agent_id")
+        if role and str(role) in known:
+            # A situational run acting for a standing role.  Temporary by
+            # construction: the run ends, the role does not.
+            edges.append(_edge("acts_for", identifier, str(role)))
 
     for identifier, record in sorted(snapshot.tasks.items()):
         owner = record.get("owner_session_id")
@@ -314,7 +453,9 @@ def build_graph(
             "delegations": _counts(snapshot.delegations, "delegation"),
             "reviews": _counts(snapshot.reviews, "review"),
             "verifications": _counts(snapshot.verifications, "verification"),
+            "agents": _counts(snapshot.agents, "agent"),
         },
+        "awaiting_human": sorted(node["id"] for node in nodes if node["awaits_human"]),
         "issues": [issue.as_dict() for issue in snapshot.issues],
         "warnings": [truncate_utf8(str(warning), 300) for warning in snapshot.warnings],
         "read_diagnostics": dict(read_diagnostics or {}),

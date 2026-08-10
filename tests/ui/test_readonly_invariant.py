@@ -1,4 +1,12 @@
-"""The UI records no canonical event.  That is mechanical, not a convention."""
+"""The default UI records no canonical event, and the writable one has exactly
+one way to record: the same manager the CLI and MCP adapter use.
+
+The read-only assertions below are unchanged.  What used to carry the whole
+invariant -- "no mutating route exists" -- now covers only the default server,
+so three assertions were added for the writable one: the mutating surface is an
+explicit allowlist, every route in it dies when `record_event` is removed, and
+each route is driven over HTTP and its event then found in the ledger.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +17,7 @@ import pytest
 
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.server import MUTATING_ROUTES
 from tests.ui.conftest import authorized, tree_digest
 
 
@@ -103,3 +112,130 @@ def test_meta_declares_the_read_only_contract(client) -> None:  # type: ignore[n
     assert meta["writes_enabled"] is False
     assert meta["truth_layers"] == ["CANONICAL", "COORDINATION", "OPERATIONAL"]
     assert "authentication" in meta["trust_note"]
+
+
+# -- the writable server -----------------------------------------------------
+
+
+def _agent_body(**overrides: Any) -> dict[str, Any]:
+    return {
+        "name": "Backend",
+        "profile_id": "claude-builder",
+        "rationale": "the backend surface needs a standing owner",
+        **overrides,
+    }
+
+
+def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    found = {
+        (method, route.path)
+        for route in writable_client.app.routes
+        for method in (getattr(route, "methods", set()) or set())
+        if method not in {"GET", "HEAD"}
+    }
+    assert found == set(MUTATING_ROUTES)
+
+
+def test_every_mutating_route_dies_without_the_manager_write_path(
+    writable_client,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No route reaches durable state by any other means.
+
+    Removing `CommonsManager.record_event` has to break all of them; a route
+    that still succeeds is a second write path by definition.
+    """
+
+    def explode(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("a UI route recorded outside CommonsManager.record_event")
+
+    created = writable_client.post("/api/agents", json=_agent_body(), headers=authorized())
+    assert created.status_code == 200, created.text
+    agent_id = created.json()["entity_ref"]["id"]
+    revision = created.json()["revision"]
+
+    monkeypatch.setattr(CommonsManager, "record_event", explode)
+    calls = (
+        ("/api/agents", _agent_body(name="Second")),
+        (
+            f"/api/agents/{agent_id}/reconfigure",
+            {"expected_revision": revision, "changes": {"name": "Renamed"}, "reason": "x"},
+        ),
+        (f"/api/agents/{agent_id}/retire", {"reason": "x"}),
+        (f"/api/agents/{agent_id}/messages", {"body": "please look at this"}),
+    )
+    for path, body in calls:
+        with pytest.raises(AssertionError, match="outside CommonsManager"):
+            writable_client.post(path, json=body, headers=authorized())
+
+
+def test_each_mutating_route_lands_its_event_in_the_ledger(
+    writable_client,  # type: ignore[no-untyped-def]
+    writable: UIContext,
+) -> None:
+    """Driven through HTTP, the seam a user of this server actually crosses."""
+
+    created = writable_client.post("/api/agents", json=_agent_body(), headers=authorized())
+    assert created.status_code == 200, created.text
+    agent_id = created.json()["entity_ref"]["id"]
+
+    shown = writable_client.get(f"/api/entities/agent/{agent_id}", headers=authorized())
+    assert shown.status_code == 200
+    assert shown.json()["record"]["origin"] == "human"
+
+    reconfigured = writable_client.post(
+        f"/api/agents/{agent_id}/reconfigure",
+        json={
+            "expected_revision": created.json()["revision"],
+            "changes": {"name": "Staff backend"},
+            "reason": "promoted",
+        },
+        headers=authorized(),
+    )
+    assert reconfigured.status_code == 200, reconfigured.text
+
+    messaged = writable_client.post(
+        f"/api/agents/{agent_id}/messages",
+        json={"body": "start with the payments endpoint"},
+        headers=authorized(),
+    )
+    assert messaged.status_code == 200, messaged.text
+
+    retired = writable_client.post(
+        f"/api/agents/{agent_id}/retire",
+        json={"reason": "surface moved"},
+        headers=authorized(),
+    )
+    assert retired.status_code == 200, retired.text
+
+    recorded = [
+        record.event["event_type"] for record in writable.writer().events.iter_events()
+    ]
+    assert "agent.created" in recorded
+    assert "agent.reconfigured" in recorded
+    assert "thread.opened" in recorded and "thread.replied" in recorded
+    assert "agent.retired" in recorded
+
+
+def test_a_refused_write_names_the_guard_it_tripped(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    grants = {"create_roles": "auto", "retire_roles": "deny", "open_links": "deny"}
+    response = writable_client.post(
+        "/api/agents",
+        json=_agent_body(grants=grants),
+        headers=authorized(),
+    )
+    assert response.status_code == 409, response.text
+    assert "turnover_budget" in response.json()["error"]["message"]
+
+
+def test_the_writable_server_declares_that_it_writes(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    meta = writable_client.get("/api/meta", headers=authorized()).json()
+    assert meta["writes_enabled"] is True
+    assert meta["read_only"] is False
+    assert meta["writer_session_id"]
