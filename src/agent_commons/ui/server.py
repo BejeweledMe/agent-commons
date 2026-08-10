@@ -169,6 +169,20 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             }
         )
 
+    @app.get("/api/search")
+    async def search(request: Request) -> Response:
+        query = request.query_params.get("q", "")
+        kind = request.query_params.get("kind") or None
+        if kind is not None and kind not in _ENTITY_KINDS:
+            return _error(400, "unknown_kind", "unsupported entity kind")
+        try:
+            limit = int(request.query_params.get("limit", "25"))
+        except ValueError:
+            return _error(400, "invalid_request", "limit must be an integer")
+        return JSONResponse(
+            await asyncio.to_thread(context.search, query=query, limit=limit, subject_kind=kind)
+        )
+
     @app.get("/api/proposals")
     async def proposals() -> Response:
         return JSONResponse(await asyncio.to_thread(context.agent_proposals))

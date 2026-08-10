@@ -334,13 +334,31 @@ plus a similar order of bounded coordination records. A decade of it stays under
 
 ADR 0008 is the binding precedent, and its rules are adopted here rather than
 restated: the index is a projection, is never authoritative, nothing canonical
-may depend on it, and **producer and consumer land in the same change**. The
-search index is therefore scheduled with the UI search box that reads it, not
-before it. Nothing here is built until the thing that queries it exists.
+may depend on it, and **producer and consumer land in the same change**. It
+shipped with `agent-commons search` and the panel's search box in the same
+commit.
 
-Only redaction-safe material is indexed: event type, entity kind, state, titles,
-summaries, rationales, verdicts, role names. Prompts, transcripts, tool
-arguments, and provider output remain excluded, as in `THREAT_MODEL.md`.
+What is indexed is a **positive allowlist** (`index/search_text.py`): event
+type, titles, descriptions, summaries, rationales, verdicts, criteria, role
+names and grants, and the actor's declared role. A denylist would have been
+wrong twice — a payload field added later would be indexed by accident, and the
+material worth keeping out is exactly what somebody adds without thinking about
+the index. Prompts, transcripts, tool arguments, and provider output are not in
+the ledger to begin with and so cannot reach it.
+
+Two properties the implementation had to carry beyond the storage choice:
+
+- **A read-only caller never builds one.** Opening the index creates
+  directories, a file, tables, and a WAL. Read-only search reads a projection
+  that already exists or reports that it cannot answer — this project has
+  already shipped a read-only command that created state.
+- **A widened query says it widened.** Operators type questions, not FTS5
+  grammar, so a query matching nothing under all-terms semantics is retried
+  as any-term. Doing that silently would make a loose match read as a precise
+  one, which is the `succeeded`-looks-like-`accepted` defect in a new place.
+
+The projection moves to schema v2. Because it is disposable, an older version is
+dropped and rebuilt rather than migrated; a newer one still fails closed.
 
 ## Q6. Review independence once roles exist
 

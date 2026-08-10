@@ -77,6 +77,21 @@ Versioning once a stable release line is declared.
   exactly one MCP server, so narrowing a set of one meant nothing and widening
   it is a separate change. The panel now shows the profile's actual servers
   read-only instead of offering a control with no effect.
+- **Full-text search over canonical history**, landing with the two things that
+  read it: `agent-commons search <query>` and a search box in the panel. What is
+  indexed is a positive allowlist of canonical fields, so a payload field added
+  later is invisible to search until somebody adds it on purpose — a denylist
+  would silently index whatever came next. Prompts, transcripts, tool arguments,
+  and provider output are not in the ledger and so are not in the index.
+- Search widens in steps and says which step answered — every term, any term, or
+  a literal phrase — because a query that quietly fell back to any-term would
+  read as a precise match.
+- A read-only search never builds a projection. Opening the index creates
+  directories, a database, tables, and a WAL; read-only callers answer from a
+  projection that already exists or report that they cannot answer.
+- The SQLite projection moves to schema v2. It is disposable, so an older
+  version is dropped and rebuilt rather than migrated; a newer one still fails
+  closed.
 - A workspace that has created a role cannot be read by a build predating
   `commons.payload.agent.v1`; rollback means reverting to a checkout taken
   before the first role existed. Recorded in the threat model rather than

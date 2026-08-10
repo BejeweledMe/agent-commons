@@ -427,6 +427,21 @@ def ui_command(
     serve(context, port=port, open_browser=not no_browser, emit=emit)
 
 
+@cli.command("search")
+@click.argument("query")
+@click.option("--limit", type=int, default=25, show_default=True)
+@click.option("--kind", "subject_kind", help="Restrict to one entity kind, e.g. agent or task.")
+@click.pass_obj
+def search_command(state: CLIState, query: str, limit: int, subject_kind: str | None) -> None:
+    """Search canonical history by free text.
+
+    Reads the rebuildable projection, which is synchronized first.  Results
+    point at event IDs; inspect them canonically before relying on one.
+    """
+
+    state.emit(state.manager().search_history(query, limit=limit, subject_kind=subject_kind))
+
+
 @cli.command("support")
 @click.option("--show-paths", is_flag=True, help="Include resolved local paths explicitly.")
 @click.pass_obj

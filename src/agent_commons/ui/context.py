@@ -338,6 +338,13 @@ class UIContext:
         write_role_catalog(path, catalogue, workspace_root=self.repo)
         return {"section": section, "removed": entry_id, "catalog_path": str(path)}
 
+    def search(
+        self, *, query: str, limit: int = 25, subject_kind: str | None = None
+    ) -> dict[str, Any]:
+        """Search history. Read-only: synchronizing a projection records nothing."""
+
+        return self.manager().search_history(query, limit=limit, subject_kind=subject_kind)
+
     def agent_proposals(self) -> list[dict[str, Any]]:
         """Open role proposals, readable whether or not this server writes."""
 

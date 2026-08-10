@@ -46,7 +46,7 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.index import SQLiteIndex
+from agent_commons.index import SQLiteIndex, search_existing_projection
 from agent_commons.integrations import initialize_workspace
 from agent_commons.platform_support import lock_exclusive, require_supported_platform, unlock
 from agent_commons.security import SecurityPolicy
@@ -587,6 +587,67 @@ class CommonsManager:
     def _sync_index(self) -> dict[str, int]:
         with SQLiteIndex(self.paths, self.events, self.manifests) as index:
             return asdict(index.sync())
+
+    def search_history(
+        self,
+        query: str,
+        *,
+        limit: int = 25,
+        subject_kind: str | None = None,
+    ) -> dict[str, Any]:
+        """Search the canonical history through the disposable projection.
+
+        The index is brought up to date first, so a search never silently
+        answers from a stale one.  Results are pointers into the ledger: each
+        carries the event id a reader can then inspect canonically.
+        """
+
+        if self.read_only:
+            # Opening the index would create the database, its tables, and a
+            # WAL.  A read-only caller answers from a projection that already
+            # exists or says it cannot answer; it never builds one.
+            found = search_existing_projection(
+                self.paths.index_db, query, limit=limit, subject_kind=subject_kind
+            )
+            if found is None:
+                return {
+                    "query": query,
+                    "results": [],
+                    "count": 0,
+                    "match": "unavailable",
+                    "index": {"available": False, "synchronized": False},
+                    "source": "rebuildable_projection",
+                    "unavailable": "no readable projection; run `agent-commons index rebuild`",
+                }
+            results, match = found
+            return {
+                "query": query,
+                "results": results,
+                "count": len(results),
+                "match": match,
+                # Read-only cannot synchronize, so it says so rather than
+                # letting a stale index look current.
+                "index": {"available": True, "synchronized": False},
+                "source": "rebuildable_projection",
+            }
+        with SQLiteIndex(self.paths, self.events, self.manifests) as index:
+            synchronized = asdict(index.sync())
+            results, match = index.search_events(
+                query, limit=limit, subject_kind=subject_kind
+            )
+        return {
+            "query": query,
+            "results": results,
+            "count": len(results),
+            # Which widening answered: every term, any term, or a literal
+            # phrase.  A precise search that quietly fell back would read as a
+            # precise match.
+            "match": match,
+            "index": {"available": True, "synchronized": True, **synchronized},
+            # Named at every call site: this is a rebuildable projection, and a
+            # result is a place to look rather than a fact.
+            "source": "rebuildable_projection",
+        }
 
     @contextmanager
     def _canonical_write_lock(self) -> Iterable[None]:

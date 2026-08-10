@@ -112,6 +112,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span class="pill" id="workspace">—</span>
   <span class="pill" id="stream">connecting</span>
   <span class="pill" id="writes">writes disabled</span>
+  <input type="search" id="search-box" placeholder="Search history…"
+         style="margin-left:auto;min-width:220px;font:12px/1.4 ui-sans-serif,system-ui,sans-serif;
+                color:var(--fg);background:var(--surface-2);border:1px solid var(--border);
+                border-radius:6px;padding:5px 8px">
   <span class="trust" id="layers"></span>
 </header>
 <main>
@@ -127,6 +131,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <button type="button" data-panel="record" aria-selected="true">Record</button>
       <button type="button" data-panel="proposals" aria-selected="false" hidden>Proposals</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
+      <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
       <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
       <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
     </div>
@@ -140,6 +145,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         Confirming creates exactly what was proposed, credited to its proposer.</p>
       <div id="proposal-list"></div>
       <p class="result" id="proposal-result"></p>
+    </section>
+
+    <section class="panel" id="panel-search">
+      <p class="note" id="search-note"></p>
+      <div id="search-results"></div>
     </section>
 
     <section class="panel" id="panel-catalog">
@@ -698,6 +708,69 @@ async function retire(cascade) {
 
 document.getElementById("settings-retire").addEventListener("click", () => retire(false));
 document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
+
+let searchTimer = null;
+
+async function runSearch(text) {
+  const tab = document.querySelector('#tabs button[data-panel="search"]');
+  const note = document.getElementById("search-note");
+  const host = document.getElementById("search-results");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  if (!text.trim()) { tab.hidden = true; return; }
+  tab.hidden = false;
+  document.getElementById("inspector").classList.add("open");
+  showPanel("search");
+  let payload;
+  try {
+    payload = await api("/api/search?q=" + encodeURIComponent(text));
+  } catch (error) {
+    note.className = "note warn";
+    note.textContent = String(error);
+    return;
+  }
+  if (payload.unavailable) {
+    note.className = "note warn";
+    note.textContent = payload.unavailable;
+    return;
+  }
+  note.className = "note";
+  // Say what layer answered.  A rebuildable projection is a place to look, not
+  // an authority, and the reader should never have to guess which they got.
+  const widening = payload.match === "any_term"
+    ? " matching any term, not all of them,"
+    : (payload.match === "phrase" ? " matching the whole phrase," : "");
+  note.textContent = payload.count + " match(es)" + widening +
+    " from the rebuildable projection" +
+    (payload.index && payload.index.synchronized ? ", synchronized" : ", not synchronized") +
+    ". Open the event to read the canonical record.";
+  for (const item of payload.results) {
+    const row = document.createElement("div");
+    row.className = "field";
+    const head = document.createElement("span");
+    head.textContent = item.event_type + " · " + item.subject.kind + " " + item.subject.id;
+    row.appendChild(head);
+    const excerpt = document.createElement("pre");
+    // Agent-written prose, written as text.
+    excerpt.textContent = item.excerpt;
+    row.appendChild(excerpt);
+    const open = document.createElement("button");
+    open.type = "button";
+    open.textContent = "Show " + item.subject.kind;
+    open.addEventListener("click", () => {
+      const node = (lastGraph ? lastGraph.nodes : []).find((n) => n.id === item.subject.id);
+      if (node) { selected = node.id; inspect(node); if (lastGraph) { render(lastGraph); } }
+      else { note.textContent = "that subject is not on the current graph"; }
+    });
+    row.appendChild(open);
+    host.appendChild(row);
+  }
+}
+
+document.getElementById("search-box").addEventListener("input", (event) => {
+  const text = event.target.value;
+  if (searchTimer) { clearTimeout(searchTimer); }
+  searchTimer = setTimeout(() => runSearch(text), 250);
+});
 
 let catalogEditing = false;
 

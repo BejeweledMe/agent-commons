@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -13,9 +14,14 @@ from agent_commons.config import CommonsPaths
 from agent_commons.core.canonical import canonical_json_bytes, loads_json_strict
 from agent_commons.core.refs import iter_typed_refs
 from agent_commons.errors import IntegrityError
+from agent_commons.index.search_text import searchable_text, subject_of
 from agent_commons.storage import EventRecord, EventStore, ManifestRecord, ManifestStore
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
+#: Older projections are dropped and rebuilt rather than migrated: this database
+#: is disposable and the ledger is the truth, so a migration path would be code
+#: that has to stay correct for no benefit.
+_REBUILDABLE_FROM = frozenset({1})
 
 
 @dataclass(frozen=True)
@@ -82,10 +88,12 @@ class SQLiteIndex:
 
     def _initialize(self) -> None:
         version = int(self.connection.execute("PRAGMA user_version").fetchone()[0])
-        if version not in {0, _SCHEMA_VERSION}:
+        if version not in {0, _SCHEMA_VERSION} and version not in _REBUILDABLE_FROM:
             raise IntegrityError(
                 f"unsupported SQLite projection version {version}; rebuild with compatible tooling"
             )
+        if version in _REBUILDABLE_FROM:
+            self._drop_everything()
         self.connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS source_files (
@@ -160,6 +168,17 @@ class SQLiteIndex:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            -- Full-text search over allowlisted canonical fields only; see
+            -- index/search_text.py for what is and is not in the document.
+            CREATE VIRTUAL TABLE IF NOT EXISTS event_search USING fts5(
+                event_id UNINDEXED,
+                subject_kind UNINDEXED,
+                subject_id UNINDEXED,
+                recorded_at UNINDEXED,
+                body,
+                tokenize = 'unicode61'
+            );
             """
         )
         expected_workspace_id = self.paths.workspace_id
@@ -181,6 +200,21 @@ class SQLiteIndex:
                     (expected_workspace_id,),
                 )
         self.connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        self.connection.commit()
+
+    def _drop_everything(self) -> None:
+        self.connection.executescript(
+            """
+            DROP TABLE IF EXISTS event_search;
+            DROP TABLE IF EXISTS explicit_refs;
+            DROP TABLE IF EXISTS relations;
+            DROP TABLE IF EXISTS event_subjects;
+            DROP TABLE IF EXISTS manifests;
+            DROP TABLE IF EXISTS events;
+            DROP TABLE IF EXISTS projection_metadata;
+            DROP TABLE IF EXISTS source_files;
+            """
+        )
         self.connection.commit()
 
     def rebuild(self) -> IndexSyncResult:
@@ -293,6 +327,13 @@ class SQLiteIndex:
                 "DELETE FROM explicit_refs WHERE owner_kind = ? AND owner_id = ?",
                 (existing["file_kind"], existing["identity"]),
             )
+            if existing["file_kind"] == "event":
+                # An FTS5 virtual table is not reached by the foreign-key
+                # cascade that removes the ordinary rows, so it is cleared here
+                # or it keeps answering for events that no longer exist.
+                self.connection.execute(
+                    "DELETE FROM event_search WHERE event_id = ?", (existing["identity"],)
+                )
         self.connection.execute("DELETE FROM source_files WHERE path = ?", (relative,))
 
     def _replace_event(
@@ -344,6 +385,18 @@ class SQLiteIndex:
                     object_ref["id"],
                 ),
             )
+        subject_kind, subject_id = subject_of(event)
+        self.connection.execute(
+            "INSERT INTO event_search(event_id, subject_kind, subject_id, recorded_at, body)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                record.event_id,
+                subject_kind,
+                subject_id,
+                event["recorded_at"],
+                searchable_text(event),
+            ),
+        )
         self._insert_refs("event", record.event_id, event)
 
     def _replace_manifest(
@@ -384,6 +437,17 @@ class SQLiteIndex:
 
     def manifest_count(self) -> int:
         return int(self.connection.execute("SELECT COUNT(*) FROM manifests").fetchone()[0])
+
+    def search_events(
+        self,
+        query: str,
+        *,
+        limit: int = 25,
+        subject_kind: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str]:
+        """Rank canonical events against a free-text query."""
+
+        return search_rows(self.connection, query, limit=limit, subject_kind=subject_kind)
 
     def get_event(self, event_id: str) -> Mapping[str, Any]:
         row = self.connection.execute(
@@ -550,6 +614,110 @@ class SQLiteIndex:
                 (kind, identifier),
             )
         ]
+
+
+_QUERY_TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def _fts_phrase(text: str) -> str:
+    return '"' + text.replace('"', " ") + '"'
+
+
+def search_rows(
+    connection: sqlite3.Connection,
+    query: str,
+    *,
+    limit: int = 25,
+    subject_kind: str | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Rank canonical events against a free-text query.
+
+    The projection is disposable and non-authoritative, so a result is a pointer
+    back to the ledger, never an answer on its own.
+
+    Operators type questions, not query grammar, so this widens in steps and
+    reports which step answered: every term, then any term.  Silently switching
+    to any-term would make a precise search look like it matched precisely when
+    it did not.
+    """
+
+    text = query.strip()
+    if not text:
+        return [], "empty"
+    bounded = max(1, min(int(limit), 100))
+    statement = (
+        "SELECT s.event_id, s.subject_kind, s.subject_id, s.recorded_at,"
+        "       e.event_type, snippet(event_search, 4, '', '', ' … ', 12) AS excerpt"
+        "  FROM event_search s JOIN events e ON e.event_id = s.event_id"
+        " WHERE event_search MATCH ?"
+        + ("   AND s.subject_kind = ?" if subject_kind else "")
+        + " ORDER BY bm25(event_search), s.recorded_at DESC LIMIT ?"
+    )
+
+    def run(expression: str) -> list[Any]:
+        arguments: list[Any] = [expression]
+        if subject_kind:
+            arguments.append(subject_kind)
+        arguments.append(bounded)
+        return connection.execute(statement, arguments).fetchall()
+
+    tokens = _QUERY_TOKEN.findall(text)
+    try:
+        rows = run(text)
+        mode = "all_terms"
+    except sqlite3.OperationalError:
+        # Not a query the engine can parse; treat what was typed as a phrase.
+        rows = run(_fts_phrase(text)) if tokens else []
+        mode = "phrase"
+    if not rows and len(tokens) > 1:
+        try:
+            rows = run(" OR ".join(_fts_phrase(token) for token in tokens))
+            mode = "any_term"
+        except sqlite3.OperationalError:  # pragma: no cover - tokens are already safe
+            rows = []
+    return [
+        {
+            "event_id": str(row["event_id"]),
+            "event_type": str(row["event_type"]),
+            "subject": {"kind": str(row["subject_kind"]), "id": str(row["subject_id"])},
+            "recorded_at": str(row["recorded_at"]),
+            "excerpt": str(row["excerpt"]),
+        }
+        for row in rows
+    ], mode
+
+
+def search_existing_projection(
+    database_path: str | Path,
+    query: str,
+    *,
+    limit: int = 25,
+    subject_kind: str | None = None,
+) -> list[dict[str, Any]] | None:
+    """Search a projection that already exists, creating and changing nothing.
+
+    Opening ``SQLiteIndex`` makes directories, a database file, tables, and a
+    WAL, which a read-only caller must not do -- this project has already
+    shipped a read-only command that created state.  ``None`` means there is no
+    projection to answer from, which the caller reports rather than papering
+    over with an empty result.
+    """
+
+    path = Path(database_path)
+    if not path.exists():
+        return None
+    connection: sqlite3.Connection | None = None
+    try:
+        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
+        connection.row_factory = sqlite3.Row
+        return search_rows(connection, query, limit=limit, subject_kind=subject_kind)
+    except sqlite3.Error:
+        # An absent WAL sidecar, a projection older than full-text search, or a
+        # concurrent writer.  All of them mean "cannot answer", not "no results".
+        return None
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 def _json_text(value: Any) -> str:
