@@ -276,14 +276,63 @@ raw output, and transcripts are excluded from durable telemetry. See
 [ADR 0004](adr/0004-optional-local-delegation-runtime.md) for the complete trust,
 crash, cancellation, observability, compatibility, and rollback contract.
 
-## 10. Keep Git operations explicit
+## 10. Separate a standing role from a situational run
+
+A **role** is persistent staff: a name, an operator-allowlisted profile, standing
+permissions, a place in the index other work can reach, and a history that
+outlives any single task. A **delegation** is one bounded run with a fresh child
+session and a terminal outcome. A run creates no role record, and "give me an
+independent review with a clean context" is fully covered by a delegation to an
+independent-reviewer profile. The separation is load-bearing, not clerical: a
+fresh context is the mechanism that makes review independent, and a run modelled
+as an instance of a role invites inheriting that role's context while still
+looking independent by `session_id`.
+
+A role selects a profile; it never describes one. Role settings may only narrow
+what the profile already grants, so no role setting can widen a child's
+authority. Choices come from an operator-owned catalogue held outside the
+delegated workspace; the model a role uses is a property of the profile it
+selects.
+
+Independence is decided over principals — session plus the role that session was
+running as — so one standing role cannot approve work it authored in an earlier
+run. Reviewing the same subject again at a later revision remains allowed; only
+authoring and then judging is refused.
+
+Three permissions, each `deny`, `ask`, or `auto`: create roles, retire roles,
+and open temporary links. Effective authority is the narrowest value across the
+role and every creator above it, derived on each call, so a level lowered
+anywhere up the line binds work that is already running. A grant above `deny`
+requires a turnover budget counting creations and retirements together. An
+automatically created role holds a strictly narrower creation grant than its
+creator. A role created by another role is marked as such and records the reason
+and the proposer, whether it was recorded automatically or confirmed by a
+person.
+
+Removal is `retire`, never delete: the ledger is immutable. No role — however it
+was created, and whoever asks — may be retired while it owes a live delegation or
+an unfinished review. A role never retires a human-created role. Prefer
+declaring a task lifetime at creation to granting a standing right to retire.
+
+A temporary link between two roles records the action it permits, not an
+open/closed flag. Today the only action is a bounded question with a deadline,
+carried over the existing communication channel. The canonical record is the
+grant; the exchange is operational.
+
+Role settings, messages to a role, and retirement may be recorded from the local
+UI when it is started with `--enable-writes`. That surface is an adapter over
+`CommonsManager` exactly as the CLI and MCP adapters are; it does not create a
+second write path, and the capability-granting half of the catalogue is not
+editable from it.
+
+## 11. Keep Git operations explicit
 
 Agent Commons does not stage, commit, push, merge, publish, or assign ownership
 of repository changes. Those actions require separate user authority. Managed
 instruction blocks may be updated idempotently, while all project-authored text
 outside those markers remains untouched.
 
-## 11. Use the lightest adequate governance
+## 12. Use the lightest adequate governance
 
 - `light`: coordination for small/reversible work may stop honestly at
   `completed`; review and accepted project truth are optional.

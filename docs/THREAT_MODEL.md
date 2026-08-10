@@ -125,6 +125,84 @@ Purpose/profile pairing is also fixed: implementation uses a builder profile,
 while independent review and verification use an independent-reviewer profile.
 Relabeling a writable builder as a reviewer is rejected before publication.
 
+### Autonomous role creation
+
+A role holding `create_roles: auto` changes the staff without a person in the
+loop. Unlike a delegation, which is terminal and ends itself, a role is
+persistent and keeps receiving work, so automatic creation grows standing
+structure. Seven mechanisms bound it, and all of them are derived from the
+ledger or checked in `validate_transition`, which every adapter crosses:
+
+- a `turnover_budget` on the role counting creations **and** retirements below
+  it, so a create/retire cycle cannot walk past a headcount ceiling;
+- grants that never widen — a created role's permissions, profile, tool
+  selection, and context isolation are all componentwise no wider than its
+  creator's *effective* values;
+- a strictly narrower creation grant on any automatically created role, which is
+  the only thing between one grant and an unbounded number of generations;
+- a canonical `agent.created` event carrying the rationale, the proposing role,
+  and whether it was recorded automatically or confirmed by a person;
+- a single cascade retire that computes the whole lineage, refuses as a whole if
+  any member owes live work, and only then writes;
+- an `origin` field, so a role an agent hired is distinguishable in the index
+  from one a person created;
+- effective grants derived at read time from the whole ancestor chain, so a
+  downgrade binds the next call from work already running rather than waiting
+  for a propagation pass.
+
+The budget deliberately lives on the role rather than in configuration.
+`workspace.yaml` sits inside the delegated workspace and a writable builder runs
+with `--sandbox workspace-write`, so a ceiling stored there is a ceiling the
+agent can edit; `OperatorLimits` is not loaded by the worker MCP process, so a
+ceiling stored there would not bind the path that needs it.
+
+Residual: this is coordination, not authentication. A process running as the
+same operating-system user can write agent events directly. The mechanisms bound
+what the protocol does, not what the filesystem allows.
+
+### Role settings widening a worker's authority
+
+An agent could try to reach new capability by naming a tool, an MCP server, or a
+model on a role. Role settings are **narrowing only**: `tool_allowlist` and
+`mcp_allowlist` are intersected with the profile's fixed set at invocation build
+time, and a selection naming anything the profile lacks fails closed before
+launch. A role cannot name a model — that is a property of the
+operator-allowlisted profile it selects, because a role that named a model would
+be editing argv. The catalogue of selectable entries is an operator file loaded
+with the same discipline as the runtime profile config: outside the delegated
+workspace, regular non-symlink file, not group/world writable, owned by the
+operator or root, size-bounded.
+
+The terminal outcome tools are exempt from narrowing. A role that cannot report
+a result would consume its budget and exit without closing its delegation, which
+is a broken role rather than a narrower one.
+
+### A weakened reviewer that still reads as independent
+
+A role pinned to a fresh context can be relaxed to an accumulated one by a later
+"optimisation", after which its verdicts look exactly like clean-slate verdicts.
+Strengthening isolation is an ordinary reconfiguration; weakening it requires the
+acting session to declare the `agent:isolation_downgrade` capability and record a
+reason, in the same shape and with the same honest limits as
+`delegation:recover`. Role memory is defined as *receiving your own earlier
+judgment on the same subject*, which the ledger can check, rather than as
+*knowing the past*, which it cannot and which would be harmful to forbid. A
+fresh-context role's own prior verdicts are never hidden from it — hiding them
+would hand a reviewer an incomplete picture it believes is complete, destroy the
+"flagged before and not fixed" signal, and be discovered through another query
+anyway.
+
+### The local UI as a write surface
+
+With `--enable-writes` the loopback server records canonical events. The
+mutating surface is a fixed enumerated list of routes, each a thin adapter over
+an existing `CommonsManager` method — the same manager the CLI and MCP adapters
+use. Anyone holding the bearer token writes as the operator session the server
+was started with, and the startup banner says so. The capability-granting half
+of the role catalogue is not editable from this surface, because a token that
+could add an MCP server would be a token that widens what every child process
+may do. Writes stay off by default.
+
 ### Recursive delegation and resource exhaustion
 
 Agents may create a Codex-to-Claude-to-Codex loop, evade limits through another
@@ -267,10 +345,12 @@ routine logs and private reasoning are excluded.
   while the Claude builder has no OS-enforced boundary and retains shell and
   file-write tools. For the Claude builder, external isolation is the only
   boundary, not a recommendation.
-- The local UI (`agent-commons ui`) opens a loopback listening socket. It is
-  read-only, registers only `GET` routes, requires a bearer token, pins the
-  `Host` header, and emits no CORS headers, but it is still a new network
-  surface on the host. Its token is held in memory and printed once; launching a
+- The local UI (`agent-commons ui`) opens a loopback listening socket. By
+  default it is read-only, registers only `GET` routes, requires a bearer token,
+  pins the `Host` header, and emits no CORS headers, but it is still a new
+  network surface on the host. With `--enable-writes` it also records canonical
+  events as the operator session it was started with, and the bearer token is
+  then the only thing between another local process and those writes. Its token is held in memory and printed once; launching a
   browser automatically exposes that URL to other processes of the same user
   through the process list.
 - The UI renders agent-written text — task titles, delegation purposes,
@@ -288,6 +368,13 @@ routine logs and private reasoning are excluded.
 - A delegation recorded by a newer schema may make an older fail-closed binary
   unable to read the checkout; disabling the broker, not downgrading the reader,
   is the normal rollback.
+- A workspace that has created a standing role cannot be read by a binary that
+  predates `commons.payload.agent.v1`: each `agent.*` event becomes a
+  `domain_validation_rejected` projection issue, and integrity gates fail closed
+  on issue severity. Rollback means reverting to a checkout taken before the
+  first role was created. This is stated rather than mitigated — a new canonical
+  entity has no cheaper rollback, and a silent partial read would be worse than
+  a refusal.
 
 These limits must remain visible in documentation and diagnostics. They are not
 silently upgraded into security claims.

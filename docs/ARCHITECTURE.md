@@ -112,6 +112,7 @@ The complete boundary is in
 
 - workspace and objective, including constraints and acceptance criteria;
 - principal, role, session, and declared capability;
+- standing agent role and temporary link between two roles;
 - task/work item and temporary claim/lease;
 - proposal or critique carried by a typed discussion thread/message;
 - artifact and immutable revision;
@@ -149,6 +150,11 @@ delegation: requested ─→ cancelled (requester cancel or authorized recovery)
                 └→ active ↔ input_needed
                        │
                        └→ succeeded | failed | timed_out | needs_operator
+
+agent:      active ↺ reconfigured ──→ retired
+                 └── task lifetime expiry ──→ retired (derived, no event)
+
+agent_link: open → closed
 ```
 
 `delegation.recovered` is an additive canonical event that projects to
@@ -199,6 +205,32 @@ Projection failures are emitted as structured issues (`code`, `severity`,
 Integrity gates consume the structured severity. Recovery simulates the exact
 maintenance event and admits it only when the structured error measure strictly
 improves without a new or larger issue.
+
+A **standing role** (`agent`) is persistent; a **delegation** is one bounded run.
+The two are deliberately separate: a fresh child session is the mechanism that
+makes review independent, so modelling a run as an instance of a role would
+invite inheriting the role's context and reduce independence to a claim about
+`session_id`. A run declares which role it acts for through an
+`on_behalf_of` event relation rather than a payload field, so the delegation
+schema is unchanged and an older reader ignores the binding.
+
+Everything a role is *allowed* to do is derived at read time from the immutable
+ledger — the narrowest grant across the role and every creator above it, with a
+retired ancestor collapsing the line to `deny`. Nothing is stored and
+propagated, so lowering a level takes effect on the next call, including for
+work already running. A role's `create_roles`/`retire_roles` grants require a
+`turnover_budget` that counts creations **and** retirements below it, because
+counted separately a create/retire cycle walks past any headcount ceiling. An
+automatically created role must hold a strictly narrower `create_roles` grant
+than its creator, which is what terminates the chain. A role bound to a task
+lifetime is retired by the projection when that task is accepted or cancelled;
+there is no event to forget to write. The full contract is in
+[ADR 0009](adr/0009-agents-as-first-class-roles.md).
+
+Independence is decided over **principals**, not sessions: the principals of an
+event are its session plus the role that session was running as. One standing
+role therefore cannot approve work it authored in an earlier run, and a
+principal kind added later is covered at every call site through one function.
 
 A delegation binds `target_ref` and `target_revision` at request time. It cannot
 target itself or an ancestor delegation, and a later target change does not
@@ -262,6 +294,14 @@ MVP-0 ships one universal software-collaboration domain. Internal registries all
 additional schemas and projections, but a public plugin ABI is deferred until a
 second non-trivial domain validates the boundary. Existing specialist workflows
 remain independent and may later become optional domain packs.
+
+The local UI is a third adapter over `CommonsManager`, beside the CLI and the
+MCP server. It is read-only by default; `agent-commons ui --enable-writes`
+registers a fixed, enumerated set of mutating routes bound to an explicit
+operator session. Each is a thin call into an existing manager method, so
+"there is no second write path" remains a property of the code rather than a
+convention: removing `CommonsManager.record_event` breaks every one of them,
+which is asserted by test.
 
 Provider runners, OpenTelemetry exporters, and an eventual AHP adapter are
 replaceable optional edges. None defines canonical entities or bypasses the

@@ -141,6 +141,24 @@ and confirm no claims or runtime attempts remain. Remove generated integration
 blocks and state only under explicit operator control; do not delete canonical
 events from a real project as “cleanup.”
 
+## Optional: standing roles
+
+Everything above works without roles. Create one when the same responsibility
+outlives a single task and you want it in an index other work can reach:
+
+```bash
+agent-commons agent create --name "Independent reviewer" \
+  --profile claude-independent-reviewer --context-mode fresh \
+  --rationale "everyone comes here for review"
+agent-commons agent list
+```
+
+Then bind runs to it with `delegation create --on-behalf-of <agent-id>`. A role
+in `fresh` context is never handed its own earlier verdict on the same subject,
+and one standing role cannot approve work it authored in an earlier run — even
+though the two sessions differ. See
+[ADR 0009](adr/0009-agents-as-first-class-roles.md).
+
 ## Optional automation
 
 The broker can launch the reviewer as a separate headless process instead of

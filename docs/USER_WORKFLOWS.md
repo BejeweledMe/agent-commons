@@ -35,6 +35,37 @@ Outcome: after orientation and the relevant bounded views, a new window sees
 current architecture, completed and blocked work, pending reviews, and rejected
 approaches without replaying earlier chats.
 
+## 1a. Staff the work with standing roles
+
+A role is persistent staff; a delegation is one bounded run. Create the role
+once with `agent create`, then point each run at it with `delegation create
+--on-behalf-of`. The run stays terminal and unnamed; the role accumulates the
+history, keeps its place in the index, and can be reached from other work.
+
+```bash
+agent-commons agent create \
+  --name "Senior Node.js backend" --profile claude-builder \
+  --rationale "the payments surface needs a standing owner between tasks"
+```
+
+Grants default to `deny`. Prefer a declared lifetime to a standing right:
+`--retire-with-task <task-id>` retires the role automatically when its task is
+accepted or cancelled, which covers "made for this task, gone when it lands"
+without granting anything. Granting `--create-roles` or `--retire-roles` above
+`deny` requires `--turnover-budget`, which counts creations and retirements
+together below that role.
+
+`agent show` reports the role's *effective* authority — the narrowest value
+across the role and every creator above it — plus what currently blocks its
+retirement. `agent retire --cascade` takes a role and everything it created out
+of service in one command, and refuses as a whole if any of them still owes a
+live delegation or an unfinished review. Nothing is ever deleted.
+
+`agent-commons ui --enable-writes` opens the same operations in a panel: click a
+role for its record, the gear for its settings, and note the ring around any node
+waiting on a human decision. Anyone holding the printed token writes as the
+session the server was started with.
+
 ## 2. Delegate one bounded local step
 
 The parent first records or finds the exact task or review request. It creates a
