@@ -414,7 +414,7 @@ def test_a_role_cannot_staff_a_run_with_a_role_it_did_not_create(
         acceptance_criteria=("done",),
         idempotency_key="staff-follow-task",
     )
-    with pytest.raises(LifecycleConflictError, match="may staff only itself or a role it created"):
+    with pytest.raises(LifecycleConflictError, match="may staff only itself"):
         worker.create_delegation(
             target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
             target_revision=follow_on["revision"],
@@ -466,3 +466,152 @@ def test_a_human_window_may_still_staff_any_active_role(workspace: dict[str, Any
         idempotency_key="staff-human-delegation",
     )
     assert created["event_type"] == "delegation.requested"
+
+
+def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
+    workspace: dict[str, Any],
+) -> None:
+    """The typed action earns its keep: it grants exactly the refused thing.
+
+    Before the link the same call is refused, after it the same call succeeds,
+    and an `ask` link does not do it -- which is why the record carries an
+    action rather than an open/closed flag.
+    """
+
+    operator: CommonsManager = workspace["operator"]
+    backend = operator.create_agent(
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="hands work over",
+        idempotency_key="link-backend",
+    )
+    frontend = operator.create_agent(
+        name="Frontend",
+        profile_id="claude-builder",
+        rationale="receives handed-over work",
+        idempotency_key="link-frontend",
+    )
+    worker = _open(workspace["repo"], workspace["state_root"], name="handoff", role="builder")
+    task = worker.create_task(
+        title="Backend work",
+        description="the run that will hand something over",
+        acceptance_criteria=("done",),
+        idempotency_key="link-task",
+    )
+    parent = _bind_run(
+        workspace,
+        agent_id=backend["entity_ref"]["id"],
+        worker=worker,
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        profile="claude-builder",
+        purpose="implementation",
+        key="link-run",
+    )
+    handed_over = worker.create_task(
+        title="Frontend work",
+        description="the piece being handed over",
+        acceptance_criteria=("done",),
+        idempotency_key="link-handed-task",
+    )
+
+    def hand_over(key: str) -> dict[str, Any]:
+        return worker.create_delegation(
+            target_ref={"kind": "task", "id": handed_over["entity_ref"]["id"]},
+            target_revision=handed_over["revision"],
+            target_profile="claude-builder",
+            purpose="implementation",
+            limits=LIMITS,
+            parent_delegation_id=parent["entity_ref"]["id"],
+            on_behalf_of_agent_id=frontend["entity_ref"]["id"],
+            idempotency_key=key,
+        )
+
+    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+        hand_over("link-before")
+
+    # An `ask` link is a different grant and does not widen staffing.
+    asking = operator.open_agent_link(
+        from_agent_id=backend["entity_ref"]["id"],
+        to_agent_id=frontend["entity_ref"]["id"],
+        allowed_action="ask",
+        deadline_seconds=900,
+        reason="one bounded question",
+        idempotency_key="link-ask",
+    )
+    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+        hand_over("link-with-ask")
+    operator.close_agent_link(
+        asking["entity_ref"]["id"],
+        asking["revision"],
+        reason="superseded by a handoff link",
+        idempotency_key="link-ask-close",
+    )
+
+    operator.open_agent_link(
+        from_agent_id=backend["entity_ref"]["id"],
+        to_agent_id=frontend["entity_ref"]["id"],
+        allowed_action="handoff_work",
+        deadline_seconds=900,
+        reason="the frontend half is theirs",
+        idempotency_key="link-handoff",
+    )
+    assert hand_over("link-after")["event_type"] == "delegation.requested"
+
+
+def test_closing_the_link_takes_the_widening_back(workspace: dict[str, Any]) -> None:
+    operator: CommonsManager = workspace["operator"]
+    backend = operator.create_agent(
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="hands work over",
+        idempotency_key="revoke-backend",
+    )
+    frontend = operator.create_agent(
+        name="Frontend",
+        profile_id="claude-builder",
+        rationale="receives handed-over work",
+        idempotency_key="revoke-frontend",
+    )
+    link = operator.open_agent_link(
+        from_agent_id=backend["entity_ref"]["id"],
+        to_agent_id=frontend["entity_ref"]["id"],
+        allowed_action="handoff_work",
+        deadline_seconds=900,
+        reason="temporary",
+        idempotency_key="revoke-link",
+    )
+    operator.close_agent_link(
+        link["entity_ref"]["id"],
+        link["revision"],
+        reason="the loan ended",
+        idempotency_key="revoke-close",
+    )
+    worker = _open(workspace["repo"], workspace["state_root"], name="revoked", role="builder")
+    task = worker.create_task(
+        title="Backend work",
+        description="after the link closed",
+        acceptance_criteria=("done",),
+        idempotency_key="revoke-task",
+    )
+    parent = _bind_run(
+        workspace,
+        agent_id=backend["entity_ref"]["id"],
+        worker=worker,
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        profile="claude-builder",
+        purpose="implementation",
+        key="revoke-run",
+    )
+    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+        worker.create_delegation(
+            target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+            target_revision=task["revision"],
+            target_profile="claude-builder",
+            purpose="implementation",
+            limits=LIMITS,
+            parent_delegation_id=parent["entity_ref"]["id"],
+            on_behalf_of_agent_id=frontend["entity_ref"]["id"],
+            idempotency_key="revoke-attempt",
+        )

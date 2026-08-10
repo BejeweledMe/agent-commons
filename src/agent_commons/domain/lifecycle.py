@@ -907,9 +907,23 @@ def _validate_role_binding(
     acting = acting_agent_id(snapshot, actor_session_id)
     if acting is None or acting == agent_id:
         return
-    if acting not in {str(record["id"]) for record in lineage(snapshot.agents, agent_id)}:
+    if acting in {str(record["id"]) for record in lineage(snapshot.agents, agent_id)}:
+        return
+    # An open link is the one thing that widens this, which is what a typed
+    # action was for.  Its deadline is not checked here: replay has no clock,
+    # and using one would make the same events project differently over time --
+    # the reason session liveness is excluded from replay too.  A link is closed
+    # explicitly, and an expired one is surfaced where a clock exists.
+    if not any(
+        link.get("state") == "open"
+        and link.get("allowed_action") == "handoff_work"
+        and str(link.get("from_agent_id")) == acting
+        and str(link.get("to_agent_id")) == agent_id
+        for link in snapshot.agent_links.values()
+    ):
         raise LifecycleConflictError(
-            f"role {acting} may staff only itself or a role it created, not {agent_id}"
+            f"role {acting} may staff only itself, a role it created, or a role it holds "
+            f"a handoff_work link to, not {agent_id}"
         )
 
 

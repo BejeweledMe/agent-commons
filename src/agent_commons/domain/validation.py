@@ -345,7 +345,10 @@ _AGENT_CONTEXT_MODES = {"fresh", "accumulated"}
 _AGENT_ORIGINS = {"human", "agent"}
 _AGENT_AUTHORIZATIONS = {"human", "human_confirmed", "automatic"}
 _AGENT_RETIRED_BY = {"human", "agent", "cascade"}
-_AGENT_LINK_ACTIONS = {"ask"}
+#: What a temporary link permits.  A typed action rather than an
+#: open/closed flag, so adding one extends this set instead of
+#: reshaping the record.
+_AGENT_LINK_ACTIONS = {"ask", "handoff_work"}
 _AGENT_MUTABLE_FIELDS = {
     "name",
     "grants",

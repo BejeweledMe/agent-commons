@@ -431,9 +431,17 @@ A link is a **typed grant**, never an open/closed flag:
  "allowed_action": "ask", "deadline": "…", "reason": "…"}
 ```
 
-`allowed_action` is an enum with one member today. Adding `handoff_work` later
-extends the enum and its validation; it does not change the model, which is the
-property Р4 asks for. The exchange itself runs over the existing bounded
+`allowed_action` is an enum, and `handoff_work` was added to it exactly as
+predicted: the enum and its validation grew, the record did not change shape.
+It also turned out to be the thing that made the model necessary rather than
+decorative — staffing a run with a role is an authority, so a link that widens
+who may do it needs a typed action rather than an open/closed flag.
+
+A link's deadline is deliberately **not** checked in the lifecycle. Replay has
+no clock, and using one would make the same events project differently over
+time; this is the same reason mutable session liveness is excluded from replay.
+A link is ended by an explicit `agent.link_closed`, and an expired one is
+surfaced where a clock exists. The exchange itself runs over the existing bounded
 communication channel; only the grant is canonical. Its consumer exists: an ask
 with no live session on the other side surfaces in the human panel with the
 blocked outline, so it is answered rather than dropped.

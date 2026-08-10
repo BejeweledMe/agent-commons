@@ -1358,10 +1358,10 @@ def agent_retire(
 @click.option(
     "--action",
     "allowed_action",
-    type=click.Choice(("ask",)),
+    type=click.Choice(("ask", "handoff_work")),
     default="ask",
     show_default=True,
-    help="What the link permits. A typed action, not an open/closed flag.",
+    help="What the link permits: a bounded question, or handing work over.",
 )
 @click.option("--deadline-seconds", type=int, required=True)
 @click.option("--reason", required=True)

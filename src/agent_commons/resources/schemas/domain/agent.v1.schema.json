@@ -184,7 +184,8 @@
     },
     "allowed_action": {
       "enum": [
-        "ask"
+        "ask",
+        "handoff_work"
       ]
     },
     "deadline_seconds": {
