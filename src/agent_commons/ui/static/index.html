@@ -126,6 +126,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="tabs" id="tabs">
       <button type="button" data-panel="record" aria-selected="true">Record</button>
       <button type="button" data-panel="proposals" aria-selected="false" hidden>Proposals</button>
+      <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
       <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
     </div>
@@ -139,6 +140,28 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         Confirming creates exactly what was proposed, credited to its proposer.</p>
       <div id="proposal-list"></div>
       <p class="result" id="proposal-result"></p>
+    </section>
+
+    <section class="panel" id="panel-catalog">
+      <p class="note warn" id="catalog-warning"></p>
+      <div id="catalog-list"></div>
+      <h3 style="font-size:12px;margin:14px 0 6px">Add or replace an entry</h3>
+      <label class="field"><span>Kind</span>
+        <select id="catalog-section">
+          <option value="skills">Skill — instructions every run of the role receives</option>
+          <option value="tools">Tool — one of the profile's tools a role may keep</option>
+        </select></label>
+      <label class="field"><span>Short id (lowercase, no spaces)</span>
+        <input type="text" id="catalog-id" autocomplete="off"></label>
+      <label class="field"><span>Name people will see</span>
+        <input type="text" id="catalog-title" autocomplete="off"></label>
+      <label class="field"><span>What it is for</span>
+        <input type="text" id="catalog-description" autocomplete="off"></label>
+      <label class="field" id="catalog-instruction-field">
+        <span>Instructions given to the agent (skills only)</span>
+        <textarea id="catalog-instruction"></textarea></label>
+      <button type="button" id="catalog-save">Save entry</button>
+      <p class="result" id="catalog-result"></p>
     </section>
 
     <section class="panel" id="panel-message">
@@ -167,8 +190,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <input type="text" id="setting-name" autocomplete="off"></label>
       <label class="field"><span>Required skills (operator catalogue)</span>
         <select id="setting-skills" multiple size="4"></select></label>
-      <label class="field"><span>MCP servers (narrows the profile, never widens)</span>
-        <select id="setting-mcp" multiple size="4"></select></label>
       <label class="field"><span>Tools (narrows the profile, never widens)</span>
         <select id="setting-tools" multiple size="4"></select></label>
       <label class="field"><span>Reason for this change</span>
@@ -529,8 +550,6 @@ function paintSettings(record) {
   document.getElementById("setting-name").value = record.name || "";
   fillSelect(document.getElementById("setting-skills"),
     (catalog && catalog.skills) || [], record.skills || [], true);
-  fillSelect(document.getElementById("setting-mcp"),
-    (catalog && catalog.mcp_servers) || [], record.mcp_allowlist || [], true);
   fillSelect(document.getElementById("setting-tools"),
     (catalog && catalog.tools) || [], record.tool_allowlist || [], true);
   document.getElementById("setting-reason").value = "";
@@ -557,6 +576,7 @@ function paintSettings(record) {
 
 async function loadCatalog() {
   try { catalog = await api("/api/catalog"); } catch (error) { catalog = null; }
+  catalogEditing = Boolean(catalog && catalog.catalog_editing_enabled);
 }
 
 async function inspect(node) {
@@ -631,7 +651,6 @@ document.getElementById("settings-save").addEventListener("click", async () => {
       open_links: document.getElementById("grant-open_links").value,
     },
     skills: selectedValues(document.getElementById("setting-skills")),
-    mcp_allowlist: selectedValues(document.getElementById("setting-mcp")),
     tool_allowlist: selectedValues(document.getElementById("setting-tools")),
   };
   const downgrade = document.getElementById("setting-downgrade");
@@ -679,6 +698,97 @@ async function retire(cascade) {
 
 document.getElementById("settings-retire").addEventListener("click", () => retire(false));
 document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
+
+let catalogEditing = false;
+
+function paintCatalog() {
+  const tab = document.querySelector('#tabs button[data-panel="catalog"]');
+  tab.hidden = !catalog;
+  if (!catalog) { return; }
+  const warning = document.getElementById("catalog-warning");
+  warning.textContent = catalogEditing
+    ? "Entries here change what delegated runs are told to do. They are stored in " +
+      (catalog.catalog_path || "the operator catalogue") + "."
+    : "Read-only. Start the UI with --role-catalog and --enable-catalog-editing to change it.";
+  const host = document.getElementById("catalog-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  for (const section of ["skills", "tools"]) {
+    const heading = document.createElement("h3");
+    heading.style.cssText = "font-size:12px;margin:12px 0 4px";
+    heading.textContent = section === "skills" ? "Skills" : "Tools";
+    host.appendChild(heading);
+    const entries = catalog[section] || [];
+    if (!entries.length) {
+      const none = document.createElement("p");
+      none.className = "note";
+      none.textContent = "none yet";
+      host.appendChild(none);
+    }
+    for (const entry of entries) {
+      const row = document.createElement("div");
+      row.className = "field";
+      const label = document.createElement("span");
+      // Operator-authored text, still written as text and never as markup.
+      label.textContent = entry.title + " — " + entry.id +
+        (entry.description ? " · " + entry.description : "");
+      row.appendChild(label);
+      if (catalogEditing) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () => removeCatalogEntry(section, entry.id));
+        row.appendChild(remove);
+      }
+      host.appendChild(row);
+    }
+  }
+  document.getElementById("catalog-save").hidden = !catalogEditing;
+}
+
+function catalogInstructionVisibility() {
+  document.getElementById("catalog-instruction-field").hidden =
+    document.getElementById("catalog-section").value !== "skills";
+}
+
+async function saveCatalogEntry() {
+  const result = document.getElementById("catalog-result");
+  const section = document.getElementById("catalog-section").value;
+  try {
+    await post("/api/catalog/entries", {
+      section: section,
+      id: document.getElementById("catalog-id").value,
+      title: document.getElementById("catalog-title").value,
+      description: document.getElementById("catalog-description").value,
+      instruction: section === "skills"
+        ? document.getElementById("catalog-instruction").value : null,
+    });
+    result.className = "result ok";
+    result.textContent = "saved";
+    await loadCatalog();
+    paintCatalog();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+async function removeCatalogEntry(section, entryId) {
+  const result = document.getElementById("catalog-result");
+  try {
+    await post("/api/catalog/entries/remove", { section: section, id: entryId });
+    result.className = "result ok";
+    result.textContent = "removed " + entryId;
+    await loadCatalog();
+    paintCatalog();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById("catalog-section")
+  .addEventListener("change", catalogInstructionVisibility);
+document.getElementById("catalog-save").addEventListener("click", saveCatalogEntry);
 
 let proposals = [];
 
@@ -858,7 +968,9 @@ async function boot() {
     document.getElementById("writes").textContent = writesEnabled
       ? "writes enabled as " + meta.writer_session_id
       : "writes disabled";
-    if (writesEnabled) { await loadCatalog(); }
+    await loadCatalog();
+    catalogInstructionVisibility();
+    paintCatalog();
     await loadProposals();
     document.getElementById("layers").textContent =
       meta.truth_layers.join(" › ") + " — " + meta.trust_note +

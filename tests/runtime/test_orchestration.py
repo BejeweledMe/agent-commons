@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from agent_commons.errors import LifecycleConflictError
+from agent_commons.errors import LifecycleConflictError, ValidationError
 from agent_commons.runtime import (
     BuiltinProfileId,
     DiagnosticCode,
@@ -287,6 +287,109 @@ def test_a_roles_tool_narrowing_reaches_the_launched_process(tmp_path: Path) -> 
     assert "mcp__agent-commons__commons_repo_read" in allowed
     assert "mcp__agent-commons__commons_repo_search" not in allowed
     assert "mcp__agent-commons__commons_succeed_delegation" in allowed
+
+
+def test_a_required_skill_reaches_the_instruction_the_provider_receives(
+    tmp_path: Path,
+) -> None:
+    """A catalogue nothing reads would be a settings screen over nothing."""
+
+    manager, task = _workspace(tmp_path)
+    role = manager.create_agent(
+        name="Backend",
+        profile_id="claude-independent-reviewer",
+        rationale="requires the house review checklist",
+        skills=("house-checklist",),
+        idempotency_key="skill-role",
+    )
+    review = manager.request_review(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        criteria=("Inspect exact target",),
+        independent=True,
+        idempotency_key="skill-review",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "micro_usd", "limit": 50_000},
+        },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="skill-delegation",
+    )
+    delegation_id = delegation["entity_ref"]["id"]
+    seen: list[bytes] = []
+
+    class CapturingRunner(FakeRunner):
+        def run(self, invocation: Any, **values: Any) -> ProcessResult:
+            seen.append(invocation.stdin)
+            return super().run(invocation, **values)
+
+    def complete_as_child(child_session_id: str) -> None:
+        child = CommonsManager(
+            manager.repo_root,
+            session_id=child_session_id,
+            state_root=manager.paths.state_root,
+        )
+        child.complete_review(
+            review["entity_ref"]["id"],
+            review["revision"],
+            target_revision=task["revision"],
+            verdict="approved",
+            summary="The exact target satisfies the requested criterion.",
+            idempotency_key="skill-child-review",
+        )
+        current = child.get_delegation(delegation_id)
+        child.succeed_delegation(
+            delegation_id,
+            current["revision"],
+            summary="Independent expert review recorded.",
+            result_refs=({"kind": "review", "id": review["entity_ref"]["id"]},),
+            idempotency_key="skill-child-succeed",
+        )
+
+    def service(catalog: dict[str, Any]) -> DelegationRuntimeService:
+        return DelegationRuntimeService(
+            manager,
+            runner=CapturingRunner(after_start=complete_as_child),  # type: ignore[arg-type]
+            profiles=default_profile_registry(
+                claude_executable="/bin/echo", mcp_executable="/bin/echo"
+            ),
+            catalog=catalog,
+            telemetry=CollectingTelemetry(),
+        )
+
+    # A role requiring a skill the operator has not defined fails closed rather
+    # than running as a different agent than the one that was configured.
+    with pytest.raises(ValidationError, match="catalogue does not define"):
+        service({"skills": [], "tools": []}).run(
+            delegation_id, delegation["revision"], idempotency_key="skill-launch-missing"
+        )
+
+    result = service(
+        {
+            "skills": [
+                {
+                    "id": "house-checklist",
+                    "title": "House checklist",
+                    "instruction": "Check error handling before style.",
+                }
+            ],
+            "tools": [],
+        }
+    ).run(delegation_id, delegation["revision"], idempotency_key="skill-launch")
+
+    assert result["delegation"]["state"] == "succeeded"
+    instruction = seen[-1].decode("utf-8")
+    assert "Check error handling before style." in instruction
+    assert "house-checklist" in instruction
 
 
 def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> None:

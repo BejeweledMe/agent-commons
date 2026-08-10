@@ -312,7 +312,6 @@ _STRING_LIST_FIELDS = {
     "superseded_correction_event_ids",
     "skills",
     "tool_allowlist",
-    "mcp_allowlist",
 }
 
 _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
@@ -353,7 +352,6 @@ _AGENT_MUTABLE_FIELDS = {
     "context_mode",
     "skills",
     "tool_allowlist",
-    "mcp_allowlist",
 }
 
 
@@ -442,7 +440,7 @@ def _validate_agent_reconfigured(payload: Mapping[str, Any]) -> None:
         raise ValidationError("changes.context_mode must be fresh or accumulated")
     if "name" in changes and (not isinstance(changes["name"], str) or not changes["name"].strip()):
         raise ValidationError("changes.name must be a non-empty string")
-    for field in ("skills", "tool_allowlist", "mcp_allowlist"):
+    for field in ("skills", "tool_allowlist"):
         if field in changes:
             _validate_string_list(changes[field], f"changes.{field}")
     downgrade = payload.get("isolation_downgrade")

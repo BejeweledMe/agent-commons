@@ -162,16 +162,26 @@ what the protocol does, not what the filesystem allows.
 
 ### Role settings widening a worker's authority
 
-An agent could try to reach new capability by naming a tool, an MCP server, or a
-model on a role. Role settings are **narrowing only**: `tool_allowlist` and
-`mcp_allowlist` are intersected with the profile's fixed set at invocation build
-time, and a selection naming anything the profile lacks fails closed before
-launch. A role cannot name a model — that is a property of the
-operator-allowlisted profile it selects, because a role that named a model would
-be editing argv. The catalogue of selectable entries is an operator file loaded
-with the same discipline as the runtime profile config: outside the delegated
-workspace, regular non-symlink file, not group/world writable, owned by the
-operator or root, size-bounded.
+An agent could try to reach new capability by naming a tool or a model on a
+role. Tool selection is **narrowing only**: `tool_allowlist` is intersected with
+the profile's fixed set at invocation build time, and a selection naming
+anything the profile lacks fails closed before launch. A role cannot name a
+model — that is a property of the operator-allowlisted profile it selects,
+because a role that named a model would be editing argv.
+
+A **skill** is the one setting that adds rather than narrows: operator-authored
+instruction text appended to the run's bounded instruction. It is safe because
+the text comes from the operator catalogue and never from an agent, so a role
+changes what a run is told to do and never what it is allowed to do. A role
+selecting a skill the catalogue does not define refuses the launch rather than
+running without it.
+
+The catalogue is an operator file loaded with the same discipline as the runtime
+profile config: outside the delegated workspace, regular non-symlink file, not
+group/world writable, owned by the operator or root, size-bounded. It is
+deliberately a different file from the profile config, because the two have
+different writers: the panel may edit this one, and may never edit the one that
+names executables.
 
 The terminal outcome tools are exempt from narrowing. A role that cannot report
 a result would consume its budget and exit without closing its delegation, which
@@ -198,10 +208,23 @@ With `--enable-writes` the loopback server records canonical events. The
 mutating surface is a fixed enumerated list of routes, each a thin adapter over
 an existing `CommonsManager` method — the same manager the CLI and MCP adapters
 use. Anyone holding the bearer token writes as the operator session the server
-was started with, and the startup banner says so. The capability-granting half
-of the role catalogue is not editable from this surface, because a token that
-could add an MCP server would be a token that widens what every child process
-may do. Writes stay off by default.
+was started with, and the startup banner says so. Writes stay off by default.
+
+`--enable-catalog-editing` is a **second, separate** gate and additionally
+requires `--role-catalog`. It lets the panel add and remove skills and tools,
+which changes what delegated runs are told to do — a different magnitude of
+privilege from recording a role, and one flag for both would hide that. The
+catalogue is written atomically at mode 0600 after full validation, so a
+rejected edit leaves the previous file byte-identical and a partial write cannot
+break the next launch. Removing an entry an active role requires is refused and
+names the roles.
+
+Provider profiles are never editable from the UI at any gate: they name
+executables, and no loopback surface should decide what process starts.
+
+Residual: with both gates open, the bearer token is the only thing between
+another local process and both the ledger and the instruction text of every
+subsequent run.
 
 ### Recursive delegation and resource exhaustion
 

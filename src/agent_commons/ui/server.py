@@ -62,6 +62,14 @@ MUTATING_ROUTES = (
     ("POST", "/api/agents/{agent_id}/messages"),
 )
 
+#: Catalogue editing is behind its own gate, so it has its own allowlist.
+#: Adding a skill and adding a role are different privileges and the test that
+#: pins the mutating surface should say so.
+CATALOG_ROUTES = (
+    ("POST", "/api/catalog/entries"),
+    ("POST", "/api/catalog/entries/remove"),
+)
+
 _HEARTBEAT_SECONDS = 15.0
 _POLL_SECONDS = 2.0
 
@@ -171,6 +179,8 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
 
     if context.writes_enabled:
         _register_writes(app, context)
+    if context.catalog_editing_enabled:
+        _register_catalog_writes(app, context)
 
     @app.get("/api/stream")
     async def stream(request: Request) -> Response:
@@ -184,27 +194,37 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     return app
 
 
+async def _json_body(request: Request) -> dict[str, Any]:
+    try:
+        value = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any) -> Response:
+    """Run one write and surface the guard that refused it, if any."""
+
+    try:
+        result = await asyncio.to_thread(action, **kwargs)
+    except CommonsError as exc:
+        # Refusals are the interesting output here: the guard that fired is
+        # what the operator needs on the node, not a generic failure.
+        return _error(409, type(exc).__name__, str(exc))
+    except (TypeError, ValueError, KeyError) as exc:
+        return _error(400, "invalid_request", str(exc))
+    context.invalidate()
+    return JSONResponse(result)
+
+
 def _register_writes(app: FastAPI, context: UIContext) -> None:
     """Attach the mutating surface. Every handler ends in ``CommonsManager``."""
 
     async def _record(action: Callable[..., Any], **kwargs: Any) -> Response:
-        try:
-            result = await asyncio.to_thread(action, **kwargs)
-        except CommonsError as exc:
-            # Refusals are the interesting output here: the guard that fired is
-            # what the operator needs on the node, not a generic failure.
-            return _error(409, type(exc).__name__, str(exc))
-        except (TypeError, ValueError, KeyError) as exc:
-            return _error(400, "invalid_request", str(exc))
-        context.invalidate()
-        return JSONResponse(result)
+        return await _guarded(action, context, **kwargs)
 
     async def _body(request: Request) -> dict[str, Any]:
-        try:
-            value = await request.json()
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-            return {}
-        return value if isinstance(value, dict) else {}
+        return await _json_body(request)
 
     @app.post("/api/agents")
     async def create_agent(request: Request) -> Response:
@@ -220,7 +240,6 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             lifetime=body.get("lifetime"),
             skills=tuple(body.get("skills") or ()),
             tool_allowlist=tuple(body.get("tool_allowlist") or ()),
-            mcp_allowlist=tuple(body.get("mcp_allowlist") or ()),
             template=bool(body.get("template", False)),
             created_by_agent_id=body.get("created_by_agent_id"),
             from_preset_id=body.get("from_preset_id"),
@@ -272,6 +291,33 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             thread_id=body.get("thread_id"),
             expected_revision=body.get("expected_revision"),
             idempotency_key=body.get("idempotency_key"),
+        )
+
+
+def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
+    """Attach the operator-catalogue surface, gated separately from role writes."""
+
+    @app.post("/api/catalog/entries")
+    async def save_catalog_entry(request: Request) -> Response:
+        body = await _json_body(request)
+        return await _guarded(
+            context.save_catalog_entry,
+            context,
+            section=str(body.get("section", "")),
+            entry_id=str(body.get("id", "")),
+            title=str(body.get("title", "")),
+            description=str(body.get("description", "")),
+            instruction=body.get("instruction"),
+        )
+
+    @app.post("/api/catalog/entries/remove")
+    async def remove_catalog_entry(request: Request) -> Response:
+        body = await _json_body(request)
+        return await _guarded(
+            context.remove_catalog_entry,
+            context,
+            section=str(body.get("section", "")),
+            entry_id=str(body.get("id", "")),
         )
 
 

@@ -200,9 +200,11 @@ def test_the_read_only_ui_serves_roles_and_the_catalogue_without_writes(
     catalog = client.get("/api/catalog", headers=authorized())
     assert catalog.status_code == 200
     payload = catalog.json()
-    # The half a bearer token must never be able to edit is named as such.
+    # Without the catalogue gate, everything but presets is operator-owned and
+    # the panel says so instead of offering controls that would fail.
     assert payload["editable_here"] == ["presets"]
-    assert "mcp_servers" in payload["operator_owned"]
+    assert payload["catalog_editing_enabled"] is False
+    assert {"profiles", "skills", "tools"} <= set(payload["operator_owned"])
     assert payload["skills"] == []
 
     graph = client.get("/api/graph", headers=authorized()).json()

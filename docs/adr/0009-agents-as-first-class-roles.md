@@ -262,25 +262,47 @@ had fails closed before launch instead of being silently dropped.
 **Choices come from an operator-owned catalog**, loaded with the same discipline
 as `runtime.yaml`: outside the delegated workspace, no-follow open, regular file,
 not group/world writable, owned by the operator or root, size-bounded. It
-declares `skills`, `mcp_servers`, `tools`, and `presets`. A role referencing an
-id absent from the catalog fails closed.
+declares `skills` and `tools`. A role referencing an id absent from the catalog
+fails closed — at launch, refusing the run rather than quietly executing a role
+without the skill it was configured to require.
+
+A **skill** carries operator-authored instruction text that is appended to the
+run's bounded instruction. This is the one thing a role setting adds rather than
+narrows, and it is safe precisely because the text comes from the operator file:
+a role can change what a run is *told to do*, never what it is *allowed to do*.
 
 **Model is chosen by choosing a profile.** A role that could name a model would
 be editing argv. The gear panel lists the allowlisted profiles with the model
 each one pins, which is the same choice expressed where it is enforceable.
 
+**MCP selection was removed rather than shipped inert.** The first cut gave a
+role an `mcp_allowlist`, which nothing read: a worker receives exactly one MCP
+server, so narrowing a set of one means nothing, and widening it is the deferred
+change. A stored field with no reader is the failure this project keeps writing
+rules about, so the field is gone and the panel instead shows, read-only, which
+servers the selected profile actually carries. It returns when a profile can
+carry a second one, which is a separate and much larger change.
+
 ### The conflict this creates with "the human writes the catalogue from the UI"
 
-Р3 asks that catalogue entries be written by a human from the UI. Half of that is
-safe and half is not, so the catalogue is split:
+Р3 asks that catalogue entries be written by a human from the UI. That is
+delivered — as a form with plain-language fields, not a YAML box, with the
+backend assembling and publishing the file atomically — but behind **its own
+gate**, `--enable-catalog-editing`, separate from `--enable-writes`:
 
-- **Capability-granting half** — MCP servers, tools, profiles. Editing this from
-  a loopback HTTP surface would mean the bearer token can widen what every child
-  process may do. It stays an operator file, edited outside the UI; the UI shows
-  it read-only and links to the path.
-- **Narrowing half** — presets, skill selections drawn from already-declared
-  fragments, display names. These can only reduce authority, so they are written
-  from the UI as canonical records.
+- `--enable-writes` lets the panel record roles, messages, and retirements. Every
+  one of those is bounded by the invariants in this document.
+- `--enable-catalog-editing` lets the panel change what delegated runs are *told
+  to do*. That is a different magnitude of privilege, and one checkbox for both
+  would hide it. It additionally requires `--role-catalog` naming the file, so
+  turning it on cannot silently edit nothing.
+
+Profiles stay out of the UI entirely at any gate: they name executables, and no
+loopback surface should be able to change what process starts.
+
+Removing a catalogue entry an active role requires is refused and names the
+roles. Otherwise the click lands here and the failure lands at somebody's next
+launch.
 
 A **preset is a role with `template: true`**: it never runs, is never delegated
 to, never authors anything, and creating from it copies its settings. That

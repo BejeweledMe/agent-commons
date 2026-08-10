@@ -579,7 +579,7 @@ def _validate_agent_creation(
         raise LifecycleConflictError(
             "a created role cannot hold a wider provider profile than its creator"
         )
-    for field in ("tool_allowlist", "mcp_allowlist", "skills"):
+    for field in ("tool_allowlist", "skills"):
         creator_values = creator.get(field)
         if not creator_values:
             continue

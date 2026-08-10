@@ -1516,7 +1516,6 @@ class CommonsManager:
         lifetime: Mapping[str, Any] | None = None,
         skills: Sequence[str] = (),
         tool_allowlist: Sequence[str] = (),
-        mcp_allowlist: Sequence[str] = (),
         turnover_budget: int | None = None,
         template: bool = False,
         created_by_agent_id: str | None = None,
@@ -1562,7 +1561,6 @@ class CommonsManager:
         for field_name, values in (
             ("skills", skills),
             ("tool_allowlist", tool_allowlist),
-            ("mcp_allowlist", mcp_allowlist),
         ):
             if values:
                 payload[field_name] = _optional_list(list(values), field_name)

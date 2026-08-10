@@ -15,11 +15,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
 from agent_commons.errors import ConfigurationError, ValidationError
 from agent_commons.services.manager import CommonsManager
-from agent_commons.ui.catalog import load_role_catalog
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
 
@@ -85,12 +85,17 @@ class UIContext:
         state_source: str = "default",
         writer_session_id: str | None = None,
         catalog_path: Path | None = None,
+        catalog_editing: bool = False,
     ) -> None:
         self.repo = repo
         self._state_root = state_root
         self._state_base = state_base
         self._state_source = state_source
         self._catalog_path = catalog_path
+        # A separate gate from --enable-writes on purpose.  Editing presets and
+        # editing the set of things a child process may run are different
+        # magnitudes of privilege, and one checkbox for both would hide that.
+        self._catalog_editing = bool(catalog_editing)
         # A writable context is opt-in and needs a real operator session, the
         # same identity the CLI writes under.  Absent one, this stays the
         # read-only server it has always been.
@@ -106,6 +111,10 @@ class UIContext:
     @property
     def writes_enabled(self) -> bool:
         return self.writer_session_id is not None
+
+    @property
+    def catalog_editing_enabled(self) -> bool:
+        return self._catalog_editing and self._catalog_path is not None
 
     def manager(self) -> CommonsManager:
         return CommonsManager(
@@ -251,10 +260,14 @@ class UIContext:
 
         snapshot = self.manager().snapshot()
         catalogue = load_role_catalog(self._catalog_path, workspace_root=self.repo)
+        editable = ["presets"] + (list(CATALOG_SECTIONS) if self.catalog_editing_enabled else [])
         return {
             "schema": CATALOG_SCHEMA,
-            "editable_here": ["presets"],
-            "operator_owned": ["skills", "mcp_servers", "tools", "profiles"],
+            "editable_here": editable,
+            "operator_owned": ["profiles"] + (
+                [] if self.catalog_editing_enabled else list(CATALOG_SECTIONS)
+            ),
+            "catalog_editing_enabled": self.catalog_editing_enabled,
             "catalog_path": str(self._catalog_path) if self._catalog_path else None,
             "profiles": sorted(PROFILE_NARROWING),
             "grant_levels": ["deny", "ask", "auto"],
@@ -266,6 +279,64 @@ class UIContext:
                 if record.get("template") and record.get("state") == "active"
             ],
         }
+
+    # -- catalogue editing ----------------------------------------------------
+
+    def _require_catalog_editing(self) -> Path:
+        if not self.catalog_editing_enabled:
+            raise ConfigurationError(
+                "catalogue editing is off; restart with --role-catalog and "
+                "--enable-catalog-editing"
+            )
+        assert self._catalog_path is not None
+        return self._catalog_path
+
+    def _catalog_users(self, section: str, entry_id: str) -> list[str]:
+        """Active roles that would break if this entry disappeared."""
+
+        field = "skills" if section == "skills" else "tool_allowlist"
+        return sorted(
+            str(record["id"])
+            for record in self.manager().snapshot().agents.values()
+            if record.get("state") == "active" and entry_id in (record.get(field) or ())
+        )
+
+    def save_catalog_entry(
+        self,
+        *,
+        section: str,
+        entry_id: str,
+        title: str,
+        description: str = "",
+        instruction: str | None = None,
+    ) -> dict[str, Any]:
+        path = self._require_catalog_editing()
+        if section not in CATALOG_SECTIONS:
+            raise ValidationError(f"unknown catalogue section: {section}")
+        catalogue = load_role_catalog(path, workspace_root=self.repo)
+        entry: dict[str, str] = {"id": entry_id, "title": title, "description": description}
+        if section == "skills":
+            entry["instruction"] = instruction or ""
+        remaining = [item for item in catalogue[section] if item["id"] != entry_id]
+        catalogue[section] = sorted([*remaining, entry], key=lambda item: item["id"])
+        write_role_catalog(path, catalogue, workspace_root=self.repo)
+        return {"section": section, "entry": entry, "catalog_path": str(path)}
+
+    def remove_catalog_entry(self, *, section: str, entry_id: str) -> dict[str, Any]:
+        path = self._require_catalog_editing()
+        if section not in CATALOG_SECTIONS:
+            raise ValidationError(f"unknown catalogue section: {section}")
+        # Removing something a role requires would make that role fail at its
+        # next launch, far from the click that caused it.
+        users = self._catalog_users(section, entry_id)
+        if users:
+            raise ValidationError(
+                f"{entry_id} is required by active roles: " + ", ".join(users)
+            )
+        catalogue = load_role_catalog(path, workspace_root=self.repo)
+        catalogue[section] = [item for item in catalogue[section] if item["id"] != entry_id]
+        write_role_catalog(path, catalogue, workspace_root=self.repo)
+        return {"section": section, "removed": entry_id, "catalog_path": str(path)}
 
     def agent_proposals(self) -> list[dict[str, Any]]:
         """Open role proposals, readable whether or not this server writes."""
@@ -283,7 +354,7 @@ class UIContext:
             for key in ("profile_id", "context_mode", "grants", "turnover_budget"):
                 if not fields.get(key):
                     fields[key] = preset.get(key)
-            for key in ("skills", "tool_allowlist", "mcp_allowlist"):
+            for key in ("skills", "tool_allowlist"):
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
         return manager.create_agent(**fields)

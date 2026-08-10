@@ -112,6 +112,43 @@ def test_enable_writes_without_a_session_is_refused_before_binding_a_socket(
     assert "context" not in captured
 
 
+def test_catalogue_editing_requires_naming_the_file_it_edits(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refuse at the command, not by silently editing nothing."""
+
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(
+        cli, ["--repo", str(repo), "--json", "ui", "--no-browser", "--enable-catalog-editing"]
+    )
+
+    assert result.exit_code != 0
+    assert "--role-catalog" in result.output
+    assert "context" not in captured
+
+
+def test_catalogue_editing_is_a_separate_switch_from_role_writes(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Editing presets and changing what a run is told to do are not one flag."""
+
+    catalogue = tmp_path / "catalog.yaml"
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo", str(repo), "--session-id", _session(repo), "--json", "ui",
+            "--no-browser", "--enable-writes", "--role-catalog", str(catalogue),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["context"].writes_enabled is True
+    assert captured["context"].catalog_editing_enabled is False
+
+
 def test_a_role_catalogue_path_reaches_the_context(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

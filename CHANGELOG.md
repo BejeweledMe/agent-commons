@@ -60,6 +60,23 @@ Versioning once a stable release line is declared.
   `POST /api/agents/proposals/{thread_id}/approve` and a Proposals tab in the
   panel. An open proposal rings its role on the graph like any other blocker
   waiting on a person.
+- The operator catalogue is editable from the panel as a form, not a YAML box,
+  behind its own gate: `agent-commons ui --enable-catalog-editing` additionally
+  requires `--role-catalog`. It is separate from `--enable-writes` because
+  recording a role and changing what every delegated run is told to do are
+  different magnitudes of privilege. Provider profiles stay out of the UI at any
+  gate. The file is validated in full and published atomically at mode 0600, so
+  a rejected edit leaves the previous one byte-identical.
+- **A required skill now reaches the process.** Catalogue skills carry
+  operator-authored instruction text appended to the run's bounded instruction,
+  resolved at launch and asserted against the bytes the provider receives. A
+  role selecting a skill the catalogue does not define refuses the launch rather
+  than silently running without it. Removing a catalogue entry an active role
+  requires is refused and names the roles.
+- Removed `mcp_allowlist` from role settings. Nothing read it: a worker receives
+  exactly one MCP server, so narrowing a set of one meant nothing and widening
+  it is a separate change. The panel now shows the profile's actual servers
+  read-only instead of offering a control with no effect.
 - A workspace that has created a role cannot be read by a build predating
   `commons.payload.agent.v1`; rollback means reverting to a checkout taken
   before the first role existed. Recorded in the threat model rather than

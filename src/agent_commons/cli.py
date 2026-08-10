@@ -332,8 +332,14 @@ def init_command(
 )
 @click.option(
     "--role-catalog",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Operator-owned catalogue of selectable skills, MCP servers, and tools.",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Operator-owned catalogue of selectable skills and tools.",
+)
+@click.option(
+    "--enable-catalog-editing",
+    is_flag=True,
+    help="Also allow editing that catalogue from the panel. Separate from "
+    "--enable-writes: this changes what child processes may run.",
 )
 @click.pass_obj
 def ui_command(
@@ -342,6 +348,7 @@ def ui_command(
     no_browser: bool,
     enable_writes: bool,
     role_catalog: Path | None,
+    enable_catalog_editing: bool,
 ) -> None:
     """Serve a local view of this workspace on loopback; read-only by default.
 
@@ -356,6 +363,10 @@ def ui_command(
     except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
         raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
 
+    if enable_catalog_editing and role_catalog is None:
+        raise ConfigurationError(
+            "--enable-catalog-editing requires --role-catalog naming the file to edit"
+        )
     writer_session_id = None
     if enable_writes:
         # Writes need the operator's own session, resolved and checked exactly
@@ -376,6 +387,7 @@ def ui_command(
         state_source=state.state_source,
         writer_session_id=writer_session_id,
         catalog_path=role_catalog,
+        catalog_editing=enable_catalog_editing,
     )
 
     def emit(bound_port: int, token: str) -> None:
@@ -390,6 +402,7 @@ def ui_command(
                     "repo": str(state.repo),
                     "read_only": not enable_writes,
                     "writer_session_id": writer_session_id,
+                    "catalog_editing": enable_catalog_editing,
                 }
             )
             return
@@ -403,6 +416,9 @@ def ui_command(
             click.echo("          anyone holding this token writes as that session")
         else:
             click.echo("  writes  disabled — this server records no canonical event")
+        if enable_catalog_editing:
+            click.echo(f"  catalog editable at {role_catalog}")
+            click.echo("          adding a skill changes what delegated runs are told to do")
         click.echo("  trust   loopback reachability alone is not authentication")
         click.echo("  note    the token is not stored on disk; opening a browser exposes")
         click.echo("          the URL to other processes of this user via the process list")
@@ -1055,7 +1071,6 @@ def agent_group() -> None:
 )
 @click.option("--skill", "skills", multiple=True, help="Operator catalogue skill id.")
 @click.option("--tool", "tools", multiple=True, help="Narrow the profile's tools to these ids.")
-@click.option("--mcp", "mcp", multiple=True, help="Narrow the profile's MCP servers to these ids.")
 @click.option("--template", is_flag=True, help="Store as a reusable preset that never runs.")
 @click.option("--created-by-agent", "created_by_agent_id", help="Proposing role, when confirming.")
 @_idem
@@ -1073,7 +1088,6 @@ def agent_create(
     retire_with_task: str | None,
     skills: tuple[str, ...],
     tools: tuple[str, ...],
-    mcp: tuple[str, ...],
     template: bool,
     created_by_agent_id: str | None,
     idempotency_key: str | None,
@@ -1100,7 +1114,6 @@ def agent_create(
             lifetime=lifetime,
             skills=skills,
             tool_allowlist=tools,
-            mcp_allowlist=mcp,
             template=template,
             created_by_agent_id=created_by_agent_id,
             idempotency_key=idempotency_key,
@@ -1601,6 +1614,7 @@ def _runtime_service(
         manager,
         profiles=config.profiles,
         operator_limits=config.limits,
+        catalog=config.catalog,
         telemetry=telemetry_sink(telemetry, manager),
     )
 

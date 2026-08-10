@@ -1515,6 +1515,7 @@ def main(argv: list[str] | None = None) -> int:
                 manager,
                 profiles=runtime_config.profiles,
                 operator_limits=runtime_config.limits,
+                catalog=runtime_config.catalog,
                 telemetry=telemetry_sink(arguments.telemetry, manager),
             )
         server = build_server(

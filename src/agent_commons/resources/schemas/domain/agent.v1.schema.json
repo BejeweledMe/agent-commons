@@ -41,19 +41,32 @@
       "$ref": "#/$defs/grants"
     },
     "context_mode": {
-      "enum": ["fresh", "accumulated"]
+      "enum": [
+        "fresh",
+        "accumulated"
+      ]
     },
     "template": {
       "type": "boolean"
     },
     "origin": {
-      "enum": ["human", "agent"]
+      "enum": [
+        "human",
+        "agent"
+      ]
     },
     "approval": {
-      "enum": ["human", "human_confirmed", "automatic"]
+      "enum": [
+        "human",
+        "human_confirmed",
+        "automatic"
+      ]
     },
     "created_by_agent_id": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
     },
     "rationale": {
@@ -70,7 +83,10 @@
       "maxLength": 8192
     },
     "turnover_budget": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 1024
     },
@@ -80,57 +96,82 @@
     "skills": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/catalogId" }
+      "items": {
+        "$ref": "#/$defs/catalogId"
+      }
     },
     "tool_allowlist": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/catalogId" }
-    },
-    "mcp_allowlist": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": { "$ref": "#/$defs/catalogId" }
+      "items": {
+        "$ref": "#/$defs/catalogId"
+      }
     },
     "changes": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "grants": { "$ref": "#/$defs/grants" },
-        "context_mode": { "enum": ["fresh", "accumulated"] },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "grants": {
+          "$ref": "#/$defs/grants"
+        },
+        "context_mode": {
+          "enum": [
+            "fresh",
+            "accumulated"
+          ]
+        },
         "skills": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/catalogId" }
+          "items": {
+            "$ref": "#/$defs/catalogId"
+          }
         },
         "tool_allowlist": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/catalogId" }
-        },
-        "mcp_allowlist": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/catalogId" }
+          "items": {
+            "$ref": "#/$defs/catalogId"
+          }
         }
       }
     },
     "isolation_downgrade": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reason", "operator_capability"],
+      "required": [
+        "reason",
+        "operator_capability"
+      ],
       "properties": {
-        "reason": { "type": "string", "minLength": 1, "maxLength": 8192 },
-        "operator_capability": { "const": "agent:isolation_downgrade" }
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "operator_capability": {
+          "const": "agent:isolation_downgrade"
+        }
       }
     },
     "retired_by": {
-      "enum": ["human", "agent", "cascade"]
+      "enum": [
+        "human",
+        "agent",
+        "cascade"
+      ]
     },
     "cascade_of": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
     },
     "from_agent_id": {
@@ -142,7 +183,9 @@
       "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
     },
     "allowed_action": {
-      "enum": ["ask"]
+      "enum": [
+        "ask"
+      ]
     },
     "deadline_seconds": {
       "type": "integer",
@@ -159,24 +202,45 @@
       "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
     },
     "grantLevel": {
-      "enum": ["deny", "ask", "auto"]
+      "enum": [
+        "deny",
+        "ask",
+        "auto"
+      ]
     },
     "grants": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["create_roles", "retire_roles", "open_links"],
+      "required": [
+        "create_roles",
+        "retire_roles",
+        "open_links"
+      ],
       "properties": {
-        "create_roles": { "$ref": "#/$defs/grantLevel" },
-        "retire_roles": { "$ref": "#/$defs/grantLevel" },
-        "open_links": { "$ref": "#/$defs/grantLevel" }
+        "create_roles": {
+          "$ref": "#/$defs/grantLevel"
+        },
+        "retire_roles": {
+          "$ref": "#/$defs/grantLevel"
+        },
+        "open_links": {
+          "$ref": "#/$defs/grantLevel"
+        }
       }
     },
     "lifetime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "properties": {
-        "kind": { "enum": ["persistent", "task_scoped"] },
+        "kind": {
+          "enum": [
+            "persistent",
+            "task_scoped"
+          ]
+        },
         "task_id": {
           "type": "string",
           "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"

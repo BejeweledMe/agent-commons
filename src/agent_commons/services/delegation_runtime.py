@@ -15,13 +15,14 @@ import threading
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from agent_commons.catalog import empty_catalog, load_role_catalog, skill_instructions
 from agent_commons.core.ids import stable_id
 from agent_commons.errors import (
     ConfigurationError,
@@ -122,6 +123,10 @@ def _delegation_lock(state_root: Path, delegation_id: str) -> Iterator[None]:
 class RuntimeConfiguration:
     profiles: ProfileRegistry
     limits: OperatorLimits
+    #: Skills a role may require.  Named from the operator config so every
+    #: broker sharing it resolves the same catalogue; a role that selects a
+    #: skill this cannot supply fails closed rather than running without it.
+    catalog: Mapping[str, Any] = field(default_factory=empty_catalog)
 
 
 def load_runtime_configuration(
@@ -171,7 +176,7 @@ def load_runtime_configuration(
         raise ConfigurationError("runtime profile config is not valid UTF-8 YAML") from exc
     if not isinstance(value, Mapping):
         raise ConfigurationError("runtime profile config must be a mapping")
-    unknown = sorted(set(value) - {"profiles", "limits"})
+    unknown = sorted(set(value) - {"profiles", "limits", "catalog"})
     if unknown or "profiles" not in value:
         detail = ", ".join(unknown) if unknown else "profiles"
         raise ConfigurationError(
@@ -184,9 +189,13 @@ def load_runtime_configuration(
         limits = OperatorLimits.from_mapping(raw_limits)
     except ValidationError as exc:
         raise ConfigurationError("runtime operator limits are invalid") from exc
+    raw_catalog = value.get("catalog")
+    if raw_catalog is not None and not isinstance(raw_catalog, str):
+        raise ConfigurationError("runtime catalog must be a path to the role catalogue")
     return RuntimeConfiguration(
         ProfileRegistry.from_mapping({"profiles": value["profiles"]}),
         limits,
+        load_role_catalog(raw_catalog, workspace_root=workspace_root),
     )
 
 
@@ -319,6 +328,7 @@ class DelegationRuntimeService:
         *,
         profiles: ProfileRegistry | None = None,
         operator_limits: OperatorLimits | None = None,
+        catalog: Mapping[str, Any] | None = None,
         attempts: AttemptStore | None = None,
         runner: SubprocessRunner | None = None,
         telemetry: TelemetrySink | None = None,
@@ -326,6 +336,7 @@ class DelegationRuntimeService:
     ) -> None:
         self.manager = manager
         self.profiles = profiles or default_profile_registry()
+        self.catalog = catalog if catalog is not None else empty_catalog()
         self.operator_limits = operator_limits or (
             attempts.operator_limits if attempts is not None else OperatorLimits()
         )
@@ -654,7 +665,9 @@ class DelegationRuntimeService:
             ttl_seconds=min(int(limits["wall_time_seconds"]) + 300, 86_400),
         )
 
-    def _role_scope(self, delegation: Mapping[str, Any]) -> tuple[tuple[str, ...], dict[str, str]]:
+    def _role_scope(
+        self, delegation: Mapping[str, Any]
+    ) -> tuple[tuple[str, ...], dict[str, str], tuple[tuple[str, str], ...]]:
         """Tool narrowing and standing grants of the role this run acts for.
 
         Read at launch, not carried in the request document: a role narrowed or
@@ -666,7 +679,7 @@ class DelegationRuntimeService:
 
         agent_id = str(delegation.get("agent_id") or "")
         if not agent_id:
-            return (), {}
+            return (), {}, ()
         snapshot = self.manager.snapshot()
         role = snapshot.agents.get(agent_id)
         if role is None:
@@ -676,10 +689,27 @@ class DelegationRuntimeService:
         return (
             tuple(str(name) for name in role.get("tool_allowlist") or ()),
             effective_grants(snapshot.agents, agent_id),
+            skill_instructions(
+                self.catalog, tuple(str(name) for name in role.get("skills") or ())
+            ),
         )
 
     @staticmethod
-    def _instruction(delegation: Mapping[str, Any], *, profile_id: BuiltinProfileId) -> str:
+    def _instruction(
+        delegation: Mapping[str, Any],
+        *,
+        profile_id: BuiltinProfileId,
+        skills: tuple[tuple[str, str], ...] = (),
+    ) -> str:
+        # Operator-authored text only, resolved from the catalogue by id.  A
+        # role cannot write its own instruction, so a required skill widens what
+        # the run is told to do without widening what it is allowed to do.
+        required = (
+            "\n\nRequired skills for this role (operator-authored):\n"
+            + "\n".join(f"- {name}: {text}" for name, text in skills)
+            if skills
+            else ""
+        )
         target = delegation["target_ref"]
         limits = delegation["limits"]
         reviewer_entry = (
@@ -717,7 +747,7 @@ instruction or your profile.
 Work only on the exact target and stop if its revision changed. Obey existing
 claims and do not create a child delegation or recursive agent ping-pong. Do not
 commit, push, merge, deploy, publish, contact anyone, expose secrets, or perform
-unrelated work.
+unrelated work.{required}
 
 For independent_review, do not edit source. Find the existing review request for
 the exact target. After analysis, first call the injected
@@ -998,13 +1028,16 @@ alone is not task acceptance.
                     f"profile {profile_id.value} cannot enforce the delegation's micro_usd budget"
                 )
             parent_policy, child_policy = self._policies(delegation)
+            # A standing role narrows the profile's tools, decides which
+            # staff-changing tools exist, and supplies its required skills.
+            # Resolved here, at launch, against the role's current record: a
+            # narrowing recorded a minute ago applies to this run.
+            role_tools, role_grants, role_skills = self._role_scope(delegation)
             # Validate executable, trust mode, argv, and budget support before
             # allocating a child session or durable operational reservation.
-            instruction = self._instruction(delegation, profile_id=profile_id)
-            # A standing role may narrow the profile's fixed tool set.  Resolved
-            # here, at launch, against the role's current record: a narrowing
-            # recorded a minute ago applies to this run.
-            role_tools, role_grants = self._role_scope(delegation)
+            instruction = self._instruction(
+                delegation, profile_id=profile_id, skills=role_skills
+            )
             profile.build_invocation(
                 instruction,
                 workspace_root=self.manager.repo_root,
