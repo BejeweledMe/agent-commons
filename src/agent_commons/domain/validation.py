@@ -398,11 +398,23 @@ def _validate_agent_created(payload: Mapping[str, Any]) -> None:
             raise ValidationError(
                 "an agent-created role is authorized automatically or human_confirmed"
             )
+        # A human-confirmed creation must point at the proposal it confirms.
+        # Without that binding, `created_by_agent_id` is a free-text claim and
+        # "role X asked for this" cannot be checked six months later.
+        if payload["approval"] == "human_confirmed":
+            proposal = payload.get("proposal_ref")
+            if not isinstance(proposal, Mapping) or proposal.get("kind") != "thread":
+                raise ValidationError(
+                    "a human-confirmed role must bind the proposal thread it confirms"
+                )
+            _validate_ref(proposal, "proposal_ref")
     else:
         if creator is not None:
             raise ValidationError("a human-created role has no creating role")
         if payload["approval"] != "human":
             raise ValidationError("a human-created role records human approval")
+        if payload.get("proposal_ref") is not None:
+            raise ValidationError("a human-created role confirms no proposal")
     budget = payload.get("turnover_budget")
     needs_budget = any(
         payload["grants"][name] != "deny" for name in ("create_roles", "retire_roles")

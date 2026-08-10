@@ -109,14 +109,19 @@ _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_record_verification",
 )
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
-#: Staff-changing tools, keyed by the standing grant that switches each one on.
-#: A run acting for no role, or for a role at `deny`, never receives them: the
-#: grant is the switch, so least privilege is the default rather than a check
-#: the tool performs on itself.
-_CLAUDE_COMMONS_GOVERNANCE_TOOLS = {
-    "create_roles": "mcp__agent-commons__commons_create_agent",
-    "retire_roles": "mcp__agent-commons__commons_retire_agent",
-    "open_links": "mcp__agent-commons__commons_open_agent_link",
+#: Staff-changing tools, keyed by the standing grant *and its level*.  A run
+#: acting for no role, or for a role at `deny`, receives none of them: the grant
+#: is the switch, so least privilege is the default rather than a check each
+#: tool performs on itself.
+#:
+#: `ask` gets the propose tool, not the record tool.  Handing a role at `ask` the
+#: tool that records directly produces a tool that always refuses -- a surface
+#: that reads as working and cannot be.
+_CLAUDE_COMMONS_GOVERNANCE_TOOLS: dict[tuple[str, str], str] = {
+    ("create_roles", "auto"): "mcp__agent-commons__commons_create_agent",
+    ("create_roles", "ask"): "mcp__agent-commons__commons_propose_agent",
+    ("retire_roles", "auto"): "mcp__agent-commons__commons_retire_agent",
+    ("open_links", "auto"): "mcp__agent-commons__commons_open_agent_link",
 }
 _WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verification"})
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
@@ -167,8 +172,8 @@ def _worker_tools(
         )
     tools += tuple(
         tool
-        for grant, tool in sorted(_CLAUDE_COMMONS_GOVERNANCE_TOOLS.items())
-        if str((role_grants or {}).get(grant, "deny")) != "deny"
+        for (grant, level), tool in sorted(_CLAUDE_COMMONS_GOVERNANCE_TOOLS.items())
+        if str((role_grants or {}).get(grant, "deny")) == level
     )
     if not role_tools:
         return tools

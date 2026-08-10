@@ -267,6 +267,11 @@ class UIContext:
             ],
         }
 
+    def agent_proposals(self) -> list[dict[str, Any]]:
+        """Open role proposals, readable whether or not this server writes."""
+
+        return [bounded_copy(item) for item in self.manager().list_agent_proposals()]
+
     # -- writes ---------------------------------------------------------------
 
     def create_agent(self, *, from_preset_id: str | None = None, **fields: Any) -> dict[str, Any]:
@@ -282,6 +287,9 @@ class UIContext:
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
         return manager.create_agent(**fields)
+
+    def approve_agent_proposal(self, *, thread_id: str, **fields: Any) -> dict[str, Any]:
+        return self.writer().approve_agent_proposal(thread_id, **fields)
 
     def reconfigure_agent(self, *, agent_id: str, **fields: Any) -> dict[str, Any]:
         expected_revision = fields.pop("expected_revision")

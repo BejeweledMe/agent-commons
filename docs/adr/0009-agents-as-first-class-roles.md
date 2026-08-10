@@ -194,13 +194,30 @@ Three levels, and two of them record the same origin:
 
 - `auto` — the agent records the event itself: `origin: agent`,
   `approval: automatic`.
-- `ask` — the agent cannot record. It opens a proposal thread; a human confirms
-  through the UI or CLI, and the recorded event still says `origin: agent` with
-  `created_by_agent_id` naming the proposer, plus `approval: human_confirmed`.
+- `ask` — the agent cannot record. It opens a proposal thread with
+  `commons_propose_agent`; a human confirms with `agent approve`, and the
+  recorded event still says `origin: agent` with `created_by_agent_id` naming
+  the proposer, plus `approval: human_confirmed`.
 - `deny` — refused.
 
 Recording a human-confirmed creation as `origin: human` would erase who asked
 for it, which is trap 3 in a new place.
+
+**A confirmation binds the proposal it confirms.** `agent.created` with
+`approval: human_confirmed` requires a `proposal_ref`, and the lifecycle checks
+that the thread is an open proposal, that the session which opened it was
+running as the crediting role, and that name, profile, grants, context mode, and
+rationale are unchanged. Without that binding `created_by_agent_id` is free text
+a human types in: anyone could attribute a role to a proposer that never asked,
+and "where did this role come from" would be unanswerable in exactly the case it
+matters. Approving therefore means approving *that* proposal; changing the terms
+means creating the role directly, under `origin: human`.
+
+The first version of this ADR shipped `ask` without the proposal flow, which
+made it worse than absent: the recording tool was registered at `ask`, every
+call refused, and the role saw a capability it could never use. Tool
+registration is now keyed on the grant *and its level* — `auto` gets the
+recording tool, `ask` gets the proposing one.
 
 The field is named `approval` rather than `authorization` because
 `authorization` is a credential marker in `SecurityPolicy`, and every canonical

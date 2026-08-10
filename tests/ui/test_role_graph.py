@@ -30,6 +30,36 @@ def _writer(workspace: dict[str, Any], suffix: str) -> CommonsManager:
     return manager
 
 
+def _run_as(
+    workspace: dict[str, Any], parent: CommonsManager, agent_id: str, key: str
+) -> CommonsManager:
+    """Return a manager whose session is running as `agent_id`."""
+
+    task = parent.create_task(
+        title=f"work for {key}",
+        description="binds a session to a role",
+        acceptance_criteria=("bound",),
+        idempotency_key=f"{key}-task",
+    )
+    delegation = parent.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        on_behalf_of_agent_id=agent_id,
+        idempotency_key=f"{key}-delegation",
+    )
+    child = _writer(workspace, key)
+    parent.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=str(child.session_id),
+        idempotency_key=f"{key}-start",
+    )
+    return child
+
+
 def test_roles_are_nodes_and_their_lineage_is_the_reporting_edge(
     workspace: dict[str, Any],
 ) -> None:
@@ -42,12 +72,14 @@ def test_roles_are_nodes_and_their_lineage_is_the_reporting_edge(
         turnover_budget=8,
         idempotency_key="graph-root",
     )
-    child = manager.create_agent(
+    # The child is created the way an agent-created role really comes about:
+    # by a session running as the root role, under its standing grant.
+    root_session = _run_as(workspace, manager, root["entity_ref"]["id"], "graph-lineage")
+    child = root_session.create_agent(
         name="Backend",
         profile_id="claude-builder",
         rationale="hired for the payments surface",
         created_by_agent_id=root["entity_ref"]["id"],
-        approval="human_confirmed",
         idempotency_key="graph-child",
     )
     graph = UIContext(workspace["repo"], state_root=workspace["state_root"]).rebuild_graph()

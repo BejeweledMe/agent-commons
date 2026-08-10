@@ -203,7 +203,9 @@ def _shed(
 
 #: Thread kinds that are an agent asking a human to decide something, rather
 #: than agents talking among themselves.
-_HUMAN_DECISION_THREADS = frozenset({"decision_request", "question", "help_request"})
+_HUMAN_DECISION_THREADS = frozenset(
+    {"decision_request", "question", "help_request", "proposal"}
+)
 
 
 def blocked_on_human(snapshot: ProjectSnapshot) -> set[str]:

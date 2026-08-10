@@ -46,11 +46,20 @@ Versioning once a stable release line is declared.
   node waiting on a human decision so a blocker is visible without opening a
   list. Both sources of that state — a delegation in `input_needed` and an open
   decision-request thread — already have producers.
-- Known gap: the `ask` level is not yet executable by a worker. The
-  staff-changing tool is registered whenever a grant is above `deny`, but a role
-  at `ask` records its own event as `automatic` and is refused, so the tool
-  cannot succeed. `auto` and `deny` work and are covered by tests. The proposal
-  flow that makes `ask` real is the next change.
+- The `ask` level is executable: a role at that level receives
+  `commons_propose_agent` rather than the recording tool, opens a proposal
+  thread, and a person confirms it with `agent approve`. Tool registration is
+  keyed on the grant *and its level*, so no role is handed a tool that can only
+  refuse.
+- A human-confirmed role must bind the proposal it confirms. The lifecycle
+  checks that the thread is an open proposal, that the session which opened it
+  was running as the crediting role, and that the confirmed terms match what was
+  proposed. `created_by_agent_id` stops being free text: a role can no longer be
+  attributed to a proposer that never asked.
+- Added `agent propose`, `agent proposals`, and `agent approve`, plus
+  `POST /api/agents/proposals/{thread_id}/approve` and a Proposals tab in the
+  panel. An open proposal rings its role on the graph like any other blocker
+  waiting on a person.
 - A workspace that has created a role cannot be read by a build predating
   `commons.payload.agent.v1`; rollback means reverting to a checkout taken
   before the first role existed. Recorded in the threat model rather than

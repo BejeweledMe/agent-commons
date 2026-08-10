@@ -477,6 +477,48 @@ def _require_grant(
         raise LifecycleConflictError(f"role {actor_agent_id} recorded an unauthorized {action}")
 
 
+#: Fields a confirmation may not quietly differ on.  Approving a proposal has to
+#: mean approving *that* proposal, or the ledger records "role X asked for this"
+#: next to something X never asked for.
+_PROPOSAL_BOUND_FIELDS = ("name", "profile_id", "grants", "context_mode", "rationale")
+
+
+def _assert_confirms_its_proposal(
+    snapshot: ProjectSnapshot,
+    payload: Mapping[str, Any],
+    *,
+    creator_id: str,
+) -> None:
+    """Tie a human-confirmed role to the open proposal a role actually made."""
+
+    reference = payload["proposal_ref"]
+    thread = require_entity(snapshot, "thread", str(reference.get("id", "")))
+    if thread.get("state") != "open":
+        raise LifecycleConflictError("a role proposal is confirmed only while its thread is open")
+    if thread.get("thread_type") != "proposal":
+        raise LifecycleConflictError("proposal_ref must name a proposal thread")
+    proposed = (thread.get("extensions") or {}).get("staff_proposal")
+    if not isinstance(proposed, Mapping) or proposed.get("action") != "create_role":
+        raise LifecycleConflictError("proposal thread carries no role-creation proposal")
+
+    # The proposing session must have been running as the role now credited
+    # with the proposal.  This is what makes `created_by_agent_id` a fact rather
+    # than a claim the confirming human types in.
+    proposer_session = str((thread.get("actor") or {}).get("session_id", ""))
+    bindings = session_agent_map(snapshot.delegations)
+    if creator_id not in bindings.get(proposer_session, frozenset()):
+        raise LifecycleConflictError(
+            "the proposal thread was not opened by a session running as the crediting role"
+        )
+    differing = sorted(
+        field for field in _PROPOSAL_BOUND_FIELDS if proposed.get(field) != payload.get(field)
+    )
+    if differing:
+        raise LifecycleConflictError(
+            "a confirmation cannot change what was proposed: " + ", ".join(differing)
+        )
+
+
 def _validate_agent_creation(
     snapshot: ProjectSnapshot,
     payload: Mapping[str, Any],
@@ -506,6 +548,8 @@ def _validate_agent_creation(
         raise LifecycleConflictError(
             "a human-confirmed role creation is recorded by the confirming human's session"
         )
+    if approval == "human_confirmed":
+        _assert_confirms_its_proposal(snapshot, payload, creator_id=str(creator_id))
     _require_grant(
         snapshot,
         str(creator_id),

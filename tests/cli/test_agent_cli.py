@@ -572,13 +572,40 @@ def test_a_cascade_retires_a_whole_lineage_in_one_command(
         root_id,
         session_id=session,
     )
-    _create(
-        workspace,
-        "cascade-grandchild",
-        "--created-by-agent",
-        child["entity_ref"]["id"],
-        session_id=workspace["human"]["session_id"],
+    # The third generation goes through the proposal flow, because a role at
+    # `ask` cannot record one itself and a confirmation must point at what was
+    # actually proposed.
+    child_session = _run_as(workspace, child["entity_ref"]["id"], "cascade-child-run")
+    proposed = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            child_session,
+            "agent",
+            "propose",
+            "--name",
+            "cascade-grandchild",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "the third generation asks rather than records",
+            "--idempotency-key",
+            "cascade-grandchild-proposal",
+        )
     )
+    _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "approve",
+            proposed["entity_ref"]["id"],
+            "--idempotency-key",
+            "cascade-grandchild-approve",
+        )
+    )
+    _finish_run(workspace, "cascade-child-run")
 
     # A live run blocks retirement whoever asks, so the cascade only becomes
     # possible once the work it owes is over.

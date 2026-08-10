@@ -1108,6 +1108,77 @@ def agent_create(
     )
 
 
+@agent_group.command("propose")
+@click.option("--name", required=True)
+@click.option("--profile", "profile_id", type=click.Choice(_DELEGATION_PROFILES), required=True)
+@click.option("--rationale", required=True)
+@click.option(
+    "--context-mode",
+    type=click.Choice(("fresh", "accumulated")),
+    default="fresh",
+    show_default=True,
+)
+@click.option("--create-roles", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option("--retire-roles", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option("--open-links", type=click.Choice(_GRANT_LEVELS), default="deny", show_default=True)
+@click.option("--turnover-budget", type=int)
+@_idem
+@click.pass_obj
+def agent_propose(
+    state: CLIState,
+    name: str,
+    profile_id: str,
+    rationale: str,
+    context_mode: str,
+    create_roles: str,
+    retire_roles: str,
+    open_links: str,
+    turnover_budget: int | None,
+    idempotency_key: str | None,
+) -> None:
+    """Ask a human for a role this session's role may not record itself.
+
+    Only a session running as a role can propose one.  The proposal grants
+    nothing until `agent approve` confirms it.
+    """
+
+    state.emit(
+        state.manager().propose_agent(
+            name=name,
+            profile_id=profile_id,
+            rationale=rationale,
+            context_mode=context_mode,
+            grants={
+                "create_roles": create_roles,
+                "retire_roles": retire_roles,
+                "open_links": open_links,
+            },
+            turnover_budget=turnover_budget,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@agent_group.command("proposals")
+@click.pass_obj
+def agent_proposals(state: CLIState) -> None:
+    """List open role proposals awaiting a human decision."""
+
+    state.emit(state.manager().list_agent_proposals())
+
+
+@agent_group.command("approve")
+@click.argument("thread_id")
+@_idem
+@click.pass_obj
+def agent_approve(state: CLIState, thread_id: str, idempotency_key: str | None) -> None:
+    """Create exactly the role a proposal asked for, crediting its proposer."""
+
+    state.emit(
+        state.manager().approve_agent_proposal(thread_id, idempotency_key=idempotency_key)
+    )
+
+
 @agent_group.command("list")
 @click.option("--include-retired", is_flag=True, help="Show roles that have left service.")
 @click.pass_obj

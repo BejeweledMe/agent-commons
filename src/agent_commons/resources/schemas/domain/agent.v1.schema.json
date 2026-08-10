@@ -61,6 +61,9 @@
       "minLength": 1,
       "maxLength": 8192
     },
+    "proposal_ref": {
+      "$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"
+    },
     "reason": {
       "type": "string",
       "minLength": 1,

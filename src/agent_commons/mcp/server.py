@@ -561,8 +561,15 @@ def build_server(
         effective_grants(commons.snapshot().agents, acting_agent_id) if acting_agent_id else {}
     )
 
-    def acting_grant(name: str) -> bool:
-        return acting_grants.get(name, "deny") != "deny"
+    def acting_grant(name: str, level: str) -> bool:
+        """A staff tool appears only at the exact level that can use it.
+
+        Registering the recording tool at `ask` would hand the role something
+        that always refuses; registering the proposing tool at `auto` would ask
+        a person for something the role was already trusted to do.
+        """
+
+        return acting_grants.get(name, "deny") == level
 
     def require_live_worker() -> dict[str, Any] | None:
         if worker is None:
@@ -997,7 +1004,7 @@ def build_server(
     # never sees the tool at all.  The domain still refuses on its own; this is
     # least privilege in front of that, not instead of it.
 
-    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("create_roles"))
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("create_roles", "auto"))
     def commons_create_agent(
         name: str,
         profile_id: str,
@@ -1037,7 +1044,42 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
-    @register(_DESTRUCTIVE_WRITE, worker_only=True, enabled=acting_grant("retire_roles"))
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("create_roles", "ask"))
+    def commons_propose_agent(
+        name: str,
+        profile_id: str,
+        rationale: str,
+        idempotency_key: str,
+        context_mode: str = "fresh",
+        create_roles: str = "deny",
+        retire_roles: str = "deny",
+        open_links: str = "deny",
+        turnover_budget: int | None = None,
+    ) -> dict[str, Any]:
+        """Ask a person for a role this role may not record itself.
+
+        The proposal is an ordinary typed thread: it lands in the same inbox and
+        the same panel as everything else needing a human, and it grants nothing
+        until somebody confirms it.  Confirming records the proposal's own
+        fields and credits this role, so what the ledger says was asked for is
+        what was asked for.
+        """
+
+        return commons.propose_agent(
+            name=name,
+            profile_id=profile_id,
+            rationale=rationale,
+            context_mode=context_mode,
+            grants={
+                "create_roles": create_roles,
+                "retire_roles": retire_roles,
+                "open_links": open_links,
+            },
+            turnover_budget=turnover_budget,
+            idempotency_key=idempotency_key,
+        )
+
+    @register(_DESTRUCTIVE_WRITE, worker_only=True, enabled=acting_grant("retire_roles", "auto"))
     def commons_retire_agent(
         agent_id: str,
         reason: str,
@@ -1057,7 +1099,7 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
-    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("open_links"))
+    @register(_IDEMPOTENT_WRITE, worker_only=True, enabled=acting_grant("open_links", "auto"))
     def commons_open_agent_link(
         to_agent_id: str,
         reason: str,

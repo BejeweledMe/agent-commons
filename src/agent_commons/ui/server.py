@@ -56,6 +56,7 @@ _ENTITY_KINDS = frozenset(
 #: not a second write path.
 MUTATING_ROUTES = (
     ("POST", "/api/agents"),
+    ("POST", "/api/agents/proposals/{thread_id}/approve"),
     ("POST", "/api/agents/{agent_id}/reconfigure"),
     ("POST", "/api/agents/{agent_id}/retire"),
     ("POST", "/api/agents/{agent_id}/messages"),
@@ -160,6 +161,10 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             }
         )
 
+    @app.get("/api/proposals")
+    async def proposals() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.agent_proposals))
+
     @app.get("/api/catalog")
     async def catalog() -> Response:
         return JSONResponse(await asyncio.to_thread(context.catalog))
@@ -219,6 +224,15 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             template=bool(body.get("template", False)),
             created_by_agent_id=body.get("created_by_agent_id"),
             from_preset_id=body.get("from_preset_id"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agents/proposals/{thread_id}/approve")
+    async def approve_proposal(thread_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.approve_agent_proposal,
+            thread_id=thread_id,
             idempotency_key=body.get("idempotency_key"),
         )
 

@@ -1521,6 +1521,7 @@ class CommonsManager:
         template: bool = False,
         created_by_agent_id: str | None = None,
         approval: str | None = None,
+        proposal_ref: Mapping[str, str] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("agent.created", idempotency_key)
@@ -1556,6 +1557,8 @@ class CommonsManager:
             "turnover_budget": turnover_budget,
             "template": bool(template),
         }
+        if proposal_ref is not None:
+            payload["proposal_ref"] = normalize_ref(proposal_ref)
         for field_name, values in (
             ("skills", skills),
             ("tool_allowlist", tool_allowlist),
@@ -1578,6 +1581,105 @@ class CommonsManager:
             idempotency_key=key,
             relations=relations,
             tags=("agent", origin),
+        )
+
+    def propose_agent(
+        self,
+        *,
+        name: str,
+        profile_id: str,
+        rationale: str,
+        grants: Mapping[str, str] | None = None,
+        context_mode: str = "fresh",
+        turnover_budget: int | None = None,
+        lifetime: Mapping[str, Any] | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Ask a human for a role this session's own grant cannot record itself.
+
+        A proposal is not a record: until it is confirmed it changes no run and
+        grants nothing.  It is an ordinary typed thread, so it lands in the same
+        inbox and the same panel as every other thing an agent needs a person
+        for.
+        """
+
+        snapshot = self.snapshot()
+        acting = acting_agent_id(snapshot, self._active_session().session_id)
+        if acting is None:
+            raise LifecycleConflictError("only a session running as a role proposes a role")
+        if effective_grants(snapshot.agents, acting)["create_roles"] == "deny":
+            raise LifecycleConflictError(f"role {acting} may not propose roles")
+        proposal = {
+            "action": "create_role",
+            "name": name,
+            "profile_id": profile_id,
+            "rationale": rationale,
+            "grants": dict(grants or dict.fromkeys(GRANT_NAMES, "deny")),
+            "context_mode": context_mode,
+            "turnover_budget": turnover_budget,
+            "lifetime": dict(lifetime or {"kind": "persistent"}),
+            "proposed_by_agent_id": acting,
+        }
+        return self.open_thread(
+            thread_type="proposal",
+            subject=f"New role proposed: {name}",
+            desired_outcome="a human confirms or declines this role",
+            to=("operator",),
+            related_refs=({"kind": "agent", "id": acting},),
+            extensions={"staff_proposal": proposal},
+            idempotency_key=self._idempotency_key("thread.opened", idempotency_key),
+        )
+
+    def list_agent_proposals(self) -> list[dict[str, Any]]:
+        """Open role proposals awaiting a person, newest last."""
+
+        snapshot = self.snapshot()
+        found = []
+        for identifier, thread in sorted(snapshot.threads.items()):
+            if thread.get("state") != "open" or thread.get("thread_type") != "proposal":
+                continue
+            proposal = (thread.get("extensions") or {}).get("staff_proposal")
+            if isinstance(proposal, Mapping) and proposal.get("action") == "create_role":
+                found.append(
+                    {
+                        "thread_id": identifier,
+                        "revision": thread.get("revision"),
+                        "proposal": dict(proposal),
+                        "recorded_at": thread.get("recorded_at"),
+                    }
+                )
+        return found
+
+    def approve_agent_proposal(
+        self,
+        thread_id: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Record exactly the role that was proposed, crediting its proposer.
+
+        The fields come from the proposal rather than from the caller, so
+        confirming cannot quietly become creating something else under the
+        proposer's name.
+        """
+
+        snapshot = self.snapshot()
+        thread = require_entity(snapshot, "thread", thread_id)
+        proposal = (thread.get("extensions") or {}).get("staff_proposal")
+        if not isinstance(proposal, Mapping) or proposal.get("action") != "create_role":
+            raise LifecycleConflictError("thread carries no role-creation proposal")
+        return self.create_agent(
+            name=str(proposal["name"]),
+            profile_id=str(proposal["profile_id"]),
+            rationale=str(proposal["rationale"]),
+            context_mode=str(proposal.get("context_mode", "fresh")),
+            grants=proposal.get("grants"),
+            turnover_budget=proposal.get("turnover_budget"),
+            lifetime=proposal.get("lifetime"),
+            created_by_agent_id=str(proposal["proposed_by_agent_id"]),
+            approval="human_confirmed",
+            proposal_ref={"kind": "thread", "id": thread_id},
+            idempotency_key=idempotency_key,
         )
 
     def reconfigure_agent(
@@ -1931,21 +2033,25 @@ class CommonsManager:
         desired_outcome: str,
         to: Sequence[str],
         related_refs: Sequence[Mapping[str, str]] = (),
+        extensions: Mapping[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("thread.opened", idempotency_key)
         thread_id = self._new_entity_id("thread", "thread.opened", key)
         refs = self._assert_refs_exist(related_refs)
+        payload: dict[str, Any] = {
+            "thread_id": thread_id,
+            "thread_type": thread_type,
+            "subject": subject,
+            "desired_outcome": desired_outcome,
+            "to": sorted(set(_nonempty_list(to, "to"))),
+            "related_refs": refs,
+        }
+        if extensions:
+            payload["extensions"] = dict(extensions)
         return self.record_event(
             "thread.opened",
-            {
-                "thread_id": thread_id,
-                "thread_type": thread_type,
-                "subject": subject,
-                "desired_outcome": desired_outcome,
-                "to": sorted(set(_nonempty_list(to, "to"))),
-                "related_refs": refs,
-            },
+            payload,
             idempotency_key=key,
             tags=("thread", thread_type),
         )
