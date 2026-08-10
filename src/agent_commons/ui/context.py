@@ -345,6 +345,11 @@ class UIContext:
 
         return self.manager().search_history(query, limit=limit, subject_kind=subject_kind)
 
+    def engagements(self) -> list[dict[str, Any]]:
+        """The main chats, readable whether or not this server writes."""
+
+        return [bounded_copy(item) for item in self.manager().list_engagements()]
+
     def agent_proposals(self) -> list[dict[str, Any]]:
         """Open role proposals, readable whether or not this server writes."""
 
@@ -365,6 +370,23 @@ class UIContext:
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
         return manager.create_agent(**fields)
+
+    def open_engagement(self, **fields: Any) -> dict[str, Any]:
+        return self.writer().open_engagement(**fields)
+
+    def say_in_engagement(
+        self,
+        *,
+        thread_id: str,
+        expected_revision: str,
+        body: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        if not body.strip():
+            raise ValidationError("a message needs a body")
+        return self.writer().reply_thread(
+            thread_id, expected_revision, body=body, idempotency_key=idempotency_key
+        )
 
     def approve_agent_proposal(self, *, thread_id: str, **fields: Any) -> dict[str, Any]:
         return self.writer().approve_agent_proposal(thread_id, **fields)

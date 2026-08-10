@@ -319,6 +319,22 @@ open/closed flag. Today the only action is a bounded question with a deadline,
 carried over the existing communication channel. The canonical record is the
 grant; the exchange is operational.
 
+Work reaches the system through a person. The standing conversation between that
+person and the roles at the top of the chain of command is an `engagement`
+thread: where the task is first stated, where progress is discussed, and where
+feedback returns. Several roles at the top share one thread with several
+recipients rather than a thread each, because merging separate threads in a view
+would assert an ordering no record holds. A chat addressed to one role is the
+situational channel for stepping in on that role alone.
+
+Recipients are fixed when a thread opens. A role created afterwards is reported
+as unaddressed rather than folded in, since rewriting canonical recipients from
+a projection is exactly what a view must never do.
+
+A delegated worker may reply only in a thread that addresses it or the role it
+runs as. Its reply is how feedback returns; it is not a way into every
+conversation in the workspace.
+
 Role settings, messages to a role, and retirement may be recorded from the local
 UI when it is started with `--enable-writes`. That surface is an adapter over
 `CommonsManager` exactly as the CLI and MCP adapters are; it does not create a

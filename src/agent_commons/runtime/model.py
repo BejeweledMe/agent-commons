@@ -104,6 +104,13 @@ _CLAUDE_COMMONS_OUTCOME_TOOLS = (
     "mcp__agent-commons__commons_ack_input",
     "mcp__agent-commons__commons_ack_control",
 )
+#: The main chat, from the worker's side.  Narrowable, unlike the outcome
+#: tools: a role configured not to talk is a narrower role, while a role that
+#: cannot report a result is a broken one.
+_CLAUDE_COMMONS_CHAT_TOOLS = (
+    "mcp__agent-commons__commons_list_my_threads",
+    "mcp__agent-commons__commons_reply_thread",
+)
 _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_complete_review",
     "mcp__agent-commons__commons_record_verification",
@@ -164,6 +171,7 @@ def _worker_tools(
     """
 
     tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
+    tools += _CLAUDE_COMMONS_CHAT_TOOLS
     if profile_id.independent_reviewer:
         tools += (
             _CLAUDE_COMMONS_REVIEW_TOOLS

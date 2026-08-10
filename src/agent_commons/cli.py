@@ -427,6 +427,67 @@ def ui_command(
     serve(context, port=port, open_browser=not no_browser, emit=emit)
 
 
+@cli.group("chat")
+def chat_group() -> None:
+    """The main conversation between a person and the top of the org."""
+
+
+@chat_group.command("open")
+@click.option("--subject", required=True)
+@click.option("--message", required=True, help="The task, in your own words.")
+@click.option("--objective-id", help="Bind this chat to the objective it is about.")
+@_idem
+@click.pass_obj
+def chat_open(
+    state: CLIState,
+    subject: str,
+    message: str,
+    objective_id: str | None,
+    idempotency_key: str | None,
+) -> None:
+    """Open the main chat, addressed to every role that answers to you."""
+
+    state.emit(
+        state.manager().open_engagement(
+            subject=subject,
+            body=message,
+            objective_id=objective_id,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@chat_group.command("show")
+@click.option("--include-resolved", is_flag=True)
+@click.pass_obj
+def chat_show(state: CLIState, include_resolved: bool) -> None:
+    """Show the main chats with their messages and who they address."""
+
+    state.emit(state.manager().list_engagements(include_resolved=include_resolved))
+
+
+@chat_group.command("say")
+@click.argument("thread_id")
+@click.argument("expected_revision")
+@click.option("--message", required=True)
+@_idem
+@click.pass_obj
+def chat_say(
+    state: CLIState,
+    thread_id: str,
+    expected_revision: str,
+    message: str,
+    idempotency_key: str | None,
+) -> None:
+    """Post a message into a main chat."""
+
+    state.emit(
+        state.manager().reply_thread(
+            thread_id, expected_revision, body=message, idempotency_key=idempotency_key
+        )
+    )
+
+
 @cli.command("search")
 @click.argument("query")
 @click.option("--limit", type=int, default=25, show_default=True)

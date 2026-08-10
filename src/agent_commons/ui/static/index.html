@@ -128,7 +128,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <span class="pill blocked" id="blocked-pill" hidden>waiting on you</span>
     </div>
     <div class="tabs" id="tabs">
-      <button type="button" data-panel="record" aria-selected="true">Record</button>
+      <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
+      <button type="button" data-panel="record" aria-selected="false">Record</button>
       <button type="button" data-panel="proposals" aria-selected="false" hidden>Proposals</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
@@ -136,7 +137,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
     </div>
 
-    <section class="panel open" id="panel-record">
+    <section class="panel open" id="panel-chat">
+      <p class="note" id="chat-note"></p>
+      <div id="chat-messages"></div>
+      <label class="field" id="chat-subject-field" hidden><span>What is the task?</span>
+        <input type="text" id="chat-subject" autocomplete="off"></label>
+      <label class="field"><span>Message</span>
+        <textarea id="chat-body"></textarea></label>
+      <button type="button" id="chat-send">Send</button>
+      <p class="result" id="chat-result"></p>
+    </section>
+
+    <section class="panel" id="panel-record">
       <pre id="inspector-body"></pre>
     </section>
 
@@ -603,7 +615,7 @@ async function inspect(node) {
   const settingsTab = document.querySelector('#tabs button[data-panel="settings"]');
   messageTab.hidden = !(isRole && writesEnabled);
   settingsTab.hidden = !(isRole && writesEnabled);
-  if (!isRole || !writesEnabled) { showPanel("record"); }
+  showPanel("record");
   currentRole = null;
   document.getElementById("message-result").textContent = "";
   document.getElementById("settings-result").textContent = "";
@@ -708,6 +720,72 @@ async function retire(cascade) {
 
 document.getElementById("settings-retire").addEventListener("click", () => retire(false));
 document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
+
+let engagement = null;
+
+async function loadChat() {
+  const note = document.getElementById("chat-note");
+  const host = document.getElementById("chat-messages");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  let chats = [];
+  try { chats = (await api("/api/chat")) || []; } catch (error) { chats = []; }
+  engagement = chats.length ? chats[chats.length - 1] : null;
+  document.getElementById("chat-subject-field").hidden = Boolean(engagement);
+  document.getElementById("chat-send").textContent = engagement ? "Send" : "Start the work";
+  if (!engagement) {
+    note.className = "note";
+    note.textContent = writesEnabled
+      ? "No main chat yet. State the task here; it is addressed to every role that answers to you."
+      : "No main chat yet. Start the UI with --enable-writes to open one.";
+    return;
+  }
+  note.className = engagement.unaddressed_roles.length ? "note warn" : "note";
+  note.textContent = engagement.subject +
+    " · addressed to " + (engagement.addressed_roles.length || "no") + " role(s)" +
+    (engagement.unaddressed_roles.length
+      ? ". Roles created since this chat opened are not addressed in it: " +
+        engagement.unaddressed_roles.join(", ") + ". Open a new chat to include them."
+      : ".");
+  for (const message of engagement.messages) {
+    const row = document.createElement("div");
+    row.className = "field";
+    const who = document.createElement("span");
+    const actor = message.actor || {};
+    who.textContent = (actor.role_id || actor.principal_id || "unknown") +
+      " · " + (message.recorded_at || "");
+    row.appendChild(who);
+    const said = document.createElement("pre");
+    // Agent-written prose reaches the DOM as text, never as markup.
+    said.textContent = message.body || "";
+    row.appendChild(said);
+    host.appendChild(row);
+  }
+}
+
+async function sendChat() {
+  const result = document.getElementById("chat-result");
+  const body = document.getElementById("chat-body").value;
+  try {
+    if (engagement) {
+      await post("/api/chat/" + encodeURIComponent(engagement.thread_id) + "/messages", {
+        expected_revision: engagement.revision, message: body,
+      });
+    } else {
+      await post("/api/chat", {
+        subject: document.getElementById("chat-subject").value, message: body,
+      });
+    }
+    document.getElementById("chat-body").value = "";
+    result.className = "result ok";
+    result.textContent = "recorded";
+    await loadChat();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById("chat-send").addEventListener("click", sendChat);
 
 let searchTimer = null;
 
@@ -1045,6 +1123,12 @@ async function boot() {
     catalogInstructionVisibility();
     paintCatalog();
     await loadProposals();
+    await loadChat();
+    // The main chat is where work starts, so it is what the panel shows before
+    // anybody clicks a node.  A node chat is for stepping in on one role.
+    document.getElementById("inspector").classList.add("open");
+    document.getElementById("inspector-title").textContent = "Main chat";
+    showPanel("chat");
     document.getElementById("layers").textContent =
       meta.truth_layers.join(" › ") + " — " + meta.trust_note +
       ". No prompts, transcripts, or tool arguments are retained by design.";

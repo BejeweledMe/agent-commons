@@ -84,6 +84,24 @@ Versioning once a stable release line is declared.
   exactly one MCP server, so narrowing a set of one meant nothing and widening
   it is a separate change. The panel now shows the profile's actual servers
   read-only instead of offering a control with no effect.
+- **A main chat**, where a person states the work and hears back. It is a
+  canonical thread of the new type `engagement`, addressed to every role that
+  answers to the operator, optionally bound to the objective it is about. The
+  panel opens on it before any node is clicked; a per-role chat stays for
+  stepping in on one role.
+- Several roles at the top share **one thread with several recipients**, not
+  several threads merged in the view. Merging would invent an ordering no record
+  has. A role created after a chat opened is reported as unaddressed rather than
+  quietly folded in, because recipients are canonical and a projection must not
+  rewrite them.
+- Workers gain `commons_list_my_threads` and `commons_reply_thread`, so feedback
+  can actually come back — without them the main chat would have been one-way.
+  Both are bounded by the domain to threads that address the acting role, and
+  both are narrowable by a role's tool selection.
+- The addressed inbox now matches the role a session is running as, not only its
+  session id and self-declared label, so a thread addressed to a standing role
+  reaches it.
+- Added `agent-commons chat open|show|say`, `GET/POST /api/chat`.
 - **Full-text search over canonical history**, landing with the two things that
   read it: `agent-commons search <query>` and a search box in the panel. What is
   indexed is a positive allowlist of canonical fields, so a payload field added

@@ -158,6 +158,10 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_report_blocker",
         "commons_ack_input",
         "commons_ack_control",
+        # The main chat is two-way or it is not a chat.  Both are bounded to
+        # threads the acting role is addressed in.
+        "commons_list_my_threads",
+        "commons_reply_thread",
     }
 )
 IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES
@@ -813,6 +817,46 @@ def build_server(
             completed_units=completed_units,
             total_units=total_units,
             deadline_seconds=deadline_seconds,
+        )
+
+    @register(_READ_ONLY, worker_only=True)
+    def commons_list_my_threads() -> list[dict[str, Any]]:
+        """Conversations this role is addressed in, including the main chat."""
+
+        reachable = {"*", active_session_id} | ({acting_agent_id} if acting_agent_id else set())
+        return [
+            {
+                "thread_id": str(thread["id"]),
+                "revision": thread.get("revision"),
+                "thread_type": thread.get("thread_type"),
+                "subject": thread.get("subject"),
+                "desired_outcome": thread.get("desired_outcome"),
+                "state": thread.get("state"),
+                "messages": [dict(item) for item in thread.get("messages") or ()],
+            }
+            for thread in commons.list_threads(state="open")
+            if {str(item) for item in thread.get("to") or ()} & reachable
+        ]
+
+    @register(_IDEMPOTENT_WRITE, worker_only=True)
+    def commons_reply_thread(
+        thread_id: str,
+        expected_revision: str,
+        body: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Reply in a conversation this role is addressed in.
+
+        This is how feedback reaches the person who started the work.  The
+        domain refuses a thread this role was not addressed in, so the tool
+        cannot become a way to write into every conversation in the workspace.
+        """
+
+        return commons.reply_thread(
+            thread_id,
+            expected_revision,
+            body=body,
+            idempotency_key=idempotency_key,
         )
 
     @register(_IDEMPOTENT_WRITE, worker_only=True)

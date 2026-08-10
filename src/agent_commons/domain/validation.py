@@ -638,6 +638,10 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
             "help_request",
             "review_discussion",
             "decision_request",
+            # The standing conversation a person has with the roles at the top
+            # of the chain of command: where a task is first stated and where
+            # its progress is discussed generally.
+            "engagement",
         }
     ):
         raise ValidationError("invalid thread type")

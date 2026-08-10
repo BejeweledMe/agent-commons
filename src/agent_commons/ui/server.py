@@ -55,6 +55,8 @@ _ENTITY_KINDS = frozenset(
 #: `CommonsManager` method; the UI is a third adapter beside the CLI and MCP,
 #: not a second write path.
 MUTATING_ROUTES = (
+    ("POST", "/api/chat"),
+    ("POST", "/api/chat/{thread_id}/messages"),
     ("POST", "/api/agents"),
     ("POST", "/api/agents/proposals/{thread_id}/approve"),
     ("POST", "/api/agents/{agent_id}/reconfigure"),
@@ -183,6 +185,10 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             await asyncio.to_thread(context.search, query=query, limit=limit, subject_kind=kind)
         )
 
+    @app.get("/api/chat")
+    async def chat() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.engagements))
+
     @app.get("/api/proposals")
     async def proposals() -> Response:
         return JSONResponse(await asyncio.to_thread(context.agent_proposals))
@@ -239,6 +245,28 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
 
     async def _body(request: Request) -> dict[str, Any]:
         return await _json_body(request)
+
+    @app.post("/api/chat")
+    async def open_chat(request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.open_engagement,
+            subject=str(body.get("subject", "")),
+            body=str(body.get("message", "")),
+            objective_id=body.get("objective_id"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/chat/{thread_id}/messages")
+    async def say_in_chat(thread_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.say_in_engagement,
+            thread_id=thread_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            body=str(body.get("message", "")),
+            idempotency_key=body.get("idempotency_key"),
+        )
 
     @app.post("/api/agents")
     async def create_agent(request: Request) -> Response:

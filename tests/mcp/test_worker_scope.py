@@ -414,6 +414,11 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_report_blocker",
         "commons_ack_input",
         "commons_ack_control",
+        # The main chat, from the worker's side: reading the conversations it is
+        # addressed in and answering them.  Both are bounded by the domain to
+        # threads that actually address this role.
+        "commons_list_my_threads",
+        "commons_reply_thread",
     }
     assert expected_tools == set(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
     assert set(server.tools) == expected_tools

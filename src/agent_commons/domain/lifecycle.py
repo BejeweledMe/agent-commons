@@ -264,6 +264,21 @@ def validate_transition(
     ):
         raise LifecycleConflictError("review result does not bind the requested target revision")
     if event_type == "thread.replied":
+        # A delegated worker speaks where it was spoken to.  Without this, the
+        # reply tool it now carries would let one bounded run write into every
+        # conversation in the workspace.
+        bound = _bound_delegations(snapshot, actor_session_id)
+        if bound:
+            addressed = {str(item) for item in current.get("to") or ()}
+            reachable = {"*", actor_session_id} | {
+                str(delegation.get("agent_id"))
+                for delegation in bound
+                if delegation.get("agent_id")
+            }
+            if not addressed & reachable:
+                raise LifecycleConflictError(
+                    "a delegated worker may reply only to a thread it is addressed in"
+                )
         message_id = payload.get("message_id")
         if any(
             item.get("message_id") == message_id

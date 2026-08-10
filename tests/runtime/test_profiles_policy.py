@@ -287,6 +287,8 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_report_blocker",
         "mcp__agent-commons__commons_ack_input",
         "mcp__agent-commons__commons_ack_control",
+        "mcp__agent-commons__commons_list_my_threads",
+        "mcp__agent-commons__commons_reply_thread",
     }
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
         invocation.argv

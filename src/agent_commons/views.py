@@ -4,7 +4,7 @@ import html
 import json
 import os
 import tempfile
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
@@ -206,10 +206,15 @@ def _verbose_orientation(
     max_text_bytes: int = 4096,
     max_nested_items: int = 32,
     max_total_bytes: int = 131_072,
+    acting_agent_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
-    addressed = {"*", role, session_id}
+    # A thread addressed to a standing role must reach the session running as
+    # it.  Matching only the session id and the self-declared label would leave
+    # the main chat invisible to the very roles it is addressed to.
+    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
+    addressed.discard("")
     objectives = list(
         islice(
             (item for item in snapshot.objectives.values() if item.get("state") == "active"),
@@ -354,6 +359,7 @@ def orientation(
     max_total_bytes: int = 131_072,
     verbose: bool = False,
     read_diagnostics: Mapping[str, Any] | None = None,
+    acting_agent_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build a bounded workspace brief; detailed legacy records require ``verbose``."""
 
@@ -370,6 +376,7 @@ def orientation(
             max_text_bytes=max_text_bytes,
             max_nested_items=max_nested_items,
             max_total_bytes=max_total_bytes,
+            acting_agent_ids=acting_agent_ids,
         )
         if read_diagnostics is not None:
             result["read_diagnostics"] = dict(read_diagnostics)
@@ -379,7 +386,11 @@ def orientation(
     claims_all = list(claims)
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
-    addressed = {"*", role, session_id}
+    # A thread addressed to a standing role must reach the session running as
+    # it.  Matching only the session id and the self-declared label would leave
+    # the main chat invisible to the very roles it is addressed to.
+    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
+    addressed.discard("")
     objectives_all = sorted(snapshot.objectives.values(), key=lambda item: str(item.get("id", "")))
     objectives = [
         _compact_record(item)
@@ -561,12 +572,17 @@ def inbox_view(
     max_total_bytes: int = 131_072,
     verbose: bool = False,
     read_diagnostics: Mapping[str, Any] | None = None,
+    acting_agent_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build the addressed inbox directly, without constructing orientation."""
 
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
-    addressed = {"*", role, session_id}
+    # A thread addressed to a standing role must reach the session running as
+    # it.  Matching only the session id and the self-declared label would leave
+    # the main chat invisible to the very roles it is addressed to.
+    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
+    addressed.discard("")
     all_threads = _addressed_items(
         snapshot.threads.values(), addressed=addressed, max_items=max(1, len(snapshot.threads))
     )
