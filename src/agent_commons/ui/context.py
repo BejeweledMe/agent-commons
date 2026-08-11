@@ -423,7 +423,7 @@ class UIContext:
         design reviewers' merged attention queue replaces the two hidden tabs.
         """
 
-        from agent_commons.ui.graph import _HUMAN_DECISION_THREADS
+        from agent_commons.ui.graph import thread_awaits_human
 
         snapshot = self.manager().snapshot()
         answerable_by_delegation: dict[str, dict[str, Any]] = {}
@@ -451,11 +451,9 @@ class UIContext:
                 }
             )
         for thread_id, record in sorted(snapshot.threads.items()):
-            if record.get("state") != "open":
+            if not thread_awaits_human(record):
                 continue
             thread_type = str(record.get("thread_type", ""))
-            if thread_type not in _HUMAN_DECISION_THREADS:
-                continue
             proposal = (record.get("extensions") or {}).get("staff_proposal")
             is_proposal = isinstance(proposal, Mapping) and proposal.get("action") == "create_role"
             items.append(
@@ -498,6 +496,22 @@ class UIContext:
             for key in ("skills", "tool_allowlist"):
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
+        # Refuse a skill the catalogue does not define at hire time, where the
+        # operator is clicking, rather than deferring the failure to whoever
+        # launches the role next (round 2, product).  The panel has the
+        # catalogue loaded, so the check is free here.
+        selected_skills = tuple(str(name) for name in fields.get("skills") or ())
+        if selected_skills and self._catalog_path is not None:
+            from agent_commons.catalog import catalog_ids, load_role_catalog
+
+            known = catalog_ids(
+                load_role_catalog(self._catalog_path, workspace_root=self.repo), "skills"
+            )
+            missing = sorted(set(selected_skills) - known)
+            if missing:
+                raise ValidationError(
+                    "these skills are not in the operator catalogue: " + ", ".join(missing)
+                )
         return manager.create_agent(**fields)
 
     def answer_operation(

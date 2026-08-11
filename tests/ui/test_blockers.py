@@ -326,3 +326,61 @@ def test_the_attention_queue_carries_a_role_proposal(
     proposals = [item for item in attention["items"] if item["kind"] == "proposal"]
     assert len(proposals) == 1
     assert proposals[0]["proposal"]["name"] == "Requested helper"
+
+
+def test_a_directive_the_operator_sends_a_role_does_not_inflate_their_own_queue(
+    workspace: dict[str, Any], owner_session: CommonsManager
+) -> None:
+    """Round 2: messaging a role opens a decision_request addressed to that role.
+    It waits on the role, not the operator, so it must not appear in the human
+    attention queue nor ring the operator's own session."""
+
+    role = owner_session.create_agent(
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="owns the surface",
+        idempotency_key="dir-role",
+    )
+    agent_id = role["entity_ref"]["id"]
+    # The human directs the role — a decision_request addressed to the role.
+    owner_session.open_thread(
+        thread_type="decision_request",
+        subject="start with payments",
+        desired_outcome="the role acts on this direction",
+        to=(agent_id,),
+        related_refs=({"kind": "agent", "id": agent_id},),
+        idempotency_key="dir-thread",
+    )
+
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(owner_session.session_id),
+    )
+    with _client(context) as client:
+        attention = client.get("/api/attention", headers=authorized()).json()
+    assert attention["count"] == 0, attention
+    graph = context.rebuild_graph()
+    assert graph["awaiting_human"] == []
+
+
+def test_a_role_asking_the_operator_still_appears_in_the_queue(
+    workspace: dict[str, Any], owner_session: CommonsManager
+) -> None:
+    """The other direction: a thread addressed to the operator does wait on them."""
+
+    owner_session.open_thread(
+        thread_type="question",
+        subject="which region hosts the primary?",
+        desired_outcome="one region named",
+        to=("operator",),
+        idempotency_key="ask-operator",
+    )
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(owner_session.session_id),
+    )
+    with _client(context) as client:
+        attention = client.get("/api/attention", headers=authorized()).json()
+    assert attention["count"] == 1

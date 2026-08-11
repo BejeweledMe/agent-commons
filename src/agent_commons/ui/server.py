@@ -207,7 +207,12 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
 
     @app.get("/api/catalog")
     async def catalog() -> Response:
-        return JSONResponse(await asyncio.to_thread(context.catalog))
+        try:
+            return JSONResponse(await asyncio.to_thread(context.catalog))
+        except CommonsError as exc:
+            # A catalogue that fails to load is a misconfiguration, not a server
+            # fault: name it rather than returning an opaque 500 (round 2).
+            return _error(422, type(exc).__name__, str(exc))
 
     if context.writes_enabled:
         _register_writes(app, context)

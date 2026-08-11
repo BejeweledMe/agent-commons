@@ -380,6 +380,14 @@ def ui_command(
             raise error
         writer_session_id = str(state.manager().show_session(state.session_id)["session_id"])
 
+    if role_catalog is not None:
+        # Load the catalogue once at startup so an invalid file fails here, while
+        # the operator is still at the terminal, rather than turning every
+        # catalogue view into an opaque 500 later (round 2, product; round 1 L7).
+        from agent_commons.catalog import load_role_catalog
+
+        load_role_catalog(role_catalog, workspace_root=state.repo)
+
     context = UIContext(
         state.repo,
         state_root=state.state_root,
@@ -1175,6 +1183,17 @@ def agent_create(
         if retire_with_task
         else {"kind": "persistent"}
     )
+    if "auto" in {create_roles, retire_roles, open_links} and not state.json_output:
+        # Do not accept `auto` silently: it is currently withheld and every role
+        # runs at an effective ceiling of `ask`.  Say so for a human at the
+        # terminal (round 2, all lenses).  A --json consumer reads the effective
+        # level off the record instead, so the machine output stays clean.
+        click.echo(
+            "note: the automatic grant level is currently withheld; this role's "
+            "effective level is 'ask' (a human confirms each staff action). "
+            "See docs/adr/0009-agents-as-first-class-roles.md.",
+            err=True,
+        )
     state.emit(
         state.manager().create_agent(
             name=name,

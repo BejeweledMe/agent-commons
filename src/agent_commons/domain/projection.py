@@ -470,9 +470,18 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
         # this binding costs no schema change and an older reader ignores it.
         # Widening the delegation payload would have made every delegation event
         # in every workspace unreadable to the previous binary.
-        bound_agent = _relation_object(event, delegation_id, "on_behalf_of", "agent")
-        if bound_agent:
-            delegation_payload["agent_id"] = bound_agent
+        #
+        # Read the binding ONLY on the requested event, the one point
+        # `validate_transition` authorises it (`_validate_role_binding`).  Reading
+        # it on later events let an `on_behalf_of` relation attached to, say,
+        # `delegation.started` rebind the run to any role during replay with no
+        # authority check -- the write path never validates it there (round 2,
+        # architecture).  On later events `_apply` carries the requested
+        # binding forward, so the role a run acts for is fixed at request time.
+        if event_type == "delegation.requested":
+            bound_agent = _relation_object(event, delegation_id, "on_behalf_of", "agent")
+            if bound_agent:
+                delegation_payload["agent_id"] = bound_agent
         _apply(
             snapshot.delegations,
             delegation_id,
@@ -894,9 +903,12 @@ def _project_events_once(
                 event_type,
                 payload,
                 actor_session_id=str((event.get("actor") or {}).get("session_id", "")),
-                # Relations carry the run/role binding, so replay revalidates
-                # who was allowed to staff that role rather than trusting that
-                # the write path checked it once.
+                # Relations carry the run/role binding on `delegation.requested`,
+                # so replay revalidates who was allowed to staff that role there
+                # rather than trusting that the write path checked it once.  The
+                # binding is read from the relation only on the requested event
+                # (see the delegation branch above), so a relation on a later
+                # delegation event cannot silently rebind the run on replay.
                 relations=event.get("relations") or (),
             )
             _apply_effective_event(snapshot, event)

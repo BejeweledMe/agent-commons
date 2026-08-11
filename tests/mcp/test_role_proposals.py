@@ -183,6 +183,34 @@ def test_a_proposal_changes_nothing_until_a_person_confirms_it(tmp_path: Path) -
     assert created["proposal_ref"] == {"kind": "thread", "id": pending[0]["thread_id"]}
 
 
+def test_approving_a_proposal_consumes_it_so_a_second_click_mints_no_duplicate(
+    tmp_path: Path,
+) -> None:
+    """Round 2: approving used to leave the thread open, so re-clicking created
+    a duplicate role, spent turnover budget again, and left the item glowing in
+    the attention queue.  It is consumed on the first approval now."""
+
+    workspace = _workspace(tmp_path, level="ask")
+    parent: CommonsManager = workspace["parent"]
+    workspace["server"].tools["commons_propose_agent"](
+        name="Backend",
+        profile_id="claude-builder",
+        rationale="the payments surface needs its own owner",
+        idempotency_key="dup-proposal",
+    )
+    thread_id = parent.list_agent_proposals()[0]["thread_id"]
+
+    first = parent.approve_agent_proposal(thread_id, idempotency_key="dup-approve-1")
+    assert first["event_type"] == "agent.created"
+
+    # The proposal is resolved: it leaves the open list, and a second approval is
+    # refused rather than minting a second role.
+    assert parent.list_agent_proposals() == []
+    with pytest.raises(LifecycleConflictError, match="already resolved"):
+        parent.approve_agent_proposal(thread_id, idempotency_key="dup-approve-2")
+    assert [item["name"] for item in parent.list_agents()].count("Backend") == 1
+
+
 def test_provenance_cannot_be_claimed_without_a_proposal_to_point_at(
     tmp_path: Path,
 ) -> None:

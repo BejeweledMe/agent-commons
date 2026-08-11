@@ -822,3 +822,63 @@ def test_a_re_review_carries_the_producing_roles_context_and_prior_count(
     # it does not read as a clean-slate opinion.
     assert second["producer_context_mode"] == "accumulated"
     assert second["producer_prior_verdict_count"] == 1
+
+
+def test_a_role_binding_on_a_non_requested_delegation_event_is_ignored_on_replay(
+    workspace: dict[str, Any],
+) -> None:
+    """Round 2 (architecture): the run/role binding is authorised only on
+    delegation.requested.  A forged on_behalf_of relation on delegation.started
+    used to rebind the run to any role on replay with no authority check.  The
+    projection now reads the binding only on the requested event."""
+
+    import copy
+
+    from agent_commons.domain.lifecycle import acting_agent_id
+    from agent_commons.domain.projection import project_events
+
+    operator: CommonsManager = workspace["operator"]
+    privileged = operator.create_agent(
+        name="Privileged",
+        profile_id="claude-builder",
+        rationale="the role a forged relation would try to reach",
+        idempotency_key="obo-role",
+    )
+    task = operator.create_task(
+        title="Unbound work",
+        description="a delegation opened for no role",
+        acceptance_criteria=("done",),
+        idempotency_key="obo-task",
+    )
+    worker = _open(workspace["repo"], workspace["state_root"], name="obo", role="builder")
+    # A delegation with NO on_behalf_of binding.
+    delegation = operator.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        idempotency_key="obo-delegation",
+    )
+    operator.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=str(worker.session_id),
+        idempotency_key="obo-start",
+    )
+
+    events = [copy.deepcopy(record.event) for record in operator.events.iter_events()]
+    for record in events:
+        if record.get("event_type") == "delegation.started":
+            record.setdefault("relations", []).append(
+                {
+                    "subject": {"kind": "delegation", "id": delegation["entity_ref"]["id"]},
+                    "predicate": "on_behalf_of",
+                    "object": {"kind": "agent", "id": privileged["entity_ref"]["id"]},
+                }
+            )
+
+    snapshot = project_events(events)
+    # The forged binding is ignored: the run acts for no role.
+    assert snapshot.delegations[delegation["entity_ref"]["id"]].get("agent_id") is None
+    assert acting_agent_id(snapshot, str(worker.session_id)) is None

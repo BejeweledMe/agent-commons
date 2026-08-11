@@ -177,3 +177,25 @@ def test_a_catalogue_inside_the_workspace_is_refused(workspace: dict[str, Any]) 
     inside = workspace["repo"] / "catalog.yaml"
     with pytest.raises(ConfigurationError, match="outside the delegated workspace"):
         write_role_catalog(inside, {"skills": [], "tools": []}, workspace_root=workspace["repo"])
+
+
+def test_an_invalid_catalogue_read_is_a_named_4xx_not_an_opaque_500(
+    workspace: dict[str, Any], tmp_path: Path
+) -> None:
+    """Round 2 (round-1 L7): a catalogue that fails to load is a
+    misconfiguration.  The read route names it with a 4xx rather than a bare
+    500, and the ui command validates it at startup (tested separately)."""
+
+    bad = tmp_path / "bad-catalog.yaml"
+    # `name:` instead of `title:` — an unsupported field the loader rejects.
+    bad.write_text("skills:\n  - id: tdd\n    name: Test-driven\n", encoding="utf-8")
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        catalog_path=bad,
+    )
+    with _client(context) as client:
+        response = client.get("/api/catalog", headers=authorized())
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "ConfigurationError"
+    assert "unsupported fields" in response.json()["error"]["message"]

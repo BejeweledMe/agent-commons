@@ -15,6 +15,7 @@ from agent_commons.errors import (
     IntegrityError,
     LifecycleConflictError,
     SecurityPolicyError,
+    ValidationError,
 )
 from agent_commons.services import CommonsManager
 
@@ -1419,3 +1420,18 @@ def test_the_canonical_write_lock_is_reentrant_within_one_manager(
             assert created["event_type"] == "objective.created"
         assert builder._write_lock_depth == 1
     assert builder._write_lock_depth == 0
+
+
+def test_a_rejected_engagement_leaves_no_empty_thread_in_the_ledger(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """Round 2: the thread.opened used to land before the reply was validated,
+    so a bad message left an empty engagement thread in the immutable ledger."""
+
+    _, _, builder, _ = workspace
+    before = [record.event_id for record in builder.events.iter_events()]
+    with pytest.raises(ValidationError, match="non-empty message"):
+        builder.open_engagement(subject="start the work", body="   ")
+    after = [record.event_id for record in builder.events.iter_events()]
+    assert after == before
+    assert builder.list_engagements() == []

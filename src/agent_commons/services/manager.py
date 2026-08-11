@@ -1745,24 +1745,45 @@ class CommonsManager:
         proposer's name.
         """
 
-        snapshot = self.snapshot()
-        thread = require_entity(snapshot, "thread", thread_id)
-        proposal = (thread.get("extensions") or {}).get("staff_proposal")
-        if not isinstance(proposal, Mapping) or proposal.get("action") != "create_role":
-            raise LifecycleConflictError("thread carries no role-creation proposal")
-        return self.create_agent(
-            name=str(proposal["name"]),
-            profile_id=str(proposal["profile_id"]),
-            rationale=str(proposal["rationale"]),
-            context_mode=str(proposal.get("context_mode", "fresh")),
-            grants=proposal.get("grants"),
-            turnover_budget=proposal.get("turnover_budget"),
-            lifetime=proposal.get("lifetime"),
-            created_by_agent_id=str(proposal["proposed_by_agent_id"]),
-            approval="human_confirmed",
-            proposal_ref={"kind": "thread", "id": thread_id},
-            idempotency_key=idempotency_key,
-        )
+        # Create the role and close the proposal as one action.  Approving used
+        # to leave the thread open, so a second click minted a duplicate role,
+        # spent turnover budget again, and left the item glowing in the
+        # attention queue forever -- "approving that proposal" happening twice
+        # (round 2, both product reviewers).  Under one write lock the second
+        # approval finds the thread resolved and is refused.
+        with self._canonical_write_lock():
+            snapshot = self.snapshot()
+            thread = require_entity(snapshot, "thread", thread_id)
+            if thread.get("state") != "open":
+                raise LifecycleConflictError(
+                    "this role proposal is already resolved and cannot be confirmed again"
+                )
+            proposal = (thread.get("extensions") or {}).get("staff_proposal")
+            if not isinstance(proposal, Mapping) or proposal.get("action") != "create_role":
+                raise LifecycleConflictError("thread carries no role-creation proposal")
+            created = self.create_agent(
+                name=str(proposal["name"]),
+                profile_id=str(proposal["profile_id"]),
+                rationale=str(proposal["rationale"]),
+                context_mode=str(proposal.get("context_mode", "fresh")),
+                grants=proposal.get("grants"),
+                turnover_budget=proposal.get("turnover_budget"),
+                lifetime=proposal.get("lifetime"),
+                created_by_agent_id=str(proposal["proposed_by_agent_id"]),
+                approval="human_confirmed",
+                proposal_ref={"kind": "thread", "id": thread_id},
+                idempotency_key=idempotency_key,
+            )
+            self.resolve_thread(
+                thread_id,
+                str(thread.get("effective_revision") or thread["revision"]),
+                resolution="accepted",
+                summary=f"confirmed role {created['entity_ref']['id']}",
+                idempotency_key=(
+                    f"{idempotency_key}:resolve" if idempotency_key else None
+                ),
+            )
+            return created
 
     def reconfigure_agent(
         self,
@@ -2174,32 +2195,39 @@ class CommonsManager:
         canonical one.
         """
 
-        snapshot = self.snapshot()
-        top = sorted(
-            identifier
-            for identifier, record in snapshot.agents.items()
-            if record.get("state") == "active"
-            and not record.get("template")
-            and not record.get("created_by_agent_id")
-        )
-        related: list[dict[str, str]] = [{"kind": "agent", "id": item} for item in top]
-        if objective_id:
-            related.append({"kind": "objective", "id": objective_id})
-        opened = self.open_thread(
-            thread_type="engagement",
-            subject=subject,
-            desired_outcome="the work moves, and a person stays in the loop",
-            # The operator is a recipient too, so replies land in their inbox.
-            to=("operator", *top),
-            related_refs=related,
-            idempotency_key=self._idempotency_key("thread.opened", idempotency_key),
-        )
-        return self.reply_thread(
-            opened["entity_ref"]["id"],
-            opened["revision"],
-            body=body,
-            idempotency_key=f"{opened['idempotency_key']}:body",
-        )
+        # Validate the message before opening the thread, and open-then-reply as
+        # one action.  The thread.opened used to land first and the reply
+        # validate second, so a bad body left an empty engagement thread in the
+        # immutable ledger forever (round 2, product).
+        if not body.strip():
+            raise ValidationError("an engagement needs a non-empty message")
+        with self._canonical_write_lock():
+            snapshot = self.snapshot()
+            top = sorted(
+                identifier
+                for identifier, record in snapshot.agents.items()
+                if record.get("state") == "active"
+                and not record.get("template")
+                and not record.get("created_by_agent_id")
+            )
+            related: list[dict[str, str]] = [{"kind": "agent", "id": item} for item in top]
+            if objective_id:
+                related.append({"kind": "objective", "id": objective_id})
+            opened = self.open_thread(
+                thread_type="engagement",
+                subject=subject,
+                desired_outcome="the work moves, and a person stays in the loop",
+                # The operator is a recipient too, so replies land in their inbox.
+                to=("operator", *top),
+                related_refs=related,
+                idempotency_key=self._idempotency_key("thread.opened", idempotency_key),
+            )
+            return self.reply_thread(
+                opened["entity_ref"]["id"],
+                opened["revision"],
+                body=body,
+                idempotency_key=f"{opened['idempotency_key']}:body",
+            )
 
     def list_engagements(self, *, include_resolved: bool = False) -> list[dict[str, Any]]:
         """Main chats, newest last, with the roles each one actually addresses.

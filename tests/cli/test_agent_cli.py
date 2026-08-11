@@ -175,6 +175,30 @@ def test_a_human_created_role_is_marked_as_such_and_denies_everything_by_default
     assert shown["rationale"] == "seam coverage for plain-role"
 
 
+def test_requesting_auto_warns_that_the_level_is_withheld(
+    workspace: dict[str, Any],
+) -> None:
+    """Round 2: `auto` is accepted but withheld, so an interactive create says
+    so rather than letting the operator believe the role acts autonomously."""
+
+    result = workspace["runner"].invoke(
+        cli,
+        [
+            "--repo", str(workspace["repo"]),
+            "--session-id", workspace["human"]["session_id"],
+            "agent", "create",
+            "--name", "Autonomous?",
+            "--profile", "claude-builder",
+            "--rationale", "wants auto",
+            "--create-roles", "auto",
+            "--turnover-budget", "4",
+            "--idempotency-key", "auto-warn",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "automatic grant level is currently withheld" in result.output
+
+
 def test_granting_creation_without_a_turnover_budget_is_refused(
     workspace: dict[str, Any],
 ) -> None:
