@@ -745,3 +745,80 @@ def test_an_authors_identity_survives_a_later_unrelated_event(
         idempotency_key="h2b-complete-indep",
     )
     assert approved["event_type"] == "review.completed"
+
+
+def test_a_re_review_carries_the_producing_roles_context_and_prior_count(
+    workspace: dict[str, Any],
+) -> None:
+    """P7.3 at the consumer: a review shows the producing role's context mode
+    and how many times it has judged this subject before.
+
+    Re-review is allowed -- only authoring then judging is refused -- so the
+    same accumulated-context role reviews one subject twice, and the second
+    review carries a prior-verdict count of one.  The count used to be dead code
+    with a type bug that reported nothing for anyone (M7, 2026-08-10 review).
+    """
+
+    operator: CommonsManager = workspace["operator"]
+    reviewer_role = operator.create_agent(
+        name="Standing reviewer",
+        profile_id="claude-independent-reviewer",
+        context_mode="accumulated",
+        rationale="an accumulated-context judge, so its verdict reads differently",
+        idempotency_key="m7-role",
+    )
+    role_id = reviewer_role["entity_ref"]["id"]
+
+    author = _open(workspace["repo"], workspace["state_root"], name="m7-author", role="builder")
+    task = author.create_task(
+        title="Subject reviewed twice",
+        description="the operator authors it; the role only judges",
+        acceptance_criteria=("works",),
+        idempotency_key="m7-task",
+    )
+    task_id = task["entity_ref"]["id"]
+
+    def review_once(key: str, verdict: str) -> str:
+        requested = operator.request_review(
+            target_ref={"kind": "task", "id": task_id},
+            target_revision=task["revision"],
+            criteria=("correctness",),
+            independent=True,
+            idempotency_key=f"{key}-request",
+        )
+        judge = _open(workspace["repo"], workspace["state_root"], name=key, role="reviewer")
+        _bind_run(
+            workspace,
+            agent_id=role_id,
+            worker=judge,
+            target_ref={"kind": "review", "id": requested["entity_ref"]["id"]},
+            target_revision=requested["revision"],
+            profile="claude-independent-reviewer",
+            purpose="independent_review",
+            key=f"{key}-run",
+        )
+        judge.complete_review(
+            requested["entity_ref"]["id"],
+            requested["revision"],
+            target_revision=task["revision"],
+            verdict=verdict,
+            summary=f"verdict for {key}",
+            idempotency_key=f"{key}-complete",
+        )
+        return requested["entity_ref"]["id"]
+
+    first_id = review_once("m7-first", "changes_requested")
+    second_id = review_once("m7-second", "approved")
+
+    reviews = operator.snapshot().reviews
+    first = reviews[first_id]
+    second = reviews[second_id]
+
+    assert first["producer_context_mode"] == "accumulated"
+    assert first["producer_agent_ids"] == [role_id]
+    assert first["producer_prior_verdict_count"] == 0
+
+    # The second verdict knows this role has judged this subject once before, so
+    # it does not read as a clean-slate opinion.
+    assert second["producer_context_mode"] == "accumulated"
+    assert second["producer_prior_verdict_count"] == 1

@@ -290,6 +290,49 @@ def _retire_lifetime_role_if_task_closed(snapshot: ProjectSnapshot, agent_id: st
         record["retired_with_task_id"] = task.get("id")
 
 
+def _annotate_review_producer(
+    snapshot: ProjectSnapshot, review_id: str, event: Mapping[str, Any]
+) -> None:
+    """Carry the producing role's context mode and prior-verdict count on a review.
+
+    Requirement P7.3, delivered at the consumer: a review from an
+    accumulated-context role reads differently from a clean-slate one, and a
+    re-review shows how many times this role has judged this subject before.
+    The count was dead code with a type bug (M7, 2026-08-10 review); it is wired
+    here so every surface -- the entity view, `agent-commons review list`, the
+    graph node -- carries it without a second computation.
+
+    Derived at completion and recomputed on replay, never hidden: the ledger
+    knows which verdicts a role recorded against a target.
+    """
+
+    from .agents import prior_verdicts, session_agent_map
+
+    review = snapshot.reviews.get(review_id)
+    if review is None:
+        return
+    actor_session = str((event.get("actor") or {}).get("session_id", ""))
+    bindings = session_agent_map(snapshot.delegations)
+    producer_roles = sorted(bindings.get(actor_session, frozenset()))
+    review["producer_agent_ids"] = producer_roles
+    modes = [
+        str(snapshot.agents[role].get("context_mode"))
+        for role in producer_roles
+        if role in snapshot.agents and snapshot.agents[role].get("context_mode")
+    ]
+    # A run acting for no role is a plain window; there is no producing role to
+    # attribute a context mode to, and the surface says so rather than guessing.
+    review["producer_context_mode"] = modes[0] if modes else None
+    target_ref = review.get("target_ref") or {}
+    earlier: set[str] = set()
+    for role in producer_roles:
+        earlier.update(
+            prior_verdicts(snapshot.reviews, bindings, agent_id=role, target_ref=target_ref)
+        )
+    earlier.discard(review_id)
+    review["producer_prior_verdict_count"] = len(earlier)
+
+
 def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) -> None:
     event_type = str(event["event_type"])
     payload = event["payload"]
@@ -392,12 +435,15 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
             "registered",
         )
     elif event_type.startswith("review."):
+        review_id = str(payload["review_id"])
         _apply(
             snapshot.reviews,
-            str(payload["review_id"]),
+            review_id,
             event,
             "requested" if event_type == "review.requested" else str(payload["verdict"]),
         )
+        if event_type == "review.completed":
+            _annotate_review_producer(snapshot, review_id, event)
     elif event_type == "verification.recorded":
         _apply(snapshot.verifications, str(payload["verification_id"]), event, "recorded")
     elif event_type in FINDING_STATES:

@@ -122,6 +122,11 @@ def _node(
         "agent_id",
         "allowed_action",
         "retired_by",
+        # A review carries the producing role's context mode and how many times
+        # it has judged this subject before, so an accumulated-context verdict
+        # does not read as a clean-slate one.
+        "producer_context_mode",
+        "producer_prior_verdict_count",
     ):
         value = record.get(key)
         if value is not None and isinstance(value, (str, int, float, bool)):

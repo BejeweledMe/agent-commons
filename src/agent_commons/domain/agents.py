@@ -245,7 +245,7 @@ def retirement_blockers(
 
 def prior_verdicts(
     reviews: Mapping[str, Mapping[str, Any]],
-    bindings: Mapping[str, str],
+    bindings: Mapping[str, frozenset[str]],
     *,
     agent_id: str,
     target_ref: Mapping[str, Any],
@@ -257,6 +257,12 @@ def prior_verdicts(
     not and would be harmful to forbid.  These records are never hidden from the
     role -- they are surfaced to the human reading the verdict, so a judgment
     from an accumulated context does not read as a clean-slate one.
+
+    ``bindings`` is a ``session_agent_map`` result: a session maps to the *set*
+    of roles it ran as, so membership is the test.  Comparing the frozenset to
+    the id with ``==`` was always false, which is why wiring this as written
+    would have reported "no prior verdicts" for everyone (M7, 2026-08-10
+    review).
     """
 
     found = []
@@ -264,6 +270,6 @@ def prior_verdicts(
         if review.get("state") == "requested" or review.get("target_ref") != dict(target_ref):
             continue
         session_id = str((review.get("actor") or {}).get("session_id", ""))
-        if session_id and bindings.get(session_id) == agent_id:
+        if session_id and agent_id in bindings.get(session_id, frozenset()):
             found.append(identifier)
     return tuple(sorted(found))
