@@ -341,6 +341,18 @@ def init_command(
     help="Also allow editing that catalogue from the panel. Separate from "
     "--enable-writes: this changes what child processes may run.",
 )
+@click.option(
+    "--profile-config",
+    "profile_config",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Operator-owned runtime profile config; required to launch runs from the panel.",
+)
+@click.option(
+    "--enable-launch",
+    is_flag=True,
+    help="Allow the panel to launch a delegation (spawn a provider run). Separate "
+    "from --enable-writes: this starts a billable subscription process.",
+)
 @click.pass_obj
 def ui_command(
     state: CLIState,
@@ -349,6 +361,8 @@ def ui_command(
     enable_writes: bool,
     role_catalog: Path | None,
     enable_catalog_editing: bool,
+    profile_config: Path | None,
+    enable_launch: bool,
 ) -> None:
     """Serve a local view of this workspace on loopback; read-only by default.
 
@@ -388,6 +402,19 @@ def ui_command(
 
         load_role_catalog(role_catalog, workspace_root=state.repo)
 
+    if enable_launch:
+        if not enable_writes:
+            raise ConfigurationError("--enable-launch requires --enable-writes")
+        if profile_config is None:
+            raise ConfigurationError(
+                "--enable-launch requires --profile-config naming the runtime profile config"
+            )
+        # Fail here, at the terminal, if the profile config is invalid — not at
+        # the first launch from a browser tab.
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+        load_runtime_configuration(profile_config, workspace_root=state.repo)
+
     context = UIContext(
         state.repo,
         state_root=state.state_root,
@@ -396,6 +423,8 @@ def ui_command(
         writer_session_id=writer_session_id,
         catalog_path=role_catalog,
         catalog_editing=enable_catalog_editing,
+        profile_config=profile_config,
+        launch_enabled=enable_launch,
     )
 
     def emit(bound_port: int, token: str) -> None:

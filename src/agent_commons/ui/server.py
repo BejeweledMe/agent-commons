@@ -73,6 +73,11 @@ CATALOG_ROUTES = (
     ("POST", "/api/catalog/entries/remove"),
 )
 
+#: Launching a provider is a third, larger privilege behind its own gate:
+#: recording a role is bounded metadata, spawning a billable subscription
+#: process is not. Its own allowlist keeps the mutating-surface test honest.
+LAUNCH_ROUTES = (("POST", "/api/delegations"),)
+
 _HEARTBEAT_SECONDS = 15.0
 _POLL_SECONDS = 2.0
 
@@ -214,10 +219,23 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             # fault: name it rather than returning an opaque 500 (round 2).
             return _error(422, type(exc).__name__, str(exc))
 
+    @app.get("/api/launch")
+    async def launch_options() -> Response:
+        # The roles and tasks the panel needs to offer a run, plus whether
+        # launching is enabled at all. Readable in any mode; acting on it is not.
+        return JSONResponse(await asyncio.to_thread(context.launch_options))
+
+    @app.get("/api/runs")
+    async def runs() -> Response:
+        # Live and recent run phases, metadata only. Readable in any mode.
+        return JSONResponse(await asyncio.to_thread(context.runs))
+
     if context.writes_enabled:
         _register_writes(app, context)
     if context.catalog_editing_enabled:
         _register_catalog_writes(app, context)
+    if context.launch_enabled:
+        _register_launch(app, context)
 
     @app.get("/api/stream")
     async def stream(request: Request) -> Response:
@@ -387,6 +405,27 @@ def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
             context,
             section=str(body.get("section", "")),
             entry_id=str(body.get("id", "")),
+        )
+
+
+def _register_launch(app: FastAPI, context: UIContext) -> None:
+    """Attach the launch surface, gated separately from role writes.
+
+    One route: put a role to work on a task. It records a delegation through the
+    same manager as every other write, then runs it through the same broker the
+    CLI uses — one launch path, not a second one.
+    """
+
+    @app.post("/api/delegations")
+    async def run_role_on_task(request: Request) -> Response:
+        body = await _json_body(request)
+        return await _guarded(
+            context.run_role_on_task,
+            context,
+            agent_id=str(body.get("agent_id", "")),
+            task_id=str(body.get("task_id", "")),
+            wall_time_seconds=body.get("wall_time_seconds"),
+            idempotency_key=body.get("idempotency_key"),
         )
 
 

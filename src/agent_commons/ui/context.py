@@ -59,11 +59,18 @@ def ledger_fingerprint(paths: CommonsPaths) -> str:
             digest.update(
                 f"{path.relative_to(root)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
             )
-    # Sessions are graph nodes but live in operational state, so a ledger-only
-    # fingerprint would leave a closed or newly opened session on screen forever.
-    sessions = paths.state_root / "sessions"
-    if sessions.exists():
-        for path in sorted(sessions.rglob("*")):
+    # Sessions and runtime attempts are graph/operational state, not ledger
+    # events, so a ledger-only fingerprint would leave a closed session on screen
+    # forever and a launched run's live phase (launching -> running -> terminal)
+    # invisible between canonical events.  Fold both into the change detector so
+    # the panel refreshes as a run progresses (MUST-5).
+    for label, root in (
+        ("sessions", paths.state_root / "sessions"),
+        ("runtime", paths.state_root / "runtime"),
+    ):
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue
             try:
@@ -71,7 +78,7 @@ def ledger_fingerprint(paths: CommonsPaths) -> str:
             except OSError:  # pragma: no cover - file vanished mid-scan
                 continue
             digest.update(
-                f"{path.relative_to(sessions)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
+                f"{label}/{path.relative_to(root)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
             )
     return "sha256:" + digest.hexdigest()
 
@@ -89,6 +96,9 @@ class UIContext:
         writer_session_id: str | None = None,
         catalog_path: Path | None = None,
         catalog_editing: bool = False,
+        profile_config: Path | None = None,
+        launch_enabled: bool = False,
+        runtime_factory: Any | None = None,
     ) -> None:
         self.repo = repo
         self._state_root = state_root
@@ -99,6 +109,14 @@ class UIContext:
         # editing the set of things a child process may run are different
         # magnitudes of privilege, and one checkbox for both would hide that.
         self._catalog_editing = bool(catalog_editing)
+        # Launching a provider is a third, larger privilege still: it spawns a
+        # billable subscription process.  It has its own gate and needs the
+        # operator profile config, exactly like the CLI broker.
+        self._profile_config = profile_config
+        self._launch_enabled = bool(launch_enabled)
+        # Tests inject a runtime service built over a fake runner here; in
+        # production it is None and the service is built from the profile config.
+        self._runtime_factory = runtime_factory
         # A writable context is opt-in and needs a real operator session, the
         # same identity the CLI writes under.  Absent one, this stays the
         # read-only server it has always been.
@@ -110,6 +128,15 @@ class UIContext:
         self._seq = 0
         self._fingerprint = ""
         self._graph: dict[str, Any] | None = None
+        # Background launch threads, kept so a test can await them; daemon so
+        # they never hold the server open.
+        self._launch_threads: list[threading.Thread] = []
+
+    def await_launches(self, timeout: float = 30.0) -> None:
+        """Join any background launch threads. For tests and clean shutdown."""
+
+        for thread in list(self._launch_threads):
+            thread.join(timeout=timeout)
 
     @property
     def writes_enabled(self) -> bool:
@@ -118,6 +145,17 @@ class UIContext:
     @property
     def catalog_editing_enabled(self) -> bool:
         return self._catalog_editing and self._catalog_path is not None
+
+    @property
+    def launch_enabled(self) -> bool:
+        # Launch needs writes (a real operator session records the delegation),
+        # its own gate, and either a profile config to build the runtime from or
+        # an injected runtime factory (tests).
+        return (
+            self._launch_enabled
+            and self.writes_enabled
+            and (self._profile_config is not None or self._runtime_factory is not None)
+        )
 
     def manager(self) -> CommonsManager:
         return CommonsManager(
@@ -513,6 +551,182 @@ class UIContext:
                     "these skills are not in the operator catalogue: " + ", ".join(missing)
                 )
         return manager.create_agent(**fields)
+
+    # -- launch (MUST-4) ------------------------------------------------------
+
+    #: A UI-launched run is a single bounded leaf: no children, one attempt, and
+    #: the subscription-friendly `provider_units` budget the broker docs prefer.
+    _DEFAULT_RUN_LIMITS: dict[str, Any] = {
+        "max_depth": 0,
+        "wall_time_seconds": 600,
+        "max_attempts": 1,
+        "max_concurrency": 1,
+        "budget": {"unit": "provider_units", "limit": 1},
+    }
+
+    def _runtime_service(self, manager: CommonsManager) -> Any:
+        """The one runtime service, over the writer session, that launches a run.
+
+        It is the same `DelegationRuntimeService` the CLI broker uses, built from
+        the operator profile config — not a second launch path.  Tests inject a
+        factory that wraps a fake runner so no real provider is spawned.
+        """
+
+        if self._runtime_factory is not None:
+            return self._runtime_factory(manager)
+        from agent_commons.services.delegation_runtime import (
+            DelegationRuntimeService,
+            load_runtime_configuration,
+        )
+
+        config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        return DelegationRuntimeService(
+            manager,
+            profiles=config.profiles,
+            operator_limits=config.limits,
+            catalog=config.catalog,
+        )
+
+    def runs(self) -> list[dict[str, Any]]:
+        """Live and recent provider runs, phase only -- never any provider output.
+
+        Reads the operational attempt store (metadata: phase, pid liveness,
+        target) and joins each to its canonical delegation state.  This is the
+        live run surface (MUST-5); by design it carries no prompts, transcripts,
+        or tool arguments, only the state a person needs to see a run move.
+        """
+
+        from agent_commons.runtime import AttemptStore
+
+        manager = self.manager()
+        store = AttemptStore(manager.paths.state_root, read_only=True)
+        try:
+            attempts = store.list_attempts()
+        except (CommonsError, OSError):
+            return []
+        delegations = manager.snapshot().delegations
+        found: list[dict[str, Any]] = []
+        for attempt in attempts:
+            record = attempt.as_dict()
+            delegation_id = str(record["correlation"]["delegation_id"])
+            delegation = delegations.get(delegation_id) or {}
+            found.append(
+                {
+                    "delegation_id": delegation_id,
+                    "attempt_id": record["attempt_id"],
+                    "phase": record["state"],
+                    "live": store.process_is_live(record.get("pid")),
+                    "profile_id": record.get("profile_id"),
+                    "target_kind": record["correlation"].get("target_kind"),
+                    "target_id": record["correlation"].get("target_id"),
+                    "agent_id": delegation.get("agent_id"),
+                    "delegation_state": delegation.get("state"),
+                }
+            )
+        # Live runs first, then most-recently-seen; a person watches the moving
+        # ones.
+        found.sort(key=lambda item: (not item["live"], item["attempt_id"]), reverse=False)
+        return [bounded_copy(item) for item in found]
+
+    def launch_options(self) -> dict[str, Any]:
+        """What the panel needs to offer a run: active roles and pickable tasks."""
+
+        snapshot = self.manager().snapshot()
+        roles = [
+            {"id": rid, "name": rec.get("name"), "profile_id": rec.get("profile_id")}
+            for rid, rec in sorted(snapshot.agents.items())
+            if rec.get("state") == "active" and not rec.get("template")
+        ]
+        # A run needs an open target; a finished task is not something to staff.
+        open_states = {"ready", "assigned", "active", "blocked"}
+        tasks = [
+            {"id": tid, "title": rec.get("title"), "state": rec.get("state")}
+            for tid, rec in sorted(snapshot.tasks.items())
+            if rec.get("state") in open_states
+        ]
+        return {"launch_enabled": self.launch_enabled, "roles": roles, "tasks": tasks}
+
+    def run_role_on_task(
+        self,
+        *,
+        agent_id: str,
+        task_id: str,
+        wall_time_seconds: int | None = None,
+        idempotency_key: str | None = None,
+        background: bool = True,
+    ) -> dict[str, Any]:
+        """Put a standing role to work on a task, and launch the provider.
+
+        Records a `delegation.requested` on behalf of the role — which fixes the
+        provider and model to the role's profile — then runs it through the same
+        broker the CLI uses.  The run proceeds off-request so the panel returns
+        at once; its canonical state changes reach the panel over the stream.
+        """
+
+        if not self.launch_enabled:
+            raise ConfigurationError(
+                "launching is off; restart with --enable-writes --profile-config and "
+                "--enable-launch"
+            )
+        writer = self.writer()
+        role = writer.get_agent(agent_id)
+        if role.get("state") != "active":
+            raise ValidationError("only an active role can be given work")
+        if role.get("template"):
+            raise ValidationError("a role preset is a template and is never employed")
+        task = writer.snapshot().tasks.get(task_id)
+        if task is None:
+            raise ValidationError(f"no such task: {task_id}")
+        profile_id = str(role["profile_id"])
+        # The purpose follows the role's profile.  A reviewer profile needs an
+        # open independent review to exist; the domain refuses with a legible
+        # message if one does not, so the panel surfaces that rather than
+        # inventing a review here.
+        purpose = (
+            "independent_review"
+            if profile_id.endswith("independent-reviewer")
+            else "implementation"
+        )
+        limits = dict(self._DEFAULT_RUN_LIMITS)
+        if wall_time_seconds:
+            limits["wall_time_seconds"] = int(wall_time_seconds)
+        delegation = writer.create_delegation(
+            target_ref={"kind": "task", "id": task_id},
+            target_revision=str(task.get("effective_revision") or task["revision"]),
+            target_profile=profile_id,
+            purpose=purpose,
+            limits=limits,
+            on_behalf_of_agent_id=agent_id,
+            idempotency_key=idempotency_key,
+        )
+        delegation_id = str(delegation["entity_ref"]["id"])
+        launch_key = f"ui-launch-{delegation_id}"
+
+        def _launch() -> None:
+            try:
+                # A fresh writer manager for the run thread: the runtime binds
+                # the requester session, and a manager is cheap and not shared.
+                self._runtime_service(self.writer()).run(
+                    delegation_id, delegation["revision"], idempotency_key=launch_key
+                )
+            except Exception as exc:  # a launch failure is reported, never silent
+                _LOG.warning("UI launch of %s failed: %s", delegation_id, exc)
+            finally:
+                self.invalidate()
+
+        if background:
+            thread = threading.Thread(target=_launch, name=launch_key, daemon=True)
+            self._launch_threads.append(thread)
+            thread.start()
+        else:
+            _launch()
+        self.invalidate()
+        return {
+            "delegation_id": delegation_id,
+            "target_profile": profile_id,
+            "purpose": purpose,
+            "launched": True,
+        }
 
     def answer_operation(
         self, *, operation_id: str, answer: Mapping[str, Any], idempotency_key: str | None = None

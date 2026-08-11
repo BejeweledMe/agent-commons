@@ -153,11 +153,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     </div>
     <div class="tabs" id="tabs">
       <button type="button" data-panel="attention" aria-selected="false">Attention</button>
+      <button type="button" data-panel="runs" aria-selected="false" hidden>Runs</button>
       <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
       <button type="button" data-panel="hire" aria-selected="false" hidden>Hire</button>
       <button type="button" data-panel="record" aria-selected="false">Record</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
+      <button type="button" data-panel="run" aria-selected="false" hidden>Run</button>
       <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
       <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
     </div>
@@ -211,6 +213,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="result" id="attention-result"></p>
     </section>
 
+    <section class="panel" id="panel-runs">
+      <p class="note">Live and recent provider runs — phase only, never any
+        provider output. No prompts, transcripts, or tool arguments are retained.</p>
+      <div id="runs-list"></div>
+    </section>
+
     <section class="panel" id="panel-search">
       <p class="note" id="search-note"></p>
       <div id="search-results"></div>
@@ -236,6 +244,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <textarea id="catalog-instruction"></textarea></label>
       <button type="button" id="catalog-save">Save entry</button>
       <p class="result" id="catalog-result"></p>
+    </section>
+
+    <section class="panel" id="panel-run">
+      <p class="note" id="run-note">Put this role to work on a task. It runs under
+        the role's profile (provider and model), through the same broker the CLI
+        uses. Progress appears on the run's node as its state changes.</p>
+      <label class="field"><span>Task</span>
+        <select id="run-task"></select></label>
+      <label class="field"><span>Wall-time seconds (blank = default)</span>
+        <input type="number" id="run-wall" min="1" max="86400"></label>
+      <button type="button" id="run-go">Run this role on the task</button>
+      <p class="result" id="run-result"></p>
     </section>
 
     <section class="panel" id="panel-message">
@@ -682,6 +702,77 @@ async function loadCatalog() {
   catalogEditing = Boolean(catalog && catalog.catalog_editing_enabled);
 }
 
+// Launching a role's run from the panel (MUST-4). The Run tab appears on a role
+// only when the operator started the UI with the launch gate; it records a
+// delegation under the role's profile and runs it through the broker.
+let launchEnabled = false;
+let launchTasks = [];
+
+async function loadLaunch() {
+  let options = { launch_enabled: false, tasks: [] };
+  try { options = (await api("/api/launch")) || options; } catch (error) { /* read-only */ }
+  launchEnabled = Boolean(options.launch_enabled);
+  launchTasks = options.tasks || [];
+  const picker = document.getElementById("run-task");
+  fillSelect(picker,
+    launchTasks.map((t) => ({ id: t.id, title: (t.title || t.id) + " · " + t.state })),
+    null, false);
+}
+
+async function runRole() {
+  const result = document.getElementById("run-result");
+  if (!currentRole) { return; }
+  const wall = document.getElementById("run-wall").value;
+  try {
+    const payload = await post("/api/delegations", {
+      agent_id: currentRole.id,
+      task_id: document.getElementById("run-task").value,
+      wall_time_seconds: wall === "" ? null : Number(wall),
+    });
+    result.className = "result ok";
+    result.textContent = "launched " + payload.delegation_id + " · " + payload.purpose +
+      " on " + payload.target_profile;
+    await loadRuns();
+  } catch (error) {
+    // The refusal names the guard — no such task, a reviewer role with no open
+    // review, an exhausted budget — which is what the operator needs.
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById("run-go").addEventListener("click", runRole);
+
+// Live run phases (MUST-5). The Runs tab appears when there is a run to show and
+// updates on the same stream as the graph, so a launched run visibly moves
+// through launching -> running -> succeeded/failed without a reload.
+let runs = [];
+
+async function loadRuns() {
+  try { runs = (await api("/api/runs")) || []; } catch (error) { runs = []; }
+  const tab = document.querySelector('#tabs button[data-panel="runs"]');
+  const liveCount = runs.filter((r) => r.live).length;
+  tab.hidden = runs.length === 0;
+  tab.textContent = liveCount ? "Runs (" + liveCount + " live)" : "Runs";
+  const host = document.getElementById("runs-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  for (const run of runs) {
+    const card = document.createElement("div");
+    card.className = "attn-item " + (run.live ? "run_blocked" : "");
+    const kind = document.createElement("div");
+    kind.className = "attn-kind";
+    kind.textContent = (run.live ? "● live · " : "○ ") + run.phase +
+      (run.delegation_state ? " · " + run.delegation_state : "");
+    card.appendChild(kind);
+    const head = document.createElement("span");
+    head.textContent = (run.profile_id || "?") +
+      (run.agent_id ? " · role " + run.agent_id : "") +
+      (run.target_id ? " · on " + run.target_kind + " " + run.target_id : "");
+    card.appendChild(head);
+    host.appendChild(card);
+  }
+}
+
 // Hiring a role: the caller for POST /api/agents that the panel lacked, so the
 // launch loop is closed here rather than only in the CLI (M8). The panel could
 // reconfigure, retire, and message a role, but could not create one.
@@ -748,8 +839,14 @@ async function inspect(node) {
   const isRole = node.kind === "agent";
   const messageTab = document.querySelector('#tabs button[data-panel="message"]');
   const settingsTab = document.querySelector('#tabs button[data-panel="settings"]');
+  const runTab = document.querySelector('#tabs button[data-panel="run"]');
   messageTab.hidden = !(isRole && writesEnabled);
   settingsTab.hidden = !(isRole && writesEnabled);
+  // Run appears on a role only when the launch gate is on, and only for an
+  // active (non-preset) role that can actually be staffed.
+  runTab.hidden = !(isRole && launchEnabled && node.state === "active" &&
+    !(node.attrs && node.attrs.template));
+  document.getElementById("run-result").textContent = "";
   showPanel("record");
   currentRole = null;
   document.getElementById("message-result").textContent = "";
@@ -1384,6 +1481,8 @@ function handleFrame(frame) {
     // then failed stale (M1). The panel's own data follows the same stream now.
     loadAttention();
     loadChat();
+    loadRuns();
+    if (launchEnabled) { loadLaunch(); }
     return;
   }
   if (event === "resume_gap") {
@@ -1405,6 +1504,8 @@ async function boot() {
     catalogInstructionVisibility();
     paintCatalog();
     paintHire();
+    await loadLaunch();
+    await loadRuns();
     await loadChat();
     await loadAttention();
     // The main chat is where work starts, so it is what the panel shows before
