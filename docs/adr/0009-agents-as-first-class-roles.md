@@ -141,6 +141,14 @@ own gate in `CATALOG_ROUTES`):
 | `POST /api/operations/{id}/answer` | `CommunicationRuntimeService.reply_to_input` |
 | `POST /api/catalog/entries` (own gate) | `write_role_catalog` |
 | `POST /api/catalog/entries/remove` (own gate) | `write_role_catalog` |
+| `POST /api/delegations` (own gate) | `create_delegation` + `DelegationRuntimeService.run` |
+
+The last route is the launch surface (MUST-4): it records a delegation on a
+role's behalf and runs it through the same `DelegationRuntimeService` the CLI
+broker uses -- one launch path, not a second -- behind `--enable-launch` plus a
+`--profile-config`. It is a larger privilege than recording a role (it spawns a
+billable subscription process), so it has its own gate and its own route
+allowlist.
 
 (The first edition of this table named `/api/operations/{id}/reply` and omitted
 the chat, proposal, and catalogue routes; it is the test, not this prose, that is

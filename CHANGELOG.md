@@ -48,6 +48,15 @@ Versioning once a stable release line is declared.
   surface equals an explicit allowlist, every route dies when `record_event` is
   removed, and each route's event is found in the ledger after being driven over
   HTTP.
+- **`agent-commons ui --enable-launch --profile-config <file>`** lets the panel
+  put a role to work: a Run action records a delegation on the role's behalf and
+  runs it through the same `DelegationRuntimeService` the CLI broker uses — one
+  launch path, not a second. Provider and model come from the role's profile. It
+  is a third, separate gate (spawning a billable process, not recording metadata)
+  with its own route allowlist. A Runs surface shows each run's live phase —
+  launching → running → terminal — as metadata only, never any provider output,
+  and the change detector folds in the runtime attempt so the panel moves as the
+  run does.
 - The graph shows roles as nodes with their reporting lineage, and rings any
   node waiting on a human decision so a blocker is visible without opening a
   list. Both sources of that state — a delegation in `input_needed` and an open

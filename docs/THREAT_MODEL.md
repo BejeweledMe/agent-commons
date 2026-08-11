@@ -262,12 +262,22 @@ rejected edit leaves the previous file byte-identical and a partial write cannot
 break the next launch. Removing an entry an active role requires is refused and
 names the roles.
 
-Provider profiles are never editable from the UI at any gate: they name
-executables, and no loopback surface should decide what process starts.
+`--enable-launch` is a **third, separate** gate and additionally requires
+`--profile-config`. It lets the panel start a provider run: record a delegation
+on a role's behalf and spawn the subscription process through the same
+`DelegationRuntimeService` the CLI broker uses. This is a larger privilege still
+— spawning a billable process, not recording bounded metadata — so it has its
+own gate and its own route allowlist, and it launches only under the role's
+operator-allowlisted profile (which fixes the executable, model, and sandbox).
+It cannot name an executable or a model: the profile does, and profiles are never
+editable from the UI at any gate, because they name executables and no loopback
+surface should decide what process starts.
 
-Residual: with both gates open, the bearer token is the only thing between
-another local process and both the ledger and the instruction text of every
-subsequent run.
+Residual: with all three gates open, the bearer token is the only thing between
+another local process and the ledger, the instruction text of every subsequent
+run, and the ability to spend provider capacity by launching a run. The launch
+inherits the operator's own provider authentication and the `provider_units`
+ceiling; Commons neither selects the account nor changes its billing.
 
 ### Recursive delegation and resource exhaustion
 
