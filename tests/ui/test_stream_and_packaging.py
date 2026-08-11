@@ -256,3 +256,52 @@ def test_a_graph_built_while_the_ledger_moves_does_not_freeze_the_view(
 def test_the_stream_pairs_a_sequence_with_the_graph_it_describes(context: UIContext) -> None:
     seq, graph = context.snapshot_frame()
     assert graph["seq"] == seq
+
+
+def test_every_stream_connection_receives_each_update_not_only_the_first(
+    context: UIContext, workspace, monkeypatch: pytest.MonkeyPatch  # type: ignore[no-untyped-def]
+) -> None:
+    """Round 2: refresh_if_changed is a one-shot consumer of a shared fingerprint,
+    so whichever connection polled first after a write got the frame and the rest
+    stayed stale while showing 'live'. Every connection must get each update."""
+
+    import asyncio
+
+    from agent_commons.services import CommonsManager
+    from agent_commons.ui import server as server_module
+
+    monkeypatch.setattr(server_module, "_POLL_SECONDS", 0.01)
+
+    async def drive() -> tuple[bytes, bytes]:
+        gen_a = server_module._events(context, None)
+        gen_b = server_module._events(context, None)
+        try:
+            for gen in (gen_a, gen_b):
+                await anext(gen)  # hello
+                await anext(gen)  # initial snapshot
+            # A real canonical write moves the ledger fingerprint.
+            writer = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+            session = writer.start_session(
+                stable_instance_id="stream-writer-window-1",
+                principal="local-operator",
+                client="claude",
+                software="claude-code",
+                role="operator",
+            )
+            writer.session_id = session["session_id"]
+            writer.create_objective(
+                title="A change to broadcast",
+                description="every connection should see this",
+                acceptance_criteria=("delivered to all",),
+                idempotency_key="stream-broadcast",
+            )
+            frame_a = await anext(gen_a)
+            frame_b = await anext(gen_b)
+            return frame_a, frame_b
+        finally:
+            await gen_a.aclose()
+            await gen_b.aclose()
+
+    frame_a, frame_b = asyncio.run(drive())
+    assert b"event: snapshot" in frame_a
+    assert b"event: snapshot" in frame_b

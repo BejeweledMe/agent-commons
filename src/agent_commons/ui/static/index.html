@@ -23,6 +23,10 @@ body{
   margin:0; background:var(--bg); color:var(--fg);
   font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   font-variant-numeric:tabular-nums;
+  /* Stack header/main/footer as a flex column so the footer -- which carries
+     counts and "waiting on you" -- is never clipped by a hardcoded height, and
+     main takes the remaining space at any viewport (round 2, design). */
+  display:flex; flex-direction:column; height:100%;
 }
 header{
   display:flex; align-items:center; gap:16px; flex-wrap:wrap;
@@ -37,7 +41,7 @@ header h1{font-size:14px; margin:0; font-weight:600}
 .pill.reconnecting{color:var(--warn); border-color:var(--warn)}
 .pill.gap{color:var(--bad); border-color:var(--bad)}
 .trust{font-size:11px; color:var(--muted)}
-main{display:flex; height:calc(100% - 84px)}
+main{display:flex; flex:1; min-height:0}
 #canvas{flex:1; background:var(--bg); cursor:grab; touch-action:none}
 #canvas:active{cursor:grabbing}
 aside{
@@ -84,7 +88,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .actions{display:flex; gap:8px; align-items:center; margin:0 0 10px; flex-wrap:wrap}
 .pill.focus{color:var(--info); border-color:var(--info)}
 .pill.blocked{color:var(--warn); border-color:var(--warn)}
-.tabs{display:flex; gap:6px; margin:0 0 10px}
+.tabs{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px}
 .tabs button[aria-selected="true"]{border-color:var(--info); color:var(--info)}
 .panel{display:none}
 .panel.open{display:block}
@@ -280,6 +284,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 <footer>
   <span id="counts"></span>
   <span id="issues"></span>
+  <span id="waiting"></span>
   <span id="truncation"></span>
 </footer>
 <script nonce="__CSP_NONCE__">
@@ -614,12 +619,18 @@ function paintSettings(record) {
   const stored = record.grants || {};
   const effective = record.effective_grants || stored;
   const narrowed = [];
+  let withheld = false;
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
     fillSelect(document.getElementById("grant-" + name), levels, stored[name] || "deny", false);
-    if ((effective[name] || "deny") !== (stored[name] || "deny")) {
-      narrowed.push(name + ": stored " + (stored[name] || "deny") +
-        ", in effect " + (effective[name] || "deny"));
-    }
+    const s = stored[name] || "deny";
+    const e = effective[name] || "deny";
+    if (e === s) { continue; }
+    // stored auto capped to ask is the global withhold, not an ancestor: the
+    // withhold caps at ask, so a lower ancestor would show effective below ask.
+    // Blaming a non-existent ancestor sent operators hunting for a parent role
+    // that isn't there (round 2, design).
+    if (s === "auto" && e === "ask") { withheld = true; }
+    else { narrowed.push(name + ": stored " + s + ", in effect " + e); }
   }
   fillSelect(
     document.getElementById("setting-context_mode"),
@@ -634,7 +645,10 @@ function paintSettings(record) {
     (catalog && catalog.tools) || [], record.tool_allowlist || [], true);
   document.getElementById("setting-reason").value = "";
   document.getElementById("setting-downgrade").value = "";
-  document.getElementById("downgrade-field").hidden = record.context_mode !== "fresh";
+  // Hidden until the operator actually weakens isolation (fresh -> accumulated);
+  // the change listener reveals it then. It was showing for every fresh role
+  // before any weakening was chosen (round 2, design).
+  document.getElementById("downgrade-field").hidden = true;
   // The model is a property of the operator-owned profile, not of the role: a
   // role that could name a model would be editing argv.
   document.getElementById("settings-model").textContent =
@@ -654,9 +668,12 @@ function paintSettings(record) {
     : "created by a human · " + (record.rationale || "");
   const parts = [];
   if (blockers.length) { parts.push("cannot be retired yet — " + blockers.join("; ")); }
+  if (withheld) {
+    parts.push("the automatic level is currently withheld; auto acts as ask (a human confirms)");
+  }
   if (narrowed.length) { parts.push("narrowed by an ancestor — " + narrowed.join("; ")); }
   parts.push(provenance);
-  note.className = (blockers.length || narrowed.length) ? "note warn" : "note";
+  note.className = (blockers.length || withheld || narrowed.length) ? "note warn" : "note";
   note.textContent = parts.join(". ");
 }
 
@@ -722,7 +739,9 @@ async function inspect(node) {
   const title = document.getElementById("inspector-title");
   const body = document.getElementById("inspector-body");
   inspector.classList.add("open");
-  title.textContent = node.kind + " " + node.id;
+  // Lead with the name for anything that has one (a role), so the heading of
+  // the screen where you manage it is not a bare ULID (round 2, design).
+  title.textContent = node.label ? node.kind + " · " + node.label : node.kind + " " + node.id;
   body.textContent = "loading…";
   document.getElementById("blocked-pill").hidden = !node.awaits_human;
 
@@ -788,9 +807,17 @@ document.getElementById("settings-save").addEventListener("click", async () => {
       retire_roles: document.getElementById("grant-retire_roles").value,
       open_links: document.getElementById("grant-open_links").value,
     },
-    skills: selectedValues(document.getElementById("setting-skills")),
-    tool_allowlist: selectedValues(document.getElementById("setting-tools")),
   };
+  // Only send skills/tools when the catalogue that populates their pickers is
+  // actually loaded.  Sending them from empty selects wiped a role's existing
+  // skills the panel could not even display, with a success message (round 2,
+  // design).  Omitting them leaves the stored values untouched.
+  if (catalog && (catalog.skills || []).length) {
+    changes.skills = selectedValues(document.getElementById("setting-skills"));
+  }
+  if (catalog && (catalog.tools || []).length) {
+    changes.tool_allowlist = selectedValues(document.getElementById("setting-tools"));
+  }
   const downgrade = document.getElementById("setting-downgrade");
   try {
     await post("/api/agents/" + encodeURIComponent(currentRole.id) + "/reconfigure", {
@@ -862,6 +889,7 @@ async function loadAttention() {
   for (const item of attention.items) {
     host.appendChild(renderAttentionItem(item));
   }
+  paintWaiting();
 }
 
 function renderAttentionItem(item) {
@@ -927,12 +955,47 @@ function renderAttentionItem(item) {
     const head = document.createElement("span");
     head.textContent = item.subject || item.id;
     card.appendChild(head);
-    const why = document.createElement("p");
-    why.className = "note";
-    why.textContent = "Open this thread from the graph to reply.";
-    card.appendChild(why);
+    // A reply box right here: the card used to say "open this thread from the
+    // graph", but threads are not graph nodes, so the decision-request the panel
+    // said was waiting on you could not be answered anywhere (round 2, design +
+    // product). Reply in place through the canonical thread-message route.
+    if (writesEnabled) {
+      const field = document.createElement("input");
+      field.type = "text";
+      field.placeholder = "Your reply";
+      card.appendChild(field);
+      const send = document.createElement("button");
+      send.type = "button";
+      send.textContent = "Reply";
+      send.addEventListener("click", () => replyThread(item.id, item.revision, field.value));
+      card.appendChild(send);
+    } else {
+      const why = document.createElement("p");
+      why.className = "note";
+      why.textContent = "Read-only. Start the UI with --enable-writes to reply.";
+      card.appendChild(why);
+    }
   }
   return card;
+}
+
+async function replyThread(threadId, revision, text) {
+  const result = document.getElementById("attention-result");
+  if (!text.trim()) {
+    result.className = "result bad";
+    result.textContent = "a reply needs a body";
+    return;
+  }
+  try {
+    await post("/api/chat/" + encodeURIComponent(threadId) + "/messages",
+               { expected_revision: revision, message: text });
+    result.className = "result ok";
+    result.textContent = "replied";
+    await loadAttention();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
 }
 
 async function answerOperation(operationId, text) {
@@ -1206,13 +1269,17 @@ function paintChrome(graph) {
     "issues: " + issues + "   stale warnings: " + warnings;
   document.getElementById("truncation").textContent =
     graph.limits && graph.limits.truncated ? "graph truncated to fit display bounds" : "";
-  const waiting = (graph.awaiting_human || []).length;
-  if (waiting) {
-    document.getElementById("issues").textContent += "   waiting on you: " + waiting;
-  }
   if (graph.workspace_id) {
     document.getElementById("workspace").textContent = graph.workspace_id;
   }
+}
+
+// The footer "waiting on you" reads the same attention count as the tab, so the
+// two cannot disagree. Deriving it from graph.awaiting_human counted nodes --
+// several per blocked run -- and diverged from the item list (round 2, design).
+function paintWaiting() {
+  document.getElementById("waiting").textContent =
+    attention.count ? "waiting on you: " + attention.count : "";
 }
 
 function setStream(state, label) {

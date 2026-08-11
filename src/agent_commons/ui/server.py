@@ -431,12 +431,20 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
                 instance=context.server_instance_id,
             )
 
+    # Each connection tracks the last sequence it sent.  refresh_if_changed is a
+    # one-shot consumer of a shared fingerprint, so whichever connection polls
+    # first after a write triggers the rebuild and the others saw `changed ==
+    # False` and never sent the frame -- one watcher got every update while the
+    # rest stayed stale showing "live" (round 2, design).  Emitting whenever the
+    # shared seq advances past this connection's own last-sent value delivers the
+    # frame to every connection regardless of which one triggered the rebuild.
+    last_sent = seq
     since_heartbeat = 0.0
     while True:
         await asyncio.sleep(_POLL_SECONDS)
         since_heartbeat += _POLL_SECONDS
-        changed = await asyncio.to_thread(context.refresh_if_changed)
-        if changed:
+        await asyncio.to_thread(context.refresh_if_changed)
+        if context.seq > last_sent:
             seq, graph = await asyncio.to_thread(context.snapshot_frame)
             yield _sse(
                 "snapshot",
@@ -444,6 +452,7 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
                 event_id=seq,
                 instance=context.server_instance_id,
             )
+            last_sent = seq
             since_heartbeat = 0.0
         elif since_heartbeat >= _HEARTBEAT_SECONDS:
             # A comment carries no id, so it cannot disturb Last-Event-ID.
