@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Commons — read-only</title>
+<title>Agent Commons</title>
 <style nonce="__CSP_NONCE__">
 :root{
   --bg:#fbfbfd; --surface:#fff; --surface-2:#f4f4f7; --border:#dcdce3;
@@ -89,7 +89,30 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .panel{display:none}
 .panel.open{display:block}
 .field{display:block; margin:0 0 8px}
+/* The UA `[hidden]` rule has the same specificity as `.field{display:block}`
+   and loses to it as the author rule, so `hidden` did not hide: a mid-thread
+   subject box stayed visible and anything typed there was silently discarded
+   (M4). `!important` settles it for every hidden element in the file. */
+[hidden]{display:none !important}
 .field span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px}
+/* The global search box: styled inside the nonce'd block, not with a markup
+   `style` attribute, which `style-src 'nonce-…'` blocks for want of a
+   `style-src-attr` (L6). It was the only element styled outside this block. */
+#search-box{
+  margin-left:auto; min-width:220px;
+  font:12px/1.4 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:6px; padding:5px 8px;
+}
+/* One always-visible attention queue: the same canonical source as the amber
+   ring and the footer count, so it can never be empty while the graph glows. */
+.attn-item{border:1px solid var(--border); border-radius:6px; padding:8px; margin:0 0 8px}
+.attn-item.proposal{border-color:var(--info)}
+.attn-item.run_blocked{border-color:var(--warn)}
+.attn-kind{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+/* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
+   the nonce'd CSP blocks (L6). */
+.subhead{font-size:12px; margin:12px 0 4px}
 .field input,.field select,.field textarea{
   width:100%; font:12px/1.4 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
   background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:6px;
@@ -112,10 +135,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span class="pill" id="workspace">—</span>
   <span class="pill" id="stream">connecting</span>
   <span class="pill" id="writes">writes disabled</span>
-  <input type="search" id="search-box" placeholder="Search history…"
-         style="margin-left:auto;min-width:220px;font:12px/1.4 ui-sans-serif,system-ui,sans-serif;
-                color:var(--fg);background:var(--surface-2);border:1px solid var(--border);
-                border-radius:6px;padding:5px 8px">
+  <input type="search" id="search-box" placeholder="Search history…">
   <span class="trust" id="layers"></span>
 </header>
 <main>
@@ -128,10 +148,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <span class="pill blocked" id="blocked-pill" hidden>waiting on you</span>
     </div>
     <div class="tabs" id="tabs">
+      <button type="button" data-panel="attention" aria-selected="false">Attention</button>
       <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
       <button type="button" data-panel="record" aria-selected="false">Record</button>
-      <button type="button" data-panel="proposals" aria-selected="false" hidden>Proposals</button>
-      <button type="button" data-panel="blockers" aria-selected="false" hidden>Blocked</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
       <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
@@ -153,18 +172,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <pre id="inspector-body"></pre>
     </section>
 
-    <section class="panel" id="panel-blockers">
-      <p class="note">Runs waiting on a person. An answer is bounded metadata —
-        never a password, key, or token.</p>
-      <div id="blocker-list"></div>
-      <p class="result" id="blocker-result"></p>
-    </section>
-
-    <section class="panel" id="panel-proposals">
-      <p class="note">A role asked for something it may not record itself.
-        Confirming creates exactly what was proposed, credited to its proposer.</p>
-      <div id="proposal-list"></div>
-      <p class="result" id="proposal-result"></p>
+    <section class="panel" id="panel-attention">
+      <p class="note" id="attention-note"></p>
+      <div id="attention-list"></div>
+      <p class="result" id="attention-result"></p>
     </section>
 
     <section class="panel" id="panel-search">
@@ -175,7 +186,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <section class="panel" id="panel-catalog">
       <p class="note warn" id="catalog-warning"></p>
       <div id="catalog-list"></div>
-      <h3 style="font-size:12px;margin:14px 0 6px">Add or replace an entry</h3>
+      <h3 class="subhead">Add or replace an entry</h3>
       <label class="field"><span>Kind</span>
         <select id="catalog-section">
           <option value="skills">Skill — instructions every run of the role receives</option>
@@ -567,9 +578,19 @@ function selectedValues(element) {
 
 function paintSettings(record) {
   const levels = (catalog && catalog.grant_levels) || ["deny", "ask", "auto"];
-  const grants = record.effective_grants || record.grants || {};
+  // Prefill from the STORED grants, which is what a save edits. Prefilling from
+  // effective_grants and then saving them as changes.grants turned a derived
+  // value into a stored one (M3): a level lowered on an ancestor would be
+  // written back onto the descendant and outlive the ancestor's downgrade.
+  const stored = record.grants || {};
+  const effective = record.effective_grants || stored;
+  const narrowed = [];
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
-    fillSelect(document.getElementById("grant-" + name), levels, grants[name] || "deny", false);
+    fillSelect(document.getElementById("grant-" + name), levels, stored[name] || "deny", false);
+    if ((effective[name] || "deny") !== (stored[name] || "deny")) {
+      narrowed.push(name + ": stored " + (stored[name] || "deny") +
+        ", in effect " + (effective[name] || "deny"));
+    }
   }
   fillSelect(
     document.getElementById("setting-context_mode"),
@@ -595,13 +616,19 @@ function paintSettings(record) {
     (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
   const note = document.getElementById("settings-note");
   const blockers = record.retirement_blockers || [];
-  note.className = blockers.length ? "note warn" : "note";
-  note.textContent = blockers.length
-    ? "cannot be retired yet — " + blockers.join("; ")
-    : (record.origin === "agent"
-        ? "created by " + (record.created_by_agent_id || "another role") +
-          " · " + (record.approval || "") + " · " + (record.rationale || "")
-        : "created by a human · " + (record.rationale || ""));
+  // effective_grants, retirement_blockers, and live_delegations now reach the
+  // panel (M3), so this warning can actually fire and the narrowing below is
+  // visible where a human edits grants.
+  const provenance = record.origin === "agent"
+    ? "created by " + (record.created_by_agent_id || "another role") +
+      " · " + (record.approval || "") + " · " + (record.rationale || "")
+    : "created by a human · " + (record.rationale || "");
+  const parts = [];
+  if (blockers.length) { parts.push("cannot be retired yet — " + blockers.join("; ")); }
+  if (narrowed.length) { parts.push("narrowed by an ancestor — " + narrowed.join("; ")); }
+  parts.push(provenance);
+  note.className = (blockers.length || narrowed.length) ? "note warn" : "note";
+  note.textContent = parts.join(". ");
 }
 
 async function loadCatalog() {
@@ -729,31 +756,57 @@ async function retire(cascade) {
 document.getElementById("settings-retire").addEventListener("click", () => retire(false));
 document.getElementById("settings-retire-cascade").addEventListener("click", () => retire(true));
 
-let operations = [];
+// One attention queue, canonical-sourced. Blocked runs, human-decision
+// threads, and role proposals are all things waiting on a person; they share
+// the source that lights the amber ring, so this list can never be empty while
+// the graph says N are waiting on you. Live answers and confirmations only
+// enrich an item; they never decide whether it appears.
+let attention = { items: [], count: 0 };
 
-async function loadOperations() {
-  try { operations = (await api("/api/operations")) || []; } catch (error) { operations = []; }
-  const tab = document.querySelector('#tabs button[data-panel="blockers"]');
-  tab.hidden = operations.length === 0;
-  tab.textContent = "Blocked (" + operations.length + ")";
-  const host = document.getElementById("blocker-list");
+async function loadAttention() {
+  try {
+    attention = (await api("/api/attention")) || { items: [], count: 0 };
+  } catch (error) {
+    attention = { items: [], count: 0 };
+  }
+  const tab = document.querySelector('#tabs button[data-panel="attention"]');
+  tab.textContent = attention.count ? "Attention (" + attention.count + ")" : "Attention";
+  const note = document.getElementById("attention-note");
+  note.className = attention.count ? "note warn" : "note";
+  note.textContent = attention.count
+    ? "Waiting on you. An answer is bounded metadata — never a password, key, or token."
+    : "Nothing is waiting on you right now.";
+  const host = document.getElementById("attention-list");
   while (host.firstChild) { host.removeChild(host.firstChild); }
-  for (const item of operations) {
-    const card = document.createElement("div");
-    card.className = "field";
+  for (const item of attention.items) {
+    host.appendChild(renderAttentionItem(item));
+  }
+}
+
+function renderAttentionItem(item) {
+  const card = document.createElement("div");
+  card.className = "attn-item " + item.kind;
+  const kind = document.createElement("div");
+  kind.className = "attn-kind";
+  kind.textContent = item.kind === "run_blocked" ? "run waiting for input"
+    : item.kind === "proposal" ? "role proposal"
+    : (item.thread_type || "needs a decision");
+  card.appendChild(kind);
+
+  if (item.kind === "run_blocked") {
     const head = document.createElement("span");
-    head.textContent = item.kind + " · " + item.delegation_id +
+    head.textContent = item.id + (item.agent_id ? " · role " + item.agent_id : "") +
       (item.deadline ? " · until " + item.deadline : "");
     card.appendChild(head);
-    const detail = document.createElement("pre");
-    // Agent-written prose, written as text.
-    detail.textContent = JSON.stringify(item.metadata, null, 2);
-    card.appendChild(detail);
-    if (item.answerable_here && writesEnabled) {
+    if (item.metadata != null) {
+      const detail = document.createElement("pre");
+      detail.textContent = JSON.stringify(item.metadata, null, 2);  // agent prose as text
+      card.appendChild(detail);
+    }
+    if (item.answerable_here && writesEnabled && item.operation_id) {
       const field = document.createElement("input");
       field.type = "text";
       field.placeholder = "Your answer";
-      field.className = "answer";
       card.appendChild(field);
       const send = document.createElement("button");
       send.type = "button";
@@ -763,25 +816,65 @@ async function loadOperations() {
     } else {
       const why = document.createElement("p");
       why.className = "note warn";
-      // Say which window can answer instead of showing a button that fails.
-      why.textContent = writesEnabled
-        ? "Answer from the session that owns this run: " +
-          (item.answer_from_session || []).join(", ")
-        : "Read-only. Start the UI with --enable-writes as the owning session.";
+      // The run is canonically blocked even when no live operation exists to
+      // answer here; say who can answer rather than hide the blocker.
+      why.textContent = !writesEnabled
+        ? "Read-only. Start the UI with --enable-writes as the owning session to answer."
+        : item.operation_id
+          ? "Answer from the session that owns this run: " +
+            (item.answer_from_session || []).join(", ")
+          : "This run is blocked in the canonical ledger; no live answer channel is open here.";
       card.appendChild(why);
     }
-    host.appendChild(card);
+  } else if (item.kind === "proposal") {
+    const body = document.createElement("pre");
+    body.textContent = JSON.stringify(item.proposal, null, 2);  // agent prose as text
+    card.appendChild(body);
+    if (writesEnabled) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Confirm this role";
+      button.addEventListener("click", () => approveProposal(item.id));
+      card.appendChild(button);
+    } else {
+      const why = document.createElement("p");
+      why.className = "note";
+      why.textContent = "Read-only. Start the UI with --enable-writes to confirm.";
+      card.appendChild(why);
+    }
+  } else {
+    const head = document.createElement("span");
+    head.textContent = item.subject || item.id;
+    card.appendChild(head);
+    const why = document.createElement("p");
+    why.className = "note";
+    why.textContent = "Open this thread from the graph to reply.";
+    card.appendChild(why);
   }
+  return card;
 }
 
 async function answerOperation(operationId, text) {
-  const result = document.getElementById("blocker-result");
+  const result = document.getElementById("attention-result");
   try {
     await post("/api/operations/" + encodeURIComponent(operationId) + "/answer",
                { answer: { answer: text } });
     result.className = "result ok";
     result.textContent = "answered";
-    await loadOperations();
+    await loadAttention();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+async function approveProposal(threadId) {
+  const result = document.getElementById("attention-result");
+  try {
+    await post("/api/agents/proposals/" + encodeURIComponent(threadId) + "/approve", {});
+    result.className = "result ok";
+    result.textContent = "role created, crediting its proposer";
+    await loadAttention();
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -793,12 +886,18 @@ let engagement = null;
 async function loadChat() {
   const note = document.getElementById("chat-note");
   const host = document.getElementById("chat-messages");
+  const send = document.getElementById("chat-send");
+  const composer = document.getElementById("chat-body");
+  // Read-only: no live composer that posts and fails with a raw HTTP status
+  // (L9). The box is disabled and says why, rather than looking ready.
+  composer.disabled = !writesEnabled;
+  send.disabled = !writesEnabled;
   while (host.firstChild) { host.removeChild(host.firstChild); }
   let chats = [];
   try { chats = (await api("/api/chat")) || []; } catch (error) { chats = []; }
   engagement = chats.length ? chats[chats.length - 1] : null;
-  document.getElementById("chat-subject-field").hidden = Boolean(engagement);
-  document.getElementById("chat-send").textContent = engagement ? "Send" : "Start the work";
+  document.getElementById("chat-subject-field").hidden = Boolean(engagement) || !writesEnabled;
+  send.textContent = engagement ? "Send" : "Start the work";
   if (!engagement) {
     note.className = "note";
     note.textContent = writesEnabled
@@ -846,8 +945,12 @@ async function sendChat() {
     result.className = "result ok";
     result.textContent = "recorded";
     await loadChat();
-    await loadOperations();
+    await loadAttention();
   } catch (error) {
+    // A stale expected revision means someone else wrote since this panel
+    // loaded; refresh so the next Send carries the current revision instead of
+    // repeating the failure (M1).
+    await loadChat();
     result.className = "result bad";
     result.textContent = String(error.message || error);
   }
@@ -933,7 +1036,7 @@ function paintCatalog() {
   while (host.firstChild) { host.removeChild(host.firstChild); }
   for (const section of ["skills", "tools"]) {
     const heading = document.createElement("h3");
-    heading.style.cssText = "font-size:12px;margin:12px 0 4px";
+    heading.className = "subhead";
     heading.textContent = section === "skills" ? "Skills" : "Tools";
     host.appendChild(heading);
     const entries = catalog[section] || [];
@@ -1008,50 +1111,6 @@ async function removeCatalogEntry(section, entryId) {
 document.getElementById("catalog-section")
   .addEventListener("change", catalogInstructionVisibility);
 document.getElementById("catalog-save").addEventListener("click", saveCatalogEntry);
-
-let proposals = [];
-
-async function loadProposals() {
-  try { proposals = (await api("/api/proposals")) || []; } catch (error) { proposals = []; }
-  const tab = document.querySelector('#tabs button[data-panel="proposals"]');
-  tab.hidden = proposals.length === 0;
-  tab.textContent = "Proposals (" + proposals.length + ")";
-  renderProposals();
-}
-
-function renderProposals() {
-  const host = document.getElementById("proposal-list");
-  while (host.firstChild) { host.removeChild(host.firstChild); }
-  for (const item of proposals) {
-    const card = document.createElement("div");
-    card.className = "field";
-    const body = document.createElement("pre");
-    // Agent-written prose: text only, never markup.
-    body.textContent = JSON.stringify(item.proposal, null, 2);
-    card.appendChild(body);
-    if (writesEnabled) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Confirm this role";
-      button.addEventListener("click", () => approveProposal(item.thread_id));
-      card.appendChild(button);
-    }
-    host.appendChild(card);
-  }
-}
-
-async function approveProposal(threadId) {
-  const result = document.getElementById("proposal-result");
-  try {
-    await post("/api/agents/proposals/" + encodeURIComponent(threadId) + "/approve", {});
-    result.className = "result ok";
-    result.textContent = "role created, crediting its proposer";
-    await loadProposals();
-  } catch (error) {
-    result.className = "result bad";
-    result.textContent = String(error.message || error);
-  }
-}
 
 function paintChrome(graph) {
   const counts = [];
@@ -1172,6 +1231,11 @@ function handleFrame(frame) {
     paintChrome(payload.graph);
     render(payload.graph);
     setStream("live", "live");
+    // The graph was the only thing that repainted on a frame, so a role's reply
+    // never appeared and the chat's Send kept posting a boot-time revision that
+    // then failed stale (M1). The panel's own data follows the same stream now.
+    loadAttention();
+    loadChat();
     return;
   }
   if (event === "resume_gap") {
@@ -1187,12 +1251,13 @@ async function boot() {
     document.getElementById("writes").textContent = writesEnabled
       ? "writes enabled as " + meta.writer_session_id
       : "writes disabled";
+    // The title was hardcoded "read-only" and stayed wrong with writes on (L8).
+    document.title = writesEnabled ? "Agent Commons — writes enabled" : "Agent Commons — read-only";
     await loadCatalog();
     catalogInstructionVisibility();
     paintCatalog();
-    await loadProposals();
     await loadChat();
-    await loadOperations();
+    await loadAttention();
     // The main chat is where work starts, so it is what the panel shows before
     // anybody clicks a node.  A node chat is for stepping in on one role.
     document.getElementById("inspector").classList.add("open");

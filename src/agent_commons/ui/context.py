@@ -8,6 +8,7 @@ top of a writable manager.
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
 import uuid
 from collections.abc import Mapping
@@ -22,6 +23,8 @@ from agent_commons.errors import CommonsError, ConfigurationError, ValidationErr
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
+
+_LOG = logging.getLogger("agent_commons.ui")
 
 
 def _iso_now() -> str:
@@ -288,7 +291,12 @@ class UIContext:
                 "catalogue editing is off; restart with --role-catalog and "
                 "--enable-catalog-editing"
             )
-        assert self._catalog_path is not None
+        # Not an assert: catalog_editing_enabled already guarantees a path, but
+        # `python -O` strips assertions, and a stripped guard here would let
+        # None reach write_role_catalog and raise an opaque TypeError instead of
+        # this refusal (O2, 2026-08-10 review).
+        if self._catalog_path is None:  # pragma: no cover - defended, not reachable
+            raise ConfigurationError("catalogue editing is on but no catalogue path is configured")
         return self._catalog_path
 
     def _catalog_users(self, section: str, entry_id: str) -> list[str]:
@@ -362,8 +370,15 @@ class UIContext:
         manager = self.writer() if self.writes_enabled else self.manager()
         try:
             operations = CommunicationRuntimeService(manager).inbox()
-        except (CommonsError, OSError):
-            # No runtime state yet, or none this session participates in.
+        except (CommonsError, OSError) as exc:
+            # A corrupt or unreadable communication store is not "no blockers":
+            # swallowing it silently made a real failure indistinguishable from
+            # nothing needing you, and it compounded the two-sources split this
+            # queue exists to close (O1/H4, 2026-08-10 review).  The canonical
+            # attention list does not depend on this read, so the operator still
+            # sees the blocker; only the live answer box is unavailable, and the
+            # reason is logged rather than hidden.
+            _LOG.warning("communication inbox unavailable, live answers disabled: %s", exc)
             operations = ()
         # Scopes store a deterministic pseudonym, not the registry session id,
         # so the comparison has to be made in the same space.
@@ -390,6 +405,74 @@ class UIContext:
                 }
             )
         return found
+
+    def attention(self) -> dict[str, Any]:
+        """One canonical queue of everything waiting on a person.
+
+        The amber ring, the footer count, and this list are now the same
+        source.  The Blocked tab used to read the operational communication
+        store, which is empty for a CLI writer, a crashed worker, replay, and
+        always in read-only, so the graph glowed 'waiting on you: N' while the
+        list was empty and the tab hid itself -- a blocker you cannot see is
+        worse than one you cannot yet act on (H4, 2026-08-10 review).
+
+        Presence is canonical: an input-needed run, an open decision-request,
+        question, or help thread, and a role proposal.  The operational store
+        only *enriches* an item with a live answer box where this session may
+        reply; if that store is unreadable the item still appears, and the
+        design reviewers' merged attention queue replaces the two hidden tabs.
+        """
+
+        from agent_commons.ui.graph import _HUMAN_DECISION_THREADS
+
+        snapshot = self.manager().snapshot()
+        answerable_by_delegation: dict[str, dict[str, Any]] = {}
+        for operation in self.pending_operations():
+            delegation_id = str(operation.get("delegation_id") or "")
+            if delegation_id:
+                answerable_by_delegation[delegation_id] = operation
+
+        items: list[dict[str, Any]] = []
+        for delegation_id, record in sorted(snapshot.delegations.items()):
+            if record.get("state") != "input_needed":
+                continue
+            operation = answerable_by_delegation.get(delegation_id)
+            items.append(
+                {
+                    "kind": "run_blocked",
+                    "id": delegation_id,
+                    "agent_id": record.get("agent_id"),
+                    "target_ref": record.get("target_ref"),
+                    "operation_id": (operation or {}).get("operation_id"),
+                    "metadata": (operation or {}).get("metadata"),
+                    "answerable_here": bool((operation or {}).get("answerable_here")),
+                    "answer_from_session": (operation or {}).get("answer_from_session") or [],
+                    "deadline": (operation or {}).get("deadline"),
+                }
+            )
+        for thread_id, record in sorted(snapshot.threads.items()):
+            if record.get("state") != "open":
+                continue
+            thread_type = str(record.get("thread_type", ""))
+            if thread_type not in _HUMAN_DECISION_THREADS:
+                continue
+            proposal = (record.get("extensions") or {}).get("staff_proposal")
+            is_proposal = isinstance(proposal, Mapping) and proposal.get("action") == "create_role"
+            items.append(
+                {
+                    "kind": "proposal" if is_proposal else "thread",
+                    "id": thread_id,
+                    "thread_type": thread_type,
+                    "subject": record.get("subject"),
+                    "revision": record.get("revision"),
+                    "proposal": dict(proposal) if is_proposal else None,
+                }
+            )
+        return {
+            "items": [bounded_copy(item) for item in items],
+            "count": len(items),
+            "writes_enabled": self.writes_enabled,
+        }
 
     def engagements(self) -> list[dict[str, Any]]:
         """The main chats, readable whether or not this server writes."""
@@ -535,5 +618,15 @@ class UIContext:
         attribute = collections.get(kind)
         if attribute is None:
             return None
-        record = getattr(self.manager().snapshot(), attribute).get(entity_id)
+        manager = self.manager()
+        if kind == "agent":
+            # Through the agent view, so effective_grants, retirement_blockers,
+            # and live_delegations reach the panel.  The raw projection record
+            # carries only stored grants, which made guarantee 7 invisible in the
+            # one screen where a human edits grants and the "cannot be retired
+            # yet" warning unable to fire (M3, 2026-08-10 review).
+            if entity_id not in manager.snapshot().agents:
+                return None
+            return bounded_copy(manager.get_agent(entity_id))
+        record = getattr(manager.snapshot(), attribute).get(entity_id)
         return None if record is None else bounded_copy(record)

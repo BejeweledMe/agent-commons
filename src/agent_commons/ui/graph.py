@@ -80,7 +80,10 @@ def _label(kind: str, record: Mapping[str, Any]) -> str:
         profile = _clean(record.get("target_profile"))
         purpose = _clean(record.get("purpose"))
         return f"{profile} · {purpose}".strip(" ·")
-    for key in ("title", "subject", "summary", "proposal", "path", "role_id"):
+    # `name` first for a role: it is the one display field agent.created
+    # guarantees, and leaving it out rendered every role as its ULID, twice per
+    # card and in the inspector heading (M2, 2026-08-10 review).
+    for key in ("name", "title", "subject", "summary", "proposal", "path", "role_id"):
         value = record.get(key)
         if value:
             return _clean(value)

@@ -127,6 +127,17 @@ def test_the_spa_never_uses_an_unsafe_dom_api() -> None:
         assert forbidden not in body, forbidden
 
 
+def test_the_spa_carries_no_inline_style_the_csp_would_drop() -> None:
+    """The CSP is `style-src 'nonce-…'` with no `style-src-attr`, so any inline
+    style attribute or CSSOM style write is silently dropped -- which is how the
+    search box lost its styling and the catalogue headings theirs (L6). All
+    styling must live in the nonce'd <style> block."""
+
+    body = read_spa()
+    assert "style=" not in body, "a markup style attribute would be blocked by the CSP"
+    assert ".style.cssText" not in body, "a CSSOM cssText write would be blocked by the CSP"
+
+
 def test_stream_ids_round_trip_through_the_parser(context: UIContext) -> None:
     """Regression: the server emitted a bare counter while the parser required
     instance:seq, so the resume_gap branch was unreachable for any client that

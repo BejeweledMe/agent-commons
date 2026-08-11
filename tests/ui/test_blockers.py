@@ -215,3 +215,114 @@ def test_the_blocked_run_also_rings_its_node_on_the_graph(
     graph = UIContext(workspace["repo"], state_root=workspace["state_root"]).rebuild_graph()
 
     assert delegation["entity_ref"]["id"] in graph["awaiting_human"]
+
+
+def test_the_attention_queue_shows_a_canonical_blocker_with_no_live_operation(
+    workspace: dict[str, Any], owner_session: CommonsManager
+) -> None:
+    """H4: one source for 'waiting on you', and it agrees with the ring.
+
+    An open decision-request thread lights the amber ring and the footer count,
+    but has no entry in the operational communication store.  The old Blocked
+    tab read only that store, so it was empty while the graph glowed and then
+    hid itself.  The attention queue is canonical, so the blocker appears there
+    and in awaiting_human from the same source.
+    """
+
+    thread = owner_session.open_thread(
+        thread_type="decision_request",
+        subject="Which region hosts the primary?",
+        desired_outcome="one region named",
+        to=("operator",),
+        idempotency_key="attention-thread",
+    )
+    thread_id = thread["entity_ref"]["id"]
+
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(owner_session.session_id),
+    )
+    with _client(context) as client:
+        operations = client.get("/api/operations", headers=authorized()).json()
+        attention = client.get("/api/attention", headers=authorized()).json()
+
+    # No live operation exists for a plain decision thread, so the old Blocked
+    # tab (which read only this store) was empty...
+    assert operations == []
+    # ...yet the attention queue lists the thread, from canonical state.
+    attention_ids = {item["id"] for item in attention["items"]}
+    assert thread_id in attention_ids
+    assert attention["count"] >= 1
+
+    # And the ring is lit from that same source: the graph shows the thread's
+    # session waiting on a person.  The list and the ring agree now -- both
+    # non-empty -- where the operational store left one empty and one glowing.
+    graph = context.rebuild_graph()
+    assert graph["awaiting_human"], "the canonical ring is dark while the attention queue is not"
+
+
+def test_the_attention_queue_carries_a_role_proposal(
+    workspace: dict[str, Any], owner_session: CommonsManager
+) -> None:
+    """Blocked and Proposals merged into one queue: a proposal is an attention
+    item, confirmable in place, rather than a second hidden tab."""
+
+    role = owner_session.create_agent(
+        name="Proposer",
+        profile_id="claude-builder",
+        grants={"create_roles": "ask", "retire_roles": "deny", "open_links": "deny"},
+        turnover_budget=4,
+        rationale="a role that may ask for staff",
+        idempotency_key="attn-role",
+    )
+    task = owner_session.create_task(
+        title="Work",
+        description="binds a run",
+        acceptance_criteria=("d",),
+        idempotency_key="attn-t",
+    )
+    delegation = owner_session.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits={**LIMITS, "max_concurrency": 1},
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="attn-d",
+    )
+    worker_session = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    child = worker_session.start_session(
+        stable_instance_id="attn-worker-window-0001",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="builder",
+    )
+    owner_session.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=child["session_id"],
+        idempotency_key="attn-start",
+    )
+    worker = CommonsManager(
+        workspace["repo"], session_id=child["session_id"], state_root=workspace["state_root"]
+    )
+    worker.propose_agent(
+        name="Requested helper",
+        profile_id="claude-builder",
+        rationale="please hire this",
+        idempotency_key="attn-proposal",
+    )
+
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(owner_session.session_id),
+    )
+    with _client(context) as client:
+        attention = client.get("/api/attention", headers=authorized()).json()
+
+    proposals = [item for item in attention["items"] if item["kind"] == "proposal"]
+    assert len(proposals) == 1
+    assert proposals[0]["proposal"]["name"] == "Requested helper"

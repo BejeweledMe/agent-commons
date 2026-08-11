@@ -198,6 +198,13 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     async def proposals() -> Response:
         return JSONResponse(await asyncio.to_thread(context.agent_proposals))
 
+    @app.get("/api/attention")
+    async def attention() -> Response:
+        # One canonical queue: the same source as the amber ring and the footer
+        # count, so the list can never be empty while the graph says N are
+        # waiting on you.
+        return JSONResponse(await asyncio.to_thread(context.attention))
+
     @app.get("/api/catalog")
     async def catalog() -> Response:
         return JSONResponse(await asyncio.to_thread(context.catalog))
