@@ -150,6 +150,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="tabs" id="tabs">
       <button type="button" data-panel="attention" aria-selected="false">Attention</button>
       <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
+      <button type="button" data-panel="hire" aria-selected="false" hidden>Hire</button>
       <button type="button" data-panel="record" aria-selected="false">Record</button>
       <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
       <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
@@ -166,6 +167,34 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <textarea id="chat-body"></textarea></label>
       <button type="button" id="chat-send">Send</button>
       <p class="result" id="chat-result"></p>
+    </section>
+
+    <section class="panel" id="panel-hire">
+      <p class="note">Hire a standing role. It selects one operator-allowlisted
+        profile and can only narrow it; a role that may create or retire other
+        roles needs a turnover budget.</p>
+      <label class="field"><span>From preset (optional)</span>
+        <select id="hire-preset"></select></label>
+      <label class="field"><span>Name</span>
+        <input type="text" id="hire-name" autocomplete="off"></label>
+      <label class="field"><span>Profile</span>
+        <select id="hire-profile"></select></label>
+      <label class="field"><span>Why this role exists (kept forever)</span>
+        <input type="text" id="hire-rationale" autocomplete="off"></label>
+      <label class="field"><span>Context</span>
+        <select id="hire-context_mode"></select></label>
+      <div class="grants">
+        <label class="field"><span>Create roles</span>
+          <select id="hire-create_roles"></select></label>
+        <label class="field"><span>Retire roles</span>
+          <select id="hire-retire_roles"></select></label>
+        <label class="field"><span>Open links</span>
+          <select id="hire-open_links"></select></label>
+        <label class="field"><span>Turnover budget (blank = none)</span>
+          <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
+      </div>
+      <button type="button" id="hire-save">Hire</button>
+      <p class="result" id="hire-result"></p>
     </section>
 
     <section class="panel" id="panel-record">
@@ -635,6 +664,58 @@ async function loadCatalog() {
   try { catalog = await api("/api/catalog"); } catch (error) { catalog = null; }
   catalogEditing = Boolean(catalog && catalog.catalog_editing_enabled);
 }
+
+// Hiring a role: the caller for POST /api/agents that the panel lacked, so the
+// launch loop is closed here rather than only in the CLI (M8). The panel could
+// reconfigure, retire, and message a role, but could not create one.
+function paintHire() {
+  const tab = document.querySelector('#tabs button[data-panel="hire"]');
+  tab.hidden = !writesEnabled;
+  if (!writesEnabled || !catalog) { return; }
+  fillSelect(document.getElementById("hire-profile"), catalog.profiles || [], null, false);
+  fillSelect(document.getElementById("hire-context_mode"),
+    catalog.context_modes || ["fresh", "accumulated"], "fresh", false);
+  const levels = catalog.grant_levels || ["deny", "ask", "auto"];
+  for (const name of ["create_roles", "retire_roles", "open_links"]) {
+    fillSelect(document.getElementById("hire-" + name), levels, "deny", false);
+  }
+  const presets = [{ id: "", title: "— none —" }].concat(
+    (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
+  fillSelect(document.getElementById("hire-preset"), presets, "", false);
+}
+
+async function hireRole() {
+  const result = document.getElementById("hire-result");
+  const budgetRaw = document.getElementById("hire-turnover_budget").value;
+  const body = {
+    name: document.getElementById("hire-name").value,
+    profile_id: document.getElementById("hire-profile").value,
+    rationale: document.getElementById("hire-rationale").value,
+    context_mode: document.getElementById("hire-context_mode").value,
+    grants: {
+      create_roles: document.getElementById("hire-create_roles").value,
+      retire_roles: document.getElementById("hire-retire_roles").value,
+      open_links: document.getElementById("hire-open_links").value,
+    },
+    turnover_budget: budgetRaw === "" ? null : Number(budgetRaw),
+    from_preset_id: document.getElementById("hire-preset").value || null,
+  };
+  try {
+    const created = await post("/api/agents", body);
+    result.className = "result ok";
+    result.textContent = "hired " + (created.entity_ref ? created.entity_ref.id : "");
+    document.getElementById("hire-name").value = "";
+    document.getElementById("hire-rationale").value = "";
+    await loadAttention();
+  } catch (error) {
+    // The refusal names the guard it tripped — a missing budget, a wider grant
+    // than allowed — which is exactly what the operator needs to fix.
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById("hire-save").addEventListener("click", hireRole);
 
 async function inspect(node) {
   const inspector = document.getElementById("inspector");
@@ -1256,6 +1337,7 @@ async function boot() {
     await loadCatalog();
     catalogInstructionVisibility();
     paintCatalog();
+    paintHire();
     await loadChat();
     await loadAttention();
     // The main chat is where work starts, so it is what the panel shows before

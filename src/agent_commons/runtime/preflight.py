@@ -192,12 +192,24 @@ def preflight_profile(
             "provider_help_process_started": False,
             "provider_work_process_started": False,
         }
-    except ConfigurationError:
+    except ConfigurationError as exc:
+        # The profile refused to build its launch, and the reason matters: a
+        # writable builder in an untrusted workspace fails here with a
+        # trusted_workspace ConfigurationError, which was flattened into a bare
+        # provider_start_failed -- so preflight blamed the executable on a
+        # machine where the executable runs fine (M8, 2026-08-10 review).  Name
+        # the real refusal, and carry its message as detail.
+        message = str(exc)
+        code = (
+            DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED
+            if "trusted_workspace" in message
+            else DiagnosticCode.PROVIDER_START_FAILED
+        )
         return {
             "profile_id": normalized.value,
             "provider": profile.provider.value,
             "ok": False,
-            "checks": {"profile": _safe_failure(DiagnosticCode.PROVIDER_START_FAILED)},
+            "checks": {"profile": {**_safe_failure(code), "detail": message}},
             "consumed_delegation_attempt": False,
             "provider_help_process_started": False,
             "provider_work_process_started": False,

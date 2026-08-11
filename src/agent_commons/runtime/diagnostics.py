@@ -44,6 +44,7 @@ class DiagnosticCode(StrEnum):
     PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
     CANONICAL_FINALIZATION_FAILED = "canonical_finalization_failed"
     REQUESTER_UNAVAILABLE = "requester_unavailable"
+    TRUSTED_WORKSPACE_REQUIRED = "trusted_workspace_required"
 
 
 _HINTS = {
@@ -81,6 +82,10 @@ _HINTS = {
     ),
     DiagnosticCode.PROCESS_CANONICAL_MISMATCH: (
         "The terminal provider-process state disagrees with the canonical delegation state."
+    ),
+    DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED: (
+        "A writable provider profile refused to build its launch: the workspace is "
+        "not marked trusted and no external isolation was declared."
     ),
     DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
         "Canonical finalization failed after the provider process became terminal."
@@ -154,6 +159,11 @@ _SAFE_NEXT_ACTIONS = {
         "delegation:recover session.",
         "For active or input-needed work, prove provider termination before any canonical "
         "classification; never relaunch blindly.",
+    ),
+    DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED: (
+        "Pass trusted_workspace: true in the writable profile's runtime configuration, "
+        "or run the builder inside an externally OS-isolated worktree.",
+        "The independent-reviewer profile of the same provider needs no such opt-in.",
     ),
 }
 

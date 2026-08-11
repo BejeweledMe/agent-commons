@@ -197,6 +197,42 @@ def test_preflight_identifies_a_missing_mcp_executable_before_provider_launch(
     assert runner.calls == []
 
 
+def test_preflight_names_a_trusted_workspace_refusal_not_a_start_failure(
+    tmp_path: Path,
+) -> None:
+    """A writable builder in an untrusted workspace refuses to build its launch
+    with a trusted_workspace ConfigurationError.  That was flattened into a bare
+    provider_start_failed, so preflight blamed the executable on a machine where
+    it runs fine (M8).  The real refusal and its message must survive."""
+
+    profile_id = BuiltinProfileId.CLAUDE_BUILDER
+    profiles = ProfileRegistry(
+        {
+            profile_id: ClaudeRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                git_executable="/usr/bin/git",
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+                trusted_workspace=False,
+            )
+        }
+    )
+
+    result = preflight_profile(
+        profiles,
+        profile_id,
+        workspace_root=tmp_path,
+        runner=ProbeRunner(),  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    check = result["checks"]["profile"]
+    assert check["diagnostic_code"] == DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED.value
+    assert "trusted_workspace" in check["detail"]
+    assert result["consumed_delegation_attempt"] is False
+
+
 def test_preflight_returns_closed_code_for_provider_flag_drift(tmp_path: Path) -> None:
     result = preflight_profile(
         _profiles(),

@@ -33,6 +33,9 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
     assert run_help.exit_code == 0
     assert "--idempotency-key" in run_help.output
     assert "--retry" in run_help.output
+    # One catalogue path shared with the panel: the launcher names the same file
+    # the UI edits, with the same flag (M8).
+    assert "--role-catalog" in run_help.output
     for forbidden in ("--command", "--prompt", "--environment", "--executable"):
         assert forbidden not in run_help.output
 

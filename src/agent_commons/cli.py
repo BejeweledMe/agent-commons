@@ -1683,16 +1683,37 @@ def _runtime_service(
     state: CLIState,
     profile_config: Path | None,
     telemetry: str = "none",
+    role_catalog: Path | None = None,
 ) -> DelegationRuntimeService:
     manager = state.manager()
     config = load_runtime_configuration(profile_config, workspace_root=state.repo)
+    # One catalogue for the panel and the launcher.  The panel edits the file
+    # named by `agent-commons ui --role-catalog`; the launcher read the `catalog:`
+    # key inside the runtime profile config, so a skill added through the form
+    # refused the next launch (M8, 2026-08-10 review).  `--role-catalog` here
+    # names the same file with the same flag, and overrides the config key when
+    # both are present.
+    catalog = config.catalog
+    if role_catalog is not None:
+        from agent_commons.catalog import load_role_catalog
+
+        catalog = load_role_catalog(role_catalog, workspace_root=state.repo)
     return DelegationRuntimeService(
         manager,
         profiles=config.profiles,
         operator_limits=config.limits,
-        catalog=config.catalog,
+        catalog=catalog,
         telemetry=telemetry_sink(telemetry, manager),
     )
+
+
+def _role_catalog_option(function: Any) -> Any:
+    return click.option(
+        "--role-catalog",
+        type=click.Path(path_type=Path, dir_okay=False),
+        help="Operator catalogue of selectable skills and tools; the same file "
+        "the panel edits with `agent-commons ui --role-catalog`.",
+    )(function)
 
 
 def _profile_config(function: Any) -> Any:
@@ -1861,6 +1882,7 @@ def broker_attempts(
     show_default=True,
 )
 @_profile_config
+@_role_catalog_option
 @click.pass_obj
 def broker_run(
     state: CLIState,
@@ -1870,11 +1892,12 @@ def broker_run(
     retry: bool,
     telemetry: str,
     profile_config: Path | None,
+    role_catalog: Path | None,
 ) -> None:
     """Launch one requested delegation; no arbitrary command or prompt is accepted."""
 
     state.emit(
-        _runtime_service(state, profile_config, telemetry).run(
+        _runtime_service(state, profile_config, telemetry, role_catalog).run(
             delegation_id,
             expected_revision,
             idempotency_key=idempotency_key,

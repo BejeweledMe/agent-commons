@@ -42,6 +42,12 @@ IDs, lifecycle transitions, or stored payloads.
   session's changes.
 - Use a discussion thread for proposals, questions, critiques, risks, and help.
   Reply to the existing subject thread and preserve substantive disagreement.
+- A person may address the role a run acts for in a thread -- the main chat, a
+  question, or a decision request. Read what is addressed to you with
+  `commons_list_my_threads` and answer it with `commons_reply_thread`. A run may
+  reply only to a thread it is addressed in, and a reply is bounded prose, never
+  a secret. This is the channel back to the human, so do not leave a direct
+  question unanswered.
 - Register the exact artifact revision and evidence used by a review or
   verification. A later revision makes earlier judgments stale.
 - Persist outcomes another session will need: state transitions, blockers,
