@@ -127,8 +127,16 @@ Relabeling a writable builder as a reviewer is rejected before publication.
 
 ### Autonomous role creation
 
-A role holding `create_roles: auto` changes the staff without a person in the
-loop. Unlike a delegation, which is terminal and ends itself, a role is
+**Withheld on this branch (2026-08-11).** The automatic (`auto`) grant level is
+capped to `ask` at read time (`effective_grants`), so no role changes the staff
+without a person confirming it, and the mechanisms below currently guard a path
+that is inert. A review defeated four of them; the fixes landed and the
+mechanisms now hold under adversarial execution, but the level itself stays
+withheld until it has run longer behind proven brakes. What follows is the design
+of the autonomous path for when it is restored.
+
+A role holding `create_roles: auto` would change the staff without a person in
+the loop. Unlike a delegation, which is terminal and ends itself, a role is
 persistent and keeps receiving work, so automatic creation grows standing
 structure. Seven mechanisms bound it, and all of them are derived from the
 ledger or checked in `validate_transition`, which every adapter crosses:
@@ -149,6 +157,17 @@ ledger or checked in `validate_transition`, which every adapter crosses:
 - effective grants derived at read time from the whole ancestor chain, so a
   downgrade binds the next call from work already running rather than waiting
   for a propagation pass.
+
+Two second paths have to re-check what creation checks, or the mechanisms read as
+enforced and are not (round-1 C2/H1): an **`event.corrected`** cannot change a
+role's authority, identity, isolation, or lineage — those fields are frozen in
+`CORRECTION_IMMUTABLE_FIELDS`, checked on write and again on replay; and an
+**`agent.reconfigured`** re-applies the creation invariants — a role that gains a
+create or retire grant needs a ceiling, the ceiling stays monotone against the
+creator, and an automatically-created role keeps a strictly narrower create grant.
+The run/role binding a delegation carries is authorised and read only on
+`delegation.requested`, so a relation on a later delegation event cannot rebind a
+run on replay (round-2, architecture).
 
 The budget deliberately lives on the role rather than in configuration.
 `workspace.yaml` sits inside the delegated workspace and a writable builder runs
@@ -172,8 +191,11 @@ A session running as no role — a human window — may staff any active role,
 because that is the ordinary way work starts and every local session is equally
 trusted in MVP-0 regardless. A session already running as a role may staff only
 itself or a role below it in its own lineage. The check lives in the domain
-lifecycle and reads the run/role relation off the event envelope, so replay
-revalidates it rather than trusting that the write path checked once.
+lifecycle and reads the run/role relation off the `delegation.requested`
+envelope, so replay revalidates it there rather than trusting that the write path
+checked once. The binding is read *only* on that event: a relation attached to a
+later delegation event (say `delegation.started`) is ignored on replay, so it
+cannot rebind a run to a role it was never authorised for (round-2, architecture).
 
 The narrower reach this closed was not live: worker profiles receive no
 delegation-creation tools, and a caller with direct manager access already holds

@@ -1,6 +1,20 @@
 # ADR 0009: Agents as first-class roles
 
-Status: accepted.
+Status: accepted; **amended 2026-08-11** after two review rounds.
+
+> **What ships today, and what an earlier edition of this ADR overclaimed.**
+> The first edition of this document said autonomous role creation ships "with
+> all seven mechanisms landing together." A review
+> (`docs/audits/2026-08-10-standing-roles-review.md`) found four independent
+> paths defeated those mechanisms; the fixes are in, and the mechanisms now hold
+> under adversarial execution. But the **automatic (`auto`) grant level is
+> deliberately withheld on this branch** until it has run longer with its brakes
+> proven: `effective_grants` caps every level at `ask`, so a stored `auto`
+> behaves as `ask` and every structural action is human-confirmed. Read Q3 below
+> with that in mind — the seven guarantees are real and tested, but the
+> *autonomous* path they guard is staged, not live. The human-confirmed path
+> that is live is bounded by the turnover budget, not by the strict-decrease
+> ceiling (which binds only `approval: automatic`).
 
 ## Context
 
@@ -111,13 +125,26 @@ the same shape. Read-only stays the default.
 Mutating routes, all of them thin adapters over an existing manager or service
 method:
 
+The mutating surface as it actually ships (the authority is
+`ui/server.py:MUTATING_ROUTES`, pinned by test; catalogue editing sits behind its
+own gate in `CATALOG_ROUTES`):
+
 | Route | Manager entry point |
 |---|---|
 | `POST /api/agents` | `create_agent` |
+| `POST /api/agents/proposals/{thread}/approve` | `approve_agent_proposal` |
 | `POST /api/agents/{id}/reconfigure` | `reconfigure_agent` |
 | `POST /api/agents/{id}/retire` | `retire_agent` |
 | `POST /api/agents/{id}/messages` | `open_thread` / `reply_thread` |
-| `POST /api/operations/{id}/reply` | `CommunicationRuntimeService.reply_to_input` |
+| `POST /api/chat` | `open_engagement` |
+| `POST /api/chat/{thread}/messages` | `reply_thread` |
+| `POST /api/operations/{id}/answer` | `CommunicationRuntimeService.reply_to_input` |
+| `POST /api/catalog/entries` (own gate) | `write_role_catalog` |
+| `POST /api/catalog/entries/remove` (own gate) | `write_role_catalog` |
+
+(The first edition of this table named `/api/operations/{id}/reply` and omitted
+the chat, proposal, and catalogue routes; it is the test, not this prose, that is
+authoritative — round 2, design.)
 
 ### What happens to the tests that prove the invariant today
 
@@ -143,7 +170,17 @@ the operator was still at the terminal.
 
 ## Q3. The seven guarantees of autonomous role creation
 
-Autonomous creation is accepted with all seven mechanisms landing together. Each
+**Status (2026-08-11): the `auto` level these guarantees protect is withheld;
+see the banner at the top.** Each mechanism below is built, and each held under
+two adversarial architecture reviews — but they guard the automatic path, which
+is currently inert (`effective_grants` caps at `ask`). When `auto` is restored,
+these are what make it safe. Until then, creation is human-confirmed and bounded
+by guarantees 1, 2, 4, 5, 6, and 7; guarantee 3 (strict decrease) is specific to
+`approval: automatic` and does not constrain the human-confirmed path, which a
+human may deliberately confirm at a level equal to the creator's, bounded only by
+the turnover budget.
+
+Autonomous creation is designed with all seven mechanisms landing together. Each
 is derived from the ledger or checked in `validate_transition`, which is on the
 path of every adapter.
 
@@ -183,10 +220,16 @@ It is deliberately **not** a configuration key:
 - `OperatorLimits` lives in the runtime config, which the worker MCP process does
   not load — the ceiling would not bind the path that actually needs it.
 
-On the role, the budget is set by the human at the same moment they grant `auto`,
-is immutable afterwards (a correction cannot change structural fields, and
-raising it through `agent.reconfigured` is refused for an agent actor), and
-narrows monotonically down the chain.
+On the role, the budget is set by the human. A **correction** can never change it
+(it is in `CORRECTION_IMMUTABLE_FIELDS`, checked on write and replay). A
+**reconfiguration** can — `turnover_budget` is a mutable field, because a role
+reconfigured to gain a create or retire grant needs a ceiling and a role that
+dropped those grants can shed one. That mutation is a human operation
+(`agent.reconfigured` is refused for a session acting as a role), it stays
+monotone against the creator, and it narrows down the chain. The earlier claim
+that the budget "is immutable afterwards" was wrong in both directions: it left
+the correction path unguarded (round-1 C2) and left the operator without a way to
+add the ceiling a widened grant requires (round-1 H1).
 
 ### `ask` keeps the proposer's provenance
 
@@ -493,9 +536,12 @@ their rollback contract from ADR 0007 are unaffected.
 - Independence stops depending on session identity, which is the third time this
   property has needed repair and the first time the repair is stated over a
   domain rather than a case.
-- Autonomous role creation is available with its brakes attached. If any of the
-  seven mechanisms had turned out to need a large rewrite, the correct move was
-  to ship the level as `ask` only — an inert brake is worse than an absent one.
+- Autonomous role creation is **staged, not live**: the `auto` level is withheld
+  and every path is human-confirmed for now. The rule the first edition wrote and
+  then broke — "if any of the seven mechanisms need a large rewrite, ship the
+  level as `ask` only, because an inert brake is worse than an absent one" — is
+  the rule now being followed literally. The brakes are built and proven; the
+  level returns when it has run longer behind them.
 - Role settings are honestly narrower than the PRD's checkbox screen. The gear
   panel can promise only what the profile boundary can enforce, and says so.
 - One more reason a launch can be refused, and one more reason a retire can be

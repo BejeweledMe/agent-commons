@@ -1,8 +1,15 @@
 # Standing-roles review: findings and remediation plan
 
-Status: findings recorded, remediation **not started**.
+Status: **remediation complete; two review rounds run.** Round 1 (below) found
+the branch's headline claim false. All nine remediation steps landed
+(`f30604c`..`2c4c91b`), each reproduced before and after and tested through the
+real seam. A second, independent six-reviewer round then ran against the fixed
+branch; its results and the further fixes they prompted (`5cb081d`, `503c63d`)
+are recorded under **Round 2** at the end of this document. The suite is green
+throughout (638 passed, 12 skipped — the skips are the withheld-`auto` cases),
+ruff clean.
 
-Date: 2026-08-10
+Date: 2026-08-10 (round 1), 2026-08-11 (round 2)
 
 Reviewed revision: `91c51fb` (branch `agent/visual-orchestrator-foundation`,
 eleven commits on top of `52dc577`). Test suite at review time: 629 passed,
@@ -454,3 +461,139 @@ workflow ends with "automatically fix High and Medium issues"; that step was
 not taken here, because a remediation plan for the larger findings is open and
 unapproved, and fixing O1/O2 in isolation would touch code that plan is about
 to restructure.
+
+---
+
+# Remediation (round 1 → fixes)
+
+Nine steps, each a working state proven in isolation, each entering through the
+seam a user crosses (CLI command, MCP tool, HTTP route) rather than a helper.
+
+| Step | Finding | Fix | Commit |
+|---|---|---|---|
+| 1 | `auto` shipped partially over broken guarantees | Withhold `auto`: `effective_grants` caps every level at `ask` while `AUTOMATIC_LEVEL_WITHHELD` is set. A stored `auto` stays valid and behaves as `ask` — tool registration, launched argv, and every lifecycle check follow from the effective level. | `f30604c` |
+| 2 (C1) | A worker stopped being its role the moment it reported success | `acting_agent_id` now reads every delegation whose child the session is (terminal included), preferring a live binding, ties by most-recent ULID. The binding lasts the session, matching `session_agent_map`. | `03e7163` |
+| 3 (C2, H1) | Corrections and reconfiguration did not re-run what creation checks | A role's authority/identity/isolation/lineage fields join `CORRECTION_IMMUTABLE_FIELDS` (checked on write and replay through one helper); reconfiguration re-checks the budget requirement, keeps it monotone against the creator, and preserves strict decrease for automatically-created roles; `turnover_budget` becomes mutable so the operator remedy exists. | `689f2c1` |
+| 4 (H2) | Independence: raw-session requester check; last-actor authorship | Requester/completer compared as principals; the projection accumulates every author session into `author_session_ids`, read for all kinds — closed by class, not by the two reported kinds. | `e7b24a9` |
+| 5 (H3, M6, L1) | Lifetime retirement not terminal; cascade not atomic/ordered; read-only made WAL sidecars | Retirement applied inline at the closing event and never undone (survives `task.reopened`, write==replay); the whole cascade runs under one reentrant write lock, leaves-first; the read-only projection opens `immutable=1`. | `20b864d` |
+| 6 (M7) | `prior_verdicts` dead with a type bug | Fixed (set membership, not `==` against a frozenset) and wired: the projection records the producing role's context mode and prior-verdict count on every completed review. | `2365327` |
+| 7 (H4, M1–M4, O1, O2, L6, L8, L9) | Panel disagreed with itself and never refreshed | One canonical attention queue (merging Blocked and Proposals, operator-approved); the panel's data follows the graph stream; `entity()` through `_agent_view`; `name` in `_label`; a real `[hidden]` rule; the CSP style attribute removed; the composer disabled in read-only. | `76bc940` |
+| 8 (M8) | Launch loop open | A Hire form calling `POST /api/agents`; the chat tools named in the worker instruction and `ONBOARDING.md`; `broker run --role-catalog` naming the panel's file; a `TRUSTED_WORKSPACE_REQUIRED` preflight diagnostic carrying the real refusal. | `2c4c91b` |
+| 9 | The docs claimed more than the code did | This document, the ADR, the threat model, the plan §15, and the CHANGELOG rewritten against what exists. | (docs) |
+
+The seventh (OpenCodeReview) pass was re-run in delegation mode over
+`52dc577..HEAD` after the fixes: clean on the added lines — no bare excepts,
+mutable defaults, identity-vs-literal comparisons, f-string logging, or runtime
+`assert`; every wrapping `raise` chains with `from`. The mechanical layer stayed
+sound, as in round 1.
+
+---
+
+# Round 2: six independent reviewers, on the fixed branch
+
+Same conditions as round 1 — three lenses (product, design/UX, architecture) in
+two model families (Opus, Fable), each given only the material (ADR, invariant
+docs, the diff, the code) and its lens, none given the round-1 report or the
+author's conclusions. Architecture reviewers were adversarial and proved
+findings by running code; design reviewers raised the UI on their own ports;
+product reviewers walked the first-run path by hand.
+
+## What held (both architecture reviewers, by execution)
+
+Neither adversarial architecture reviewer could break any of the seven
+guarantees or the replay / one-write-path invariants. Each ran code that tried:
+replay determinism (no clock/liveness in validation; re-projection equals the
+write-time snapshot), the single canonical write path (`append_event` has
+exactly one caller), the grant algebra with `auto` withheld at all three layers
+(tool registration, launched argv, lifecycle), turnover-budget churn, review
+independence by principal, terminal lifetime retirement in both event orders,
+atomic leaves-first cascade, and corrections frozen against authority change.
+This is the round-1 gap closed: the same properties that were claimed and
+defeated are now claimed and hold under attack.
+
+## New findings, and their disposition
+
+Marked **[converged]** where reviewers of different lenses or models found it
+independently.
+
+Fixed in `5cb081d` (backend) and `503c63d` (UI):
+
+- **Approving a proposal did not consume it** — [converged: both product
+  reviewers, reproduced]. A second approval minted a duplicate role, spent
+  turnover budget again, and left the item in the attention queue forever. This
+  is round-1 **L2**, which the round-1 plan did not schedule. Approve now creates
+  the role and resolves the proposal thread as one locked action; a second
+  approval is refused.
+- **`auto` withheld but undisclosed** — [converged: all six lenses touch it].
+  Docs, CHANGELOG, and the CLI flag said `auto` ships while the code withholds
+  it. Deciding to withhold was right; not disclosing it was the defect. Now: the
+  CLI warns on an interactive `--create-roles auto`, the settings panel names the
+  withhold, and the ADR / threat model / plan / CHANGELOG say it plainly.
+- **`on_behalf_of` rebind on non-requested delegation events** — [architecture,
+  Opus, PROVED behaviour]. The run/role binding was applied on every delegation
+  event but authorised only on `delegation.requested`; a relation forged onto
+  `delegation.started` rebound the run on replay with no check. Reachability was
+  low (no worker path forwards relations), but the stated replay-revalidation
+  guarantee was incomplete. The projection reads the binding only on the
+  requested event now; the overclaimed comment is corrected.
+- **Empty engagement thread on a rejected chat** — [product]. `open_engagement`
+  recorded `thread.opened` before validating the message, leaving an empty thread
+  in the immutable ledger. The message is validated first; the two writes are one
+  locked action.
+- **Invalid catalogue → silent 500** — [product]; round-1 **L7**, unscheduled.
+  The `ui` command validates the catalogue at startup; the read route returns a
+  named 422.
+- **Hiring a role with an unknown skill** — [converged: both product]. Deferred
+  the failure to the next launch. Hiring validates skill ids against the loaded
+  catalogue.
+- **Attention queue directionality** — [design]. An operator's own directive to a
+  role (a `decision_request` addressed to the role) counted as waiting on the
+  operator, inflating their own queue and ringing their own session. A shared
+  predicate now counts a human-decision thread only when addressed to the human;
+  the ring and the list read it, and the footer count reads the same number as
+  the tab.
+- **Stale-while-live, multi-client** — [design, Fable, reproduced]. `refresh_if_changed`
+  is a one-shot consumer of a shared fingerprint, so one stream connection got
+  each update and the rest stayed stale while showing "live". Each connection
+  now emits whenever the shared sequence advances past its own last-sent value.
+- **Gear-panel Save wiped skills/tools** — [design, Fable]. Save sent skills and
+  tools from selects that are empty when no catalogue is loaded, silently
+  destroying configuration. It sends them only when the catalogue is present.
+- **The decision-request dead end** — [converged: both design, both product]. The
+  attention card told the operator to "open this thread from the graph", but
+  threads are not graph nodes. The card carries a reply box now, replying through
+  the canonical thread-message route.
+- Plus: inspector heading leads with the role name; the weakening-isolation field
+  starts hidden; the layout is a flex column with wrapping tabs so the footer and
+  the Settings tab are not clipped at 1280×800; the "narrowed by an ancestor"
+  note distinguishes the global withhold.
+
+## Deferred, with the human's decision recorded
+
+These are product-shape changes, not defects, and are marked deferred in the
+plan §15 rather than built in this pass:
+
+- **Launching a delegation from the UI** — [converged: both product]. Plan §10
+  stage-3 "запускает делегацию из UI" (MUST-4) and the streaming seam (MUST-5)
+  are undelivered. The panel builds the org chart, talks to it, and answers it;
+  every unit of work still starts from the CLI. Marked deferred in §15.
+- **Full human↔role threading** — [design, Fable]. The Message tab opens a new
+  thread per send and the role's reply is only readable in the attention queue,
+  not threaded. The reply affordance closes the acute dead end; a threaded
+  human↔role conversation is a larger surface, deferred.
+- **Keyboard reachability of the canvas** — [converged: both design]. Graph nodes
+  are SVG groups with click handlers and no `tabindex`/`role`, so role selection
+  is mouse-only. Deferred; a real a11y pass is its own change.
+
+## Where a reviewer was wrong, with evidence
+
+- One design reviewer read the single-browser "panel stays current" as contradicting
+  the multi-client "stale-while-live" finding. They do not contradict: the first was
+  verified with one browser (its own SSE poll notices the change), the second with two
+  clients (a second consumer wins the fingerprint race). Both are true; the fix
+  addresses the multi-client case without regressing the single-client one, which the
+  new multi-connection test pins.
+- The product reviewers' "auto is broken" framing is imprecise: `auto` is not broken,
+  it is deliberately withheld and behaves as `ask`. The defect is the missing
+  disclosure, not the mechanism — which is why the fix is a warning and a doc
+  correction, not a code change to the grant algebra.

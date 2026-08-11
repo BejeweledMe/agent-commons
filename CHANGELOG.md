@@ -17,12 +17,18 @@ Versioning once a stable release line is declared.
   standing role that authored work in one run cannot approve it in the next,
   even though every session identifier differs. The rule is expressed once, over
   the class, so a principal kind added later is covered at every call site.
-- **Autonomous role creation ships with all seven of its brakes attached**: a
+- **Autonomous role creation is built with all seven of its brakes, and the
+  automatic (`auto`) level is currently withheld behind them.** The brakes — a
   turnover budget counting creations and retirements together, grants that never
   widen, a strictly narrower creation grant on each automatic generation, a
   canonical event carrying rationale and proposer, one-action cascade retire,
   visible `origin` in the index, and effective grants derived on every read so a
-  downgrade binds work already running.
+  downgrade binds work already running — held under two adversarial reviews. But
+  a 2026-08-10 review found the first edition of this line untrue in practice, so
+  `auto` is capped to `ask` at read time (`AUTOMATIC_LEVEL_WITHHELD`): every
+  structural action is human-confirmed until the level has run longer behind its
+  proven brakes. See ADR 0009 and
+  `docs/audits/2026-08-10-standing-roles-review.md`.
 - Role settings **narrow and never widen**: `tool_allowlist` is intersected with
   the profile's fixed tool set at invocation build time, and the narrowing is
   asserted against the argv of a launched run rather than against a settings
