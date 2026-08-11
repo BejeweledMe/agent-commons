@@ -141,6 +141,10 @@ def test_a_read_only_search_reads_an_existing_projection_without_changing_it(
     _search(workspace, "warm the index")
     database = workspace["manager"].paths.index_db
     before = database.stat().st_mtime_ns
+    # The main file's mtime is not the whole story: a plain read-only open still
+    # materialises -wal and -shm sidecars, which the first version of this test
+    # missed (L1, 2026-08-10 review).  Assert the sidecars stay absent too.
+    sidecars_before = sorted(p.name for p in database.parent.glob("index.sqlite3-*"))
 
     reader = CommonsManager(workspace["repo"], read_only=True)
     payload = reader.search_history("signing key")
@@ -148,6 +152,7 @@ def test_a_read_only_search_reads_an_existing_projection_without_changing_it(
     assert payload["count"] >= 1
     assert payload["index"]["synchronized"] is False
     assert database.stat().st_mtime_ns == before
+    assert sorted(p.name for p in database.parent.glob("index.sqlite3-*")) == sidecars_before
 
 
 def test_only_allowlisted_fields_become_searchable() -> None:

@@ -236,12 +236,23 @@ def _relation_object(
     return None
 
 
-def _apply_derived_agent_retirement(snapshot: ProjectSnapshot) -> None:
-    """Retire task-scoped roles when their task reaches a terminal state.
+def _retire_lifetime_roles_for_task(snapshot: ProjectSnapshot, task_id: str) -> None:
+    """Retire the active task-scoped roles bound to a task that just closed.
 
-    Derived rather than recorded on purpose: an event would have to be written
-    by whoever accepts or cancels the task, and a path that forgets it leaves a
-    role collecting work forever.
+    Applied inline, at the event that closes the task, rather than in a pass
+    over final state.  Two things depended on that:
+
+    * `task.reopened` used to resurrect a lifetime-retired role, because a
+      post-pass reads the task's *current* state and a reopened task is active
+      again.  Retiring at the closing event and never un-retiring makes the
+      removal terminal, matching "there is no transition out of retired".
+    * A post-pass runs after the replay loop, so a lifetime-expired role was
+      `active` for every `validate_transition` during replay while the write
+      path (a fresh snapshot with the pass already run) saw it `retired`.
+      Doing it in the loop makes replay re-apply the same rule the write saw.
+
+    Derived, not recorded: there is still no `agent.retired` event and no writer
+    to forget, so `retired_by: lifetime` records carry no such event by design.
     """
 
     for record in snapshot.agents.values():
@@ -250,11 +261,33 @@ def _apply_derived_agent_retirement(snapshot: ProjectSnapshot) -> None:
         lifetime = record.get("lifetime")
         if not isinstance(lifetime, Mapping) or lifetime.get("kind") != "task_scoped":
             continue
-        task = snapshot.tasks.get(str(lifetime.get("task_id", "")))
-        if task is not None and task.get("state") in _LIFETIME_CLOSING_TASK_STATES:
+        if str(lifetime.get("task_id", "")) == task_id:
             record["state"] = "retired"
             record["retired_by"] = "lifetime"
-            record["retired_with_task_id"] = task.get("id")
+            record["retired_with_task_id"] = task_id
+
+
+def _retire_lifetime_role_if_task_closed(snapshot: ProjectSnapshot, agent_id: str) -> None:
+    """Retire a task-scoped role created after its task already closed.
+
+    The closing-event path covers a role that exists when its task closes; this
+    covers the reverse order -- a role created while its task is already
+    accepted or cancelled -- so a late role is not born collecting work forever.
+    A role bound to a task that is currently active (including one reopened
+    since an earlier close) lives on, retiring at that task's next close.
+    """
+
+    record = snapshot.agents.get(agent_id)
+    if record is None or record.get("state") != "active":
+        return
+    lifetime = record.get("lifetime")
+    if not isinstance(lifetime, Mapping) or lifetime.get("kind") != "task_scoped":
+        return
+    task = snapshot.tasks.get(str(lifetime.get("task_id", "")))
+    if task is not None and task.get("state") in _LIFETIME_CLOSING_TASK_STATES:
+        record["state"] = "retired"
+        record["retired_by"] = "lifetime"
+        record["retired_with_task_id"] = task.get("id")
 
 
 def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) -> None:
@@ -312,6 +345,11 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
                 {**event, "payload": task_payload},
                 TASK_STATES[event_type],
             )
+        if TASK_STATES[event_type] in _LIFETIME_CLOSING_TASK_STATES:
+            # Terminal for the roles it scopes: retire them here, at the closing
+            # event, so a later task.reopened cannot bring them back and replay
+            # sees the same state the write path did.
+            _retire_lifetime_roles_for_task(snapshot, task_id)
     elif event_type in THREAD_STATES:
         thread_id = str(payload["thread_id"])
         _apply(
@@ -412,6 +450,10 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
             snapshot.agents[agent_id].setdefault("turnover_budget", None)
             snapshot.agents[agent_id].setdefault("template", False)
             snapshot.agents[agent_id]["created_event_id"] = str(event["event_id"])
+            # A role born after its task already closed is retired at once, so
+            # the two event orders -- task-then-role and role-then-task -- reach
+            # the same terminal state.
+            _retire_lifetime_role_if_task_closed(snapshot, agent_id)
     elif event_type in AGENT_LINK_STATES:
         _apply(
             snapshot.agent_links,
@@ -840,7 +882,6 @@ def _project_events_once(
             )
 
     _mark_bound_evidence_stale(snapshot)
-    _apply_derived_agent_retirement(snapshot)
     _fail_closed_decision_conflicts(snapshot)
     snapshot.replay_metrics = {
         "events_replayed": len(raw),

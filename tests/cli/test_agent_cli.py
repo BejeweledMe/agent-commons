@@ -725,7 +725,7 @@ def test_a_task_scoped_role_leaves_service_when_its_task_is_cancelled(
     )
     assert created["entity_ref"]["id"] in [item["id"] for item in listed]
 
-    manager.cancel_task(task_id, task["revision"], reason="descoped")
+    cancelled = manager.cancel_task(task_id, task["revision"], reason="descoped")
     after = _json(
         _invoke(
             workspace["runner"],
@@ -738,6 +738,23 @@ def test_a_task_scoped_role_leaves_service_when_its_task_is_cancelled(
     )
     assert after["state"] == "retired"
     assert after["retired_by"] == "lifetime"
+
+    # Retirement is terminal: reopening the task must not bring the role back.
+    # A post-pass over final task state used to do exactly that, because a
+    # reopened task is active again (H3, 2026-08-10 review).
+    manager.reopen_task(task_id, cancelled["revision"], reason="back in scope")
+    reopened = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "show",
+            created["entity_ref"]["id"],
+        )
+    )
+    assert reopened["state"] == "retired"
+    assert reopened["retired_by"] == "lifetime"
 
 
 # -- context isolation -------------------------------------------------------
@@ -1105,3 +1122,105 @@ def test_reconfiguration_re_checks_the_turnover_budget(
     assert shown["effective_grants"]["create_roles"] == "ask"
     assert shown["turnover_budget"] == 4
     assert accepted["event_type"] == "agent.reconfigured"
+
+
+# -- cascade retirement is atomic and leaves-first (M6) ------------------------
+
+
+def _lineage_via_proposals(workspace: dict[str, Any]) -> dict[str, str]:
+    """Build root -> mid -> leaf without the withheld automatic level.
+
+    Each agent-created role comes about the way one really does now: a session
+    running as a role proposes it, and the operator confirms.  Returns the three
+    role ids and ends every run so the cascade is not blocked by live work.
+    """
+
+    manager: CommonsManager = workspace["manager"]
+    root = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "create",
+            "--name",
+            "root",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "top of the lineage",
+            "--create-roles",
+            "ask",
+            "--turnover-budget",
+            "8",
+            "--idempotency-key",
+            "cascade-root",
+        )
+    )
+    root_id = root["entity_ref"]["id"]
+
+    def propose_and_confirm(parent_id: str, name: str, grant: str, key: str) -> str:
+        worker_session = _run_as(workspace, parent_id, f"{key}-run")
+        worker = CommonsManager(
+            workspace["repo"],
+            session_id=worker_session,
+            state_root=manager.paths.state_root,
+        )
+        proposal = worker.propose_agent(
+            name=name,
+            profile_id="claude-builder",
+            rationale=f"{name} under {parent_id}",
+            grants={"create_roles": grant, "retire_roles": "deny", "open_links": "deny"},
+            turnover_budget=4 if grant != "deny" else None,
+            idempotency_key=f"{key}-proposal",
+        )
+        confirmed = _json(
+            _invoke(
+                workspace["runner"],
+                workspace["repo"],
+                workspace["human"]["session_id"],
+                "agent",
+                "approve",
+                proposal["entity_ref"]["id"],
+                "--idempotency-key",
+                f"{key}-approve",
+            )
+        )
+        _finish_run(workspace, f"{key}-run")
+        return confirmed["entity_ref"]["id"]
+
+    mid_id = propose_and_confirm(root_id, "mid", "ask", "cascade-mid")
+    leaf_id = propose_and_confirm(mid_id, "leaf", "deny", "cascade-leaf")
+    return {"root": root_id, "mid": mid_id, "leaf": leaf_id}
+
+
+def test_a_cascade_retires_leaves_first_and_as_a_whole(workspace: dict[str, Any]) -> None:
+    lineage = _lineage_via_proposals(workspace)
+
+    retired = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "retire",
+            lineage["root"],
+            "--reason",
+            "programme wound down",
+            "--cascade",
+            "--idempotency-key",
+            "cascade-retire",
+        )
+    )
+    order = [item["entity_ref"]["id"] for item in retired["retired"]]
+    # A role is always written before the creator it collapses, so a partial
+    # cascade never leaves a child active under a retired parent.
+    assert order == [lineage["leaf"], lineage["mid"], lineage["root"]]
+
+    manager: CommonsManager = workspace["manager"]
+    snapshot = manager.snapshot()
+    for identifier in lineage.values():
+        assert snapshot.agents[identifier]["state"] == "retired"
+    assert snapshot.agents[lineage["root"]]["retired_by"] == "human"
+    assert snapshot.agents[lineage["mid"]]["retired_by"] == "cascade"
+    assert snapshot.agents[lineage["leaf"]]["retired_by"] == "cascade"

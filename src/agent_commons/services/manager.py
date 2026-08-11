@@ -26,6 +26,7 @@ from agent_commons.domain.agents import (
     agent_delegations,
     descendants,
     effective_grants,
+    lineage,
     retirement_blockers,
     turnover_used,
 )
@@ -200,6 +201,12 @@ class CommonsManager:
             validators=(self._validate_stored_manifest,),
         )
         self.session_id = session_id
+        # Reentrancy depth for the cross-process canonical write lock.  A cascade
+        # that records several events -- retiring a lineage as one action -- must
+        # hold one critical section across all of them, so record_event reuses
+        # the outer hold instead of releasing and reacquiring between events,
+        # which is where a concurrent writer used to slip in.
+        self._write_lock_depth = 0
 
     def _require_writable(self) -> None:
         if self.read_only:
@@ -651,9 +658,23 @@ class CommonsManager:
 
     @contextmanager
     def _canonical_write_lock(self) -> Iterable[None]:
-        """Serialize lifecycle CAS and append across processes and worktrees."""
+        """Serialize lifecycle CAS and append across processes and worktrees.
+
+        Reentrant within one manager: a nested acquisition reuses the outer
+        hold rather than blocking on the same file lock (flock does not detect
+        same-process nesting) or releasing it between writes.  An outer caller
+        can therefore make several record_event calls atomic against other
+        processes -- the whole cascade lands or none of it does.
+        """
 
         self._require_writable()
+        if self._write_lock_depth > 0:
+            self._write_lock_depth += 1
+            try:
+                yield
+            finally:
+                self._write_lock_depth -= 1
+            return
         self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         lock_path = self.paths.state_root / "canonical-write.lock"
         with lock_path.open("a+b") as handle:
@@ -662,9 +683,11 @@ class CommonsManager:
             except OSError:
                 pass
             lock_exclusive(handle.fileno())
+            self._write_lock_depth = 1
             try:
                 yield
             finally:
+                self._write_lock_depth = 0
                 unlock(handle.fileno())
 
     def _idempotency_key(self, event_type: str, value: str | None) -> str:
@@ -1785,67 +1808,84 @@ class CommonsManager:
     ) -> dict[str, Any]:
         """Take a role out of service, optionally with everything it created.
 
-        Nothing is deleted; the ledger keeps the whole history.  A cascade is
-        checked in full before its first write, because a half-applied cascade
-        leaves exactly the orphaned authority it exists to remove.
+        Nothing is deleted; the ledger keeps the whole history.  The whole
+        cascade runs inside one canonical write lock: a half-applied cascade
+        leaves exactly the orphaned authority it exists to remove, and a
+        concurrent writer that gave the root live work between two separate
+        writes used to produce precisely that -- descendants retired, root
+        active.  Members are written leaves-first, so if anything still fails
+        mid-cascade a child is never left active under a retired parent.
         """
 
-        snapshot = self.snapshot()
-        require_entity(snapshot, "agent", agent_id)
-        order = [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
-        targets = [identifier for identifier in order if identifier in snapshot.agents]
-        pending = [
-            identifier
-            for identifier in targets
-            if snapshot.agents[identifier].get("state") == "active"
-        ]
-        blocked = {
-            identifier: retirement_blockers(
-                agents=snapshot.agents,
-                delegations=snapshot.delegations,
-                reviews=snapshot.reviews,
-                agent_id=identifier,
+        with self._canonical_write_lock():
+            snapshot = self.snapshot()
+            require_entity(snapshot, "agent", agent_id)
+            targets = (
+                [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
             )
-            for identifier in pending
-        }
-        refusals = {key_: value for key_, value in blocked.items() if value}
-        if refusals:
-            detail = "; ".join(f"{name}: {', '.join(items)}" for name, items in refusals.items())
-            # Say what was actually attempted.  Reporting a plain retire as a
-            # refused cascade is a small lie in the record, and this branch has
-            # already paid for one of those.
-            scope = "cascade retire is refused as a whole" if cascade else "retire is refused"
-            raise LifecycleConflictError(f"{scope}: a role owing live work: {detail}")
-        base_key = self._idempotency_key("agent.retired", idempotency_key)
-        session = self._active_session()
-        retired_by = "agent" if acting_agent_id(snapshot, session.session_id) else "human"
-        results = []
-        for identifier in pending:
-            record = snapshot.agents[identifier]
-            revision = (
-                expected_revision
-                if identifier == agent_id and expected_revision
-                else str(record.get("effective_revision") or record["revision"])
+            targets = [identifier for identifier in targets if identifier in snapshot.agents]
+            # Leaves-first: order by distance from the human root, deepest first,
+            # so a role is always retired before the creator it reports to.
+            # descendants() returns ULID (chronological, ancestors-first) order,
+            # the opposite of what a cascade needs.
+            targets.sort(
+                key=lambda identifier: (len(lineage(snapshot.agents, identifier)), identifier),
+                reverse=True,
             )
-            payload: dict[str, Any] = {
-                "agent_id": identifier,
-                "expected_revision": revision,
-                "reason": reason,
-                "retired_by": "cascade" if identifier != agent_id else retired_by,
-            }
-            if identifier != agent_id:
-                payload["cascade_of"] = agent_id
-            results.append(
-                self.record_event(
-                    "agent.retired",
-                    payload,
-                    idempotency_key=f"{base_key}:{identifier}",
-                    tags=("agent",),
+            pending = [
+                identifier
+                for identifier in targets
+                if snapshot.agents[identifier].get("state") == "active"
+            ]
+            blocked = {
+                identifier: retirement_blockers(
+                    agents=snapshot.agents,
+                    delegations=snapshot.delegations,
+                    reviews=snapshot.reviews,
+                    agent_id=identifier,
                 )
-            )
-        if not results:
-            raise LifecycleConflictError(f"agent is already retired: {agent_id}")
-        return {"retired": results, "count": len(results)}
+                for identifier in pending
+            }
+            refusals = {key_: value for key_, value in blocked.items() if value}
+            if refusals:
+                detail = "; ".join(
+                    f"{name}: {', '.join(items)}" for name, items in refusals.items()
+                )
+                # Say what was actually attempted.  Reporting a plain retire as a
+                # refused cascade is a small lie in the record, and this branch
+                # has already paid for one of those.
+                scope = "cascade retire is refused as a whole" if cascade else "retire is refused"
+                raise LifecycleConflictError(f"{scope}: a role owing live work: {detail}")
+            base_key = self._idempotency_key("agent.retired", idempotency_key)
+            session = self._active_session()
+            retired_by = "agent" if acting_agent_id(snapshot, session.session_id) else "human"
+            results = []
+            for identifier in pending:
+                record = snapshot.agents[identifier]
+                revision = (
+                    expected_revision
+                    if identifier == agent_id and expected_revision
+                    else str(record.get("effective_revision") or record["revision"])
+                )
+                payload: dict[str, Any] = {
+                    "agent_id": identifier,
+                    "expected_revision": revision,
+                    "reason": reason,
+                    "retired_by": "cascade" if identifier != agent_id else retired_by,
+                }
+                if identifier != agent_id:
+                    payload["cascade_of"] = agent_id
+                results.append(
+                    self.record_event(
+                        "agent.retired",
+                        payload,
+                        idempotency_key=f"{base_key}:{identifier}",
+                        tags=("agent",),
+                    )
+                )
+            if not results:
+                raise LifecycleConflictError(f"agent is already retired: {agent_id}")
+            return {"retired": results, "count": len(results)}
 
     def open_agent_link(
         self,

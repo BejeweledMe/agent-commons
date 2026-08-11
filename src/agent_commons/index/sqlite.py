@@ -708,7 +708,13 @@ def search_existing_projection(
         return None
     connection: sqlite3.Connection | None = None
     try:
-        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
+        # `immutable=1`, not merely `mode=ro`: a plain read-only open still
+        # materialises the `-wal` and `-shm` sidecars, so "creating and changing
+        # nothing" left two files behind (L1, 2026-08-10 review).  immutable
+        # promises the file will not change under us and suppresses the sidecars;
+        # a genuinely mid-write projection surfaces as an error, which this
+        # already reports as "cannot answer".
+        connection = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True, timeout=5)
         connection.row_factory = sqlite3.Row
         return search_rows(connection, query, limit=limit, subject_kind=subject_kind)
     except sqlite3.Error:

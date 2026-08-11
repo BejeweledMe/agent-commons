@@ -1391,3 +1391,31 @@ def test_unreadable_sqlite_projection_falls_back_to_canonical_history(
     assert brief["read_diagnostics"]["reason"] == "index_fallback"
     assert brief["read_diagnostics"]["fallback_error"] == "IntegrityError"
     assert brief["counts"]["objectives"] == {"active": 1}
+
+
+def test_the_canonical_write_lock_is_reentrant_within_one_manager(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """A cascade holds one critical section across several writes.
+
+    flock does not detect same-process nesting, so a naive nested acquisition
+    would deadlock; a release-and-reacquire between writes is where a concurrent
+    writer slipped into the cascade (M6, 2026-08-10 review).  The lock reuses the
+    outer hold and records a canonical event from inside it.
+    """
+
+    _, _, builder, _ = workspace
+    with builder._canonical_write_lock():
+        assert builder._write_lock_depth == 1
+        with builder._canonical_write_lock():
+            assert builder._write_lock_depth == 2
+            # A real canonical write from inside the nested hold must not block.
+            created = builder.create_objective(
+                title="Written under a nested lock",
+                description="the reentrant path records without deadlocking",
+                acceptance_criteria=("recorded",),
+                idempotency_key="reentrant-write",
+            )
+            assert created["event_type"] == "objective.created"
+        assert builder._write_lock_depth == 1
+    assert builder._write_lock_depth == 0
