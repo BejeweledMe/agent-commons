@@ -108,6 +108,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   background:var(--surface-2); border:1px solid var(--border);
   border-radius:6px; padding:5px 8px;
 }
+/* The language picker, styled here like #search-box because the CSP drops
+   markup style attributes (L6). */
+#lang{
+  font:12px/1.4 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:6px; padding:5px 8px;
+}
 /* One always-visible attention queue: the same canonical source as the amber
    ring and the footer count, so it can never be empty while the graph glows. */
 .attn-item{border:1px solid var(--border); border-radius:6px; padding:8px; margin:0 0 8px}
@@ -139,7 +146,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span class="pill" id="workspace">—</span>
   <span class="pill" id="stream">connecting</span>
   <span class="pill" id="writes">writes disabled</span>
-  <input type="search" id="search-box" placeholder="Search history…">
+  <input type="search" id="search-box" placeholder="Search history…" data-i18n-placeholder="search_placeholder">
+  <select id="lang" aria-label="Language">
+    <option value="en">English</option>
+    <option value="ru">Русский</option>
+  </select>
   <span class="trust" id="layers"></span>
 </header>
 <main>
@@ -149,57 +160,57 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="actions">
       <button type="button" id="focus-toggle" aria-pressed="false">Isolate connections</button>
       <span class="pill" id="focus-count"></span>
-      <span class="pill blocked" id="blocked-pill" hidden>waiting on you</span>
+      <span class="pill blocked" id="blocked-pill" hidden data-i18n="waiting_on_you">waiting on you</span>
     </div>
     <div class="tabs" id="tabs">
       <button type="button" data-panel="attention" aria-selected="false">Attention</button>
       <button type="button" data-panel="runs" aria-selected="false" hidden>Runs</button>
-      <button type="button" data-panel="chat" aria-selected="true">Main chat</button>
-      <button type="button" data-panel="hire" aria-selected="false" hidden>Hire</button>
-      <button type="button" data-panel="record" aria-selected="false">Record</button>
-      <button type="button" data-panel="catalog" aria-selected="false" hidden>Catalogue</button>
-      <button type="button" data-panel="search" aria-selected="false" hidden>Search</button>
-      <button type="button" data-panel="run" aria-selected="false" hidden>Run</button>
-      <button type="button" data-panel="message" aria-selected="false" hidden>Message</button>
-      <button type="button" data-panel="settings" aria-selected="false" hidden>⚙ Settings</button>
+      <button type="button" data-panel="chat" aria-selected="true" data-i18n="tab_chat">Main chat</button>
+      <button type="button" data-panel="hire" aria-selected="false" hidden data-i18n="tab_hire">Hire</button>
+      <button type="button" data-panel="record" aria-selected="false" data-i18n="tab_record">Record</button>
+      <button type="button" data-panel="catalog" aria-selected="false" hidden data-i18n="tab_catalog">Catalogue</button>
+      <button type="button" data-panel="search" aria-selected="false" hidden data-i18n="tab_search">Search</button>
+      <button type="button" data-panel="run" aria-selected="false" hidden data-i18n="tab_run">Run</button>
+      <button type="button" data-panel="message" aria-selected="false" hidden data-i18n="tab_message">Message</button>
+      <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">⚙ Settings</button>
     </div>
 
     <section class="panel open" id="panel-chat">
       <p class="note" id="chat-note"></p>
       <div id="chat-messages"></div>
-      <label class="field" id="chat-subject-field" hidden><span>What is the task?</span>
+      <label class="field" id="chat-subject-field" hidden><span data-i18n="chat_subject_label">What is the task?</span>
         <input type="text" id="chat-subject" autocomplete="off"></label>
-      <label class="field"><span>Message</span>
+      <label class="field"><span data-i18n="chat_message_label">Message</span>
         <textarea id="chat-body"></textarea></label>
       <button type="button" id="chat-send">Send</button>
       <p class="result" id="chat-result"></p>
     </section>
 
     <section class="panel" id="panel-hire">
-      <p class="note">Hire a standing role. It selects one operator-allowlisted
+      <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
         profile and can only narrow it; a role that may create or retire other
         roles needs a turnover budget.</p>
-      <label class="field"><span>From preset (optional)</span>
+      <label class="field"><span data-i18n="hire_preset_label">From preset (optional)</span>
         <select id="hire-preset"></select></label>
-      <label class="field"><span>Name</span>
+      <label class="field"><span data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
-      <label class="field"><span>Profile</span>
+      <label class="field"><span data-i18n="hire_profile_label">Profile</span>
         <select id="hire-profile"></select></label>
-      <label class="field"><span>Why this role exists (kept forever)</span>
+      <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
-      <label class="field"><span>Context</span>
+      <label class="field"><span data-i18n="hire_context_label">Context</span>
         <select id="hire-context_mode"></select></label>
       <div class="grants">
-        <label class="field"><span>Create roles</span>
+        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
           <select id="hire-create_roles"></select></label>
-        <label class="field"><span>Retire roles</span>
+        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
           <select id="hire-retire_roles"></select></label>
-        <label class="field"><span>Open links</span>
+        <label class="field"><span data-i18n="open_links_label">Open links</span>
           <select id="hire-open_links"></select></label>
-        <label class="field"><span>Turnover budget (blank = none)</span>
+        <label class="field"><span data-i18n="hire_budget_label">Turnover budget (blank = none)</span>
           <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
       </div>
-      <button type="button" id="hire-save">Hire</button>
+      <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
       <p class="result" id="hire-result"></p>
     </section>
 
@@ -214,7 +225,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     </section>
 
     <section class="panel" id="panel-runs">
-      <p class="note">Live and recent provider runs — phase only, never any
+      <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
         provider output. No prompts, transcripts, or tool arguments are retained.</p>
       <div id="runs-list"></div>
     </section>
@@ -227,74 +238,74 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <section class="panel" id="panel-catalog">
       <p class="note warn" id="catalog-warning"></p>
       <div id="catalog-list"></div>
-      <h3 class="subhead">Add or replace an entry</h3>
-      <label class="field"><span>Kind</span>
+      <h3 class="subhead" data-i18n="catalog_add_heading">Add or replace an entry</h3>
+      <label class="field"><span data-i18n="catalog_kind_label">Kind</span>
         <select id="catalog-section">
-          <option value="skills">Skill — instructions every run of the role receives</option>
-          <option value="tools">Tool — one of the profile's tools a role may keep</option>
+          <option value="skills" data-i18n="catalog_option_skill">Skill — instructions every run of the role receives</option>
+          <option value="tools" data-i18n="catalog_option_tool">Tool — one of the profile's tools a role may keep</option>
         </select></label>
-      <label class="field"><span>Short id (lowercase, no spaces)</span>
+      <label class="field"><span data-i18n="catalog_id_label">Short id (lowercase, no spaces)</span>
         <input type="text" id="catalog-id" autocomplete="off"></label>
-      <label class="field"><span>Name people will see</span>
+      <label class="field"><span data-i18n="catalog_title_label">Name people will see</span>
         <input type="text" id="catalog-title" autocomplete="off"></label>
-      <label class="field"><span>What it is for</span>
+      <label class="field"><span data-i18n="catalog_desc_label">What it is for</span>
         <input type="text" id="catalog-description" autocomplete="off"></label>
       <label class="field" id="catalog-instruction-field">
-        <span>Instructions given to the agent (skills only)</span>
+        <span data-i18n="catalog_instruction_label">Instructions given to the agent (skills only)</span>
         <textarea id="catalog-instruction"></textarea></label>
-      <button type="button" id="catalog-save">Save entry</button>
+      <button type="button" id="catalog-save" data-i18n="catalog_save">Save entry</button>
       <p class="result" id="catalog-result"></p>
     </section>
 
     <section class="panel" id="panel-run">
-      <p class="note" id="run-note">Put this role to work on a task. It runs under
+      <p class="note" id="run-note" data-i18n="run_note">Put this role to work on a task. It runs under
         the role's profile (provider and model), through the same broker the CLI
         uses. Progress appears on the run's node as its state changes.</p>
-      <label class="field"><span>Task</span>
+      <label class="field"><span data-i18n="run_task_label">Task</span>
         <select id="run-task"></select></label>
-      <label class="field"><span>Wall-time seconds (blank = default)</span>
+      <label class="field"><span data-i18n="run_wall_label">Wall-time seconds (blank = default)</span>
         <input type="number" id="run-wall" min="1" max="86400"></label>
-      <button type="button" id="run-go">Run this role on the task</button>
+      <button type="button" id="run-go" data-i18n="run_go">Run this role on the task</button>
       <p class="result" id="run-result"></p>
     </section>
 
     <section class="panel" id="panel-message">
       <p class="note" id="message-note"></p>
-      <label class="field"><span>Subject (new thread only)</span>
+      <label class="field"><span data-i18n="message_subject_label">Subject (new thread only)</span>
         <input type="text" id="message-subject" autocomplete="off"></label>
-      <label class="field"><span>Message to this role</span>
+      <label class="field"><span data-i18n="message_body_label">Message to this role</span>
         <textarea id="message-body"></textarea></label>
-      <button type="button" id="message-send">Send</button>
+      <button type="button" id="message-send" data-i18n="send">Send</button>
       <p class="result" id="message-result"></p>
     </section>
 
     <section class="panel" id="panel-settings">
       <p class="note" id="settings-note"></p>
       <div class="grants">
-        <label class="field"><span>Create roles</span>
+        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
           <select id="grant-create_roles"></select></label>
-        <label class="field"><span>Retire roles</span>
+        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
           <select id="grant-retire_roles"></select></label>
-        <label class="field"><span>Open links</span>
+        <label class="field"><span data-i18n="open_links_label">Open links</span>
           <select id="grant-open_links"></select></label>
-        <label class="field"><span>Context</span>
+        <label class="field"><span data-i18n="hire_context_label">Context</span>
           <select id="setting-context_mode"></select></label>
       </div>
-      <label class="field"><span>Display name</span>
+      <label class="field"><span data-i18n="setting_name_label">Display name</span>
         <input type="text" id="setting-name" autocomplete="off"></label>
-      <label class="field"><span>Required skills (operator catalogue)</span>
+      <label class="field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
         <select id="setting-skills" multiple size="4"></select></label>
-      <label class="field"><span>Tools (narrows the profile, never widens)</span>
+      <label class="field"><span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
         <select id="setting-tools" multiple size="4"></select></label>
-      <label class="field"><span>Reason for this change</span>
+      <label class="field"><span data-i18n="setting_reason_label">Reason for this change</span>
         <input type="text" id="setting-reason" autocomplete="off"></label>
       <label class="field" id="downgrade-field" hidden>
-        <span>Weakening isolation — recorded reason (needs agent:isolation_downgrade)</span>
+        <span data-i18n="downgrade_label">Weakening isolation — recorded reason (needs agent:isolation_downgrade)</span>
         <input type="text" id="setting-downgrade" autocomplete="off"></label>
       <div class="actions">
-        <button type="button" id="settings-save">Save</button>
-        <button type="button" id="settings-retire">Retire…</button>
-        <button type="button" id="settings-retire-cascade">Retire with everything it created…</button>
+        <button type="button" id="settings-save" data-i18n="settings_save">Save</button>
+        <button type="button" id="settings-retire" data-i18n="settings_retire">Retire…</button>
+        <button type="button" id="settings-retire-cascade" data-i18n="settings_retire_cascade">Retire with everything it created…</button>
       </div>
       <p class="result" id="settings-result"></p>
       <p class="note" id="settings-model"></p>
@@ -311,6 +322,324 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 "use strict";
 const SVGNS = "http://www.w3.org/2000/svg";
 const COLUMN = 210, ROW = 118, W = 180, H = 62;
+
+// --- i18n -----------------------------------------------------------------
+// Panel chrome only.  Canonical data -- states, kinds, ids, grant levels, role
+// names, agent prose, and backend refusal messages -- is never translated: those
+// strings are shared with the CLI, the ledger, and the logs, and must keep
+// matching them verbatim.
+const STRINGS = {
+  en: {
+    tab_attention: "Attention",
+    tab_runs: "Runs",
+    tab_chat: "Main chat",
+    tab_hire: "Hire",
+    tab_record: "Record",
+    tab_catalog: "Catalogue",
+    tab_search: "Search",
+    tab_run: "Run",
+    tab_message: "Message",
+    tab_settings: "⚙ Settings",
+    stream_connecting: "connecting",
+    stream_live: "live",
+    stream_reconnecting: "reconnecting",
+    stream_gap_resume: "resumed with a gap",
+    stream_unavailable: "live updates unavailable — reload to refresh",
+    stream_unauthorized: "unauthorized — reopen the printed URL",
+    writes_disabled: "writes disabled",
+    writes_enabled_as: "writes enabled as",
+    title_writes: "Agent Commons — writes enabled",
+    title_readonly: "Agent Commons — read-only",
+    search_placeholder: "Search history…",
+    layers_suffix: ". No prompts, transcripts, or tool arguments are retained by design.",
+    isolate: "Isolate connections",
+    show_all: "Show all",
+    direct_links: "direct links",
+    waiting_on_you: "waiting on you",
+    loading: "loading…",
+    empty_workspace: "No canonical entities in this workspace yet.",
+    band_operator: "reports to operator",
+    band_delegated: "delegated · depth ",
+    stale: "stale",
+    not_accepted: "not accepted",
+    chat_subject_label: "What is the task?",
+    chat_message_label: "Message",
+    send: "Send",
+    start_work: "Start the work",
+    recorded: "recorded",
+    chat_empty_writable: "No main chat yet. State the task here; it is addressed to every role that answers to you.",
+    chat_empty_readonly: "No main chat yet. Start the UI with --enable-writes to open one.",
+    addressed_roles: "addressed roles",
+    unaddressed_prefix: ". Roles created since this chat opened are not addressed in it: ",
+    unaddressed_suffix: ". Open a new chat to include them.",
+    unknown: "unknown",
+    hire_note: "Hire a standing role. It selects one operator-allowlisted profile and can only narrow it; a role that may create or retire other roles needs a turnover budget.",
+    hire_preset_label: "From preset (optional)",
+    hire_name_label: "Name",
+    hire_profile_label: "Profile",
+    hire_rationale_label: "Why this role exists (kept forever)",
+    hire_context_label: "Context",
+    create_roles_label: "Create roles",
+    retire_roles_label: "Retire roles",
+    open_links_label: "Open links",
+    hire_budget_label: "Turnover budget (blank = none)",
+    hire_button: "Hire",
+    hired: "hired",
+    preset_none: "— none —",
+    runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
+    live: "live",
+    role_word: "role",
+    on_word: "on",
+    until: "until",
+    run_note: "Put this role to work on a task. It runs under the role's profile (provider and model), through the same broker the CLI uses. Progress appears on the run's node as its state changes.",
+    run_task_label: "Task",
+    run_wall_label: "Wall-time seconds (blank = default)",
+    run_go: "Run this role on the task",
+    launched: "launched",
+    message_subject_label: "Subject (new thread only)",
+    message_body_label: "Message to this role",
+    message_note_role: "You are writing to this role. Agents talk to each other through delegation; this channel carries human direction only.",
+    message_recorded: "recorded as a canonical thread message",
+    setting_name_label: "Display name",
+    setting_skills_label: "Required skills (operator catalogue)",
+    setting_tools_label: "Tools (narrows the profile, never widens)",
+    setting_reason_label: "Reason for this change",
+    downgrade_label: "Weakening isolation — recorded reason (needs agent:isolation_downgrade)",
+    settings_save: "Save",
+    settings_retire: "Retire…",
+    settings_retire_cascade: "Retire with everything it created…",
+    retire_needs_reason: "a retirement needs a reason; it stays in the ledger forever",
+    confirm_retire: "Retire this role? Nothing is deleted; it stops taking work.",
+    confirm_retire_cascade: "Retire this role and every role it created? Nothing is deleted; they stop taking work.",
+    retired: "retired",
+    history_retained: "history retained",
+    profile_word: "profile",
+    profile_note: "the profile fixes the executable, model, sandbox, and tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
+    stored_word: "stored",
+    in_effect: "in effect",
+    cannot_retire: "cannot be retired yet — ",
+    withheld_note: "the automatic level is currently withheld; auto acts as ask (a human confirms)",
+    narrowed_note: "narrowed by an ancestor — ",
+    created_by: "created by",
+    another_role: "another role",
+    created_by_human: "created by a human",
+    attention_waiting: "Waiting on you. An answer is bounded metadata — never a password, key, or token.",
+    attention_empty: "Nothing is waiting on you right now.",
+    run_waiting: "run waiting for input",
+    role_proposal: "role proposal",
+    needs_decision: "needs a decision",
+    your_answer: "Your answer",
+    answer_button: "Answer",
+    readonly_answer: "Read-only. Start the UI with --enable-writes as the owning session to answer.",
+    answer_owner: "Answer from the session that owns this run: ",
+    blocked_no_channel: "This run is blocked in the canonical ledger; no live answer channel is open here.",
+    confirm_role_button: "Confirm this role",
+    readonly_confirm: "Read-only. Start the UI with --enable-writes to confirm.",
+    your_reply: "Your reply",
+    reply_button: "Reply",
+    readonly_reply: "Read-only. Start the UI with --enable-writes to reply.",
+    reply_needs_body: "a reply needs a body",
+    replied: "replied",
+    answered: "answered",
+    proposal_approved: "role created, crediting its proposer",
+    matches: "matches",
+    match_any: " matching any term, not all of them,",
+    match_phrase: " matching the whole phrase,",
+    from_projection: "from the rebuildable projection",
+    synchronized: ", synchronized",
+    not_synchronized: ", not synchronized",
+    open_event_hint: ". Open the event to read the canonical record.",
+    show_word: "Show",
+    not_on_graph: "that subject is not on the current graph",
+    catalog_editing_note: "Entries here change what delegated runs are told to do. They are stored in",
+    catalog_default_store: "the operator catalogue",
+    catalog_readonly: "Read-only. Start the UI with --role-catalog and --enable-catalog-editing to change it.",
+    skills_heading: "Skills",
+    tools_heading: "Tools",
+    none_yet: "none yet",
+    remove_button: "Remove",
+    catalog_add_heading: "Add or replace an entry",
+    catalog_kind_label: "Kind",
+    catalog_option_skill: "Skill — instructions every run of the role receives",
+    catalog_option_tool: "Tool — one of the profile's tools a role may keep",
+    catalog_id_label: "Short id (lowercase, no spaces)",
+    catalog_title_label: "Name people will see",
+    catalog_desc_label: "What it is for",
+    catalog_instruction_label: "Instructions given to the agent (skills only)",
+    catalog_save: "Save entry",
+    saved: "saved",
+    removed: "removed",
+    issues_word: "issues",
+    stale_warnings: "stale warnings",
+    truncated: "graph truncated to fit display bounds",
+    request_failed: "request failed:",
+  },
+  ru: {
+    tab_attention: "Внимание",
+    tab_runs: "Запуски",
+    tab_chat: "Общий чат",
+    tab_hire: "Нанять",
+    tab_record: "Запись",
+    tab_catalog: "Каталог",
+    tab_search: "Поиск",
+    tab_run: "Запуск",
+    tab_message: "Сообщение",
+    tab_settings: "⚙ Настройки",
+    stream_connecting: "подключение",
+    stream_live: "онлайн",
+    stream_reconnecting: "переподключение",
+    stream_gap_resume: "возобновлено с пропуском",
+    stream_unavailable: "живые обновления недоступны — перезагрузите страницу",
+    stream_unauthorized: "нет доступа — заново откройте напечатанную ссылку",
+    writes_disabled: "запись отключена",
+    writes_enabled_as: "запись включена как",
+    title_writes: "Agent Commons — запись включена",
+    title_readonly: "Agent Commons — только чтение",
+    search_placeholder: "Поиск по истории…",
+    layers_suffix: ". Промпты, транскрипты и аргументы инструментов намеренно не сохраняются.",
+    isolate: "Изолировать связи",
+    show_all: "Показать всё",
+    direct_links: "прямых связей",
+    waiting_on_you: "ждёт вас",
+    loading: "загрузка…",
+    empty_workspace: "В этом рабочем пространстве пока нет канонических записей.",
+    band_operator: "подчиняется оператору",
+    band_delegated: "делегировано · глубина ",
+    stale: "устарело",
+    not_accepted: "не принято",
+    chat_subject_label: "В чём задача?",
+    chat_message_label: "Сообщение",
+    send: "Отправить",
+    start_work: "Начать работу",
+    recorded: "записано",
+    chat_empty_writable: "Общего чата пока нет. Сформулируйте задачу здесь — она адресована каждой роли, которая вам подчиняется.",
+    chat_empty_readonly: "Общего чата пока нет. Запустите интерфейс с --enable-writes, чтобы открыть его.",
+    addressed_roles: "адресовано ролям",
+    unaddressed_prefix: ". Роли, созданные после открытия этого чата, в нём не адресованы: ",
+    unaddressed_suffix: ". Откройте новый чат, чтобы включить их.",
+    unknown: "неизвестно",
+    hire_note: "Наймите постоянную роль. Она выбирает один разрешённый оператором профиль и может только сузить его; роли, которая может создавать или отправлять в отставку другие роли, нужен бюджет ротации.",
+    hire_preset_label: "Из пресета (необязательно)",
+    hire_name_label: "Имя",
+    hire_profile_label: "Профиль",
+    hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
+    hire_context_label: "Контекст",
+    create_roles_label: "Создание ролей",
+    retire_roles_label: "Отставка ролей",
+    open_links_label: "Открытие ссылок",
+    hire_budget_label: "Бюджет ротации (пусто = нет)",
+    hire_button: "Нанять",
+    hired: "нанята",
+    preset_none: "— нет —",
+    runs_note: "Текущие и недавние запуски провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
+    live: "в работе",
+    role_word: "роль",
+    on_word: "на",
+    until: "до",
+    run_note: "Поставьте эту роль на задачу. Запуск идёт под профилем роли (провайдер и модель) через тот же брокер, что и CLI. Прогресс отображается на узле запуска по мере смены его состояния.",
+    run_task_label: "Задача",
+    run_wall_label: "Лимит времени, секунд (пусто = по умолчанию)",
+    run_go: "Запустить эту роль на задаче",
+    launched: "запущена делегация",
+    message_subject_label: "Тема (только для новой ветки)",
+    message_body_label: "Сообщение этой роли",
+    message_note_role: "Вы пишете этой роли. Агенты общаются между собой через делегацию; этот канал — только для указаний человека.",
+    message_recorded: "записано как каноническое сообщение ветки",
+    setting_name_label: "Отображаемое имя",
+    setting_skills_label: "Обязательные навыки (каталог оператора)",
+    setting_tools_label: "Инструменты (только сужают профиль, никогда не расширяют)",
+    setting_reason_label: "Причина этого изменения",
+    downgrade_label: "Ослабление изоляции — причина попадает в запись (нужно право agent:isolation_downgrade)",
+    settings_save: "Сохранить",
+    settings_retire: "В отставку…",
+    settings_retire_cascade: "В отставку со всем, что она создала…",
+    retire_needs_reason: "для отставки нужна причина; она навсегда останется в реестре",
+    confirm_retire: "Отправить эту роль в отставку? Ничего не удаляется; она перестаёт брать работу.",
+    confirm_retire_cascade: "Отправить в отставку эту роль и все созданные ею роли? Ничего не удаляется; они перестают брать работу.",
+    retired: "отправлено в отставку",
+    history_retained: "история сохранена",
+    profile_word: "профиль",
+    profile_note: "профиль фиксирует исполняемый файл, модель, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
+    stored_word: "сохранено",
+    in_effect: "действует",
+    cannot_retire: "пока нельзя отправить в отставку — ",
+    withheld_note: "автоматический уровень сейчас приостановлен; auto действует как ask (подтверждает человек)",
+    narrowed_note: "сужено предком — ",
+    created_by: "создана",
+    another_role: "другой ролью",
+    created_by_human: "создана человеком",
+    attention_waiting: "Ждёт вас. Ответ — это ограниченные метаданные, никогда не пароль, ключ или токен.",
+    attention_empty: "Сейчас ничто вас не ждёт.",
+    run_waiting: "запуск ждёт ввода",
+    role_proposal: "предложение роли",
+    needs_decision: "нужно решение",
+    your_answer: "Ваш ответ",
+    answer_button: "Ответить",
+    readonly_answer: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes из сессии-владельца.",
+    answer_owner: "Ответить может сессия — владелец этого запуска: ",
+    blocked_no_channel: "Этот запуск заблокирован в каноническом реестре; живого канала для ответа здесь нет.",
+    confirm_role_button: "Подтвердить эту роль",
+    readonly_confirm: "Только чтение. Чтобы подтвердить, запустите интерфейс с --enable-writes.",
+    your_reply: "Ваш ответ",
+    reply_button: "Ответить",
+    readonly_reply: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes.",
+    reply_needs_body: "ответу нужен текст",
+    replied: "ответ отправлен",
+    answered: "ответ записан",
+    proposal_approved: "роль создана, авторство предложившего сохранено",
+    matches: "совпадений",
+    match_any: " по любому из слов, не по всем сразу,",
+    match_phrase: " по фразе целиком,",
+    from_projection: "из перестраиваемой проекции",
+    synchronized: ", синхронизированной",
+    not_synchronized: ", не синхронизированной",
+    open_event_hint: ". Откройте событие, чтобы прочитать каноническую запись.",
+    show_word: "Показать",
+    not_on_graph: "этого объекта нет на текущем графе",
+    catalog_editing_note: "Записи здесь меняют то, что поручается делать делегированным запускам. Они хранятся в",
+    catalog_default_store: "каталоге оператора",
+    catalog_readonly: "Только чтение. Чтобы изменять, запустите интерфейс с --role-catalog и --enable-catalog-editing.",
+    skills_heading: "Навыки",
+    tools_heading: "Инструменты",
+    none_yet: "пока пусто",
+    remove_button: "Удалить",
+    catalog_add_heading: "Добавить или заменить запись",
+    catalog_kind_label: "Тип",
+    catalog_option_skill: "Навык — инструкции, которые получает каждый запуск роли",
+    catalog_option_tool: "Инструмент — один из инструментов профиля, который роль может оставить",
+    catalog_id_label: "Короткий id (строчными, без пробелов)",
+    catalog_title_label: "Имя, которое увидят люди",
+    catalog_desc_label: "Для чего это",
+    catalog_instruction_label: "Инструкции агенту (только для навыков)",
+    catalog_save: "Сохранить запись",
+    saved: "сохранено",
+    removed: "удалено",
+    issues_word: "проблем",
+    stale_warnings: "устаревших предупреждений",
+    truncated: "граф усечён до границ отображения",
+    request_failed: "запрос не выполнен:",
+  },
+};
+const LANG_KEY = "ac_ui_lang";
+let lang = localStorage.getItem(LANG_KEY) === "ru" ? "ru" : "en";
+
+function t(key) {
+  const table = STRINGS[lang] || STRINGS.en;
+  return table[key] || STRINGS.en[key] || key;
+}
+
+// Static chrome carries data-i18n / data-i18n-placeholder markers; everything
+// painted from JS goes through t() instead, so an element is owned by exactly
+// one of the two mechanisms and repaints cannot race each other.
+function applyI18n() {
+  document.documentElement.lang = lang;
+  for (const element of document.querySelectorAll("[data-i18n]")) {
+    element.textContent = t(element.dataset.i18n);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-placeholder]")) {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  }
+}
 
 // --- auth -----------------------------------------------------------------
 const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
@@ -331,14 +660,16 @@ async function post(path, body) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     // Refusals name the guard they tripped; that string is the useful part.
-    throw new Error((payload.error && payload.error.message) || ("request " + response.status));
+    // The backend message is canonical and stays verbatim in any language.
+    throw new Error((payload.error && payload.error.message) ||
+      (t("request_failed") + " " + response.status));
   }
   return payload;
 }
 
 async function api(path) {
   const response = await fetch(path, { headers: authHeaders() });
-  if (!response.ok) { throw new Error("request failed: " + response.status); }
+  if (!response.ok) { throw new Error(t("request_failed") + " " + response.status); }
   return response.json();
 }
 
@@ -369,10 +700,12 @@ function glyphFor(node) {
   return [glyph, tone];
 }
 function stateLabel(node) {
+  // The state itself is canonical and stays as the ledger spells it; only the
+  // panel's own qualifiers are translated.
   const base = node.state || "—";
-  if (node.stale && ACCEPTED_STATES.has(node.state)) { return base + " (stale)"; }
+  if (node.stale && ACCEPTED_STATES.has(node.state)) { return base + " (" + t("stale") + ")"; }
   if (node.state === "succeeded" || node.state === "completed") {
-    return base + " · not accepted";
+    return base + " · " + t("not_accepted");
   }
   return base;
 }
@@ -453,7 +786,7 @@ function render(graph) {
   paintFocusChrome(focus);
 
   if (!graph.nodes.length) {
-    viewport.appendChild(text(0, 20, "No canonical entities in this workspace yet.", "empty"));
+    viewport.appendChild(text(0, 20, t("empty_workspace"), "empty"));
     applyView();
     return;
   }
@@ -483,8 +816,8 @@ function render(graph) {
     if (!position || seenBands.has(position.band)) { continue; }
     seenBands.add(position.band);
     const caption = position.band === 0
-      ? "reports to operator"
-      : "delegated · depth " + position.band;
+      ? t("band_operator")
+      : t("band_delegated") + position.band;
     // Above the rank, not beside it: to the left it collided with the first node.
     captions.appendChild(text(0, position.y - 10, caption, "band-label"));
   }
@@ -535,9 +868,10 @@ function render(graph) {
     content.appendChild(text(10, 18, glyph, tone));
     content.appendChild(text(26, 18, node.label || node.id, null));
     const line = node.kind + " · " + stateLabel(node) +
-      (node.awaits_human ? "  ⏳ waiting on you" : "");
+      (node.awaits_human ? "  ⏳ " + t("waiting_on_you") : "");
     content.appendChild(text(10, 34, line, "meta"));
-    content.appendChild(text(10, 50, node.stale ? node.id + "  ▨ stale" : node.id, "meta"));
+    content.appendChild(text(10, 50,
+      node.stale ? node.id + "  ▨ " + t("stale") : node.id, "meta"));
     group.appendChild(content);
 
     const tooltip = document.createElementNS(SVGNS, "title");
@@ -563,10 +897,11 @@ function paintFocusChrome(focus) {
   const count = document.getElementById("focus-count");
   const isolating = Boolean(focus) && focused === selected;
   toggle.setAttribute("aria-pressed", isolating ? "true" : "false");
-  toggle.textContent = isolating ? "Show all" : "Isolate connections";
+  toggle.textContent = isolating ? t("show_all") : t("isolate");
   if (focus && focused) {
     const direct = focus.nodes.size - 1;
-    count.textContent = direct + (direct === 1 ? " direct link" : " direct links");
+    // Label-then-count, so neither language needs plural agreement rules.
+    count.textContent = t("direct_links") + ": " + direct;
     count.className = "pill focus";
   } else {
     count.textContent = "";
@@ -650,7 +985,7 @@ function paintSettings(record) {
     // Blaming a non-existent ancestor sent operators hunting for a parent role
     // that isn't there (round 2, design).
     if (s === "auto" && e === "ask") { withheld = true; }
-    else { narrowed.push(name + ": stored " + s + ", in effect " + e); }
+    else { narrowed.push(name + ": " + t("stored_word") + " " + s + ", " + t("in_effect") + " " + e); }
   }
   fillSelect(
     document.getElementById("setting-context_mode"),
@@ -672,10 +1007,7 @@ function paintSettings(record) {
   // The model is a property of the operator-owned profile, not of the role: a
   // role that could name a model would be editing argv.
   document.getElementById("settings-model").textContent =
-    "profile " + (record.profile_id || "—") +
-    " — the profile fixes the executable, model, sandbox, and tool set. " +
-    "Selections here can only narrow it. Catalogue entries are added by the " +
-    "operator outside this UI" +
+    t("profile_word") + " " + (record.profile_id || "—") + " — " + t("profile_note") +
     (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
   const note = document.getElementById("settings-note");
   const blockers = record.retirement_blockers || [];
@@ -683,15 +1015,15 @@ function paintSettings(record) {
   // panel (M3), so this warning can actually fire and the narrowing below is
   // visible where a human edits grants.
   const provenance = record.origin === "agent"
-    ? "created by " + (record.created_by_agent_id || "another role") +
+    ? t("created_by") + " " + (record.created_by_agent_id || t("another_role")) +
       " · " + (record.approval || "") + " · " + (record.rationale || "")
-    : "created by a human · " + (record.rationale || "");
+    : t("created_by_human") + " · " + (record.rationale || "");
   const parts = [];
-  if (blockers.length) { parts.push("cannot be retired yet — " + blockers.join("; ")); }
+  if (blockers.length) { parts.push(t("cannot_retire") + blockers.join("; ")); }
   if (withheld) {
-    parts.push("the automatic level is currently withheld; auto acts as ask (a human confirms)");
+    parts.push(t("withheld_note"));
   }
-  if (narrowed.length) { parts.push("narrowed by an ancestor — " + narrowed.join("; ")); }
+  if (narrowed.length) { parts.push(t("narrowed_note") + narrowed.join("; ")); }
   parts.push(provenance);
   note.className = (blockers.length || withheld || narrowed.length) ? "note warn" : "note";
   note.textContent = parts.join(". ");
@@ -715,7 +1047,7 @@ async function loadLaunch() {
   launchTasks = options.tasks || [];
   const picker = document.getElementById("run-task");
   fillSelect(picker,
-    launchTasks.map((t) => ({ id: t.id, title: (t.title || t.id) + " · " + t.state })),
+    launchTasks.map((task) => ({ id: task.id, title: (task.title || task.id) + " · " + task.state })),
     null, false);
 }
 
@@ -730,8 +1062,8 @@ async function runRole() {
       wall_time_seconds: wall === "" ? null : Number(wall),
     });
     result.className = "result ok";
-    result.textContent = "launched " + payload.delegation_id + " · " + payload.purpose +
-      " on " + payload.target_profile;
+    result.textContent = t("launched") + " " + payload.delegation_id + " · " + payload.purpose +
+      " " + t("on_word") + " " + payload.target_profile;
     await loadRuns();
   } catch (error) {
     // The refusal names the guard — no such task, a reviewer role with no open
@@ -753,7 +1085,8 @@ async function loadRuns() {
   const tab = document.querySelector('#tabs button[data-panel="runs"]');
   const liveCount = runs.filter((r) => r.live).length;
   tab.hidden = runs.length === 0;
-  tab.textContent = liveCount ? "Runs (" + liveCount + " live)" : "Runs";
+  tab.textContent = liveCount
+    ? t("tab_runs") + " (" + t("live") + ": " + liveCount + ")" : t("tab_runs");
   const host = document.getElementById("runs-list");
   while (host.firstChild) { host.removeChild(host.firstChild); }
   for (const run of runs) {
@@ -761,13 +1094,13 @@ async function loadRuns() {
     card.className = "attn-item " + (run.live ? "run_blocked" : "");
     const kind = document.createElement("div");
     kind.className = "attn-kind";
-    kind.textContent = (run.live ? "● live · " : "○ ") + run.phase +
+    kind.textContent = (run.live ? "● " + t("live") + " · " : "○ ") + run.phase +
       (run.delegation_state ? " · " + run.delegation_state : "");
     card.appendChild(kind);
     const head = document.createElement("span");
     head.textContent = (run.profile_id || "?") +
-      (run.agent_id ? " · role " + run.agent_id : "") +
-      (run.target_id ? " · on " + run.target_kind + " " + run.target_id : "");
+      (run.agent_id ? " · " + t("role_word") + " " + run.agent_id : "") +
+      (run.target_id ? " · " + t("on_word") + " " + run.target_kind + " " + run.target_id : "");
     card.appendChild(head);
     host.appendChild(card);
   }
@@ -787,7 +1120,7 @@ function paintHire() {
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
     fillSelect(document.getElementById("hire-" + name), levels, "deny", false);
   }
-  const presets = [{ id: "", title: "— none —" }].concat(
+  const presets = [{ id: "", title: t("preset_none") }].concat(
     (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
   fillSelect(document.getElementById("hire-preset"), presets, "", false);
 }
@@ -811,7 +1144,7 @@ async function hireRole() {
   try {
     const created = await post("/api/agents", body);
     result.className = "result ok";
-    result.textContent = "hired " + (created.entity_ref ? created.entity_ref.id : "");
+    result.textContent = t("hired") + " " + (created.entity_ref ? created.entity_ref.id : "");
     document.getElementById("hire-name").value = "";
     document.getElementById("hire-rationale").value = "";
     await loadAttention();
@@ -833,7 +1166,7 @@ async function inspect(node) {
   // Lead with the name for anything that has one (a role), so the heading of
   // the screen where you manage it is not a bare ULID (round 2, design).
   title.textContent = node.label ? node.kind + " · " + node.label : node.kind + " " + node.id;
-  body.textContent = "loading…";
+  body.textContent = t("loading");
   document.getElementById("blocked-pill").hidden = !node.awaits_human;
 
   const isRole = node.kind === "agent";
@@ -851,10 +1184,7 @@ async function inspect(node) {
   currentRole = null;
   document.getElementById("message-result").textContent = "";
   document.getElementById("settings-result").textContent = "";
-  document.getElementById("message-note").textContent = isRole
-    ? "You are writing to this role. Agents talk to each other through delegation; " +
-      "this channel carries human direction only."
-    : "";
+  document.getElementById("message-note").textContent = isRole ? t("message_note_role") : "";
 
   try {
     const payload = await api("/api/entities/" + encodeURIComponent(node.kind) + "/" +
@@ -880,7 +1210,7 @@ document.getElementById("message-send").addEventListener("click", async () => {
     });
     document.getElementById("message-body").value = "";
     result.className = "result ok";
-    result.textContent = "recorded as a canonical thread message";
+    result.textContent = t("message_recorded");
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -925,7 +1255,7 @@ document.getElementById("settings-save").addEventListener("click", async () => {
         document.getElementById("downgrade-field").hidden ? null : (downgrade.value || null),
     });
     result.className = "result ok";
-    result.textContent = "recorded";
+    result.textContent = t("recorded");
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -938,12 +1268,10 @@ async function retire(cascade) {
   const reason = document.getElementById("setting-reason").value;
   if (!reason) {
     result.className = "result bad";
-    result.textContent = "a retirement needs a reason; it stays in the ledger forever";
+    result.textContent = t("retire_needs_reason");
     return;
   }
-  const question = cascade
-    ? "Retire this role and every role it created? Nothing is deleted; they stop taking work."
-    : "Retire this role? Nothing is deleted; it stops taking work.";
+  const question = cascade ? t("confirm_retire_cascade") : t("confirm_retire");
   if (!window.confirm(question)) { return; }
   try {
     const payload = await post(
@@ -951,7 +1279,7 @@ async function retire(cascade) {
       { reason: reason, cascade: cascade }
     );
     result.className = "result ok";
-    result.textContent = "retired " + payload.count + " role(s); history retained";
+    result.textContent = t("retired") + ": " + payload.count + " — " + t("history_retained");
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -975,12 +1303,11 @@ async function loadAttention() {
     attention = { items: [], count: 0 };
   }
   const tab = document.querySelector('#tabs button[data-panel="attention"]');
-  tab.textContent = attention.count ? "Attention (" + attention.count + ")" : "Attention";
+  tab.textContent = attention.count
+    ? t("tab_attention") + " (" + attention.count + ")" : t("tab_attention");
   const note = document.getElementById("attention-note");
   note.className = attention.count ? "note warn" : "note";
-  note.textContent = attention.count
-    ? "Waiting on you. An answer is bounded metadata — never a password, key, or token."
-    : "Nothing is waiting on you right now.";
+  note.textContent = attention.count ? t("attention_waiting") : t("attention_empty");
   const host = document.getElementById("attention-list");
   while (host.firstChild) { host.removeChild(host.firstChild); }
   for (const item of attention.items) {
@@ -994,15 +1321,15 @@ function renderAttentionItem(item) {
   card.className = "attn-item " + item.kind;
   const kind = document.createElement("div");
   kind.className = "attn-kind";
-  kind.textContent = item.kind === "run_blocked" ? "run waiting for input"
-    : item.kind === "proposal" ? "role proposal"
-    : (item.thread_type || "needs a decision");
+  kind.textContent = item.kind === "run_blocked" ? t("run_waiting")
+    : item.kind === "proposal" ? t("role_proposal")
+    : (item.thread_type || t("needs_decision"));
   card.appendChild(kind);
 
   if (item.kind === "run_blocked") {
     const head = document.createElement("span");
-    head.textContent = item.id + (item.agent_id ? " · role " + item.agent_id : "") +
-      (item.deadline ? " · until " + item.deadline : "");
+    head.textContent = item.id + (item.agent_id ? " · " + t("role_word") + " " + item.agent_id : "") +
+      (item.deadline ? " · " + t("until") + " " + item.deadline : "");
     card.appendChild(head);
     if (item.metadata != null) {
       const detail = document.createElement("pre");
@@ -1012,11 +1339,11 @@ function renderAttentionItem(item) {
     if (item.answerable_here && writesEnabled && item.operation_id) {
       const field = document.createElement("input");
       field.type = "text";
-      field.placeholder = "Your answer";
+      field.placeholder = t("your_answer");
       card.appendChild(field);
       const send = document.createElement("button");
       send.type = "button";
-      send.textContent = "Answer";
+      send.textContent = t("answer_button");
       send.addEventListener("click", () => answerOperation(item.operation_id, field.value));
       card.appendChild(send);
     } else {
@@ -1025,11 +1352,10 @@ function renderAttentionItem(item) {
       // The run is canonically blocked even when no live operation exists to
       // answer here; say who can answer rather than hide the blocker.
       why.textContent = !writesEnabled
-        ? "Read-only. Start the UI with --enable-writes as the owning session to answer."
+        ? t("readonly_answer")
         : item.operation_id
-          ? "Answer from the session that owns this run: " +
-            (item.answer_from_session || []).join(", ")
-          : "This run is blocked in the canonical ledger; no live answer channel is open here.";
+          ? t("answer_owner") + (item.answer_from_session || []).join(", ")
+          : t("blocked_no_channel");
       card.appendChild(why);
     }
   } else if (item.kind === "proposal") {
@@ -1039,13 +1365,13 @@ function renderAttentionItem(item) {
     if (writesEnabled) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = "Confirm this role";
+      button.textContent = t("confirm_role_button");
       button.addEventListener("click", () => approveProposal(item.id));
       card.appendChild(button);
     } else {
       const why = document.createElement("p");
       why.className = "note";
-      why.textContent = "Read-only. Start the UI with --enable-writes to confirm.";
+      why.textContent = t("readonly_confirm");
       card.appendChild(why);
     }
   } else {
@@ -1059,17 +1385,17 @@ function renderAttentionItem(item) {
     if (writesEnabled) {
       const field = document.createElement("input");
       field.type = "text";
-      field.placeholder = "Your reply";
+      field.placeholder = t("your_reply");
       card.appendChild(field);
       const send = document.createElement("button");
       send.type = "button";
-      send.textContent = "Reply";
+      send.textContent = t("reply_button");
       send.addEventListener("click", () => replyThread(item.id, item.revision, field.value));
       card.appendChild(send);
     } else {
       const why = document.createElement("p");
       why.className = "note";
-      why.textContent = "Read-only. Start the UI with --enable-writes to reply.";
+      why.textContent = t("readonly_reply");
       card.appendChild(why);
     }
   }
@@ -1080,14 +1406,14 @@ async function replyThread(threadId, revision, text) {
   const result = document.getElementById("attention-result");
   if (!text.trim()) {
     result.className = "result bad";
-    result.textContent = "a reply needs a body";
+    result.textContent = t("reply_needs_body");
     return;
   }
   try {
     await post("/api/chat/" + encodeURIComponent(threadId) + "/messages",
                { expected_revision: revision, message: text });
     result.className = "result ok";
-    result.textContent = "replied";
+    result.textContent = t("replied");
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
@@ -1101,7 +1427,7 @@ async function answerOperation(operationId, text) {
     await post("/api/operations/" + encodeURIComponent(operationId) + "/answer",
                { answer: { answer: text } });
     result.className = "result ok";
-    result.textContent = "answered";
+    result.textContent = t("answered");
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
@@ -1114,7 +1440,7 @@ async function approveProposal(threadId) {
   try {
     await post("/api/agents/proposals/" + encodeURIComponent(threadId) + "/approve", {});
     result.className = "result ok";
-    result.textContent = "role created, crediting its proposer";
+    result.textContent = t("proposal_approved");
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
@@ -1138,27 +1464,24 @@ async function loadChat() {
   try { chats = (await api("/api/chat")) || []; } catch (error) { chats = []; }
   engagement = chats.length ? chats[chats.length - 1] : null;
   document.getElementById("chat-subject-field").hidden = Boolean(engagement) || !writesEnabled;
-  send.textContent = engagement ? "Send" : "Start the work";
+  send.textContent = engagement ? t("send") : t("start_work");
   if (!engagement) {
     note.className = "note";
-    note.textContent = writesEnabled
-      ? "No main chat yet. State the task here; it is addressed to every role that answers to you."
-      : "No main chat yet. Start the UI with --enable-writes to open one.";
+    note.textContent = writesEnabled ? t("chat_empty_writable") : t("chat_empty_readonly");
     return;
   }
   note.className = engagement.unaddressed_roles.length ? "note warn" : "note";
   note.textContent = engagement.subject +
-    " · addressed to " + (engagement.addressed_roles.length || "no") + " role(s)" +
+    " · " + t("addressed_roles") + ": " + engagement.addressed_roles.length +
     (engagement.unaddressed_roles.length
-      ? ". Roles created since this chat opened are not addressed in it: " +
-        engagement.unaddressed_roles.join(", ") + ". Open a new chat to include them."
+      ? t("unaddressed_prefix") + engagement.unaddressed_roles.join(", ") + t("unaddressed_suffix")
       : ".");
   for (const message of engagement.messages) {
     const row = document.createElement("div");
     row.className = "field";
     const who = document.createElement("span");
     const actor = message.actor || {};
-    who.textContent = (actor.role_id || actor.principal_id || "unknown") +
+    who.textContent = (actor.role_id || actor.principal_id || t("unknown")) +
       " · " + (message.recorded_at || "");
     row.appendChild(who);
     const said = document.createElement("pre");
@@ -1184,7 +1507,7 @@ async function sendChat() {
     }
     document.getElementById("chat-body").value = "";
     result.className = "result ok";
-    result.textContent = "recorded";
+    result.textContent = t("recorded");
     await loadChat();
     await loadAttention();
   } catch (error) {
@@ -1227,12 +1550,12 @@ async function runSearch(text) {
   // Say what layer answered.  A rebuildable projection is a place to look, not
   // an authority, and the reader should never have to guess which they got.
   const widening = payload.match === "any_term"
-    ? " matching any term, not all of them,"
-    : (payload.match === "phrase" ? " matching the whole phrase," : "");
-  note.textContent = payload.count + " match(es)" + widening +
-    " from the rebuildable projection" +
-    (payload.index && payload.index.synchronized ? ", synchronized" : ", not synchronized") +
-    ". Open the event to read the canonical record.";
+    ? t("match_any")
+    : (payload.match === "phrase" ? t("match_phrase") : "");
+  note.textContent = t("matches") + ": " + payload.count + widening +
+    " " + t("from_projection") +
+    (payload.index && payload.index.synchronized ? t("synchronized") : t("not_synchronized")) +
+    t("open_event_hint");
   for (const item of payload.results) {
     const row = document.createElement("div");
     row.className = "field";
@@ -1245,11 +1568,11 @@ async function runSearch(text) {
     row.appendChild(excerpt);
     const open = document.createElement("button");
     open.type = "button";
-    open.textContent = "Show " + item.subject.kind;
+    open.textContent = t("show_word") + " " + item.subject.kind;
     open.addEventListener("click", () => {
       const node = (lastGraph ? lastGraph.nodes : []).find((n) => n.id === item.subject.id);
       if (node) { selected = node.id; inspect(node); if (lastGraph) { render(lastGraph); } }
-      else { note.textContent = "that subject is not on the current graph"; }
+      else { note.textContent = t("not_on_graph"); }
     });
     row.appendChild(open);
     host.appendChild(row);
@@ -1270,21 +1593,20 @@ function paintCatalog() {
   if (!catalog) { return; }
   const warning = document.getElementById("catalog-warning");
   warning.textContent = catalogEditing
-    ? "Entries here change what delegated runs are told to do. They are stored in " +
-      (catalog.catalog_path || "the operator catalogue") + "."
-    : "Read-only. Start the UI with --role-catalog and --enable-catalog-editing to change it.";
+    ? t("catalog_editing_note") + " " + (catalog.catalog_path || t("catalog_default_store")) + "."
+    : t("catalog_readonly");
   const host = document.getElementById("catalog-list");
   while (host.firstChild) { host.removeChild(host.firstChild); }
   for (const section of ["skills", "tools"]) {
     const heading = document.createElement("h3");
     heading.className = "subhead";
-    heading.textContent = section === "skills" ? "Skills" : "Tools";
+    heading.textContent = section === "skills" ? t("skills_heading") : t("tools_heading");
     host.appendChild(heading);
     const entries = catalog[section] || [];
     if (!entries.length) {
       const none = document.createElement("p");
       none.className = "note";
-      none.textContent = "none yet";
+      none.textContent = t("none_yet");
       host.appendChild(none);
     }
     for (const entry of entries) {
@@ -1298,7 +1620,7 @@ function paintCatalog() {
       if (catalogEditing) {
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.textContent = "Remove";
+        remove.textContent = t("remove_button");
         remove.addEventListener("click", () => removeCatalogEntry(section, entry.id));
         row.appendChild(remove);
       }
@@ -1326,7 +1648,7 @@ async function saveCatalogEntry() {
         ? document.getElementById("catalog-instruction").value : null,
     });
     result.className = "result ok";
-    result.textContent = "saved";
+    result.textContent = t("saved");
     await loadCatalog();
     paintCatalog();
   } catch (error) {
@@ -1340,7 +1662,7 @@ async function removeCatalogEntry(section, entryId) {
   try {
     await post("/api/catalog/entries/remove", { section: section, id: entryId });
     result.className = "result ok";
-    result.textContent = "removed " + entryId;
+    result.textContent = t("removed") + " " + entryId;
     await loadCatalog();
     paintCatalog();
   } catch (error) {
@@ -1363,9 +1685,9 @@ function paintChrome(graph) {
   const issues = (graph.issues || []).length;
   const warnings = (graph.warnings || []).length;
   document.getElementById("issues").textContent =
-    "issues: " + issues + "   stale warnings: " + warnings;
+    t("issues_word") + ": " + issues + "   " + t("stale_warnings") + ": " + warnings;
   document.getElementById("truncation").textContent =
-    graph.limits && graph.limits.truncated ? "graph truncated to fit display bounds" : "";
+    graph.limits && graph.limits.truncated ? t("truncated") : "";
   if (graph.workspace_id) {
     document.getElementById("workspace").textContent = graph.workspace_id;
   }
@@ -1376,13 +1698,18 @@ function paintChrome(graph) {
 // several per blocked run -- and diverged from the item list (round 2, design).
 function paintWaiting() {
   document.getElementById("waiting").textContent =
-    attention.count ? "waiting on you: " + attention.count : "";
+    attention.count ? t("waiting_on_you") + ": " + attention.count : "";
 }
 
-function setStream(state, label) {
+// The pill remembers its key, not its text, so a language switch can repaint
+// the current connection state without waiting for the next transition.
+let lastStream = { state: "", key: "stream_connecting" };
+
+function setStream(state, key) {
+  lastStream = { state: state, key: key };
   const pill = document.getElementById("stream");
   pill.className = "pill " + state;
-  pill.textContent = label;
+  pill.textContent = t(key);
 }
 
 // --- pan and zoom ---------------------------------------------------------
@@ -1421,18 +1748,18 @@ let lastEventId = null;
 
 async function connect() {
   if (!self.ReadableStream || !("body" in Response.prototype)) {
-    setStream("gap", "live updates unavailable — reload to refresh");
+    setStream("gap", "stream_unavailable");
     return;
   }
   let backoff = 1000;
   for (;;) {
     try {
-      setStream("reconnecting", "connecting");
+      setStream("reconnecting", "stream_connecting");
       const headers = authHeaders({ "Accept": "text/event-stream" });
       if (lastEventId) { headers["Last-Event-ID"] = lastEventId; }
       const response = await fetch("/api/stream", { headers: headers });
       if (!response.ok || !response.body) { throw new Error("stream " + response.status); }
-      setStream("live", "live");
+      setStream("live", "stream_live");
       backoff = 1000;
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -1448,7 +1775,7 @@ async function connect() {
         }
       }
     } catch (error) {
-      setStream("reconnecting", "reconnecting");
+      setStream("reconnecting", "stream_reconnecting");
     }
     await new Promise((resolve) => setTimeout(resolve, backoff));
     backoff = Math.min(15000, backoff * 2);
@@ -1473,9 +1800,10 @@ function handleFrame(frame) {
   if (event === "snapshot" && data) {
     const payload = JSON.parse(data);
     if (id !== null) { lastEventId = id; }
+    applyI18n();
     paintChrome(payload.graph);
     render(payload.graph);
-    setStream("live", "live");
+    setStream("live", "stream_live");
     // The graph was the only thing that repainted on a frame, so a role's reply
     // never appeared and the chat's Send kept posting a boot-time revision that
     // then failed stale (M1). The panel's own data follows the same stream now.
@@ -1486,20 +1814,58 @@ function handleFrame(frame) {
     return;
   }
   if (event === "resume_gap") {
-    setStream("gap", "resumed with a gap");
+    setStream("gap", "stream_gap_resume");
   }
+}
+
+let metaInfo = null;
+
+// The title was hardcoded "read-only" and stayed wrong with writes on (L8);
+// gathered here so a language switch repaints it from the stored meta too.
+// The truth_layers and trust_note protocol wording stays exactly as /api/meta
+// sent it; only the panel's own retained-nothing suffix is translated.
+function paintStatus() {
+  document.getElementById("writes").textContent = writesEnabled
+    ? t("writes_enabled_as") + " " + (metaInfo ? metaInfo.writer_session_id : "")
+    : t("writes_disabled");
+  document.title = writesEnabled ? t("title_writes") : t("title_readonly");
+  if (metaInfo) {
+    document.getElementById("layers").textContent =
+      metaInfo.truth_layers.join(" › ") + " — " + metaInfo.trust_note + t("layers_suffix");
+  }
+}
+
+const langPicker = document.getElementById("lang");
+langPicker.value = lang;
+langPicker.addEventListener("change", () => {
+  lang = langPicker.value === "ru" ? "ru" : "en";
+  localStorage.setItem(LANG_KEY, lang);
+  applyLanguage();
+});
+
+// Repaint everything the current language touches, without a reload.  Chrome
+// only: the canonical data inside the repainted views passes through untouched.
+function applyLanguage() {
+  applyI18n();
+  paintStatus();
+  setStream(lastStream.state, lastStream.key);
+  if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
+  if (!selected) { document.getElementById("inspector-title").textContent = t("tab_chat"); }
+  paintCatalog();
+  paintHire();
+  loadRuns();
+  loadChat();
+  loadAttention();
+  if (launchEnabled) { loadLaunch(); }
 }
 
 async function boot() {
   try {
     const meta = await api("/api/meta");
+    metaInfo = meta;
     document.getElementById("workspace").textContent = meta.workspace_id;
     writesEnabled = Boolean(meta.writes_enabled);
-    document.getElementById("writes").textContent = writesEnabled
-      ? "writes enabled as " + meta.writer_session_id
-      : "writes disabled";
-    // The title was hardcoded "read-only" and stayed wrong with writes on (L8).
-    document.title = writesEnabled ? "Agent Commons — writes enabled" : "Agent Commons — read-only";
+    paintStatus();
     await loadCatalog();
     catalogInstructionVisibility();
     paintCatalog();
@@ -1511,13 +1877,10 @@ async function boot() {
     // The main chat is where work starts, so it is what the panel shows before
     // anybody clicks a node.  A node chat is for stepping in on one role.
     document.getElementById("inspector").classList.add("open");
-    document.getElementById("inspector-title").textContent = "Main chat";
+    document.getElementById("inspector-title").textContent = t("tab_chat");
     showPanel("chat");
-    document.getElementById("layers").textContent =
-      meta.truth_layers.join(" › ") + " — " + meta.trust_note +
-      ". No prompts, transcripts, or tool arguments are retained by design.";
   } catch (error) {
-    setStream("gap", "unauthorized — reopen the printed URL");
+    setStream("gap", "stream_unauthorized");
     return;
   }
   const graph = await api("/api/graph");
@@ -1526,6 +1889,7 @@ async function boot() {
   connect();
 }
 
+applyI18n();
 boot();
 </script>
 </body>

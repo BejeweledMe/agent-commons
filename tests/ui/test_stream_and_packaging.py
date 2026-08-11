@@ -196,6 +196,36 @@ def test_only_acceptance_may_render_as_a_green_tick() -> None:
         assert re.search(rf"{state}:\s*\[\"[^\"]+\",\s*\"info\"\]", table), state
 
 
+def test_the_two_panel_languages_translate_exactly_the_same_keys() -> None:
+    """The chrome is translated from one STRINGS table with an English fallback,
+    so a key present in one language and missing in the other would silently
+    show English inside a Russian panel.  Parsed from the asset, like GLYPHS,
+    so a frontend edit cannot quietly desynchronise the two languages."""
+
+    body = read_spa()
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    en_block = table.split("en: {", 1)[1].split("\n  },", 1)[0]
+    ru_block = table.split("ru: {", 1)[1].split("\n  },", 1)[0]
+    # Anchored to the line start: a value may itself end with a colon.
+    en_keys = set(re.findall(r'^\s*([a-z0-9_]+): "', en_block, re.MULTILINE))
+    ru_keys = set(re.findall(r'^\s*([a-z0-9_]+): "', ru_block, re.MULTILINE))
+    assert en_keys, "the STRINGS table lost its English catalogue"
+    assert en_keys == ru_keys, en_keys ^ ru_keys
+
+
+def test_the_panel_carries_a_language_toggle_that_persists() -> None:
+    """The header offers en/ru, static chrome re-renders through data-i18n
+    markers, and the choice survives a reload via localStorage."""
+
+    body = read_spa()
+    assert 'id="lang"' in body
+    assert 'data-i18n="' in body
+    assert 'data-i18n-placeholder="' in body
+    assert "function applyI18n" in body
+    assert 'localStorage.getItem(LANG_KEY)' in body
+    assert "localStorage.setItem(LANG_KEY, lang)" in body
+
+
 def test_stale_acceptance_loses_its_acceptance_tone() -> None:
     body = read_spa()
     assert 'if (node.stale && tone === "ok") { return ["▨", "warn"]; }' in body
