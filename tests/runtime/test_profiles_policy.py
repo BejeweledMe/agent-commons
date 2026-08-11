@@ -608,3 +608,30 @@ def test_raising_read_only_profile_concurrency_is_allowed() -> None:
         profile_concurrency={"claude-independent-reviewer": 3},
     )
     assert narrowed.profile_concurrency_cap("claude-independent-reviewer") == 2
+
+
+def test_runtime_config_parses_and_validates_the_demo_flag(tmp_path: Path) -> None:
+    from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+    body = (
+        "profiles:\n"
+        "  claude-builder:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: acceptEdits\n"
+        "    trusted_workspace: true\n"
+    )
+
+    without = tmp_path / "plain.yaml"
+    without.write_text(body, encoding="utf-8")
+    assert load_runtime_configuration(without).demo is False
+
+    demo = tmp_path / "demo.yaml"
+    demo.write_text("demo: true\n" + body, encoding="utf-8")
+    assert load_runtime_configuration(demo).demo is True
+
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("demo: yes-please\n" + body, encoding="utf-8")
+    with pytest.raises(ConfigurationError, match="demo must be a boolean"):
+        load_runtime_configuration(bad)

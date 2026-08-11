@@ -127,6 +127,13 @@ class RuntimeConfiguration:
     #: broker sharing it resolves the same catalogue; a role that selects a
     #: skill this cannot supply fails closed rather than running without it.
     catalog: Mapping[str, Any] = field(default_factory=empty_catalog)
+    #: Demo mode: no real provider is launched.  Every run is simulated by the
+    #: DemoRunner, which completes the delegation as its bound child with an
+    #: honest "demo run -- no provider" summary.  This exists so a newcomer can
+    #: see the whole Hire -> Task -> Run -> result loop close in a scratch
+    #: workspace without a subscription or any billable process.  It is opt-in
+    #: through the operator config and never the default.
+    demo: bool = False
 
 
 def load_runtime_configuration(
@@ -176,11 +183,12 @@ def load_runtime_configuration(
         raise ConfigurationError("runtime profile config is not valid UTF-8 YAML") from exc
     if not isinstance(value, Mapping):
         raise ConfigurationError("runtime profile config must be a mapping")
-    unknown = sorted(set(value) - {"profiles", "limits", "catalog"})
+    unknown = sorted(set(value) - {"profiles", "limits", "catalog", "demo"})
     if unknown or "profiles" not in value:
         detail = ", ".join(unknown) if unknown else "profiles"
         raise ConfigurationError(
-            "runtime config requires profiles and supports only profiles/limits; invalid: " + detail
+            "runtime config requires profiles and supports only "
+            "profiles/limits/catalog/demo; invalid: " + detail
         )
     raw_limits = value.get("limits")
     if raw_limits is not None and not isinstance(raw_limits, Mapping):
@@ -192,10 +200,14 @@ def load_runtime_configuration(
     raw_catalog = value.get("catalog")
     if raw_catalog is not None and not isinstance(raw_catalog, str):
         raise ConfigurationError("runtime catalog must be a path to the role catalogue")
+    raw_demo = value.get("demo", False)
+    if not isinstance(raw_demo, bool):
+        raise ConfigurationError("runtime demo must be a boolean")
     return RuntimeConfiguration(
         ProfileRegistry.from_mapping({"profiles": value["profiles"]}),
         limits,
         load_role_catalog(raw_catalog, workspace_root=workspace_root),
+        demo=raw_demo,
     )
 
 

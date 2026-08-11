@@ -1746,11 +1746,19 @@ def _runtime_service(
         from agent_commons.catalog import load_role_catalog
 
         catalog = load_role_catalog(role_catalog, workspace_root=state.repo)
+    runner = None
+    if config.demo:
+        # No provider is launched; the demo runner completes runs so the loop
+        # closes without a subscription or a billable process.
+        from agent_commons.runtime.demo import DemoRunner
+
+        runner = DemoRunner(manager.paths.state_root)
     return DelegationRuntimeService(
         manager,
         profiles=config.profiles,
         operator_limits=config.limits,
         catalog=catalog,
+        runner=runner,
         telemetry=telemetry_sink(telemetry, manager),
     )
 
