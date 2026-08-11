@@ -37,6 +37,30 @@ CORRECTION_IMMUTABLE_FIELDS = frozenset(
         "root_delegation_id",
         "to",
         "verdict",
+        # Standing-role authority, identity, isolation, and lineage.  A
+        # correction fixes a typo in the ledger; it is not a reconfiguration and
+        # not a re-creation, so it may never change what a role is allowed to do
+        # or how it is isolated.  Without these a worker corrected its own
+        # `agent.created` to all grants `auto` with a wide budget, and a human
+        # correction moved `context_mode` `fresh -> accumulated` around the
+        # `agent:isolation_downgrade` gate `agent.reconfigured` exists to demand
+        # (C2, 2026-08-10 review).  Every field here is agent-family only, so
+        # freezing it under correction touches no other event type.  `name` and
+        # `rationale`/`reason` stay correctable: they carry no authority.
+        "grants",
+        "turnover_budget",
+        "context_mode",
+        "origin",
+        "approval",
+        "created_by_agent_id",
+        "lifetime",
+        "profile_id",
+        "template",
+        "skills",
+        "tool_allowlist",
+        "allowed_action",
+        "from_agent_id",
+        "to_agent_id",
     }
 )
 

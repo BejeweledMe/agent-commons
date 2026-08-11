@@ -139,6 +139,14 @@
           "items": {
             "$ref": "#/$defs/catalogId"
           }
+        },
+        "turnover_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1024
         }
       }
     },

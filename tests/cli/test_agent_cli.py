@@ -979,3 +979,129 @@ def test_a_worker_that_reported_success_is_still_its_role(
         "sticky-escape-delegation",
     )
     _refused(escape, "cannot escape its lineage")
+
+
+# -- the second path re-checks what creation checks (C2, H1) -------------------
+
+
+def _shown_event(workspace: dict[str, Any], event_id: str) -> dict[str, Any]:
+    return workspace["manager"].show_event(event_id)
+
+
+def test_a_correction_cannot_widen_a_roles_grants_or_isolation(
+    workspace: dict[str, Any],
+) -> None:
+    """C2 through the seam: a correction fixes a typo, it is not a back door
+    around the reconfiguration gates.  The authority, budget, and isolation of a
+    role are frozen against correction on the write path and on replay."""
+
+    created = _create(workspace, "correctable")
+    shown = _shown_event(workspace, created["event_id"])
+    widened = {
+        **shown["event"]["payload"],
+        "grants": {"create_roles": "auto", "retire_roles": "auto", "open_links": "auto"},
+        "turnover_budget": 1024,
+        "context_mode": "accumulated",
+    }
+    refusal = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        workspace["human"]["session_id"],
+        "event",
+        "correct",
+        created["event_id"],
+        "--expected-target-sha256",
+        shown["canonical_sha256"],
+        "--replacement-payload-json",
+        json.dumps(widened),
+        "--idempotency-key",
+        "correctable-widen",
+    )
+    _refused(refusal, "grants")
+
+    # A descriptive typo is still correctable: name and rationale carry no
+    # authority, so freezing the governance fields does not freeze the record.
+    fixed = {**shown["event"]["payload"], "rationale": "corrected rationale text"}
+    accepted = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        workspace["human"]["session_id"],
+        "event",
+        "correct",
+        created["event_id"],
+        "--expected-target-sha256",
+        shown["canonical_sha256"],
+        "--replacement-payload-json",
+        json.dumps(fixed),
+        "--idempotency-key",
+        "correctable-typo",
+    )
+    _json(accepted)
+
+
+def test_reconfiguration_re_checks_the_turnover_budget(
+    workspace: dict[str, Any],
+) -> None:
+    """H1 through the seam: granting create_roles by reconfigure demands a
+    ceiling, exactly as creation does, and the ceiling is now settable so the
+    operator remedy exists."""
+
+    created = _create(workspace, "widen-me")
+    agent_id = created["entity_ref"]["id"]
+
+    refusal = _invoke(
+        workspace["runner"],
+        workspace["repo"],
+        workspace["human"]["session_id"],
+        "agent",
+        "reconfigure",
+        agent_id,
+        created["revision"],
+        "--changes-json",
+        json.dumps(
+            {"grants": {"create_roles": "ask", "retire_roles": "deny", "open_links": "deny"}}
+        ),
+        "--reason",
+        "grant creation with no ceiling",
+        "--idempotency-key",
+        "widen-nobudget",
+    )
+    _refused(refusal, "turnover_budget")
+
+    # The remedy the review said was unreachable: set the grant and its ceiling
+    # together.  turnover_budget is mutable now, so this is expressible.
+    accepted = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "reconfigure",
+            agent_id,
+            created["revision"],
+            "--changes-json",
+            json.dumps(
+                {
+                    "grants": {"create_roles": "ask", "retire_roles": "deny", "open_links": "deny"},
+                    "turnover_budget": 4,
+                }
+            ),
+            "--reason",
+            "grant creation with a ceiling",
+            "--idempotency-key",
+            "widen-withbudget",
+        )
+    )
+    shown = _json(
+        _invoke(
+            workspace["runner"],
+            workspace["repo"],
+            workspace["human"]["session_id"],
+            "agent",
+            "show",
+            agent_id,
+        )
+    )
+    assert shown["effective_grants"]["create_roles"] == "ask"
+    assert shown["turnover_budget"] == 4
+    assert accepted["event_type"] == "agent.reconfigured"

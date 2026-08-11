@@ -682,12 +682,57 @@ def _validate_agent_reconfiguration(
                 "weakening a role's context isolation requires a recorded isolation_downgrade"
             )
     creator_id = current.get("created_by_agent_id")
+    # The grants and budget a reconfigure would leave the role holding: changed
+    # values win, unchanged ones keep their stored value.  Every check below
+    # reads this post-change view, so reconfiguration is held to the same
+    # invariants as creation rather than trusting the one snapshot the write
+    # happened under.
+    new_grants = {
+        name: str((changes.get("grants") or current.get("grants") or {}).get(name, "deny"))
+        for name in GRANT_NAMES
+    }
+    new_budget = (
+        changes.get("turnover_budget")
+        if "turnover_budget" in changes
+        else current.get("turnover_budget")
+    )
     if "grants" in changes and creator_id:
         creator_grants = effective_grants(snapshot.agents, str(creator_id))
         for name in GRANT_NAMES:
-            if grant_level(changes["grants"][name]) > grant_level(creator_grants[name]):
+            if grant_level(new_grants[name]) > grant_level(creator_grants[name]):
                 raise LifecycleConflictError(
                     f"a role cannot be reconfigured past its creator's {name} grant"
+                )
+        # Strict decrease is enforced at automatic creation so the chain
+        # terminates; a reconfigure that restored an automatically-created role
+        # to its creator's level would defeat it one generation at a time.
+        # Mirror creation exactly -- the rule binds `approval: automatic`, not
+        # a role a human confirmed at an equal level on purpose.
+        if str(current.get("approval", "")) == "automatic" and grant_level(
+            new_grants["create_roles"]
+        ) >= grant_level(creator_grants["create_roles"]):
+            raise LifecycleConflictError(
+                "an automatically-created role keeps a strictly narrower create_roles grant "
+                "than its creator"
+            )
+    if "grants" in changes or "turnover_budget" in changes:
+        # A role that may create or retire needs a ceiling, exactly as at
+        # creation; reconfiguration used to grant the right and skip the budget,
+        # so a null-budget root removed the ceiling for its whole subtree (H1).
+        needs_budget = any(new_grants[name] != "deny" for name in ("create_roles", "retire_roles"))
+        if needs_budget and (isinstance(new_budget, bool) or not isinstance(new_budget, int)):
+            raise LifecycleConflictError(
+                "a role that may create or retire roles requires an integer turnover_budget"
+            )
+        if creator_id and isinstance(new_budget, int) and not isinstance(new_budget, bool):
+            creator_budget = (snapshot.agents.get(str(creator_id)) or {}).get("turnover_budget")
+            if (
+                isinstance(creator_budget, int)
+                and not isinstance(creator_budget, bool)
+                and new_budget > creator_budget
+            ):
+                raise LifecycleConflictError(
+                    "a role cannot be reconfigured to a turnover budget wider than its creator"
                 )
 
 
