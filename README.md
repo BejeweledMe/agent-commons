@@ -188,6 +188,36 @@ across a parent/provider scope; `micro_usd` is an explicit provider-native cap
 and is partitioned across retries. The bounded shared queue reports wait/depth
 metadata and rejects excess work with backpressure.
 
+### See the whole loop without a provider (demo mode)
+
+To watch a role take a task from Hire to a finished result in a scratch
+workspace — without a subscription and without launching any billable process —
+add `demo: true` to the top level of the same operator config:
+
+```yaml
+demo: true
+profiles:
+  claude-builder:
+    executable: /absolute/path/to/claude   # never invoked in demo mode
+    mcp_executable: /absolute/path/to/agent-commons-mcp
+    git_executable: /absolute/path/to/git
+    permission_mode: acceptEdits
+    trusted_workspace: true
+```
+
+Then launch the panel with the same gate the real broker uses:
+
+```bash
+agent-commons ui --state-root /absolute/path/to/state \
+  --enable-launch --profile-config /absolute/path/to/demo-runtime.yaml
+```
+
+Demo mode stands in for the provider CLI at the exact runner seam — it is still
+the one launch path, not a second one. A demo implementation run records an
+honest `delegation.succeeded` whose summary says plainly that no provider ran;
+it never fabricates a review or a verification, so those purposes fall to
+`needs_operator` instead. Remove `demo: true` to run the real provider.
+
 Preflight checks static flags, source/catalog compatibility, and starts no model
 work. A missing MCP helper is reported as
 `mcp_executable_unavailable`, before the provider starts. Static success is not

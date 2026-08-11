@@ -580,11 +580,19 @@ class UIContext:
         )
 
         config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        runner = None
+        if config.demo:
+            # Demo mode: complete the run without launching a provider, so the
+            # panel's Run closes the loop in a scratch workspace without billing.
+            from agent_commons.runtime.demo import DemoRunner
+
+            runner = DemoRunner(manager.paths.state_root)
         return DelegationRuntimeService(
             manager,
             profiles=config.profiles,
             operator_limits=config.limits,
             catalog=config.catalog,
+            runner=runner,
         )
 
     def runs(self) -> list[dict[str, Any]]:

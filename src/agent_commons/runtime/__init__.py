@@ -34,6 +34,7 @@ from .communication import (
     OperationRequestSpec,
     OperationState,
 )
+from .demo import DemoRunner
 from .diagnostics import (
     DiagnosticCode,
     SafeDiagnostic,
@@ -111,6 +112,7 @@ __all__ = [
     "CommunicationScope",
     "CommunicationStore",
     "CorrelationIds",
+    "DemoRunner",
     "DiagnosticCode",
     "ExecutableResolutionError",
     "ExecutableRole",
