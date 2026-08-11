@@ -163,17 +163,23 @@ def validate_transition(
             f"{event_type} is not allowed from {family} state {current.get('state')}"
         )
     if event_type == "review.completed" and current.get("independent"):
-        requester_session = (current.get("actor") or {}).get("session_id")
-        if requester_session == actor_session_id:
+        bindings = session_agent_map(snapshot.delegations)
+        completer = principals(bindings, {actor_session_id})
+        # Requester and completer are compared as principals, not sessions: a
+        # standing role that requested a review in one run and approved it in
+        # the next used two different session ids and passed a raw comparison
+        # (H2, 2026-08-10 review).  The requester principal set comes from the
+        # authors of the review record itself, which accumulate across its
+        # events rather than tracking the last actor.
+        requester = _record_author_principals(snapshot, current)
+        if requester & completer:
             raise LifecycleConflictError(
-                "an independent review cannot be completed by its requester session"
+                "an independent review cannot be completed by a principal that requested it: "
+                + ", ".join(sorted(requester & completer))
             )
         target_ref = current.get("target_ref") or {}
         target_kind = str(target_ref.get("kind", ""))
-        bindings = session_agent_map(snapshot.delegations)
-        overlap = _subject_author_principals(snapshot, target_ref) & principals(
-            bindings, {actor_session_id}
-        )
+        overlap = _subject_author_principals(snapshot, target_ref) & completer
         if overlap:
             raise LifecycleConflictError(
                 f"an independent {target_kind or 'subject'} review cannot be completed "
@@ -817,6 +823,25 @@ def _subject_author_principals(
     return principals(bindings, _subject_author_sessions(snapshot, target_ref))
 
 
+def _record_author_principals(snapshot: ProjectSnapshot, record: Mapping[str, Any]) -> set[str]:
+    """Principals that authored one record, from its accumulated author set.
+
+    The projection keeps every session that recorded an event for an entity in
+    `author_session_ids`, so this survives a later unrelated event overwriting
+    `actor`.
+    """
+
+    bindings = session_agent_map(snapshot.delegations)
+    sessions = {
+        str(session_id) for session_id in record.get("author_session_ids", []) if str(session_id)
+    }
+    if not sessions:
+        actor_session = str((record.get("actor") or {}).get("session_id", ""))
+        if actor_session:
+            sessions.add(actor_session)
+    return principals(bindings, sessions)
+
+
 def _subject_author_sessions(snapshot: ProjectSnapshot, target_ref: Mapping[str, Any]) -> set[str]:
     """Every session that authored the subject of a review, whatever its kind.
 
@@ -846,9 +871,17 @@ def _subject_author_sessions(snapshot: ProjectSnapshot, target_ref: Mapping[str,
         # is not authoring its work, so the actor alone does not count here.
         authors.update(_evidence_author_sessions(snapshot, record))
         return authors
-    actor_session = str((record.get("actor") or {}).get("session_id", ""))
-    if actor_session:
-        authors.add(actor_session)
+    # Every session that recorded an event for this subject, not the last one.
+    # `actor` is overwritten on each event, so reading it credited whoever
+    # touched the record most recently and let the real author review its own
+    # decision, finding, or thread after any unrelated event (H2).
+    authors.update(
+        str(session_id) for session_id in record.get("author_session_ids", []) if str(session_id)
+    )
+    if not authors:
+        actor_session = str((record.get("actor") or {}).get("session_id", ""))
+        if actor_session:
+            authors.add(actor_session)
     return authors
 
 

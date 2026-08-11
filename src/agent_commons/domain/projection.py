@@ -191,6 +191,21 @@ def _apply(
 ) -> None:
     current = deepcopy(collection.get(identifier, {}))
     payload = deepcopy(dict(event.get("payload") or {}))
+    # Every session that ever recorded an event for this entity, accumulated
+    # rather than overwritten.  `actor` is the *last* actor by construction, so
+    # any check that read it for authorship credited whoever touched the record
+    # most recently -- one unrelated event by anyone else made the real author
+    # look independent of its own subject (H2, 2026-08-10 review).  This set is
+    # the authorship of record for every kind that has no curated author list of
+    # its own.
+    authors = {
+        str(session_id)
+        for session_id in current.get("author_session_ids", [])
+        if str(session_id)
+    }
+    actor_session = str((event.get("actor") or {}).get("session_id", ""))
+    if actor_session:
+        authors.add(actor_session)
     collection[identifier] = {
         **current,
         **payload,
@@ -200,6 +215,7 @@ def _apply(
         "effective_revision": str(event.get("_effective_correction_id") or event["event_id"]),
         "recorded_at": event.get("recorded_at"),
         "actor": event.get("actor"),
+        "author_session_ids": sorted(authors),
     }
 
 

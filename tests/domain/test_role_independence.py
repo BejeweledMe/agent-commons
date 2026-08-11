@@ -615,3 +615,133 @@ def test_closing_the_link_takes_the_widening_back(workspace: dict[str, Any]) -> 
             on_behalf_of_agent_id=frontend["entity_ref"]["id"],
             idempotency_key="revoke-attempt",
         )
+
+
+def test_one_role_cannot_request_a_review_and_then_approve_it(
+    workspace: dict[str, Any],
+) -> None:
+    """H2, hole one: the requester/completer check is over principals now.
+
+    A standing role that requested an independent review in one run and
+    completed it in the next used two different session ids and slipped past a
+    raw session comparison.  It is the same judgment either way.
+    """
+
+    operator: CommonsManager = workspace["operator"]
+    role = operator.create_agent(
+        name="Reviewer role",
+        profile_id="claude-independent-reviewer",
+        rationale="requests in one run, approves in the next",
+        idempotency_key="h2a-role",
+    )
+    role_id = role["entity_ref"]["id"]
+    task = operator.create_task(
+        title="Subject of review",
+        description="something to review",
+        acceptance_criteria=("done",),
+        idempotency_key="h2a-task",
+    )
+    task_id = task["entity_ref"]["id"]
+
+    run1 = _open(workspace["repo"], workspace["state_root"], name="h2a1", role="reviewer")
+    _bind_run(
+        workspace,
+        agent_id=role_id,
+        worker=run1,
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=task["revision"],
+        profile="claude-independent-reviewer",
+        purpose="verification",
+        key="h2a-run1",
+    )
+    review = run1.request_review(
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=task["revision"],
+        criteria=("looks right",),
+        independent=True,
+        idempotency_key="h2a-review",
+    )
+    review_id = review["entity_ref"]["id"]
+
+    run2 = _open(workspace["repo"], workspace["state_root"], name="h2a2", role="reviewer")
+    _bind_run(
+        workspace,
+        agent_id=role_id,
+        worker=run2,
+        target_ref={"kind": "review", "id": review_id},
+        target_revision=review["revision"],
+        profile="claude-independent-reviewer",
+        purpose="independent_review",
+        key="h2a-run2",
+    )
+    with pytest.raises(LifecycleConflictError, match="requested it"):
+        run2.complete_review(
+            review_id,
+            review["revision"],
+            verdict="approved",
+            summary="the same role approves its own request",
+            target_revision=task["revision"],
+            idempotency_key="h2a-complete",
+        )
+
+
+def test_an_authors_identity_survives_a_later_unrelated_event(
+    workspace: dict[str, Any],
+) -> None:
+    """H2, hole two: authorship accumulates, it does not track the last actor.
+
+    A decision's author used to be read off `actor`, which the projection
+    overwrites on every event.  One unrelated `decision.deferred` by anyone
+    else made the original proposer look independent of its own decision.  A
+    genuinely uninvolved reviewer must still be free to approve, so this checks
+    both directions.
+    """
+
+    operator: CommonsManager = workspace["operator"]
+    author = _open(workspace["repo"], workspace["state_root"], name="h2b-author", role="builder")
+    decision = author.propose_decision(
+        scope="h2b-scope",
+        proposal="choose the approach",
+        alternatives=("a", "b"),
+        idempotency_key="h2b-decision",
+    )
+    decision_id = decision["entity_ref"]["id"]
+
+    # Someone unrelated touches the decision, overwriting `actor`.
+    toucher = _open(workspace["repo"], workspace["state_root"], name="h2b-touch", role="operator")
+    deferred = toucher.defer_decision(
+        decision_id, decision["revision"], reason="park it", idempotency_key="h2b-defer"
+    )
+
+    review = operator.request_review(
+        target_ref={"kind": "decision", "id": decision_id},
+        target_revision=deferred["revision"],
+        criteria=("sound",),
+        independent=True,
+        idempotency_key="h2b-review",
+    )
+
+    with pytest.raises(LifecycleConflictError, match="authored the subject"):
+        author.complete_review(
+            review["entity_ref"]["id"],
+            review["revision"],
+            verdict="approved",
+            summary="the proposer approves its own decision after an unrelated defer",
+            target_revision=deferred["revision"],
+            idempotency_key="h2b-complete",
+        )
+
+    # Independence is not over-broad: a reviewer that never touched the decision
+    # still approves it.
+    independent = _open(
+        workspace["repo"], workspace["state_root"], name="h2b-indep", role="reviewer"
+    )
+    approved = independent.complete_review(
+        review["entity_ref"]["id"],
+        review["revision"],
+        verdict="approved",
+        summary="a third party that never touched the decision",
+        target_revision=deferred["revision"],
+        idempotency_key="h2b-complete-indep",
+    )
+    assert approved["event_type"] == "review.completed"
