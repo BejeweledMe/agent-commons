@@ -5,17 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Commons</title>
 <style nonce="__CSP_NONCE__">
+/* The panel commits to one dark, dense working surface (operator-approved
+   redesign): data carries the identity — mono ids, tabular digits, thin
+   borders — not decoration.  No light theme by design. */
 :root{
-  --bg:#fbfbfd; --surface:#fff; --surface-2:#f4f4f7; --border:#dcdce3;
-  --fg:#1c1c22; --muted:#6a6a76; --edge:#9a9aa8;
-  --ok:#1d7a44; --warn:#8a5a00; --bad:#a02020; --info:#2b5fd9;
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#17171b; --surface:#212127; --surface-2:#26262d; --border:#3a3a44;
-    --fg:#f0f0f4; --muted:#a0a0ae; --edge:#5c5c68;
-    --ok:#4ec27f; --warn:#d9a441; --bad:#e06c6c; --info:#7aa2f7;
-  }
+  --bg:#101113; --surface:#141619; --surface-2:#1d2024; --border:#26292e;
+  --fg:#e7e9ec; --muted:#8a8f98; --faint:#5c616b; --edge:#3a3f46;
+  --ok:#3ecf8e; --warn:#e0b04f; --bad:#e06c5f; --info:#5b9dd9;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -41,14 +37,15 @@ header h1{font-size:14px; margin:0; font-weight:600}
 .pill.reconnecting{color:var(--warn); border-color:var(--warn)}
 .pill.gap{color:var(--bad); border-color:var(--bad)}
 .trust{font-size:11px; color:var(--muted)}
-main{display:flex; flex:1; min-height:0}
-#canvas{flex:1; background:var(--bg); cursor:grab; touch-action:none}
+/* Three-zone shell: library on the left, the board in the centre, the
+   conversation on the right — one home per kind of thing (redesign, item 6). */
+main{display:grid; grid-template-columns:200px 1fr 360px; flex:1; min-height:0}
+#canvas{width:100%; height:100%; background:var(--bg); cursor:grab; touch-action:none}
 #canvas:active{cursor:grabbing}
 aside{
-  width:380px; border-left:1px solid var(--border); background:var(--surface);
-  overflow:auto; padding:12px; display:none;
+  border-left:1px solid var(--border); background:var(--surface);
+  overflow:auto; padding:0; display:flex; flex-direction:column; min-height:0;
 }
-aside.open{display:block}
 aside h2{font-size:13px; margin:0 0 8px}
 aside pre{
   font:12px/1.5 ui-monospace,"JetBrains Mono",monospace; white-space:pre-wrap;
@@ -138,6 +135,105 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .info{fill:var(--info)}
 .muted{fill:var(--muted)}
 .empty{fill:var(--muted); font-size:12px}
+
+/* --- redesign layout: sidebar, centre views, dock, drawer, modal ---------- */
+#sidebar{
+  border-right:1px solid var(--border); background:var(--surface);
+  overflow-y:auto; display:flex; flex-direction:column; padding:8px 8px 12px;
+}
+.navgroup{display:flex; flex-direction:column; gap:1px; margin:0 0 10px}
+.navlbl{
+  font-size:10px; font-weight:600; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--faint); padding:8px 8px 5px;
+}
+#sidebar button{
+  display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+  background:none; border:none; border-radius:6px; padding:6px 8px;
+  color:var(--muted); font-size:13px;
+}
+#sidebar button:hover{background:var(--surface-2); color:var(--fg)}
+#sidebar button[aria-selected="true"]{background:var(--surface-2); color:var(--fg)}
+#sidebar button .chip{
+  margin-left:auto; font:10px ui-monospace,monospace; color:var(--faint);
+}
+#center{position:relative; min-width:0; min-height:0; overflow:hidden}
+#center .view{display:none; position:absolute; inset:0; overflow:auto}
+#center .view.open{display:block}
+#view-board{overflow:hidden}
+.doc{max-width:640px; margin:0 auto; padding:36px 28px 72px}
+.doc h1{font-size:18px; font-weight:650; margin:0 0 4px}
+.doc h3{font-size:13px; font-weight:600; margin:22px 0 6px}
+.doc p{font-size:13px; color:var(--fg); max-width:62ch; margin:0 0 8px}
+.doc p.dim{color:var(--muted)}
+.doc ol{padding-left:20px; margin:0 0 8px}
+.doc li{font-size:13px; margin:0 0 5px}
+.listwrap{max-width:680px; margin:0 auto; padding:28px 24px 64px}
+.listwrap h1{font-size:16px; font-weight:650; margin:0 0 4px}
+#fab{
+  position:absolute; right:22px; bottom:22px; width:44px; height:44px;
+  border-radius:50%; background:var(--info); color:#0d1117; border:none;
+  font-size:22px; line-height:1; cursor:pointer; z-index:5;
+}
+#fab:hover{filter:brightness(1.1)}
+.dock-tabs{
+  display:flex; gap:2px; padding:8px 10px 0; border-bottom:1px solid var(--border);
+  flex:none;
+}
+.dock-tabs button{
+  background:none; border:none; border-radius:6px 6px 0 0; position:relative;
+  padding:7px 11px 9px; font-size:12.5px; color:var(--muted);
+}
+.dock-tabs button:hover{color:var(--fg)}
+.dock-tabs button[aria-selected="true"]{color:var(--fg)}
+.dock-tabs button[aria-selected="true"]::after{
+  content:""; position:absolute; left:8px; right:8px; bottom:-1px; height:2px;
+  background:var(--info); border-radius:2px;
+}
+#dock .panel.open{display:block; overflow-y:auto; padding:12px; min-height:0}
+#drawer{
+  position:absolute; inset:0; background:var(--surface); z-index:3;
+  display:flex; flex-direction:column; min-height:0;
+}
+#drawer .drawer-head{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border-bottom:1px solid var(--border); flex:none;
+}
+#drawer .drawer-head h2{flex:1; margin:0; font-size:13px}
+#drawer .panel.open{display:block; overflow-y:auto; padding:12px; min-height:0}
+#drawer .actions{padding:8px 12px 0; margin:0; flex:none}
+#dock{position:relative}
+.scrim{
+  position:fixed; inset:0; background:rgba(6,7,9,.62); z-index:70;
+  display:grid; place-items:center;
+}
+.modal{
+  width:420px; max-height:86vh; overflow-y:auto; background:var(--surface);
+  border:1px solid var(--border); border-radius:10px; padding:18px;
+}
+.modal h2{font-size:14px; margin:0 0 10px}
+#onboarding{
+  position:absolute; inset:0; display:grid; place-items:center;
+  background:var(--bg); z-index:4; overflow:auto;
+}
+.onb-card{width:min(430px,90%); display:flex; flex-direction:column; gap:14px; padding:24px 0}
+.onb-card h2{font-size:16px; margin:0}
+.step{
+  display:flex; gap:12px; align-items:flex-start; padding:11px 13px;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+}
+.step .n{
+  font:12px ui-monospace,monospace; color:var(--info);
+  border:1px solid var(--edge); border-radius:50%; width:22px; height:22px;
+  display:grid; place-items:center; flex:none;
+}
+.step b{font-size:13px}
+.step p{font-size:12px; color:var(--muted); margin:2px 0 0}
+.cta{
+  background:var(--info); color:#0d1117; border:none; border-radius:6px;
+  padding:8px 14px; font-weight:600; align-self:flex-start; cursor:pointer;
+}
+.mono{font-family:ui-monospace,"JetBrains Mono",monospace}
+@media (max-width:1100px){ main{grid-template-columns:176px 1fr 320px} }
 </style>
 </head>
 <body>
@@ -154,90 +250,117 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span class="trust" id="layers"></span>
 </header>
 <main>
-  <svg id="canvas" role="img" aria-label="workspace graph"></svg>
-  <aside id="inspector">
-    <h2 id="inspector-title">—</h2>
-    <div class="actions">
-      <button type="button" id="focus-toggle" aria-pressed="false">Isolate connections</button>
-      <span class="pill" id="focus-count"></span>
-      <span class="pill blocked" id="blocked-pill" hidden data-i18n="waiting_on_you">waiting on you</span>
+  <nav id="sidebar">
+    <div class="navgroup">
+      <span class="navlbl" data-i18n="nav_work">Workspace</span>
+      <button type="button" data-view="board" aria-selected="true" data-i18n="nav_board" data-i18n-title="tip_board">Board</button>
+      <button type="button" data-view="runs" id="nav-runs" aria-selected="false" data-i18n-title="tip_runs">Runs</button>
     </div>
-    <div class="tabs" id="tabs">
-      <button type="button" data-panel="attention" aria-selected="false">Attention</button>
-      <button type="button" data-panel="runs" aria-selected="false" hidden>Runs</button>
-      <button type="button" data-panel="chat" aria-selected="true" data-i18n="tab_chat">Main chat</button>
-      <button type="button" data-panel="hire" aria-selected="false" hidden data-i18n="tab_hire">Hire</button>
-      <button type="button" data-panel="record" aria-selected="false" data-i18n="tab_record">Record</button>
-      <button type="button" data-panel="catalog" aria-selected="false" hidden data-i18n="tab_catalog">Catalogue</button>
-      <button type="button" data-panel="search" aria-selected="false" hidden data-i18n="tab_search">Search</button>
-      <button type="button" data-panel="run" aria-selected="false" hidden data-i18n="tab_run">Run</button>
-      <button type="button" data-panel="message" aria-selected="false" hidden data-i18n="tab_message">Message</button>
-      <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">⚙ Settings</button>
+    <div class="navgroup">
+      <span class="navlbl" data-i18n="nav_library">Library</span>
+      <button type="button" data-view="guide" aria-selected="false" data-i18n="nav_guide" data-i18n-title="tip_guide">Overview</button>
+      <button type="button" data-view="skills" aria-selected="false" data-i18n="nav_skills" data-i18n-title="tip_skills">Skills</button>
+      <button type="button" data-view="tools" aria-selected="false" data-i18n="nav_tools" data-i18n-title="tip_tools">Tools</button>
+      <button type="button" data-view="sgr" aria-selected="false" data-i18n-title="tip_sgr">SGR <span class="chip" data-i18n="chip_soon">soon</span></button>
+      <button type="button" data-view="mcp" aria-selected="false" data-i18n-title="tip_mcp">MCP <span class="chip" data-i18n="chip_later">later</span></button>
     </div>
+  </nav>
 
-    <section class="panel open" id="panel-chat">
-      <p class="note" id="chat-note"></p>
-      <div id="chat-messages"></div>
-      <label class="field" id="chat-subject-field" hidden><span data-i18n="chat_subject_label">What is the task?</span>
-        <input type="text" id="chat-subject" autocomplete="off"></label>
-      <label class="field"><span data-i18n="chat_message_label">Message</span>
-        <textarea id="chat-body"></textarea></label>
-      <button type="button" id="chat-send">Send</button>
-      <p class="result" id="chat-result"></p>
-    </section>
-
-    <section class="panel" id="panel-hire">
-      <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
-        profile and can only narrow it; a role that may create or retire other
-        roles needs a turnover budget.</p>
-      <label class="field"><span data-i18n="hire_preset_label">From preset (optional)</span>
-        <select id="hire-preset"></select></label>
-      <label class="field"><span data-i18n="hire_name_label">Name</span>
-        <input type="text" id="hire-name" autocomplete="off"></label>
-      <label class="field"><span data-i18n="hire_profile_label">Profile</span>
-        <select id="hire-profile"></select></label>
-      <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
-        <input type="text" id="hire-rationale" autocomplete="off"></label>
-      <label class="field"><span data-i18n="hire_context_label">Context</span>
-        <select id="hire-context_mode"></select></label>
-      <div class="grants">
-        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
-          <select id="hire-create_roles"></select></label>
-        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
-          <select id="hire-retire_roles"></select></label>
-        <label class="field"><span data-i18n="open_links_label">Open links</span>
-          <select id="hire-open_links"></select></label>
-        <label class="field"><span data-i18n="hire_budget_label">Turnover budget (blank = none)</span>
-          <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
+  <div id="center">
+    <section class="view open" id="view-board">
+      <svg id="canvas" role="img" aria-label="workspace graph"></svg>
+      <div id="onboarding" hidden>
+        <div class="onb-card">
+          <h2 data-i18n="onb_title">This is your agent team's headquarters</h2>
+          <p class="note" data-i18n="onb_lead">Hire agents, give them tasks, watch work reach a result.</p>
+          <div class="step"><span class="n">1</span><div>
+            <b data-i18n="onb_s1_t">Hire your first agent</b>
+            <p data-i18n="onb_s1_p">The + button on the board. The profile decides who it is and what it may do.</p></div></div>
+          <div class="step"><span class="n">2</span><div>
+            <b data-i18n="onb_s2_t">Create a task</b>
+            <p data-i18n="onb_s2_p">Briefly: what to do and how we will know it is done.</p></div></div>
+          <div class="step"><span class="n">3</span><div>
+            <b data-i18n="onb_s3_t">Run it</b>
+            <p data-i18n="onb_s3_p">The agent takes the task. The run shows up live in Runs.</p></div></div>
+          <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first agent</button>
+        </div>
       </div>
-      <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
-      <p class="result" id="hire-result"></p>
+      <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
     </section>
 
-    <section class="panel" id="panel-record">
-      <pre id="inspector-body"></pre>
+    <section class="view" id="view-runs">
+      <div class="listwrap">
+        <h1 data-i18n="tab_runs">Runs</h1>
+        <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
+          provider output. No prompts, transcripts, or tool arguments are retained.</p>
+        <div id="runs-list"></div>
+      </div>
     </section>
 
-    <section class="panel" id="panel-attention">
-      <p class="note" id="attention-note"></p>
-      <div id="attention-list"></div>
-      <p class="result" id="attention-result"></p>
+    <section class="view" id="view-search">
+      <div class="listwrap">
+        <h1 data-i18n="tab_search">Search</h1>
+        <p class="note" id="search-note"></p>
+        <div id="search-results"></div>
+      </div>
     </section>
 
-    <section class="panel" id="panel-runs">
-      <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
-        provider output. No prompts, transcripts, or tool arguments are retained.</p>
-      <div id="runs-list"></div>
+    <section class="view" id="view-guide">
+      <div class="doc">
+        <h1 data-i18n="guide_title">Agent Commons, in short</h1>
+        <p class="dim" data-i18n="guide_sub">Two minutes, top-down, simple first.</p>
+        <h3 data-i18n="guide_what_h">What this is</h3>
+        <p data-i18n="guide_what_p"></p>
+        <h3 data-i18n="guide_how_h">How it fits together</h3>
+        <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
+        <p data-i18n="guide_how_p"></p>
+        <h3 data-i18n="guide_route_h">Your first route</h3>
+        <ol>
+          <li data-i18n="guide_route_1"></li>
+          <li data-i18n="guide_route_2"></li>
+          <li data-i18n="guide_route_3"></li>
+        </ol>
+        <h3 data-i18n="guide_next_h">Once you are comfortable</h3>
+        <p data-i18n="guide_next_p"></p>
+        <h3 data-i18n="guide_never_h">What this panel never does</h3>
+        <p data-i18n="guide_never_p"></p>
+      </div>
     </section>
 
-    <section class="panel" id="panel-search">
-      <p class="note" id="search-note"></p>
-      <div id="search-results"></div>
+    <section class="view" id="view-skills">
+      <div class="listwrap">
+        <h1 data-i18n="nav_skills">Skills</h1>
+        <p class="note" data-i18n="skills_view_note"></p>
+        <div id="skills-list"></div>
+        <div id="skills-editor-slot"></div>
+      </div>
     </section>
 
-    <section class="panel" id="panel-catalog">
+    <section class="view" id="view-tools">
+      <div class="listwrap">
+        <h1 data-i18n="nav_tools">Tools</h1>
+        <p class="note" data-i18n="tools_view_note"></p>
+        <div id="tools-list"></div>
+        <div id="tools-editor-slot"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-sgr">
+      <div class="listwrap">
+        <h1>SGR — Schema-Guided Reasoning</h1>
+        <p class="note" data-i18n="sgr_note"></p>
+      </div>
+    </section>
+
+    <section class="view" id="view-mcp">
+      <div class="listwrap">
+        <h1>MCP</h1>
+        <p class="note" data-i18n="mcp_note"></p>
+      </div>
+    </section>
+
+    <div id="catalog-editor" hidden>
       <p class="note warn" id="catalog-warning"></p>
-      <div id="catalog-list"></div>
       <h3 class="subhead" data-i18n="catalog_add_heading">Add or replace an entry</h3>
       <label class="field"><span data-i18n="catalog_kind_label">Kind</span>
         <select id="catalog-section">
@@ -255,6 +378,51 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <textarea id="catalog-instruction"></textarea></label>
       <button type="button" id="catalog-save" data-i18n="catalog_save">Save entry</button>
       <p class="result" id="catalog-result"></p>
+    </div>
+  </div>
+
+  <aside id="dock">
+    <div class="dock-tabs" id="dock-tabs">
+      <button type="button" data-panel="chat" aria-selected="true" data-i18n="tab_chat">Main chat</button>
+      <button type="button" data-panel="attention" aria-selected="false">Attention</button>
+    </div>
+
+    <section class="panel open" id="panel-chat">
+      <p class="note" id="chat-note"></p>
+      <div id="chat-messages"></div>
+      <label class="field" id="chat-subject-field" hidden><span data-i18n="chat_subject_label">What is the task?</span>
+        <input type="text" id="chat-subject" autocomplete="off"></label>
+      <label class="field"><span data-i18n="chat_message_label">Message</span>
+        <textarea id="chat-body"></textarea></label>
+      <button type="button" id="chat-send">Send</button>
+      <p class="result" id="chat-result"></p>
+    </section>
+
+    <section class="panel" id="panel-attention">
+      <p class="note" id="attention-note"></p>
+      <div id="attention-list"></div>
+      <p class="result" id="attention-result"></p>
+    </section>
+
+    <div id="drawer" hidden>
+      <div class="drawer-head">
+        <h2 id="inspector-title">—</h2>
+        <span class="pill blocked" id="blocked-pill" hidden data-i18n="waiting_on_you">waiting on you</span>
+        <button type="button" id="drawer-close" data-i18n-title="drawer_close">✕</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="focus-toggle" aria-pressed="false">Isolate connections</button>
+        <span class="pill" id="focus-count"></span>
+      </div>
+      <div class="dock-tabs" id="drawer-tabs">
+        <button type="button" data-panel="record" aria-selected="true" data-i18n="tab_record">Record</button>
+        <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">⚙ Settings</button>
+        <button type="button" data-panel="run" aria-selected="false" hidden data-i18n="tab_run">Run</button>
+        <button type="button" data-panel="message" aria-selected="false" hidden data-i18n="tab_message">Message</button>
+      </div>
+
+    <section class="panel open" id="panel-record">
+      <pre id="inspector-body"></pre>
     </section>
 
     <section class="panel" id="panel-run">
@@ -310,6 +478,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="result" id="settings-result"></p>
       <p class="note" id="settings-model"></p>
     </section>
+    </div>
   </aside>
 </main>
 <footer>
@@ -318,6 +487,41 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span id="waiting"></span>
   <span id="truncation"></span>
 </footer>
+<div class="scrim" id="hire-modal" hidden>
+  <div class="modal">
+    <h2 data-i18n="tab_hire">Hire</h2>
+    <section class="panel open" id="panel-hire">
+      <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
+        profile and can only narrow it; a role that may create or retire other
+        roles needs a turnover budget.</p>
+      <label class="field"><span data-i18n="hire_preset_label">From preset (optional)</span>
+        <select id="hire-preset"></select></label>
+      <label class="field"><span data-i18n="hire_name_label">Name</span>
+        <input type="text" id="hire-name" autocomplete="off"></label>
+      <label class="field"><span data-i18n="hire_profile_label">Profile</span>
+        <select id="hire-profile"></select></label>
+      <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
+        <input type="text" id="hire-rationale" autocomplete="off"></label>
+      <label class="field"><span data-i18n="hire_context_label">Context</span>
+        <select id="hire-context_mode"></select></label>
+      <div class="grants">
+        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+          <select id="hire-create_roles"></select></label>
+        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+          <select id="hire-retire_roles"></select></label>
+        <label class="field"><span data-i18n="open_links_label">Open links</span>
+          <select id="hire-open_links"></select></label>
+        <label class="field"><span data-i18n="hire_budget_label">Turnover budget (blank = none)</span>
+          <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
+        <button type="button" id="hire-cancel" data-i18n="hire_cancel">Cancel</button>
+      </div>
+      <p class="result" id="hire-result"></p>
+    </section>
+  </div>
+</div>
 <script nonce="__CSP_NONCE__">
 "use strict";
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -473,6 +677,52 @@ const STRINGS = {
     stale_warnings: "stale warnings",
     truncated: "graph truncated to fit display bounds",
     request_failed: "request failed:",
+    nav_work: "Workspace",
+    nav_library: "Library",
+    nav_board: "Board",
+    nav_guide: "Overview",
+    nav_skills: "Skills",
+    nav_tools: "Tools",
+    chip_soon: "soon",
+    chip_later: "later",
+    hire_cancel: "Cancel",
+    drawer_close: "Close",
+    fab_hire: "Hire an agent: name, profile — and the role appears on the board.",
+    tip_board: "Your team and its work. Click an entity for details; the wiring is the org chart.",
+    tip_runs: "Every provider run: what is moving now and how it ended. State only — no prompts or transcripts.",
+    tip_guide: "A two-minute explanation of the whole system: what it is, how it fits, where to start.",
+    tip_skills: "Behaviour packages from the operator catalogue. Granted to agents in their settings.",
+    tip_tools: "Tools from the same catalogue: what an agent may run on a task.",
+    tip_sgr: "Schema-Guided Reasoning: a library of structured-output schemas. Arrives with API providers.",
+    tip_mcp: "Custom tools reach subscription CLIs as MCP servers; this section arrives later.",
+    onb_title: "This is your agent team's headquarters",
+    onb_lead: "Hire agents, give them tasks, and watch the work reach a result. Every step is recorded in a shared history.",
+    onb_s1_t: "Hire your first agent",
+    onb_s1_p: "The + button on the board. The profile decides who it is and what it may do.",
+    onb_s2_t: "Create a task",
+    onb_s2_p: "Briefly: what to do and how we will know it is done.",
+    onb_s3_t: "Run it",
+    onb_s3_p: "The agent takes the task. The run shows up live in Runs.",
+    onb_cta: "Hire the first agent",
+    guide_title: "Agent Commons, in short",
+    guide_sub: "Two minutes, top-down, simple things first.",
+    guide_what_h: "What this is",
+    guide_what_p: "A local headquarters for a team of coding agents. You hire agents into roles, give them tasks, and confirm the decisions that matter. Every step — a hire, a task, a run, a result — lands in an append-only history, so it is always clear who did what and why.",
+    guide_how_h: "How it fits together",
+    guide_ladder: "Agents → Tasks → Runs → Reviews",
+    guide_how_p: "An agent is a standing role with a profile (which model, what it may do). A task says what to do and when it counts as done. A run is one attempt by an agent to do the work. A review is an independent check of the result.",
+    guide_route_h: "Your first route",
+    guide_route_1: "Hire an agent (+ on the board) — pick a profile.",
+    guide_route_2: "Create a task with a clear done-criterion.",
+    guide_route_3: "Run the agent on the task and follow it in Runs.",
+    guide_next_h: "Once you are comfortable",
+    guide_next_p: "Links between agents, independent reviews of each other's work, the skills and tools catalogue, role permissions — all of it joins in as you need it, not all at once.",
+    guide_never_h: "What this panel never does",
+    guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
+    skills_view_note: "Behaviour packages from the operator catalogue. An agent gets only what its settings grant.",
+    tools_view_note: "From the same operator catalogue: what an agent may run on a task. Granted in agent settings.",
+    sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic API, local vLLM).",
+    mcp_note: "Custom tools reach both subscription CLIs as MCP servers. Registering them from the panel arrives later; the contract is being designed first.",
   },
   ru: {
     tab_attention: "Внимание",
@@ -618,6 +868,52 @@ const STRINGS = {
     stale_warnings: "устаревших предупреждений",
     truncated: "граф усечён до границ отображения",
     request_failed: "запрос не выполнен:",
+    nav_work: "Рабочее",
+    nav_library: "Библиотека",
+    nav_board: "Борд",
+    nav_guide: "Обзор",
+    nav_skills: "Скиллы",
+    nav_tools: "Инструменты",
+    chip_soon: "скоро",
+    chip_later: "позже",
+    hire_cancel: "Отмена",
+    drawer_close: "Закрыть",
+    fab_hire: "Нанять агента: имя, профиль — и роль появляется на борде.",
+    tip_board: "Ваша команда и её работа. Клик по сущности — детали; связи — это оргсхема.",
+    tip_runs: "Все прогоны провайдеров: что движется сейчас и чем закончилось. Только состояние — без промптов и транскриптов.",
+    tip_guide: "Объяснение всей системы за две минуты: что это, как устроено, с чего начать.",
+    tip_skills: "Пакеты поведения из операторского каталога. Выдаются агентам в их настройках.",
+    tip_tools: "Инструменты из того же каталога: что агент может запускать на задаче.",
+    tip_sgr: "Schema-Guided Reasoning: библиотека схем структурированного вывода. Появится вместе с API-провайдерами.",
+    tip_mcp: "Кастомные туллы доезжают до подписочных CLI как MCP-серверы; раздел появится позже.",
+    onb_title: "Это штаб вашей команды агентов",
+    onb_lead: "Нанимайте агентов, давайте им задачи и смотрите, как работа доходит до результата. Каждый шаг записывается в общую историю.",
+    onb_s1_t: "Наймите первого агента",
+    onb_s1_p: "Кнопка «+» на борде. Профиль решает, кто это и что ему можно.",
+    onb_s2_t: "Создайте задачу",
+    onb_s2_p: "Коротко: что сделать и как поймём, что готово.",
+    onb_s3_t: "Запустите",
+    onb_s3_p: "Агент берёт задачу. Прогон виден вживую в «Прогонах».",
+    onb_cta: "Нанять первого агента",
+    guide_title: "Agent Commons, коротко",
+    guide_sub: "Две минуты, сверху вниз, сначала простое.",
+    guide_what_h: "Что это",
+    guide_what_p: "Локальный штаб для команды кодинг-агентов. Вы нанимаете агентов под роли, даёте им задачи и подтверждаете важные решения. Каждый шаг — найм, задача, прогон, результат — попадает в неизменяемую историю, поэтому всегда видно, кто что сделал и почему.",
+    guide_how_h: "Как устроено",
+    guide_ladder: "Агенты → Задачи → Прогоны → Ревью",
+    guide_how_p: "Агент — постоянная роль с профилем (какая модель, что разрешено). Задача — что сделать и когда это считается готовым. Прогон — одна попытка агента выполнить работу. Ревью — независимая проверка результата.",
+    guide_route_h: "Первый маршрут",
+    guide_route_1: "Наймите агента («+» на борде) — выберите профиль.",
+    guide_route_2: "Создайте задачу с понятным критерием готовности.",
+    guide_route_3: "Запустите агента на задаче и следите в «Прогонах».",
+    guide_next_h: "Когда освоитесь",
+    guide_next_p: "Связи между агентами, независимые ревью чужой работы, каталог скиллов и инструментов, права ролей — всё это подключается по мере надобности, не сразу.",
+    guide_never_h: "Чего панель никогда не делает",
+    guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
+    skills_view_note: "Пакеты поведения из операторского каталога. Агент получает только то, что выдано в его настройках.",
+    tools_view_note: "Из того же операторского каталога: что агент может запускать на задаче. Выдаётся в настройках агента.",
+    sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic API, локальный vLLM).",
+    mcp_note: "Кастомные туллы доезжают до обоих подписочных CLI как MCP-серверы. Регистрация из панели появится позже; сначала проектируется контракт.",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -638,6 +934,11 @@ function applyI18n() {
   }
   for (const element of document.querySelectorAll("[data-i18n-placeholder]")) {
     element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  }
+  // Native title tooltips: the one-line explanation every control carries
+  // (redesign, item 8). Translated like any other chrome.
+  for (const element of document.querySelectorAll("[data-i18n-title]")) {
+    element.setAttribute("title", t(element.dataset.i18nTitle));
   }
 }
 
@@ -779,6 +1080,10 @@ function layout(nodes) {
 
 function render(graph) {
   lastGraph = graph;
+  // Cold start gets a guided three-step card instead of a bare empty graph:
+  // the newcomer should know where they landed and what to do first (item 3).
+  document.getElementById("onboarding").hidden =
+    graph.nodes.length > 0 || !writesEnabled;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
   const layoutResult = layout(graph.nodes);
   const positions = layoutResult.placed;
@@ -935,8 +1240,14 @@ let writesEnabled = false;
 let catalog = null;
 let currentRole = null;
 
-function showPanel(name) {
-  for (const button of document.querySelectorAll("#tabs button")) {
+// One home per kind of thing (redesign): the dock holds the conversation
+// (chat, attention), the drawer holds the selected entity (record, settings,
+// run, message), the centre holds views, and hire is a modal off the board.
+const DOCK_PANELS = ["chat", "attention"];
+const DRAWER_PANELS = ["record", "settings", "run", "message"];
+
+function switchGroup(groupId, name) {
+  for (const button of document.querySelectorAll("#" + groupId + " button")) {
     const active = button.dataset.panel === name;
     button.setAttribute("aria-selected", active ? "true" : "false");
     document.getElementById("panel-" + button.dataset.panel)
@@ -944,9 +1255,67 @@ function showPanel(name) {
   }
 }
 
-document.getElementById("tabs").addEventListener("click", (event) => {
+function openDrawer() { document.getElementById("drawer").hidden = false; }
+
+function closeDrawer() {
+  document.getElementById("drawer").hidden = true;
+  selected = null;
+  if (focused) { setFocus(null); }
+  else if (lastGraph) { render(lastGraph); }
+}
+
+function showHire(open) {
+  document.getElementById("hire-modal").hidden = !open;
+  if (open) { document.getElementById("hire-name").focus(); }
+}
+
+function showPanel(name) {
+  if (name === "hire") { showHire(true); return; }
+  if (DOCK_PANELS.indexOf(name) >= 0) { switchGroup("dock-tabs", name); return; }
+  if (DRAWER_PANELS.indexOf(name) >= 0) { openDrawer(); switchGroup("drawer-tabs", name); return; }
+  viewShow(name === "catalog" ? "skills" : name);
+}
+
+// Centre views: the board plus the library. Selecting one keeps the dock as-is.
+function viewShow(name) {
+  for (const button of document.querySelectorAll("#sidebar button")) {
+    button.setAttribute("aria-selected", button.dataset.view === name ? "true" : "false");
+  }
+  for (const view of document.querySelectorAll("#center > .view")) {
+    view.classList.toggle("open", view.id === "view-" + name);
+  }
+  if (name === "skills" || name === "tools") { mountCatalogEditor(name); }
+}
+
+// The single catalogue editor serves both library views: it moves to whichever
+// one is open, preset to that kind. One element, one id namespace.
+function mountCatalogEditor(section) {
+  const editor = document.getElementById("catalog-editor");
+  const slot = document.getElementById(section === "skills" ? "skills-editor-slot" : "tools-editor-slot");
+  slot.appendChild(editor);
+  document.getElementById("catalog-section").value = section;
+  catalogInstructionVisibility();
+  editor.hidden = !catalog;
+}
+
+document.getElementById("dock-tabs").addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button && !button.hidden) { showPanel(button.dataset.panel); }
+});
+document.getElementById("drawer-tabs").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (button && !button.hidden) { switchGroup("drawer-tabs", button.dataset.panel); }
+});
+document.getElementById("sidebar").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (button) { viewShow(button.dataset.view); }
+});
+document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+document.getElementById("fab").addEventListener("click", () => showHire(true));
+document.getElementById("onb-cta").addEventListener("click", () => showHire(true));
+document.getElementById("hire-cancel").addEventListener("click", () => showHire(false));
+document.getElementById("hire-modal").addEventListener("click", (event) => {
+  if (event.target === document.getElementById("hire-modal")) { showHire(false); }
 });
 
 function fillSelect(element, values, selected, multiple) {
@@ -1082,9 +1451,10 @@ let runs = [];
 
 async function loadRuns() {
   try { runs = (await api("/api/runs")) || []; } catch (error) { runs = []; }
-  const tab = document.querySelector('#tabs button[data-panel="runs"]');
+  // The nav item stays visible even with zero runs: an empty view that says
+  // what will appear there beats a section that comes and goes.
+  const tab = document.getElementById("nav-runs");
   const liveCount = runs.filter((r) => r.live).length;
-  tab.hidden = runs.length === 0;
   tab.textContent = liveCount
     ? t("tab_runs") + " (" + t("live") + ": " + liveCount + ")" : t("tab_runs");
   const host = document.getElementById("runs-list");
@@ -1110,8 +1480,8 @@ async function loadRuns() {
 // launch loop is closed here rather than only in the CLI (M8). The panel could
 // reconfigure, retire, and message a role, but could not create one.
 function paintHire() {
-  const tab = document.querySelector('#tabs button[data-panel="hire"]');
-  tab.hidden = !writesEnabled;
+  // Hiring lives behind the board's + button, not a tab (redesign, item 6).
+  document.getElementById("fab").hidden = !writesEnabled;
   if (!writesEnabled || !catalog) { return; }
   fillSelect(document.getElementById("hire-profile"), catalog.profiles || [], null, false);
   fillSelect(document.getElementById("hire-context_mode"),
@@ -1159,10 +1529,8 @@ async function hireRole() {
 document.getElementById("hire-save").addEventListener("click", hireRole);
 
 async function inspect(node) {
-  const inspector = document.getElementById("inspector");
   const title = document.getElementById("inspector-title");
   const body = document.getElementById("inspector-body");
-  inspector.classList.add("open");
   // Lead with the name for anything that has one (a role), so the heading of
   // the screen where you manage it is not a bare ULID (round 2, design).
   title.textContent = node.label ? node.kind + " · " + node.label : node.kind + " " + node.id;
@@ -1170,9 +1538,9 @@ async function inspect(node) {
   document.getElementById("blocked-pill").hidden = !node.awaits_human;
 
   const isRole = node.kind === "agent";
-  const messageTab = document.querySelector('#tabs button[data-panel="message"]');
-  const settingsTab = document.querySelector('#tabs button[data-panel="settings"]');
-  const runTab = document.querySelector('#tabs button[data-panel="run"]');
+  const messageTab = document.querySelector('#drawer-tabs button[data-panel="message"]');
+  const settingsTab = document.querySelector('#drawer-tabs button[data-panel="settings"]');
+  const runTab = document.querySelector('#drawer-tabs button[data-panel="run"]');
   messageTab.hidden = !(isRole && writesEnabled);
   settingsTab.hidden = !(isRole && writesEnabled);
   // Run appears on a role only when the launch gate is on, and only for an
@@ -1302,7 +1670,7 @@ async function loadAttention() {
   } catch (error) {
     attention = { items: [], count: 0 };
   }
-  const tab = document.querySelector('#tabs button[data-panel="attention"]');
+  const tab = document.querySelector('#dock-tabs button[data-panel="attention"]');
   tab.textContent = attention.count
     ? t("tab_attention") + " (" + attention.count + ")" : t("tab_attention");
   const note = document.getElementById("attention-note");
@@ -1525,14 +1893,12 @@ document.getElementById("chat-send").addEventListener("click", sendChat);
 let searchTimer = null;
 
 async function runSearch(text) {
-  const tab = document.querySelector('#tabs button[data-panel="search"]');
   const note = document.getElementById("search-note");
   const host = document.getElementById("search-results");
   while (host.firstChild) { host.removeChild(host.firstChild); }
-  if (!text.trim()) { tab.hidden = true; return; }
-  tab.hidden = false;
-  document.getElementById("inspector").classList.add("open");
-  showPanel("search");
+  // An emptied query returns to the board rather than leaving a dead view.
+  if (!text.trim()) { viewShow("board"); return; }
+  viewShow("search");
   let payload;
   try {
     payload = await api("/api/search?q=" + encodeURIComponent(text));
@@ -1588,20 +1954,18 @@ document.getElementById("search-box").addEventListener("input", (event) => {
 let catalogEditing = false;
 
 function paintCatalog() {
-  const tab = document.querySelector('#tabs button[data-panel="catalog"]');
-  tab.hidden = !catalog;
-  if (!catalog) { return; }
+  // Skills and Tools are separate library views over the ONE operator
+  // catalogue file — two doors, one store (redesign decision).
   const warning = document.getElementById("catalog-warning");
+  const editor = document.getElementById("catalog-editor");
+  editor.hidden = !catalog;
+  if (!catalog) { return; }
   warning.textContent = catalogEditing
     ? t("catalog_editing_note") + " " + (catalog.catalog_path || t("catalog_default_store")) + "."
     : t("catalog_readonly");
-  const host = document.getElementById("catalog-list");
-  while (host.firstChild) { host.removeChild(host.firstChild); }
   for (const section of ["skills", "tools"]) {
-    const heading = document.createElement("h3");
-    heading.className = "subhead";
-    heading.textContent = section === "skills" ? t("skills_heading") : t("tools_heading");
-    host.appendChild(heading);
+    const host = document.getElementById(section === "skills" ? "skills-list" : "tools-list");
+    while (host.firstChild) { host.removeChild(host.firstChild); }
     const entries = catalog[section] || [];
     if (!entries.length) {
       const none = document.createElement("p");
@@ -1850,7 +2214,6 @@ function applyLanguage() {
   paintStatus();
   setStream(lastStream.state, lastStream.key);
   if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
-  if (!selected) { document.getElementById("inspector-title").textContent = t("tab_chat"); }
   paintCatalog();
   paintHire();
   loadRuns();
@@ -1874,10 +2237,8 @@ async function boot() {
     await loadRuns();
     await loadChat();
     await loadAttention();
-    // The main chat is where work starts, so it is what the panel shows before
+    // The main chat is where work starts, so it is what the dock shows before
     // anybody clicks a node.  A node chat is for stepping in on one role.
-    document.getElementById("inspector").classList.add("open");
-    document.getElementById("inspector-title").textContent = t("tab_chat");
     showPanel("chat");
   } catch (error) {
     setStream("gap", "stream_unauthorized");
