@@ -167,7 +167,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .tabs button[aria-selected="true"]{border-color:var(--info); color:var(--info)}
 .panel{display:none}
 .panel.open{display:block}
-.field{display:block; margin:0 0 8px}
+/* `position:relative` for one reason only: a field may carry a "?" that opens
+   the paragraph explaining its term, and that mark belongs at the right end of
+   the caption row — never between a label and its control (round 3, designer:
+   the guide's deep pages answer questions that arise here, not there). */
+.field{display:block; margin:0 0 8px; position:relative}
 /* The UA `[hidden]` rule has the same specificity as `.field{display:block}`
    and loses to it as the author rule, so `hidden` did not hide: a mid-thread
    subject box stayed visible and anything typed there was silently discarded
@@ -179,7 +183,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
    3, designer 13; the agent settings' tool-access rows).  The child combinator
    keeps the caption behaviour every ordinary field relies on and lets a nested
    row lay itself out. */
-.field > span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px}
+/* The right-hand gutter is reserved on EVERY caption, not only the ones that
+   carry a "?" today: seen in a live panel, "May take other roles out of
+   service" ran straight under its mark.  Reserving it unconditionally costs a
+   short caption nothing and means a mark added later cannot collide with one. */
+.field > span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px; padding-right:20px}
 /* One row per choice, wherever a control is a radio or a checkbox: the settings
    tool-access modes, the tools checklist, the link modal's type, the Runs
    view's grouping switch.  Baseline alignment rather than centre, so the dot
@@ -281,6 +289,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
+/* A heading with its "?" beside it rather than under it.  The heading keeps its
+   own margins; the row adds none, so nothing shifts where no mark is used. */
+.headrow{display:flex; align-items:baseline; gap:6px}
+/* The deep-link mark itself.  Round 3, designer: "In short" reads as onboarding
+   and the five deep pages as a specification — a specification is fine, but
+   only if the panel carries the reader to the paragraph when the question
+   arises.  Every one of these is the same control with a different pair of data
+   attributes; the glyph is drawn in CSS because a "?" carried as a text node
+   would be an untranslated string sitting inside translated chrome. */
+.gref{
+  flex:none; width:16px; height:16px; padding:0; border-radius:50%;
+  border:1px solid var(--border); background:var(--surface-2);
+  color:var(--muted); font-size:10px; line-height:1; cursor:pointer;
+  display:inline-grid; place-items:center; vertical-align:middle;
+}
+.gref::before{content:"?"}
+.gref:hover{border-color:var(--info); color:var(--info)}
+.field > .gref{position:absolute; top:-1px; right:0}
 /* A field's own control fills the field's width — and that is all this says.
    Written as a descendant it also caught the RADIO and CHECKBOX inside a row
    nested in a field, stretching a 13px dot into a 324px styled box that pushed
@@ -340,6 +366,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 #sidebar button[aria-selected="true"]{background:var(--surface-2); color:var(--fg)}
 #sidebar button .chip{
   margin-left:auto; font:10px ui-monospace,monospace; color:var(--faint);
+}
+/* Round 3, designer 20, and the compromise recorded against it: SGR and MCP are
+   not dead ends to be hidden — both pages carry real content and name what
+   unlocks them — but standing among the sections that work today they read as
+   if they did.  So they get a group of their own, a rule above it, and a hollow
+   mark on each entry.  Marked, never dimmed: dimming is how the panel says
+   "disabled", and these two open like anything else. */
+.navgroup.soon{border-top:1px dashed var(--border); padding-top:6px}
+.navgroup.soon button::before{
+  content:"\25CB"; flex:none; color:var(--faint); font-size:9px; line-height:1;
 }
 #center{position:relative; min-width:0; min-height:0; overflow:hidden}
 #center .view{display:none; position:absolute; inset:0; overflow:auto}
@@ -414,6 +450,51 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   background:var(--info); border-radius:2px;
 }
 #guide-tabs{padding:0; margin:0 0 18px; flex-wrap:wrap}
+/* Round 3, designer: the five deep tabs were scored 8/10 as reference and 3/10
+   as onboarding.  They are reference — the honest fix is to say so in the strip
+   itself, so nobody reads them as a tutorial that failed to teach.  A span, not
+   a button: the tab handler asks for `closest("button")` and steps over it. */
+.tabsplit{
+  align-self:center; margin:0 2px 0 10px; padding:0 0 0 12px;
+  border-left:1px solid var(--border);
+  font-size:10px; text-transform:uppercase; letter-spacing:.09em; color:var(--faint);
+}
+/* And the same sentence at the top of each of those five pages, because a
+   reader who arrives by deep link never passes the strip. */
+.doc p.guidelead{margin:0 0 14px; font-size:12px}
+/* Round 3, designer: the guide's examples — its most concrete sentences — were
+   `--muted` monospace on the page's own ground, the dimmest text in the panel.
+   They are examples, so they now look like examples: full foreground on the
+   raised surface, with a rule down the side.  The subtitle under the title
+   stays `--muted`: it is one deliberately quiet line, not a thing to read. */
+.doc p.mono.dim{
+  color:var(--fg); background:var(--surface-2);
+  border-left:2px solid var(--edge); border-radius:0 6px 6px 0;
+  padding:7px 10px; margin:0 0 12px; font-size:12px; overflow-x:auto;
+}
+/* A deep link lands on a heading, and every heading on a long page looks like
+   every other one.  The mark says which paragraph the question was about and
+   fades on its own; `scroll-margin` keeps the heading off the very top edge. */
+.doc h3{scroll-margin-top:18px}
+.doc h3.flash{animation:guideflash 1800ms ease-out}
+@keyframes guideflash{
+  from{background:var(--surface-2); box-shadow:-8px 0 0 var(--surface-2), 8px 0 0 var(--surface-2)}
+  to{background:transparent; box-shadow:none}
+}
+/* The guide's one picture (item 33).  Colours come from the palette through
+   classes, never from a presentation attribute the reader cannot re-theme and
+   never from a markup `style` the CSP drops. */
+.guidemap{display:block; width:100%; height:auto; margin:6px 0 4px}
+.guidemap .gm-box{fill:var(--surface-2); stroke:var(--border)}
+.guidemap .gm-box.gm-goal{stroke:var(--ok)}
+.guidemap .gm-label{fill:var(--fg); font-size:12px; text-anchor:middle}
+.guidemap .gm-edge{fill:none; stroke:var(--edge); stroke-width:1.5}
+.guidemap .gm-arrow{fill:var(--edge)}
+.guidemap .gm-elabel{fill:var(--muted); font-size:10px; text-anchor:middle}
+/* Sent back is an ordinary outcome, not a failure — warn, not bad. */
+.guidemap .gm-back .gm-edge{stroke:var(--warn)}
+.guidemap .gm-back .gm-arrow{fill:var(--warn)}
+.guidemap .gm-back .gm-elabel{fill:var(--warn)}
 #dock .panel.open{display:block; overflow-y:auto; padding:12px; min-height:0}
 #drawer{
   position:absolute; inset:0; background:var(--surface); z-index:3;
@@ -580,6 +661,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <button type="button" data-view="presets" aria-selected="false" data-i18n="nav_presets" data-i18n-title="tip_presets">Agent catalogue</button>
       <button type="button" data-view="skills" aria-selected="false" data-i18n="nav_skills" data-i18n-title="tip_skills">Skills</button>
       <button type="button" data-view="tools" aria-selected="false" data-i18n="nav_tools" data-i18n-title="tip_tools">Tools</button>
+    </div>
+    <!-- Round 3, designer 20, and the compromise recorded against it: these two
+         stay, because each page says plainly what it is waiting for, and hiding
+         a stated roadmap would be less honest than showing it.  What changes is
+         only their company: they leave the list of sections that work today for
+         a group that says they do not yet.  Neither is hidden, neither is
+         disabled — both pages open and both still name their unlock condition. -->
+    <div class="navgroup soon">
+      <span class="navlbl" data-i18n="nav_soon">Not built yet</span>
       <button type="button" data-view="sgr" aria-selected="false" data-i18n-title="tip_sgr">SGR <span class="chip" data-i18n="chip_soon">soon</span></button>
       <button type="button" data-view="mcp" aria-selected="false" data-i18n-title="tip_mcp">MCP <span class="chip" data-i18n="chip_later">later</span></button>
     </div>
@@ -646,7 +736,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-runs">
       <div class="listwrap">
-        <h1 data-i18n="tab_runs">Runs</h1>
+        <!-- The states on these cards are the ledger's own words and there is
+             nowhere on this page they are defined; the mark opens the paragraph
+             that lists them (round 3, designer). -->
+        <div class="headrow">
+          <h1 data-i18n="tab_runs">Runs</h1>
+          <button type="button" class="gref" data-guide-page="tasks" data-guide-anchor="g-tk-run"
+            data-i18n-title="gref_run_states" data-i18n-aria="gref_run_states"></button>
+        </div>
         <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
           provider output. No prompts, transcripts, or tool arguments are retained.</p>
         <!-- Where an operator looks for a cost, and finds the truth instead.
@@ -686,6 +783,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              is recorded but not yet consumed by the runtime. -->
         <div class="dock-tabs" id="guide-tabs">
           <button type="button" data-gpage="brief" aria-selected="true" data-i18n="guide_tab_brief">In short</button>
+          <!-- The strip's own confession (round 3, designer): what follows this
+               rule is reference, scored 8/10 as reference and 3/10 as
+               onboarding.  Saying so costs nothing and stops the five pages
+               being read as a tutorial that does not teach. -->
+          <span class="tabsplit" data-i18n="guide_ref_label">Reference</span>
           <button type="button" data-gpage="agents" aria-selected="false" data-i18n="guide_tab_agents">Agents and memory</button>
           <button type="button" data-gpage="tasks" aria-selected="false" data-i18n="guide_tab_tasks">Tasks and runs</button>
           <button type="button" data-gpage="links" aria-selected="false" data-i18n="guide_tab_links">Links</button>
@@ -699,6 +801,51 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <p data-i18n="guide_what_p"></p>
           <h3 data-i18n="guide_how_h">How it fits together</h3>
           <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
+          <!-- The guide's one picture (item 33), and it draws the one thing both
+               blind testers got wrong: a run that succeeded has not finished the
+               task.  The lifecycle wins over a board/dock/drawer map because the
+               furniture is discoverable by clicking and this rule is not — put
+               review between the run and acceptance and a reader cannot step
+               over it, and the return edge shows that being sent back is an
+               ordinary outcome rather than a failure.  Inline SVG: no asset, no
+               data URI, colours from the palette through classes, and every
+               label a `data-i18n` text node the ordinary applyI18n pass
+               translates like any other piece of chrome. -->
+          <svg class="guidemap" viewBox="0 0 640 150" role="img" data-i18n-aria="guide_map_aria">
+            <!-- The edges say what happens in plain words; the caption under the
+                 picture names the canonical states.  A 10px label has no room
+                 for a canonical value AND its gloss, and a bare canonical value
+                 inside a translated table is exactly what item 20 forbids. -->
+            <text class="gm-elabel" x="387" y="22" data-i18n="guide_map_notdone">not done yet</text>
+            <text class="gm-elabel" x="521" y="22" data-i18n="guide_map_decide">your decision</text>
+            <rect class="gm-box" x="10" y="32" width="84" height="40" rx="8"></rect>
+            <text class="gm-label" x="52" y="57" data-i18n="guide_map_role">Role</text>
+            <rect class="gm-box" x="144" y="32" width="84" height="40" rx="8"></rect>
+            <text class="gm-label" x="186" y="57" data-i18n="guide_map_task">Task</text>
+            <rect class="gm-box" x="278" y="32" width="84" height="40" rx="8"></rect>
+            <text class="gm-label" x="320" y="57" data-i18n="guide_map_run">Run</text>
+            <rect class="gm-box" x="412" y="32" width="84" height="40" rx="8"></rect>
+            <text class="gm-label" x="454" y="57" data-i18n="guide_map_review">Review</text>
+            <rect class="gm-box gm-goal" x="546" y="32" width="84" height="40" rx="8"></rect>
+            <text class="gm-label" x="588" y="57" data-i18n="guide_map_accepted">Accepted</text>
+            <path class="gm-edge" d="M100 52 H135"></path>
+            <path class="gm-arrow" d="M135 48 L143 52 L135 56 Z"></path>
+            <path class="gm-edge" d="M234 52 H269"></path>
+            <path class="gm-arrow" d="M269 48 L277 52 L269 56 Z"></path>
+            <path class="gm-edge" d="M368 52 H403"></path>
+            <path class="gm-arrow" d="M403 48 L411 52 L403 56 Z"></path>
+            <path class="gm-edge" d="M502 52 H537"></path>
+            <path class="gm-arrow" d="M537 48 L545 52 L537 56 Z"></path>
+            <g class="gm-back">
+              <!-- The arrow stops ON the Run box's bottom edge (y=72), not at
+                   its centre: a tip aimed at the middle of a filled rectangle is
+                   drawn inside it, over the label.  Seen in a live panel. -->
+              <path class="gm-edge" d="M454 72 V116 H320 V80"></path>
+              <path class="gm-arrow" d="M316 80 L324 80 L320 72 Z"></path>
+              <text class="gm-elabel" x="387" y="134" data-i18n="guide_map_back">sent back</text>
+            </g>
+          </svg>
+          <p class="dim" data-i18n="guide_map_caption"></p>
           <p data-i18n="guide_how_p"></p>
           <!-- The rule round 3 found buried in the second tab, where nobody who
                needed it looked: a finished run is not a finished task. -->
@@ -714,69 +861,79 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 data-i18n="guide_never_h">What this panel never does</h3>
           <p data-i18n="guide_never_p"></p>
         </div>
+        <!-- Every heading below carries a stable id, and that is the whole
+             deep-link mechanism: a "?" in the panel names a page and one of
+             these ids, and `openGuide` does the rest.  An id here is a promise —
+             a test compares the set of ids against the set of link targets, so a
+             renamed heading breaks the build rather than the link. -->
         <div id="gpage-agents" hidden>
-          <h3 data-i18n="guide_ag_role_h"></h3>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-ag-role" data-i18n="guide_ag_role_h"></h3>
           <p data-i18n="guide_ag_role_p"></p>
           <p class="mono dim" data-i18n="guide_ag_role_ex"></p>
-          <h3 data-i18n="guide_ag_grants_h"></h3>
+          <h3 id="g-ag-grants" data-i18n="guide_ag_grants_h"></h3>
           <p data-i18n="guide_ag_grants_p"></p>
           <p class="mono dim" data-i18n="guide_ag_grants_ex"></p>
-          <h3 data-i18n="guide_ag_memory_h"></h3>
+          <h3 id="g-ag-memory" data-i18n="guide_ag_memory_h"></h3>
           <p data-i18n="guide_ag_memory_p"></p>
           <p class="mono dim" data-i18n="guide_ag_memory_ex"></p>
-          <h3 data-i18n="guide_ag_lineage_h"></h3>
+          <h3 id="g-ag-lineage" data-i18n="guide_ag_lineage_h"></h3>
           <p data-i18n="guide_ag_lineage_p"></p>
           <p class="mono dim" data-i18n="guide_ag_lineage_ex"></p>
         </div>
         <div id="gpage-tasks" hidden>
-          <h3 data-i18n="guide_tk_ledger_h"></h3>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-tk-ledger" data-i18n="guide_tk_ledger_h"></h3>
           <p data-i18n="guide_tk_ledger_p"></p>
           <p class="mono dim" data-i18n="guide_tk_ledger_ex"></p>
-          <h3 data-i18n="guide_tk_run_h"></h3>
+          <h3 id="g-tk-run" data-i18n="guide_tk_run_h"></h3>
           <p data-i18n="guide_tk_run_p"></p>
           <p class="mono dim" data-i18n="guide_tk_run_ex"></p>
-          <h3 data-i18n="guide_tk_accept_h"></h3>
+          <h3 id="g-tk-accept" data-i18n="guide_tk_accept_h"></h3>
           <p data-i18n="guide_tk_accept_p"></p>
           <p class="mono dim" data-i18n="guide_tk_accept_ex"></p>
-          <h3 data-i18n="guide_tk_demo_h"></h3>
+          <h3 id="g-tk-demo" data-i18n="guide_tk_demo_h"></h3>
           <p data-i18n="guide_tk_demo_p"></p>
           <p class="mono dim" data-i18n="guide_tk_demo_ex"></p>
         </div>
         <div id="gpage-links" hidden>
-          <h3 data-i18n="guide_ln_record_h"></h3>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-ln-record" data-i18n="guide_ln_record_h"></h3>
           <p data-i18n="guide_ln_record_p"></p>
           <p class="mono dim" data-i18n="guide_ln_record_ex"></p>
-          <h3 data-i18n="guide_ln_ask_h"></h3>
+          <h3 id="g-ln-ask" data-i18n="guide_ln_ask_h"></h3>
           <p data-i18n="guide_ln_ask_p"></p>
           <p class="mono dim" data-i18n="guide_ln_ask_ex"></p>
-          <h3 data-i18n="guide_ln_handoff_h"></h3>
+          <h3 id="g-ln-handoff" data-i18n="guide_ln_handoff_h"></h3>
           <p data-i18n="guide_ln_handoff_p"></p>
           <p class="mono dim" data-i18n="guide_ln_handoff_ex"></p>
-          <h3 data-i18n="guide_ln_deadline_h"></h3>
+          <h3 id="g-ln-deadline" data-i18n="guide_ln_deadline_h"></h3>
           <p data-i18n="guide_ln_deadline_p"></p>
         </div>
         <div id="gpage-limits" hidden>
-          <h3 data-i18n="guide_lm_two_h"></h3>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-lm-two" data-i18n="guide_lm_two_h"></h3>
           <p data-i18n="guide_lm_two_p"></p>
           <p class="mono dim" data-i18n="guide_lm_two_ex"></p>
-          <h3 data-i18n="guide_lm_queue_h"></h3>
+          <h3 id="g-lm-queue" data-i18n="guide_lm_queue_h"></h3>
           <p data-i18n="guide_lm_queue_p"></p>
           <p class="mono dim" data-i18n="guide_lm_queue_ex"></p>
-          <h3 data-i18n="guide_lm_panel_h"></h3>
+          <h3 id="g-lm-panel" data-i18n="guide_lm_panel_h"></h3>
           <p data-i18n="guide_lm_panel_p"></p>
           <p class="mono dim" data-i18n="guide_lm_panel_ex"></p>
-          <h3 data-i18n="guide_lm_gates_h"></h3>
+          <h3 id="g-lm-gates" data-i18n="guide_lm_gates_h"></h3>
           <p data-i18n="guide_lm_gates_p"></p>
           <p class="mono dim" data-i18n="guide_lm_gates_ex"></p>
         </div>
         <div id="gpage-catalog" hidden>
-          <h3 data-i18n="guide_ct_file_h"></h3>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-ct-file" data-i18n="guide_ct_file_h"></h3>
           <p data-i18n="guide_ct_file_p"></p>
           <p class="mono dim" data-i18n="guide_ct_file_ex"></p>
-          <h3 data-i18n="guide_ct_skill_h"></h3>
+          <h3 id="g-ct-skill" data-i18n="guide_ct_skill_h"></h3>
           <p data-i18n="guide_ct_skill_p"></p>
           <p class="mono dim" data-i18n="guide_ct_skill_ex"></p>
-          <h3 data-i18n="guide_ct_tools_h"></h3>
+          <h3 id="g-ct-tools" data-i18n="guide_ct_tools_h"></h3>
           <p data-i18n="guide_ct_tools_p"></p>
           <p class="mono dim" data-i18n="guide_ct_tools_ex"></p>
         </div>
@@ -796,7 +953,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-skills">
       <div class="listwrap">
-        <h1 data-i18n="nav_skills">Skills</h1>
+        <div class="headrow">
+          <h1 data-i18n="nav_skills">Skills</h1>
+          <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-skill"
+            data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
+        </div>
         <p class="note" data-i18n="skills_view_note"></p>
         <div id="skills-list"></div>
         <div id="skills-editor-slot"></div>
@@ -805,7 +966,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-tools">
       <div class="listwrap">
-        <h1 data-i18n="nav_tools">Tools</h1>
+        <!-- Skills and tools are the pair round 3 could not tell apart, so each
+             page carries the mark that opens its own half of the explanation. -->
+        <div class="headrow">
+          <h1 data-i18n="nav_tools">Tools</h1>
+          <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-tools"
+            data-i18n-title="gref_tools" data-i18n-aria="gref_tools"></button>
+        </div>
         <p class="note" data-i18n="tools_view_note"></p>
         <p class="note" data-i18n="tools_bridge">Need a tool of your own? That is an MCP server — see
           the MCP section. This page only narrows what a profile already has.</p>
@@ -923,7 +1090,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            task stands and what the next HUMAN step is; it never decides
            anything itself (round 3, both testers' blocker). -->
       <div id="task-acceptance" hidden>
-        <h3 class="subhead" data-i18n="accept_heading">Accepting this work</h3>
+        <div class="headrow">
+          <h3 class="subhead" data-i18n="accept_heading">Accepting this work</h3>
+          <button type="button" class="gref" data-guide-page="tasks" data-guide-anchor="g-tk-accept"
+            data-i18n-title="gref_accept" data-i18n-aria="gref_accept"></button>
+        </div>
         <p class="note" id="task-acceptance-state"></p>
         <p class="note mono" id="task-acceptance-canonical"></p>
         <div class="actions">
@@ -1003,19 +1174,33 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="panel" id="panel-settings">
       <p class="note" id="settings-note"></p>
+      <!-- Three grants and a context mode: four words an operator meets here and
+           cannot guess, and each carries the mark that opens the paragraph
+           defining it.  The three grants share one target because the guide
+           explains deny/ask/auto once, for all three (round 3, designer). -->
       <div class="grants">
         <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-create_roles"></select></label>
         <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-retire_roles"></select></label>
         <label class="field"><span data-i18n="open_links_label">Open links</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-open_links"></select></label>
         <label class="field"><span data-i18n="hire_context_label">Context</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
+            data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
           <select id="setting-context_mode"></select></label>
       </div>
       <label class="field"><span data-i18n="setting_name_label">Display name</span>
         <input type="text" id="setting-name" autocomplete="off"></label>
       <label class="field" id="setting-skills-field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
+        <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-skill"
+          data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
         <select id="setting-skills" multiple size="4"></select></label>
       <!-- An empty operator catalogue rendered this control as an empty box and
            read as broken (round 3, designer).  The box gives way to a line that
@@ -1029,6 +1214,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         degrade the work.</p>
       <div class="field" id="tools-access-field">
         <span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
+        <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-tools"
+          data-i18n-title="gref_tools" data-i18n-aria="gref_tools"></button>
         <label class="choice"><input type="radio" name="tools-mode" id="tools-mode-full" checked>
           <span data-i18n="tools_mode_full">Whole profile (default)</span></label>
         <label class="choice"><input type="radio" name="tools-mode" id="tools-mode-narrow">
@@ -1104,16 +1291,30 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <select id="hire-profile"></select></label>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
+      <!-- The same four marks as the settings panel, plus the turnover budget,
+           because this form is where an operator meets all five for the first
+           time.  A mark inside a dialog leaves the dialog, so it goes through
+           the same guard Esc does — nothing typed is discarded without asking. -->
       <label class="field" id="hire-context-field"><span data-i18n="hire_context_label" data-i18n-title="tip_hire_context">Context</span>
+        <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
+          data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
         <select id="hire-context_mode"></select></label>
       <div class="grants" id="hire-grants">
         <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="hire-create_roles"></select></label>
         <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="hire-retire_roles"></select></label>
         <label class="field"><span data-i18n="open_links_label">Open links</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="hire-open_links"></select></label>
         <label class="field"><span data-i18n="hire_budget_label" data-i18n-title="tip_hire_budget">Turnover budget (blank = none)</span>
+          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-lineage"
+            data-i18n-title="gref_turnover" data-i18n-aria="gref_turnover"></button>
           <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
       </div>
       <div class="actions">
@@ -1153,7 +1354,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <p class="note" id="link-pair"></p>
     <p class="note" data-i18n="link_permission_note">A link is a recorded permission in the journal;
       it does not open a communication channel yet.</p>
-    <label class="field"><span data-i18n="link_type_label">Type</span></label>
+    <!-- `ask` and `handoff_work` are a typed enum, not a pair of English words;
+         the mark opens the paragraph that says what the record actually holds. -->
+    <label class="field"><span data-i18n="link_type_label">Type</span>
+      <button type="button" class="gref" data-guide-page="links" data-guide-anchor="g-ln-record"
+        data-i18n-title="gref_link_type" data-i18n-aria="gref_link_type"></button></label>
     <label class="choice"><input type="radio" name="link-type" id="link-type-ask" value="ask" checked>
       <span data-i18n="link_type_ask">Ask — may put questions to this role</span></label>
     <label class="choice"><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
@@ -1403,6 +1608,7 @@ const STRINGS = {
     nav_guide: "Overview",
     nav_skills: "Skills",
     nav_tools: "Tools",
+    nav_soon: "Not built yet",
     chip_soon: "soon",
     chip_later: "later",
     hire_cancel: "Cancel",
@@ -1445,6 +1651,26 @@ const STRINGS = {
     guide_tab_links: "Links",
     guide_tab_limits: "Limits and safety",
     guide_tab_catalog: "Skills and tools",
+    guide_ref_label: "Reference",
+    guide_ref_lead: "This page is reference: it explains how the mechanism works, rather than teaching a first route. The first route is in “In short”.",
+    guide_map_aria: "The work loop: a role takes a task, a run works it, a review judges it, and only acceptance closes it — a finished run sends the work to review, never straight to accepted.",
+    guide_map_caption: "A run that ends succeeded has not finished the task: it hands the work to review. You accept it — or send it back.",
+    guide_map_role: "Role",
+    guide_map_task: "Task",
+    guide_map_run: "Run",
+    guide_map_review: "Review",
+    guide_map_accepted: "Accepted",
+    guide_map_notdone: "not done yet",
+    guide_map_decide: "your decision",
+    guide_map_back: "sent back",
+    gref_grants: "deny, ask, auto — what the three permission levels actually do. Opens the Overview.",
+    gref_context: "context_mode — what a role’s memory really is. Opens the Overview.",
+    gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. Opens the Overview.",
+    gref_accept: "Why a finished run has not finished the task. Opens the Overview.",
+    gref_link_type: "ask and handoff_work — what a link actually records. Opens the Overview.",
+    gref_skills: "What a skill is, and where it comes from. Opens the Overview.",
+    gref_tools: "Why choosing tools can only narrow, never widen. Opens the Overview.",
+    gref_run_states: "requested, active, succeeded, needs_operator — what a run’s states mean. Opens the Overview.",
     guide_ag_role_h: "A role is a ledger record",
     guide_ag_role_p: "Hiring writes one agent.created event: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no store beside the ledger — the current staff list is replayed from events, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
@@ -1904,6 +2130,7 @@ const STRINGS = {
     nav_guide: "Обзор",
     nav_skills: "Навыки",
     nav_tools: "Инструменты",
+    nav_soon: "Ещё не сделано",
     chip_soon: "скоро",
     chip_later: "позже",
     hire_cancel: "Отмена",
@@ -1946,6 +2173,26 @@ const STRINGS = {
     guide_tab_links: "Связи",
     guide_tab_limits: "Лимиты и безопасность",
     guide_tab_catalog: "Навыки и инструменты",
+    guide_ref_label: "Справочник",
+    guide_ref_lead: "Эта страница — справочник: она объясняет, как устроен механизм, а не ведёт по первому маршруту. Первый маршрут — в разделе «Коротко».",
+    guide_map_aria: "Круг работы: роль берёт задачу, прогон её делает, ревью выносит вердикт, и закрывает задачу только приёмка — закончившийся прогон отправляет работу на ревью, а не сразу в приёмку.",
+    guide_map_caption: "Прогон, закончившийся succeeded, задачу не завершает: он передаёт работу на ревью. Принимаете её вы — или отправляете назад.",
+    guide_map_role: "Роль",
+    guide_map_task: "Задача",
+    guide_map_run: "Прогон",
+    guide_map_review: "Ревью",
+    guide_map_accepted: "Принято",
+    guide_map_notdone: "ещё не готово",
+    guide_map_decide: "ваше решение",
+    guide_map_back: "назад в работу",
+    gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Откроет «Обзор».",
+    gref_context: "context_mode — что такое «память» роли на самом деле. Откроет «Обзор».",
+    gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Откроет «Обзор».",
+    gref_accept: "Почему закончившийся прогон не завершает задачу. Откроет «Обзор».",
+    gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Откроет «Обзор».",
+    gref_skills: "Что такое навык и откуда он берётся. Откроет «Обзор».",
+    gref_tools: "Почему выбор инструментов может только сужать, но не расширять. Откроет «Обзор».",
+    gref_run_states: "requested, active, succeeded, needs_operator — что значат состояния прогона. Откроет «Обзор».",
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
@@ -3182,14 +3429,55 @@ document.getElementById("drawer-tabs").addEventListener("click", (event) => {
 });
 // Overview pages: same tab chrome, but the pages are static prose, not panels,
 // so they toggle by `hidden` instead of joining the panel-id namespace.
-document.getElementById("guide-tabs").addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (!button) { return; }
+function guideShowPage(page) {
   for (const tab of document.querySelectorAll("#guide-tabs button")) {
-    const active = tab === button;
+    const active = tab.dataset.gpage === page;
     tab.setAttribute("aria-selected", active ? "true" : "false");
     document.getElementById("gpage-" + tab.dataset.gpage).hidden = !active;
   }
+}
+document.getElementById("guide-tabs").addEventListener("click", (event) => {
+  // The strip also holds the "reference" divider, which is a span: `closest`
+  // returns null for it and the handler steps over it.
+  const button = event.target.closest("button");
+  if (button) { guideShowPage(button.dataset.gpage); }
+});
+
+// Round 3, designer: "In short" reads as onboarding, the five deep pages read
+// as a specification — and a specification is only useful if the reader is
+// carried to the right paragraph at the moment the question arises.  So the
+// panel carries them.  This is the whole mechanism: the guide's headings hold
+// stable ids, a link is a `data-guide-page` / `data-guide-anchor` pair on any
+// control, and one delegated listener calls this.  No bespoke handlers.
+function openGuide(page, anchorId) {
+  // A mark inside a dialog is a departure from that dialog, and departures go
+  // through the guard Esc already uses rather than dropping typed work.
+  if (openModalId && !dismissOpenModal()) { return; }
+  viewShow("guide");
+  guideShowPage(page);
+  // Keyboard focus follows the reader.  Seen in a live panel: a mark inside the
+  // hire dialog closes it, and focus went back to whatever had opened the
+  // dialog — an element now hidden behind the guide.  The page's own tab is a
+  // real visible control at the top of what was just opened; `preventScroll`
+  // keeps the landing the scroll below is about to make.
+  const tab = document.querySelector('#guide-tabs button[data-gpage="' + page + '"]');
+  if (tab) { tab.focus({ preventScroll: true }); }
+  const heading = document.getElementById(anchorId);
+  if (!heading) { return; }
+  heading.scrollIntoView({ block: "start" });
+  // Every heading on a long reference page looks like every other one, so the
+  // one that answers the question is marked for a moment.  Cleared first, and
+  // the reflow between is what lets a second click on the same mark replay the
+  // animation instead of doing nothing.
+  for (const marked of document.querySelectorAll(".doc .flash")) {
+    marked.classList.remove("flash");
+  }
+  void heading.offsetWidth;
+  heading.classList.add("flash");
+}
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-guide-anchor]");
+  if (link) { openGuide(link.dataset.guidePage, link.dataset.guideAnchor); }
 });
 document.getElementById("sidebar").addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -3272,14 +3560,24 @@ function closeModal(scrimId) {
   }
 }
 
+// Leaving an open dialog, whichever way the operator leaves it: Esc, or a "?"
+// that opens the guide behind it.  Both are the same departure, so both ask the
+// same question before dropping what has been typed, and the answer is what
+// this returns.
+function dismissOpenModal() {
+  const scrim = document.getElementById(openModalId);
+  if (modalOpenedAs !== null && modalFieldState(scrim) !== modalOpenedAs &&
+      !window.confirm(t("confirm_discard"))) { return false; }
+  (MODAL_CLOSERS[openModalId] || (() => closeModal(openModalId)))();
+  return true;
+}
+
 window.addEventListener("keydown", (event) => {
   if (!openModalId) { return; }
   const scrim = document.getElementById(openModalId);
   if (event.key === "Escape") {
     event.preventDefault();
-    if (modalOpenedAs !== null && modalFieldState(scrim) !== modalOpenedAs &&
-        !window.confirm(t("confirm_discard"))) { return; }
-    (MODAL_CLOSERS[openModalId] || (() => closeModal(openModalId)))();
+    dismissOpenModal();
     return;
   }
   if (event.key !== "Tab") { return; }

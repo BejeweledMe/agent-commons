@@ -1,6 +1,11 @@
 # Cold-run usability: three blind rounds, one consolidated plan
 
-Status: **rounds 1–3 complete; wave A–C landed; waves 1–4 below are open.**
+Status: **rounds 1–3 complete; waves A–C and 1–4 all landed (2026-08-13).**
+Of the 34 findings below, 31 were implemented, 3 were rejected on the
+record, and the two compromises those rejections carried were built. Two
+things this plan asked for are deliberately absent and named as such in the
+entries: a run's spend, which nothing in this codebase records, and a
+demo-mode acceptance that would have required fabricating a review verdict.
 Three blind walkthroughs ran against the panel, each by an agent with no access
 to the source, the tests, or the documentation — knowing only three sentences
 about the product and given the same job: get a simple site built by someone
@@ -47,23 +52,28 @@ That shapes wave 1 below.
 
 ## Consolidated findings
 
-Legend: **[done]** landed before round 3 or during it · **[open]** to do ·
-**[rejected]** deliberately not done, with the reason.
+Legend: **[done]** landed · **[rejected]** deliberately not done, with the
+reason. Two rejected items carried an [open] compromise instead; both
+compromises were built and are marked [done] inside those entries.
 
 ### Wave 1 — close the loop (both testers' blocker)
 
-1. **[open]** No way to accept finished work. Add "Send for review" to the task
+1. **[done]** No way to accept finished work. Add "Send for review" to the task
    drawer over `request_review`, run an independent reviewer against that
    request, and offer "Accept" / "Send back" bound to the approved review's
-   revision. (Designer 2, PM 1.)
-2. **[open]** The review refusal (`an independent_review delegation requires an
+   revision. (Designer 2, PM 1.) Built as three sealed routes. Note that in
+   demo mode the chain stops one step short by design: `DemoRunner` will not
+   fabricate a review verdict, so an approved independent review can only
+   come from a real reviewer. The panel says that plainly rather than
+   simulating an acceptance nobody made.
+2. **[done]** The review refusal (`an independent_review delegation requires an
    open independent review request…`) reaches the operator raw and in English
    under a Russian UI. Map it to a human sentence that names the next action.
    (PM 2.)
-3. **[open]** A finished run leaves nothing in Attention. A succeeded run whose
+3. **[done]** A finished run leaves nothing in Attention. A succeeded run whose
    task is unaccepted belongs in the queue: "X handed work back — accept or
    send back." (Designer 2.)
-4. **[open]** "In short" never says why a succeeded run does not finish a task —
+4. **[done]** "In short" never says why a succeeded run does not finish a task —
    the most practically important rule is buried in the second tab. One line
    in the first tab, linking onward. (PM, overview section.)
 5. **[rejected]** Advance the task automatically on `succeeded`. Acceptance is
@@ -72,94 +82,99 @@ Legend: **[done]** landed before round 3 or during it · **[open]** to do ·
 
 ### Wave 2 — trust in forms and reading
 
-6. **[open]** Entity panels open on raw ledger JSON. Lead with a human summary
+6. **[done]** Entity panels open on raw ledger JSON. Lead with a human summary
    (what to do, criteria, state, last run, what is next); keep JSON behind a
    "Show record" control. The task drawer already does the right thing —
    generalise it. (Designer 3, PM 10.)
-7. **[open]** Hire's "Why this role exists" is required but unmarked, and its
+7. **[done]** Hire's "Why this role exists" is required but unmarked, and its
    refusal renders below the buttons, outside the modal's scroll — it reads as
    a dead button. Mark required fields, put the error at the field, scroll it
    into view. (Designer 1, PM 3; round-2 PM raised it as minor and it was
    under-rated.)
-8. **[open]** The same error placement problem in "New task", plus the canonical
+8. **[done]** The same error placement problem in "New task", plus the canonical
    server text leaking in brackets. (Designer 14.)
-9. **[open]** The hire modal does not close on success, and both testers saw it
+9. **[done]** The hire modal does not close on success, and both testers saw it
    change state on its own (self-closing, unexpected prefill). Close on
    success; investigate the state change — a repaint is the suspect. (Designer
    7, PM 4 and 14.)
-10. **[open]** Modals have no focus trap: Tab leaves the dialog and it appears
+10. **[done]** Modals have no focus trap: Tab leaves the dialog and it appears
     to vanish while still open. Trap focus, Esc closes with a guard when the
     form is dirty. (Designer 8.)
-11. **[open]** Confirmations speak in ids (`нанята agent.61JBN…`, `launched
+11. **[done]** Confirmations speak in ids (`нанята agent.61JBN…`, `launched
     delegation.6S7B…`) and double a status (`SUCCEEDED · SUCCEEDED`). Say what
     happened in words; keep the id one click away. (Designer 6.)
-12. **[open]** The onboarding card hides whenever any node exists, so a newcomer
+12. **[done]** The onboarding card hides whenever any node exists, so a newcomer
     who was handed a task never sees the first step. Condition it on having no
     hired agent. (Designer 19, PM's run — he never saw it once. Confirmed in
     code: `graph.nodes.length > 0`.)
-13. **[open]** An empty template catalogue offers "— none —" with no way
+13. **[done]** An empty template catalogue offers "— none —" with no way
     forward. Offer the CTA that creates the first template. (PM 5.)
-14. **[open]** The skills multiselect renders as an empty box with no empty
+14. **[done]** The skills multiselect renders as an empty box with no empty
     state and reads as broken. (Designer 23.)
 
 ### Wave 3 — the board and the language
 
-15. **[open]** The board mixes the domain (agents, tasks) with the runtime
+15. **[done]** The board mixes the domain (agents, tasks) with the runtime
     (sessions, delegations, "DEPTH 1/2"): one launch added four technical
     nodes. Show the team by default; put runtime nodes behind a toggle or on
     the run's card. (Designer 5.)
-16. **[open]** "Fit" ignores that the dock covers the right of the canvas, and
+16. **[done]** "Fit" ignores that the dock covers the right of the canvas, and
     at nine nodes it scales to roughly six pixels. Fit the visible area, floor
     the scale, lay nodes out as a grid rather than one row. (Designer 4.)
-17. **[open]** Link ports are about six pixels after autofit — unhittable. Grab
+17. **[done]** Link ports are about six pixels after autofit — unhittable. Grab
     area ≥24px, hover affordance, cursor hint. Both testers failed to open a
     link by drag, independently. (Designer 17, PM 12.)
-18. **[open]** Language switching does not repaint already-open panels: the
+18. **[done]** Language switching does not repaint already-open panels: the
     links list keeps the previous locale. Confirmed — `applyLanguage()` does
     not call `paintLinks`. (PM 9, designer 10.)
-19. **[open]** Untranslated strings remain (`No links yet. Drag a port…`).
+19. **[done]** Untranslated strings remain (`No links yet. Drag a port…`).
     Sweep them. (Designer 10, PM 7.)
 20. **[rejected]** Translate canonical values (`deny`/`ask`/`auto`, `fresh`,
     `succeeded`). They are the shared vocabulary of the panel, the CLI and the
-    ledger; translating them would make the same state read two ways. **[open]**
+    ledger; translating them would make the same state read two ways. **[done]**
     instead: show a human gloss beside the canonical value. (Designer 10, PM 6.)
-21. **[open]** One thing has four names: "Запуски" in the nav, "Запуск" on the
+21. **[done]** One thing has four names: "Запуски" in the nav, "Запуск" on the
     tab, "прогоны" in the guide, "делегация" in the drawer; and "Скиллы"/"Туллы"
     sit beside "Инструменты". Pick one term per thing. (Designer 11, PM 8.)
-22. **[open]** State glyphs (◑ ○ ⊘ ●) are never explained, and the `operator`
+22. **[done]** State glyphs (◑ ○ ⊘ ●) are never explained, and the `operator`
     card does not say it is you where a person can see it — the tooltip exists
     but is not discoverable. Add a legend. (Designer 18, PM 11 and 13.)
-23. **[open]** Russian overflows the dock: the drawer title clips to "nt ·
+23. **[done]** Russian overflows the dock: the drawer title clips to "nt ·
     Верстальщик", a horizontal scrollbar appears, "+ Задача" wraps and breaks
     the toolbar row. Test layout at +30% string length. (Designer 9.)
-24. **[open]** Radio controls in agent settings stack the dot above its label —
+24. **[done]** Radio controls in agent settings stack the dot above its label —
     `.field span{display:block}` catches them. Confirmed in code. (Designer 13.)
-25. **[open]** The "Settings" tab sits off the baseline of its neighbours, with
+25. **[done]** The "Settings" tab sits off the baseline of its neighbours, with
     the indicator dot above it. (Designer 12.)
-26. **[open]** Scrollbars are white on the dark surface — the highest-contrast
+26. **[done]** Scrollbars are white on the dark surface — the highest-contrast
     object on screen. Confirmed: no scrollbar styling exists. (Designer 15.)
-27. **[open]** The footer is 11px, unseparated, and says "устаревших
+27. **[done]** The footer is 11px, unseparated, and says "устаревших
     предупреждений" without explaining it. (Designer 22.)
-28. **[open]** Runs carry no start time, duration or spend, and cannot be
-    filtered or grouped. (Designer 16.)
-29. **[open]** The header spends half its width on two ULIDs. Show the
+28. **[done]** Runs carry no start time, duration or spend, and cannot be
+    filtered or grouped. (Designer 16.) Start time, duration, purpose,
+    filtering and grouping landed. **Spend did not, on purpose:** nothing in
+    this codebase records consumed `provider_units`, so the panel shows the
+    budget the run was *permitted* and says in words that consumption is
+    recorded nowhere. Showing an estimate would have been the one thing this
+    surface must never do.
+29. **[done]** The header spends half its width on two ULIDs. Show the
     workspace by name; keep the id one click away. (Designer 18.)
-30. **[open]** Below ~900px the board is unusable: the sidebar does not
+30. **[done]** Below ~900px the board is unusable: the sidebar does not
     collapse and the dock takes half the width. (Designer 24.)
-31. **[open]** Form microcopy speaks system ("Бюджет ротации", "Контекст:
+31. **[done]** Form microcopy speaks system ("Бюджет ротации", "Контекст:
     fresh", "Отставка ролей"). (Designer 21.)
 
 ### Wave 4 — the guide, and the record
 
-32. **[open]** "In short" is the onboarding (9/10); the other five tabs are a
+32. **[done]** "In short" is the onboarding (9/10); the other five tabs are a
     specification (8/10 as reference, 3/10 as onboarding). Frame them as a
     reference, and link terms in the interface to the paragraph that explains
     them. (Designer, overview section.)
-33. **[open]** The guide has no picture of the thing it describes, and its
+33. **[done]** The guide has no picture of the thing it describes, and its
     monospace examples are dim grey on dark. (Designer, overview section.)
 34. **[rejected]** Remove SGR and MCP from the sidebar as dead ends. Both pages
     carry real content and name their unlock condition; hiding the roadmap
-    would be less honest, not more. **[open]** instead: group them visually as
+    would be less honest, not more. **[done]** instead: group them visually as
     forthcoming. (Designer 20.)
 
 ## Landed before this plan (do not redo)

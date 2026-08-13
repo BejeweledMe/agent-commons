@@ -489,8 +489,14 @@ def test_every_dialog_shares_one_focus_trap_and_guards_esc_over_a_dirty_form() -
     # caller has filled the form in.
     assert 'window.confirm(t("confirm_discard"))' in body
     assert "modalOpenedAs = modalFieldState(scrim);" in body
+    # The guard lives in one place, because Esc is no longer the only way out:
+    # a guide "?" inside a dialog leaves it too, and both departures ask the
+    # same question (wave 4, item 32).
+    dismiss = body.split("function dismissOpenModal() {", 1)[1].split("\n}\n", 1)[0]
+    assert "modalFieldState(scrim) !== modalOpenedAs" in dismiss
+    assert "{ return false; }" in dismiss
     trap = body.split('if (event.key === "Escape") {', 1)[1].split("return;", 1)[0]
-    assert "modalFieldState(scrim) !== modalOpenedAs" in trap
+    assert "dismissOpenModal();" in trap
     # And an open dialog owns Esc: one press must not also un-isolate the graph.
     assert 'event.key === "Escape" && !openModalId && focused' in body
 
@@ -1642,3 +1648,263 @@ def test_the_shell_collapses_below_the_breakpoint_and_fit_still_measures_it() ->
     assert 'window.addEventListener("resize", applyShell);' in body
     for toggle in ("shell-nav", "shell-dock"):
         assert f'id="{toggle}"' in body, toggle
+
+
+# --- wave 4: the guide's framing, its picture, and the forthcoming sections ---
+
+
+def _guide_markup() -> str:
+    """The Overview section, from its `<section>` to the next one."""
+
+    return read_spa().split('<section class="view" id="view-guide">', 1)[1].split(
+        "\n    </section>", 1
+    )[0]
+
+
+GUIDE_DEEP_PAGES = ("agents", "tasks", "links", "limits", "catalog")
+
+
+def test_the_guide_says_out_loud_which_of_its_pages_are_reference() -> None:
+    """Item 32: the designer scored "In short" 9/10 as onboarding and the other
+    five pages 8/10 as reference and 3/10 as onboarding.  They are reference --
+    the dishonesty was never the content, only that nothing said so, leaving
+    five specifications to be read as a tutorial that does not teach."""
+
+    body = read_spa()
+    guide = _guide_markup()
+
+    # The strip separates the two kinds, with a label, not a bare gap.
+    strip = guide.split('id="guide-tabs"', 1)[1].split("</div>", 1)[0]
+    assert '<span class="tabsplit" data-i18n="guide_ref_label">' in strip
+    assert strip.index('data-gpage="brief"') < strip.index("tabsplit")
+    for page in GUIDE_DEEP_PAGES:
+        assert strip.index("tabsplit") < strip.index(f'data-gpage="{page}"'), page
+    # A span rather than a button, so the tab handler steps straight over it.
+    tabs = body.split('document.getElementById("guide-tabs").addEventListener', 1)[1]
+    assert 'const button = event.target.closest("button");' in tabs.split("});", 1)[0]
+
+    # And each of the five says it again at its own top, because a reader who
+    # arrives by deep link never passes the strip.
+    for page in GUIDE_DEEP_PAGES:
+        section = guide.split(f'<div id="gpage-{page}"', 1)[1].split("\n        </div>", 1)[0]
+        assert 'data-i18n="guide_ref_lead"' in section, page
+    brief = guide.split('<div id="gpage-brief">', 1)[1].split("\n        </div>", 1)[0]
+    assert "guide_ref_lead" not in brief, "the onboarding page is not a reference page"
+
+    english, russian = _language_tables()
+    for key in ("guide_ref_label", "guide_ref_lead"):
+        for block in (english, russian):
+            assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
+
+
+def test_every_guide_deep_link_lands_on_a_heading_that_actually_exists() -> None:
+    """The other half of item 32: terms an operator meets in the panel and
+    cannot guess are linked to the paragraph that explains them.  One mechanism
+    -- stable heading ids plus `openGuide` -- so this compares the two sets and
+    a renamed heading breaks the build rather than the link."""
+
+    body = read_spa()
+    guide = _guide_markup()
+
+    ids = set(re.findall(r'<h3 id="(g-[a-z-]+)"', guide))
+    assert len(ids) >= 19, ids
+    links = re.findall(
+        r'data-guide-page="([a-z]+)"\s*\n?\s*data-guide-anchor="([a-z-]+)"', body
+    )
+    assert links, "no term in the panel links into the guide"
+    assert {anchor for _, anchor in links} <= ids, {a for _, a in links} - ids
+
+    # And the page each link names is the page the heading is actually on: a
+    # correct id on the wrong tab lands the reader on a hidden element.
+    for page, anchor in links:
+        section = guide.split(f'<div id="gpage-{page}"', 1)[1].split("\n        </div>", 1)[0]
+        assert f'id="{anchor}"' in section, (page, anchor)
+
+    # One mechanism, not a handler per link: `openGuide` is defined once and
+    # called once, from a single delegated listener.
+    assert body.count("openGuide(") == 2
+    assert 'const link = event.target.closest("[data-guide-anchor]");' in body
+    opener = body.split("function openGuide(page, anchorId) {", 1)[1].split("\n}\n", 1)[0]
+    assert "viewShow(\"guide\");" in opener
+    assert "guideShowPage(page);" in opener
+    assert "heading.scrollIntoView({ block: \"start\" });" in opener
+    # A dialog is left through the guard Esc uses, never over typed work.
+    assert "if (openModalId && !dismissOpenModal()) { return; }" in opener
+    # The heading it lands on is marked, in CSS, for long enough to be seen.
+    assert 'heading.classList.add("flash");' in opener
+    assert "@keyframes guideflash{" in body
+    # And keyboard focus goes with the reader rather than staying on a mark that
+    # may now be inside a dialog this very call closed (seen in a live panel).
+    assert "tab.focus({ preventScroll: true });" in opener
+
+
+def test_the_terms_an_operator_cannot_guess_carry_their_link_where_they_appear() -> None:
+    """Item 32 names the terms: the grant levels, `context_mode`, the turnover
+    budget, the acceptance chain, link types, skills against tools, and the run
+    states.  Each is linked at the control where it is met, not only from a
+    contents page nobody opens."""
+
+    body = read_spa()
+    regions = {
+        "hire": body.split('id="hire-modal"', 1)[1].split('id="task-modal"', 1)[0],
+        "settings": body.split('id="panel-settings"', 1)[1].split("\n    </section>", 1)[0],
+        "link": body.split('id="link-modal"', 1)[1].split('id="close-link-modal"', 1)[0],
+        "acceptance": body.split('id="task-acceptance"', 1)[1].split('id="task-runs"', 1)[0],
+        "runs": body.split('id="view-runs"', 1)[1].split("\n    </section>", 1)[0],
+        "skills": body.split('id="view-skills"', 1)[1].split("\n    </section>", 1)[0],
+        "tools": body.split('id="view-tools"', 1)[1].split("\n    </section>", 1)[0],
+    }
+    for region, anchor in (
+        ("hire", "g-ag-memory"),      # context_mode
+        ("hire", "g-ag-lineage"),     # turnover_budget
+        ("settings", "g-ag-memory"),
+        ("settings", "g-ct-skill"),
+        ("settings", "g-ct-tools"),
+        ("link", "g-ln-record"),      # ask / handoff_work
+        ("acceptance", "g-tk-accept"),
+        ("runs", "g-tk-run"),         # the run states
+        ("skills", "g-ct-skill"),
+        ("tools", "g-ct-tools"),
+    ):
+        assert f'data-guide-anchor="{anchor}"' in regions[region], (region, anchor)
+    # Three grants, one explanation: every grant row in both forms carries it.
+    for region in ("hire", "settings"):
+        assert regions[region].count('data-guide-anchor="g-ag-grants"') == 3, region
+
+    # The mark sits in the caption's right-hand gutter, and the caption reserves
+    # it: seen in a live panel, "May take other roles out of service" ran
+    # straight under its "?" before the gutter existed.
+    assert ".field > .gref{position:absolute" in body
+    assert "padding-right" in body.split(".field > span{", 1)[1].split("}", 1)[0]
+
+    # Each mark is a control a screen reader can name, and its glyph is drawn in
+    # CSS rather than carried as an untranslated character inside the chrome.
+    assert ".gref::before{content:\"?\"}" in body
+    english, russian = _language_tables()
+    for key in re.findall(r'class="gref"[^>]*data-i18n-title="([a-z_]+)"', body):
+        for block in (english, russian):
+            assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
+    for element in re.findall(r"<button[^>]*class=\"gref\"[^>]*>", body):
+        assert "data-i18n-aria=" in element, element
+
+
+def test_the_guide_carries_one_picture_and_every_label_in_it_is_translated() -> None:
+    """Item 33: the guide described a loop and drew nothing.  The picture is
+    inline SVG -- no asset, no data URI -- it takes its colours from the palette
+    through classes, and every label goes through the same i18n pass as the rest
+    of the chrome rather than being hardcoded English under a Russian panel."""
+
+    body = read_spa()
+    guide = _guide_markup()
+    assert '<svg class="guidemap"' in guide
+    figure = guide.split('<svg class="guidemap"', 1)[1].split("</svg>", 1)[0]
+
+    # Drawn, not fetched, and not smuggled in as an encoded image either.
+    for forbidden in ("<image", "data:", "xlink:href", "<use "):
+        assert forbidden not in figure, forbidden
+
+    # Colours through classes: a presentation attribute would put the palette
+    # out of the stylesheet's reach, and a `style` attribute the CSP would drop.
+    for forbidden in ('fill="', 'stroke="', "style="):
+        assert forbidden not in figure, forbidden
+    for rule in (".guidemap .gm-box{", ".guidemap .gm-label{", ".guidemap .gm-edge{"):
+        assert rule in body, rule
+    assert "var(--" in body.split(".guidemap .gm-box{", 1)[1].split("}", 1)[0]
+
+    # Every label is a marker, and every marker reaches both tables.  `applyI18n`
+    # writes textContent on anything carrying `data-i18n`, which is what an SVG
+    # `<text>` node needs and all it needs.
+    labels = re.findall(r"<text[^>]*>", figure)
+    assert len(labels) >= 8, labels
+    english, russian = _language_tables()
+    for label in labels:
+        key = re.search(r'data-i18n="([a-z0-9_]+)"', label)
+        assert key, label
+        for block in (english, russian):
+            assert re.search(rf'^\s*{key.group(1)}: "', block, re.MULTILINE), key.group(1)
+    # The figure names itself for a screen reader, in both languages too.
+    assert 'role="img" data-i18n-aria="guide_map_aria"' in guide
+    for block in (english, russian):
+        assert re.search(r'^\s*guide_map_aria: "', block, re.MULTILINE)
+
+    # Review sits between the run and acceptance, which is the one thing both
+    # blind testers got wrong; a picture that skipped it would be worse than
+    # none.  The return edge is drawn too: sent back is an ordinary outcome.
+    order = [
+        figure.index(f'data-i18n="guide_map_{node}"')
+        for node in ("role", "task", "run", "review", "accepted")
+    ]
+    assert order == sorted(order), order
+    assert 'class="gm-back"' in figure
+
+
+def test_the_guides_examples_read_as_examples_instead_of_dim_grey_on_dark() -> None:
+    """Item 33's other half: the guide's monospace examples -- its most concrete
+    sentences -- were `--muted` on the page's own ground, the dimmest text in a
+    dark panel.  Every `.dim` in the guide is accounted for here, not only the
+    ones that happened to be noticed."""
+
+    body = read_spa()
+    guide = _guide_markup()
+
+    rule = body.split(".doc p.mono.dim{", 1)[1].split("}", 1)[0]
+    assert "color:var(--fg)" in rule, "an example still has no readable foreground"
+    assert "background:var(--surface-2)" in rule, "an example still has no surface of its own"
+    # Specific enough to beat the muted `.doc p.dim` above it.
+    assert body.index(".doc p.dim{") < body.index(".doc p.mono.dim{")
+
+    # And the rest of the guide's dim text, counted: one subtitle under the
+    # title, one caption under the picture, and the five reference leads.  Those
+    # are meta-lines about the page rather than the page's content, so they stay
+    # quiet on purpose -- but they are pinned, so the next `.dim` added to the
+    # guide has to be a deliberate choice rather than an inherited default.
+    classes = re.findall(r'<p class="([^"]*\bdim\b[^"]*)"', guide)
+    assert classes.count("dim") == 2, classes
+    assert classes.count("dim guidelead") == len(GUIDE_DEEP_PAGES), classes
+    assert classes.count("mono dim") == len(re.findall(r'class="mono dim"', guide))
+    assert set(classes) == {"dim", "dim guidelead", "mono dim"}, set(classes)
+
+
+def test_the_forthcoming_sections_are_grouped_yet_neither_hidden_nor_disabled() -> None:
+    """Item 34 was rejected as reported -- SGR and MCP carry real content and
+    each names its unlock condition, so hiding them would be less honest, not
+    more.  The recorded compromise is to group them as forthcoming."""
+
+    body = read_spa()
+    nav = body.split('<nav id="sidebar">', 1)[1].split("</nav>", 1)[0]
+    assert '<div class="navgroup soon">' in nav
+    forthcoming = nav.split('<div class="navgroup soon">', 1)[1].split("</div>", 1)[0]
+
+    # Their own group, under its own translated heading.
+    assert 'class="navlbl" data-i18n="nav_soon"' in forthcoming
+    english, russian = _language_tables()
+    for block in (english, russian):
+        assert re.search(r'^\s*nav_soon: "', block, re.MULTILINE)
+
+    # Both are in it, and neither is left among the sections that work today.
+    library = nav.split('data-i18n="nav_library"', 1)[1].split("</div>", 1)[0]
+    for view in ("sgr", "mcp"):
+        assert f'data-view="{view}"' in forthcoming, view
+        assert f'data-view="{view}"' not in library, view
+
+    # Grouped, not withdrawn: nothing here is hidden and nothing is disabled,
+    # and each entry keeps the chip that says when it arrives.
+    buttons = re.findall(r"<button[^>]*>", forthcoming)
+    assert len(buttons) == 2, buttons
+    for button in buttons:
+        assert "hidden" not in button, button
+        assert "disabled" not in button, button
+    assert 'data-i18n="chip_soon"' in forthcoming
+    assert 'data-i18n="chip_later"' in forthcoming
+
+    # The marker that makes the grouping legible is drawn in CSS, so it can
+    # never join a translated label or be mistaken for a disabled state.
+    assert ".navgroup.soon button::before{" in body
+    assert ".navgroup.soon{" in body
+
+    # And the pages still open, and still say what unlocks them.
+    for view, note in (("sgr", "sgr_note"), ("mcp", "mcp_note")):
+        assert f'id="view-{view}"' in body, view
+        assert f'data-i18n="{note}"' in body, note
+        for block in (english, russian):
+            assert re.search(rf'^\s*{note}: "', block, re.MULTILINE), note

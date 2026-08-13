@@ -5,6 +5,67 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **The loop closes: a finished run now has somewhere to be accepted.**
+  Two blind round-3 testers, working in parallel and on different models,
+  reached `succeeded` and independently reported the same blocker — nothing
+  anywhere in the panel could accept the work. Acceptance turned out to be a
+  chain rather than a button: `task.accepted` is legal only from state
+  `review`, and only with an approved independent review that is not stale,
+  is bound to the task's current effective revision, and was written outside
+  the principals that did the work. Three routes now offer the steps of that
+  chain — `review-request` walks the task to `review` through the manager's
+  own transitions and opens the independent request, `accept` records the
+  human decision with the manager choosing which review qualifies, `reopen`
+  sends the work back — each a thin adapter over the same `CommonsManager`
+  the CLI uses and each sealed into `MUTATING_ROUTES` with its test. Nothing
+  was weakened to get there: the task never advances itself, the operator
+  cannot approve their own review request, and accepting with no approved
+  verdict is refused. That refusal is pinned by test, because it is the
+  point of the design rather than a gap in it. Lifecycle refusals stop
+  arriving as lifecycle vocabulary — a table maps each to the next action a
+  person can take, canonical text kept in brackets — and a succeeded run
+  whose task is unaccepted lands in the attention queue with the role's name
+  and a click through to the task.
+- **Every drawer leads with an answer instead of a ledger record.** Each
+  entity kind gets a short human summary built only from fields the server
+  returned; the JSON moved behind a toggle that re-collapses on each opening.
+  Canonical values keep the ledger's spelling everywhere and carry a human
+  gloss beside them — the recorded compromise in place of translating them,
+  since the panel, the CLI and the ledger have to say the same state the same
+  way. One glossary above the strings table now fixes one word per concept in
+  each language, ending the four names one thing had, and records the split
+  that resolves the canonical twins: `delegation` names the record, a run is
+  the activity; `agent` is the ledger's kind, a role is what a person hires.
+- **Three modal bugs that looked like the panel changing its own mind.** A
+  click is delivered to the nearest common ancestor of press and release, so
+  selecting text in a field and releasing past the dialog's edge dismissed
+  the form. `applyI18n()` runs on every snapshot and rewrote the hire heading
+  from its `data-i18n`, undoing a JS-written title. And `fillSelect` drops
+  every option and re-selects the default, so any repaint reaching an open
+  modal silently reset profile, grants and context mode — widening a grant
+  decision without telling anyone — and took the chosen task off the Run tab
+  mid-run. All three are fixed at the cause. The four dialogs also gained one
+  shared focus trap, with Esc guarded when a field has moved.
+- **The board shows the team, and its ports can be grabbed.** Runtime nodes
+  — sessions and delegations — sit behind a counted toggle that persists, so
+  one launch no longer adds four technical nodes under "depth 1" captions.
+  Fit measures the actually visible rectangle rather than the whole canvas
+  and floors the scale where a card is still legible; a band wraps into a
+  grid derived from its own size instead of a fixed eight per row. Link ports
+  carry a 24px hit target counter-scaled from the one place the zoom changes,
+  after both testers failed independently to open a link by dragging.
+- **The panel survives Russian, a narrow window and a dark scrollbar.**
+  +30% string length is the stated design margin and a test measures the
+  Russian table against it. Scrollbars take the palette, the footer explains
+  what a stale warning is rather than naming it, radio dots sit beside their
+  labels again (two causes, not the one reported), and below 900px both side
+  columns become overlays — toggled with the `hidden` attribute the board's
+  fit computation already measures, so fitting stays honest at any width.
+  Runs say when they started, how long they took, what they were for and
+  what budget they were permitted; they deliberately show no spend, because
+  nothing in this codebase records consumed provider units and the panel says
+  so rather than estimating. The header shows the workspace as its directory
+  with the ids one click away — the only honest human name available.
 - **Agent links stopped asking for a deadline they cannot keep.**
   `deadline_seconds` is optional now: replay has no clock, so no reader ever
   enforced expiry, and requiring the field only made the panel, the CLI, the
