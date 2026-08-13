@@ -1192,6 +1192,17 @@ function render(graph) {
       inspect(node);
       render(graph);
     });
+    // Right-click is the shortcut into the same drawer: select the node and
+    // land on Settings for a role, Record otherwise (redesign, item 1).
+    group.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      selected = node.id;
+      if (focused !== null) { focused = node.id; }
+      inspect(node).then(() => {
+        if (node.kind === "agent" && writesEnabled) { showPanel("settings"); }
+      });
+      render(graph);
+    });
     nodeLayer.appendChild(group);
   }
   applyView();
@@ -1265,6 +1276,9 @@ function closeDrawer() {
 }
 
 function showHire(open) {
+  // A direct hire is always an independent role: lineage ("created by") is
+  // reserved for the proposal flow, where the parent itself proposes and the
+  // operator confirms — the panel cannot fabricate that attribution.
   document.getElementById("hire-modal").hidden = !open;
   if (open) { document.getElementById("hire-name").focus(); }
 }
