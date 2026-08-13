@@ -182,8 +182,11 @@ compromises were built and are marked [done] inside those entries.
 An independent verifier read the seven implementation commits against this
 plan and the invariants. It confirmed the domain and services are untouched
 across the range (`git diff --stat` over both trees is empty), one write path,
-CSP clean, 520-key locale parity, and 714 tests passing. It also found three
-real defects, all fixed before the push:
+CSP clean, locale parity, and the suite passing. It also found three real
+defects, all fixed before the push, plus four locale keys that no surface
+renders — removed, so parity now guards 516 real keys rather than 520 with
+four ghosts among them. The suite finished at 716 passed, 12 skipped,
+against a 654-passed baseline.
 
 - **A language switch discarded a half-typed acceptance summary.**
   `paintTaskAcceptance()` closed the confirm form on every repaint, and it is
