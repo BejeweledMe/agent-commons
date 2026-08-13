@@ -1009,6 +1009,7 @@ def _value(block: str, key: str) -> str:
 LANGUAGE_SURFACES = {
     "chrome",
     "status",
+    "workspace",
     "stream",
     "board",
     "legend",
@@ -1309,3 +1310,335 @@ def test_every_user_facing_string_in_the_markup_reaches_the_tables() -> None:
     for key in ("lang_label", "board_aria", "sgr_title"):
         for block in (english, russian):
             assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
+
+
+# --- wave 3C: the board, the dock and a longer language -------------------
+
+
+def test_the_dock_survives_a_language_a_third_longer_than_english() -> None:
+    """Round 3, designer 9: Russian overflowed the dock.  The drawer title
+    clipped to "nt · Верстальщик", a horizontal scrollbar appeared across the
+    dock, and "+ Задача" wrapped inside its own button and broke the toolbar
+    row.  The margin the panel is designed to survive is +30% on every string,
+    and this measures the Russian table against it before pinning the three
+    rules that make the layout independent of a length (item 23)."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    # A real margin, not a hypothetical one: the Russian table has to still be
+    # exercising it.  A table that stopped would make every rule below untested
+    # rather than unnecessary.
+    pairs = [
+        (len(_value(english, key)), len(_value(russian, key)))
+        for key in re.findall(r'^\s*([a-z0-9_]+): "', english, re.MULTILINE)
+        if re.search(rf'^\s*{key}: "', russian, re.MULTILINE)
+    ]
+    ratios = [ru / en for en, ru in pairs if en >= 3]
+    assert ratios, "the two tables no longer share a measurable key"
+    assert max(ratios) >= 1.3, "the Russian table no longer reaches the +30% margin"
+    assert 1.0 <= sum(ratios) / len(ratios) <= 1.6, sum(ratios) / len(ratios)
+
+    # Rule one: a title that must stay one line ellipsizes AND carries the whole
+    # of itself as a tooltip, so being cut never makes it unreadable.
+    assert (
+        "#drawer .drawer-head h2{white-space:nowrap; overflow:hidden;"
+        " text-overflow:ellipsis; min-width:0}"
+    ) in body
+    assert "title.title = title.textContent;" in body
+
+    # Rule two: no dock container scrolls sideways.  The width is fixed, so the
+    # content is what gives way -- every container in the chain says so, and
+    # none of them may declare a width the content cannot wrap inside.
+    for rule in (
+        "#dock{overflow-x:hidden; min-width:0}",
+        # `break-word`, not `anywhere`: both break an over-long id, but
+        # `anywhere` also collapses an element's min-content width to one
+        # character, which flattened every flex row in these panels into a
+        # vertical alphabet.
+        "#dock .panel.open{overflow-x:hidden; overflow-wrap:break-word}",
+        "#drawer{overflow-x:hidden; min-width:0}",
+        "#drawer .panel.open{overflow-x:hidden; overflow-wrap:break-word}",
+        "#sidebar{overflow-x:hidden}",
+    ):
+        assert rule in body, rule
+
+    # Rule three: a toolbar wraps BETWEEN its controls, never inside one.
+    assert ".board-bar button{white-space:nowrap; flex:none}" in body
+    assert ".board-bar{row-gap:8px}" in body
+    tabs = body.split(".dock-tabs{", 1)[1].split("}", 1)[0]
+    assert "flex-wrap:wrap" in tabs, tabs
+    assert "min-width:0" in tabs, tabs
+
+    # And the margin those three rules are sized to is stated beside them, so
+    # the next person testing this file knows what to test it at.
+    assert "+30% IS THE DESIGN MARGIN" in body
+
+
+def test_a_radio_row_keeps_its_dot_beside_its_label() -> None:
+    """Round 3, designer 13, confirmed in code: `.field span{display:block}` was
+    a descendant rule and caught the caption inside a radio row nested in a
+    field, so the dot rendered above its label in the agent settings.  The child
+    combinator keeps the caption behaviour ordinary fields rely on, and every
+    radio and checkbox in the file now sits in a row of its own (item 24)."""
+
+    body = read_spa()
+    assert ".field > span{display:block" in body
+    assert ".field span{display:block" not in body
+    assert ".choice{display:flex; align-items:baseline" in body
+
+    # Every radio and checkbox in the markup: the settings tool-access modes,
+    # the link modal's two types, the Runs view's grouping switch.
+    rows = re.findall(r"<label([^>]*)><input type=\"(radio|checkbox)\"", body)
+    assert len(rows) == 5, rows
+    for attributes, control in rows:
+        assert 'class="choice"' in attributes, (control, attributes)
+
+    # And the checklist the settings panel builds from JS, both halves of it.
+    assert body.count('row.className = "choice";') == 2
+    # The <br> spacers those rows used are gone with the class that replaced
+    # them; a flex row does not need one, and one left behind would open a blank
+    # line between every tool.
+    checklist = body.split("const checklist = document.getElementById", 1)[1].split(
+        "\n  }\n", 1
+    )[0]
+    assert 'createElement("br")' not in checklist
+
+
+def test_the_settings_tab_wears_its_glyph_in_css_not_in_its_label() -> None:
+    """Round 3, designer 12: the "⚙ Settings" tab sat off the baseline of its
+    siblings.  The glyph was inside the translated string, where it moved with
+    the language and could not be given a line box of its own -- an element to
+    hold it would have been overwritten by applyI18n's textContent write.  So
+    the glyph is drawn by CSS and the string is only words (item 25)."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    for block in (english, russian):
+        assert "⚙" not in block
+    assert _value(english, "tab_settings") == "Settings"
+    assert _value(russian, "tab_settings") == "Настройки"
+    assert 'data-i18n="tab_settings">Settings</button>' in body
+
+    glyph = body.split('.dock-tabs button[data-panel="settings"]::before{', 1)[1].split(
+        "}", 1
+    )[0]
+    assert 'content:"\\2699"' in glyph
+    assert "line-height:1.2" in glyph
+    assert "vertical-align:baseline" in glyph
+    # The siblings state the same line box, so no tab depends on what is in it.
+    tab = body.split(".dock-tabs button{", 1)[1].split("}", 1)[0]
+    assert "line-height:1.2" in tab, tab
+
+
+def test_every_scroll_container_takes_the_panels_own_scrollbar() -> None:
+    """Round 3, designer 15: with no scrollbar styling at all, every scroll
+    container rendered the platform's light scrollbar -- the highest-contrast
+    object on a dark screen.  Both mechanisms are styled, on the universal
+    selector, because between them they cover the dock, the drawer, the sidebar,
+    the centre views, `pre` blocks, the guide and the lists (item 26)."""
+
+    body = read_spa()
+
+    # The page declares itself dark, so the user agent stops handing it light
+    # chrome for scrollbars, selects and number spinners.
+    assert "color-scheme:dark" in body
+
+    assert "*{scrollbar-width:thin; scrollbar-color:var(--edge) var(--surface)}" in body
+    for rule in (
+        "::-webkit-scrollbar{width:10px; height:10px}",
+        "::-webkit-scrollbar-track{background:var(--surface)}",
+        "::-webkit-scrollbar-thumb{",
+        "::-webkit-scrollbar-thumb:hover{background:var(--faint)}",
+        "::-webkit-scrollbar-corner{background:var(--surface)}",
+    ):
+        assert rule in body, rule
+
+    # Painted from the palette, never from a literal: a hardcoded grey here is
+    # how a surface drifts out of the theme it belongs to.
+    thumb = body.split("::-webkit-scrollbar-thumb{", 1)[1].split("}", 1)[0]
+    assert "var(--edge)" in thumb
+    assert "var(--surface)" in thumb
+    assert not re.search(r"#[0-9a-fA-F]{3,6}", thumb), thumb
+
+
+def test_the_footer_is_readable_and_says_what_a_stale_warning_is() -> None:
+    """Round 3, designer 22: the footer was 11px, unseparated from the board
+    above it, and said "устаревших предупреждений" without explaining what that
+    meant.  The explanation here is read off `_mark_bound_evidence_stale` in the
+    projection, not approximated: it names the five kinds that can go stale and
+    says what going stale does and does not do (item 27)."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    foot = body.split("\nfooter{", 1)[1].split("}", 1)[0]
+    assert "font-size:12px" in foot, foot
+    assert "border-top:1px solid var(--edge)" in foot, foot
+    assert "padding:9px 12px" in foot, foot
+
+    # The term travels with its own explanation rather than waiting inside a
+    # tooltip nobody hovers, and the tooltip carries the whole of it.
+    assert 'gloss.textContent = "— " + t("stale_warnings_gloss");' in body
+    assert 'stale.title = t("stale_warnings_tip");' in body
+    assert 'errors.title = t("issues_tip");' in body
+
+    for block in (english, russian):
+        assert len(_value(block, "stale_warnings_gloss")) > 30
+        assert len(_value(block, "stale_warnings_tip")) > 120
+
+    # Truthful, not approximate: what the projection actually marks stale, and
+    # what it does not do to it.
+    tip = _value(english, "stale_warnings_tip").lower()
+    for named in ("review", "verification", "artifact", "finding", "decision", "revision"):
+        assert named in tip, named
+    assert "deleted" in tip
+    assert "acceptance" in tip
+    russian_tip = _value(russian, "stale_warnings_tip").lower()
+    for named in ("обзор", "проверка", "артефакт", "находка", "решение", "ревизии"):
+        assert named in russian_tip, named
+
+
+def test_a_run_card_says_when_it_ran_and_never_invents_a_spend() -> None:
+    """Round 3, designer 16: runs carried no start time, duration or spend, and
+    could be neither filtered nor grouped.  Three of those four are now on the
+    card.  The fourth is deliberately absent: nothing in this codebase records a
+    consumed provider unit, so the card shows the LIMIT a run was launched under
+    and the view says plainly that consumption is not recorded (item 28)."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    meta = body.split("function runMetaLine(card, run) {", 1)[1].split("\n}\n", 1)[0]
+    for field in ("run.started_at", "run.duration_seconds", "run.purpose", "run.limits.budget"):
+        assert field in meta, field
+
+    # The budget is a mapping -- a limit and the unit it counts -- so it is
+    # spelled as one.  Printed bare it read "бюджет: [object Object]" in a live
+    # panel, and the unit is canonical, so it stays as the ledger writes it.
+    assert "budgetText(budget)" in meta
+    formatter = body.split("function budgetText(budget) {", 1)[1].split("\n}\n", 1)[0]
+    assert "budget.limit" in formatter
+    assert "budget.unit" in formatter
+    # A shape it does not recognise is spelled out, never silently dropped.
+    assert "Object.entries(budget)" in formatter
+    # A canonical purpose keeps the ledger's word and gains the panel's beside it.
+    assert "valueWithGloss(run.purpose)" in meta
+    # One line, both surfaces: the Runs view and the drawer's runs on a task.
+    assert body.count("runMetaLine(") == 3, body.count("runMetaLine(")
+
+    # The readable form is what a person reads; the ISO string stays canonical
+    # and travels as the tooltip, the same split the id chip makes.
+    assert "toLocaleString" in body
+    assert 'formatWhen(run.started_at), run.started_at || ""' in meta
+
+    # No spend-shaped label, and no arithmetic that would turn a cap into one.
+    assert _value(english, "run_budget_word") == "budget"
+    assert _value(russian, "run_budget_word") == "бюджет"
+    for operator in ("budget *", "budget /", "budget +", "budget -"):
+        assert operator not in body, operator
+    for block in (english, russian):
+        assert len(_value(block, "runs_no_spend")) > 80
+    honesty = _value(english, "runs_no_spend").lower()
+    for word in ("recorded", "token", "money", "cap"):
+        assert word in honesty, word
+    assert "cap" in _value(english, "run_budget_tip").lower()
+    # It is said where the operator looks for a cost: the Runs view and the
+    # task drawer's runs block, both.
+    assert body.count('data-i18n="runs_no_spend"') == 2
+
+    # Filtering: live/finished and by role, from plain form controls, so the
+    # view stays keyboard-usable and dependency-free.
+    assert '<select id="runs-filter-status">' in body
+    assert '<select id="runs-filter-role">' in body
+    assert '<input type="checkbox" id="runs-group-task">' in body
+    filters = body.split("function filteredRuns() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'status === "live" && !run.live' in filters
+    assert 'status === "finished" && run.live' in filters
+    assert "run.agent_id !== role" in filters
+
+    # Grouping by task.
+    grouped = body.split("function paintRunsList() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'document.getElementById("runs-group-task").checked' in grouped
+    assert "groups.get(key).push(run)" in grouped
+
+    # And a snapshot repaint -- which arrives about every two seconds -- refills
+    # both pickers AROUND the operator's choice rather than onto it.
+    refill = body.split("function paintRunFilters() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'status.value || "all"' in refill
+    assert 'role.value || ""' in refill
+
+
+def test_the_header_names_the_workspace_and_keeps_both_ulids_one_click_away() -> None:
+    """Round 3, designer 18: the header spent half its width on two ULIDs and
+    neither said which workspace this was.  There is no workspace name in this
+    system, so the honest human handle is the directory it runs in; the ids stay
+    retrievable behind it, because they are what an operator pastes into a CLI
+    command (item 29)."""
+
+    body = read_spa()
+
+    # The name is the repo directory's basename, and nothing else is invented.
+    naming = body.split("function workspaceDirName(repo) {", 1)[1].split("\n}\n", 1)[0]
+    assert "split(/[\\\\/]+/)" in naming
+    assert "workspace_name" not in body, "the panel must not invent a workspace name field"
+
+    identity = body.split("function paintWorkspaceIdentity() {", 1)[1].split("\n}\n", 1)[0]
+    assert "metaInfo.repo" in identity
+    # And it says that is what it is, in words, with the whole path.
+    assert 'said("workspace_dir_tip", { path: repo })' in identity
+
+    # Both ULIDs stay reachable, as the same chips the confirmations use.
+    for chip in ("ws-repo", "ws-id", "ws-writer", "ws-instance"):
+        assert f'class="idchip" id="{chip}"' in body, chip
+        assert f'"{chip}"' in identity, chip
+    assert "metaInfo.workspace_id" in identity
+    assert "metaInfo.writer_session_id" in identity
+    assert 'aria-controls="workspace-ids"' in body
+    assert 'document.getElementById("workspace-ids").hidden = !open;' in body
+
+    # The second ULID is off the header: the writes pill answers whether writes
+    # are on, which is the whole question it exists for.
+    status = body.split("function paintStatus() {", 1)[1].split("\n}\n", 1)[0]
+    assert "writer_session_id" not in status, status
+
+
+def test_the_shell_collapses_below_the_breakpoint_and_fit_still_measures_it() -> None:
+    """Round 3, designer 24: below about 900px the sidebar would not collapse
+    and the dock still took 360 of the width, leaving the board a strip.  Under
+    the breakpoint both side columns leave the grid and become overlays -- and
+    they are toggled with the `hidden` ATTRIBUTE, which is exactly what wave
+    3A's `visibleBoardRect` reads, so the fit keeps measuring the area the
+    operator can actually see (item 30)."""
+
+    body = read_spa()
+    css = body.split("<style", 1)[1].split("</style>", 1)[0]
+
+    assert "@media (max-width:900px){" in css
+    narrow = css.split("@media (max-width:900px){", 1)[1].split("\n}\n", 1)[0]
+    assert "main{grid-template-columns:1fr}" in narrow
+    assert "#sidebar,#dock{" in narrow
+    assert "position:absolute" in narrow
+    assert "#shell-toggles{display:flex}" in narrow
+    # Narrowest LAST: both queries match an 800px window, and a shell still
+    # declaring three columns there would quietly undo the collapse.
+    assert css.index("@media (max-width:1100px)") < css.index("@media (max-width:900px)")
+    # The overlays are positioned against the shell row, so they stop at the
+    # footer rather than crossing it.
+    shell_row = css.split("\nmain{", 1)[1].split("}", 1)[0]
+    assert "position:relative" in shell_row
+
+    # `hidden`, not a class -- this is the join with the fit computation.
+    applied = body.split("function applyShell() {", 1)[1].split("\n}\n", 1)[0]
+    assert "document.getElementById(id).hidden = !open;" in applied
+    assert 'setAttribute("aria-expanded"' in applied
+    rect = body.split("function visibleBoardRect() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'for (const id of ["sidebar", "dock"])' in rect
+    assert "element.hidden" in rect
+    assert "getBoundingClientRect()" in rect
+
+    # A window widened back past the breakpoint gets its columns returned to it.
+    assert 'window.addEventListener("resize", applyShell);' in body
+    for toggle in ("shell-nav", "shell-dock"):
+        assert f'id="{toggle}"' in body, toggle

@@ -12,8 +12,27 @@
   --bg:#101113; --surface:#141619; --surface-2:#1d2024; --border:#26292e;
   --fg:#e7e9ec; --muted:#8a8f98; --faint:#5c616b; --edge:#3a3f46;
   --ok:#3ecf8e; --warn:#e0b04f; --bad:#e06c5f; --info:#5b9dd9;
+  /* The surface is dark by declaration, not only by paint.  Without this the
+     user agent still believes the page is light and hands every scroll
+     container, select and number spinner its light-theme chrome — which is how
+     the scrollbars came out white, the brightest objects on the screen (round
+     3, designer 15). */
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
+/* Scrollbars, in both mechanisms the browsers offer, because between them they
+   cover every scroll container this panel has: the dock, the drawer, the
+   sidebar, the centre views, `pre` blocks, the guide and the lists.  Written on
+   the universal selector for exactly that reason — a container styled one at a
+   time is a container someone will add and forget. */
+*{scrollbar-width:thin; scrollbar-color:var(--edge) var(--surface)}
+::-webkit-scrollbar{width:10px; height:10px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{
+  background:var(--edge); border-radius:6px; border:2px solid var(--surface);
+}
+::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+::-webkit-scrollbar-corner{background:var(--surface)}
 html,body{height:100%}
 body{
   margin:0; background:var(--bg); color:var(--fg);
@@ -33,13 +52,37 @@ header h1{font-size:14px; margin:0; font-weight:600}
   padding:2px 8px; border:1px solid var(--border); border-radius:999px;
   font-size:11px; color:var(--muted); background:var(--surface-2);
 }
+/* The workspace pill is a control now, not a caption: it opens the ids behind
+   the name.  It keeps the pill's shape so the header still reads as one row of
+   pills, and gains only what a button needs to look pressable. */
+button.pill{
+  font:11px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+button.pill:hover{border-color:var(--info); color:var(--fg)}
+button.pill[aria-expanded="true"]{border-color:var(--info); color:var(--fg)}
+/* A full-width row under the header's pills, so opening the ids pushes nothing
+   sideways and the header keeps its rhythm at any width. */
+#workspace-ids{
+  flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:baseline;
+  padding:4px 0 2px;
+}
+.idrow{display:inline-flex; align-items:baseline; gap:5px; max-width:100%}
+.idlbl{font:10px ui-monospace,"JetBrains Mono",monospace; color:var(--faint)}
+.idrow .idchip{margin-left:0; overflow-wrap:anywhere}
 .pill.live{color:var(--ok); border-color:var(--ok)}
 .pill.reconnecting{color:var(--warn); border-color:var(--warn)}
 .pill.gap{color:var(--bad); border-color:var(--bad)}
 .trust{font-size:11px; color:var(--muted)}
 /* Three-zone shell: library on the left, the board in the centre, the
    conversation on the right — one home per kind of thing (redesign, item 6). */
-main{display:grid; grid-template-columns:200px 1fr 360px; flex:1; min-height:0}
+/* `position:relative` because below the narrow breakpoint the two side columns
+   leave the flow and are positioned against this row rather than the viewport —
+   they must stop at the footer, not cross it. */
+main{
+  display:grid; grid-template-columns:200px 1fr 360px; flex:1; min-height:0;
+  position:relative;
+}
 #canvas{width:100%; height:100%; background:var(--bg); cursor:grab; touch-action:none}
 #canvas:active{cursor:grabbing}
 aside{
@@ -52,10 +95,25 @@ aside pre{
   word-break:break-word; background:var(--surface-2); padding:8px;
   border:1px solid var(--border); border-radius:6px; margin:0;
 }
+/* 11px and one hairline away from the board is not a footer, it is a fringe:
+   round 3's designer read it as noise and never learned what its counts meant.
+   12px is the smallest size the rest of the panel uses for a real line, the
+   brighter rule and the deeper padding give it a side of its own, and the terms
+   themselves are explained where they are counted (item 27). */
 footer{
-  padding:6px 12px; border-top:1px solid var(--border); background:var(--surface);
-  font-size:11px; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap;
+  padding:9px 12px; border-top:1px solid var(--edge); background:var(--surface);
+  font-size:12px; color:var(--muted); display:flex; gap:18px; flex-wrap:wrap;
+  align-items:baseline; row-gap:4px;
 }
+/* The count and the sentence that says what it counts, on one line: the term
+   was the complaint, so the term travels with its own explanation rather than
+   waiting inside a tooltip nobody hovers. */
+footer .foot-gloss{color:var(--faint)}
+/* The counts group is three elements now — the errors, the stale count and the
+   clause that explains it — so it needs the same spacing between its own parts
+   that the footer gives its groups.  Without it they ran together as
+   "issues: 0stale warnings: 0", seen in a live panel. */
+#issues{display:flex; flex-wrap:wrap; gap:3px 14px; align-items:baseline}
 .node rect{fill:var(--surface); stroke:var(--border); stroke-width:1.5}
 .node.stale rect{stroke-dasharray:5 3}
 /* A node nobody but the human can unblock.  On the graph itself, because the
@@ -115,7 +173,20 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
    subject box stayed visible and anything typed there was silently discarded
    (M4). `!important` settles it for every hidden element in the file. */
 [hidden]{display:none !important}
-.field span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px}
+/* A field's own caption sits above its input, and that is what this says — but
+   written as a descendant it also caught the caption INSIDE a radio row nested
+   in a field, so the dot rendered on one line and its label on the next (round
+   3, designer 13; the agent settings' tool-access rows).  The child combinator
+   keeps the caption behaviour every ordinary field relies on and lets a nested
+   row lay itself out. */
+.field > span{display:block; font-size:11px; color:var(--muted); margin:0 0 3px}
+/* One row per choice, wherever a control is a radio or a checkbox: the settings
+   tool-access modes, the tools checklist, the link modal's type, the Runs
+   view's grouping switch.  Baseline alignment rather than centre, so the dot
+   sits on the line of the words instead of floating beside their box. */
+.choice{display:flex; align-items:baseline; gap:6px; margin:0 0 4px}
+.choice input{flex:none; width:auto; margin:0}
+.choice span{font-size:12px; color:var(--fg)}
 /* The global search box: styled inside the nonce'd block, not with a markup
    `style` attribute, which `style-src 'nonce-…'` blocks for want of a
    `style-src-attr` (L6). It was the only element styled outside this block. */
@@ -145,6 +216,22 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 #task-runs-list .attn-item{cursor:pointer}
 #task-runs-list .attn-item:hover{border-color:var(--info)}
 .attn-kind{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+/* When a run ran, how long it took, what it was for and the cap it was
+   launched under: four short facts on one wrapping line, quieter than the
+   status above them and than the summary below (item 28). */
+.runmeta{
+  display:flex; flex-wrap:wrap; gap:2px 12px; margin:3px 0 0;
+  font-size:11px; color:var(--muted);
+}
+.runmeta-part{white-space:nowrap}
+/* The Runs view's own controls.  A row that wraps, because three controls with
+   Russian labels do not fit an 800px centre (item 23's margin applies here as
+   much as anywhere). */
+.runs-filters{
+  display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; margin:0 0 14px;
+}
+.runs-filters .field{margin:0; min-width:170px; max-width:260px}
+.runs-filters .choice{margin:0 0 6px}
 /* The acceptance chain sits above the raw record and is the reason the drawer
    is open at all once a run has finished, so it reads as its own block rather
    than as another paragraph of the record (round 3: both testers reached a
@@ -194,7 +281,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
-.field input,.field select,.field textarea{
+/* A field's own control fills the field's width — and that is all this says.
+   Written as a descendant it also caught the RADIO and CHECKBOX inside a row
+   nested in a field, stretching a 13px dot into a 324px styled box that pushed
+   its label onto the next line: the other half of round 3's stacked radio
+   (designer 13), and the half a scoped caption rule alone does not fix.  Every
+   real field puts its control directly inside itself, so the child combinator
+   costs nothing and stops at the nested row. */
+.field > input,.field > select,.field > textarea{
   width:100%; font:12px/1.4 ui-sans-serif,system-ui,sans-serif; color:var(--fg);
   background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:6px;
 }
@@ -287,13 +381,31 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   padding:7px 12px; font-size:12px; color:var(--fg); cursor:pointer;
 }
 #task-fab:hover{border-color:var(--info)}
+/* Wraps rather than overflows.  Five drawer tabs in Russian are wider than a
+   360px dock, and a no-wrap row answered that with a horizontal scrollbar
+   across the dock (round 3, designer 9): the row now takes a second line and
+   the dock keeps its width.  `row-gap` keeps the rhythm even when it does. */
 .dock-tabs{
-  display:flex; gap:2px; padding:8px 10px 0; border-bottom:1px solid var(--border);
-  flex:none;
+  display:flex; flex-wrap:wrap; gap:2px; row-gap:0;
+  padding:8px 10px 0; border-bottom:1px solid var(--border);
+  flex:none; min-width:0;
 }
 .dock-tabs button{
   background:none; border:none; border-radius:6px 6px 0 0; position:relative;
   padding:7px 11px 9px; font-size:12.5px; color:var(--muted);
+  /* Every tab states its own line box.  Left to the glyph, "⚙ Settings" grew a
+     taller line than its siblings and dropped off their baseline, taking its
+     selected-state rule with it (round 3, designer 12). */
+  line-height:1.2; white-space:nowrap;
+}
+/* And the glyph is a decoration, so it is drawn as one rather than carried in
+   the translated string: a mark inside `tab_settings` moved with the language
+   and could not be given a line box of its own without an element the i18n
+   repaint would overwrite.  Here it survives both label lengths and every
+   language switch, because applyI18n only ever writes textContent. */
+.dock-tabs button[data-panel="settings"]::before{
+  content:"\2699"; display:inline-block; margin-right:5px;
+  font-size:12px; line-height:1.2; vertical-align:baseline;
 }
 .dock-tabs button:hover{color:var(--fg)}
 .dock-tabs button[aria-selected="true"]{color:var(--fg)}
@@ -354,13 +466,88 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 #sidebar button .chip{flex:none}
 .attn-item{overflow-wrap:anywhere}
 .modal{max-width:92vw}
+
+/* --- surviving a longer language ------------------------------------------
+   Russian runs about a third longer than the English these strings were sized
+   against, and round 3 (designer 9) found exactly what that costs: the drawer
+   title clipped to "nt · Верстальщик", a horizontal scrollbar appeared across
+   the dock, and "+ Задача" wrapped inside its own button and broke the toolbar
+   row.  +30% IS THE DESIGN MARGIN for this panel: every rule below has to hold
+   with each label a third longer than its English source, and the test beside
+   this file measures the Russian table against that margin.
+
+   Three rules, one per failure.  A title that must stay one line ellipsizes and
+   carries its whole text as a tooltip, so nothing becomes unreadable by being
+   cut.  No dock container scrolls sideways — the width is fixed, so the CONTENT
+   gives way, wrapping or breaking rather than pushing a second axis onto a
+   panel that already scrolls vertically.  And a toolbar wraps between its
+   controls, never inside one. */
+#drawer .drawer-head h2{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+#dock{overflow-x:hidden; min-width:0}
+/* `break-word`, deliberately, and not `anywhere`: the two break an over-long
+   id the same way, but `anywhere` also shrinks an element's MIN-CONTENT width
+   to a single character, which collapsed every flex row inside these panels to
+   one letter per line — the settings radios rendered as a vertical alphabet in
+   a live panel.  `break-word` leaves intrinsic sizing alone. */
+#dock .panel.open{overflow-x:hidden; overflow-wrap:break-word}
+#drawer{overflow-x:hidden; min-width:0}
+#drawer .panel.open{overflow-x:hidden; overflow-wrap:break-word}
+#drawer .drawer-head{min-width:0}
+.board-bar button{white-space:nowrap; flex:none}
+.board-bar{row-gap:8px}
+#sidebar{overflow-x:hidden}
+
+/* --- the shell at a narrow window -----------------------------------------
+   Below 900px the three fixed columns stopped being a shell and became a
+   squeeze: the sidebar would not collapse and the dock still claimed 360 of
+   perhaps 800 pixels, leaving the board a strip (round 3, designer 24).  Under
+   the breakpoint both side columns leave the flow and become overlays over the
+   board, each opened from its own header toggle, and the centre takes the whole
+   row.  They are toggled with the `hidden` ATTRIBUTE rather than a class, which
+   is what keeps wave 3A's fit honest: `visibleBoardRect` skips a hidden element
+   and measures a shown one where it actually is, so an overlay subtracts the
+   part of the canvas it covers exactly as a column did. */
+#shell-toggles{display:none; gap:6px}
+/* Ordered narrowest LAST: both queries match an 800px window, and a shell that
+   still declared three columns there would quietly undo the collapse. */
 @media (max-width:1100px){ main{grid-template-columns:176px 1fr 320px} }
+@media (max-width:900px){
+  main{grid-template-columns:1fr}
+  #shell-toggles{display:flex}
+  #sidebar,#dock{
+    position:absolute; top:0; bottom:0; z-index:8;
+    box-shadow:0 0 24px rgba(6,7,9,.6);
+  }
+  #sidebar{left:0; width:216px; border-right:1px solid var(--edge)}
+  #dock{right:0; width:min(360px,92vw); border-left:1px solid var(--edge)}
+  /* The search box gave itself 220px and a `margin-left:auto` that pushed the
+     rest of the header off the line; on a narrow window it takes what is left
+     of the row instead. */
+  #search-box{margin-left:0; min-width:0; flex:1 1 140px}
+  #legend-panel{max-width:min(340px,calc(100vw - 28px))}
+}
 </style>
 </head>
 <body>
 <header>
+  <!-- Only below the narrow breakpoint, where the two side columns have become
+       overlays and something has to open them (round 3, designer 24). -->
+  <div id="shell-toggles">
+    <button type="button" id="shell-nav" aria-expanded="false" aria-controls="sidebar"
+      data-i18n="shell_nav" data-i18n-title="tip_shell_nav">Menu</button>
+    <button type="button" id="shell-dock" aria-expanded="false" aria-controls="dock"
+      data-i18n="shell_dock" data-i18n-title="tip_shell_dock">Panel</button>
+  </div>
   <h1>Agent Commons</h1>
-  <span class="pill" id="workspace">—</span>
+  <!-- Half the header was two ULIDs — the workspace's and the writer session's —
+       and neither told anyone which workspace they were looking at (round 3,
+       designer 18).  There is no workspace name in this product and inventing
+       one would be a lie, so the honest human handle is the directory the
+       workspace runs in; its basename rides here and the whole path, with both
+       ULIDs, is one click behind it.  Text and tooltip are written from JS, so
+       neither carries a data-i18n marker. -->
+  <button type="button" class="pill" id="workspace"
+    aria-expanded="false" aria-controls="workspace-ids">—</button>
   <span class="pill" id="stream">connecting</span>
   <span class="pill" id="writes">writes disabled</span>
   <input type="search" id="search-box" placeholder="Search history…" data-i18n-placeholder="search_placeholder">
@@ -369,6 +556,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <option value="ru">Русский</option>
   </select>
   <span class="trust" id="layers"></span>
+  <!-- The ids themselves, as the same chips every confirmation uses: quiet,
+       selectable in one gesture, and spelled the way the CLI wants them —
+       these are what an operator pastes into a command. -->
+  <div id="workspace-ids" hidden>
+    <span class="idrow" data-i18n-title="tip_ws_repo"><span class="idlbl">repo</span><code class="idchip" id="ws-repo"></code></span>
+    <span class="idrow" data-i18n-title="tip_ws_id"><span class="idlbl">workspace_id</span><code class="idchip" id="ws-id"></code></span>
+    <span class="idrow" data-i18n-title="tip_ws_writer"><span class="idlbl">writer_session_id</span><code class="idchip" id="ws-writer"></code></span>
+    <span class="idrow" data-i18n-title="tip_ws_instance"><span class="idlbl">server_instance_id</span><code class="idchip" id="ws-instance"></code></span>
+    <span class="note" data-i18n="ws_ids_note"></span>
+  </div>
 </header>
 <main>
   <nav id="sidebar">
@@ -452,6 +649,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <h1 data-i18n="tab_runs">Runs</h1>
         <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
           provider output. No prompts, transcripts, or tool arguments are retained.</p>
+        <!-- Where an operator looks for a cost, and finds the truth instead.
+             Round 3, designer 16, asked for spend on the run card; nothing in
+             this codebase records a consumed provider unit, so there is no
+             spend to show and an estimate would read as a measurement.  The
+             budget below each run is the CAP it was launched under. -->
+        <p class="note" data-i18n="runs_no_spend"></p>
+        <!-- Filter and group, both from plain form controls: a select and a
+             checkbox are keyboard-operable as they come, and the view stays
+             dependency-free (item 28). -->
+        <div class="runs-filters">
+          <label class="field"><span data-i18n="runs_filter_status_label">Show</span>
+            <select id="runs-filter-status"></select></label>
+          <label class="field"><span data-i18n="runs_filter_role_label">Run by</span>
+            <select id="runs-filter-role"></select></label>
+          <label class="choice"><input type="checkbox" id="runs-group-task">
+            <span data-i18n="runs_group_task">Group by task</span></label>
+        </div>
+        <p class="note" id="runs-empty" hidden></p>
         <div id="runs-list"></div>
       </div>
     </section>
@@ -695,7 +910,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
       <div class="dock-tabs" id="drawer-tabs">
         <button type="button" data-panel="record" aria-selected="true" data-i18n="tab_record">Record</button>
-        <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">⚙ Settings</button>
+        <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">Settings</button>
         <button type="button" data-panel="links" aria-selected="false" hidden data-i18n="links_tab">Links</button>
         <button type="button" data-panel="run" aria-selected="false" hidden data-i18n="tab_run">Run</button>
         <button type="button" data-panel="message" aria-selected="false" hidden data-i18n="tab_message">Message</button>
@@ -735,6 +950,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            path from a finished run to its result is one click, not a graph hunt. -->
       <div id="task-runs" hidden>
         <h3 class="subhead" data-i18n="task_runs_heading">Runs on this task</h3>
+        <!-- The same honesty as the Runs view: a run's budget is what it was
+             permitted, never what it used, because nothing here measures use. -->
+        <p class="note" data-i18n="runs_no_spend"></p>
         <div id="task-runs-list"></div>
       </div>
       <!-- What a person came to find out, ahead of the ledger's own words.  The
@@ -811,9 +1029,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         degrade the work.</p>
       <div class="field" id="tools-access-field">
         <span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
-        <label><input type="radio" name="tools-mode" id="tools-mode-full" checked>
+        <label class="choice"><input type="radio" name="tools-mode" id="tools-mode-full" checked>
           <span data-i18n="tools_mode_full">Whole profile (default)</span></label>
-        <label><input type="radio" name="tools-mode" id="tools-mode-narrow">
+        <label class="choice"><input type="radio" name="tools-mode" id="tools-mode-narrow">
           <span data-i18n="tools_mode_narrow">Narrow to selected tools</span></label>
         <div id="tools-checklist" hidden></div>
         <p class="note" data-i18n="tools_narrow_note">Narrowing only — a role can never gain a tool its
@@ -936,9 +1154,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <p class="note" data-i18n="link_permission_note">A link is a recorded permission in the journal;
       it does not open a communication channel yet.</p>
     <label class="field"><span data-i18n="link_type_label">Type</span></label>
-    <label><input type="radio" name="link-type" id="link-type-ask" value="ask" checked>
+    <label class="choice"><input type="radio" name="link-type" id="link-type-ask" value="ask" checked>
       <span data-i18n="link_type_ask">Ask — may put questions to this role</span></label>
-    <label><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
+    <label class="choice"><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
       <span data-i18n="link_type_handoff">Hand off work — may pass work to this role</span></label>
     <label class="field"><span data-i18n="link_reason_label">Why this link</span>
       <input type="text" id="link-reason" autocomplete="off"></label>
@@ -1011,7 +1229,7 @@ const STRINGS = {
     tab_search: "Search",
     tab_run: "Run",
     tab_message: "Message",
-    tab_settings: "⚙ Settings",
+    tab_settings: "Settings",
     stream_connecting: "connecting",
     stream_live: "live",
     stream_reconnecting: "reconnecting",
@@ -1019,7 +1237,19 @@ const STRINGS = {
     stream_unavailable: "live updates unavailable — reload to refresh",
     stream_unauthorized: "unauthorized — reopen the printed URL",
     writes_disabled: "writes disabled",
-    writes_enabled_as: "writes enabled as",
+    writes_enabled: "writes enabled",
+    writes_enabled_tip: "This panel may record events in the ledger. The session it writes as is one click behind the workspace name.",
+    workspace_dir_tip: "The workspace\u2019s own directory: {path}. This system has no workspace name, so the folder it runs in is what it goes by here. Click for the ids.",
+    workspace_dir_unknown: "The workspace directory is not known yet. Click for the ids.",
+    tip_ws_repo: "The absolute path of the directory this workspace runs in.",
+    tip_ws_id: "The workspace\u2019s canonical id \u2014 what a CLI command asks for.",
+    tip_ws_writer: "The session this panel records its events as.",
+    tip_ws_instance: "This server process; it changes whenever the server starts again.",
+    ws_ids_note: "Each of these selects in one click, to paste into a command.",
+    shell_nav: "Sections",
+    shell_dock: "Panel",
+    tip_shell_nav: "Show or hide the section list over the board.",
+    tip_shell_dock: "Show or hide the chat and details panel over the board.",
     title_writes: "Agent Commons — writes enabled",
     title_readonly: "Agent Commons — read-only",
     search_placeholder: "Search history…",
@@ -1059,6 +1289,28 @@ const STRINGS = {
     preset_none: "— none —",
     runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
     runs_open_tip: "Open the run's record.",
+    runs_no_spend: "No cost appears here because none is recorded: nothing in this system counts tokens, requests or money. The budget on a run is the cap it was launched under, never what it used.",
+    runs_filter_status_label: "Show",
+    runs_filter_role_label: "Which role ran it",
+    runs_filter_any_role: "any role",
+    runs_group_task: "Group by task",
+    runs_group_none: "attached to no task",
+    runs_status_all: "all runs",
+    runs_status_live: "running now",
+    runs_status_finished: "finished",
+    runs_none_match: "No run matches this filter.",
+    runs_none_yet: "No run yet. Start one from a role's Run tab.",
+    run_started_word: "started",
+    run_took_word: "took",
+    run_took_tip: "Between the first and last operational record of this attempt; last touched",
+    run_still_running: "still running",
+    run_still_running_tip: "A duration is recorded only once the run stops; until then, count up from the start time.",
+    run_purpose_word: "for",
+    run_budget_word: "budget",
+    run_budget_tip: "The cap this run was launched under, not what it consumed \u2014 consumption is recorded nowhere in this system.",
+    dur_h: "h",
+    dur_m: "m",
+    dur_s: "s",
     task_runs_heading: "Runs on this task",
     live: "live",
     role_word: "role",
@@ -1139,7 +1391,10 @@ const STRINGS = {
     saved: "saved",
     removed: "removed",
     issues_word: "issues",
+    issues_tip: "Events the ledger's projection could not apply, or applied under protest: a broken payload, an illegal transition, a conflict between two records.",
     stale_warnings: "stale warnings",
+    stale_warnings_gloss: "evidence bound to an older revision of the thing it is about",
+    stale_warnings_tip: "A review, verification, artifact binding, finding or decision was recorded against one revision of its subject, and the subject has changed since. Nothing is deleted and the evidence still exists; it simply no longer proves anything about the current revision, so it stops counting towards acceptance. The issues counted beside this are included in the number too.",
     truncated: "graph truncated to fit display bounds",
     request_failed: "request failed:",
     nav_work: "Workspace",
@@ -1475,7 +1730,7 @@ const STRINGS = {
     tab_search: "Поиск",
     tab_run: "Прогон",
     tab_message: "Сообщение",
-    tab_settings: "⚙ Настройки",
+    tab_settings: "Настройки",
     stream_connecting: "подключение",
     stream_live: "онлайн",
     stream_reconnecting: "переподключение",
@@ -1483,7 +1738,19 @@ const STRINGS = {
     stream_unavailable: "живые обновления недоступны — перезагрузите страницу",
     stream_unauthorized: "нет доступа — заново откройте напечатанную ссылку",
     writes_disabled: "запись отключена",
-    writes_enabled_as: "запись включена как",
+    writes_enabled: "запись включена",
+    writes_enabled_tip: "Панель может записывать события в журнал. Сессия, от имени которой она пишет, \u2014 в одном щелчке за именем рабочего пространства.",
+    workspace_dir_tip: "Собственный каталог рабочего пространства: {path}. Имени у рабочего пространства в этой системе нет, поэтому здесь оно зовётся по папке, в которой работает. Нажмите, чтобы увидеть идентификаторы.",
+    workspace_dir_unknown: "Каталог рабочего пространства пока неизвестен. Нажмите, чтобы увидеть идентификаторы.",
+    tip_ws_repo: "Абсолютный путь каталога, в котором работает это рабочее пространство.",
+    tip_ws_id: "Канонический идентификатор рабочего пространства \u2014 то, что просит команда CLI.",
+    tip_ws_writer: "Сессия, от имени которой панель записывает свои события.",
+    tip_ws_instance: "Процесс этого сервера; меняется всякий раз, когда сервер стартует заново.",
+    ws_ids_note: "Каждый из них выделяется одним щелчком, чтобы вставить в команду.",
+    shell_nav: "Разделы",
+    shell_dock: "Панель",
+    tip_shell_nav: "Показать или скрыть список разделов поверх доски.",
+    tip_shell_dock: "Показать или скрыть панель чата и подробностей поверх доски.",
     title_writes: "Agent Commons — запись включена",
     title_readonly: "Agent Commons — только чтение",
     search_placeholder: "Поиск по истории…",
@@ -1523,6 +1790,28 @@ const STRINGS = {
     preset_none: "— нет —",
     runs_note: "Текущие и недавние прогоны провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
     runs_open_tip: "Открыть запись прогона.",
+    runs_no_spend: "Стоимости здесь нет, потому что она нигде не записывается: система не считает ни токены, ни обращения, ни деньги. Бюджет у прогона \u2014 это предел, с которым его начали, а не то, что он израсходовал.",
+    runs_filter_status_label: "Показывать",
+    runs_filter_role_label: "Чья это работа",
+    runs_filter_any_role: "любая роль",
+    runs_group_task: "Собрать по задачам",
+    runs_group_none: "без задачи",
+    runs_status_all: "все прогоны",
+    runs_status_live: "идут сейчас",
+    runs_status_finished: "завершённые",
+    runs_none_match: "Ни один прогон не подходит под этот фильтр.",
+    runs_none_yet: "Прогонов пока нет. Начните с вкладки Прогон у роли.",
+    run_started_word: "начат",
+    run_took_word: "занял",
+    run_took_tip: "Между первой и последней операционной записью этой попытки; последнее касание",
+    run_still_running: "ещё идёт",
+    run_still_running_tip: "Длительность записывается только когда прогон остановился; до тех пор считайте от времени начала.",
+    run_purpose_word: "цель",
+    run_budget_word: "бюджет",
+    run_budget_tip: "Предел, с которым этот прогон начали, а не то, что он потратил \u2014 расход в этой системе нигде не записывается.",
+    dur_h: " ч",
+    dur_m: " м",
+    dur_s: " с",
     task_runs_heading: "Прогоны по этой задаче",
     live: "в работе",
     role_word: "роль",
@@ -1603,7 +1892,10 @@ const STRINGS = {
     saved: "сохранено",
     removed: "удалено",
     issues_word: "проблем",
+    issues_tip: "События, которые проекция журнала не смогла применить или применила с оговоркой: испорченная полезная нагрузка, недопустимый переход, конфликт двух записей.",
     stale_warnings: "устаревших предупреждений",
+    stale_warnings_gloss: "свидетельство привязано к более старой ревизии того, о чём оно",
+    stale_warnings_tip: "Обзор, проверка, привязка артефакта, находка или решение записаны против одной ревизии своего предмета, а предмет с тех пор изменился. Ничего не удаляется, и свидетельство никуда не делось; оно просто больше ничего не доказывает про текущую ревизию и перестаёт считаться при приёмке. Проблемы, посчитанные рядом, входят и в это число.",
     truncated: "граф усечён до границ отображения",
     request_failed: "запрос не выполнен:",
     nav_work: "Рабочее",
@@ -3394,19 +3686,23 @@ function paintSettings(record) {
       none.textContent = t("tools_none_narrowable");
       checklist.appendChild(none);
     }
+    // Each tool is a `.choice` row rather than a label followed by a <br>: the
+    // box and its name share one baseline, which is the same fix the two mode
+    // radios above needed (round 3, designer 13).
     for (const name of summary.narrowable) {
       const row = document.createElement("label");
+      row.className = "choice";
       const box = document.createElement("input");
       box.type = "checkbox";
       box.value = name;
       box.checked = !allowlist.length || allowlist.indexOf(name) >= 0;
       row.appendChild(box);
-      row.appendChild(document.createTextNode(" " + name));
+      row.appendChild(document.createTextNode(name));
       checklist.appendChild(row);
-      checklist.appendChild(document.createElement("br"));
     }
     for (const name of summary.fixed) {
       const row = document.createElement("label");
+      row.className = "choice";
       const box = document.createElement("input");
       box.type = "checkbox";
       box.checked = true;
@@ -3415,9 +3711,8 @@ function paintSettings(record) {
       // The tool name rides on the row so the label repaint can rewrite this
       // line without rebuilding the checklist the operator is standing in.
       row.dataset.fixedTool = name;
-      row.appendChild(document.createTextNode(" " + name + " — " + t("tools_fixed_note")));
+      row.appendChild(document.createTextNode(name + " — " + t("tools_fixed_note")));
       checklist.appendChild(row);
-      checklist.appendChild(document.createElement("br"));
     }
   }
   document.getElementById("setting-reason").value = "";
@@ -3441,7 +3736,7 @@ function paintSettingsLabels(record) {
   // Rewritten in place, one text node per row, so the checkboxes beside them —
   // and whatever the operator has ticked — are left exactly as they are.
   for (const row of document.querySelectorAll("#tools-checklist label[data-fixed-tool]")) {
-    row.lastChild.textContent = " " + row.dataset.fixedTool + " — " + t("tools_fixed_note");
+    row.lastChild.textContent = row.dataset.fixedTool + " — " + t("tools_fixed_note");
   }
   // The same trick on the pickers.  Refilling them through `fillSelect` is what
   // would drop the operator's chosen level, so the option VALUES — the canonical
@@ -3590,6 +3885,83 @@ function runIdChip(delegationId) {
   return chip;
 }
 
+// --- when a run ran, and under what cap -----------------------------------
+// Round 3, designer 16: a run card carried no start time, no duration and no
+// spend, and the list could be neither filtered nor grouped.  Three of those
+// four are now on the card.  The fourth is not, and deliberately: NOTHING in
+// this codebase records a consumed provider unit — not tokens, not requests,
+// not money — so there is no spend to report, and a number derived from the
+// budget would read as a measurement of something nobody measured.  What the
+// card shows instead is the LIMIT the run was launched under, said as a limit,
+// and the Runs view says plainly that consumption is not recorded.
+//
+// The ISO string is canonical, so it stays: the readable form is what a person
+// reads and the exact instant travels as the tooltip, the same division the id
+// chip makes between a name and its identifier.
+function formatWhen(iso) {
+  if (!iso) { return ""; }
+  const when = new Date(iso);
+  if (isNaN(when.getTime())) { return String(iso); }
+  return when.toLocaleString(lang === "ru" ? "ru-RU" : "en-GB",
+    { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Coarse on purpose: an operator reading a list wants "about four minutes", and
+// the exact seconds are in the record for anyone who wants them.
+function formatDuration(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours) { return hours + t("dur_h") + " " + minutes + t("dur_m"); }
+  if (minutes) { return minutes + t("dur_m") + " " + (total % 60) + t("dur_s"); }
+  return total + t("dur_s");
+}
+
+// A delegation's budget is a MAPPING -- a limit and the unit it counts -- not a
+// number, and printed bare it read "бюджет: [object Object]" in a live panel.
+// The unit is a canonical token and stays as the ledger writes it; a shape this
+// does not recognise is spelled out key by key rather than dropped, because a
+// cap the panel cannot read is exactly the thing an operator must still see.
+function budgetText(budget) {
+  if (budget === null || budget === undefined || budget === "") { return ""; }
+  if (typeof budget !== "object") { return String(budget); }
+  const limit = budget.limit;
+  const unit = budget.unit;
+  if (limit !== undefined || unit !== undefined) {
+    return [limit, unit].filter((part) => part !== undefined && part !== null).join(" ");
+  }
+  return Object.entries(budget).map(([name, value]) => name + " " + value).join(", ");
+}
+
+function metaPart(host, label, value, tip) {
+  if (value === "" || value === null || value === undefined) { return; }
+  const part = document.createElement("span");
+  part.className = "runmeta-part";
+  part.textContent = label + ": " + value;
+  if (tip) { part.title = tip; }
+  host.appendChild(part);
+}
+
+// One meta line, shared by the Runs view and the drawer's "Runs on this task",
+// so the two can never drift into saying different things about the same run.
+function runMetaLine(card, run) {
+  const meta = document.createElement("div");
+  meta.className = "runmeta";
+  metaPart(meta, t("run_started_word"), formatWhen(run.started_at), run.started_at || "");
+  if (run.duration_seconds !== null && run.duration_seconds !== undefined) {
+    metaPart(meta, t("run_took_word"), formatDuration(run.duration_seconds),
+      run.updated_at ? t("run_took_tip") + " " + run.updated_at : t("run_took_tip"));
+  } else if (run.live) {
+    metaPart(meta, t("run_took_word"), t("run_still_running"), t("run_still_running_tip"));
+  }
+  // The purpose decides which guards apply to a run, so it stays the ledger's
+  // own word with the panel's sentence beside it (item 20).
+  if (run.purpose) { metaPart(meta, t("run_purpose_word"), valueWithGloss(run.purpose)); }
+  const budget = run.limits && run.limits.budget;
+  metaPart(meta, t("run_budget_word"), budgetText(budget), t("run_budget_tip"));
+  if (meta.firstChild) { card.appendChild(meta); }
+}
+
 function runStatusText(run) {
   const lead = run.live ? "● " + t("live") + " · " : "○ ";
   const phase = String(run.phase || "");
@@ -3620,6 +3992,121 @@ function openRunRecord(delegationId) {
   inspect({ kind: "delegation", id: delegationId, label: "", awaits_human: false, attrs: {} });
 }
 
+// What the target of a run is called on screen, and what it is called in the
+// ledger.  The label is what a person groups by; the id is what stays exact.
+function runTargetLabel(run) {
+  if (!run.target_id) { return t("runs_group_none"); }
+  const node = ((lastGraph && lastGraph.nodes) || [])
+    .find((candidate) => candidate.id === run.target_id);
+  return (node && node.label) || (run.target_kind + " " + run.target_id);
+}
+
+function runCard(run) {
+  const card = document.createElement("div");
+  card.className = "attn-item " + (run.live ? "run_blocked" : "");
+  const kind = document.createElement("div");
+  kind.className = "attn-kind";
+  kind.textContent = runStatusText(run);
+  card.appendChild(kind);
+  const head = document.createElement("span");
+  // Names first, ids on demand (PM run, finding 6): the tooltip keeps the
+  // exact identifiers for anyone who needs them, and the run's own id sits
+  // under the card as a chip anyone can copy without opening the record.
+  head.textContent =
+    (run.agent_id ? t("role_word") + " " + agentLabel(run.agent_id) + " · " : "") +
+    (run.target_id ? t("on_word") + " " + runTargetLabel(run) + " · " : "") +
+    t("profile_word") + " " + (run.profile_id || "?");
+  head.title = (run.agent_id || "") + (run.target_id ? " → " + run.target_id : "");
+  card.appendChild(head);
+  // When it started, how long it took, what it was launched to do and under
+  // what cap (item 28).
+  runMetaLine(card, run);
+  if (run.summary) {
+    // The one human-readable line the run left behind (finding 4) — the
+    // canonical delegation summary, agent prose written as text.
+    const summary = document.createElement("p");
+    summary.className = "note";
+    summary.textContent = run.summary;
+    card.appendChild(summary);
+  }
+  // One click from the run to its record (round 2, PM finding 4).
+  card.appendChild(runIdChip(run.delegation_id));
+  card.setAttribute("title", t("runs_open_tip"));
+  card.addEventListener("click", () => openRunRecord(run.delegation_id));
+  return card;
+}
+
+// The two pickers and the switch, refilled on every stream snapshot — so both
+// are refilled AROUND whatever the operator has chosen, never onto it.  A run
+// list that reset its own filter every two seconds would be worse than no
+// filter at all (the clobber rule this file already follows for the hire and
+// launch pickers).
+const RUN_STATUS_FILTERS = ["all", "live", "finished"];
+
+function paintRunFilters() {
+  const status = document.getElementById("runs-filter-status");
+  fillSelect(status,
+    RUN_STATUS_FILTERS.map((value) => ({ id: value, title: t("runs_status_" + value) })),
+    status.value || "all", false);
+  const role = document.getElementById("runs-filter-role");
+  // Only the roles that actually ran something: a picker offering roles with no
+  // runs is a list of dead ends.
+  const seen = [];
+  for (const run of runs) {
+    if (run.agent_id && seen.indexOf(run.agent_id) < 0) { seen.push(run.agent_id); }
+  }
+  fillSelect(role,
+    [{ id: "", title: t("runs_filter_any_role") }].concat(
+      seen.map((id) => ({ id: id, title: agentLabel(id) }))),
+    role.value || "", false);
+}
+
+function filteredRuns() {
+  const status = document.getElementById("runs-filter-status").value || "all";
+  const role = document.getElementById("runs-filter-role").value || "";
+  return runs.filter((run) => {
+    if (status === "live" && !run.live) { return false; }
+    if (status === "finished" && run.live) { return false; }
+    if (role && run.agent_id !== role) { return false; }
+    return true;
+  });
+}
+
+function paintRunsList() {
+  const host = document.getElementById("runs-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const shown = filteredRuns();
+  const empty = document.getElementById("runs-empty");
+  // An empty list after a filter is a different thing from an empty workspace,
+  // and saying which is the difference between "nothing yet" and "you filtered
+  // it away".
+  empty.hidden = shown.length > 0;
+  empty.textContent = runs.length ? t("runs_none_match") : t("runs_none_yet");
+  if (!document.getElementById("runs-group-task").checked) {
+    for (const run of shown) { host.appendChild(runCard(run)); }
+    return;
+  }
+  // Grouped by the task each run was launched against, in the order the runs
+  // already arrive in — live first, as the backend sorts them — so grouping
+  // rearranges the list without reordering what is urgent inside it.
+  const order = [];
+  const groups = new Map();
+  for (const run of shown) {
+    const key = run.target_id || "";
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key).push(run);
+  }
+  for (const key of order) {
+    const members = groups.get(key);
+    const heading = document.createElement("h3");
+    heading.className = "subhead";
+    heading.textContent = runTargetLabel(members[0]) + " · " + members.length;
+    if (key) { heading.title = key; }
+    host.appendChild(heading);
+    for (const run of members) { host.appendChild(runCard(run)); }
+  }
+}
+
 async function loadRuns() {
   try { runs = (await api("/api/runs")) || []; } catch (error) { runs = []; }
   // The nav item stays visible even with zero runs: an empty view that says
@@ -3628,44 +4115,14 @@ async function loadRuns() {
   const liveCount = runs.filter((r) => r.live).length;
   tab.textContent = liveCount
     ? t("tab_runs") + " (" + t("live") + ": " + liveCount + ")" : t("tab_runs");
-  const host = document.getElementById("runs-list");
-  while (host.firstChild) { host.removeChild(host.firstChild); }
-  for (const run of runs) {
-    const card = document.createElement("div");
-    card.className = "attn-item " + (run.live ? "run_blocked" : "");
-    const kind = document.createElement("div");
-    kind.className = "attn-kind";
-    kind.textContent = runStatusText(run);
-    card.appendChild(kind);
-    const head = document.createElement("span");
-    // Names first, ids on demand (PM run, finding 6): the tooltip keeps the
-    // exact identifiers for anyone who needs them, and the run's own id sits
-    // under the card as a chip anyone can copy without opening the record.
-    const targetNode = ((lastGraph && lastGraph.nodes) || [])
-      .find((node) => node.id === run.target_id);
-    head.textContent =
-      (run.agent_id ? t("role_word") + " " + agentLabel(run.agent_id) + " · " : "") +
-      (run.target_id
-        ? t("on_word") + " " +
-          ((targetNode && targetNode.label) || run.target_kind + " " + run.target_id) + " · "
-        : "") + t("profile_word") + " " + (run.profile_id || "?");
-    head.title = (run.agent_id || "") + (run.target_id ? " → " + run.target_id : "");
-    card.appendChild(head);
-    if (run.summary) {
-      // The one human-readable line the run left behind (finding 4) — the
-      // canonical delegation summary, agent prose written as text.
-      const summary = document.createElement("p");
-      summary.className = "note";
-      summary.textContent = run.summary;
-      card.appendChild(summary);
-    }
-    // One click from the run to its record (round 2, PM finding 4). The loop
-    // variable is per-iteration, so the closure captures this run only.
-    card.appendChild(runIdChip(run.delegation_id));
-    card.setAttribute("title", t("runs_open_tip"));
-    card.addEventListener("click", () => openRunRecord(run.delegation_id));
-    host.appendChild(card);
-  }
+  paintRunFilters();
+  paintRunsList();
+}
+
+for (const id of ["runs-filter-status", "runs-filter-role", "runs-group-task"]) {
+  // Repaint from the runs already in hand: a filter must answer the keystroke,
+  // not wait for the next snapshot.
+  document.getElementById(id).addEventListener("change", paintRunsList);
 }
 
 // The same runs, filtered to the task under inspection: the human layer above
@@ -3690,6 +4147,9 @@ function paintTaskRuns(node) {
       (run.agent_id ? t("role_word") + " " + agentLabel(run.agent_id) + " · " : "") +
       t("profile_word") + " " + (run.profile_id || "?");
     row.appendChild(head);
+    // The same start time, duration, purpose and cap as the Runs view: a person
+    // who reached the task first should not have to go and find them (item 28).
+    runMetaLine(row, run);
     if (run.summary) {
       // Agent prose, written as text.
       const summary = document.createElement("p");
@@ -4235,6 +4695,11 @@ async function inspect(node) {
   // Lead with the name for anything that has one (a role), so the heading of
   // the screen where you manage it is not a bare ULID (round 2, design).
   title.textContent = node.label ? node.kind + " · " + node.label : node.kind + " " + node.id;
+  // The heading has one line and no more, so a Russian label a third longer than
+  // its English source is ellipsized rather than allowed to widen the dock —
+  // and the whole text becomes the tooltip, because round 3 read "nt ·
+  // Верстальщик" and could not tell what it was looking at (designer 9).
+  title.title = title.textContent;
   body.textContent = t("loading");
   document.getElementById("blocked-pill").hidden = !node.awaits_human;
 
@@ -4974,12 +5439,41 @@ function paintChrome(graph) {
   document.getElementById("counts").textContent = counts.join("   ");
   const issues = (graph.issues || []).length;
   const warnings = (graph.warnings || []).length;
-  document.getElementById("issues").textContent =
-    t("issues_word") + ": " + issues + "   " + t("stale_warnings") + ": " + warnings;
+  // "устаревших предупреждений" told the round-3 designer nothing, and a term
+  // nobody can decode is a count nobody can act on (item 27).  So the footer
+  // says what a stale warning IS, in one clause beside the number, and the
+  // tooltip carries the whole of it.  The wording is read off the projection
+  // rather than guessed: `_mark_bound_evidence_stale` flags a review,
+  // verification, artifact binding, finding or decision whose bound revision is
+  // no longer the current one — the subject moved on, so the evidence stopped
+  // proving anything about it.  Nothing is deleted by going stale.
+  const line = document.getElementById("issues");
+  while (line.firstChild) { line.removeChild(line.firstChild); }
+  const errors = document.createElement("span");
+  errors.textContent = t("issues_word") + ": " + issues;
+  errors.title = t("issues_tip");
+  line.appendChild(errors);
+  const stale = document.createElement("span");
+  stale.textContent = t("stale_warnings") + ": " + warnings;
+  stale.title = t("stale_warnings_tip");
+  line.appendChild(stale);
+  // The gloss earns its room only when there is something to explain; a zero
+  // count needs a number, not a definition.
+  if (warnings) {
+    const gloss = document.createElement("span");
+    gloss.className = "foot-gloss";
+    gloss.textContent = "— " + t("stale_warnings_gloss");
+    gloss.title = t("stale_warnings_tip");
+    line.appendChild(gloss);
+  }
   document.getElementById("truncation").textContent =
     graph.limits && graph.limits.truncated ? t("truncated") : "";
   if (graph.workspace_id) {
-    document.getElementById("workspace").textContent = graph.workspace_id;
+    // The header shows the workspace by NAME now; the id it used to print
+    // outright lives behind that name (item 29), so the graph's copy updates the
+    // stored meta rather than overwriting the pill.
+    if (metaInfo) { metaInfo.workspace_id = graph.workspace_id; }
+    paintWorkspaceIdentity();
   }
 }
 
@@ -5042,6 +5536,49 @@ canvas.addEventListener("wheel", (event) => {
 // elements rather than off the grid's declared column widths, so the responsive
 // work still to come cannot silently un-fix this — and only the part that truly
 // overlaps counts, side by side today, overlaid tomorrow.
+// --- the shell at a narrow window -----------------------------------------
+// Round 3, designer 24: below about 900px the board was unusable — the sidebar
+// would not collapse and the dock still took 360 of the width.  Under the
+// breakpoint the CSS lifts both side columns out of the grid and makes them
+// overlays; this decides WHEN each one is on screen.
+//
+// They are shown and hidden with the `hidden` attribute rather than a class,
+// and that is not a detail: `visibleBoardRect` below skips a hidden element and
+// subtracts a shown one where `getBoundingClientRect` actually finds it.  An
+// overlaid dock therefore takes the same bite out of the fit's frame that a
+// docked column did, and a closed one takes none — wave 3A's measurement stays
+// literally true through the change rather than being re-derived for it.
+const NARROW_SHELL = "(max-width: 900px)";
+// Both closed on arrival at a narrow window: the board is what the operator
+// came for, and an overlay that opens itself is a column by another name.
+const shellOpen = { sidebar: false, dock: false };
+const SHELL_TOGGLES = { sidebar: "shell-nav", dock: "shell-dock" };
+
+function applyShell() {
+  const narrow = window.matchMedia(NARROW_SHELL).matches;
+  for (const [id, toggleId] of Object.entries(SHELL_TOGGLES)) {
+    const open = !narrow || shellOpen[id];
+    document.getElementById(id).hidden = !open;
+    document.getElementById(toggleId)
+      .setAttribute("aria-expanded", narrow && shellOpen[id] ? "true" : "false");
+  }
+}
+
+for (const [id, toggleId] of Object.entries(SHELL_TOGGLES)) {
+  document.getElementById(toggleId).addEventListener("click", () => {
+    // One overlay at a time: two of them over an 800px board would leave a
+    // strip narrower than the column layout this replaced.
+    for (const other of Object.keys(shellOpen)) {
+      shellOpen[other] = other === id ? !shellOpen[id] : false;
+    }
+    applyShell();
+  });
+}
+// A window widened back past the breakpoint gets both columns returned to it,
+// whatever the toggles were left saying.
+window.addEventListener("resize", applyShell);
+applyShell();
+
 function visibleBoardRect() {
   const rect = canvas.getBoundingClientRect();
   // Whatever hangs past the window is not visible either, however the shell
@@ -5185,10 +5722,57 @@ let metaInfo = null;
 // gathered here so a language switch repaints it from the stored meta too.
 // The truth_layers and trust_note protocol wording stays exactly as /api/meta
 // sent it; only the panel's own retained-nothing suffix is translated.
+// Which workspace this is, said in the one human word the product actually
+// has.  Round 3, designer 18: the header spent half its width on two ULIDs —
+// the workspace's and the writer session's — and neither answered "which
+// workspace am I in?".  There is no workspace NAME anywhere in this system and
+// inventing one would put a label on the screen that matches nothing in the
+// ledger or the CLI, so the honest handle is the directory the workspace runs
+// in.  Its basename rides in the header; the full path and both ULIDs are one
+// click behind it, as the same chips every confirmation uses, because those
+// ids are what an operator pastes into a command.
+function workspaceDirName(repo) {
+  const parts = String(repo || "").split(/[\\/]+/).filter((part) => part.length);
+  return parts.length ? parts[parts.length - 1] : "";
+}
+
+function paintWorkspaceIdentity() {
+  const pill = document.getElementById("workspace");
+  const repo = metaInfo ? metaInfo.repo : "";
+  const name = workspaceDirName(repo);
+  // The directory's own name is not the panel's prose and is never translated;
+  // the sentence that says what it IS is the tooltip, and that is.
+  pill.textContent = name || (metaInfo && metaInfo.workspace_id) || "—";
+  pill.title = name ? said("workspace_dir_tip", { path: repo }) : t("workspace_dir_unknown");
+  const values = {
+    "ws-repo": repo,
+    "ws-id": metaInfo ? metaInfo.workspace_id : "",
+    "ws-writer": metaInfo ? metaInfo.writer_session_id : "",
+    "ws-instance": metaInfo ? metaInfo.server_instance_id : "",
+  };
+  for (const [id, value] of Object.entries(values)) {
+    const chip = document.getElementById(id);
+    chip.textContent = value || "—";
+    chip.title = t("id_chip_tip");
+  }
+}
+
+document.getElementById("workspace").addEventListener("click", () => {
+  const pill = document.getElementById("workspace");
+  const open = pill.getAttribute("aria-expanded") !== "true";
+  pill.setAttribute("aria-expanded", open ? "true" : "false");
+  document.getElementById("workspace-ids").hidden = !open;
+});
+
 function paintStatus() {
-  document.getElementById("writes").textContent = writesEnabled
-    ? t("writes_enabled_as") + " " + (metaInfo ? metaInfo.writer_session_id : "")
-    : t("writes_disabled");
+  // The writer session's ULID has moved in behind the workspace name with the
+  // other one: the pill says whether writes are on, which is the whole question
+  // it exists to answer (item 29).
+  document.getElementById("writes").textContent =
+    writesEnabled ? t("writes_enabled") : t("writes_disabled");
+  document.getElementById("writes").title =
+    writesEnabled ? t("writes_enabled_tip") : "";
+  paintWorkspaceIdentity();
   document.title = writesEnabled ? t("title_writes") : t("title_readonly");
   if (metaInfo) {
     // The trust wording is canonical and stays verbatim — but as a tooltip,
@@ -5231,6 +5815,9 @@ langPicker.addEventListener("change", () => {
 const LANGUAGE_SURFACES = [
   ["chrome", () => applyI18n()],
   ["status", () => paintStatus()],
+  // The workspace's name is its directory and is never translated; the sentence
+  // that says so, and the tooltip on every id chip beside it, are (item 29).
+  ["workspace", () => paintWorkspaceIdentity()],
   ["stream", () => setStream(lastStream.state, lastStream.key)],
   ["board", () => { if (lastGraph) { paintChrome(lastGraph); render(lastGraph); } }],
   ["legend", () => paintGlyphLegend()],
@@ -5265,7 +5852,6 @@ async function boot() {
   try {
     const meta = await api("/api/meta");
     metaInfo = meta;
-    document.getElementById("workspace").textContent = meta.workspace_id;
     writesEnabled = Boolean(meta.writes_enabled);
     paintStatus();
     await loadCatalog();
