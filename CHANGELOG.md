@@ -5,6 +5,24 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **A second cold run drove eight fixes toward a findable result.** The
+  follow-up PM walkthrough passed hire → task → run → terminal state both
+  ways, then failed to find the result anywhere; the panel now answers.
+  Runs cards and a "Runs on this task" section in the task drawer open the
+  run's delegation record — with its canonical summary — in one click (the
+  task's own state stays a human decision and never advances itself). The
+  board fits itself once on first paint, offers a Fit button and a plain
+  pan/zoom hint, and stops rendering role templates as live agents: the
+  catalogue is their shelf, and the graph tally splits `counts.templates`
+  from `counts.agents`. The hire modal resets every opening (a cancelled
+  attempt no longer leaks into the next), says "Save the template" when
+  that is what the click records, and prefills the rationale a chosen
+  template already carries. Known field refusals lead with the field's
+  label in the panel's language, canonical text kept in brackets; unknown
+  refusals stay verbatim. The read-only catalogue hides its form under the
+  banner instead of dangling live inputs, footer counts speak both
+  locales, and the operator's own session card says plainly that it is
+  them. Graph card states stay canonical by position.
 - **The panel is rebuilt around one home per kind of thing.** A library
   sidebar (board, runs, a two-minute Overview, Skills and Tools as two doors
   over the one operator catalogue, honest SGR/MCP placeholders that name their
