@@ -442,6 +442,241 @@ def test_new_task_marks_exactly_the_fields_the_domain_refuses_blank(
     assert len(marked) == len(blank), marked
 
 
+def test_every_dialog_shares_one_focus_trap_and_guards_esc_over_a_dirty_form() -> None:
+    """Round 3, designer: Tab walked out of an open dialog into the page behind
+    it, and because that page keeps its focus outlines the dialog looked as if
+    it had vanished while it was still open.  All four dialogs share ONE
+    mechanism -- trap, opening focus, restore, Esc -- rather than four copies,
+    and Esc over a form whose fields have moved asks before discarding, through
+    the same `window.confirm` the retire buttons already use."""
+
+    body = read_spa()
+    scrims = ("hire-modal", "task-modal", "link-modal", "close-link-modal")
+
+    # One mechanism, not four: a single opener, a single closer, one entry per
+    # dialog in the table that says how each is dismissed.
+    assert body.count("function openModal(") == 1
+    assert body.count("function closeModal(") == 1
+    closers = body.split("const MODAL_CLOSERS = {", 1)[1].split("};", 1)[0]
+    for scrim in scrims:
+        assert f'"{scrim}":' in closers, scrim
+        # Nothing may reach around the mechanism to hide a dialog by hand; that
+        # is how focus was left stranded on a control the operator cannot see.
+        assert f'document.getElementById("{scrim}").hidden = ' not in body, scrim
+
+    # Each dialog says it is one, and is named by its own heading.
+    for scrim, heading in (
+        ("hire-modal", "hire-title"),
+        ("task-modal", "task-modal-title"),
+        ("link-modal", "link-modal-title"),
+        ("close-link-modal", "close-link-modal-title"),
+    ):
+        markup = body.split(f'id="{scrim}"', 1)[1].split("</div>", 1)[0]
+        assert 'role="dialog"' in markup, scrim
+        assert 'aria-modal="true"' in markup, scrim
+        assert f'aria-labelledby="{heading}"' in markup, scrim
+        assert f'id="{heading}"' in body, heading
+
+    # Tab and Shift+Tab both wrap inside the dialog instead of running on.
+    assert 'if (event.key !== "Tab") { return; }' in body
+    assert "event.shiftKey && (!inside || active === first)" in body
+    assert "!event.shiftKey && (!inside || active === last)" in body
+    # Focus moves in on opening and goes back to whatever opened the dialog.
+    assert "if (openModalId !== scrimId) { modalOpener = document.activeElement; }" in body
+    assert "opener.focus();" in body
+    # Esc closes, but not over work: the guard compares the fields against what
+    # they held as the dialog opened, and the sample is taken last, after the
+    # caller has filled the form in.
+    assert 'window.confirm(t("confirm_discard"))' in body
+    assert "modalOpenedAs = modalFieldState(scrim);" in body
+    trap = body.split('if (event.key === "Escape") {', 1)[1].split("return;", 1)[0]
+    assert "modalFieldState(scrim) !== modalOpenedAs" in trap
+    # And an open dialog owns Esc: one press must not also un-isolate the graph.
+    assert 'event.key === "Escape" && !openModalId && focused' in body
+
+
+def test_confirmations_say_what_happened_and_keep_the_id_one_click_away() -> None:
+    """Round 3, designer: the panel confirmed its writes with the ids it had
+    just minted -- `нанята agent.61JBN…`, `launched delegation.6S7B…` -- so the
+    operator was told a ULID instead of what had happened, and the name they had
+    typed a second earlier appeared nowhere.  Every confirmation now leads with
+    a sentence naming the thing, and the canonical id follows it as a chip that
+    stays selectable."""
+
+    body = read_spa()
+    assert "function reportResult(" in body
+    assert 'chip.className = "idchip"' in body
+    assert ".idchip{" in body
+    # The chip must stay readable where the line is width-constrained: the board
+    # bar gives the sentence its own truncating row and puts the id under it,
+    # rather than squeezing both onto one row until the words vanish.
+    assert "#board-result .saidline{" in body
+    assert "#board-result .idchip{" in body
+    assert "display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" in body
+
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    english = table.split("en: {", 1)[1].split("\n  },", 1)[0]
+    russian = table.split("ru: {", 1)[1].split("\n  },", 1)[0]
+    for key in (
+        "hired_named",
+        "preset_saved_named",
+        "task_created_named",
+        "link_opened_named",
+        "link_closed_named",
+        "run_started",
+        "settings_saved_named",
+        "retired_named",
+        "message_recorded_named",
+        "accept_review_requested_named",
+        "accept_recorded_named",
+        "reopen_recorded_named",
+    ):
+        values = []
+        for block in (english, russian):
+            line = re.search(rf'^\s*{key}: "(.*)",$', block, re.MULTILINE)
+            assert line is not None, key
+            # A sentence that names the thing: every one carries a slot for the
+            # human name or title, which is what the id was standing in for.
+            assert "{" in line.group(1), key
+            values.append(line.group(1))
+        assert values[0] != values[1], f"{key} was not actually translated"
+
+    # The id-leading forms these replaced are gone.
+    assert 't("launched") + " " + payload.delegation_id' not in body
+    assert 't("hired")' not in body
+    assert 't("task_created")' not in body
+
+
+def test_a_run_card_states_its_status_once_unless_the_two_values_disagree() -> None:
+    """`SUCCEEDED · SUCCEEDED` (round 3, designer): the attempt's operational
+    phase and the canonical delegation's state were concatenated bare.  Agreeing
+    values are said once; disagreeing ones are real information about a run in
+    trouble and are shown as two labelled values, never two bare words."""
+
+    body = read_spa()
+    status = body.split("function runStatusText(run) {", 1)[1].split("\n}\n", 1)[0]
+    assert "if (!state || state === phase) { return lead + phase; }" in status
+    assert 't("run_phase_word")' in status
+    assert 't("run_state_word")' in status
+    # Both card renderers -- the Runs view and the task drawer -- go through it,
+    # and neither still concatenates the two values itself.
+    assert body.count("kind.textContent = runStatusText(run);") == 2
+    assert '" · " + run.delegation_state' not in body
+    # Both values keep the ledger's spelling: only the labels are the panel's.
+    assert "String(run.phase" in status
+    assert "String(run.delegation_state" in status
+
+
+def test_the_onboarding_card_waits_for_a_hire_not_for_an_empty_graph(
+    writable,  # type: ignore[no-untyped-def]
+) -> None:
+    """The card hid the moment ANY node existed, so a workspace handed over with
+    a task -- or merely an operator session -- in it hid the first step before it
+    had been taken, and the round-3 PM never saw the card once.  Hiring IS the
+    first step, so the card waits for a hired role; a template is shelf stock,
+    which the graph marks on the node's own attrs."""
+
+    writable.create_task(title="Handed over", description="d", acceptance_criteria=("c",))
+    writable.create_agent(
+        name="Reviewer template",
+        profile_id="claude-builder",
+        rationale="shelf stock, not a hire",
+        template=True,
+    )
+    writable.rebuild_graph()
+    nodes = writable.graph()["nodes"]
+    # The old condition would have hidden the card on this workspace...
+    assert len(nodes) > 0
+    # ...and the panel's new one keeps it, because nobody has hired yet.  The
+    # template marker the panel reads is really carried on the node.
+    templates = [node for node in nodes if (node["attrs"] or {}).get("template")]
+    assert templates, "the graph stopped marking templates on the node's attrs"
+    hired = [
+        node
+        for node in nodes
+        if node["kind"] == "agent" and not (node["attrs"] or {}).get("template")
+    ]
+    assert hired == []
+
+    body = read_spa()
+    assert "graph.nodes.length > 0 || !writesEnabled" not in body
+    render = body.split("function render(graph) {", 1)[1].split(
+        "function paintFocusChrome", 1
+    )[0]
+    assert 'node.kind === "agent" && !(node.attrs && node.attrs.template)' in render
+    assert "hasHire || onboardingSetAside || !writesEnabled" in render
+    # The card can now land over a board that already carries work, so it must
+    # be possible to put aside -- an opaque overlay with no exit would trade one
+    # finding for a worse one.
+    assert 'id="onb-dismiss"' in body
+
+
+def test_an_empty_template_catalogue_offers_the_route_that_creates_the_first_one() -> None:
+    """Round 3, PM: choosing "From the agent catalogue" with an empty catalogue
+    showed a select holding "— none —" and nothing else.  The dead select gives
+    way to what a template is and to the path that creates one -- the
+    from-scratch form with "save as a template" on, which this modal already
+    had -- and the dead-end option leaves the list rather than merely refusing
+    to be chosen."""
+
+    body = read_spa()
+    assert 'id="hire-preset-empty"' in body
+    assert 'data-i18n="hire_preset_empty"' in body
+    assert 'id="hire-preset-create"' in body
+
+    mode = body.split("function applyHireMode() {", 1)[1].split("\n}\n", 1)[0]
+    assert "const hasPresets = Boolean(catalog && (catalog.presets || []).length);" in mode
+    assert 'document.getElementById("hire-preset-field").hidden = !fromPreset;' in mode
+    assert (
+        'document.getElementById("hire-preset-empty").hidden = !(wantsPreset && !hasPresets);'
+        in mode
+    )
+    # Hidden, not merely disabled: a disabled option still advertises a path.
+    paint = body.split("function paintHire() {", 1)[1].split("\n}\n", 1)[0]
+    assert "presetMode.hidden = !hasPresets;" in paint
+    assert "presetMode.disabled = !hasPresets;" in paint
+    # No new route was invented: the shelf's own creation path is reused.
+    assert body.count("showHire(true, { template: true })") == 2
+
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    for key in ("hire_preset_empty", "hire_preset_create"):
+        for block in ("en: {", "ru: {"):
+            language = table.split(block, 1)[1].split("\n  },", 1)[0]
+            assert re.search(rf'^\s*{key}: "', language, re.MULTILINE), (key, block)
+
+
+def test_an_empty_catalogue_explains_the_skills_box_instead_of_showing_an_empty_one() -> None:
+    """Round 3, designer: the skills multiselect rendered as an empty box with no
+    empty state and read as broken.  The box gives way to a line saying what a
+    skill is and where skills come from, in the same words the Catalogue view
+    already uses about the editing gate.  The tools checklist had the same hole
+    for a profile whose tools are all fixed."""
+
+    body = read_spa()
+    assert 'id="settings-skills-empty"' in body
+    paint = body.split("function paintSettings(record) {", 1)[1].split(
+        "\nasync function loadCatalog", 1
+    )[0]
+    assert 'document.getElementById("setting-skills-field").hidden = !skills.length;' in paint
+    assert "skillsEmpty.hidden = skills.length > 0;" in paint
+    # Consistent with the Catalogue view: the same sentence about the same gate.
+    assert 'catalogEditing ? t("catalog_add_here") : t("catalog_readonly")' in paint
+    catalogue = body.split("function paintCatalog() {", 1)[1].split("\n}\n", 1)[0]
+    assert 't("catalog_readonly")' in catalogue
+    # The empty state is written from JS, so it must not also claim a data-i18n
+    # marker -- applyI18n runs on every snapshot and would overwrite it.
+    assert '<p class="note" id="settings-skills-empty" hidden></p>' in body
+    # The tools checklist gets the same treatment.
+    assert "if (!summary.narrowable.length) {" in paint
+    assert 't("tools_none_narrowable")' in paint
+
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    for key in ("skills_empty", "catalog_add_here", "tools_none_narrowable"):
+        for block in ("en: {", "ru: {"):
+            language = table.split(block, 1)[1].split("\n  },", 1)[0]
+            assert re.search(rf'^\s*{key}: "', language, re.MULTILINE), (key, block)
+
+
 def test_a_repaint_cannot_change_the_hire_modal_under_the_operator() -> None:
     """Both round-3 testers saw the modal self-close or prefill unexpectedly, and
     it did, three ways.  `applyI18n` runs on every stream snapshot and rewrote a

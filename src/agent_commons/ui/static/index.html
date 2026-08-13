@@ -159,10 +159,29 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
    button that looked dead because its refusal rendered past the fold. */
 .req::after{content:" *"; color:var(--warn)}
 .field-error{font-size:11px; color:var(--bad); margin:3px 0 0}
+/* Round 3, designer: every confirmation led with the id it had just written —
+   `нанята agent.61JBN…` names nothing a person recognises.  The sentence leads
+   now and the canonical id follows it as a chip: small, quiet, and selectable
+   in one gesture, because an operator still has to be able to copy it. */
+.idchip{
+  display:inline-block; margin-left:6px; padding:1px 5px;
+  font:11px ui-monospace,"JetBrains Mono",monospace; color:var(--faint);
+  background:var(--surface-2); border:1px solid var(--border); border-radius:4px;
+  user-select:all;
+}
 /* The hire result on the board's bar stays one line: wrapped, it pushed the
    two + buttons apart.  The id is long, so the line ellipsizes and carries the
    whole text as its tooltip — and the role it names is selected on the board. */
-#board-result{margin:0; max-width:32ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* Sentence on top, id under it.  Both have to be readable — a chip nobody can
+   see is the same dead end as no id at all — and neither may push the two +
+   buttons apart, which is what the wrapping line did in round 2.  A fixed
+   width and a fixed two rows settle it, and the bar does not grow: two 11px
+   rows are still shorter than the 36px + button beside them. */
+#board-result{margin:0; max-width:44ch; flex:none}
+#board-result .saidline{
+  display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#board-result .idchip{margin-left:0}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
@@ -219,7 +238,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
    and eat its link ports (a real drag died on exactly that). */
 #view-board{display:flex; flex-direction:column}
 #view-board #canvas{flex:1; min-height:0}
-.board-bar{display:flex; gap:10px; align-items:center; padding:9px 14px; flex:none}
+/* Wraps rather than squeezing: the bar's last item is the confirmation of what
+   the operator just recorded, and on a narrow centre a no-wrap row shrank it to
+   a single letter (round 3's confirmations, seen in a live panel). */
+.board-bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:9px 14px; flex:none}
 #fab{
   width:36px; height:36px;
   border-radius:50%; background:var(--info); color:#0d1117; border:none;
@@ -359,7 +381,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <div class="step"><span class="n">3</span><div>
             <b data-i18n="onb_s3_t">Run it</b>
             <p data-i18n="onb_s3_p">The agent takes the task. The run shows up live in Runs.</p></div></div>
-          <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first agent</button>
+          <!-- The card now waits for a hire rather than for any node at all, so
+               it can land over a board that already carries tasks or sessions.
+               It must therefore be possible to put aside — an opaque overlay
+               with no exit would trade round 3's invisible first step for an
+               unreachable board.  Set aside for this window only; a reload
+               brings the first step back until it has actually been taken. -->
+          <div class="actions">
+            <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first agent</button>
+            <button type="button" id="onb-dismiss" data-i18n="onb_dismiss">Look at the board first</button>
+          </div>
         </div>
       </div>
       <svg id="linkband" hidden><path d=""></path></svg>
@@ -715,8 +746,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
       <label class="field"><span data-i18n="setting_name_label">Display name</span>
         <input type="text" id="setting-name" autocomplete="off"></label>
-      <label class="field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
+      <label class="field" id="setting-skills-field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
         <select id="setting-skills" multiple size="4"></select></label>
+      <!-- An empty operator catalogue rendered this control as an empty box and
+           read as broken (round 3, designer).  The box gives way to a line that
+           says what a skill is and where skills come from — written from JS
+           because the second half depends on the catalogue-editing gate. -->
+      <p class="note" id="settings-skills-empty" hidden></p>
       <p class="note" data-i18n="skill_contract_line">Skills are glued into the agent's instructions on
         every run. Changes apply from the next run, never retroactively.</p>
       <p class="note warn" id="skills-count-note" hidden data-i18n="skills_too_many">More than three
@@ -761,8 +797,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span id="truncation"></span>
 </footer>
 <div class="scrim" id="hire-modal" hidden>
-  <div class="modal">
-    <h2 data-i18n="tab_hire" id="hire-title">Hire</h2>
+  <!-- Every dialog names itself by its own heading and says it is modal: round
+       3 found Tab walking straight out of an open form into the page behind it,
+       which keeps its focus outlines, so the dialog read as if it had vanished
+       while it was still open.  The heading takes `tabindex="-1"` so focus has
+       somewhere to land in a dialog whose fields are all hidden. -->
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="hire-title">
+    <h2 data-i18n="tab_hire" id="hire-title" tabindex="-1">Hire</h2>
     <section class="panel open" id="panel-hire">
       <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
         profile and can only narrow it; a role that may create or retire other
@@ -777,6 +818,17 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         </select></label>
       <label class="field" id="hire-preset-field" hidden><span data-i18n="hire_preset_label">Template</span>
         <select id="hire-preset"></select></label>
+      <!-- The catalogue path with an empty catalogue offered a select holding
+           "— none —" and nothing else (round 3, PM): a dead end whose only
+           answer is to create the first template.  The dead select gives way to
+           that answer, and the button is the route this modal already has —
+           the from-scratch form with "save as a template" turned on. -->
+      <div class="field" id="hire-preset-empty" hidden>
+        <p class="note" data-i18n="hire_preset_empty">A template is a saved role setup — profile,
+          permissions and budget under one name. There are none yet.</p>
+        <button type="button" id="hire-preset-create"
+          data-i18n="hire_preset_create">Set one up from scratch and save it as a template</button>
+      </div>
       <label class="field"><span class="req" data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
       <label class="field" id="hire-profile-field"><span class="req" data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
@@ -804,8 +856,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   </div>
 </div>
 <div class="scrim" id="task-modal" hidden>
-  <div class="modal">
-    <h2 data-i18n="task_modal_title">New task</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
+    <h2 data-i18n="task_modal_title" id="task-modal-title" tabindex="-1">New task</h2>
     <p class="note" data-i18n="task_modal_note">A task is what a role gets run on: what to do, and how
       we will know it is done. It lands on the board and in the history.</p>
     <!-- All three are marked because the server refuses all three: `title` and
@@ -827,8 +879,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   </div>
 </div>
 <div class="scrim" id="link-modal" hidden>
-  <div class="modal">
-    <h2 data-i18n="link_modal_title">Open a link</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
+    <h2 data-i18n="link_modal_title" id="link-modal-title" tabindex="-1">Open a link</h2>
     <p class="note" id="link-pair"></p>
     <p class="note" data-i18n="link_permission_note">A link is a recorded permission in the journal;
       it does not open a communication channel yet.</p>
@@ -847,8 +899,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   </div>
 </div>
 <div class="scrim" id="close-link-modal" hidden>
-  <div class="modal">
-    <h2 data-i18n="link_close_title">Close this link?</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="close-link-modal-title">
+    <h2 data-i18n="link_close_title" id="close-link-modal-title" tabindex="-1">Close this link?</h2>
     <p class="note" id="close-link-pair"></p>
     <p class="note" data-i18n="link_close_note">Closing is a recorded state change — the journal keeps
       the link's history. Nothing is deleted.</p>
@@ -927,7 +979,6 @@ const STRINGS = {
     open_links_label: "Open links",
     hire_budget_label: "Turnover budget (blank = none)",
     hire_button: "Hire",
-    hired: "hired",
     preset_none: "— none —",
     runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
     runs_open_tip: "Open the run's record.",
@@ -940,11 +991,9 @@ const STRINGS = {
     run_task_label: "Task",
     run_wall_label: "Wall-time seconds (blank = default)",
     run_go: "Run this role on the task",
-    launched: "launched",
     message_subject_label: "Subject (new thread only)",
     message_body_label: "Message to this role",
     message_note_role: "You are writing to this role. Agents talk to each other through delegation; this channel carries human direction only.",
-    message_recorded: "recorded as a canonical thread message",
     setting_name_label: "Display name",
     setting_skills_label: "Required skills (operator catalogue)",
     setting_tools_label: "Tools (narrows the profile, never widens)",
@@ -956,8 +1005,6 @@ const STRINGS = {
     retire_needs_reason: "a retirement needs a reason; it stays in the ledger forever",
     confirm_retire: "Retire this role? Nothing is deleted; it stops taking work.",
     confirm_retire_cascade: "Retire this role and every role it created? Nothing is deleted; they stop taking work.",
-    retired: "retired",
-    history_retained: "history retained",
     profile_word: "profile",
     profile_note: "the profile fixes the executable, model, sandbox, and tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
     stored_word: "stored",
@@ -1177,7 +1224,6 @@ const STRINGS = {
     preset_hire_from: "Hire from this",
     preset_create_button: "Create a template…",
     preset_create_title: "New template",
-    preset_saved: "template saved",
     preset_save_button: "Save the template",
     err_field_empty: "The “{field}” field cannot be empty.",
     hire_mode_label: "How",
@@ -1192,7 +1238,6 @@ const STRINGS = {
     task_desc_label: "What to do",
     task_criteria_label: "Done when (one criterion per line)",
     task_create_button: "Create the task",
-    task_created: "task recorded",
     link_open_with: "Open a link with…",
     trust_short: "ⓘ trust model",
     tip_hire_profile: "The profile fixes the provider, model and tool set. Profiles are operator-owned and never edited from the panel.",
@@ -1219,10 +1264,7 @@ const STRINGS = {
     accept_needs_summary: "Acceptance needs one line saying what you are accepting; it stays in the history forever.",
     reopen_reason_label: "Why send it back?",
     reopen_needs_reason: "Sending work back needs a reason — whoever picks the task up reads it.",
-    accept_review_requested: "sent for review",
     accept_review_next: "Now launch a role whose profile is an independent reviewer on this task.",
-    accept_recorded: "accepted — a person signed this work off",
-    reopen_recorded: "sent back to work",
     err_needs_open_review: "This role reviews work, and there is no open review request for this task yet. Open the task and press “Send for review” first, then launch the reviewer.",
     err_needs_approved_review: "Nobody has approved this work yet. Launch a role whose profile is an independent reviewer against this task; when its verdict is approved, “Accept” will go through.",
     err_review_not_independent: "The review this task has is not an independent one. Send the task for review again and let a role outside the work do the checking.",
@@ -1235,6 +1277,28 @@ const STRINGS = {
     work_returned_open: "Open the task",
     guide_accept_p: "One rule matters more than the rest in daily use: a run reaching succeeded does not finish a task. A person accepts the work, and only after an independent review of it. The “Tasks and runs” tab walks through that chain.",
     required_note: "Fields marked * are required.",
+    confirm_discard: "Discard what you entered and close this dialog?",
+    onb_dismiss: "Look at the board first",
+    id_chip_tip: "The canonical id. Select it to copy.",
+    hired_named: "Hired {name}. The role is on the board.",
+    preset_saved_named: "Saved the template {name}. Hiring from it is two clicks.",
+    task_created_named: "Created the task “{title}”. It is on the board and in the history.",
+    link_opened_named: "{from} may now reach {to}. The permission is recorded.",
+    link_closed_named: "Withdrew the permission {pair}. The history stays.",
+    run_started: "{role} is now running on “{task}”.",
+    run_phase_word: "run",
+    run_state_word: "delegation",
+    settings_saved_named: "Saved {name}. The changes apply from its next run.",
+    retired_named: "Retired {name}; {count} records closed. The history stays.",
+    message_recorded_named: "Sent to {name}, recorded as a thread message.",
+    accept_review_requested_named: "Sent “{title}” for review.",
+    accept_recorded_named: "Accepted “{title}” — you signed this work off.",
+    reopen_recorded_named: "Sent “{title}” back to work.",
+    hire_preset_empty: "A template is a saved role setup — one profile with its permissions and its budget, under a name. There are none yet.",
+    hire_preset_create: "Set a role up from scratch and save it as the first template",
+    skills_empty: "No skills in the operator catalogue yet. A skill is a behaviour package glued into the agent's instructions on every run.",
+    catalog_add_here: "Add one under Skills in the library.",
+    tools_none_narrowable: "This profile grants nothing that can be narrowed — every tool it has is fixed.",
     record_show_json: "Show record",
     record_hide_json: "Hide record",
     sum_what: "What it is",
@@ -1357,7 +1421,6 @@ const STRINGS = {
     open_links_label: "Открытие ссылок",
     hire_budget_label: "Бюджет ротации (пусто = нет)",
     hire_button: "Нанять",
-    hired: "нанята",
     preset_none: "— нет —",
     runs_note: "Текущие и недавние запуски провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
     runs_open_tip: "Открыть запись прогона.",
@@ -1370,11 +1433,9 @@ const STRINGS = {
     run_task_label: "Задача",
     run_wall_label: "Лимит времени, секунд (пусто = по умолчанию)",
     run_go: "Запустить эту роль на задаче",
-    launched: "запущена делегация",
     message_subject_label: "Тема (только для новой ветки)",
     message_body_label: "Сообщение этой роли",
     message_note_role: "Вы пишете этой роли. Агенты общаются между собой через делегацию; этот канал — только для указаний человека.",
-    message_recorded: "записано как каноническое сообщение ветки",
     setting_name_label: "Отображаемое имя",
     setting_skills_label: "Обязательные навыки (каталог оператора)",
     setting_tools_label: "Инструменты (только сужают профиль, никогда не расширяют)",
@@ -1386,8 +1447,6 @@ const STRINGS = {
     retire_needs_reason: "для отставки нужна причина; она навсегда останется в реестре",
     confirm_retire: "Отправить эту роль в отставку? Ничего не удаляется; она перестаёт брать работу.",
     confirm_retire_cascade: "Отправить в отставку эту роль и все созданные ею роли? Ничего не удаляется; они перестают брать работу.",
-    retired: "отправлено в отставку",
-    history_retained: "история сохранена",
     profile_word: "профиль",
     profile_note: "профиль фиксирует исполняемый файл, модель, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
     stored_word: "сохранено",
@@ -1607,7 +1666,6 @@ const STRINGS = {
     preset_hire_from: "Нанять из этого",
     preset_create_button: "Создать шаблон…",
     preset_create_title: "Новый шаблон",
-    preset_saved: "шаблон сохранён",
     preset_save_button: "Сохранить шаблон",
     err_field_empty: "Поле «{field}» не может быть пустым.",
     hire_mode_label: "Как нанимаем",
@@ -1622,7 +1680,6 @@ const STRINGS = {
     task_desc_label: "Что сделать",
     task_criteria_label: "Готово, когда (по одному критерию в строке)",
     task_create_button: "Создать задачу",
-    task_created: "задача записана",
     link_open_with: "Открыть связь с…",
     trust_short: "ⓘ модель доверия",
     tip_hire_profile: "Профиль фиксирует провайдера, модель и набор инструментов. Профили принадлежат оператору и из панели не редактируются.",
@@ -1649,10 +1706,7 @@ const STRINGS = {
     accept_needs_summary: "Приёмке нужна одна строка о том, что вы принимаете; она останется в истории навсегда.",
     reopen_reason_label: "Почему возвращаете?",
     reopen_needs_reason: "Возврату работы нужна причина — её прочитает тот, кто возьмёт задачу дальше.",
-    accept_review_requested: "отправлено на ревью",
     accept_review_next: "Теперь запустите на этой задаче роль с профилем независимого ревьюера.",
-    accept_recorded: "принято — человек подписал эту работу",
-    reopen_recorded: "возвращено в работу",
     err_needs_open_review: "Эта роль проверяет работу, а открытого запроса на ревью по задаче пока нет. Откройте задачу, нажмите «Отправить на ревью», и только потом запускайте ревьюера.",
     err_needs_approved_review: "Работу пока никто не одобрил. Запустите на этой задаче роль с профилем независимого ревьюера; когда её вердикт станет approved, «Принять» пройдёт.",
     err_review_not_independent: "Имеющееся ревью не является независимым. Отправьте задачу на ревью заново и дайте проверить роли, не участвовавшей в работе.",
@@ -1665,6 +1719,28 @@ const STRINGS = {
     work_returned_open: "Открыть задачу",
     guide_accept_p: "Одно правило в ежедневной работе важнее остальных: прогон, дошедший до succeeded, не завершает задачу. Работу принимает человек — и только после независимого ревью. Вся цепочка разобрана во вкладке «Задачи и прогоны».",
     required_note: "Поля со звёздочкой * обязательны.",
+    confirm_discard: "Отменить введённое и закрыть это окно?",
+    onb_dismiss: "Сначала посмотреть доску",
+    id_chip_tip: "Канонический идентификатор. Выделите, чтобы скопировать.",
+    hired_named: "{name} нанят. Роль появилась на доске.",
+    preset_saved_named: "Шаблон «{name}» сохранён. Наём по нему — два клика.",
+    task_created_named: "Задача «{title}» создана. Она на доске и в истории.",
+    link_opened_named: "{from} теперь может обратиться к {to}. Разрешение записано.",
+    link_closed_named: "Разрешение {pair} отозвано. История сохранена.",
+    run_started: "{role} работает над задачей «{task}».",
+    run_phase_word: "прогон",
+    run_state_word: "делегация",
+    settings_saved_named: "Настройки роли {name} сохранены. Изменения действуют со следующего прогона.",
+    retired_named: "{name} отправлена в отставку; закрыто записей: {count}. История сохранена.",
+    message_recorded_named: "Отправлено роли {name} и записано как сообщение ветки.",
+    accept_review_requested_named: "Задача «{title}» отправлена на ревью.",
+    accept_recorded_named: "Задача «{title}» принята — вы подписали эту работу.",
+    reopen_recorded_named: "Задача «{title}» возвращена в работу.",
+    hire_preset_empty: "Шаблон — это сохранённая настройка роли: профиль с его правами и бюджетом под одним именем. Пока их нет.",
+    hire_preset_create: "Настроить роль с нуля и сохранить как первый шаблон",
+    skills_empty: "В операторском каталоге пока нет навыков. Навык — это пакет поведения, который вклеивается в инструкции агента на каждом прогоне.",
+    catalog_add_here: "Добавьте его в разделе «Навыки».",
+    tools_none_narrowable: "Этот профиль не даёт ничего, что можно сузить: все его инструменты фиксированы.",
     record_show_json: "Показать запись",
     record_hide_json: "Скрыть запись",
     sum_what: "Что это",
@@ -1882,6 +1958,42 @@ function showFormError(error, fields, result) {
   input.focus();
 }
 
+// --- confirmations, said in words -----------------------------------------
+// The mirror of `showFormError`, for the half of the panel that succeeded.
+// Round 3, designer: every confirmation led with the id it had just written —
+// `нанята agent.61JBN…`, `launched delegation.6S7B…` — so the operator was told
+// a ULID rather than what had happened, and the name they had typed a second
+// earlier appeared nowhere.  The sentence leads and names the thing; the
+// canonical id follows as a chip, quiet but selectable, because an id an
+// operator cannot copy is worse than no id at all.
+function reportResult(host, tone, sentence, canonicalId) {
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  host.className = "result " + tone;
+  // The sentence is its own element so a host that has to fit a fixed width —
+  // the board's bar — can truncate the words without also truncating the id.
+  const line = document.createElement("span");
+  line.className = "saidline";
+  line.textContent = sentence;
+  host.appendChild(line);
+  if (canonicalId) {
+    const chip = document.createElement("code");
+    chip.className = "idchip";
+    chip.textContent = canonicalId;
+    chip.title = t("id_chip_tip");
+    host.appendChild(chip);
+  }
+}
+
+// One sentence, one substitution, so a name never lands in the middle of a
+// half-built string: the Russian word order for these differs from the English.
+function said(key, values) {
+  let sentence = t(key);
+  for (const [name, value] of Object.entries(values || {})) {
+    sentence = sentence.replace("{" + name + "}", String(value));
+  }
+  return sentence;
+}
+
 async function api(path) {
   const response = await fetch(path, { headers: authHeaders() });
   if (!response.ok) { throw new Error(t("request_failed") + " " + response.status); }
@@ -2054,12 +2166,25 @@ function visibleNodesOf(graph) {
     !(node.kind === "agent" && node.attrs && node.attrs.template));
 }
 
+// Set aside by the operator for this window; never persisted, because the first
+// step is still untaken and a later window should say so again.
+let onboardingSetAside = false;
+
 function render(graph) {
   lastGraph = graph;
   // Cold start gets a guided three-step card instead of a bare empty graph:
   // the newcomer should know where they landed and what to do first (item 3).
+  //
+  // It used to go the moment ANY node existed, and round 3 showed what that
+  // costs: a workspace handed over with a task or an operator session already
+  // in it hid the card before its first step had been taken, and the round-3 PM
+  // never saw it once.  The first step is hiring, so the card stays until
+  // somebody has hired — a template is shelf stock, not a hire, and the graph
+  // marks it on the node's own attrs.
+  const hasHire = graph.nodes.some((node) =>
+    node.kind === "agent" && !(node.attrs && node.attrs.template));
   document.getElementById("onboarding").hidden =
-    graph.nodes.length > 0 || !writesEnabled;
+    hasHire || onboardingSetAside || !writesEnabled;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
   const visibleNodes = visibleNodesOf(graph);
   const layoutResult = layout(visibleNodes);
@@ -2257,9 +2382,11 @@ document.getElementById("focus-toggle").addEventListener("click", () => {
 });
 
 // Esc and a click on empty canvas both leave focus mode, so nobody gets stuck
-// looking at a mostly faded graph without an obvious way out.
+// looking at a mostly faded graph without an obvious way out.  An open dialog
+// owns Esc while it is open: one press must not both dismiss the dialog and
+// silently un-isolate the graph behind it.
 window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && focused) { setFocus(null); }
+  if (event.key === "Escape" && !openModalId && focused) { setFocus(null); }
 });
 canvas.addEventListener("click", (event) => {
   if (event.target === canvas && !suppressClick && focused) { setFocus(null); }
@@ -2307,9 +2434,17 @@ function closeDrawer() {
 let hireTemplate = false;
 
 function applyHireMode() {
-  const fromPreset =
+  const wantsPreset =
     document.getElementById("hire-mode").value === "preset" && !hireTemplate;
+  // Round 3, PM: with an empty catalogue this path showed a select holding
+  // "— none —" and nothing else, and no way on from there.  An empty catalogue
+  // has no template to pick, so the picker gives way to the route that creates
+  // the first one, and the rest of the form behaves as if the operator were
+  // still setting a role up from scratch — which is what they will be doing.
+  const hasPresets = Boolean(catalog && (catalog.presets || []).length);
+  const fromPreset = wantsPreset && hasPresets;
   document.getElementById("hire-preset-field").hidden = !fromPreset;
+  document.getElementById("hire-preset-empty").hidden = !(wantsPreset && !hasPresets);
   document.getElementById("hire-profile-field").hidden = fromPreset;
   document.getElementById("hire-context-field").hidden = fromPreset;
   document.getElementById("hire-grants").hidden = fromPreset;
@@ -2339,8 +2474,7 @@ function prefillPresetRationale() {
 }
 
 function showHire(open, options) {
-  document.getElementById("hire-modal").hidden = !open;
-  if (!open) { return; }
+  if (!open) { closeModal("hire-modal"); return; }
   const values = options || {};
   hireTemplate = Boolean(values.template);
   // The modal is reused, so values from the previous opening leaked into the
@@ -2384,7 +2518,10 @@ function showHire(open, options) {
   }
   applyHireMode();
   document.getElementById("hire-result").textContent = "";
-  document.getElementById("hire-name").focus();
+  // Unhidden last, once the form holds what THIS opening asks for: the dirty
+  // guard samples the fields as it opens, and a sample taken before the reset
+  // would call a freshly reset form dirty.
+  openModal("hire-modal", "hire-name");
 }
 
 function showPanel(name) {
@@ -2442,7 +2579,107 @@ document.getElementById("sidebar").addEventListener("click", (event) => {
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 document.getElementById("fab").addEventListener("click", () => showHire(true));
 document.getElementById("onb-cta").addEventListener("click", () => showHire(true));
+document.getElementById("onb-dismiss").addEventListener("click", () => {
+  onboardingSetAside = true;
+  document.getElementById("onboarding").hidden = true;
+});
 document.getElementById("hire-cancel").addEventListener("click", () => showHire(false));
+
+// --- one modal mechanism for all four dialogs ------------------------------
+// Round 3, designer: Tab walked out of an open dialog into the page behind it,
+// and because that page keeps its own focus outlines the dialog appeared to
+// have vanished while it was still open and still holding what had been typed.
+// Only one dialog is ever open here, so this keeps a single open id rather than
+// a stack, and every dialog shares the same trap, the same opening focus, the
+// same restore, and the same Esc.
+//
+// Esc closes, but not silently over work: a dialog whose fields have moved
+// since it opened asks first, through the same `window.confirm` the retire
+// buttons already use — the panel does not gain a second dialog layer to guard
+// the first one.
+const MODAL_CLOSERS = {
+  "hire-modal": () => showHire(false),
+  "task-modal": () => showTaskModal(false),
+  "link-modal": () => closeModal("link-modal"),
+  "close-link-modal": () => closeModal("close-link-modal"),
+};
+let openModalId = null;
+let modalOpener = null;      // what had focus when the dialog opened
+let modalOpenedAs = null;    // the field values it opened with, for the guard
+
+// Rendered and enabled only: a hidden field is not somewhere Tab may land, and
+// `offsetParent` is null for anything the `[hidden]` rule has taken out.
+function focusablesIn(scrim) {
+  return Array.from(scrim.querySelectorAll(
+    'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter((element) => !element.disabled && element.offsetParent !== null);
+}
+
+// What "changed from the value it opened with" means, in one string: every
+// control the dialog carries, checkboxes and radios by their checked state.
+function modalFieldState(scrim) {
+  return Array.from(scrim.querySelectorAll("input, select, textarea"))
+    .map((field) => (field.type === "checkbox" || field.type === "radio"
+      ? (field.checked ? "1" : "0") : field.value))
+    .join(" ");
+}
+
+function openModal(scrimId, focusId) {
+  const scrim = document.getElementById(scrimId);
+  // Re-entrant on purpose: the empty-catalogue route re-opens the hire modal in
+  // template mode from a button inside it, and remembering THAT button as the
+  // opener would restore focus to something hidden when the dialog closes.
+  if (openModalId !== scrimId) { modalOpener = document.activeElement; }
+  scrim.hidden = false;
+  openModalId = scrimId;
+  const preferred = focusId ? document.getElementById(focusId) : null;
+  const target = (preferred && preferred.offsetParent !== null ? preferred : null) ||
+    focusablesIn(scrim)[0] || scrim.querySelector("h2");
+  if (target) { target.focus(); }
+  // Sampled last, after the caller has filled the form in: what a template
+  // prefilled is what the dialog opened with, not a change the operator made.
+  modalOpenedAs = modalFieldState(scrim);
+}
+
+function closeModal(scrimId) {
+  document.getElementById(scrimId).hidden = true;
+  if (openModalId !== scrimId) { return; }
+  openModalId = null;
+  modalOpenedAs = null;
+  const opener = modalOpener;
+  modalOpener = null;
+  if (opener && document.contains(opener) && typeof opener.focus === "function") {
+    opener.focus();
+  }
+}
+
+window.addEventListener("keydown", (event) => {
+  if (!openModalId) { return; }
+  const scrim = document.getElementById(openModalId);
+  if (event.key === "Escape") {
+    event.preventDefault();
+    if (modalOpenedAs !== null && modalFieldState(scrim) !== modalOpenedAs &&
+        !window.confirm(t("confirm_discard"))) { return; }
+    (MODAL_CLOSERS[openModalId] || (() => closeModal(openModalId)))();
+    return;
+  }
+  if (event.key !== "Tab") { return; }
+  const items = focusablesIn(scrim);
+  if (!items.length) { return; }
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  const inside = scrim.contains(active);
+  // Wrap at both ends, and pull focus back in if it ever left: the browser's
+  // own Tab order runs on to the page behind, which is the whole complaint.
+  if (event.shiftKey && (!inside || active === first)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (!inside || active === last)) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 // The other half of "the modal closed on its own", and the half that cost work.
 // A `click` is delivered to the nearest common ancestor of where the button went
@@ -2480,16 +2717,19 @@ document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
 document.getElementById("preset-create").addEventListener("click", () =>
   showHire(true, { template: true }));
+// The way out of an empty catalogue is the way INTO one: the same from-scratch
+// form the shelf's own "Create a template…" opens, with saving as a template
+// already turned on.  No new route — the one this modal already has.
+document.getElementById("hire-preset-create").addEventListener("click", () =>
+  showHire(true, { template: true }));
 
 // --- task creation (PM run, finding 3): the chat records a thread, a task is
 // its own record — the board needs both doors, side by side.
 function showTaskModal(open) {
-  document.getElementById("task-modal").hidden = !open;
-  if (open) {
-    document.getElementById("task-result").textContent = "";
-    clearFieldErrors(document.getElementById("task-modal"));
-    document.getElementById("task-title").focus();
-  }
+  if (!open) { closeModal("task-modal"); return; }
+  document.getElementById("task-result").textContent = "";
+  clearFieldErrors(document.getElementById("task-modal"));
+  openModal("task-modal", "task-title");
 }
 // Every field the server refuses, with the label it goes by and the input the
 // operator has to come back to.  All three are genuinely required: `title` and
@@ -2510,15 +2750,16 @@ document.getElementById("task-create-go").addEventListener("click", async () => 
   result.textContent = "";
   const criteria = document.getElementById("task-criteria").value
     .split("\n").map((line) => line.trim()).filter(Boolean);
+  const title = document.getElementById("task-title").value.trim();
   try {
     const created = await post("/api/tasks", {
       title: document.getElementById("task-title").value,
       description: document.getElementById("task-desc").value,
       acceptance_criteria: criteria,
     });
-    result.className = "result ok";
-    result.textContent = t("task_created") + " " +
-      (created.entity_ref ? created.entity_ref.id : "");
+    // The title the operator just typed, not the ULID the ledger just minted.
+    reportResult(result, "ok", said("task_created_named", { title: title }),
+      created.entity_ref ? created.entity_ref.id : "");
     document.getElementById("task-title").value = "";
     document.getElementById("task-desc").value = "";
     document.getElementById("task-criteria").value = "";
@@ -2595,25 +2836,34 @@ function openLinkModal(fromId, toId) {
   document.getElementById("link-type-ask").checked = true;
   document.getElementById("link-reason").value = "";
   document.getElementById("link-result").textContent = "";
-  document.getElementById("link-modal").hidden = false;
+  openModal("link-modal", "link-reason");
 }
 
 document.getElementById("link-cancel").addEventListener("click", () => {
-  document.getElementById("link-modal").hidden = true;
+  closeModal("link-modal");
 });
 document.getElementById("link-open-go").addEventListener("click", async () => {
   if (!linkPair) { return; }
   const result = document.getElementById("link-result");
+  const action =
+    document.getElementById("link-type-handoff").checked ? "handoff_work" : "ask";
+  const pair = { from: agentLabel(linkPair.from), to: agentLabel(linkPair.to) };
   try {
-    await post("/api/agent-links", {
+    const opened = await post("/api/agent-links", {
       from_agent_id: linkPair.from,
       to_agent_id: linkPair.to,
-      allowed_action:
-        document.getElementById("link-type-handoff").checked ? "handoff_work" : "ask",
+      allowed_action: action,
       reason: document.getElementById("link-reason").value,
     });
-    document.getElementById("link-modal").hidden = true;
+    closeModal("link-modal");
     await refreshGraph();
+    // The dialog is gone, so the confirmation lands on the board's own line,
+    // where the link it describes has just been drawn.  The permission keeps
+    // its canonical name with the panel's gloss beside it, never instead of it.
+    reportOnBoard(
+      said("link_opened_named", pair) + " · " +
+        glossed(action, LINK_ACTION_GLOSS[action]),
+      opened && opened.entity_ref ? opened.entity_ref.id : "");
   } catch (error) {
     result.className = "result bad";
     result.textContent = humanizeError(error, { reason: "link_reason_label" });
@@ -2628,11 +2878,11 @@ function openCloseLinkModal(linkId, pairText) {
   document.getElementById("close-link-pair").textContent = pairText || linkId;
   document.getElementById("close-link-reason").value = "";
   document.getElementById("close-link-result").textContent = "";
-  document.getElementById("close-link-modal").hidden = false;
+  openModal("close-link-modal", "close-link-reason");
 }
 
 document.getElementById("close-link-cancel").addEventListener("click", () => {
-  document.getElementById("close-link-modal").hidden = true;
+  closeModal("close-link-modal");
 });
 document.getElementById("link-close-btn").addEventListener("click", () => {
   if (selected) {
@@ -2642,6 +2892,8 @@ document.getElementById("link-close-btn").addEventListener("click", () => {
 document.getElementById("close-link-go").addEventListener("click", async () => {
   if (!closingLink) { return; }
   const result = document.getElementById("close-link-result");
+  const closedId = closingLink;
+  const pairText = document.getElementById("close-link-pair").textContent;
   try {
     // The close names the revision it closes: fetch the record it races.
     const payload = await api("/api/entities/agent_link/" + encodeURIComponent(closingLink));
@@ -2649,10 +2901,13 @@ document.getElementById("close-link-go").addEventListener("click", async () => {
       expected_revision: payload.record.revision,
       reason: document.getElementById("close-link-reason").value,
     });
-    document.getElementById("close-link-modal").hidden = true;
+    closeModal("close-link-modal");
     if (selected === closingLink) { closeDrawer(); }
     closingLink = null;
     await refreshGraph();
+    // Both the dialog and, often, the drawer behind it are gone by now, so the
+    // board's line is the only place left that can say what was withdrawn.
+    reportOnBoard(said("link_closed_named", { pair: pairText }), closedId);
   } catch (error) {
     result.className = "result bad";
     result.textContent = humanizeError(error, { reason: "link_close_reason" });
@@ -2782,9 +3037,19 @@ function paintSettings(record) {
     false
   );
   document.getElementById("setting-name").value = record.name || "";
-  fillSelect(document.getElementById("setting-skills"),
-    (catalog && catalog.skills) || [], record.skills || [], true);
+  const skills = (catalog && catalog.skills) || [];
+  fillSelect(document.getElementById("setting-skills"), skills, record.skills || [], true);
   document.getElementById("skills-count-note").hidden = (record.skills || []).length <= 3;
+  // An empty catalogue rendered this multiselect as an empty box, which reads
+  // as a broken control rather than as an empty shelf (round 3, designer).  The
+  // box goes and a line takes its place: what a skill is, where skills come
+  // from, and — in the same words the Catalogue view uses — what it takes to
+  // add one.  The Skills view is the door, so it is what the line names.
+  const skillsEmpty = document.getElementById("settings-skills-empty");
+  document.getElementById("setting-skills-field").hidden = !skills.length;
+  skillsEmpty.hidden = skills.length > 0;
+  skillsEmpty.textContent = t("skills_empty") + " " +
+    (catalogEditing ? t("catalog_add_here") : t("catalog_readonly"));
   // Tool access: the real narrowable set of THIS role's profile, not the
   // catalogue's passports.  Empty allowlist means the whole profile.
   const summary = ((catalog && catalog.profile_tools) || {})[record.profile_id];
@@ -2796,6 +3061,15 @@ function paintSettings(record) {
     const checklist = document.getElementById("tools-checklist");
     while (checklist.firstChild) { checklist.removeChild(checklist.firstChild); }
     checklist.hidden = !allowlist.length;
+    // The same hole as the skills box: a profile whose tools are all fixed left
+    // "Narrow to selected tools" opening onto nothing.  Say that there is
+    // nothing to narrow rather than showing an empty list (round 3, designer).
+    if (!summary.narrowable.length) {
+      const none = document.createElement("p");
+      none.className = "note";
+      none.textContent = t("tools_none_narrowable");
+      checklist.appendChild(none);
+    }
     for (const name of summary.narrowable) {
       const row = document.createElement("label");
       const box = document.createElement("input");
@@ -2881,15 +3155,27 @@ async function runRole() {
   const result = document.getElementById("run-result");
   if (!currentRole) { return; }
   const wall = document.getElementById("run-wall").value;
+  const picker = document.getElementById("run-task");
+  // The task's own title, off the payload the picker was built from rather than
+  // off the option's label, which carries the state as well.
+  const chosen = launchTasks.find((task) => task.id === picker.value);
+  const taskTitle = (chosen && chosen.title) || picker.value;
   try {
     const payload = await post("/api/delegations", {
       agent_id: currentRole.id,
-      task_id: document.getElementById("run-task").value,
+      task_id: picker.value,
       wall_time_seconds: wall === "" ? null : Number(wall),
     });
-    result.className = "result ok";
-    result.textContent = t("launched") + " " + payload.delegation_id + " · " + payload.purpose +
-      " " + t("on_word") + " " + payload.target_profile;
+    // Who was put on what, in words.  The purpose and the profile stay in the
+    // ledger's own spelling with a gloss beside them — a run's purpose decides
+    // which guards apply to it, so it must remain the canonical word.
+    reportResult(result, "ok",
+      said("run_started", {
+        role: currentRole.name || currentRole.id,
+        task: taskTitle,
+      }) + " · " + valueWithGloss(payload.purpose) +
+        " · " + t("profile_word") + " " + payload.target_profile,
+      payload.delegation_id);
     await loadRuns();
   } catch (error) {
     // The refusal names the guard — no such task, a reviewer role with no open
@@ -2908,6 +3194,32 @@ document.getElementById("run-go").addEventListener("click", runRole);
 // updates on the same stream as the graph, so a launched run visibly moves
 // through launching -> running -> succeeded/failed without a reload.
 let runs = [];
+
+// `SUCCEEDED · SUCCEEDED` (round 3, designer).  Two different canonical values
+// were concatenated bare: the attempt's operational phase and the canonical
+// delegation's state.  They usually agree, and then repeating the word says
+// nothing twice; when they disagree — a process that exited while the
+// delegation is still `running`, a delegation already `failed` whose attempt
+// store still reads `launching` — the disagreement is real information about a
+// run in trouble, so it is shown as two LABELLED values instead of two bare
+// words nobody can tell apart.  Neither value is translated: both are canonical.
+// The card says what happened in words; the delegation's id stays on it as the
+// same chip the confirmations use, so it is copyable without opening anything.
+function runIdChip(delegationId) {
+  const chip = document.createElement("code");
+  chip.className = "idchip";
+  chip.textContent = delegationId;
+  chip.title = t("id_chip_tip");
+  return chip;
+}
+
+function runStatusText(run) {
+  const lead = run.live ? "● " + t("live") + " · " : "○ ";
+  const phase = String(run.phase || "");
+  const state = String(run.delegation_state || "");
+  if (!state || state === phase) { return lead + phase; }
+  return lead + t("run_phase_word") + " " + phase + " · " + t("run_state_word") + " " + state;
+}
 
 // The run's record is the result surface; the task's state is a human decision
 // and never advances itself (round 2, PM findings). Clicking a run therefore
@@ -2942,20 +3254,20 @@ async function loadRuns() {
     card.className = "attn-item " + (run.live ? "run_blocked" : "");
     const kind = document.createElement("div");
     kind.className = "attn-kind";
-    kind.textContent = (run.live ? "● " + t("live") + " · " : "○ ") + run.phase +
-      (run.delegation_state ? " · " + run.delegation_state : "");
+    kind.textContent = runStatusText(run);
     card.appendChild(kind);
     const head = document.createElement("span");
     // Names first, ids on demand (PM run, finding 6): the tooltip keeps the
-    // exact identifiers for anyone who needs them.
+    // exact identifiers for anyone who needs them, and the run's own id sits
+    // under the card as a chip anyone can copy without opening the record.
     const targetNode = ((lastGraph && lastGraph.nodes) || [])
       .find((node) => node.id === run.target_id);
-    head.textContent = (run.profile_id || "?") +
-      (run.agent_id ? " · " + t("role_word") + " " + agentLabel(run.agent_id) : "") +
+    head.textContent =
+      (run.agent_id ? t("role_word") + " " + agentLabel(run.agent_id) + " · " : "") +
       (run.target_id
-        ? " · " + t("on_word") + " " +
-          ((targetNode && targetNode.label) || run.target_kind + " " + run.target_id)
-        : "");
+        ? t("on_word") + " " +
+          ((targetNode && targetNode.label) || run.target_kind + " " + run.target_id) + " · "
+        : "") + t("profile_word") + " " + (run.profile_id || "?");
     head.title = (run.agent_id || "") + (run.target_id ? " → " + run.target_id : "");
     card.appendChild(head);
     if (run.summary) {
@@ -2968,6 +3280,7 @@ async function loadRuns() {
     }
     // One click from the run to its record (round 2, PM finding 4). The loop
     // variable is per-iteration, so the closure captures this run only.
+    card.appendChild(runIdChip(run.delegation_id));
     card.setAttribute("title", t("runs_open_tip"));
     card.addEventListener("click", () => openRunRecord(run.delegation_id));
     host.appendChild(card);
@@ -2987,13 +3300,14 @@ function paintTaskRuns(node) {
     row.className = "attn-item";
     const kind = document.createElement("div");
     kind.className = "attn-kind";
-    // Phase and delegation state are canonical strings, never translated.
-    kind.textContent = (run.live ? "● " + t("live") + " · " : "○ ") + run.phase +
-      (run.delegation_state ? " · " + run.delegation_state : "");
+    // Phase and delegation state are canonical strings, never translated — and
+    // never doubled either; `runStatusText` is where that is decided.
+    kind.textContent = runStatusText(run);
     row.appendChild(kind);
     const head = document.createElement("span");
-    head.textContent = (run.profile_id || "?") +
-      (run.agent_id ? " · " + t("role_word") + " " + agentLabel(run.agent_id) : "");
+    head.textContent =
+      (run.agent_id ? t("role_word") + " " + agentLabel(run.agent_id) + " · " : "") +
+      t("profile_word") + " " + (run.profile_id || "?");
     row.appendChild(head);
     if (run.summary) {
       // Agent prose, written as text.
@@ -3002,6 +3316,7 @@ function paintTaskRuns(node) {
       summary.textContent = run.summary;
       row.appendChild(summary);
     }
+    row.appendChild(runIdChip(run.delegation_id));
     row.setAttribute("title", t("runs_open_tip"));
     row.addEventListener("click", () => openRunRecord(run.delegation_id));
     host.appendChild(row);
@@ -3086,11 +3401,14 @@ async function requestTaskReview() {
         idempotency_key: null,
       });
     await repaintAfterAcceptanceWrite(node);
-    result.className = "result ok";
-    // The state and the ids come from the response — the panel reports what the
-    // server did, including how far the walk actually got.
-    result.textContent = t("accept_review_requested") + " · " + payload.task_state +
-      " · " + payload.review_id + " — " + t("accept_review_next");
+    // The sentence says what happened and what is next; the state comes from
+    // the response, because how far the walk actually got is the server's to
+    // report, and it keeps its canonical spelling under the panel's label.
+    reportResult(result, "ok",
+      said("accept_review_requested_named", { title: task.title || task.id }) + " " +
+        t("accept_review_next") + " · " + t("accept_ledger_state") + ": " +
+        payload.task_state,
+      payload.review_id);
   } catch (error) {
     result.className = "result bad";
     result.textContent = humanizeError(error);
@@ -3115,8 +3433,8 @@ async function acceptTask() {
       idempotency_key: null,
     });
     await repaintAfterAcceptanceWrite(node);
-    result.className = "result ok";
-    result.textContent = t("accept_recorded");
+    reportResult(result, "ok",
+      said("accept_recorded_named", { title: task.title || task.id }), task.id);
   } catch (error) {
     // The refusal names the missing link in the chain; humanizeError turns it
     // into the next action and keeps the canonical sentence in brackets.
@@ -3143,8 +3461,8 @@ async function reopenTask() {
       idempotency_key: null,
     });
     await repaintAfterAcceptanceWrite(node);
-    result.className = "result ok";
-    result.textContent = t("reopen_recorded");
+    reportResult(result, "ok",
+      said("reopen_recorded_named", { title: task.title || task.id }), task.id);
   } catch (error) {
     result.className = "result bad";
     result.textContent = humanizeError(error);
@@ -3209,6 +3527,10 @@ function paintHire() {
   const presetMode = document.querySelector('#hire-mode option[value="preset"]');
   const hasPresets = (catalog.presets || []).length > 0;
   presetMode.disabled = !hasPresets;
+  // Disabled was not enough: a disabled option still stands in the list, so the
+  // catalogue path advertised itself and then refused to be chosen (round 3,
+  // PM).  An empty catalogue takes it out of the list altogether.
+  presetMode.hidden = !hasPresets;
   presetMode.title = hasPresets ? "" : t("presets_none");
   if (!hasPresets && document.getElementById("hire-mode").value === "preset") {
     document.getElementById("hire-mode").value = "new";
@@ -3272,9 +3594,12 @@ async function hireRole() {
     // findable: if it landed on the graph, it is selected and its drawer opens
     // on the summary, so the name and the id are one glance away rather than
     // gone with the dialog.  A template lives on the shelf, off the board, so
-    // the line is all there is — and it says which one was saved.
-    reportOnBoard((hireTemplate ? t("preset_saved") : t("hired")) +
-      (hiredName ? " · " + hiredName : "") + (newId ? " · " + newId : ""));
+    // the line is all there is — and it says which one was saved.  It leads
+    // with the name the operator typed, not with the id the ledger minted.
+    reportOnBoard(
+      said(hireTemplate ? "preset_saved_named" : "hired_named",
+        { name: hiredName || (newId || "—") }),
+      newId);
     openNodeById(newId);
   } catch (error) {
     // The refusal names the guard it tripped — a missing budget, a wider grant
@@ -3285,11 +3610,12 @@ async function hireRole() {
 }
 
 // The board's own line: the one place a modal's result can survive the modal.
-function reportOnBoard(text) {
+// The sentence is the line; the id rides along as a chip, and the tooltip keeps
+// both for the case where the line is too narrow to show them (round 3).
+function reportOnBoard(sentence, canonicalId) {
   const line = document.getElementById("board-result");
-  line.className = "result ok";
-  line.textContent = text;
-  line.title = text;
+  reportResult(line, "ok", sentence, canonicalId);
+  line.title = sentence + (canonicalId ? " · " + canonicalId : "");
 }
 
 // Select and open a freshly recorded entity, when the board actually carries it.
@@ -3584,8 +3910,9 @@ document.getElementById("message-send").addEventListener("click", async () => {
       subject: document.getElementById("message-subject").value || null,
     });
     document.getElementById("message-body").value = "";
-    result.className = "result ok";
-    result.textContent = t("message_recorded");
+    reportResult(result, "ok",
+      said("message_recorded_named", { name: currentRole.name || currentRole.id }),
+      currentRole.id);
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -3637,8 +3964,11 @@ document.getElementById("settings-save").addEventListener("click", async () => {
       isolation_downgrade_reason:
         document.getElementById("downgrade-field").hidden ? null : (downgrade.value || null),
     });
-    result.className = "result ok";
-    result.textContent = t("recorded");
+    // Named, and honest about when it takes effect: skills and tools apply from
+    // the next run, which is the one thing an operator needs to know here.
+    reportResult(result, "ok",
+      said("settings_saved_named", { name: changes.name || currentRole.id }),
+      currentRole.id);
   } catch (error) {
     result.className = "result bad";
     result.textContent = humanizeError(error, {
@@ -3659,13 +3989,15 @@ async function retire(cascade) {
   }
   const question = cascade ? t("confirm_retire_cascade") : t("confirm_retire");
   if (!window.confirm(question)) { return; }
+  const retiredName = currentRole.name || currentRole.id;
+  const retiredId = currentRole.id;
   try {
     const payload = await post(
       "/api/agents/" + encodeURIComponent(currentRole.id) + "/retire",
       { reason: reason, cascade: cascade }
     );
-    result.className = "result ok";
-    result.textContent = t("retired") + ": " + payload.count + " — " + t("history_retained");
+    reportResult(result, "ok",
+      said("retired_named", { name: retiredName, count: payload.count }), retiredId);
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);
@@ -3845,8 +4177,7 @@ async function replyThread(threadId, revision, text) {
   try {
     await post("/api/chat/" + encodeURIComponent(threadId) + "/messages",
                { expected_revision: revision, message: text });
-    result.className = "result ok";
-    result.textContent = t("replied");
+    reportResult(result, "ok", t("replied"), threadId);
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
@@ -3859,8 +4190,7 @@ async function answerOperation(operationId, text) {
   try {
     await post("/api/operations/" + encodeURIComponent(operationId) + "/answer",
                { answer: { answer: text } });
-    result.className = "result ok";
-    result.textContent = t("answered");
+    reportResult(result, "ok", t("answered"), operationId);
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
@@ -3871,9 +4201,12 @@ async function answerOperation(operationId, text) {
 async function approveProposal(threadId) {
   const result = document.getElementById("attention-result");
   try {
-    await post("/api/agents/proposals/" + encodeURIComponent(threadId) + "/approve", {});
-    result.className = "result ok";
-    result.textContent = t("proposal_approved");
+    const approved = await post(
+      "/api/agents/proposals/" + encodeURIComponent(threadId) + "/approve", {});
+    // The new role's own id when the response carries one, the thread's
+    // otherwise: the panel reports what it was actually told, never a guess.
+    reportResult(result, "ok", t("proposal_approved"),
+      approved && approved.entity_ref ? approved.entity_ref.id : threadId);
     await loadAttention();
   } catch (error) {
     result.className = "result bad";
