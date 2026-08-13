@@ -5,6 +5,36 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **The panel is rebuilt around one home per kind of thing.** A library
+  sidebar (board, runs, a two-minute Overview, Skills and Tools as two doors
+  over the one operator catalogue, honest SGR/MCP placeholders that name their
+  unlock condition), the board in the centre, the conversation — main chat and
+  the attention queue — docked right, and a per-entity drawer where Record,
+  Settings, Links, Run and Message are tabs of the selected thing. Hiring
+  moved behind a + button; a cold start shows a guided three-step card; every
+  control carries a translated one-line tooltip; the whole surface commits to
+  one dark, dense look. No write path changed.
+- **Links are first-class on the board.** Dragging one of a role card's four
+  ports onto another role opens a recorded permission through the new
+  `POST /api/agent-links` route (closed via
+  `POST /api/agent-links/{link_id}/close`, always with the revision it
+  closes); the form states plainly that a link is a journal permission, not
+  yet a communication channel, and closing keeps history — the UI never says
+  "delete". Both routes are sealed into `MUTATING_ROUTES` with their tests.
+- **Granting cannot outrun the catalogue any more.** `GET /api/catalog`
+  serves each profile's real tool sets (`profile_tools`, the same composition
+  a launch receives, locked by a bit-for-bit test), reconfigure mirrors the
+  hire-time checks (unknown skills and out-of-profile tools are refused at
+  click time with their ids named), catalogue entries carry their active
+  holders, and the attention queue warns when a hand-edited catalogue leaves
+  a role holding a vanished skill — before any run fails.
+- **Demo mode closes the loop without a provider.** `demo: true` in the
+  operator runtime config swaps the provider CLI for a DemoRunner at the same
+  runner seam: an implementation run completes with an honest
+  "no provider was launched" summary, so a newcomer can watch
+  Hire → Task → Run → result finish in a scratch workspace without a
+  subscription. Reviews and verifications are never simulated.
+
 - **Agents become a first-class standing role**, separate from the situational
   run they perform. New canonical events `agent.created`, `agent.reconfigured`,
   `agent.retired`, `agent.link_opened`, and `agent.link_closed`, with the
