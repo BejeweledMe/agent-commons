@@ -199,3 +199,124 @@ def test_an_invalid_catalogue_read_is_a_named_4xx_not_an_opaque_500(
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "ConfigurationError"
     assert "unsupported fields" in response.json()["error"]["message"]
+
+
+def test_profile_tools_in_the_catalog_match_a_launch_bit_for_bit(
+    workspace: dict[str, Any],
+) -> None:
+    """Wave 1 item 3: the Tools reference the panel renders is the same
+    composition `_worker_tools` hands a launch — short names, outcome tools
+    fixed, everything else narrowable — so the view cannot drift from
+    reality."""
+
+    from agent_commons.runtime.model import (
+        _MCP_TOOL_PREFIX,
+        BuiltinProfileId,
+        _worker_tools,
+    )
+
+    context = UIContext(workspace["repo"], state_root=workspace["state_root"])
+    payload = context.catalog()
+    summary = payload["profile_tools"]
+    assert set(summary) == {profile.value for profile in BuiltinProfileId}
+    for profile in BuiltinProfileId:
+        entry = summary[profile.value]
+        purpose = entry["purpose"]
+        launched = [
+            tool.removeprefix(_MCP_TOOL_PREFIX)
+            for tool in _worker_tools(profile, purpose)
+        ]
+        assert sorted(entry["fixed"] + entry["narrowable"]) == sorted(launched)
+        # Outcome tools are how a role hands work back: they must all be fixed.
+        assert entry["fixed"], profile.value
+        assert not set(entry["fixed"]) & set(entry["narrowable"])
+
+
+def test_a_granted_selection_the_next_launch_would_refuse_is_a_422_now(
+    workspace: dict[str, Any], tmp_path: Path
+) -> None:
+    """Wave 1 item 5: reconfigure was a passthrough, so the panel could grant
+    a skill the catalogue lost — or a foreign tool — and only the NEXT launch
+    would fail. Both refusals now happen at click time (the panel's uniform
+    409-refusal shape), name the ids, and leave no event behind."""
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="mirror-check-window-01",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    catalog_file = tmp_path / "catalog.yaml"
+    write_role_catalog(
+        catalog_file,
+        {
+            "skills": [
+                {"id": "pytest-runner", "title": "Pytest", "instruction": "run the tests"}
+            ],
+            "tools": [],
+        },
+    )
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(session["session_id"]),
+        catalog_path=catalog_file,
+    )
+    with _client(context) as client:
+        created = client.post(
+            "/api/agents",
+            json={
+                "name": "Backend owner",
+                "profile_id": "claude-builder",
+                "rationale": "owns the surface",
+                "skills": ["pytest-runner"],
+            },
+            headers=authorized(),
+        )
+        assert created.status_code == 200, created.text
+        record = created.json()
+        agent_id = record["entity_ref"]["id"]
+        revision = record["revision"]
+
+        ghost = client.post(
+            "/api/agents/" + agent_id + "/reconfigure",
+            json={
+                "expected_revision": revision,
+                "changes": {"skills": ["pytest-runner", "ghost-skill"]},
+                "reason": "grant a skill the catalogue does not define",
+            },
+            headers=authorized(),
+        )
+        assert ghost.status_code == 409, ghost.text
+        assert "ghost-skill" in ghost.json()["error"]["message"]
+
+        foreign = client.post(
+            "/api/agents/" + agent_id + "/reconfigure",
+            json={
+                "expected_revision": revision,
+                "changes": {"tool_allowlist": ["commons_orient", "not-a-profile-tool"]},
+                "reason": "narrow to a tool the profile never had",
+            },
+            headers=authorized(),
+        )
+        assert foreign.status_code == 409, foreign.text
+        assert "not-a-profile-tool" in foreign.json()["error"]["message"]
+
+        # Refusals recorded nothing: the role still shows its hire revision.
+        assert manager.get_agent(agent_id)["revision"] == revision
+
+        # A hire naming a foreign tool is refused by the same mirror.
+        hire = client.post(
+            "/api/agents",
+            json={
+                "name": "Docs reviewer",
+                "profile_id": "claude-independent-reviewer",
+                "rationale": "reviews docs",
+                "tool_allowlist": ["definitely-not-a-tool"],
+            },
+            headers=authorized(),
+        )
+        assert hire.status_code == 409, hire.text
+        assert "definitely-not-a-tool" in hire.json()["error"]["message"]

@@ -201,6 +201,43 @@ def _worker_tools(
     )
 
 
+def profile_tool_summary() -> dict[str, dict[str, Any]]:
+    """Per-profile tool sets for read-only display, in short (unprefixed) names.
+
+    Built by the same composition as ``_worker_tools`` so the panel's Tools
+    reference can never drift from what a launch actually receives.  The
+    outcome tools are listed as ``fixed`` -- they are how a role hands work
+    back and cannot be narrowed away -- everything else is ``narrowable``, and
+    the governance tools appear under the exact ``grant:level`` that switches
+    them on.
+    """
+
+    values: dict[str, dict[str, Any]] = {}
+    for profile_id in BuiltinProfileId:
+        purpose = (
+            "independent_review" if profile_id.independent_reviewer else "implementation"
+        )
+        tools = _worker_tools(profile_id, purpose)
+        values[profile_id.value] = {
+            "purpose": purpose,
+            "fixed": [
+                tool.removeprefix(_MCP_TOOL_PREFIX)
+                for tool in tools
+                if tool in _CLAUDE_COMMONS_OUTCOME_TOOLS
+            ],
+            "narrowable": [
+                tool.removeprefix(_MCP_TOOL_PREFIX)
+                for tool in tools
+                if tool not in _CLAUDE_COMMONS_OUTCOME_TOOLS
+            ],
+            "grant_tools": {
+                grant + ":" + level: tool.removeprefix(_MCP_TOOL_PREFIX)
+                for (grant, level), tool in sorted(_CLAUDE_COMMONS_GOVERNANCE_TOOLS.items())
+            },
+        }
+    return values
+
+
 def _resolved_worker_mcp(
     *,
     workspace_root: Path,

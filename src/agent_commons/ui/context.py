@@ -20,6 +20,7 @@ from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_rol
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
 from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
+from agent_commons.runtime.model import profile_tool_summary
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
@@ -311,6 +312,9 @@ class UIContext:
             "catalog_editing_enabled": self.catalog_editing_enabled,
             "catalog_path": str(self._catalog_path) if self._catalog_path else None,
             "profiles": sorted(PROFILE_NARROWING),
+            # Read-only reference: the same composition a launch receives, so
+            # the Tools view can never drift from what actually runs.
+            "profile_tools": profile_tool_summary(),
             "grant_levels": ["deny", "ask", "auto"],
             "context_modes": ["fresh", "accumulated"],
             **catalogue,
@@ -522,6 +526,46 @@ class UIContext:
 
     # -- writes ---------------------------------------------------------------
 
+    def _check_role_selection(
+        self,
+        profile_id: str | None,
+        skills: Any,
+        tool_allowlist: Any,
+    ) -> None:
+        """Refuse a selection the next launch would refuse, at click time.
+
+        The launch path stays the last line (fail-closed), but the operator is
+        here now: a skill the catalogue does not define or a tool outside the
+        role's profile should be named while they are still looking at the
+        form, not when the run dies later (round 2, product; wave 1 item 5).
+        """
+
+        selected_skills = tuple(str(name) for name in skills or ())
+        if selected_skills and self._catalog_path is not None:
+            from agent_commons.catalog import catalog_ids, load_role_catalog
+
+            known = catalog_ids(
+                load_role_catalog(self._catalog_path, workspace_root=self.repo), "skills"
+            )
+            missing = sorted(set(selected_skills) - known)
+            if missing:
+                raise ValidationError(
+                    "these skills are not in the operator catalogue: " + ", ".join(missing)
+                )
+        selected_tools = tuple(str(name) for name in tool_allowlist or ())
+        if selected_tools and profile_id:
+            summary = profile_tool_summary().get(str(profile_id))
+            if summary is not None:
+                available = set(summary["fixed"]) | set(summary["narrowable"]) | set(
+                    summary["grant_tools"].values()
+                )
+                outside = sorted(set(selected_tools) - available)
+                if outside:
+                    raise ValidationError(
+                        "role tool selection is not part of this profile: "
+                        + ", ".join(outside)
+                    )
+
     def create_agent(self, *, from_preset_id: str | None = None, **fields: Any) -> dict[str, Any]:
         manager = self.writer()
         if from_preset_id:
@@ -534,22 +578,9 @@ class UIContext:
             for key in ("skills", "tool_allowlist"):
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
-        # Refuse a skill the catalogue does not define at hire time, where the
-        # operator is clicking, rather than deferring the failure to whoever
-        # launches the role next (round 2, product).  The panel has the
-        # catalogue loaded, so the check is free here.
-        selected_skills = tuple(str(name) for name in fields.get("skills") or ())
-        if selected_skills and self._catalog_path is not None:
-            from agent_commons.catalog import catalog_ids, load_role_catalog
-
-            known = catalog_ids(
-                load_role_catalog(self._catalog_path, workspace_root=self.repo), "skills"
-            )
-            missing = sorted(set(selected_skills) - known)
-            if missing:
-                raise ValidationError(
-                    "these skills are not in the operator catalogue: " + ", ".join(missing)
-                )
+        self._check_role_selection(
+            fields.get("profile_id"), fields.get("skills"), fields.get("tool_allowlist")
+        )
         return manager.create_agent(**fields)
 
     # -- launch (MUST-4) ------------------------------------------------------
@@ -774,7 +805,19 @@ class UIContext:
 
     def reconfigure_agent(self, *, agent_id: str, **fields: Any) -> dict[str, Any]:
         expected_revision = fields.pop("expected_revision")
-        return self.writer().reconfigure_agent(agent_id, expected_revision, **fields)
+        manager = self.writer()
+        # Mirror of the hire-time check: reconfigure was a pure passthrough, so
+        # the panel could grant a skill the catalogue lost or a foreign tool and
+        # only the NEXT launch would fail (council contract, wave 1 item 5).
+        changes = fields.get("changes") or {}
+        if "skills" in changes or "tool_allowlist" in changes:
+            record = manager.get_agent(agent_id)
+            self._check_role_selection(
+                record.get("profile_id"),
+                changes.get("skills"),
+                changes.get("tool_allowlist"),
+            )
+        return manager.reconfigure_agent(agent_id, expected_revision, **fields)
 
     def retire_agent(self, *, agent_id: str, **fields: Any) -> dict[str, Any]:
         expected_revision = fields.pop("expected_revision", None)
