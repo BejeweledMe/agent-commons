@@ -77,9 +77,18 @@ footer{
 .edge.link{stroke:var(--info); stroke-dasharray:5 4; opacity:.85}
 .edge.hier{stroke:var(--edge)}
 /* Link ports: four grab points on a role card; drag one to another role to
-   open a link.  Visible on hover/selection only, so the board stays calm. */
-.portc{fill:var(--bg); stroke:var(--info); stroke-width:2; opacity:0; cursor:crosshair}
+   open a link.  Visible on hover/selection only, so the board stays calm.
+   The grab area is a transparent circle BEHIND the dot, and the whole port
+   counter-scales with the zoom (sizePorts), so it stays 24 CSS px across at
+   any scale: after the one-shot fit the old dot measured about six pixels and
+   both round-3 testers failed to open a link by dragging it. */
+.port{cursor:crosshair}
+.porthit{fill:transparent; stroke:none}
+.portc{fill:var(--bg); stroke:var(--info); stroke-width:2; opacity:0; pointer-events:none}
 .node:hover .portc, .node.sel .portc{opacity:1}
+/* The port answers the pointer before the drag begins, so it reads as a handle
+   rather than as decoration — the round-3 testers never took it for one. */
+.port:hover .portc{opacity:1; r:7; fill:var(--info)}
 #linkband{position:absolute; inset:0; width:100%; height:100%;
   pointer-events:none; z-index:6}
 #linkband path{fill:none; stroke:var(--info); stroke-width:1.5; stroke-dasharray:5 4}
@@ -236,8 +245,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 /* Top-left, where reading starts (operator feedback) — as a toolbar ROW that
    takes real layout space, so floating chrome can never sit on top of a card
    and eat its link ports (a real drag died on exactly that). */
-#view-board{display:flex; flex-direction:column}
-#view-board #canvas{flex:1; min-height:0}
+/* Written as a bare id, this lost to `#center .view.open` and never applied:
+   the board stayed a block, the canvas kept its 100% height, and the toolbar's
+   height hung off the bottom of the window.  Cards laid out down there can be
+   neither read nor clicked, and a fit computed on that rectangle aims part of
+   the board at it (round 3, designer 4).  height:auto lets the flex row own
+   the canvas's height instead of the inherited 100%. */
+#center #view-board.view.open{display:flex; flex-direction:column}
+#view-board #canvas{flex:1; min-height:0; height:auto}
 /* Wraps rather than squeezing: the bar's last item is the confirmation of what
    the operator just recorded, and on a narrow centre a no-wrap row shrank it to
    a single letter (round 3's confirmations, seen in a live panel). */
@@ -361,7 +376,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
         <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
         <button type="button" id="board-fit" data-i18n="board_fit" data-i18n-title="tip_board_fit">Fit</button>
-        <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom.</span>
+        <!-- The label carries the count of what is being held back, so it is
+             painted from JS; only its tooltip is a data-i18n marker. -->
+        <button type="button" id="board-runtime" aria-pressed="false" hidden data-i18n-title="tip_runtime_nodes">Runtime nodes</button>
+        <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom. To link two agents, drag a port on a card's edge — or use the role's Links tab.</span>
         <!-- A successful hire closes its modal, so the result has to land
              somewhere that outlives it: the bar above the board the new role
              just appeared on (round 3, designer). -->
@@ -1245,7 +1263,10 @@ const STRINGS = {
     tip_hire_budget: "How many role creations and retirements this role may perform itself. Blank means none.",
     board_fit: "Fit",
     tip_board_fit: "Bring every card into view.",
-    board_hint: "Drag the canvas to pan; scroll to zoom.",
+    board_hint: "Drag the canvas to pan; scroll to zoom. To link two agents, drag a port on a card's edge — or use the role's Links tab.",
+    runtime_nodes: "Runtime nodes",
+    tip_runtime_nodes: "Sessions and delegations — the machinery a run leaves behind. Hidden by default so the board shows your team; the number says how many nodes it covers.",
+    port_tip: "Drag to another agent's card to open a link between them. Prefer buttons? The role's Links tab opens the same form.",
     board_only_shelf: "Nothing on the board yet — templates live in the Agent catalogue. Hire an agent to begin.",
     session_you_tip: "This is you — a human operator window; roles below answer to it.",
     accept_heading: "Accepting this work",
@@ -1687,7 +1708,10 @@ const STRINGS = {
     tip_hire_budget: "Сколько созданий и увольнений ролей эта роль может совершить сама. Пусто — ноль.",
     board_fit: "Вписать",
     tip_board_fit: "Вписать все карточки в окно.",
-    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб.",
+    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб. Чтобы связать двух агентов, потяните точку с края карточки — или откройте вкладку «Связи» у роли.",
+    runtime_nodes: "Узлы рантайма",
+    tip_runtime_nodes: "Сессии и делегирования — механика, которую оставляет после себя запуск. По умолчанию скрыты, чтобы на борде была видна команда; число — сколько узлов под этим скрыто.",
+    port_tip: "Потяните к карточке другого агента, чтобы открыть связь между ними. Не любите перетаскивание? На вкладке «Связи» у роли открывается та же форма.",
     board_only_shelf: "На борде пока пусто — шаблоны живут в Каталоге агентов. Наймите агента, чтобы начать.",
     session_you_tip: "Это вы — окно человека-оператора; роли ниже подчиняются ему.",
     accept_heading: "Приёмка работы",
@@ -2110,11 +2134,33 @@ function neighboursOf(graph, nodeId) {
   return { nodes: near, edges: edges };
 }
 
+// The link ports live in board coordinates but have to stay a fixed size on
+// SCREEN: a grab point that shrinks with the board is a grab point nobody can
+// hit (round 3, designer 17 and PM 12).  Each port therefore carries the
+// inverse of the current zoom, applied from applyView() — the one place the
+// zoom ever changes — so the 24 CSS px target holds at every scale.
+const PORT_HIT = 12;      // radius in board units: 24 across at scale 1
+let portGroups = [];
+let portScale = null;
+
+function sizePorts() {
+  if (portScale === view.scale) { return; }
+  portScale = view.scale;
+  const inverse = 1 / view.scale;
+  for (const port of portGroups) {
+    port.element.setAttribute(
+      "transform",
+      "translate(" + port.x + "," + port.y + ") scale(" + inverse + ")"
+    );
+  }
+}
+
 function applyView() {
   viewport.setAttribute(
     "transform",
     "translate(" + view.x + "," + view.y + ") scale(" + view.scale + ")"
   );
+  sizePorts();
 }
 
 function text(x, y, value, className) {
@@ -2130,7 +2176,21 @@ function text(x, y, value, className) {
 // step down is one delegation further away.  Wide ranks wrap onto further rows
 // rather than running off to the right, which is what made 328 nodes read as
 // one endless horizontal strip.
-const PER_ROW = 8;
+//
+// The wrap used to be a flat eight per row, and eight cards side by side are
+// 1650 board units against a centre that is rarely 900 CSS px: Fit then had to
+// shrink the WHOLE board to the width of its widest rank, which is how nine
+// nodes ended up unreadable (round 3, designer 4).  So the wrap follows the
+// frame instead of a constant: c columns of COLUMN over ceil(n/c) rows of ROW,
+// solved for the visible area's own aspect ratio, which keeps the rectangle Fit
+// has to fit shaped like the rectangle it must fit into.
+function bandColumns(count) {
+  if (count <= 1) { return 1; }
+  const frame = visibleBoardRect();
+  const aspect = frame.width && frame.height ? frame.width / frame.height : 16 / 10;
+  const columns = Math.ceil(Math.sqrt(count * aspect * ROW / COLUMN));
+  return Math.max(1, Math.min(count, columns));
+}
 
 function layout(nodes) {
   const bands = new Map();
@@ -2144,27 +2204,75 @@ function layout(nodes) {
   let row = 0;
   for (const band of ordered) {
     const members = bands.get(band);
+    const columns = bandColumns(members.length);
     members.forEach((node, index) => {
       placed.set(node.id, {
-        x: (index % PER_ROW) * COLUMN,
-        y: (row + Math.floor(index / PER_ROW)) * ROW,
+        x: (index % columns) * COLUMN,
+        y: (row + Math.floor(index / columns)) * ROW,
         band: band
       });
     });
-    row += Math.max(1, Math.ceil(members.length / PER_ROW)) + 0.35;
+    row += Math.max(1, Math.ceil(members.length / columns)) + 0.35;
   }
   return { placed: placed, bands: ordered, rows: row };
+}
+
+// The board is the operator's TEAM, and one launch adds a delegation and a
+// child session per step: round 3's manager looked at their people and saw
+// plumbing (designer 5).  The runtime is one click away rather than gone, and
+// the toggle carries the count, so nothing disappears silently.  The operator's
+// own window is not plumbing — it is the person, and the root the team hangs
+// off — so it stays on the board either way.
+const RUNTIME_KEY = "ac_ui_runtime";
+let showRuntime = localStorage.getItem(RUNTIME_KEY) === "1";
+
+// The panel's own writer session is unambiguously the operator's window.  With
+// writes off there is none, and the projection's own "answers to a human" rank
+// is then the best the board has — every other CLI window opens a session too,
+// and those are machinery like any other.
+function isOperatorSession(node) {
+  if (node.kind !== "session") { return false; }
+  const own = metaInfo && metaInfo.writer_session_id;
+  return own ? node.id === String(own) : Boolean(node.reports_to_operator);
+}
+
+function isRuntimeNode(node) {
+  return node.kind === "delegation" ||
+    (node.kind === "session" && !isOperatorSession(node));
 }
 
 // What the board actually shows.  A closed link leaves the board (its history
 // stays in the Links tab); the edges that referenced it drop with it,
 // position-less.  Templates are catalogue shelf stock; the board shows the
-// live team (round 2, PM findings).
+// live team (round 2, PM findings).  This is the one seam: render() lays out
+// only what comes back from here and skips any edge whose endpoint has no
+// position, so a hidden node takes its edges with it and never leaves a
+// dangling line.
 function visibleNodesOf(graph) {
   return graph.nodes.filter((node) =>
     !(node.kind === "agent_link" && node.state === "closed") &&
-    !(node.kind === "agent" && node.attrs && node.attrs.template));
+    !(node.kind === "agent" && node.attrs && node.attrs.template) &&
+    (showRuntime || !isRuntimeNode(node)));
 }
+
+// Never hidden, only held back: the button says how many nodes it covers, and
+// with nothing to cover it stays out of the way rather than putting the word
+// "runtime" in a newcomer's face on an empty board.
+function paintRuntimeToggle(graph) {
+  const toggle = document.getElementById("board-runtime");
+  const runtime = graph.nodes.filter(isRuntimeNode).length;
+  toggle.hidden = !runtime && !showRuntime;
+  toggle.setAttribute("aria-pressed", showRuntime ? "true" : "false");
+  toggle.textContent = t("runtime_nodes") + " (" + runtime + ")";
+}
+
+// Persisted like the language, and for the same reason: a view preference the
+// operator set once should not be re-asked on every reload.
+document.getElementById("board-runtime").addEventListener("click", () => {
+  showRuntime = !showRuntime;
+  localStorage.setItem(RUNTIME_KEY, showRuntime ? "1" : "0");
+  if (lastGraph) { render(lastGraph); }
+});
 
 // Set aside by the operator for this window; never persisted, because the first
 // step is still untaken and a later window should say so again.
@@ -2186,11 +2294,16 @@ function render(graph) {
   document.getElementById("onboarding").hidden =
     hasHire || onboardingSetAside || !writesEnabled;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
+  // The ports painted below are the only thing that reads the zoom outside
+  // applyView(); both the list and the scale it was last sized at reset here.
+  portGroups = [];
+  portScale = null;
   const visibleNodes = visibleNodesOf(graph);
   const layoutResult = layout(visibleNodes);
   const positions = layoutResult.placed;
   const focus = focused ? neighboursOf(graph, focused) : null;
   paintFocusChrome(focus);
+  paintRuntimeToggle(graph);
 
   if (!graph.nodes.length) {
     viewport.appendChild(text(0, 20, t("empty_workspace"), "empty"));
@@ -2210,8 +2323,8 @@ function render(graph) {
   // snatching the view out of the operator's hands, so neither later
   // snapshots nor a reconnect ever re-trigger it (round 2, PM findings).
   if (!autoFitted && !userAdjustedView) {
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width && rect.height) { autoFitted = true; fitView(); }
+    const frame = visibleBoardRect();
+    if (frame.width && frame.height) { autoFitted = true; fitView(); }
   }
 
   // One shared clip so long ledger text can never spill past its node box.
@@ -2238,6 +2351,11 @@ function render(graph) {
     const position = positions.get(node.id);
     if (!position || seenBands.has(position.band)) { continue; }
     seenBands.add(position.band);
+    // "delegated · depth 2" is the shape of a launch, not of a team: the depth
+    // captions are the runtime's own vocabulary, so they come and go with the
+    // runtime nodes (round 3, designer 5).  Rank 0 keeps its caption — that one
+    // says who the operator is, which is domain, not plumbing.
+    if (position.band !== 0 && !showRuntime) { continue; }
     const caption = position.band === 0
       ? t("band_operator")
       : t("band_delegated") + position.band;
@@ -2308,7 +2426,7 @@ function render(graph) {
     tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id;
     // The operator's own window is the one card a newcomer cannot map to
     // anything they did; say plainly that it is them (round 2, PM findings).
-    if (node.kind === "session" && node.reports_to_operator) {
+    if (isOperatorSession(node)) {
       tooltip.textContent += "\n" + t("session_you_tip");
     }
     group.appendChild(tooltip);
@@ -2326,16 +2444,30 @@ function render(graph) {
     // role to open a recorded link.  Writes only — the ports ARE the promise.
     if (node.kind === "agent" && node.state === "active" && writesEnabled) {
       for (const [px, py] of [[W / 2, 0], [W, H / 2], [W / 2, H], [0, H / 2]]) {
-        const port = document.createElementNS(SVGNS, "circle");
-        port.setAttribute("class", "portc");
-        port.setAttribute("cx", px);
-        port.setAttribute("cy", py);
-        port.setAttribute("r", 5);
+        // A group, not a bare dot: the transparent circle behind the dot is the
+        // grab area, sized in screen space by sizePorts(), while the dot stays
+        // small enough not to swallow the card it sits on.
+        const port = document.createElementNS(SVGNS, "g");
+        port.setAttribute("class", "port");
+        const hit = document.createElementNS(SVGNS, "circle");
+        hit.setAttribute("class", "porthit");
+        hit.setAttribute("r", PORT_HIT);
+        port.appendChild(hit);
+        const dot = document.createElementNS(SVGNS, "circle");
+        dot.setAttribute("class", "portc");
+        dot.setAttribute("r", 5);
+        port.appendChild(dot);
+        // What the handle does, said before the drag rather than after it has
+        // already failed — and where to go if dragging is not an option.
+        const portTip = document.createElementNS(SVGNS, "title");
+        portTip.textContent = t("port_tip");
+        port.appendChild(portTip);
         port.addEventListener("pointerdown", (event) => {
           event.stopPropagation();
           event.preventDefault();
           startLinkDrag(node, event);
         });
+        portGroups.push({ element: port, x: px, y: py });
         group.appendChild(port);
       }
     }
@@ -2803,6 +2935,12 @@ function startLinkDrag(node, event) {
     // Forgiving drop, Miro-style: a stream repaint can shift cards mid-drag,
     // so a release a few pixels off the edge still counts.  Snap to the
     // nearest active role card within reach; genuinely empty space cancels.
+    //
+    // The reach is in SCREEN pixels and so does not shrink with the zoom — but
+    // the card does, and a miss that looks small beside a fitted card is a
+    // proportionally large one, which is half of why both round-3 testers
+    // failed the drag.  Nearest-box-wins keeps the wider reach unambiguous.
+    const DROP_REACH = 64;
     let best = null;
     for (const group of document.querySelectorAll("g.node.role")) {
       if (group.getAttribute("data-node-state") !== "active") { continue; }
@@ -2812,7 +2950,7 @@ function startLinkDrag(node, event) {
       const dx = Math.max(box.left - up.clientX, 0, up.clientX - box.right);
       const dy = Math.max(box.top - up.clientY, 0, up.clientY - box.bottom);
       const distance = Math.hypot(dx, dy);
-      if (distance <= 48 && (!best || distance < best.distance)) {
+      if (distance <= DROP_REACH && (!best || distance < best.distance)) {
         best = { id: toId, distance: distance };
       }
     }
@@ -4623,6 +4761,45 @@ canvas.addEventListener("wheel", (event) => {
   applyView();
 }, { passive: false });
 
+// The rectangle a fit has to land in is the one the operator can actually SEE.
+// The canvas element is not it: the library on the left and the dock on the
+// right are chrome over the same row, and fitting the whole element parked part
+// of the board underneath them (round 3, designer 4).  Measured off those
+// elements rather than off the grid's declared column widths, so the responsive
+// work still to come cannot silently un-fix this — and only the part that truly
+// overlaps counts, side by side today, overlaid tomorrow.
+function visibleBoardRect() {
+  const rect = canvas.getBoundingClientRect();
+  // Whatever hangs past the window is not visible either, however the shell
+  // arranges itself.
+  const top = Math.max(rect.top, 0);
+  const bottom = Math.min(rect.bottom, window.innerHeight || rect.bottom);
+  let left = Math.max(rect.left, 0);
+  let right = Math.min(rect.right, window.innerWidth || rect.right);
+  for (const id of ["sidebar", "dock"]) {
+    const element = document.getElementById(id);
+    if (!element || element.hidden) { continue; }
+    const box = element.getBoundingClientRect();
+    if (!box.width || box.bottom <= top || box.top >= bottom) { continue; }
+    if (box.left <= left && box.right > left) { left = Math.min(box.right, right); }
+    else if (box.right >= right && box.left < right) { right = Math.max(box.left, left); }
+  }
+  return {
+    left: left - rect.left,
+    top: top - rect.top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
+  };
+}
+
+// How small a card may get before fitting stops being a service.  A card is
+// 180x62 board units, so at 0.5 it renders 90x31 CSS px: still above the 24px
+// hit target the link ports are built to, and still large enough to tell one
+// card from another.  Below that the board is a mosaic, and a fit that leaves
+// work off-screen is the better trade — panning exists, illegible content
+// helps nobody (round 3, designer 4).
+const FIT_MIN_SCALE = 0.5;
+
 // Zoom-to-fit: from three agents up the layout outgrows the window and cards
 // silently leave the screen with no hint that panning exists (round 2, PM
 // findings).  Scale to bring every visible card inside the frame — capped at
@@ -4636,14 +4813,16 @@ function fitView() {
     width = Math.max(width, position.x + W);
     height = Math.max(height, position.y + H);
   }
-  const rect = canvas.getBoundingClientRect();
-  if (!rect.width || !rect.height) { return; }
+  const frame = visibleBoardRect();
+  if (!frame.width || !frame.height) { return; }
   const pad = 40;
-  const scale = Math.min(1, Math.max(0.05,
-    Math.min((rect.width - 2 * pad) / width, (rect.height - 2 * pad) / height)));
+  const scale = Math.min(1, Math.max(FIT_MIN_SCALE,
+    Math.min((frame.width - 2 * pad) / width, (frame.height - 2 * pad) / height)));
   view.scale = scale;
-  view.x = pad + Math.max(0, (rect.width - 2 * pad - width * scale) / 2);
-  view.y = pad + Math.max(0, (rect.height - 2 * pad - height * scale) / 2);
+  view.x = frame.left + pad +
+    Math.max(0, (frame.width - 2 * pad - width * scale) / 2);
+  view.y = frame.top + pad +
+    Math.max(0, (frame.height - 2 * pad - height * scale) / 2);
   applyView();
 }
 document.getElementById("board-fit").addEventListener("click", fitView);

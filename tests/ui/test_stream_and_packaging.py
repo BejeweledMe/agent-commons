@@ -857,3 +857,127 @@ def test_every_stream_connection_receives_each_update_not_only_the_first(
     frame_a, frame_b = asyncio.run(drive())
     assert b"event: snapshot" in frame_a
     assert b"event: snapshot" in frame_b
+
+
+def test_the_board_shows_the_team_and_holds_the_runtime_behind_a_toggle() -> None:
+    """Round 3, designer 5: one launch adds a delegation and a child session per
+    step, and the manager looking at their team saw plumbing.  The runtime is
+    filtered in the single seam the board lays out from, so no edge is left
+    dangling, the toggle says how many nodes it covers, and the choice persists
+    the way the language does."""
+
+    body = read_spa()
+    assert 'id="board-runtime"' in body
+    # The filter belongs in visibleNodesOf: render() positions only what comes
+    # back from there and skips any edge whose endpoint has no position, so a
+    # hidden node takes its edges with it.
+    seam = body.split("function visibleNodesOf(graph) {", 1)[1].split("\n}", 1)[0]
+    assert "showRuntime || !isRuntimeNode(node)" in seam
+    assert "if (!from || !to) { continue; }" in body
+    # The operator's own window is the person, not machinery, so it stays -- and
+    # "own" means the panel's writer session, not any window that happens to
+    # answer to a human, because every other CLI window opens one of those too.
+    predicate = body.split("function isRuntimeNode(node) {", 1)[1].split("\n}", 1)[0]
+    assert 'node.kind === "delegation"' in predicate
+    assert 'node.kind === "session" && !isOperatorSession(node)' in predicate
+    own = body.split("function isOperatorSession(node) {", 1)[1].split("\n}", 1)[0]
+    assert "metaInfo && metaInfo.writer_session_id" in own
+    assert "Boolean(node.reports_to_operator)" in own
+    # Nothing disappears silently: the count is part of the label.
+    assert 't("runtime_nodes") + " (" + runtime + ")"' in body
+    assert "localStorage.getItem(RUNTIME_KEY)" in body
+    assert 'localStorage.setItem(RUNTIME_KEY, showRuntime ? "1" : "0")' in body
+    # The depth captions are the runtime's own vocabulary and go with it; rank 0
+    # names the operator, which is domain.
+    assert "if (position.band !== 0 && !showRuntime) { continue; }" in body
+    # ... and the run's own record stays reachable with the node off the board:
+    # both entry points read the whole graph, never the board's filtered view,
+    # and fall back to the record when the node is not there at all.
+    opener = body.split("function openRunRecord(delegationId) {", 1)[1].split("\n}\n", 1)[0]
+    assert "visibleNodesOf" not in opener
+    assert 'inspect({ kind: "delegation"' in opener
+    assert body.count("openRunRecord(run.delegation_id)") == 2
+
+
+def test_fit_measures_the_area_the_operator_can_see_and_stops_at_readable() -> None:
+    """Round 3, designer 4: Fit scaled to the whole canvas element, parking part
+    of the board under the chrome, and shrank without a floor.  The frame is
+    measured off the chrome elements themselves -- not off the grid's declared
+    columns -- so the responsive work still to come cannot silently un-fix it."""
+
+    body = read_spa()
+    frame = body.split("function visibleBoardRect() {", 1)[1].split("\n}", 1)[0]
+    assert "canvas.getBoundingClientRect()" in frame
+    assert 'for (const id of ["sidebar", "dock"])' in frame
+    assert "element.getBoundingClientRect()" in frame
+    # Nothing past the window is visible either, however the shell arranges
+    # itself -- measured in a live panel, where the canvas hung the toolbar's
+    # own height below the fold.
+    assert "Math.min(rect.bottom, window.innerHeight" in frame
+    # ... and the cause of that overhang: the board's flex rule lost to
+    # `#center .view.open`, so the toolbar never took layout space.
+    assert "#center #view-board.view.open{display:flex" in body
+    assert "#view-board #canvas{flex:1; min-height:0; height:auto}" in body
+    fit = body.split("function fitView() {", 1)[1].split("\n}", 1)[0]
+    assert "const frame = visibleBoardRect();" in fit
+    assert "canvas.getBoundingClientRect" not in fit, "fit is back on the full element"
+    assert "(frame.width - 2 * pad) / width" in fit
+    assert "frame.left + pad" in fit, "the fitted content must clear the left chrome"
+    # A floor, and one a card survives: 62 board units of card height at the
+    # floor must still clear the 24px hit target the link ports are built to.
+    assert "Math.max(FIT_MIN_SCALE" in fit
+    match = re.search(r"const FIT_MIN_SCALE = ([0-9.]+);", body)
+    assert match, "the fit scale has no named floor"
+    assert float(match.group(1)) * 62 >= 24, "a card would shrink past its own hit target"
+
+
+def test_a_wide_rank_wraps_into_a_block_shaped_like_the_frame() -> None:
+    """A flat eight per row is 1650 board units against a centre rarely 900 CSS
+    px wide, so Fit had to shrink the whole board to the width of its widest
+    rank -- which is how nine nodes became unreadable (round 3, designer 4)."""
+
+    body = read_spa()
+    assert "PER_ROW" not in body, "the wrap is still a fixed eight"
+    columns = body.split("function bandColumns(count) {", 1)[1].split("\n}", 1)[0]
+    # Derived from the band's own size and the frame's proportions, cell
+    # geometry included, rather than from a constant.
+    assert "frame.width / frame.height" in columns
+    assert "Math.sqrt(count * aspect * ROW / COLUMN)" in columns
+    placement = body.split("function layout(nodes) {", 1)[1].split("\n}", 1)[0]
+    assert "const columns = bandColumns(members.length);" in placement
+    assert "(index % columns) * COLUMN" in placement
+    assert "Math.floor(index / columns)" in placement
+
+
+def test_a_link_port_stays_hittable_at_any_zoom_and_says_what_it_does() -> None:
+    """Round 3, designer 17 and PM 12: after the autofit the ports were about six
+    pixels across and both testers failed to open a link by dragging.  The grab
+    area is sized in SCREEN space -- it counter-scales with the view -- so the
+    24px target holds at every scale."""
+
+    body = read_spa()
+    match = re.search(r"const PORT_HIT = (\d+);", body)
+    assert match, "the port hit area has no named radius"
+    assert int(match.group(1)) * 2 >= 24, "the grab area is under 24 CSS px at 1:1"
+    sizing = body.split("function sizePorts() {", 1)[1].split("\n}", 1)[0]
+    assert "const inverse = 1 / view.scale;" in sizing
+    assert 'scale(" + inverse + ")' in sizing
+    # applyView is the one place the zoom ever changes, so it is where the
+    # ports are re-sized; a wheel zoom must not leave them behind.
+    applied = body.split("function applyView() {", 1)[1].split("\n}", 1)[0]
+    assert "sizePorts();" in applied
+    # A transparent grab circle behind a proportionate dot, a hover affordance
+    # and a cursor hint, so the port reads as a handle before the drag.
+    assert ".porthit{fill:transparent" in body
+    assert ".port{cursor:crosshair}" in body
+    assert ".port:hover .portc{" in body
+    # The tooltip says what dragging does -- and names the non-drag path, since
+    # the port itself is not keyboard-operable and will not pretend to be.
+    assert 'portTip.textContent = t("port_tip");' in body
+    english = body.split("const STRINGS = {", 1)[1].split("en: {", 1)[1].split("\n  },", 1)[0]
+    port_tip = re.search(r'\n    port_tip: "([^"]+)"', english)
+    assert port_tip and "Links tab" in port_tip.group(1)
+    # The drop matters as much as the grab: the reach is in screen pixels and
+    # was measured against a card at 1:1.
+    assert "const DROP_REACH = 64;" in body
+    assert "distance <= DROP_REACH" in body
