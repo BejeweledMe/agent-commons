@@ -303,6 +303,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="board-bar">
         <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
         <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
+        <button type="button" id="board-fit" data-i18n="board_fit" data-i18n-title="tip_board_fit">Fit</button>
+        <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom.</span>
       </div>
       <svg id="canvas" role="img" aria-label="workspace graph"></svg>
       <div id="onboarding" hidden>
@@ -966,6 +968,18 @@ const STRINGS = {
     tip_hire_profile: "The profile fixes the provider, model and tool set. Profiles are operator-owned and never edited from the panel.",
     tip_hire_context: "fresh — every run starts clean; accumulated — the role keeps context between runs (weaker isolation, needs a recorded reason to switch later).",
     tip_hire_budget: "How many role creations and retirements this role may perform itself. Blank means none.",
+    board_fit: "Fit",
+    tip_board_fit: "Bring every card into view.",
+    board_hint: "Drag the canvas to pan; scroll to zoom.",
+    board_only_shelf: "Nothing on the board yet — templates live in the Agent catalogue. Hire an agent to begin.",
+    session_you_tip: "This is you — a human operator window; roles below answer to it.",
+    count_objectives: "objectives",
+    count_tasks: "tasks",
+    count_delegations: "delegations",
+    count_reviews: "reviews",
+    count_verifications: "verifications",
+    count_agents: "agents",
+    count_templates: "templates",
   },
   ru: {
     tab_attention: "Внимание",
@@ -1231,6 +1245,18 @@ const STRINGS = {
     tip_hire_profile: "Профиль фиксирует провайдера, модель и набор инструментов. Профили принадлежат оператору и из панели не редактируются.",
     tip_hire_context: "fresh — каждый запуск с чистого листа; accumulated — роль копит контекст между запусками (слабее изоляция, смена позже требует записанной причины).",
     tip_hire_budget: "Сколько созданий и увольнений ролей эта роль может совершить сама. Пусто — ноль.",
+    board_fit: "Вписать",
+    tip_board_fit: "Вписать все карточки в окно.",
+    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб.",
+    board_only_shelf: "На борде пока пусто — шаблоны живут в Каталоге агентов. Наймите агента, чтобы начать.",
+    session_you_tip: "Это вы — окно человека-оператора; роли ниже подчиняются ему.",
+    count_objectives: "целей",
+    count_tasks: "задач",
+    count_delegations: "делегаций",
+    count_reviews: "ревью",
+    count_verifications: "проверок",
+    count_agents: "агентов",
+    count_templates: "шаблонов",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -1410,6 +1436,16 @@ function layout(nodes) {
   return { placed: placed, bands: ordered, rows: row };
 }
 
+// What the board actually shows.  A closed link leaves the board (its history
+// stays in the Links tab); the edges that referenced it drop with it,
+// position-less.  Templates are catalogue shelf stock; the board shows the
+// live team (round 2, PM findings).
+function visibleNodesOf(graph) {
+  return graph.nodes.filter((node) =>
+    !(node.kind === "agent_link" && node.state === "closed") &&
+    !(node.kind === "agent" && node.attrs && node.attrs.template));
+}
+
 function render(graph) {
   lastGraph = graph;
   // Cold start gets a guided three-step card instead of a bare empty graph:
@@ -1417,10 +1453,7 @@ function render(graph) {
   document.getElementById("onboarding").hidden =
     graph.nodes.length > 0 || !writesEnabled;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
-  // A closed link leaves the board (its history stays in the Links tab); the
-  // edges that referenced it drop with it, position-less.
-  const visibleNodes = graph.nodes.filter(
-    (node) => !(node.kind === "agent_link" && node.state === "closed"));
+  const visibleNodes = visibleNodesOf(graph);
   const layoutResult = layout(visibleNodes);
   const positions = layoutResult.placed;
   const focus = focused ? neighboursOf(graph, focused) : null;
@@ -1430,6 +1463,22 @@ function render(graph) {
     viewport.appendChild(text(0, 20, t("empty_workspace"), "empty"));
     applyView();
     return;
+  }
+  // Records exist but every one is filtered off the board (say, the only agent
+  // is a template): name where the work lives instead of presenting a
+  // workspace with history as untouched (round 2, PM findings).
+  if (!visibleNodes.length) {
+    viewport.appendChild(text(0, 20, t("board_only_shelf"), "empty"));
+    applyView();
+    return;
+  }
+  // Fit exactly once, on the first paint with visible nodes and a laid-out
+  // canvas.  The stream repaints every ~2s; a repeating fit would keep
+  // snatching the view out of the operator's hands, so neither later
+  // snapshots nor a reconnect ever re-trigger it (round 2, PM findings).
+  if (!autoFitted && !userAdjustedView) {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) { autoFitted = true; fitView(); }
   }
 
   // One shared clip so long ledger text can never spill past its node box.
@@ -1524,6 +1573,11 @@ function render(graph) {
 
     const tooltip = document.createElementNS(SVGNS, "title");
     tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id;
+    // The operator's own window is the one card a newcomer cannot map to
+    // anything they did; say plainly that it is them (round 2, PM findings).
+    if (node.kind === "session" && node.reports_to_operator) {
+      tooltip.textContent += "\n" + t("session_you_tip");
+    }
     group.appendChild(tooltip);
 
     group.addEventListener("click", () => {
@@ -2958,11 +3012,19 @@ document.getElementById("catalog-section")
   .addEventListener("change", catalogInstructionVisibility);
 document.getElementById("catalog-save").addEventListener("click", saveCatalogEntry);
 
+// Footer count groups arrive as canonical backend names; caption the known
+// ones in the panel's language and let an unfamiliar group pass through
+// verbatim, so a new backend group still shows up rather than vanishing.
+function countLabel(group) {
+  const table = STRINGS[lang] || STRINGS.en;
+  return table["count_" + group] || STRINGS.en["count_" + group] || group;
+}
+
 function paintChrome(graph) {
   const counts = [];
   for (const [group, states] of Object.entries(graph.counts || {})) {
     const total = Object.values(states).reduce((a, b) => a + b, 0);
-    if (total) { counts.push(group + ": " + total); }
+    if (total) { counts.push(countLabel(group) + ": " + total); }
   }
   document.getElementById("counts").textContent = counts.join("   ");
   const issues = (graph.issues || []).length;
@@ -3001,6 +3063,10 @@ function setStream(state, key) {
 // drag apart from a click instead.
 let dragging = null;
 let suppressClick = false;
+// One deliberate pan or zoom means the operator has placed the view; the
+// one-shot auto-fit in render() must never snatch it back afterwards.
+let userAdjustedView = false;
+let autoFitted = false;
 canvas.addEventListener("pointerdown", (event) => {
   dragging = { x: event.clientX, y: event.clientY, ox: view.x, oy: view.y, moved: 0 };
   suppressClick = false;
@@ -3010,7 +3076,7 @@ window.addEventListener("pointermove", (event) => {
   const dx = event.clientX - dragging.x;
   const dy = event.clientY - dragging.y;
   dragging.moved = Math.max(dragging.moved, Math.abs(dx) + Math.abs(dy));
-  if (dragging.moved > 4) { suppressClick = true; }
+  if (dragging.moved > 4) { suppressClick = true; userAdjustedView = true; }
   view.x = dragging.ox + dx;
   view.y = dragging.oy + dy;
   applyView();
@@ -3018,10 +3084,36 @@ window.addEventListener("pointermove", (event) => {
 window.addEventListener("pointerup", () => { dragging = null; });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
+  userAdjustedView = true;
   const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
   view.scale = Math.min(2.5, Math.max(0.25, view.scale * factor));
   applyView();
 }, { passive: false });
+
+// Zoom-to-fit: from three agents up the layout outgrows the window and cards
+// silently leave the screen with no hint that panning exists (round 2, PM
+// findings).  Scale to bring every visible card inside the frame — capped at
+// 1:1 so a two-card board is not blown up into a wall — and centre the slack.
+function fitView() {
+  if (!lastGraph) { return; }
+  const nodes = visibleNodesOf(lastGraph);
+  if (!nodes.length) { return; }
+  let width = 0, height = 0;
+  for (const position of layout(nodes).placed.values()) {
+    width = Math.max(width, position.x + W);
+    height = Math.max(height, position.y + H);
+  }
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) { return; }
+  const pad = 40;
+  const scale = Math.min(1, Math.max(0.05,
+    Math.min((rect.width - 2 * pad) / width, (rect.height - 2 * pad) / height)));
+  view.scale = scale;
+  view.x = pad + Math.max(0, (rect.width - 2 * pad - width * scale) / 2);
+  view.y = pad + Math.max(0, (rect.height - 2 * pad - height * scale) / 2);
+  applyView();
+}
+document.getElementById("board-fit").addEventListener("click", fitView);
 
 // --- SSE over fetch -------------------------------------------------------
 // EventSource cannot send an Authorization header, and putting the token in the
