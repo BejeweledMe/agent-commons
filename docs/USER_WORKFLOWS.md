@@ -61,10 +61,17 @@ retirement. `agent retire --cascade` takes a role and everything it created out
 of service in one command, and refuses as a whole if any of them still owes a
 live delegation or an unfinished review. Nothing is ever deleted.
 
-`agent-commons ui --enable-writes` opens the same operations in a panel: click a
-role for its record, the gear for its settings, and note the ring around any node
-waiting on a human decision. Anyone holding the printed token writes as the
-session the server was started with.
+`agent-commons ui --enable-writes` opens the same operations in a panel built
+around one home per kind of thing: a library sidebar (the board, runs, a
+two-minute Overview, Skills and Tools over the operator catalogue, the agent
+catalogue of role templates), the board in the centre, and the conversation —
+main chat plus the attention queue — docked right. Clicking a node opens its
+drawer, where Record, Settings, Links, Run and Message are tabs of the selected
+thing; the ring still marks anything waiting on a human. Hiring sits behind the
+board's + button (a new agent from scratch, or two clicks from a template), and
+dragging one of a role card's four ports onto another role opens a recorded
+link — closed later with a reason, never deleted. Anyone holding the printed
+token writes as the session the server was started with.
 
 ## 2. Delegate one bounded local step
 

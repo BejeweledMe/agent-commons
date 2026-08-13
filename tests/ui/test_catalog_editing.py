@@ -320,3 +320,59 @@ def test_a_granted_selection_the_next_launch_would_refuse_is_a_422_now(
         )
         assert hire.status_code == 409, hire.text
         assert "definitely-not-a-tool" in hire.json()["error"]["message"]
+
+
+def test_hiring_from_a_template_inherits_what_the_form_omits(
+    workspace: dict[str, Any],
+) -> None:
+    """The agent catalogue: a hire that names only from_preset_id (the panel's
+    'from the catalogue' mode omits profile/grants/budget entirely) inherits
+    every one of them from the template, because an explicit value would
+    override the template instead."""
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="preset-window-000001",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(session["session_id"]),
+    )
+    with _client(context) as client:
+        template = client.post(
+            "/api/agents",
+            json={
+                "name": "Reviewer template",
+                "profile_id": "claude-independent-reviewer",
+                "rationale": "standard reviewer setup",
+                "template": True,
+                "grants": {"create_roles": "deny", "retire_roles": "deny", "open_links": "ask"},
+            },
+            headers=authorized(),
+        )
+        assert template.status_code == 200, template.text
+        preset_id = template.json()["entity_ref"]["id"]
+
+        # The template appears in the catalogue payload the panel renders.
+        presets = client.get("/api/catalog", headers=authorized()).json()["presets"]
+        assert preset_id in {preset["id"] for preset in presets}
+
+        hired = client.post(
+            "/api/agents",
+            json={
+                "name": "Docs reviewer",
+                "rationale": "reviews the docs",
+                "from_preset_id": preset_id,
+            },
+            headers=authorized(),
+        )
+        assert hired.status_code == 200, hired.text
+        record = manager.get_agent(hired.json()["entity_ref"]["id"])
+        assert record["profile_id"] == "claude-independent-reviewer"
+        assert record["grants"]["open_links"] == "ask"
+        assert not record.get("template")

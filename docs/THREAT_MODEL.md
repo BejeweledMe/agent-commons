@@ -250,8 +250,14 @@ anyway.
 With `--enable-writes` the loopback server records canonical events. The
 mutating surface is a fixed enumerated list of routes, each a thin adapter over
 an existing `CommonsManager` method — the same manager the CLI and MCP adapters
-use. Anyone holding the bearer token writes as the operator session the server
-was started with, and the startup banner says so. Writes stay off by default.
+use. That list now includes opening and closing agent links (`/api/agent-links`
+and `/api/agent-links/{link_id}/close`): governance-magnitude writes validated
+entirely by the domain — enum, self-link, deadline bounds, both roles active —
+and a close must name the revision it closes, so a blind close is refused. A
+link is a recorded permission, not a communication channel; the runtime does
+not consume it, and the panel says so. Anyone holding the bearer token writes
+as the operator session the server was started with, and the startup banner
+says so. Writes stay off by default.
 
 `--enable-catalog-editing` is a **second, separate** gate and additionally
 requires `--role-catalog`. It lets the panel add and remove skills and tools,

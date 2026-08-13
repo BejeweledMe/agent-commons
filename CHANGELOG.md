@@ -28,6 +28,13 @@ Versioning once a stable release line is declared.
   click time with their ids named), catalogue entries carry their active
   holders, and the attention queue warns when a hand-edited catalogue leaves
   a role holding a vanished skill — before any run fails.
+- **The agent catalogue turns role templates into a shelf.** Templates
+  (`template: true` roles — still not a fourth record kind) get their own
+  library view with a two-click "Hire from this", and the hire modal now leads
+  with the choice — a new agent from scratch, or a ready template — showing
+  only the fields that choice needs. Hiring from a template sends only
+  `from_preset_id`, inheriting profile, permissions and budget, guarded by an
+  HTTP test.
 - **Demo mode closes the loop without a provider.** `demo: true` in the
   operator runtime config swaps the provider CLI for a DemoRunner at the same
   runner seam: an implementation run completes with an honest

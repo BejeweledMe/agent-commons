@@ -139,9 +139,18 @@ own gate in `CATALOG_ROUTES`):
 | `POST /api/chat` | `open_engagement` |
 | `POST /api/chat/{thread}/messages` | `reply_thread` |
 | `POST /api/operations/{id}/answer` | `CommunicationRuntimeService.reply_to_input` |
+| `POST /api/agent-links` | `open_agent_link` |
+| `POST /api/agent-links/{link_id}/close` | `close_agent_link` |
 | `POST /api/catalog/entries` (own gate) | `write_role_catalog` |
 | `POST /api/catalog/entries/remove` (own gate) | `write_role_catalog` |
 | `POST /api/delegations` (own gate) | `create_delegation` + `DelegationRuntimeService.run` |
+
+The link routes surface `agent.link_opened`/`agent.link_closed` from the board:
+dragging one of a role card's four ports onto another role opens the form, and a
+close must carry the revision it closes. The domain remains the judge (enum,
+self-link, deadline bounds, both roles active); the panel maps refusals and
+never re-implements them. A link is presented as what it is today — a recorded
+permission the runtime does not yet consume, not a communication channel.
 
 The last route is the launch surface (MUST-4): it records a delegation on a
 role's behalf and runs it through the same `DelegationRuntimeService` the CLI

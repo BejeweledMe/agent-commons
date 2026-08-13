@@ -180,10 +180,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .doc li{font-size:13px; margin:0 0 5px}
 .listwrap{max-width:680px; margin:0 auto; padding:28px 24px 64px}
 .listwrap h1{font-size:16px; font-weight:650; margin:0 0 4px}
+/* Top-left, where reading starts (operator feedback), and the glyph is
+   grid-centred so no font metric can push it past the circle. */
 #fab{
-  position:absolute; right:22px; bottom:22px; width:44px; height:44px;
+  position:absolute; left:16px; top:12px; width:40px; height:40px;
   border-radius:50%; background:var(--info); color:#0d1117; border:none;
-  font-size:22px; line-height:1; cursor:pointer; z-index:5;
+  font-size:20px; line-height:0; display:grid; place-items:center; padding:0;
+  cursor:pointer; z-index:5;
 }
 #fab:hover{filter:brightness(1.1)}
 .dock-tabs{
@@ -244,6 +247,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   padding:8px 14px; font-weight:600; align-self:flex-start; cursor:pointer;
 }
 .mono{font-family:ui-monospace,"JetBrains Mono",monospace}
+/* Nothing may overflow its frame (operator feedback): long ids and labels
+   truncate or wrap inside their own box, never past it. */
+.pill{max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#drawer .drawer-head h2{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+#sidebar button{white-space:nowrap; overflow:hidden}
+#sidebar button .chip{flex:none}
+.attn-item{overflow-wrap:anywhere}
+.modal{max-width:92vw}
 @media (max-width:1100px){ main{grid-template-columns:176px 1fr 320px} }
 </style>
 </head>
@@ -270,6 +281,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="navgroup">
       <span class="navlbl" data-i18n="nav_library">Library</span>
       <button type="button" data-view="guide" aria-selected="false" data-i18n="nav_guide" data-i18n-title="tip_guide">Overview</button>
+      <button type="button" data-view="presets" aria-selected="false" data-i18n="nav_presets" data-i18n-title="tip_presets">Agent catalogue</button>
       <button type="button" data-view="skills" aria-selected="false" data-i18n="nav_skills" data-i18n-title="tip_skills">Skills</button>
       <button type="button" data-view="tools" aria-selected="false" data-i18n="nav_tools" data-i18n-title="tip_tools">Tools</button>
       <button type="button" data-view="sgr" aria-selected="false" data-i18n-title="tip_sgr">SGR <span class="chip" data-i18n="chip_soon">soon</span></button>
@@ -336,6 +348,17 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <p data-i18n="guide_next_p"></p>
         <h3 data-i18n="guide_never_h">What this panel never does</h3>
         <p data-i18n="guide_never_p"></p>
+      </div>
+    </section>
+
+    <section class="view" id="view-presets">
+      <div class="listwrap">
+        <h1 data-i18n="nav_presets">Agent catalogue</h1>
+        <p class="note" data-i18n="presets_note">Ready-made role templates. Hire from one in two
+          clicks instead of filling the form from scratch; the template fixes
+          the profile, permissions and budget, you give the name.</p>
+        <div id="presets-list"></div>
+        <button type="button" id="preset-create" hidden data-i18n="preset_create_button">Create a template…</button>
       </div>
     </section>
 
@@ -555,22 +578,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 </footer>
 <div class="scrim" id="hire-modal" hidden>
   <div class="modal">
-    <h2 data-i18n="tab_hire">Hire</h2>
+    <h2 data-i18n="tab_hire" id="hire-title">Hire</h2>
     <section class="panel open" id="panel-hire">
       <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
         profile and can only narrow it; a role that may create or retire other
         roles needs a turnover budget.</p>
-      <label class="field"><span data-i18n="hire_preset_label">From preset (optional)</span>
+      <label class="field" id="hire-mode-field"><span data-i18n="hire_mode_label">How</span>
+        <select id="hire-mode">
+          <option value="new" data-i18n="hire_mode_new">A new agent — set it up from scratch</option>
+          <option value="preset" data-i18n="hire_mode_preset">From the agent catalogue — a ready template</option>
+        </select></label>
+      <label class="field" id="hire-preset-field" hidden><span data-i18n="hire_preset_label">Template</span>
         <select id="hire-preset"></select></label>
       <label class="field"><span data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
-      <label class="field"><span data-i18n="hire_profile_label">Profile</span>
+      <label class="field" id="hire-profile-field"><span data-i18n="hire_profile_label">Profile</span>
         <select id="hire-profile"></select></label>
       <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
-      <label class="field"><span data-i18n="hire_context_label">Context</span>
+      <label class="field" id="hire-context-field"><span data-i18n="hire_context_label">Context</span>
         <select id="hire-context_mode"></select></label>
-      <div class="grants">
+      <div class="grants" id="hire-grants">
         <label class="field"><span data-i18n="create_roles_label">Create roles</span>
           <select id="hire-create_roles"></select></label>
         <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
@@ -683,7 +711,7 @@ const STRINGS = {
     unaddressed_suffix: ". Open a new chat to include them.",
     unknown: "unknown",
     hire_note: "Hire a standing role. It selects one operator-allowlisted profile and can only narrow it; a role that may create or retire other roles needs a turnover budget.",
-    hire_preset_label: "From preset (optional)",
+    hire_preset_label: "Template",
     hire_name_label: "Name",
     hire_profile_label: "Profile",
     hire_rationale_label: "Why this role exists (kept forever)",
@@ -874,6 +902,18 @@ const STRINGS = {
     link_close_reason: "Why close it",
     config_broken_kind: "will not launch",
     config_broken_msg: "granted skills missing from the catalogue:",
+    nav_presets: "Agent catalogue",
+    tip_presets: "Ready-made role templates: hire in two clicks instead of setting a role up from scratch.",
+    presets_note: "Ready-made role templates. Hire from one in two clicks instead of filling the form from scratch; the template fixes the profile, permissions and budget, you give the name.",
+    presets_none: "No templates yet. Create one — future hires become two clicks.",
+    preset_hire_from: "Hire from this",
+    preset_create_button: "Create a template…",
+    preset_create_title: "New template",
+    preset_saved: "template saved",
+    hire_mode_label: "How",
+    hire_mode_new: "A new agent — set it up from scratch",
+    hire_mode_preset: "From the agent catalogue — a ready template",
+    hire_budget_short: "budget",
   },
   ru: {
     tab_attention: "Внимание",
@@ -920,7 +960,7 @@ const STRINGS = {
     unaddressed_suffix: ". Откройте новый чат, чтобы включить их.",
     unknown: "неизвестно",
     hire_note: "Наймите постоянную роль. Она выбирает один разрешённый оператором профиль и может только сузить его; роли, которая может создавать или отправлять в отставку другие роли, нужен бюджет ротации.",
-    hire_preset_label: "Из пресета (необязательно)",
+    hire_preset_label: "Шаблон",
     hire_name_label: "Имя",
     hire_profile_label: "Профиль",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
@@ -1111,6 +1151,18 @@ const STRINGS = {
     link_close_reason: "Почему закрываете",
     config_broken_kind: "не запустится",
     config_broken_msg: "выданы скиллы, которых нет в каталоге:",
+    nav_presets: "Каталог агентов",
+    tip_presets: "Готовые шаблоны ролей: найм в два клика вместо настройки с нуля.",
+    presets_note: "Готовые шаблоны ролей. Нанимайте из шаблона в два клика вместо заполнения формы с нуля; шаблон фиксирует профиль, права и бюджет, вы даёте имя.",
+    presets_none: "Шаблонов пока нет. Создайте один — будущие наймы станут двумя кликами.",
+    preset_hire_from: "Нанять из этого",
+    preset_create_button: "Создать шаблон…",
+    preset_create_title: "Новый шаблон",
+    preset_saved: "шаблон сохранён",
+    hire_mode_label: "Как нанимаем",
+    hire_mode_new: "Нового агента — настроить с нуля",
+    hire_mode_preset: "Из каталога агентов — готовый шаблон",
+    hire_budget_short: "бюджет",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -1500,12 +1552,42 @@ function closeDrawer() {
   else if (lastGraph) { render(lastGraph); }
 }
 
-function showHire(open) {
-  // A direct hire is always an independent role: lineage ("created by") is
-  // reserved for the proposal flow, where the parent itself proposes and the
-  // operator confirms — the panel cannot fabricate that attribution.
+// A direct hire is always an independent role: lineage ("created by") is
+// reserved for the proposal flow, where the parent itself proposes and the
+// operator confirms — the panel cannot fabricate that attribution.
+//
+// Two ways in (operator feedback): a new agent set up from scratch, or a
+// ready template from the agent catalogue — the same modal, first choice
+// first, and the fields follow it.
+let hireTemplate = false;
+
+function applyHireMode() {
+  const fromPreset =
+    document.getElementById("hire-mode").value === "preset" && !hireTemplate;
+  document.getElementById("hire-preset-field").hidden = !fromPreset;
+  document.getElementById("hire-profile-field").hidden = fromPreset;
+  document.getElementById("hire-context-field").hidden = fromPreset;
+  document.getElementById("hire-grants").hidden = fromPreset;
+}
+
+function showHire(open, options) {
   document.getElementById("hire-modal").hidden = !open;
-  if (open) { document.getElementById("hire-name").focus(); }
+  if (!open) { return; }
+  const values = options || {};
+  hireTemplate = Boolean(values.template);
+  // A template IS a from-scratch definition; hiring from one is the fast path.
+  document.getElementById("hire-mode-field").hidden = hireTemplate;
+  document.getElementById("hire-title").textContent =
+    hireTemplate ? t("preset_create_title") : t("tab_hire");
+  if (values.presetId) {
+    document.getElementById("hire-mode").value = "preset";
+    document.getElementById("hire-preset").value = values.presetId;
+  } else if (hireTemplate) {
+    document.getElementById("hire-mode").value = "new";
+  }
+  applyHireMode();
+  document.getElementById("hire-result").textContent = "";
+  document.getElementById("hire-name").focus();
 }
 
 function showPanel(name) {
@@ -1567,6 +1649,9 @@ document.getElementById("setting-skills").addEventListener("change", () => {
     selectedValues(document.getElementById("setting-skills")).length <= 3;
 });
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
+document.getElementById("hire-mode").addEventListener("change", applyHireMode);
+document.getElementById("preset-create").addEventListener("click", () =>
+  showHire(true, { template: true }));
 
 // --- board links: drag a port, drop on a role, record the permission -------
 // The rubber band lives in a screen-space overlay, so pan/zoom math never
@@ -1965,27 +2050,43 @@ function paintHire() {
 
 async function hireRole() {
   const result = document.getElementById("hire-result");
-  const budgetRaw = document.getElementById("hire-turnover_budget").value;
+  const fromPreset =
+    document.getElementById("hire-mode").value === "preset" && !hireTemplate;
   const body = {
     name: document.getElementById("hire-name").value,
-    profile_id: document.getElementById("hire-profile").value,
     rationale: document.getElementById("hire-rationale").value,
-    context_mode: document.getElementById("hire-context_mode").value,
-    grants: {
+    template: hireTemplate,
+  };
+  if (fromPreset) {
+    // Omit profile/context/grants/budget entirely: the backend fills every
+    // unset field from the template, and an explicit value would override it.
+    body.from_preset_id = document.getElementById("hire-preset").value || null;
+  } else {
+    const budgetRaw = document.getElementById("hire-turnover_budget").value;
+    body.profile_id = document.getElementById("hire-profile").value;
+    body.context_mode = document.getElementById("hire-context_mode").value;
+    body.grants = {
       create_roles: document.getElementById("hire-create_roles").value,
       retire_roles: document.getElementById("hire-retire_roles").value,
       open_links: document.getElementById("hire-open_links").value,
-    },
-    turnover_budget: budgetRaw === "" ? null : Number(budgetRaw),
-    from_preset_id: document.getElementById("hire-preset").value || null,
-  };
+    };
+    body.turnover_budget = budgetRaw === "" ? null : Number(budgetRaw);
+  }
   try {
     const created = await post("/api/agents", body);
     result.className = "result ok";
-    result.textContent = t("hired") + " " + (created.entity_ref ? created.entity_ref.id : "");
+    result.textContent = (hireTemplate ? t("preset_saved") : t("hired")) + " " +
+      (created.entity_ref ? created.entity_ref.id : "");
     document.getElementById("hire-name").value = "";
     document.getElementById("hire-rationale").value = "";
     await loadAttention();
+    if (hireTemplate) {
+      // The new template joins the catalogue payload; repaint the pickers.
+      await loadCatalog();
+      paintCatalog();
+      paintHire();
+    }
+    await refreshGraph();
   } catch (error) {
     // The refusal names the guard it tripped — a missing budget, a wider grant
     // than allowed — which is exactly what the operator needs to fix.
@@ -2494,6 +2595,48 @@ function paintCatalog() {
   }
   document.getElementById("catalog-save").hidden = !catalogEditing;
   paintProfileReference();
+  paintPresets();
+}
+
+// The agent catalogue: ready-made role templates, hired from in two clicks.
+function paintPresets() {
+  const host = document.getElementById("presets-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  document.getElementById("preset-create").hidden = !writesEnabled;
+  const presets = (catalog && catalog.presets) || [];
+  if (!presets.length) {
+    const none = document.createElement("p");
+    none.className = "note";
+    none.textContent = t("presets_none");
+    host.appendChild(none);
+    return;
+  }
+  for (const preset of presets) {
+    const row = document.createElement("div");
+    row.className = "attn-item";
+    const head = document.createElement("span");
+    const grants = preset.grants || {};
+    head.textContent = (preset.name || preset.id) + " — " + (preset.profile_id || "?") +
+      " · " + ["create_roles", "retire_roles", "open_links"]
+        .map((grant) => grant + ": " + (grants[grant] || "deny")).join(", ") +
+      (preset.turnover_budget != null
+        ? " · " + t("hire_budget_short") + " " + preset.turnover_budget : "");
+    row.appendChild(head);
+    if (preset.rationale) {
+      const why = document.createElement("p");
+      why.className = "note";
+      why.textContent = preset.rationale;
+      row.appendChild(why);
+    }
+    if (writesEnabled) {
+      const hire = document.createElement("button");
+      hire.type = "button";
+      hire.textContent = t("preset_hire_from");
+      hire.addEventListener("click", () => showHire(true, { presetId: preset.id }));
+      row.appendChild(hire);
+    }
+    host.appendChild(row);
+  }
 }
 
 // The Tools reference and the MCP page render the same profile_tools payload:
