@@ -468,6 +468,21 @@ def build_graph(
 
     nodes, edges, truncated = _shed(nodes, edges)
 
+    # A template is shelf stock, not a live hire; the board's footer must not
+    # count it as an agent (round 2 PM finding: creating a template grew the
+    # agents counter).  Only the tally splits — nodes above stay the full
+    # ledger projection, and hiding shelf stock is the renderer's decision.
+    live_agents = {
+        identifier: record
+        for identifier, record in snapshot.agents.items()
+        if not record.get("template")
+    }
+    template_agents = {
+        identifier: record
+        for identifier, record in snapshot.agents.items()
+        if record.get("template")
+    }
+
     return {
         "schema": GRAPH_SCHEMA,
         "workspace_id": workspace_id or snapshot.workspace_id,
@@ -483,7 +498,8 @@ def build_graph(
             "delegations": _counts(snapshot.delegations, "delegation"),
             "reviews": _counts(snapshot.reviews, "review"),
             "verifications": _counts(snapshot.verifications, "verification"),
-            "agents": _counts(snapshot.agents, "agent"),
+            "agents": _counts(live_agents, "agent"),
+            "templates": _counts(template_agents, "agent"),
         },
         "awaiting_human": sorted(node["id"] for node in nodes if node["awaits_human"]),
         "issues": [issue.as_dict() for issue in snapshot.issues],

@@ -171,6 +171,26 @@ def test_counts_and_warnings_are_carried_through() -> None:
     assert len(graph["warnings"]) == 1
 
 
+def test_a_template_is_counted_as_shelf_stock_not_a_live_agent() -> None:
+    """Creating a role template grew the board's agents counter (round 2 PM
+    finding).  A template is catalogue stock, not a hire: the tally splits,
+    while the nodes stay the full ledger projection."""
+
+    snapshot = ProjectSnapshot(
+        agents={
+            "agent.live": {"state": "active", "name": "Backend"},
+            "agent.shelf": {"state": "active", "name": "Backend blueprint", "template": True},
+        }
+    )
+    graph = graph_of(snapshot)
+    assert sum(graph["counts"]["agents"].values()) == 1
+    assert sum(graph["counts"]["templates"].values()) == 1
+    assert {node["id"] for node in graph["nodes"] if node["kind"] == "agent"} == {
+        "agent.live",
+        "agent.shelf",
+    }
+
+
 def test_a_real_session_renders_as_a_node(populated, context) -> None:  # type: ignore[no-untyped-def]
     """Regression: an empty workspace never exercised the session path, so a
     wrong attribute name on Session survived every other test."""
