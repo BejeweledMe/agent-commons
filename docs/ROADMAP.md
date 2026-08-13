@@ -75,6 +75,15 @@ provider cancellation, changed-path attestation, DAG scheduling, model routing,
 council templates, cursor subscriptions, and OpenTelemetry metrics remain
 explicitly deferred; no release claim depends on them.
 
+API-based providers are a deferred stage of their own, and they are plural by
+decision: Anthropic, OpenAI, Google, OpenRouter, and a local vLLM endpoint,
+not a single vendor. They are what unlocks enforced structured output (SGR) —
+schemas stored as pure JSON Schema so one library serves every backend
+(Anthropic `output_config`/strict tools, OpenAI structured outputs, Google
+`responseSchema`, vLLM `guided_json`; OpenRouter passes through what the
+routed model supports). On subscription CLIs the only typed channel remains
+MCP tool input schemas, which validate but do not constrain generation.
+
 The long-running broker stage must also define an authenticated operator
 adjudication path for `active` or `input_needed` work whose requester becomes
 unavailable. It may classify that work only after provider termination and

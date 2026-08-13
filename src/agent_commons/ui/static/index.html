@@ -583,7 +583,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="field">
         <span data-i18n="schema_row_label">Output schema — SGR</span>
         <p class="note" data-i18n="schema_row_value">— none. Attaching a schema arrives with API
-          providers (Anthropic API, local vLLM); subscription Claude Code and
+          providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM); subscription Claude Code and
           Codex cannot enforce structured output.</p>
       </div>
       <label class="field"><span data-i18n="setting_reason_label">Reason for this change</span>
@@ -906,7 +906,7 @@ const STRINGS = {
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     skills_view_note: "Behaviour packages from the operator catalogue. An agent gets only what its settings grant.",
     tools_view_note: "From the same operator catalogue: what an agent may run on a task. Granted in agent settings.",
-    sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic API, local vLLM).",
+    sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM).",
     mcp_note: "Custom tools reach both subscription CLIs as MCP servers. Registering them from the panel arrives later; the contract is being designed first.",
     used_by: "used by",
     remove_blocked: "Held by active roles — release it from them first:",
@@ -925,7 +925,7 @@ const STRINGS = {
     tools_profiles_heading: "What each profile actually receives",
     tools_bridge: "Need a tool of your own? That is an MCP server — see the MCP section. This page only narrows what a profile already has.",
     schema_row_label: "Output schema — SGR",
-    schema_row_value: "— none. Attaching a schema arrives with API providers (Anthropic API, local vLLM); subscription Claude Code and Codex cannot enforce structured output.",
+    schema_row_value: "— none. Attaching a schema arrives with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM); subscription Claude Code and Codex cannot enforce structured output.",
     sgr_now_heading: "How agents hand back structured results today",
     sgr_now_body: "Through typed outcome tools: an agent finishes a run by calling commons_succeed_delegation with a typed result reference, and a reviewer records its verdict through commons_complete_review. That is the only typed result channel on subscription CLIs — provider stdout is never parsed or stored, by design.",
     sgr_see_runs: "See them in Runs",
@@ -1185,7 +1185,7 @@ const STRINGS = {
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     skills_view_note: "Пакеты поведения из операторского каталога. Агент получает только то, что выдано в его настройках.",
     tools_view_note: "Из того же операторского каталога: что агент может запускать на задаче. Выдаётся в настройках агента.",
-    sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic API, локальный vLLM).",
+    sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM).",
     mcp_note: "Кастомные туллы доезжают до обоих подписочных CLI как MCP-серверы. Регистрация из панели появится позже; сначала проектируется контракт.",
     used_by: "используют",
     remove_blocked: "Держат активные роли — сначала снимите с них:",
@@ -1204,7 +1204,7 @@ const STRINGS = {
     tools_profiles_heading: "Что реально получает каждый профиль",
     tools_bridge: "Нужен свой инструмент? Это MCP-сервер — см. раздел MCP. Здесь только сужение того, что уже есть у профиля.",
     schema_row_label: "Схема вывода — SGR",
-    schema_row_value: "— нет. Прикрепление схемы появится с API-провайдерами (Anthropic API, локальный vLLM); подписочные Claude Code и Codex не умеют навязанный структурированный вывод.",
+    schema_row_value: "— нет. Прикрепление схемы появится с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM); подписочные Claude Code и Codex не умеют навязанный структурированный вывод.",
     sgr_now_heading: "Как агенты сдают структурированный результат сейчас",
     sgr_now_body: "Через типизированные outcome-туллы: агент завершает прогон вызовом commons_succeed_delegation с типизированной ссылкой на результат, ревьюер записывает вердикт через commons_complete_review. Это единственный типизированный канал результата на подписочных CLI — stdout провайдера никем не парсится и не сохраняется, намеренно.",
     sgr_see_runs: "Посмотреть в «Прогонах»",
