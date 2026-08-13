@@ -1131,8 +1131,11 @@ def test_the_panel_uses_one_word_per_concept_in_each_language() -> None:
     assert _value(russian, "run_state_word") == "delegation"
 
     # A skill is a навык and a tool is an инструмент wherever they are named.
-    assert _value(russian, "nav_skills") == _value(russian, "skills_heading")
-    assert _value(russian, "nav_tools") == _value(russian, "tools_heading")
+    # Anchored on keys the panel actually renders: `skills_heading` and
+    # `tools_heading` were carried here from a surface that no longer exists,
+    # and pinning vocabulary to a string nothing displays proves nothing.
+    assert _value(russian, "nav_skills") == "Навыки"
+    assert _value(russian, "nav_tools") == "Инструменты"
     assert _value(russian, "guide_tab_catalog") == "Навыки и инструменты"
 
 
