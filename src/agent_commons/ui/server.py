@@ -63,6 +63,8 @@ MUTATING_ROUTES = (
     ("POST", "/api/agents/{agent_id}/reconfigure"),
     ("POST", "/api/agents/{agent_id}/retire"),
     ("POST", "/api/agents/{agent_id}/messages"),
+    ("POST", "/api/agent-links"),
+    ("POST", "/api/agent-links/{link_id}/close"),
 )
 
 #: Catalogue editing is behind its own gate, so it has its own allowlist.
@@ -352,6 +354,32 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             changes=body.get("changes") or {},
             reason=str(body.get("reason", "")),
             isolation_downgrade_reason=body.get("isolation_downgrade_reason"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agent-links")
+    async def open_agent_link(request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.open_agent_link,
+            from_agent_id=str(body.get("from_agent_id", "")),
+            to_agent_id=str(body.get("to_agent_id", "")),
+            allowed_action=str(body.get("allowed_action", "ask")),
+            deadline_seconds=body.get("deadline_seconds"),
+            reason=str(body.get("reason", "")),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agent-links/{link_id}/close")
+    async def close_agent_link(link_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.close_agent_link,
+            link_id=link_id,
+            # Required by the domain signature: closing races an open ledger,
+            # so the caller must say which revision of the link it is closing.
+            expected_revision=str(body.get("expected_revision", "")),
+            reason=str(body.get("reason", "")),
             idempotency_key=body.get("idempotency_key"),
         )
 

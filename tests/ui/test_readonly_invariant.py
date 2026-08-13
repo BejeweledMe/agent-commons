@@ -239,3 +239,68 @@ def test_the_writable_server_declares_that_it_writes(
     assert meta["writes_enabled"] is True
     assert meta["read_only"] is False
     assert meta["writer_session_id"]
+
+
+def test_agent_links_open_and_close_through_the_one_write_path(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """Wave 1 item 7: both link routes are thin adapters over the manager's
+    open/close — the domain judges, the panel maps refusals. Closing is a
+    recorded state change, never a delete, and demands the revision it
+    closes."""
+
+    a = writable_client.post("/api/agents", json=_agent_body(name="A"), headers=authorized())
+    b = writable_client.post("/api/agents", json=_agent_body(name="B"), headers=authorized())
+    assert a.status_code == 200 and b.status_code == 200
+    a_id = a.json()["entity_ref"]["id"]
+    b_id = b.json()["entity_ref"]["id"]
+
+    opened = writable_client.post(
+        "/api/agent-links",
+        json={
+            "from_agent_id": a_id,
+            "to_agent_id": b_id,
+            "allowed_action": "handoff_work",
+            "deadline_seconds": 86400,
+            "reason": "A hands documentation to B for review",
+        },
+        headers=authorized(),
+    )
+    assert opened.status_code == 200, opened.text
+    link = opened.json()
+    link_id = link["entity_ref"]["id"] if link.get("entity_ref") else link["link_id"]
+
+    # A self-link is the domain's refusal, surfaced verbatim — not a UI rule.
+    selflink = writable_client.post(
+        "/api/agent-links",
+        json={
+            "from_agent_id": a_id,
+            "to_agent_id": a_id,
+            "allowed_action": "ask",
+            "deadline_seconds": 3600,
+            "reason": "nonsense",
+        },
+        headers=authorized(),
+    )
+    assert selflink.status_code in (400, 409), selflink.text
+
+    # Closing without the revision it closes is refused, nothing recorded.
+    blind = writable_client.post(
+        "/api/agent-links/" + link_id + "/close",
+        json={"reason": "done"},
+        headers=authorized(),
+    )
+    assert blind.status_code in (400, 409), blind.text
+
+    closed = writable_client.post(
+        "/api/agent-links/" + link_id + "/close",
+        json={"expected_revision": link["revision"], "reason": "handoff finished"},
+        headers=authorized(),
+    )
+    assert closed.status_code == 200, closed.text
+
+    shown = writable_client.get(
+        "/api/entities/agent_link/" + link_id, headers=authorized()
+    )
+    assert shown.status_code == 200
+    assert shown.json()["record"]["state"] == "closed"

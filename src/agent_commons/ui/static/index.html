@@ -340,7 +340,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="listwrap">
         <h1 data-i18n="nav_tools">Tools</h1>
         <p class="note" data-i18n="tools_view_note"></p>
+        <p class="note" data-i18n="tools_bridge">Need a tool of your own? That is an MCP server — see
+          the MCP section. This page only narrows what a profile already has.</p>
         <div id="tools-list"></div>
+        <h3 class="subhead" data-i18n="tools_profiles_heading">What each profile actually receives</h3>
+        <div id="tools-profiles"></div>
         <div id="tools-editor-slot"></div>
       </div>
     </section>
@@ -349,6 +353,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="listwrap">
         <h1>SGR — Schema-Guided Reasoning</h1>
         <p class="note" data-i18n="sgr_note"></p>
+        <h3 class="subhead" data-i18n="sgr_now_heading">How agents hand back structured results today</h3>
+        <p class="note" data-i18n="sgr_now_body">Through typed outcome tools: an agent finishes a run by
+          calling commons_succeed_delegation with a typed result reference, and a
+          reviewer records its verdict through commons_complete_review. That is
+          the only typed result channel on subscription CLIs — provider stdout is
+          never parsed or stored, by design.</p>
+        <button type="button" id="sgr-to-runs" data-i18n="sgr_see_runs">See them in Runs</button>
       </div>
     </section>
 
@@ -356,6 +367,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="listwrap">
         <h1>MCP</h1>
         <p class="note" data-i18n="mcp_note"></p>
+        <h3 class="subhead" data-i18n="mcp_builtin_heading">agent-commons — built in</h3>
+        <p class="note" data-i18n="mcp_builtin_body">Every run talks to headquarters only through this
+          stdio server. External MCP configs are disabled on purpose: Claude runs
+          under --strict-mcp-config with no setting sources, Codex ignores user
+          config entirely. What each profile may call is listed under Tools.</p>
+        <div id="mcp-profile-list"></div>
+        <button type="button" disabled data-i18n="mcp_add_disabled"
+          data-i18n-title="mcp_add_reason">Add a server…</button>
       </div>
     </section>
 
@@ -375,7 +394,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <input type="text" id="catalog-description" autocomplete="off"></label>
       <label class="field" id="catalog-instruction-field">
         <span data-i18n="catalog_instruction_label">Instructions given to the agent (skills only)</span>
-        <textarea id="catalog-instruction"></textarea></label>
+        <textarea id="catalog-instruction"
+          data-i18n-placeholder="catalog_instruction_hint"></textarea>
+        <span class="note" id="catalog-counter"></span></label>
+      <div class="field" id="catalog-preview-field" hidden>
+        <span data-i18n="catalog_preview_label">Exactly what the model will receive</span>
+        <pre id="catalog-preview"></pre>
+      </div>
       <button type="button" id="catalog-save" data-i18n="catalog_save">Save entry</button>
       <p class="result" id="catalog-result"></p>
     </div>
@@ -463,8 +488,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <input type="text" id="setting-name" autocomplete="off"></label>
       <label class="field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
         <select id="setting-skills" multiple size="4"></select></label>
-      <label class="field"><span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
-        <select id="setting-tools" multiple size="4"></select></label>
+      <p class="note" data-i18n="skill_contract_line">Skills are glued into the agent's instructions on
+        every run. Changes apply from the next run, never retroactively.</p>
+      <p class="note warn" id="skills-count-note" hidden data-i18n="skills_too_many">More than three
+        skills compete for the agent's attention; conflicting playbooks quietly
+        degrade the work.</p>
+      <div class="field" id="tools-access-field">
+        <span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
+        <label><input type="radio" name="tools-mode" id="tools-mode-full" checked>
+          <span data-i18n="tools_mode_full">Whole profile (default)</span></label>
+        <label><input type="radio" name="tools-mode" id="tools-mode-narrow">
+          <span data-i18n="tools_mode_narrow">Narrow to selected tools</span></label>
+        <div id="tools-checklist" hidden></div>
+        <p class="note" data-i18n="tools_narrow_note">Narrowing only — a role can never gain a tool its
+          profile does not grant. Applies from the next run.</p>
+      </div>
+      <div class="field">
+        <span data-i18n="schema_row_label">Output schema — SGR</span>
+        <p class="note" data-i18n="schema_row_value">— none. Attaching a schema arrives with API
+          providers (Anthropic API, local vLLM); subscription Claude Code and
+          Codex cannot enforce structured output.</p>
+      </div>
       <label class="field"><span data-i18n="setting_reason_label">Reason for this change</span>
         <input type="text" id="setting-reason" autocomplete="off"></label>
       <label class="field" id="downgrade-field" hidden>
@@ -723,6 +767,34 @@ const STRINGS = {
     tools_view_note: "From the same operator catalogue: what an agent may run on a task. Granted in agent settings.",
     sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic API, local vLLM).",
     mcp_note: "Custom tools reach both subscription CLIs as MCP servers. Registering them from the panel arrives later; the contract is being designed first.",
+    used_by: "used by",
+    remove_blocked: "Held by active roles — release it from them first:",
+    catalog_instruction_hint: "Write it like a brief to a contractor: what to do, what is forbidden, what to hand back.",
+    catalog_preview_label: "Exactly what the model will receive",
+    skill_contract_line: "Skills are glued into the agent's instructions on every run. Changes apply from the next run, never retroactively.",
+    skills_too_many: "More than three skills compete for the agent's attention; conflicting playbooks quietly degrade the work.",
+    tools_mode_full: "Whole profile (default)",
+    tools_mode_narrow: "Narrow to selected tools",
+    tools_narrow_note: "Narrowing only — a role can never gain a tool its profile does not grant. Applies from the next run.",
+    tools_fixed_note: "fixed: this is how the role hands work back",
+    tools_fixed_label: "Fixed",
+    tools_narrowable_label: "Narrowable",
+    tools_reserved_label: "Reserved",
+    tools_reserved_note: "reserved (the automatic level is withheld; ask is the ceiling)",
+    tools_profiles_heading: "What each profile actually receives",
+    tools_bridge: "Need a tool of your own? That is an MCP server — see the MCP section. This page only narrows what a profile already has.",
+    schema_row_label: "Output schema — SGR",
+    schema_row_value: "— none. Attaching a schema arrives with API providers (Anthropic API, local vLLM); subscription Claude Code and Codex cannot enforce structured output.",
+    sgr_now_heading: "How agents hand back structured results today",
+    sgr_now_body: "Through typed outcome tools: an agent finishes a run by calling commons_succeed_delegation with a typed result reference, and a reviewer records its verdict through commons_complete_review. That is the only typed result channel on subscription CLIs — provider stdout is never parsed or stored, by design.",
+    sgr_see_runs: "See them in Runs",
+    mcp_builtin_heading: "agent-commons — built in",
+    mcp_builtin_body: "Every run talks to headquarters only through this stdio server. External MCP configs are disabled on purpose: Claude runs under --strict-mcp-config with no setting sources, Codex ignores user config entirely. What each profile may call is listed under Tools.",
+    mcp_add_disabled: "Add a server…",
+    mcp_add_reason: "Later. Registering a server is an operator action in runtime.yaml (a file outside the workspace); the panel will show and verify it.",
+    mcp_tools_word: "tools",
+    update_next_run: "holders pick this up on their next run:",
+    saved_to: "Saved to",
   },
   ru: {
     tab_attention: "Внимание",
@@ -914,6 +986,34 @@ const STRINGS = {
     tools_view_note: "Из того же операторского каталога: что агент может запускать на задаче. Выдаётся в настройках агента.",
     sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic API, локальный vLLM).",
     mcp_note: "Кастомные туллы доезжают до обоих подписочных CLI как MCP-серверы. Регистрация из панели появится позже; сначала проектируется контракт.",
+    used_by: "используют",
+    remove_blocked: "Держат активные роли — сначала снимите с них:",
+    catalog_instruction_hint: "Пишите как ТЗ исполнителю: что делать, что запрещено, в каком виде сдавать.",
+    catalog_preview_label: "Ровно то, что получит модель",
+    skill_contract_line: "Скиллы вклеиваются в инструкцию агента при каждом запуске. Изменения — со следующего прогона, никогда задним числом.",
+    skills_too_many: "Больше трёх скиллов борются за внимание агента; конфликтующие методички тихо ухудшают работу.",
+    tools_mode_full: "Весь профиль (по умолчанию)",
+    tools_mode_narrow: "Сузить до выбранных",
+    tools_narrow_note: "Только сужение — роль не может получить инструмент, которого нет у профиля. Применится со следующего запуска.",
+    tools_fixed_note: "неотчуждаемый: этим роль сдаёт работу",
+    tools_fixed_label: "Неотчуждаемые",
+    tools_narrowable_label: "Сужаемые",
+    tools_reserved_label: "Зарезервированные",
+    tools_reserved_note: "зарезервировано (автоматический уровень удержан; потолок — спросить)",
+    tools_profiles_heading: "Что реально получает каждый профиль",
+    tools_bridge: "Нужен свой инструмент? Это MCP-сервер — см. раздел MCP. Здесь только сужение того, что уже есть у профиля.",
+    schema_row_label: "Схема вывода — SGR",
+    schema_row_value: "— нет. Прикрепление схемы появится с API-провайдерами (Anthropic API, локальный vLLM); подписочные Claude Code и Codex не умеют навязанный структурированный вывод.",
+    sgr_now_heading: "Как агенты сдают структурированный результат сейчас",
+    sgr_now_body: "Через типизированные outcome-туллы: агент завершает прогон вызовом commons_succeed_delegation с типизированной ссылкой на результат, ревьюер записывает вердикт через commons_complete_review. Это единственный типизированный канал результата на подписочных CLI — stdout провайдера никем не парсится и не сохраняется, намеренно.",
+    sgr_see_runs: "Посмотреть в «Прогонах»",
+    mcp_builtin_heading: "agent-commons — встроенный",
+    mcp_builtin_body: "Каждый прогон общается со штабом только через этот stdio-сервер. Внешние MCP-конфиги отключены намеренно: Claude работает под --strict-mcp-config без пользовательских настроек, Codex полностью игнорирует пользовательский конфиг. Что может вызывать каждый профиль — в разделе «Инструменты».",
+    mcp_add_disabled: "Добавить сервер…",
+    mcp_add_reason: "Позже. Регистрация сервера — операторское действие в runtime.yaml (файл вне workspace); панель будет его показывать и проверять.",
+    mcp_tools_word: "туллов",
+    update_next_run: "держатели получат при следующем запуске:",
+    saved_to: "Сохранено в",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -1331,6 +1431,37 @@ document.getElementById("hire-cancel").addEventListener("click", () => showHire(
 document.getElementById("hire-modal").addEventListener("click", (event) => {
   if (event.target === document.getElementById("hire-modal")) { showHire(false); }
 });
+document.getElementById("tools-mode-full").addEventListener("change", () => {
+  document.getElementById("tools-checklist").hidden = true;
+});
+document.getElementById("tools-mode-narrow").addEventListener("change", () => {
+  document.getElementById("tools-checklist").hidden = false;
+});
+document.getElementById("setting-skills").addEventListener("change", () => {
+  document.getElementById("skills-count-note").hidden =
+    selectedValues(document.getElementById("setting-skills")).length <= 3;
+});
+document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
+
+// The editor's live preview is the exact line the launch composes for a skill,
+// and the counter names the ceiling before the server refuses it.
+function paintEditorPreview() {
+  const section = document.getElementById("catalog-section").value;
+  const idValue = document.getElementById("catalog-id").value.trim();
+  const instruction = document.getElementById("catalog-instruction").value;
+  document.getElementById("catalog-counter").textContent =
+    instruction.length ? instruction.length + "/4000" : "";
+  const field = document.getElementById("catalog-preview-field");
+  field.hidden = section !== "skills" || (!idValue && !instruction);
+  if (!field.hidden) {
+    document.getElementById("catalog-preview").textContent =
+      "- " + (idValue || "…") + ": " + instruction;
+  }
+}
+for (const id of ["catalog-id", "catalog-instruction"]) {
+  document.getElementById(id).addEventListener("input", paintEditorPreview);
+}
+document.getElementById("catalog-section").addEventListener("change", paintEditorPreview);
 
 function fillSelect(element, values, selected, multiple) {
   while (element.firstChild) { element.removeChild(element.firstChild); }
@@ -1379,8 +1510,41 @@ function paintSettings(record) {
   document.getElementById("setting-name").value = record.name || "";
   fillSelect(document.getElementById("setting-skills"),
     (catalog && catalog.skills) || [], record.skills || [], true);
-  fillSelect(document.getElementById("setting-tools"),
-    (catalog && catalog.tools) || [], record.tool_allowlist || [], true);
+  document.getElementById("skills-count-note").hidden = (record.skills || []).length <= 3;
+  // Tool access: the real narrowable set of THIS role's profile, not the
+  // catalogue's passports.  Empty allowlist means the whole profile.
+  const summary = ((catalog && catalog.profile_tools) || {})[record.profile_id];
+  const allowlist = record.tool_allowlist || [];
+  document.getElementById("tools-access-field").hidden = !summary;
+  if (summary) {
+    document.getElementById("tools-mode-full").checked = !allowlist.length;
+    document.getElementById("tools-mode-narrow").checked = allowlist.length > 0;
+    const checklist = document.getElementById("tools-checklist");
+    while (checklist.firstChild) { checklist.removeChild(checklist.firstChild); }
+    checklist.hidden = !allowlist.length;
+    for (const name of summary.narrowable) {
+      const row = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.value = name;
+      box.checked = !allowlist.length || allowlist.indexOf(name) >= 0;
+      row.appendChild(box);
+      row.appendChild(document.createTextNode(" " + name));
+      checklist.appendChild(row);
+      checklist.appendChild(document.createElement("br"));
+    }
+    for (const name of summary.fixed) {
+      const row = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = true;
+      box.disabled = true;
+      row.appendChild(box);
+      row.appendChild(document.createTextNode(" " + name + " — " + t("tools_fixed_note")));
+      checklist.appendChild(row);
+      checklist.appendChild(document.createElement("br"));
+    }
+  }
   document.getElementById("setting-reason").value = "";
   document.getElementById("setting-downgrade").value = "";
   // Hidden until the operator actually weakens isolation (fresh -> accumulated);
@@ -1624,8 +1788,16 @@ document.getElementById("settings-save").addEventListener("click", async () => {
   if (catalog && (catalog.skills || []).length) {
     changes.skills = selectedValues(document.getElementById("setting-skills"));
   }
-  if (catalog && (catalog.tools || []).length) {
-    changes.tool_allowlist = selectedValues(document.getElementById("setting-tools"));
+  // The radio is the intent: "whole profile" clears the allowlist explicitly,
+  // "narrow" sends the checked narrowable names.  Omitted entirely when the
+  // profile reference is not loaded, so nothing is wiped blind.
+  if (!document.getElementById("tools-access-field").hidden) {
+    changes.tool_allowlist = document.getElementById("tools-mode-full").checked
+      ? []
+      : Array.from(document.querySelectorAll(
+          '#tools-checklist input[type="checkbox"]:not(:disabled)'))
+          .filter((box) => box.checked)
+          .map((box) => box.value);
   }
   const downgrade = document.getElementById("setting-downgrade");
   try {
@@ -1991,21 +2163,73 @@ function paintCatalog() {
       const row = document.createElement("div");
       row.className = "field";
       const label = document.createElement("span");
+      const users = entry.users || [];
       // Operator-authored text, still written as text and never as markup.
       label.textContent = entry.title + " — " + entry.id +
-        (entry.description ? " · " + entry.description : "");
+        (entry.description ? " · " + entry.description : "") +
+        (users.length ? " · " + t("used_by") + ": " + users.length : "");
       row.appendChild(label);
       if (catalogEditing) {
         const remove = document.createElement("button");
         remove.type = "button";
         remove.textContent = t("remove_button");
-        remove.addEventListener("click", () => removeCatalogEntry(section, entry.id));
+        if (users.length) {
+          // Explain the refusal BEFORE the click: the server would refuse
+          // anyway, but the holders belong on the button, not in an error.
+          remove.disabled = true;
+          remove.title = t("remove_blocked") + " " + users.join(", ");
+        } else {
+          remove.addEventListener("click", () => removeCatalogEntry(section, entry.id));
+        }
         row.appendChild(remove);
       }
       host.appendChild(row);
     }
   }
   document.getElementById("catalog-save").hidden = !catalogEditing;
+  paintProfileReference();
+}
+
+// The Tools reference and the MCP page render the same profile_tools payload:
+// the exact composition a launch receives, so neither can drift from reality.
+function paintProfileReference() {
+  const profiles = (catalog && catalog.profile_tools) || {};
+  const profHost = document.getElementById("tools-profiles");
+  while (profHost.firstChild) { profHost.removeChild(profHost.firstChild); }
+  for (const [profileId, info] of Object.entries(profiles)) {
+    const head = document.createElement("h3");
+    head.className = "subhead";
+    head.textContent = profileId + " · " + info.purpose;
+    profHost.appendChild(head);
+    const lines = [
+      [t("tools_fixed_label"), info.fixed.join(", ") + " — " + t("tools_fixed_note")],
+      [t("tools_narrowable_label"), info.narrowable.join(", ")],
+    ];
+    const reserved = Object.entries(info.grant_tools || {})
+      .filter(([key]) => key.endsWith(":auto"));
+    if (reserved.length) {
+      lines.push([
+        t("tools_reserved_label"),
+        reserved.map(([key, name]) => name + " (" + key + ")").join(", ") +
+          " — " + t("tools_reserved_note"),
+      ]);
+    }
+    for (const [caption, text] of lines) {
+      const row = document.createElement("p");
+      row.className = "note";
+      row.textContent = caption + ": " + text;
+      profHost.appendChild(row);
+    }
+  }
+  const mcpHost = document.getElementById("mcp-profile-list");
+  while (mcpHost.firstChild) { mcpHost.removeChild(mcpHost.firstChild); }
+  for (const [profileId, info] of Object.entries(profiles)) {
+    const row = document.createElement("p");
+    row.className = "note";
+    row.textContent = profileId + " — " +
+      (info.fixed.length + info.narrowable.length) + " " + t("mcp_tools_word");
+    mcpHost.appendChild(row);
+  }
 }
 
 function catalogInstructionVisibility() {
@@ -2025,10 +2249,16 @@ async function saveCatalogEntry() {
       instruction: section === "skills"
         ? document.getElementById("catalog-instruction").value : null,
     });
-    result.className = "result ok";
-    result.textContent = t("saved");
     await loadCatalog();
     paintCatalog();
+    result.className = "result ok";
+    // Live playbooks: a run reads the current catalogue, so holders of an
+    // edited skill pick the change up on their NEXT run — say so, with names.
+    const saved = ((catalog && catalog[section]) || [])
+      .find((entry) => entry.id === document.getElementById("catalog-id").value.trim());
+    const holders = (saved && saved.users) || [];
+    result.textContent = t("saved_to") + " " + ((catalog && catalog.catalog_path) || "") +
+      (holders.length ? " · " + t("update_next_run") + " " + holders.join(", ") : "");
   } catch (error) {
     result.className = "result bad";
     result.textContent = String(error.message || error);

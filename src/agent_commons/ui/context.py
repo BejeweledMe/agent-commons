@@ -302,6 +302,17 @@ class UIContext:
 
         snapshot = self.manager().snapshot()
         catalogue = load_role_catalog(self._catalog_path, workspace_root=self.repo)
+        # Annotate each entry with the active roles that hold it: the card can
+        # then say "used by N" and removal can be explained before the click.
+        for section in CATALOG_SECTIONS:
+            field = "skills" if section == "skills" else "tool_allowlist"
+            for entry in catalogue.get(section) or []:
+                entry["users"] = sorted(
+                    str(record["id"])
+                    for record in snapshot.agents.values()
+                    if record.get("state") == "active"
+                    and entry.get("id") in (record.get(field) or ())
+                )
         editable = ["presets"] + (list(CATALOG_SECTIONS) if self.catalog_editing_enabled else [])
         return {
             "schema": CATALOG_SCHEMA,
@@ -818,6 +829,20 @@ class UIContext:
                 changes.get("tool_allowlist"),
             )
         return manager.reconfigure_agent(agent_id, expected_revision, **fields)
+
+    def open_agent_link(self, **fields: Any) -> dict[str, Any]:
+        """Open one directed link between two roles — a recorded permission.
+
+        A thin adapter over the same ``open_agent_link`` the CLI uses: the
+        domain is the judge (enum, self-link, deadline bounds, both roles
+        active); the panel maps its refusal, never re-implements it.
+        """
+
+        return self.writer().open_agent_link(**fields)
+
+    def close_agent_link(self, *, link_id: str, **fields: Any) -> dict[str, Any]:
+        expected_revision = fields.pop("expected_revision")
+        return self.writer().close_agent_link(link_id, expected_revision, **fields)
 
     def retire_agent(self, *, agent_id: str, **fields: Any) -> dict[str, Any]:
         expected_revision = fields.pop("expected_revision", None)
