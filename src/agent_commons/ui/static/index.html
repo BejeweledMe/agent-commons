@@ -205,6 +205,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .result.ok{color:var(--ok)} .result.bad{color:var(--bad)}
 .grants{display:grid; grid-template-columns:1fr 1fr; gap:6px}
 .band-label{fill:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em}
+/* "you", on the operator's own card.  Anchored to the card's right edge so it
+   never collides with the label growing from the left. */
+.youbadge{fill:var(--info); font-size:9px; letter-spacing:.06em; text-anchor:end}
+/* The glyph legend: a panel over the board, not a column beside it, so opening
+   it costs the board nothing once it is closed again. */
+#legend-panel{
+  position:absolute; z-index:5; top:46px; left:14px; max-width:340px;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:4px 12px 8px; box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.lgrow{display:grid; grid-template-columns:18px 1fr; gap:8px; margin:0 0 6px}
+.lgglyph{font-size:13px; line-height:1.2; text-align:center}
+.lgtext{display:block; font-size:11px; color:var(--fg)}
+.lgstates{display:block; font-size:10px; color:var(--muted); word-break:break-word}
+/* The tone classes above paint SVG (`fill`); the legend is HTML and needs the
+   same colours as text. */
+.lgglyph.ok{color:var(--ok)} .lgglyph.bad{color:var(--bad)}
+.lgglyph.warn{color:var(--warn)} .lgglyph.info{color:var(--info)}
+.lgglyph.muted{color:var(--muted)}
 .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .info{fill:var(--info)}
 .muted{fill:var(--muted)}
 .empty{fill:var(--muted); font-size:12px}
@@ -346,7 +364,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span class="pill" id="stream">connecting</span>
   <span class="pill" id="writes">writes disabled</span>
   <input type="search" id="search-box" placeholder="Search history…" data-i18n-placeholder="search_placeholder">
-  <select id="lang" aria-label="Language">
+  <select id="lang" aria-label="Language" data-i18n-aria="lang_label">
     <option value="en">English</option>
     <option value="ru">Русский</option>
   </select>
@@ -379,13 +397,19 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <!-- The label carries the count of what is being held back, so it is
              painted from JS; only its tooltip is a data-i18n marker. -->
         <button type="button" id="board-runtime" aria-pressed="false" hidden data-i18n-title="tip_runtime_nodes">Runtime nodes</button>
+        <!-- The board's status glyphs were the panel's whole state language and
+             nothing explained them anywhere (round 3, designer 18).  The key
+             lives on the board because that is where a person meets them, and
+             folds away because a permanent key would spend the work surface. -->
+        <button type="button" id="board-legend" aria-expanded="false" aria-controls="legend-panel"
+          data-i18n="legend_open" data-i18n-title="tip_legend">Marks</button>
         <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom. To link two agents, drag a port on a card's edge — or use the role's Links tab.</span>
         <!-- A successful hire closes its modal, so the result has to land
              somewhere that outlives it: the bar above the board the new role
              just appeared on (round 3, designer). -->
         <span class="result" id="board-result"></span>
       </div>
-      <svg id="canvas" role="img" aria-label="workspace graph"></svg>
+      <svg id="canvas" role="img" aria-label="workspace graph" data-i18n-aria="board_aria"></svg>
       <div id="onboarding" hidden>
         <div class="onb-card">
           <h2 data-i18n="onb_title">This is your agent team's headquarters</h2>
@@ -410,6 +434,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
             <button type="button" id="onb-dismiss" data-i18n="onb_dismiss">Look at the board first</button>
           </div>
         </div>
+      </div>
+      <div id="legend-panel" hidden>
+        <h3 class="subhead" data-i18n="legend_title">What the marks mean</h3>
+        <!-- Built from the GLYPHS table itself, so a state added there cannot go
+             missing from its own explanation.  The canonical states stay in the
+             ledger's spelling: this is the panel teaching that vocabulary, which
+             is the opposite of translating it away (item 20). -->
+        <div id="legend-rows"></div>
+        <p class="note" data-i18n="legend_note"></p>
       </div>
       <svg id="linkband" hidden><path d=""></path></svg>
     </section>
@@ -570,7 +603,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-sgr">
       <div class="listwrap">
-        <h1>SGR — Schema-Guided Reasoning</h1>
+        <h1 data-i18n="sgr_title">SGR — Schema-Guided Reasoning</h1>
         <p class="note" data-i18n="sgr_note"></p>
         <h3 class="subhead" data-i18n="sgr_now_heading">How agents hand back structured results today</h3>
         <p class="note" data-i18n="sgr_now_body">Through typed outcome tools: an agent finishes a run by
@@ -941,6 +974,32 @@ const COLUMN = 210, ROW = 118, W = 180, H = 62;
 // names, agent prose, and backend refusal messages -- is never translated: those
 // strings are shared with the CLI, the ledger, and the logs, and must keep
 // matching them verbatim.
+// One thing, one word.  Round 3 counted four names for the same object --
+// "Запуски" in the nav, "Запуск" on the tab, "прогоны" in the guide,
+// "делегация" in the drawer -- and "Скиллы"/"Туллы" sitting beside
+// "Инструменты" (item 21).  The drift came from having nowhere the choice was
+// written down, so it is written down here, and the tables below follow it.
+//
+//   concept                             English        Russian
+//   the standing hire, seen as a
+//   member of the operator's team       role           роль
+//   one attempt at a piece of work      run            прогон
+//   a behaviour package                 skill          навык
+//   something a run may call            tool           инструмент
+//   a unit of work                      task           задача
+//   the canvas the team stands on       board          доска
+//
+// Two of those have a canonical twin, and the rule for both is the same one the
+// glosses follow: the LEDGER's name is used when the panel names the RECORD,
+// and the human word when it names what a person watches.
+//
+//   `delegation` names the record a run writes; a person watches a run.
+//   `agent`      names the ledger kind and the events (`agent.created`,
+//                `agent.link_opened`) and the product; a person hires a role.
+//
+// Canonical names are never translated in either direction -- that is item 20's
+// recorded compromise, and it applies to these two entity names as much as to
+// `deny`, `fresh` or `succeeded`.
 const STRINGS = {
   en: {
     tab_attention: "Attention",
@@ -986,16 +1045,16 @@ const STRINGS = {
     unaddressed_prefix: ". Roles created since this chat opened are not addressed in it: ",
     unaddressed_suffix: ". Open a new chat to include them.",
     unknown: "unknown",
-    hire_note: "Hire a standing role. It selects one operator-allowlisted profile and can only narrow it; a role that may create or retire other roles needs a turnover budget.",
+    hire_note: "Hire a standing role. It selects one operator-allowlisted profile and can only narrow it; a role that may hire or retire other roles needs a budget for it.",
     hire_preset_label: "Template",
     hire_name_label: "Name",
     hire_profile_label: "Profile",
     hire_rationale_label: "Why this role exists (kept forever)",
-    hire_context_label: "Context",
-    create_roles_label: "Create roles",
-    retire_roles_label: "Retire roles",
-    open_links_label: "Open links",
-    hire_budget_label: "Turnover budget (blank = none)",
+    hire_context_label: "Memory between runs",
+    create_roles_label: "May hire other roles",
+    retire_roles_label: "May take other roles out of service",
+    open_links_label: "May open links to other roles",
+    hire_budget_label: "How many roles it may hire or retire in total (blank = none)",
     hire_button: "Hire",
     preset_none: "— none —",
     runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
@@ -1007,16 +1066,16 @@ const STRINGS = {
     until: "until",
     run_note: "Put this role to work on a task. It runs under the role's profile (provider and model), through the same broker the CLI uses. Progress appears on the run's node as its state changes.",
     run_task_label: "Task",
-    run_wall_label: "Wall-time seconds (blank = default)",
+    run_wall_label: "Stop the run after this many seconds (blank = default)",
     run_go: "Run this role on the task",
     message_subject_label: "Subject (new thread only)",
     message_body_label: "Message to this role",
-    message_note_role: "You are writing to this role. Agents talk to each other through delegation; this channel carries human direction only.",
-    setting_name_label: "Display name",
-    setting_skills_label: "Required skills (operator catalogue)",
-    setting_tools_label: "Tools (narrows the profile, never widens)",
+    message_note_role: "You are writing to this role. Roles talk to each other through delegation; this channel carries human direction only.",
+    setting_name_label: "Name you will see on the board",
+    setting_skills_label: "Skills every run of this role receives",
+    setting_tools_label: "Which of the profile's tools this role may use",
     setting_reason_label: "Reason for this change",
-    downgrade_label: "Weakening isolation — recorded reason (needs agent:isolation_downgrade)",
+    downgrade_label: "You are weakening this role's isolation — say why (kept forever; needs agent:isolation_downgrade)",
     settings_save: "Save",
     settings_retire: "Retire…",
     settings_retire_cascade: "Retire with everything it created…",
@@ -1075,7 +1134,7 @@ const STRINGS = {
     catalog_id_label: "Short id (lowercase, no spaces)",
     catalog_title_label: "Name people will see",
     catalog_desc_label: "What it is for",
-    catalog_instruction_label: "Instructions given to the agent (skills only)",
+    catalog_instruction_label: "Instructions given to the role (skills only)",
     catalog_save: "Save entry",
     saved: "saved",
     removed: "removed",
@@ -1093,40 +1152,40 @@ const STRINGS = {
     chip_later: "later",
     hire_cancel: "Cancel",
     drawer_close: "Close",
-    fab_hire: "Hire an agent: name, profile — and the role appears on the board.",
+    fab_hire: "Hire a role: name, profile — and it appears on the board.",
     tip_board: "Your team and its work. Click an entity for details; the wiring is the org chart.",
     tip_runs: "Every provider run: what is moving now and how it ended. State only — no prompts or transcripts.",
     tip_guide: "A two-minute explanation of the whole system: what it is, how it fits, where to start.",
-    tip_skills: "Behaviour packages from the operator catalogue. Granted to agents in their settings.",
-    tip_tools: "Tools from the same catalogue: what an agent may run on a task.",
+    tip_skills: "Behaviour packages from the operator catalogue. Granted to roles in their settings.",
+    tip_tools: "Tools from the same catalogue: what a role may run on a task.",
     tip_sgr: "Schema-Guided Reasoning: a library of structured-output schemas. Arrives with API providers.",
     tip_mcp: "Custom tools reach subscription CLIs as MCP servers; this section arrives later.",
-    onb_title: "This is your agent team's headquarters",
-    onb_lead: "Hire agents, give them tasks, and watch the work reach a result. Every step is recorded in a shared history.",
-    onb_s1_t: "Hire your first agent",
+    onb_title: "This is your team's headquarters",
+    onb_lead: "Hire roles, give them tasks, and watch the work reach a result. Every step is recorded in a shared history.",
+    onb_s1_t: "Hire your first role",
     onb_s1_p: "The + button on the board. The profile decides who it is and what it may do.",
     onb_s2_t: "Create a task",
     onb_s2_p: "Briefly: what to do and how we will know it is done.",
     onb_s3_t: "Run it",
-    onb_s3_p: "The agent takes the task. The run shows up live in Runs.",
-    onb_cta: "Hire the first agent",
+    onb_s3_p: "The role takes the task. The run shows up live in Runs.",
+    onb_cta: "Hire the first role",
     guide_title: "Agent Commons, in short",
     guide_sub: "Two minutes, top-down, simple things first.",
     guide_what_h: "What this is",
-    guide_what_p: "A local headquarters for a team of coding agents. You hire agents into roles, give them tasks, and confirm the decisions that matter. Every step — a hire, a task, a run, a result — lands in an append-only history, so it is always clear who did what and why.",
+    guide_what_p: "A local headquarters for a team of coding roles. You hire a role, give it tasks, and confirm the decisions that matter. Every step — a hire, a task, a run, a result — lands in an append-only history, so it is always clear who did what and why.",
     guide_how_h: "How it fits together",
-    guide_ladder: "Agents → Tasks → Runs → Reviews",
-    guide_how_p: "An agent is a standing role with a profile (which model, what it may do). A task says what to do and when it counts as done. A run is one attempt by an agent to do the work. A review is an independent check of the result.",
+    guide_ladder: "Roles → Tasks → Runs → Reviews",
+    guide_how_p: "A role is a standing hire with a profile (which model, what it may do). A task says what to do and when it counts as done. A run is one attempt by a role to do the work. A review is an independent check of the result.",
     guide_route_h: "Your first route",
-    guide_route_1: "Hire an agent (+ on the board) — pick a profile.",
+    guide_route_1: "Hire a role (+ on the board) — pick a profile.",
     guide_route_2: "Create a task with a clear done-criterion.",
-    guide_route_3: "Run the agent on the task and follow it in Runs.",
+    guide_route_3: "Run the role on the task and follow it in Runs.",
     guide_next_h: "Once you are comfortable",
-    guide_next_p: "Links between agents, independent reviews of each other's work, the skills and tools catalogue, role permissions — all of it joins in as you need it, not all at once.",
+    guide_next_p: "Links between roles, independent reviews of each other's work, the skills and tools catalogue, role permissions — all of it joins in as you need it, not all at once.",
     guide_never_h: "What this panel never does",
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     guide_tab_brief: "In short",
-    guide_tab_agents: "Agents and memory",
+    guide_tab_agents: "Roles and memory",
     guide_tab_tasks: "Tasks and runs",
     guide_tab_links: "Links",
     guide_tab_limits: "Limits and safety",
@@ -1165,7 +1224,7 @@ const STRINGS = {
     guide_ln_handoff_p: "Exactly one place in the lifecycle reads links: staffing a delegation. A session running as a role may staff itself or a role in its own lineage; an open handoff_work link from it to another role widens precisely that — nothing else. The check runs on delegation.requested and again on every replay.",
     guide_ln_handoff_ex: "role A, no link → delegation on_behalf_of role B is refused; open handoff_work A→B and the same write passes",
     guide_ln_deadline_h: "A link ends only when you close it",
-    guide_ln_deadline_p: "There is no expiry. Replay has no clock, and giving it one would let the same events project differently over time, so nothing can retire a permission on a schedule — only an explicit agent.link_closed does. The optional deadline_seconds field records an intended horizon for people to read; it constrains nothing, which is why the panel no longer asks for it. Bounds on agents are counted in attempts, provider units and depth, not in hours.",
+    guide_ln_deadline_p: "There is no expiry. Replay has no clock, and giving it one would let the same events project differently over time, so nothing can retire a permission on a schedule — only an explicit agent.link_closed does. The optional deadline_seconds field records an intended horizon for people to read; it constrains nothing, which is why the panel no longer asks for it. Bounds on roles are counted in attempts, provider units and depth, not in hours.",
     guide_lm_two_h: "Two layers of limits",
     guide_lm_two_p: "Per-run limits are written into delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency and a budget in provider_units or micro_usd — and a child can only narrow them. Operator limits live in the runtime config and cap every broker sharing one state root: global_concurrency 2, per-provider and per-profile concurrency, parent_provider_units 4, parent_budget_microusd, and max_delegations_total 16 bounding the whole tree — which depth and fanout alone never did.",
     guide_lm_two_ex: "provider_units budget below max_attempts → refused at launch: every permitted attempt must be payable",
@@ -1180,23 +1239,23 @@ const STRINGS = {
     guide_lm_gates_ex: "read-only start → the app registers GET routes only; the stream without the token → 401",
     guide_ct_file_h: "The catalogue is an operator file",
     guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue (second gate), never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
-    guide_ct_file_ex: "a builder runs with write access to the workspace — a catalogue inside it would be a catalogue the agent can rewrite",
+    guide_ct_file_ex: "a builder runs with write access to the workspace — a catalogue inside it would be a catalogue the role can rewrite",
     guide_ct_skill_h: "A skill is operator-authored instruction",
-    guide_ct_skill_p: "A skill entry carries up to 4000 characters of instruction text; a tool entry carries only an identity, because the tool it names is already fixed by the profile. At launch skill_instructions resolves each id fail-closed: an id the catalogue lacks refuses the launch, rather than silently running a different agent than the operator described. The resolved text joins the bounded instruction fed to the provider process over stdin — a role cannot write its own skill.",
+    guide_ct_skill_p: "A skill entry carries up to 4000 characters of instruction text; a tool entry carries only an identity, because the tool it names is already fixed by the profile. At launch skill_instructions resolves each id fail-closed: an id the catalogue lacks refuses the launch, rather than silently running a different role than the operator described. The resolved text joins the bounded instruction fed to the provider process over stdin — a role cannot write its own skill.",
     guide_ct_skill_ex: "role requires a skill the catalogue lacks → launch refused: role selects skills the operator catalogue does not define",
     guide_ct_tools_h: "Tools only narrow",
     guide_ct_tools_p: "A role's tool_allowlist is intersected with the profile's fixed set — no selection can widen a capability. The outcome tools (commons_succeed_delegation, commons_delegation_needs_operator and kin) are exempt from narrowing: a role that cannot report a terminal result is broken, not narrower. Staff-changing tools switch on by exact grant level: create_roles: ask injects commons_propose_agent, create_roles: auto would inject commons_create_agent — withheld today along with the auto level itself.",
     guide_ct_tools_ex: "allowlist names a tool outside the profile → launch refused; outcome tools survive any narrowing",
-    skills_view_note: "Behaviour packages from the operator catalogue. An agent gets only what its settings grant.",
-    tools_view_note: "From the same operator catalogue: what an agent may run on a task. Granted in agent settings.",
-    sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM).",
+    skills_view_note: "Behaviour packages from the operator catalogue. A role gets only what its settings grant.",
+    tools_view_note: "From the same operator catalogue: what a role may run on a task. Granted in the role's settings.",
+    sgr_note: "A library of structured-output schemas you will attach to roles. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM).",
     mcp_note: "Custom tools reach both subscription CLIs as MCP servers. Registering them from the panel arrives later; the contract is being designed first.",
     used_by: "used by",
     remove_blocked: "Held by active roles — release it from them first:",
     catalog_instruction_hint: "Write it like a brief to a contractor: what to do, what is forbidden, what to hand back.",
     catalog_preview_label: "Exactly what the model will receive",
-    skill_contract_line: "Skills are glued into the agent's instructions on every run. Changes apply from the next run, never retroactively.",
-    skills_too_many: "More than three skills compete for the agent's attention; conflicting playbooks quietly degrade the work.",
+    skill_contract_line: "Skills are glued into the role's instructions on every run. Changes apply from the next run, never retroactively.",
+    skills_too_many: "More than three skills compete for the role's attention; conflicting playbooks quietly degrade the work.",
     tools_mode_full: "Whole profile (default)",
     tools_mode_narrow: "Narrow to selected tools",
     tools_narrow_note: "Narrowing only — a role can never gain a tool its profile does not grant. Applies from the next run.",
@@ -1209,8 +1268,8 @@ const STRINGS = {
     tools_bridge: "Need a tool of your own? That is an MCP server — see the MCP section. This page only narrows what a profile already has.",
     schema_row_label: "Output schema — SGR",
     schema_row_value: "— none. Attaching a schema arrives with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM); subscription Claude Code and Codex cannot enforce structured output.",
-    sgr_now_heading: "How agents hand back structured results today",
-    sgr_now_body: "Through typed outcome tools: an agent finishes a run by calling commons_succeed_delegation with a typed result reference, and a reviewer records its verdict through commons_complete_review. That is the only typed result channel on subscription CLIs — provider stdout is never parsed or stored, by design.",
+    sgr_now_heading: "How roles hand back structured results today",
+    sgr_now_body: "Through typed outcome tools: a role finishes a run by calling commons_succeed_delegation with a typed result reference, and a reviewer records its verdict through commons_complete_review. That is the only typed result channel on subscription CLIs — provider stdout is never parsed or stored, by design.",
     sgr_see_runs: "See them in Runs",
     mcp_builtin_heading: "agent-commons — built in",
     mcp_builtin_body: "Every run talks to headquarters only through this stdio server. External MCP configs are disabled on purpose: Claude runs under --strict-mcp-config with no setting sources, Codex ignores user config entirely. What each profile may call is listed under Tools.",
@@ -1224,9 +1283,9 @@ const STRINGS = {
     links_none: "No links yet. Drag a port on the card's edge to another role — or approve one a role proposes.",
     link_modal_title: "Open a link",
     link_permission_note: "A link is a recorded permission in the journal; it does not open a communication channel yet.",
-    link_type_label: "Type",
-    link_type_ask: "Ask — may put questions to this role",
-    link_type_handoff: "Hand off work — may pass work to this role",
+    link_type_label: "What this link permits",
+    link_type_ask: "ask — may put questions to this role",
+    link_type_handoff: "handoff_work — may pass work to this role",
     link_reason_label: "Why this link",
     link_open_button: "Open the link",
     link_close_button: "Close the link",
@@ -1235,7 +1294,7 @@ const STRINGS = {
     link_close_reason: "Why close it",
     config_broken_kind: "will not launch",
     config_broken_msg: "granted skills missing from the catalogue:",
-    nav_presets: "Agent catalogue",
+    nav_presets: "Role catalogue",
     tip_presets: "Ready-made role templates: hire in two clicks instead of setting a role up from scratch.",
     presets_note: "Ready-made role templates. Hire from one in two clicks instead of filling the form from scratch; the template fixes the profile, permissions and budget, you give the name.",
     presets_none: "No templates yet. Create one — future hires become two clicks.",
@@ -1244,15 +1303,15 @@ const STRINGS = {
     preset_create_title: "New template",
     preset_save_button: "Save the template",
     err_field_empty: "The “{field}” field cannot be empty.",
-    hire_mode_label: "How",
-    hire_mode_new: "A new agent — set it up from scratch",
-    hire_mode_preset: "From the agent catalogue — a ready template",
+    hire_mode_label: "Where this role comes from",
+    hire_mode_new: "A new role — set it up from scratch",
+    hire_mode_preset: "From the role catalogue — a ready template",
     hire_budget_short: "budget",
     task_fab: "+ Task",
     tip_task_fab: "Create a task: what to do and how we will know it is done.",
     task_modal_title: "New task",
     task_modal_note: "A task is what a role gets run on: what to do, and how we will know it is done. It lands on the board and in the history.",
-    task_title_label: "Title",
+    task_title_label: "Short name for this task",
     task_desc_label: "What to do",
     task_criteria_label: "Done when (one criterion per line)",
     task_create_button: "Create the task",
@@ -1260,14 +1319,14 @@ const STRINGS = {
     trust_short: "ⓘ trust model",
     tip_hire_profile: "The profile fixes the provider, model and tool set. Profiles are operator-owned and never edited from the panel.",
     tip_hire_context: "fresh — every run starts clean; accumulated — the role keeps context between runs (weaker isolation, needs a recorded reason to switch later).",
-    tip_hire_budget: "How many role creations and retirements this role may perform itself. Blank means none.",
+    tip_hire_budget: "Hires and retirements are counted against the same number and it never resets, so a hire-and-fire cycle cannot walk past it.",
     board_fit: "Fit",
     tip_board_fit: "Bring every card into view.",
-    board_hint: "Drag the canvas to pan; scroll to zoom. To link two agents, drag a port on a card's edge — or use the role's Links tab.",
+    board_hint: "Drag the canvas to pan; scroll to zoom. To link two roles, drag a port on a card's edge — or use the role's Links tab.",
     runtime_nodes: "Runtime nodes",
     tip_runtime_nodes: "Sessions and delegations — the machinery a run leaves behind. Hidden by default so the board shows your team; the number says how many nodes it covers.",
-    port_tip: "Drag to another agent's card to open a link between them. Prefer buttons? The role's Links tab opens the same form.",
-    board_only_shelf: "Nothing on the board yet — templates live in the Agent catalogue. Hire an agent to begin.",
+    port_tip: "Drag to another role's card to open a link between them. Prefer buttons? The role's Links tab opens the same form.",
+    board_only_shelf: "Nothing on the board yet — templates live in the Role catalogue. Hire a role to begin.",
     session_you_tip: "This is you — a human operator window; roles below answer to it.",
     accept_heading: "Accepting this work",
     accept_ledger_state: "state in the ledger",
@@ -1317,7 +1376,7 @@ const STRINGS = {
     reopen_recorded_named: "Sent “{title}” back to work.",
     hire_preset_empty: "A template is a saved role setup — one profile with its permissions and its budget, under a name. There are none yet.",
     hire_preset_create: "Set a role up from scratch and save it as the first template",
-    skills_empty: "No skills in the operator catalogue yet. A skill is a behaviour package glued into the agent's instructions on every run.",
+    skills_empty: "No skills in the operator catalogue yet. A skill is a behaviour package glued into the role's instructions on every run.",
     catalog_add_here: "Add one under Skills in the library.",
     tools_none_narrowable: "This profile grants nothing that can be narrowed — every tool it has is fixed.",
     record_show_json: "Show record",
@@ -1379,23 +1438,42 @@ const STRINGS = {
     gl_verification: "reproducing a claim",
     gl_builder: "does the work",
     gl_reviewer: "reviews work it did not do",
+    lang_label: "Language",
+    board_aria: "workspace graph",
+    sgr_title: "SGR — Schema-Guided Reasoning",
+    legend_open: "Marks",
+    tip_legend: "What the marks on the cards mean.",
+    legend_title: "What the marks mean",
+    legend_note: "The states beside each mark are the ledger's own words, and are never translated.",
+    lg_pending: "not started yet",
+    lg_moving: "under way",
+    lg_waiting: "waiting on a person",
+    lg_finished: "finished — which is not accepted",
+    lg_accepted: "a person accepted it, or a reviewer approved it",
+    lg_refused: "it did not finish, or it was turned down",
+    lg_timed_out: "it ran past its wall time",
+    lg_needs_operator: "it cannot go on without you",
+    lg_closed: "closed, withdrawn or cancelled",
+    lg_abstained: "nobody would judge it",
+    lg_stale: "the evidence behind it no longer binds",
+    session_you_badge: "you",
     count_objectives: "objectives",
     count_tasks: "tasks",
-    count_delegations: "delegations",
+    count_delegations: "runs",
     count_reviews: "reviews",
     count_verifications: "verifications",
-    count_agents: "agents",
+    count_agents: "roles",
     count_templates: "templates",
   },
   ru: {
     tab_attention: "Внимание",
-    tab_runs: "Запуски",
+    tab_runs: "Прогоны",
     tab_chat: "Общий чат",
     tab_hire: "Нанять",
     tab_record: "Запись",
     tab_catalog: "Каталог",
     tab_search: "Поиск",
-    tab_run: "Запуск",
+    tab_run: "Прогон",
     tab_message: "Сообщение",
     tab_settings: "⚙ Настройки",
     stream_connecting: "подключение",
@@ -1431,37 +1509,37 @@ const STRINGS = {
     unaddressed_prefix: ". Роли, созданные после открытия этого чата, в нём не адресованы: ",
     unaddressed_suffix: ". Откройте новый чат, чтобы включить их.",
     unknown: "неизвестно",
-    hire_note: "Наймите постоянную роль. Она выбирает один разрешённый оператором профиль и может только сузить его; роли, которая может создавать или отправлять в отставку другие роли, нужен бюджет ротации.",
+    hire_note: "Наймите постоянную роль. Она выбирает один разрешённый оператором профиль и может только сузить его; роли, которая может нанимать или увольнять другие роли, нужен на это бюджет.",
     hire_preset_label: "Шаблон",
     hire_name_label: "Имя",
     hire_profile_label: "Профиль",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
-    hire_context_label: "Контекст",
-    create_roles_label: "Создание ролей",
-    retire_roles_label: "Отставка ролей",
-    open_links_label: "Открытие ссылок",
-    hire_budget_label: "Бюджет ротации (пусто = нет)",
+    hire_context_label: "Память между прогонами",
+    create_roles_label: "Может нанимать другие роли",
+    retire_roles_label: "Может выводить другие роли из работы",
+    open_links_label: "Может открывать связи с другими ролями",
+    hire_budget_label: "Сколько ролей может нанять и уволить всего (пусто — ни одной)",
     hire_button: "Нанять",
     preset_none: "— нет —",
-    runs_note: "Текущие и недавние запуски провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
+    runs_note: "Текущие и недавние прогоны провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
     runs_open_tip: "Открыть запись прогона.",
     task_runs_heading: "Прогоны по этой задаче",
     live: "в работе",
     role_word: "роль",
     on_word: "на",
     until: "до",
-    run_note: "Поставьте эту роль на задачу. Запуск идёт под профилем роли (провайдер и модель) через тот же брокер, что и CLI. Прогресс отображается на узле запуска по мере смены его состояния.",
+    run_note: "Поставьте эту роль на задачу. Прогон идёт под профилем роли (провайдер и модель) через тот же брокер, что и CLI. Прогресс виден на узле прогона по мере смены его состояния.",
     run_task_label: "Задача",
-    run_wall_label: "Лимит времени, секунд (пусто = по умолчанию)",
+    run_wall_label: "Остановить прогон через столько секунд (пусто — по умолчанию)",
     run_go: "Запустить эту роль на задаче",
     message_subject_label: "Тема (только для новой ветки)",
     message_body_label: "Сообщение этой роли",
-    message_note_role: "Вы пишете этой роли. Агенты общаются между собой через делегацию; этот канал — только для указаний человека.",
-    setting_name_label: "Отображаемое имя",
-    setting_skills_label: "Обязательные навыки (каталог оператора)",
-    setting_tools_label: "Инструменты (только сужают профиль, никогда не расширяют)",
+    message_note_role: "Вы пишете этой роли. Роли общаются между собой через delegation; этот канал — только для указаний человека.",
+    setting_name_label: "Имя, которое видно на доске",
+    setting_skills_label: "Навыки, которые получает каждый прогон этой роли",
+    setting_tools_label: "Какими инструментами профиля роль может пользоваться",
     setting_reason_label: "Причина этого изменения",
-    downgrade_label: "Ослабление изоляции — причина попадает в запись (нужно право agent:isolation_downgrade)",
+    downgrade_label: "Вы ослабляете изоляцию этой роли — напишите почему (останется навсегда; нужно право agent:isolation_downgrade)",
     settings_save: "Сохранить",
     settings_retire: "В отставку…",
     settings_retire_cascade: "В отставку со всем, что она создала…",
@@ -1480,14 +1558,14 @@ const STRINGS = {
     created_by_human: "создана человеком",
     attention_waiting: "Ждёт вас. Ответ — это ограниченные метаданные, никогда не пароль, ключ или токен.",
     attention_empty: "Сейчас ничто вас не ждёт.",
-    run_waiting: "запуск ждёт ввода",
+    run_waiting: "прогон ждёт ввода",
     role_proposal: "предложение роли",
     needs_decision: "нужно решение",
     your_answer: "Ваш ответ",
     answer_button: "Ответить",
     readonly_answer: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes из сессии-владельца.",
-    answer_owner: "Ответить может сессия — владелец этого запуска: ",
-    blocked_no_channel: "Этот запуск заблокирован в каноническом реестре; живого канала для ответа здесь нет.",
+    answer_owner: "Ответить может сессия — владелец этого прогона: ",
+    blocked_no_channel: "Этот прогон заблокирован в каноническом реестре; живого канала для ответа здесь нет.",
     confirm_role_button: "Подтвердить эту роль",
     readonly_confirm: "Только чтение. Чтобы подтвердить, запустите интерфейс с --enable-writes.",
     your_reply: "Ваш ответ",
@@ -1506,7 +1584,7 @@ const STRINGS = {
     open_event_hint: ". Откройте событие, чтобы прочитать каноническую запись.",
     show_word: "Показать",
     not_on_graph: "этого объекта нет на текущем графе",
-    catalog_editing_note: "Записи здесь меняют то, что поручается делать делегированным запускам. Они хранятся в",
+    catalog_editing_note: "Записи здесь меняют то, что поручается делать делегированным прогонам. Они хранятся в",
     catalog_default_store: "каталоге оператора",
     catalog_readonly: "Только чтение. Чтобы изменять, запустите интерфейс с --role-catalog и --enable-catalog-editing.",
     skills_heading: "Навыки",
@@ -1515,12 +1593,12 @@ const STRINGS = {
     remove_button: "Удалить",
     catalog_add_heading: "Добавить или заменить запись",
     catalog_kind_label: "Тип",
-    catalog_option_skill: "Навык — инструкции, которые получает каждый запуск роли",
+    catalog_option_skill: "Навык — инструкции, которые получает каждый прогон роли",
     catalog_option_tool: "Инструмент — один из инструментов профиля, который роль может оставить",
     catalog_id_label: "Короткий id (строчными, без пробелов)",
     catalog_title_label: "Имя, которое увидят люди",
     catalog_desc_label: "Для чего это",
-    catalog_instruction_label: "Инструкции агенту (только для навыков)",
+    catalog_instruction_label: "Инструкции роли (только для навыков)",
     catalog_save: "Сохранить запись",
     saved: "сохранено",
     removed: "удалено",
@@ -1530,60 +1608,60 @@ const STRINGS = {
     request_failed: "запрос не выполнен:",
     nav_work: "Рабочее",
     nav_library: "Библиотека",
-    nav_board: "Борд",
+    nav_board: "Доска",
     nav_guide: "Обзор",
-    nav_skills: "Скиллы",
+    nav_skills: "Навыки",
     nav_tools: "Инструменты",
     chip_soon: "скоро",
     chip_later: "позже",
     hire_cancel: "Отмена",
     drawer_close: "Закрыть",
-    fab_hire: "Нанять агента: имя, профиль — и роль появляется на борде.",
+    fab_hire: "Нанять роль: имя, профиль — и она появляется на доске.",
     tip_board: "Ваша команда и её работа. Клик по сущности — детали; связи — это оргсхема.",
     tip_runs: "Все прогоны провайдеров: что движется сейчас и чем закончилось. Только состояние — без промптов и транскриптов.",
     tip_guide: "Объяснение всей системы за две минуты: что это, как устроено, с чего начать.",
-    tip_skills: "Пакеты поведения из операторского каталога. Выдаются агентам в их настройках.",
-    tip_tools: "Инструменты из того же каталога: что агент может запускать на задаче.",
+    tip_skills: "Пакеты поведения из операторского каталога. Выдаются ролям в их настройках.",
+    tip_tools: "Инструменты из того же каталога: что роль может запускать на задаче.",
     tip_sgr: "Schema-Guided Reasoning: библиотека схем структурированного вывода. Появится вместе с API-провайдерами.",
-    tip_mcp: "Кастомные туллы доезжают до подписочных CLI как MCP-серверы; раздел появится позже.",
-    onb_title: "Это штаб вашей команды агентов",
-    onb_lead: "Нанимайте агентов, давайте им задачи и смотрите, как работа доходит до результата. Каждый шаг записывается в общую историю.",
-    onb_s1_t: "Наймите первого агента",
-    onb_s1_p: "Кнопка «+» на борде. Профиль решает, кто это и что ему можно.",
+    tip_mcp: "Кастомные инструменты доезжают до подписочных CLI как MCP-серверы; раздел появится позже.",
+    onb_title: "Это штаб вашей команды",
+    onb_lead: "Нанимайте роли, давайте им задачи и смотрите, как работа доходит до результата. Каждый шаг записывается в общую историю.",
+    onb_s1_t: "Наймите первую роль",
+    onb_s1_p: "Кнопка «+» на доске. Профиль решает, кто это и что ему можно.",
     onb_s2_t: "Создайте задачу",
     onb_s2_p: "Коротко: что сделать и как поймём, что готово.",
     onb_s3_t: "Запустите",
-    onb_s3_p: "Агент берёт задачу. Прогон виден вживую в «Прогонах».",
-    onb_cta: "Нанять первого агента",
+    onb_s3_p: "Роль берёт задачу. Прогон виден вживую в «Прогонах».",
+    onb_cta: "Нанять первую роль",
     guide_title: "Agent Commons, коротко",
     guide_sub: "Две минуты, сверху вниз, сначала простое.",
     guide_what_h: "Что это",
-    guide_what_p: "Локальный штаб для команды кодинг-агентов. Вы нанимаете агентов под роли, даёте им задачи и подтверждаете важные решения. Каждый шаг — найм, задача, прогон, результат — попадает в неизменяемую историю, поэтому всегда видно, кто что сделал и почему.",
+    guide_what_p: "Локальный штаб для команды ролей, которые пишут код. Вы нанимаете роль, даёте ей задачи и подтверждаете важные решения. Каждый шаг — найм, задача, прогон, результат — попадает в неизменяемую историю, поэтому всегда видно, кто что сделал и почему.",
     guide_how_h: "Как устроено",
-    guide_ladder: "Агенты → Задачи → Прогоны → Ревью",
-    guide_how_p: "Агент — постоянная роль с профилем (какая модель, что разрешено). Задача — что сделать и когда это считается готовым. Прогон — одна попытка агента выполнить работу. Ревью — независимая проверка результата.",
+    guide_ladder: "Роли → Задачи → Прогоны → Ревью",
+    guide_how_p: "Роль — постоянный наём с профилем (какая модель, что разрешено). Задача — что сделать и когда это считается готовым. Прогон — одна попытка роли выполнить работу. Ревью — независимая проверка результата.",
     guide_route_h: "Первый маршрут",
-    guide_route_1: "Наймите агента («+» на борде) — выберите профиль.",
+    guide_route_1: "Наймите роль («+» на доске) — выберите профиль.",
     guide_route_2: "Создайте задачу с понятным критерием готовности.",
-    guide_route_3: "Запустите агента на задаче и следите в «Прогонах».",
+    guide_route_3: "Запустите роль на задаче и следите в «Прогонах».",
     guide_next_h: "Когда освоитесь",
-    guide_next_p: "Связи между агентами, независимые ревью чужой работы, каталог скиллов и инструментов, права ролей — всё это подключается по мере надобности, не сразу.",
+    guide_next_p: "Связи между ролями, независимые ревью чужой работы, каталог навыков и инструментов, права ролей — всё это подключается по мере надобности, не сразу.",
     guide_never_h: "Чего панель никогда не делает",
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     guide_tab_brief: "Коротко",
-    guide_tab_agents: "Агенты и память",
+    guide_tab_agents: "Роли и память",
     guide_tab_tasks: "Задачи и прогоны",
     guide_tab_links: "Связи",
     guide_tab_limits: "Лимиты и безопасность",
-    guide_tab_catalog: "Скиллы и туллы",
+    guide_tab_catalog: "Навыки и инструменты",
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
     guide_ag_grants_h: "Права выводятся, а не хранятся",
     guide_ag_grants_p: "Три гранта — create_roles, retire_roles, open_links — каждый deny, ask или auto, по умолчанию deny. Реальные права — effective_grants: минимум по роли и всем её создателям вверх по цепочке, пересчитывается на каждом вызове, поэтому понижение действует и на уже идущую работу; уволенный предок схлопывает всю линию до deny. Уровень auto сознательно удержан: он записывается как есть, но действует как ask — каждое автоматическое действие всё равно спрашивает человека.",
-    guide_ag_grants_ex: "create_roles: ask → запуск получает commons_propose_agent; предложение падает во «Внимание»; только ваше подтверждение записывает agent.created",
+    guide_ag_grants_ex: "create_roles: ask → прогон получает commons_propose_agent; предложение падает во «Внимание»; только ваше подтверждение записывает agent.created",
     guide_ag_memory_h: "Что такое «память» роли на самом деле",
-    guide_ag_memory_p: "Каждый прогон — новый процесс провайдера с одной и той же ограниченной инструкцией; накопленный контекст рантайм в запуск не передаёт, какой бы context_mode роль ни объявляла. Что режим делает сегодня: его проверяют при создании и перенастройке (создаваемая роль не может быть менее изолированной, чем создатель; позднейшее ослабление требует записанного isolation_downgrade), а каждое завершённое ревью несёт producer_context_mode и producer_prior_verdict_count — вердикт «накопленной» роли не выглядит как вердикт с чистого листа.",
+    guide_ag_memory_p: "Каждый прогон — новый процесс провайдера с одной и той же ограниченной инструкцией; накопленный контекст рантайм в прогон не передаёт, какой бы context_mode роль ни объявляла. Что режим делает сегодня: его проверяют при создании и перенастройке (создаваемая роль не может быть менее изолированной, чем создатель; позднейшее ослабление требует записанного isolation_downgrade), а каждое завершённое ревью несёт producer_context_mode и producer_prior_verdict_count — вердикт «накопленной» роли не выглядит как вердикт с чистого листа.",
     guide_ag_memory_ex: "второе ревью той же цели той же ролью → рядом с вердиктом видно producer_prior_verdict_count: 1",
     guide_ag_lineage_h: "Линия, сужение, текучка",
     guide_ag_lineage_p: "Роль может создать только более узкую роль: PROFILE_NARROWING разрешает билдеру билдера или ревьюера того же провайдера, ревьюеру — только ревьюеров, кросс-провайдер недостижим; grants, skills и tool_allowlist не могут стать шире, чем у создателя. turnover_budget считает вместе созданных и явно уволенных потомков, поэтому цикл «нанял-уволил» не обходит потолок. lifetime вида task_scoped увольняет роль вместе с закрытием задачи — это выводится при replay, события agent.retired нет, и забыть его записать некому.",
@@ -1592,59 +1670,59 @@ const STRINGS = {
     guide_tk_ledger_p: "Леджер — JSON-события только на дозапись; состояние — проекция, пересобираемая replay-ем. Каждая запись перепроверяется: record_event собирает снапшот, прогоняет validate_transition и compare-and-swap по expected_revision под одним локом записи, поэтому отставший клиент не затирает более новую запись — вместо этого он получает внятный конфликт. Исправления и инвалидации — сами новые события; история не переписывается.",
     guide_tk_ledger_ex: "task.created: ready · task.taken: assigned · task.started: active · task.submitted: review · task.accepted",
     guide_tk_run_h: "Прогон — ограниченное делегирование",
-    guide_tk_run_p: "Запуск записывает delegation.requested: точную цель и её ревизию, purpose, limits и связь on_behalf_of, привязывающую прогон к роли — она фиксируется в момент запроса и перепроверяется при каждом replay. Брокер открывает дочернюю сессию; delegation.started несёт child_session_id; воркер обязан завершиться каноническим туллом исхода. Состояния: requested → active → succeeded, failed, timed_out, needs_operator или input_needed (возобновимо).",
+    guide_tk_run_p: "Прогон записывает delegation.requested: точную цель и её ревизию, purpose, limits и связь on_behalf_of, привязывающую прогон к роли — она фиксируется в момент запроса и перепроверяется при каждом replay. Брокер открывает дочернюю сессию; delegation.started несёт child_session_id; воркер обязан завершиться каноническим инструментом исхода. Состояния: requested → active → succeeded, failed, timed_out, needs_operator или input_needed (возобновимо).",
     guide_tk_run_ex: "воркер вышел с кодом 0, не вызвав commons_succeed_delegation → needs_operator (invalid_result), а не тихий успех",
     guide_tk_accept_h: "Успех — не приёмка",
     guide_tk_accept_p: "delegation.succeeded закрывает прогон, но не задачу: задача остаётся ровно там, где была, потому что приёмка — действие человека. task.accepted требует актуального одобренного независимого ревью точной ревизии задачи, автор которого не входит в work_author_session_ids; без него запись отклоняется. Если привязанное ревью потом устареет, проекция снимает приёмку при replay.",
     guide_tk_accept_ex: "зелёная галка в графе — только accepted или approved; succeeded остаётся информационным синим",
     guide_tk_demo_h: "Demo-режим",
-    guide_tk_demo_p: "С demo: true в конфиге оператора провайдер не запускается: DemoRunner встаёт на тот же шов раннера, что и настоящий брокер, — путь запуска остаётся одним. Он сам завершает только implementation-прогоны с честным summary о том, что провайдер не запускался; ревью и верификации он не выдумывает — такие прогоны уходят в needs_operator. Включается явно и никогда не по умолчанию.",
+    guide_tk_demo_p: "С demo: true в конфиге оператора провайдер не запускается: DemoRunner встаёт на тот же шов раннера, что и настоящий брокер, — путь прогона остаётся одним. Он сам завершает только implementation-прогоны с честным summary о том, что провайдер не запускался; ревью и верификации он не выдумывает — такие прогоны уходят в needs_operator. Включается явно и никогда не по умолчанию.",
     guide_tk_demo_ex: "demo-прогон роли ревьюера → вердикт не выдумывается; делегирование уходит в needs_operator",
     guide_ln_record_h: "Что записывает связь",
     guide_ln_record_p: "agent.link_opened записывает from_agent_id, to_agent_id, allowed_action, deadline_seconds и причину; agent.link_closed обязан назвать ревизию, которую закрывает, — слепое закрытие отклоняется. Домен проверяет запись целиком: обе роли активны, связь не сама на себя, у открывающего есть open_links. allowed_action — типизированный enum (ask или handoff_work), а не флаг «открыто».",
     guide_ln_record_ex: "закрытие без expected_revision → отказ; связь открыта до явного agent.link_closed",
     guide_ln_ask_h: "ask — записанное разрешение, не канал",
-    guide_ln_ask_p: "Связь ask разрешает один ограниченный вопрос, но канал под него рантайм не открывает: разговор ролей идёт обычными тредами, и панель говорит об этом прямо. Сегодня ни один запуск даже не получает commons_open_agent_link — тулл включается только на open_links: auto, а уровень auto удержан, — так что связи открывает человек, из этой панели.",
-    guide_ln_ask_ex: "open_links: ask → запуск не получает никакого тулла связей; тулла «предложить связь» пока не существует",
+    guide_ln_ask_p: "Связь ask разрешает один ограниченный вопрос, но канал под него рантайм не открывает: разговор ролей идёт обычными тредами, и панель говорит об этом прямо. Сегодня ни один прогон даже не получает commons_open_agent_link — инструмент включается только на open_links: auto, а уровень auto удержан, — так что связи открывает человек, из этой панели.",
+    guide_ln_ask_ex: "open_links: ask → прогон не получает никакого инструмента связей; инструмента «предложить связь» пока не существует",
     guide_ln_handoff_h: "handoff_work реально потребляется",
     guide_ln_handoff_p: "Ровно одно место в lifecycle читает связи: постановка роли на делегирование. Сессия, работающая как роль, может ставить себя или роль из своей линии; открытая handoff_work-связь от неё к другой роли расширяет ровно это — и ничего больше. Проверка выполняется на delegation.requested и заново при каждом replay.",
     guide_ln_handoff_ex: "роль A без связи → делегирование on_behalf_of роли B отклоняется; откройте handoff_work A→B — та же запись проходит",
     guide_ln_deadline_h: "Связь заканчивается только закрытием",
-    guide_ln_deadline_p: "Истечения нет. У replay нет часов, а если их дать, одни и те же события начнут проецироваться по-разному со временем — поэтому снять полномочие по расписанию невозможно, только явным agent.link_closed. Необязательное поле deadline_seconds фиксирует намеренный горизонт для чтения людьми; оно ничего не ограничивает, поэтому панель его больше не спрашивает. Границы агентов считаются в попытках, provider units и глубине, а не в часах.",
+    guide_ln_deadline_p: "Истечения нет. У replay нет часов, а если их дать, одни и те же события начнут проецироваться по-разному со временем — поэтому снять полномочие по расписанию невозможно, только явным agent.link_closed. Необязательное поле deadline_seconds фиксирует намеренный горизонт для чтения людьми; оно ничего не ограничивает, поэтому панель его больше не спрашивает. Границы ролей считаются в попытках, provider units и глубине, а не в часах.",
     guide_lm_two_h: "Два слоя лимитов",
     guide_lm_two_p: "Лимиты прогона записываются в delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency и бюджет в provider_units или micro_usd — и потомок может их только сузить. Лимиты оператора живут в runtime-конфиге и накрывают все брокеры одного state root: global_concurrency 2, конкурентность по провайдеру и профилю, parent_provider_units 4, parent_budget_microusd и max_delegations_total 16, ограничивающий всё дерево целиком — чего depth и fanout сами по себе не делали.",
-    guide_lm_two_ex: "бюджет provider_units меньше max_attempts → отказ на запуске: каждая разрешённая попытка должна быть оплачиваемой",
+    guide_lm_two_ex: "бюджет provider_units меньше max_attempts → отказ на прогоне: каждая разрешённая попытка должна быть оплачиваемой",
     guide_lm_queue_h: "Допуск и обратное давление",
     guide_lm_queue_p: "До старта любого процесса reserve проверяет каждый применимый потолок под одним эксклюзивным локом — побеждает самый строгий. Если мощности нет, запрос встаёт в очередь; полная очередь (queue_capacity 8) отклоняет сразу, ожидание ограничено queue_wait_seconds 30. Конкурентность выше 1 для пишущего профиля отвергается при загрузке конфига: двум писателям в одном рабочем дереве нужна worktree-изоляция, которой нет.",
     guide_lm_queue_ex: "запрос сверх мощности при полной очереди → runtime admission queue is full; backpressure rejected request",
     guide_lm_panel_h: "Что реально запускает панель",
-    guide_lm_panel_p: "Запуск из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
-    guide_lm_panel_ex: "Run на борде → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
+    guide_lm_panel_p: "Прогон из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
+    guide_lm_panel_ex: "Run на доске → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
     guide_lm_gates_h: "Три гейта, loopback, без транскриптов",
-    guide_lm_gates_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. По умолчанию только чтение: существуют только GET-маршруты. --enable-writes открывает перечисленные маршруты записи; --enable-catalog-editing (плюс --role-catalog) дополнительно даёт панели править каталог; --enable-launch (плюс --profile-config) дополнительно запускает прогоны провайдера. Профили из UI не редактируются ни при каком гейте. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
-    guide_lm_gates_ex: "запуск только на чтение → приложение регистрирует только GET-маршруты; стрим без токена → 401",
+    guide_lm_gates_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. По умолчанию только чтение: существуют только GET-маршруты. --enable-writes открывает перечисленные маршруты записи; --enable-catalog-editing (плюс --role-catalog) дополнительно даёт панели править каталог; --enable-launch (плюс --profile-config) дополнительно разрешает прогоны провайдера. Профили из UI не редактируются ни при каком гейте. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
+    guide_lm_gates_ex: "старт только на чтение → приложение регистрирует только GET-маршруты; стрим без токена → 401",
     guide_ct_file_h: "Каталог — файл оператора",
-    guide_ct_file_p: "Скиллы и туллы живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог (второй гейт), но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
-    guide_ct_file_ex: "билдер работает с правом записи в workspace — каталог внутри него был бы каталогом, который агент может переписать",
-    guide_ct_skill_h: "Скилл — инструкция от оператора",
-    guide_ct_skill_p: "Запись скилла несёт до 4000 знаков инструкции; запись тулла — только идентификатор, потому что сам тулл уже зафиксирован профилем. На запуске skill_instructions разрешает каждый id fail-closed: id, которого нет в каталоге, отменяет запуск — вместо того чтобы молча запустить другого агента, чем описал оператор. Разрешённый текст входит в ограниченную инструкцию, подаваемую процессу провайдера через stdin, — роль не может написать себе скилл сама.",
-    guide_ct_skill_ex: "роль требует скилл, которого нет в каталоге → запуск отклонён: role selects skills the operator catalogue does not define",
-    guide_ct_tools_h: "Туллы только сужают",
-    guide_ct_tools_p: "tool_allowlist роли пересекается с фиксированным набором профиля — выбор не может расширить возможность. Туллы исхода (commons_succeed_delegation, commons_delegation_needs_operator и родственные) сужению не подлежат: роль, неспособная отчитаться о терминальном результате, — сломанная, а не более узкая. Штатные туллы включаются точным уровнем гранта: create_roles: ask даёт commons_propose_agent, create_roles: auto дал бы commons_create_agent — сегодня удержан вместе с самим уровнем auto.",
-    guide_ct_tools_ex: "в allowlist тулл вне профиля → запуск отклонён; туллы исхода переживают любое сужение",
-    skills_view_note: "Пакеты поведения из операторского каталога. Агент получает только то, что выдано в его настройках.",
-    tools_view_note: "Из того же операторского каталога: что агент может запускать на задаче. Выдаётся в настройках агента.",
-    sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM).",
-    mcp_note: "Кастомные туллы доезжают до обоих подписочных CLI как MCP-серверы. Регистрация из панели появится позже; сначала проектируется контракт.",
+    guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог (второй гейт), но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
+    guide_ct_file_ex: "билдер работает с правом записи в workspace — каталог внутри него был бы каталогом, который роль может переписать",
+    guide_ct_skill_h: "Навык — инструкция от оператора",
+    guide_ct_skill_p: "Запись навыка несёт до 4000 знаков инструкции; запись инструмента — только идентификатор, потому что сам инструмент уже зафиксирован профилем. На старте прогона skill_instructions разрешает каждый id fail-closed: id, которого нет в каталоге, отменяет прогон — вместо того чтобы молча запустить другую роль, чем описал оператор. Разрешённый текст входит в ограниченную инструкцию, подаваемую процессу провайдера через stdin, — роль не может написать себе навык сама.",
+    guide_ct_skill_ex: "роль требует навык, которого нет в каталоге → прогон отклонён: role selects skills the operator catalogue does not define",
+    guide_ct_tools_h: "Инструменты только сужают",
+    guide_ct_tools_p: "tool_allowlist роли пересекается с фиксированным набором профиля — выбор не может расширить возможность. Инструменты исхода (commons_succeed_delegation, commons_delegation_needs_operator и родственные) сужению не подлежат: роль, неспособная отчитаться о терминальном результате, — сломанная, а не более узкая. Штатные инструменты включаются точным уровнем гранта: create_roles: ask даёт commons_propose_agent, create_roles: auto дал бы commons_create_agent — сегодня удержан вместе с самим уровнем auto.",
+    guide_ct_tools_ex: "в allowlist инструмент вне профиля → прогон отклонён; инструменты исхода переживают любое сужение",
+    skills_view_note: "Пакеты поведения из операторского каталога. Роль получает только то, что выдано в её настройках.",
+    tools_view_note: "Из того же операторского каталога: что роль может запускать на задаче. Выдаётся в настройках роли.",
+    sgr_note: "Библиотека схем структурированного вывода для прикрепления к ролям. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM).",
+    mcp_note: "Кастомные инструменты доезжают до обоих подписочных CLI как MCP-серверы. Регистрация из панели появится позже; сначала проектируется контракт.",
     used_by: "используют",
     remove_blocked: "Держат активные роли — сначала снимите с них:",
     catalog_instruction_hint: "Пишите как ТЗ исполнителю: что делать, что запрещено, в каком виде сдавать.",
     catalog_preview_label: "Ровно то, что получит модель",
-    skill_contract_line: "Скиллы вклеиваются в инструкцию агента при каждом запуске. Изменения — со следующего прогона, никогда задним числом.",
-    skills_too_many: "Больше трёх скиллов борются за внимание агента; конфликтующие методички тихо ухудшают работу.",
+    skill_contract_line: "Навыки вклеиваются в инструкцию роли на каждом прогоне. Изменения — со следующего прогона, никогда задним числом.",
+    skills_too_many: "Больше трёх навыков борются за внимание роли; конфликтующие методички тихо ухудшают работу.",
     tools_mode_full: "Весь профиль (по умолчанию)",
     tools_mode_narrow: "Сузить до выбранных",
-    tools_narrow_note: "Только сужение — роль не может получить инструмент, которого нет у профиля. Применится со следующего запуска.",
+    tools_narrow_note: "Только сужение — роль не может получить инструмент, которого нет у профиля. Применится со следующего прогона.",
     tools_fixed_note: "неотчуждаемый: этим роль сдаёт работу",
     tools_fixed_label: "Неотчуждаемые",
     tools_narrowable_label: "Сужаемые",
@@ -1654,24 +1732,24 @@ const STRINGS = {
     tools_bridge: "Нужен свой инструмент? Это MCP-сервер — см. раздел MCP. Здесь только сужение того, что уже есть у профиля.",
     schema_row_label: "Схема вывода — SGR",
     schema_row_value: "— нет. Прикрепление схемы появится с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM); подписочные Claude Code и Codex не умеют навязанный структурированный вывод.",
-    sgr_now_heading: "Как агенты сдают структурированный результат сейчас",
-    sgr_now_body: "Через типизированные outcome-туллы: агент завершает прогон вызовом commons_succeed_delegation с типизированной ссылкой на результат, ревьюер записывает вердикт через commons_complete_review. Это единственный типизированный канал результата на подписочных CLI — stdout провайдера никем не парсится и не сохраняется, намеренно.",
+    sgr_now_heading: "Как роли сдают структурированный результат сейчас",
+    sgr_now_body: "Через типизированные инструменты исхода: роль завершает прогон вызовом commons_succeed_delegation с типизированной ссылкой на результат, ревьюер записывает вердикт через commons_complete_review. Это единственный типизированный канал результата на подписочных CLI — stdout провайдера никем не парсится и не сохраняется, намеренно.",
     sgr_see_runs: "Посмотреть в «Прогонах»",
     mcp_builtin_heading: "agent-commons — встроенный",
     mcp_builtin_body: "Каждый прогон общается со штабом только через этот stdio-сервер. Внешние MCP-конфиги отключены намеренно: Claude работает под --strict-mcp-config без пользовательских настроек, Codex полностью игнорирует пользовательский конфиг. Что может вызывать каждый профиль — в разделе «Инструменты».",
     mcp_add_disabled: "Добавить сервер…",
     mcp_add_reason: "Позже. Регистрация сервера — операторское действие в runtime.yaml (файл вне workspace); панель будет его показывать и проверять.",
-    mcp_tools_word: "туллов",
-    update_next_run: "держатели получат при следующем запуске:",
+    mcp_tools_word: "инструментов",
+    update_next_run: "держатели получат при следующем прогоне:",
     saved_to: "Сохранено в",
     links_tab: "Связи",
     links_note: "Записанные разрешения между этой ролью и другими. Закрытие сохраняет историю; ничего не удаляется.",
     links_none: "Связей пока нет. Протяните точку с края карточки к другой роли — или подтвердите предложенную ролью.",
     link_modal_title: "Открыть связь",
     link_permission_note: "Связь — запись разрешения в журнале; канал общения она пока не открывает.",
-    link_type_label: "Тип",
-    link_type_ask: "Спросить — может задавать вопросы этой роли",
-    link_type_handoff: "Передать работу — может передавать работу этой роли",
+    link_type_label: "Что разрешает эта связь",
+    link_type_ask: "ask — может задавать вопросы этой роли",
+    link_type_handoff: "handoff_work — может передавать работу этой роли",
     link_reason_label: "Зачем эта связь",
     link_open_button: "Открыть связь",
     link_close_button: "Закрыть связь",
@@ -1679,8 +1757,8 @@ const STRINGS = {
     link_close_note: "Закрытие — записанная смена состояния; журнал сохраняет историю связи. Ничего не удаляется.",
     link_close_reason: "Почему закрываете",
     config_broken_kind: "не запустится",
-    config_broken_msg: "выданы скиллы, которых нет в каталоге:",
-    nav_presets: "Каталог агентов",
+    config_broken_msg: "выданы навыки, которых нет в каталоге:",
+    nav_presets: "Каталог ролей",
     tip_presets: "Готовые шаблоны ролей: найм в два клика вместо настройки с нуля.",
     presets_note: "Готовые шаблоны ролей. Нанимайте из шаблона в два клика вместо заполнения формы с нуля; шаблон фиксирует профиль, права и бюджет, вы даёте имя.",
     presets_none: "Шаблонов пока нет. Создайте один — будущие наймы станут двумя кликами.",
@@ -1689,30 +1767,30 @@ const STRINGS = {
     preset_create_title: "Новый шаблон",
     preset_save_button: "Сохранить шаблон",
     err_field_empty: "Поле «{field}» не может быть пустым.",
-    hire_mode_label: "Как нанимаем",
-    hire_mode_new: "Нового агента — настроить с нуля",
-    hire_mode_preset: "Из каталога агентов — готовый шаблон",
+    hire_mode_label: "Откуда берём роль",
+    hire_mode_new: "Новую роль — настроить с нуля",
+    hire_mode_preset: "Из каталога ролей — готовый шаблон",
     hire_budget_short: "бюджет",
     task_fab: "+ Задача",
     tip_task_fab: "Создать задачу: что сделать и как поймём, что готово.",
     task_modal_title: "Новая задача",
-    task_modal_note: "Задача — то, на чём запускают роль: что сделать и как поймём, что готово. Она появится на борде и в истории.",
-    task_title_label: "Название",
+    task_modal_note: "Задача — то, на чём запускают роль: что сделать и как поймём, что готово. Она появится на доске и в истории.",
+    task_title_label: "Короткое название задачи",
     task_desc_label: "Что сделать",
     task_criteria_label: "Готово, когда (по одному критерию в строке)",
     task_create_button: "Создать задачу",
     link_open_with: "Открыть связь с…",
     trust_short: "ⓘ модель доверия",
     tip_hire_profile: "Профиль фиксирует провайдера, модель и набор инструментов. Профили принадлежат оператору и из панели не редактируются.",
-    tip_hire_context: "fresh — каждый запуск с чистого листа; accumulated — роль копит контекст между запусками (слабее изоляция, смена позже требует записанной причины).",
-    tip_hire_budget: "Сколько созданий и увольнений ролей эта роль может совершить сама. Пусто — ноль.",
+    tip_hire_context: "fresh — каждый прогон с чистого листа; accumulated — роль копит контекст между прогонами (слабее изоляция, смена позже требует записанной причины).",
+    tip_hire_budget: "Наймы и увольнения считаются одним и тем же счётчиком, и он не обнуляется, поэтому цикл «нанял-уволил» не обходит потолок.",
     board_fit: "Вписать",
     tip_board_fit: "Вписать все карточки в окно.",
-    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб. Чтобы связать двух агентов, потяните точку с края карточки — или откройте вкладку «Связи» у роли.",
+    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб. Чтобы связать две роли, потяните точку с края карточки — или откройте вкладку «Связи» у роли.",
     runtime_nodes: "Узлы рантайма",
-    tip_runtime_nodes: "Сессии и делегирования — механика, которую оставляет после себя запуск. По умолчанию скрыты, чтобы на борде была видна команда; число — сколько узлов под этим скрыто.",
-    port_tip: "Потяните к карточке другого агента, чтобы открыть связь между ними. Не любите перетаскивание? На вкладке «Связи» у роли открывается та же форма.",
-    board_only_shelf: "На борде пока пусто — шаблоны живут в Каталоге агентов. Наймите агента, чтобы начать.",
+    tip_runtime_nodes: "Сессии и delegation — механика, которую оставляет после себя прогон. По умолчанию скрыты, чтобы на доске была видна команда; число — сколько узлов под этим скрыто.",
+    port_tip: "Потяните к карточке другой роли, чтобы открыть связь между ними. Не любите перетаскивание? На вкладке «Связи» у роли открывается та же форма.",
+    board_only_shelf: "На доске пока пусто — шаблоны живут в Каталоге ролей. Наймите роль, чтобы начать.",
     session_you_tip: "Это вы — окно человека-оператора; роли ниже подчиняются ему.",
     accept_heading: "Приёмка работы",
     accept_ledger_state: "состояние в леджере",
@@ -1753,7 +1831,7 @@ const STRINGS = {
     link_closed_named: "Разрешение {pair} отозвано. История сохранена.",
     run_started: "{role} работает над задачей «{task}».",
     run_phase_word: "прогон",
-    run_state_word: "делегация",
+    run_state_word: "delegation",
     settings_saved_named: "Настройки роли {name} сохранены. Изменения действуют со следующего прогона.",
     retired_named: "{name} отправлена в отставку; закрыто записей: {count}. История сохранена.",
     message_recorded_named: "Отправлено роли {name} и записано как сообщение ветки.",
@@ -1762,7 +1840,7 @@ const STRINGS = {
     reopen_recorded_named: "Задача «{title}» возвращена в работу.",
     hire_preset_empty: "Шаблон — это сохранённая настройка роли: профиль с его правами и бюджетом под одним именем. Пока их нет.",
     hire_preset_create: "Настроить роль с нуля и сохранить как первый шаблон",
-    skills_empty: "В операторском каталоге пока нет навыков. Навык — это пакет поведения, который вклеивается в инструкции агента на каждом прогоне.",
+    skills_empty: "В операторском каталоге пока нет навыков. Навык — это пакет поведения, который вклеивается в инструкции роли на каждом прогоне.",
     catalog_add_here: "Добавьте его в разделе «Навыки».",
     tools_none_narrowable: "Этот профиль не даёт ничего, что можно сузить: все его инструменты фиксированы.",
     record_show_json: "Показать запись",
@@ -1824,12 +1902,31 @@ const STRINGS = {
     gl_verification: "воспроизводит заявленный результат",
     gl_builder: "делает работу",
     gl_reviewer: "проверяет работу, которую не делала",
+    lang_label: "Язык",
+    board_aria: "граф рабочего пространства",
+    sgr_title: "SGR — Schema-Guided Reasoning",
+    legend_open: "Значки",
+    tip_legend: "Что означают значки на карточках.",
+    legend_title: "Что означают значки",
+    legend_note: "Состояния рядом со значком — слова самого леджера, они не переводятся.",
+    lg_pending: "ещё не начато",
+    lg_moving: "идёт сейчас",
+    lg_waiting: "ждёт человека",
+    lg_finished: "завершено — но это ещё не приёмка",
+    lg_accepted: "принял человек или одобрил ревьюер",
+    lg_refused: "не дошло до конца или отклонено",
+    lg_timed_out: "вышло за отведённое время",
+    lg_needs_operator: "без вас дальше не пойдёт",
+    lg_closed: "закрыто, отозвано или отменено",
+    lg_abstained: "судить никто не стал",
+    lg_stale: "основание под этим больше не действует",
+    session_you_badge: "это вы",
     count_objectives: "целей",
     count_tasks: "задач",
-    count_delegations: "делегаций",
+    count_delegations: "прогонов",
     count_reviews: "ревью",
     count_verifications: "проверок",
-    count_agents: "агентов",
+    count_agents: "ролей",
     count_templates: "шаблонов",
   },
 };
@@ -1856,6 +1953,12 @@ function applyI18n() {
   // (redesign, item 8). Translated like any other chrome.
   for (const element of document.querySelectorAll("[data-i18n-title]")) {
     element.setAttribute("title", t(element.dataset.i18nTitle));
+  }
+  // An aria-label is a label a screen reader reads out, and two of them — the
+  // board canvas and the language picker itself — were still hardcoded English
+  // under a Russian panel (item 19).
+  for (const element of document.querySelectorAll("[data-i18n-aria]")) {
+    element.setAttribute("aria-label", t(element.dataset.i18nAria));
   }
 }
 
@@ -2113,6 +2216,33 @@ function valueWithGloss(value) {
 // actions have their own glosses rather than reading the shared table.
 const LINK_ACTION_GLOSS = { ask: "gl_link_ask", handoff_work: "gl_link_handoff" };
 
+// The same rule carried into the controls that SET a canonical value.  The
+// option's VALUE is the bare canonical token — it is what gets written to the
+// ledger — and its label leads with that same token before the panel's
+// sentence.  A picker offering only the sentence would be item 20's rejected
+// half: the level would then read one way here and another in the CLI.
+function glossedOptions(values, table) {
+  return values.map((value) => ({ id: value, title: glossed(value, table[value]) }));
+}
+
+// --- what the marks mean --------------------------------------------------
+// Round 3, designer 18: the glyphs above are the board's whole status language
+// and nothing anywhere explained them.  One meaning per GLYPH rather than per
+// state, because that is the grouping a person reads off the board — and the
+// legend is BUILT from GLYPHS below, so a state added there cannot go missing
+// here.  The states themselves are canonical and are listed unglossed and
+// untranslated: the legend is where the panel teaches the ledger's vocabulary,
+// not where it replaces it.
+const GLYPH_MEANING = {
+  "○": "lg_pending", "◑": "lg_moving", "◐": "lg_waiting", "●": "lg_finished",
+  "✓": "lg_accepted", "✕": "lg_refused", "⏱": "lg_timed_out",
+  "⚠": "lg_needs_operator", "⊘": "lg_closed", "–": "lg_abstained",
+};
+// `▨` is the one mark no state produces on its own: `glyphFor` substitutes it
+// for an accepted or approved node whose evidence has gone stale, so it is
+// listed with the two states it can stand in for.
+const STALE_GLYPH = ["▨", "warn", "lg_stale", ["accepted", "approved"]];
+
 // --- rendering ------------------------------------------------------------
 const canvas = document.getElementById("canvas");
 const viewport = document.createElementNS(SVGNS, "g");
@@ -2265,6 +2395,55 @@ function paintRuntimeToggle(graph) {
   toggle.setAttribute("aria-pressed", showRuntime ? "true" : "false");
   toggle.textContent = t("runtime_nodes") + " (" + runtime + ")";
 }
+
+// Folded away until it is asked for: the board is the operator's work surface
+// and a permanent key would spend it, but a mark nobody can read is worse.  It
+// is built from GLYPHS rather than written out beside it, so a state added to
+// that table cannot quietly go missing from its explanation.
+function paintGlyphLegend() {
+  const host = document.getElementById("legend-rows");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const byGlyph = new Map();
+  for (const [state, pair] of Object.entries(GLYPHS)) {
+    if (!byGlyph.has(pair[0])) { byGlyph.set(pair[0], { tone: pair[1], states: [] }); }
+    byGlyph.get(pair[0]).states.push(state);
+  }
+  const rows = [...byGlyph.entries()]
+    .map(([glyph, entry]) => [glyph, entry.tone, GLYPH_MEANING[glyph], entry.states]);
+  rows.push(STALE_GLYPH);
+  for (const [glyph, tone, meaningKey, states] of rows) {
+    // A glyph nobody wrote a meaning for is left out rather than shown blank.
+    if (!meaningKey) { continue; }
+    const row = document.createElement("div");
+    row.className = "lgrow";
+    const mark = document.createElement("span");
+    mark.className = "lgglyph " + tone;
+    mark.textContent = glyph;
+    row.appendChild(mark);
+    const said = document.createElement("div");
+    const meaning = document.createElement("span");
+    meaning.className = "lgtext";
+    meaning.textContent = t(meaningKey);
+    said.appendChild(meaning);
+    // The states stay exactly as the ledger spells them: this is the one place
+    // in the panel whose whole job is teaching that vocabulary (item 20).
+    const canonical = document.createElement("span");
+    canonical.className = "lgstates";
+    canonical.textContent = states.join(" · ");
+    said.appendChild(canonical);
+    row.appendChild(said);
+    host.appendChild(row);
+  }
+}
+
+document.getElementById("board-legend").addEventListener("click", () => {
+  const panel = document.getElementById("legend-panel");
+  const opening = panel.hidden;
+  if (opening) { paintGlyphLegend(); }
+  panel.hidden = !opening;
+  document.getElementById("board-legend")
+    .setAttribute("aria-expanded", opening ? "true" : "false");
+});
 
 // Persisted like the language, and for the same reason: a view preference the
 // operator set once should not be re-asked on every reload.
@@ -2420,10 +2599,22 @@ function render(graph) {
     content.appendChild(text(10, 34, line, "meta"));
     content.appendChild(text(10, 50,
       node.stale ? node.id + "  ▨ " + t("stale") : node.id, "meta"));
+    // The tooltip is where the state's gloss goes, and only here: a card is 180
+    // by 62 units and already carries a kind, a state, a label and a ULID, so a
+    // sentence beside the state would push one of those off the card.  The
+    // ledger's word stays on the visible line, the meaning is one hover away,
+    // and the drawer's summary says the same thing in full (item 20).
+    if (isOperatorSession(node)) {
+      // Round 3, PM 11 and 13: the operator's own card explained itself only in
+      // a tooltip, and a tooltip is not somewhere a newcomer thinks to look.
+      // The badge is the visible half of that answer; the tooltip keeps the rest.
+      content.appendChild(text(W - 8, 34, t("session_you_badge"), "youbadge"));
+    }
     group.appendChild(content);
 
     const tooltip = document.createElementNS(SVGNS, "title");
-    tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id;
+    tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id +
+      "\n" + node.kind + " · " + stateWithGloss(node);
     // The operator's own window is the one card a newcomer cannot map to
     // anything they did; say plainly that it is them (round 2, PM findings).
     if (isOperatorSession(node)) {
@@ -2552,6 +2743,10 @@ function openDrawer() { document.getElementById("drawer").hidden = false; }
 function closeDrawer() {
   document.getElementById("drawer").hidden = true;
   selected = null;
+  // Nothing is on show any more, so a language switch has nothing to repaint
+  // here; leaving the last node behind would have it repaint a closed drawer.
+  shownNode = null;
+  shownRecord = null;
   if (focused) { setFocus(null); }
   else if (lastGraph) { render(lastGraph); }
 }
@@ -3066,8 +3261,13 @@ function paintLinks(agentId) {
   const row = document.getElementById("link-open-row");
   row.hidden = !writesEnabled || !others.length;
   if (!row.hidden) {
-    fillSelect(document.getElementById("link-open-with"),
-      others.map((node) => ({ id: node.id, title: node.label || node.id })), null, false);
+    // A language switch repaints this list now (item 18), and `fillSelect`
+    // re-selects the default: whoever the operator had picked to link to would
+    // change under them.  Keep the standing choice, as the hire pickers do.
+    const picker = document.getElementById("link-open-with");
+    fillSelect(picker,
+      others.map((node) => ({ id: node.id, title: node.label || node.id })),
+      picker.value || null, false);
     document.getElementById("link-open-with-go").onclick = () => {
       const target = document.getElementById("link-open-with").value;
       if (target) { openLinkModal(agentId, target); }
@@ -3153,24 +3353,13 @@ function paintSettings(record) {
   // value into a stored one (M3): a level lowered on an ancestor would be
   // written back onto the descendant and outlive the ancestor's downgrade.
   const stored = record.grants || {};
-  const effective = record.effective_grants || stored;
-  const narrowed = [];
-  let withheld = false;
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
-    fillSelect(document.getElementById("grant-" + name), levels, stored[name] || "deny", false);
-    const s = stored[name] || "deny";
-    const e = effective[name] || "deny";
-    if (e === s) { continue; }
-    // stored auto capped to ask is the global withhold, not an ancestor: the
-    // withhold caps at ask, so a lower ancestor would show effective below ask.
-    // Blaming a non-existent ancestor sent operators hunting for a parent role
-    // that isn't there (round 2, design).
-    if (s === "auto" && e === "ask") { withheld = true; }
-    else { narrowed.push(name + ": " + t("stored_word") + " " + s + ", " + t("in_effect") + " " + e); }
+    fillSelect(document.getElementById("grant-" + name),
+      glossedOptions(levels, VALUE_GLOSS), stored[name] || "deny", false);
   }
   fillSelect(
     document.getElementById("setting-context_mode"),
-    (catalog && catalog.context_modes) || ["fresh", "accumulated"],
+    glossedOptions((catalog && catalog.context_modes) || ["fresh", "accumulated"], VALUE_GLOSS),
     record.context_mode || "fresh",
     false
   );
@@ -3183,11 +3372,8 @@ function paintSettings(record) {
   // box goes and a line takes its place: what a skill is, where skills come
   // from, and — in the same words the Catalogue view uses — what it takes to
   // add one.  The Skills view is the door, so it is what the line names.
-  const skillsEmpty = document.getElementById("settings-skills-empty");
   document.getElementById("setting-skills-field").hidden = !skills.length;
-  skillsEmpty.hidden = skills.length > 0;
-  skillsEmpty.textContent = t("skills_empty") + " " +
-    (catalogEditing ? t("catalog_add_here") : t("catalog_readonly"));
+  document.getElementById("settings-skills-empty").hidden = skills.length > 0;
   // Tool access: the real narrowable set of THIS role's profile, not the
   // catalogue's passports.  Empty allowlist means the whole profile.
   const summary = ((catalog && catalog.profile_tools) || {})[record.profile_id];
@@ -3226,6 +3412,9 @@ function paintSettings(record) {
       box.checked = true;
       box.disabled = true;
       row.appendChild(box);
+      // The tool name rides on the row so the label repaint can rewrite this
+      // line without rebuilding the checklist the operator is standing in.
+      row.dataset.fixedTool = name;
       row.appendChild(document.createTextNode(" " + name + " — " + t("tools_fixed_note")));
       checklist.appendChild(row);
       checklist.appendChild(document.createElement("br"));
@@ -3237,6 +3426,34 @@ function paintSettings(record) {
   // the change listener reveals it then. It was showing for every fresh role
   // before any weakening was chosen (round 2, design).
   document.getElementById("downgrade-field").hidden = true;
+  paintSettingsLabels(record);
+}
+
+// The half of the settings panel that is the panel's own words rather than the
+// operator's.  It is separate because a language switch must repaint it while
+// the form is open, and `paintSettings` cannot be that repaint: it refills every
+// picker and blanks the reason field, so switching language mid-edit would take
+// the grants, the context mode and the typed reason with it — the same clobber
+// the hire modal was fixed for in an earlier wave (item 18).
+function paintSettingsLabels(record) {
+  document.getElementById("settings-skills-empty").textContent = t("skills_empty") + " " +
+    (catalogEditing ? t("catalog_add_here") : t("catalog_readonly"));
+  // Rewritten in place, one text node per row, so the checkboxes beside them —
+  // and whatever the operator has ticked — are left exactly as they are.
+  for (const row of document.querySelectorAll("#tools-checklist label[data-fixed-tool]")) {
+    row.lastChild.textContent = " " + row.dataset.fixedTool + " — " + t("tools_fixed_note");
+  }
+  // The same trick on the pickers.  Refilling them through `fillSelect` is what
+  // would drop the operator's chosen level, so the option VALUES — the canonical
+  // tokens — are left untouched and only their labels are rewritten: each one is
+  // that same token followed by the panel's sentence (item 20), and the sentence
+  // is the half that has to change language.
+  for (const id of ["grant-create_roles", "grant-retire_roles", "grant-open_links",
+    "setting-context_mode"]) {
+    for (const option of document.getElementById(id).options) {
+      option.textContent = glossed(option.value, VALUE_GLOSS[option.value]);
+    }
+  }
   // The model is a property of the operator-owned profile, not of the role: a
   // role that could name a model would be editing argv.
   document.getElementById("settings-model").textContent =
@@ -3244,6 +3461,23 @@ function paintSettings(record) {
     (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
   const note = document.getElementById("settings-note");
   const blockers = record.retirement_blockers || [];
+  // What is stored against what is in effect.  Both are canonical grant levels
+  // and stay in the ledger's spelling; only the two captions are the panel's.
+  const stored = record.grants || {};
+  const effective = record.effective_grants || stored;
+  const narrowed = [];
+  let withheld = false;
+  for (const name of ["create_roles", "retire_roles", "open_links"]) {
+    const s = stored[name] || "deny";
+    const e = effective[name] || "deny";
+    if (e === s) { continue; }
+    // stored auto capped to ask is the global withhold, not an ancestor: the
+    // withhold caps at ask, so a lower ancestor would show effective below ask.
+    // Blaming a non-existent ancestor sent operators hunting for a parent role
+    // that isn't there (round 2, design).
+    if (s === "auto" && e === "ask") { withheld = true; }
+    else { narrowed.push(name + ": " + t("stored_word") + " " + s + ", " + t("in_effect") + " " + e); }
+  }
   // effective_grants, retirement_blockers, and live_delegations now reach the
   // panel (M3), so this warning can actually fire and the narrowing below is
   // visible where a human edits grants.
@@ -3284,8 +3518,13 @@ async function loadLaunch() {
   // re-selecting the default took the operator's chosen task off the Run tab
   // mid-decision.  Keep whatever is selected; a task that has left the list
   // falls back to the first, as it always did.
+  // The task's state decides whether a run on it is even worth starting, so it
+  // carries its gloss here too — canonical word first, as everywhere (item 20).
   fillSelect(picker,
-    launchTasks.map((task) => ({ id: task.id, title: (task.title || task.id) + " · " + task.state })),
+    launchTasks.map((task) => ({
+      id: task.id,
+      title: (task.title || task.id) + " · " + glossed(task.state, STATE_GLOSS[task.state]),
+    })),
     picker.value || null, false);
 }
 
@@ -3355,8 +3594,12 @@ function runStatusText(run) {
   const lead = run.live ? "● " + t("live") + " · " : "○ ";
   const phase = String(run.phase || "");
   const state = String(run.delegation_state || "");
-  if (!state || state === phase) { return lead + phase; }
-  return lead + t("run_phase_word") + " " + phase + " · " + t("run_state_word") + " " + state;
+  // Each value keeps the ledger's spelling and gains the panel's sentence beside
+  // it: a run card is the surface where `succeeded` is most often misread as
+  // "done", and it is exactly there that the gloss earns its room (item 20).
+  if (!state || state === phase) { return lead + glossed(phase, STATE_GLOSS[phase]); }
+  return lead + t("run_phase_word") + " " + phase + " · " +
+    t("run_state_word") + " " + glossed(state, STATE_GLOSS[state]);
 }
 
 // The run's record is the result surface; the task's state is a human decision
@@ -3506,7 +3749,7 @@ function paintTaskAcceptance() {
     : "accept_state_other";
   document.getElementById("task-acceptance-state").textContent = t(line);
   document.getElementById("task-acceptance-canonical").textContent =
-    t("accept_ledger_state") + ": " + (state || "—");
+    t("accept_ledger_state") + ": " + (state ? glossed(state, STATE_GLOSS[state]) : "—");
   document.getElementById("task-review-request").hidden = line !== "accept_state_open";
   document.getElementById("task-accept").hidden = line !== "accept_state_review";
   document.getElementById("task-reopen").hidden = line !== "accept_state_review";
@@ -3650,10 +3893,11 @@ function paintHire() {
   fillSelect(document.getElementById("hire-profile"), catalog.profiles || [],
     held("hire-profile", null), false);
   fillSelect(document.getElementById("hire-context_mode"),
-    catalog.context_modes || ["fresh", "accumulated"], held("hire-context_mode", "fresh"), false);
+    glossedOptions(catalog.context_modes || ["fresh", "accumulated"], VALUE_GLOSS),
+    held("hire-context_mode", "fresh"), false);
   const levels = catalog.grant_levels || ["deny", "ask", "auto"];
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
-    fillSelect(document.getElementById("hire-" + name), levels,
+    fillSelect(document.getElementById("hire-" + name), glossedOptions(levels, VALUE_GLOSS),
       held("hire-" + name, "deny"), false);
   }
   const presets = [{ id: "", title: t("preset_none") }].concat(
@@ -3845,6 +4089,13 @@ let taskRunCount = 0;
 // like the acceptance block it has to be repainted on a language switch rather
 // than sitting in the language the drawer happened to open in.
 let shownRecord = null;
+// And the node it was opened on, held separately because the record arrives one
+// fetch later: the links list, the task's runs and the message note are painted
+// from the NODE, and round 3 caught the links list keeping the previous locale
+// precisely because a repaint needed an argument nobody had kept (item 18).
+// Every surface that takes an argument keeps its last one here rather than
+// opting out of the repaint.
+let shownNode = null;
 
 function summarizeTask(host, node, record) {
   summaryRow(host, "task_title_label", record.title);
@@ -3970,9 +4221,17 @@ document.getElementById("record-json-toggle").addEventListener("click", () => {
   showRecordJson(document.getElementById("inspector-body").hidden);
 });
 
+// The one line of drawer chrome that is neither a summary row nor an acceptance
+// step, and so had no repaint of its own.
+function paintDrawerChrome() {
+  document.getElementById("message-note").textContent =
+    shownNode && shownNode.kind === "agent" ? t("message_note_role") : "";
+}
+
 async function inspect(node) {
   const title = document.getElementById("inspector-title");
   const body = document.getElementById("inspector-body");
+  shownNode = node;
   // Lead with the name for anything that has one (a role), so the heading of
   // the screen where you manage it is not a bare ULID (round 2, design).
   title.textContent = node.label ? node.kind + " · " + node.label : node.kind + " " + node.id;
@@ -4011,7 +4270,7 @@ async function inspect(node) {
   document.getElementById("task-acceptance-result").textContent = "";
   document.getElementById("message-result").textContent = "";
   document.getElementById("settings-result").textContent = "";
-  document.getElementById("message-note").textContent = isRole ? t("message_note_role") : "";
+  paintDrawerChrome();
 
   try {
     const payload = await api("/api/entities/" + encodeURIComponent(node.kind) + "/" +
@@ -4194,9 +4453,11 @@ function renderAttentionItem(item) {
     card.appendChild(head);
     const what = document.createElement("p");
     what.className = "note";
-    // Title for the human, canonical state beside it for the record.
+    // Title for the human, canonical state beside it for the record — and the
+    // state's own gloss beside that, because this card exists to tell somebody
+    // who has never met `review` what it now wants from them (item 20).
     what.textContent = (item.title || item.task_id) +
-      (item.task_state ? " · " + item.task_state : "");
+      (item.task_state ? " · " + glossed(item.task_state, STATE_GLOSS[item.task_state]) : "");
     card.appendChild(what);
     const why = document.createElement("p");
     why.className = "note warn";
@@ -4427,8 +4688,21 @@ async function sendChat() {
 document.getElementById("chat-send").addEventListener("click", sendChat);
 
 let searchTimer = null;
+// The query the results on screen answer, so a language switch can repaint the
+// match line and the Show buttons rather than leaving them in the old locale.
+let lastSearchText = "";
+
+// Only while the search view is the one open: re-running a query behind a board
+// the operator is looking at would pull them off it.
+function repaintSearch() {
+  if (!lastSearchText.trim()) { return; }
+  if (document.getElementById("view-search").classList.contains("open")) {
+    runSearch(lastSearchText);
+  }
+}
 
 async function runSearch(text) {
+  lastSearchText = text;
   const note = document.getElementById("search-note");
   const host = document.getElementById("search-results");
   while (host.firstChild) { host.removeChild(host.firstChild); }
@@ -4935,24 +5209,56 @@ langPicker.addEventListener("change", () => {
   applyLanguage();
 });
 
+// Every surface this panel paints from JS, and how each one repaints itself.
+//
+// Round 3 reported one symptom — switching language left the links list in the
+// previous locale (PM 9, designer 10) — but the cause was that `applyLanguage`
+// was a hand-written call list, and a hand-written call list is only ever as
+// complete as the last person to remember it.  Half these surfaces were missing.
+// So the surfaces are enumerated once, here, and `applyLanguage` walks the whole
+// table: adding a surface without adding it here is now a visible omission
+// rather than a silent one.
+//
+// Not listed, because they are not painted from JS at all: the onboarding card,
+// the overview guide, every modal, and every static label — those carry
+// `data-i18n` and are repainted wholesale by `chrome` below.  That is the file's
+// standing rule (an element is owned by `data-i18n` OR by a JS write, never
+// both), and it is what keeps this table as short as it is.
+//
+// A surface that needs an argument keeps its last one rather than sitting the
+// repaint out, and a surface with an open form repaints its LABELS only: a
+// language switch must never take an operator's half-finished input with it.
+const LANGUAGE_SURFACES = [
+  ["chrome", () => applyI18n()],
+  ["status", () => paintStatus()],
+  ["stream", () => setStream(lastStream.state, lastStream.key)],
+  ["board", () => { if (lastGraph) { paintChrome(lastGraph); render(lastGraph); } }],
+  ["legend", () => paintGlyphLegend()],
+  ["catalogue", () => paintCatalog()],
+  ["hire", () => paintHire()],
+  ["links", () => { if (shownNode && shownNode.kind === "agent") { paintLinks(shownNode.id); } }],
+  ["settings", () => { if (currentRole) { paintSettingsLabels(currentRole); } }],
+  ["drawer", () => paintDrawerChrome()],
+  ["task_runs", () => { if (shownNode) { taskRunCount = paintTaskRuns(shownNode); } }],
+  ["acceptance", () => paintTaskAcceptance()],
+  ["record_summary", () => {
+    if (shownRecord) { paintRecordSummary(shownRecord.node, shownRecord.record); }
+  }],
+  ["runs", () => loadRuns()],
+  ["chat", () => loadChat()],
+  ["attention", () => loadAttention()],
+  ["search", () => repaintSearch()],
+  ["launch", () => { if (launchEnabled) { loadLaunch(); } }],
+];
+
 // Repaint everything the current language touches, without a reload.  Chrome
 // only: the canonical data inside the repainted views passes through untouched.
 function applyLanguage() {
-  applyI18n();
-  paintStatus();
-  setStream(lastStream.state, lastStream.key);
-  if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
-  paintCatalog();
-  paintHire();
-  // The open task drawer's acceptance block is painted from JS, so it needs the
-  // same repaint as the rest of the chrome — and so does the record summary
-  // above it, whose labels and glosses are the panel's own words.
-  paintTaskAcceptance();
-  if (shownRecord) { paintRecordSummary(shownRecord.node, shownRecord.record); }
-  loadRuns();
-  loadChat();
-  loadAttention();
-  if (launchEnabled) { loadLaunch(); }
+  for (const [name, repaint] of LANGUAGE_SURFACES) {
+    // One surface that throws must not leave the rest of the panel half
+    // translated; the name is what says which one it was.
+    try { repaint(); } catch (error) { console.error("repaint failed: " + name, error); }
+  }
 }
 
 async function boot() {

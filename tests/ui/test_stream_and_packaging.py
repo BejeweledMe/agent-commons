@@ -555,7 +555,7 @@ def test_a_run_card_states_its_status_once_unless_the_two_values_disagree() -> N
 
     body = read_spa()
     status = body.split("function runStatusText(run) {", 1)[1].split("\n}\n", 1)[0]
-    assert "if (!state || state === phase) { return lead + phase; }" in status
+    assert "if (!state || state === phase) { return lead + glossed(phase" in status
     assert 't("run_phase_word")' in status
     assert 't("run_state_word")' in status
     # Both card renderers -- the Runs view and the task drawer -- go through it,
@@ -658,9 +658,13 @@ def test_an_empty_catalogue_explains_the_skills_box_instead_of_showing_an_empty_
         "\nasync function loadCatalog", 1
     )[0]
     assert 'document.getElementById("setting-skills-field").hidden = !skills.length;' in paint
-    assert "skillsEmpty.hidden = skills.length > 0;" in paint
+    assert 'document.getElementById("settings-skills-empty").hidden = skills.length > 0;' in paint
+    # Whether the line SHOWS is data; what it SAYS is the panel's own words, so
+    # the sentence lives with the other labels that a language switch repaints
+    # without touching the form around them (item 18).
+    labels = body.split("function paintSettingsLabels(record) {", 1)[1].split("\n}\n", 1)[0]
     # Consistent with the Catalogue view: the same sentence about the same gate.
-    assert 'catalogEditing ? t("catalog_add_here") : t("catalog_readonly")' in paint
+    assert 'catalogEditing ? t("catalog_add_here") : t("catalog_readonly")' in labels
     catalogue = body.split("function paintCatalog() {", 1)[1].split("\n}\n", 1)[0]
     assert 't("catalog_readonly")' in catalogue
     # The empty state is written from JS, so it must not also claim a data-i18n
@@ -981,3 +985,327 @@ def test_a_link_port_stays_hittable_at_any_zoom_and_says_what_it_does() -> None:
     # was measured against a card at 1:1.
     assert "const DROP_REACH = 64;" in body
     assert "distance <= DROP_REACH" in body
+
+
+def _language_tables() -> tuple[str, str]:
+    """The two STRINGS blocks, parsed the way the symmetry test parses them."""
+
+    table = read_spa().split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    return (
+        table.split("en: {", 1)[1].split("\n  },", 1)[0],
+        table.split("ru: {", 1)[1].split("\n  },", 1)[0],
+    )
+
+
+def _value(block: str, key: str) -> str:
+    match = re.search(rf'^\s*{key}: "(.*)",$', block, re.MULTILINE)
+    assert match, key
+    return match.group(1)
+
+
+# Every surface the panel paints from JS, and therefore every surface a language
+# switch has to repaint.  Named here as well as in the asset so that adding one
+# without repainting it fails a test rather than shipping a half-Russian panel.
+LANGUAGE_SURFACES = {
+    "chrome",
+    "status",
+    "stream",
+    "board",
+    "legend",
+    "catalogue",
+    "hire",
+    "links",
+    "settings",
+    "drawer",
+    "task_runs",
+    "acceptance",
+    "record_summary",
+    "runs",
+    "chat",
+    "attention",
+    "search",
+    "launch",
+}
+
+
+def test_switching_language_repaints_every_surface_the_panel_paints_itself() -> None:
+    """Round 3, PM 9 and designer 10: switching language left the links list in
+    the previous locale.  The reported symptom was one surface; the cause was
+    that `applyLanguage` was a hand-written call list, and half the panel was
+    missing from it.  The surfaces are enumerated in the asset now, and this
+    pins the enumeration -- mechanically, so a new surface cannot be quietly
+    left out of it (item 18)."""
+
+    body = read_spa()
+    table = body.split("const LANGUAGE_SURFACES = [", 1)[1].split("\n];", 1)[0]
+    named = set(re.findall(r'^\s*\["([a-z_]+)"', table, re.MULTILINE))
+    assert named == LANGUAGE_SURFACES, named ^ LANGUAGE_SURFACES
+
+    # It walks the table rather than repeating it: a call list beside a table
+    # would drift from it, which is the bug all over again.
+    switch = body.split("function applyLanguage() {", 1)[1].split("\n}\n", 1)[0]
+    assert "for (const [name, repaint] of LANGUAGE_SURFACES)" in switch
+
+    # A surface whose paint function takes an argument keeps the last one rather
+    # than sitting the repaint out -- that omission is what stranded the links.
+    assert "shownNode = node;" in body
+    assert 'if (shownNode && shownNode.kind === "agent") { paintLinks(shownNode.id); }' in table
+    assert "taskRunCount = paintTaskRuns(shownNode);" in table
+    # ...and is forgotten when there is nothing on show, so a closed drawer is
+    # not repainted behind the operator's back.
+    closing = body.split("function closeDrawer() {", 1)[1].split("\n}\n", 1)[0]
+    assert "shownNode = null;" in closing
+    assert "shownRecord = null;" in closing
+
+    # The settings form is open over operator input, so the repaint is
+    # labels-only.  `paintSettings` refills every picker and blanks the reason
+    # field; calling it here would take a half-finished edit with it.
+    assert "paintSettingsLabels(currentRole)" in table
+    assert "paintSettings(currentRole)" not in table
+    # The pickers' option labels still change language -- rewritten in place, so
+    # the selected value survives while its gloss is translated.
+    labels = body.split("function paintSettingsLabels(record) {", 1)[1].split("\n}\n", 1)[0]
+    assert "option.textContent = glossed(option.value, VALUE_GLOSS[option.value]);" in labels
+    assert "fillSelect(" not in labels
+
+    # The search view repaints only while it is the view on screen: re-running a
+    # query behind a board the operator is reading would move them off it.
+    repaint = body.split("function repaintSearch() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'document.getElementById("view-search").classList.contains("open")' in repaint
+
+    # The onboarding card and the guide are not in the table because they are
+    # not painted from JS at all -- `chrome` (applyI18n) owns them, which is the
+    # file's standing rule about who owns an element.
+    assert '["chrome", () => applyI18n()]' in table
+    for marker in ('id="onboarding"', 'id="gpage-brief"'):
+        section = body.split(marker, 1)[1][:2000]
+        assert "data-i18n=" in section, marker
+
+
+def test_the_panel_uses_one_word_per_concept_in_each_language() -> None:
+    """Round 3, designer 11 and PM 8: one thing had four names -- "Запуски" in
+    the nav, "Запуск" on the tab, "прогоны" in the guide, "делегация" in the
+    drawer -- and "Скиллы"/"Туллы" sat beside "Инструменты".  The glossary is
+    written into the asset so the next person cannot drift from it, and this
+    pins both the glossary and the words themselves (item 21)."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    # The glossary is a comment block ahead of the table it governs.
+    glossary = body.split("// One thing, one word.", 1)[1].split("const STRINGS = {", 1)[0]
+    for concept in ("role           роль", "run            прогон", "skill          навык",
+                    "tool           инструмент", "task           задача", "board          доска"):
+        assert concept in glossary, concept
+    # And it states the one distinction that keeps a canonical name canonical:
+    # the record keeps the ledger's word, the activity gets the human one.
+    assert "`delegation` names the record a run writes; a person watches a run." in glossary
+    assert "`agent`      names the ledger kind" in glossary
+
+    # No transliteration, and no second name for anything the glossary settles.
+    for forbidden in ("скилл", "тулл", "борд", "агент", "делегац"):
+        offenders = [line.strip() for line in russian.split("\n") if forbidden in line.lower()]
+        assert offenders == [], (forbidden, offenders)
+
+    # The run has exactly one Russian noun, and it is the same one everywhere.
+    assert _value(russian, "tab_runs") == "Прогоны"
+    assert _value(russian, "tab_run") == "Прогон"
+    assert _value(russian, "count_delegations") == "прогонов"
+    assert _value(english, "tab_runs") == "Runs"
+    assert _value(english, "count_delegations") == "runs"
+    # "запуск" survives only as the verb: no Russian string may use it as a noun
+    # for a run again.
+    for line in russian.split("\n"):
+        for noun in ("запуски", "запуска ", "запуске", "запуском", "запуску"):
+            assert noun not in line.lower(), line.strip()
+
+    # The record itself keeps the ledger's name, in both languages.
+    assert _value(english, "run_state_word") == "delegation"
+    assert _value(russian, "run_state_word") == "delegation"
+
+    # A skill is a навык and a tool is an инструмент wherever they are named.
+    assert _value(russian, "nav_skills") == _value(russian, "skills_heading")
+    assert _value(russian, "nav_tools") == _value(russian, "tools_heading")
+    assert _value(russian, "guide_tab_catalog") == "Навыки и инструменты"
+
+
+def test_the_russian_table_never_translates_a_canonical_value() -> None:
+    """Item 20 was rejected as reported -- translating `deny`/`fresh`/`succeeded`
+    would make one state read two ways between the panel, the CLI and the
+    ledger.  The recorded compromise is a gloss BESIDE the canonical value, so
+    the canonical value has to still be there, spelled the ledger's way."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    # The link type was the one control that had translated its canonical value
+    # away: the radio said "Спросить", and nothing on screen said `ask`.
+    for block in (english, russian):
+        assert _value(block, "link_type_ask").startswith("ask — ")
+        assert _value(block, "link_type_handoff").startswith("handoff_work — ")
+
+    # The gloss tables stay keyed by the canonical token, and the gloss is
+    # appended to it rather than substituted for it.
+    assert 'return glossKey ? value + " — " + t(glossKey) : value;' in body
+    options = body.split("function glossedOptions(values, table) {", 1)[1].split("\n}\n", 1)[0]
+    assert "{ id: value, title: glossed(value, table[value]) }" in options
+
+    # No Russian string may spell a canonical state or grant level in Russian.
+    # The glosses SAY what those words mean; none of them is offered as a name.
+    for canonical in ("deny", "ask", "auto", "fresh", "accumulated", "succeeded", "review"):
+        assert f'"{canonical}"' not in russian, canonical
+
+
+def test_a_canonical_value_shown_to_a_person_carries_its_gloss() -> None:
+    """The other half of item 20: the gloss `stateWithGloss` built for the record
+    summaries had to reach every surface that shows a canonical value to a
+    person, not only the drawer."""
+
+    body = read_spa()
+
+    # The runs list and the task's runs both go through one status line.
+    status = body.split("function runStatusText(run) {", 1)[1].split("\n}\n", 1)[0]
+    assert "glossed(phase, STATE_GLOSS[phase])" in status
+    assert "glossed(state, STATE_GLOSS[state])" in status
+
+    # The attention card, the acceptance line and the launch picker.
+    assert 'glossed(item.task_state, STATE_GLOSS[item.task_state])' in body
+    assert 'glossed(state, STATE_GLOSS[state]) : "—"' in body
+    assert "glossed(task.state, STATE_GLOSS[task.state])" in body
+
+    # The grant and context pickers, in both the settings panel and the hire
+    # modal: the option's value stays the bare canonical token either way.
+    # One definition and four call sites: both grant rows and both context
+    # pickers.  A fifth picker of a canonical value would have to join them.
+    assert body.count("glossedOptions(") == 5
+    for fragment in (
+        'fillSelect(document.getElementById("grant-" + name),\n'
+        "      glossedOptions(levels, VALUE_GLOSS)",
+        'glossedOptions((catalog && catalog.context_modes)',
+        'glossedOptions(catalog.context_modes',
+        'glossedOptions(levels, VALUE_GLOSS),\n      held("hire-" + name, "deny"), false);',
+    ):
+        assert fragment in body, fragment
+
+    # A node card has no room for a sentence, so its gloss is the tooltip and the
+    # visible line keeps the bare canonical state.  Both halves are pinned: a
+    # gloss on the card's own line would push the label or the id off it.
+    render = body.split("for (const node of visibleNodes) {", 1)[1].split(
+        "\n    nodeLayer.appendChild(group);", 1
+    )[0]
+    assert 'const line = node.kind + " · " + stateLabel(node) +' in render
+    assert '"\\n" + node.kind + " · " + stateWithGloss(node);' in render
+
+
+def test_the_board_explains_its_marks_and_says_which_card_is_you() -> None:
+    """Round 3, designer 18 and PM 11 and 13: the glyphs `◑ ○ ⊘ ●` were the
+    board's entire status language and nothing anywhere explained them, and the
+    operator's own card said "this is you" only in a tooltip nobody hovers
+    (item 22)."""
+
+    body = read_spa()
+
+    # The legend lives on the board, where a person meets the marks, and folds
+    # away so it does not spend the work surface.
+    assert 'id="board-legend"' in body
+    assert 'id="legend-panel" hidden' in body
+    assert 'aria-controls="legend-panel"' in body
+    assert 'data-i18n="legend_open"' in body
+
+    # It is BUILT from the GLYPHS table rather than written out beside it, so a
+    # state added there cannot go missing from its own explanation.
+    legend = body.split("function paintGlyphLegend() {", 1)[1].split("\n}\n", 1)[0]
+    assert "for (const [state, pair] of Object.entries(GLYPHS))" in legend
+    # Every distinct glyph the table can produce has a meaning written for it.
+    glyphs = body.split("const GLYPHS = {", 1)[1].split("};", 1)[0]
+    produced = set(re.findall(r'\["([^"]+)",\s*"\w+"\]', glyphs))
+    meanings = body.split("const GLYPH_MEANING = {", 1)[1].split("};", 1)[0]
+    explained = set(re.findall(r'"([^"]+)": "lg_', meanings))
+    assert produced <= explained, produced - explained
+    # `▨` is substituted by `glyphFor` for stale evidence, so no state produces
+    # it and it is listed with the two states it can stand in for.
+    assert 'const STALE_GLYPH = ["▨", "warn", "lg_stale", ["accepted", "approved"]];' in body
+    assert "rows.push(STALE_GLYPH);" in legend
+
+    # The canonical states in the legend are printed, never translated: this is
+    # the panel teaching that vocabulary, which is the opposite of replacing it.
+    assert 'canonical.textContent = states.join(" · ");' in legend
+    assert "t(states" not in legend
+
+    # "This is you" becomes visible on the card, and the tooltip stays.
+    assert 't("session_you_badge")' in body
+    assert 't("session_you_tip")' in body
+    render = body.split("for (const node of visibleNodes) {", 1)[1].split(
+        "\n    nodeLayer.appendChild(group);", 1
+    )[0]
+    assert 'content.appendChild(text(W - 8, 34, t("session_you_badge"), "youbadge"));' in render
+    assert ".youbadge{" in body
+
+    english, russian = _language_tables()
+    for key in ("legend_open", "legend_title", "legend_note", "lg_stale", "session_you_badge"):
+        for block in (english, russian):
+            assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
+
+
+def test_form_microcopy_says_what_the_operator_is_deciding() -> None:
+    """Round 3, designer 21: "Бюджет ротации", "Контекст: fresh", "Отставка
+    ролей" are the system's words, not a person's.  Each label now says what the
+    operator is choosing, with the canonical value still beside it (item 31)."""
+
+    english, russian = _language_tables()
+
+    # The three the designer named, gone in both languages.
+    assert "Бюджет ротации" not in russian
+    assert "Turnover budget" not in english
+    assert _value(russian, "retire_roles_label") != "Отставка ролей"
+    assert _value(russian, "hire_context_label") != "Контекст"
+    assert _value(english, "hire_context_label") != "Context"
+
+    # What replaced them says what the role may DO, in a person's words.
+    for block in (english, russian):
+        for key in ("create_roles_label", "retire_roles_label", "open_links_label",
+                    "hire_budget_label", "hire_context_label", "setting_tools_label",
+                    "setting_skills_label", "run_wall_label", "link_type_label"):
+            assert len(_value(block, key)) > 12, (key, _value(block, key))
+    assert _value(english, "create_roles_label").startswith("May hire")
+    assert _value(english, "retire_roles_label").startswith("May take")
+    assert _value(english, "hire_context_label") == "Memory between runs"
+    assert _value(russian, "hire_context_label") == "Память между прогонами"
+
+    # The tooltips that already explained these fields are still there, and are
+    # reconciled with the new labels rather than repeating them.
+    body = read_spa()
+    for tip in ("tip_hire_budget", "tip_hire_context", "tip_hire_profile"):
+        assert f'data-i18n-title="{tip}"' in body, tip
+    for block in (english, russian):
+        assert _value(block, "tip_hire_budget") != _value(block, "hire_budget_label")
+        # The label says how many; the tooltip says how the number is counted.
+        assert _value(block, "tip_hire_budget") not in _value(block, "hire_budget_label")
+
+
+def test_every_user_facing_string_in_the_markup_reaches_the_tables() -> None:
+    """Round 3, designer 10 and PM 7: untranslated strings remained.  The one
+    they reported has since been translated; these are the rest -- two aria
+    labels a screen reader reads aloud, and a heading with no marker at all
+    (item 19)."""
+
+    body = read_spa()
+
+    # aria-label is a label like any other, and is translated like one.
+    assert 'data-i18n-aria="lang_label"' in body
+    assert 'data-i18n-aria="board_aria"' in body
+    i18n = body.split("function applyI18n() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'element.setAttribute("aria-label", t(element.dataset.i18nAria));' in i18n
+
+    # Every heading in the markup is either translated or a proper name.  The
+    # product and the two protocol acronyms are the only things spelled the same
+    # in both languages; anything else with a bare English heading is a miss.
+    proper = {"Agent Commons", "MCP"}
+    for heading in re.findall(r"<h1([^>]*)>([^<]*)</h1>", body):
+        attributes, shown = heading
+        assert "data-i18n=" in attributes or shown.strip() in proper, shown
+
+    english, russian = _language_tables()
+    for key in ("lang_label", "board_aria", "sgr_title"):
+        for block in (english, russian):
+            assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
