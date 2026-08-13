@@ -384,3 +384,59 @@ def test_a_role_asking_the_operator_still_appears_in_the_queue(
     with _client(context) as client:
         attention = client.get("/api/attention", headers=authorized()).json()
     assert attention["count"] == 1
+
+
+def test_a_role_holding_a_vanished_skill_is_flagged_before_any_run(
+    workspace: dict[str, Any], tmp_path,  # type: ignore[no-untyped-def]
+) -> None:
+    """Wave 1 item 8: the catalogue is an operator file and can be edited by
+    hand, outside the panel. A role granted a skill the catalogue no longer
+    defines will fail its NEXT launch fail-closed — the attention queue says
+    so first, naming the role and the missing ids."""
+
+    from pathlib import Path
+
+    from agent_commons.catalog import write_role_catalog
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="preflight-window-0001",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    manager.session_id = session["session_id"]
+    catalog_file = Path(tmp_path) / "catalog.yaml"
+    write_role_catalog(
+        catalog_file,
+        {
+            "skills": [{"id": "pytest-runner", "title": "Pytest", "instruction": "run tests"}],
+            "tools": [],
+        },
+    )
+    manager.create_agent(
+        name="Backend owner",
+        profile_id="claude-builder",
+        rationale="owns the surface",
+        skills=("pytest-runner",),
+        idempotency_key="preflight-role",
+    )
+    context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        catalog_path=catalog_file,
+    )
+    assert not [
+        item for item in context.attention()["items"] if item["kind"] == "config_broken"
+    ]
+
+    # The operator edits the file by hand and drops the skill.
+    write_role_catalog(catalog_file, {"skills": [], "tools": []})
+
+    broken = [
+        item for item in context.attention()["items"] if item["kind"] == "config_broken"
+    ]
+    assert len(broken) == 1
+    assert broken[0]["missing_skills"] == ["pytest-runner"]
+    assert broken[0]["name"] == "Backend owner"

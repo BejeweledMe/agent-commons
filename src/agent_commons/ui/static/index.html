@@ -72,6 +72,17 @@ footer{
 .node.faded{opacity:.14}
 .edge{fill:none; stroke:var(--edge); stroke-width:1.4}
 .edge.comm{stroke-dasharray:4 3}
+/* Permission is not provenance: an opened link (dashed, accent) must never be
+   confused with who created whom (solid, quiet). */
+.edge.link{stroke:var(--info); stroke-dasharray:5 4; opacity:.85}
+.edge.hier{stroke:var(--edge)}
+/* Link ports: four grab points on a role card; drag one to another role to
+   open a link.  Visible on hover/selection only, so the board stays calm. */
+.portc{fill:var(--bg); stroke:var(--info); stroke-width:2; opacity:0; cursor:crosshair}
+.node:hover .portc, .node.sel .portc{opacity:1}
+#linkband{position:absolute; inset:0; width:100%; height:100%;
+  pointer-events:none; z-index:6}
+#linkband path{fill:none; stroke:var(--info); stroke-width:1.5; stroke-dasharray:5 4}
 .edge.faded{opacity:.07}
 .edge.incident{stroke:var(--info); stroke-width:2.2; opacity:1}
 button{
@@ -286,6 +297,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         </div>
       </div>
       <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
+      <svg id="linkband" hidden><path d=""></path></svg>
     </section>
 
     <section class="view" id="view-runs">
@@ -442,12 +454,22 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="dock-tabs" id="drawer-tabs">
         <button type="button" data-panel="record" aria-selected="true" data-i18n="tab_record">Record</button>
         <button type="button" data-panel="settings" aria-selected="false" hidden data-i18n="tab_settings">⚙ Settings</button>
+        <button type="button" data-panel="links" aria-selected="false" hidden data-i18n="links_tab">Links</button>
         <button type="button" data-panel="run" aria-selected="false" hidden data-i18n="tab_run">Run</button>
         <button type="button" data-panel="message" aria-selected="false" hidden data-i18n="tab_message">Message</button>
       </div>
 
     <section class="panel open" id="panel-record">
       <pre id="inspector-body"></pre>
+      <div class="actions">
+        <button type="button" id="link-close-btn" hidden data-i18n="link_close_button">Close the link</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-links">
+      <p class="note" data-i18n="links_note">Recorded permissions between this role and others.
+        Closing keeps the history; nothing is deleted.</p>
+      <div id="links-list"></div>
     </section>
 
     <section class="panel" id="panel-run">
@@ -564,6 +586,45 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
       <p class="result" id="hire-result"></p>
     </section>
+  </div>
+</div>
+<div class="scrim" id="link-modal" hidden>
+  <div class="modal">
+    <h2 data-i18n="link_modal_title">Open a link</h2>
+    <p class="note" id="link-pair"></p>
+    <p class="note" data-i18n="link_permission_note">A link is a recorded permission in the journal;
+      it does not open a communication channel yet.</p>
+    <label class="field"><span data-i18n="link_type_label">Type</span></label>
+    <label><input type="radio" name="link-type" id="link-type-ask" value="ask" checked>
+      <span data-i18n="link_type_ask">Ask — may put questions to this role</span></label>
+    <label><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
+      <span data-i18n="link_type_handoff">Hand off work — may pass work to this role</span></label>
+    <label class="field"><span data-i18n="link_deadline_label">Deadline, hours</span>
+      <input type="number" id="link-hours" min="1" max="168" value="24">
+      <small class="note" data-i18n="link_deadline_note">Informative — required by the record, not
+        enforced by a timer.</small></label>
+    <label class="field"><span data-i18n="link_reason_label">Why this link</span>
+      <input type="text" id="link-reason" autocomplete="off"></label>
+    <div class="actions">
+      <button type="button" id="link-open-go" data-i18n="link_open_button">Open the link</button>
+      <button type="button" id="link-cancel" data-i18n="hire_cancel">Cancel</button>
+    </div>
+    <p class="result" id="link-result"></p>
+  </div>
+</div>
+<div class="scrim" id="close-link-modal" hidden>
+  <div class="modal">
+    <h2 data-i18n="link_close_title">Close this link?</h2>
+    <p class="note" id="close-link-pair"></p>
+    <p class="note" data-i18n="link_close_note">Closing is a recorded state change — the journal keeps
+      the link's history. Nothing is deleted.</p>
+    <label class="field"><span data-i18n="link_close_reason">Why close it</span>
+      <input type="text" id="close-link-reason" autocomplete="off"></label>
+    <div class="actions">
+      <button type="button" id="close-link-go" data-i18n="link_close_button">Close the link</button>
+      <button type="button" id="close-link-cancel" data-i18n="hire_cancel">Cancel</button>
+    </div>
+    <p class="result" id="close-link-result"></p>
   </div>
 </div>
 <script nonce="__CSP_NONCE__">
@@ -795,6 +856,24 @@ const STRINGS = {
     mcp_tools_word: "tools",
     update_next_run: "holders pick this up on their next run:",
     saved_to: "Saved to",
+    links_tab: "Links",
+    links_note: "Recorded permissions between this role and others. Closing keeps the history; nothing is deleted.",
+    links_none: "No links yet. Drag a port on the card's edge to another role — or approve one a role proposes.",
+    link_modal_title: "Open a link",
+    link_permission_note: "A link is a recorded permission in the journal; it does not open a communication channel yet.",
+    link_type_label: "Type",
+    link_type_ask: "Ask — may put questions to this role",
+    link_type_handoff: "Hand off work — may pass work to this role",
+    link_deadline_label: "Deadline, hours",
+    link_deadline_note: "Informative — required by the record, not enforced by a timer.",
+    link_reason_label: "Why this link",
+    link_open_button: "Open the link",
+    link_close_button: "Close the link",
+    link_close_title: "Close this link?",
+    link_close_note: "Closing is a recorded state change — the journal keeps the link's history. Nothing is deleted.",
+    link_close_reason: "Why close it",
+    config_broken_kind: "will not launch",
+    config_broken_msg: "granted skills missing from the catalogue:",
   },
   ru: {
     tab_attention: "Внимание",
@@ -1014,6 +1093,24 @@ const STRINGS = {
     mcp_tools_word: "туллов",
     update_next_run: "держатели получат при следующем запуске:",
     saved_to: "Сохранено в",
+    links_tab: "Связи",
+    links_note: "Записанные разрешения между этой ролью и другими. Закрытие сохраняет историю; ничего не удаляется.",
+    links_none: "Связей пока нет. Протяните точку с края карточки к другой роли — или подтвердите предложенную ролью.",
+    link_modal_title: "Открыть связь",
+    link_permission_note: "Связь — запись разрешения в журнале; канал общения она пока не открывает.",
+    link_type_label: "Тип",
+    link_type_ask: "Спросить — может задавать вопросы этой роли",
+    link_type_handoff: "Передать работу — может передавать работу этой роли",
+    link_deadline_label: "Срок, часов",
+    link_deadline_note: "Информативный — обязателен для записи, таймером не исполняется.",
+    link_reason_label: "Зачем эта связь",
+    link_open_button: "Открыть связь",
+    link_close_button: "Закрыть связь",
+    link_close_title: "Закрыть связь?",
+    link_close_note: "Закрытие — записанная смена состояния; журнал сохраняет историю связи. Ничего не удаляется.",
+    link_close_reason: "Почему закрываете",
+    config_broken_kind: "не запустится",
+    config_broken_msg: "выданы скиллы, которых нет в каталоге:",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -1185,7 +1282,11 @@ function render(graph) {
   document.getElementById("onboarding").hidden =
     graph.nodes.length > 0 || !writesEnabled;
   while (viewport.firstChild) { viewport.removeChild(viewport.firstChild); }
-  const layoutResult = layout(graph.nodes);
+  // A closed link leaves the board (its history stays in the Links tab); the
+  // edges that referenced it drop with it, position-less.
+  const visibleNodes = graph.nodes.filter(
+    (node) => !(node.kind === "agent_link" && node.state === "closed"));
+  const layoutResult = layout(visibleNodes);
   const positions = layoutResult.placed;
   const focus = focused ? neighboursOf(graph, focused) : null;
   paintFocusChrome(focus);
@@ -1241,13 +1342,17 @@ function render(graph) {
     );
     // Permanent: standing structure, who reports to whom.  Temporary: one
     // exchange bound to a single attempt.  The projection decides which.
-    let edgeClass = edge.relation === "temporary" ? "edge comm" : "edge";
+    // Permission (an opened link, dashed accent) is never confused with
+    // provenance (who created whom, solid and quiet).
+    let edgeClass = edge.kind === "reports_to" ? "edge hier"
+      : (edge.kind === "link_from" || edge.kind === "link_to") ? "edge link"
+      : edge.relation === "temporary" ? "edge comm" : "edge";
     if (focus) { edgeClass += focus.edges.has(edge.id) ? " incident" : " faded"; }
     path.setAttribute("class", edgeClass);
     edgeLayer.appendChild(path);
   }
 
-  for (const node of graph.nodes) {
+  for (const node of visibleNodes) {
     const position = positions.get(node.id);
     const group = document.createElementNS(SVGNS, "g");
     let nodeClass = "node" + (node.stale ? " stale" : "") +
@@ -1259,6 +1364,9 @@ function render(graph) {
     if (node.awaits_human) { nodeClass += " awaits"; }
     if (node.kind === "agent") { nodeClass += " role"; }
     group.setAttribute("class", nodeClass);
+    group.setAttribute("data-node-id", node.id);
+    group.setAttribute("data-node-kind", node.kind);
+    group.setAttribute("data-node-state", node.state || "");
     group.setAttribute("transform", "translate(" + position.x + "," + position.y + ")");
 
     const rect = document.createElementNS(SVGNS, "rect");
@@ -1292,6 +1400,23 @@ function render(graph) {
       inspect(node);
       render(graph);
     });
+    // Four link ports on an active role (Miro-style): drag one to another
+    // role to open a recorded link.  Writes only — the ports ARE the promise.
+    if (node.kind === "agent" && node.state === "active" && writesEnabled) {
+      for (const [px, py] of [[W / 2, 0], [W, H / 2], [W / 2, H], [0, H / 2]]) {
+        const port = document.createElementNS(SVGNS, "circle");
+        port.setAttribute("class", "portc");
+        port.setAttribute("cx", px);
+        port.setAttribute("cy", py);
+        port.setAttribute("r", 5);
+        port.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+          event.preventDefault();
+          startLinkDrag(node, event);
+        });
+        group.appendChild(port);
+      }
+    }
     // Right-click is the shortcut into the same drawer: select the node and
     // land on Settings for a role, Record otherwise (redesign, item 1).
     group.addEventListener("contextmenu", (event) => {
@@ -1355,7 +1480,7 @@ let currentRole = null;
 // (chat, attention), the drawer holds the selected entity (record, settings,
 // run, message), the centre holds views, and hire is a modal off the board.
 const DOCK_PANELS = ["chat", "attention"];
-const DRAWER_PANELS = ["record", "settings", "run", "message"];
+const DRAWER_PANELS = ["record", "settings", "links", "run", "message"];
 
 function switchGroup(groupId, name) {
   for (const button of document.querySelectorAll("#" + groupId + " button")) {
@@ -1442,6 +1567,171 @@ document.getElementById("setting-skills").addEventListener("change", () => {
     selectedValues(document.getElementById("setting-skills")).length <= 3;
 });
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
+
+// --- board links: drag a port, drop on a role, record the permission -------
+// The rubber band lives in a screen-space overlay, so pan/zoom math never
+// touches it; the domain stays the judge of what a valid link is.
+let linkDragFrom = null;
+
+async function refreshGraph() {
+  try {
+    const graph = await api("/api/graph");
+    paintChrome(graph);
+    render(graph);
+  } catch (error) { /* the stream will repaint on its next snapshot */ }
+}
+
+function startLinkDrag(node, event) {
+  linkDragFrom = node;
+  const band = document.getElementById("linkband");
+  const bounds = band.parentElement.getBoundingClientRect();
+  const x0 = event.clientX - bounds.left, y0 = event.clientY - bounds.top;
+  band.hidden = false;
+  const trace = (move) => {
+    const x = move.clientX - bounds.left, y = move.clientY - bounds.top;
+    band.firstElementChild.setAttribute("d", "M " + x0 + " " + y0 + " L " + x + " " + y);
+  };
+  const finish = (up) => {
+    document.removeEventListener("pointermove", trace);
+    band.hidden = true;
+    band.firstElementChild.setAttribute("d", "");
+    const target = document.elementFromPoint(up.clientX, up.clientY);
+    const group = target && target.closest ? target.closest("g.node") : null;
+    const from = linkDragFrom;
+    linkDragFrom = null;
+    if (!group || !from) { return; }
+    if (group.getAttribute("data-node-kind") !== "agent") { return; }
+    if (group.getAttribute("data-node-state") !== "active") { return; }
+    const toId = group.getAttribute("data-node-id");
+    if (!toId || toId === from.id) { return; }
+    openLinkModal(from.id, toId);
+  };
+  document.addEventListener("pointermove", trace);
+  document.addEventListener("pointerup", finish, { once: true });
+}
+
+let linkPair = null;
+
+function agentLabel(agentId) {
+  const node = ((lastGraph && lastGraph.nodes) || []).find((n) => n.id === agentId);
+  return node && node.label ? node.label : agentId;
+}
+
+function openLinkModal(fromId, toId) {
+  linkPair = { from: fromId, to: toId };
+  document.getElementById("link-pair").textContent =
+    agentLabel(fromId) + " → " + agentLabel(toId);
+  document.getElementById("link-type-ask").checked = true;
+  document.getElementById("link-hours").value = "24";
+  document.getElementById("link-reason").value = "";
+  document.getElementById("link-result").textContent = "";
+  document.getElementById("link-modal").hidden = false;
+}
+
+document.getElementById("link-cancel").addEventListener("click", () => {
+  document.getElementById("link-modal").hidden = true;
+});
+document.getElementById("link-open-go").addEventListener("click", async () => {
+  if (!linkPair) { return; }
+  const result = document.getElementById("link-result");
+  try {
+    await post("/api/agent-links", {
+      from_agent_id: linkPair.from,
+      to_agent_id: linkPair.to,
+      allowed_action:
+        document.getElementById("link-type-handoff").checked ? "handoff_work" : "ask",
+      deadline_seconds: Number(document.getElementById("link-hours").value || 24) * 3600,
+      reason: document.getElementById("link-reason").value,
+    });
+    document.getElementById("link-modal").hidden = true;
+    await refreshGraph();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+});
+
+// Closing is a recorded state change with a reason — never a delete.
+let closingLink = null;
+
+function openCloseLinkModal(linkId, pairText) {
+  closingLink = linkId;
+  document.getElementById("close-link-pair").textContent = pairText || linkId;
+  document.getElementById("close-link-reason").value = "";
+  document.getElementById("close-link-result").textContent = "";
+  document.getElementById("close-link-modal").hidden = false;
+}
+
+document.getElementById("close-link-cancel").addEventListener("click", () => {
+  document.getElementById("close-link-modal").hidden = true;
+});
+document.getElementById("link-close-btn").addEventListener("click", () => {
+  if (selected) {
+    openCloseLinkModal(selected, document.getElementById("inspector-title").textContent);
+  }
+});
+document.getElementById("close-link-go").addEventListener("click", async () => {
+  if (!closingLink) { return; }
+  const result = document.getElementById("close-link-result");
+  try {
+    // The close names the revision it closes: fetch the record it races.
+    const payload = await api("/api/entities/agent_link/" + encodeURIComponent(closingLink));
+    await post("/api/agent-links/" + encodeURIComponent(closingLink) + "/close", {
+      expected_revision: payload.record.revision,
+      reason: document.getElementById("close-link-reason").value,
+    });
+    document.getElementById("close-link-modal").hidden = true;
+    if (selected === closingLink) { closeDrawer(); }
+    closingLink = null;
+    await refreshGraph();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+});
+
+// The guaranteed close path without pixel-hunting: the role's Links tab.
+function paintLinks(agentId) {
+  const host = document.getElementById("links-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const graph = lastGraph;
+  if (!graph) { return; }
+  const linksById = new Map();
+  for (const edge of graph.edges) {
+    if (edge.kind !== "link_from" && edge.kind !== "link_to") { continue; }
+    const entry = linksById.get(edge.from) || {};
+    entry[edge.kind] = edge.to;
+    entry.allowed_action = (edge.attrs || {}).allowed_action || entry.allowed_action;
+    linksById.set(edge.from, entry);
+  }
+  let any = false;
+  for (const [linkId, entry] of linksById) {
+    if (entry.link_from !== agentId && entry.link_to !== agentId) { continue; }
+    const node = graph.nodes.find((n) => n.id === linkId) || {};
+    any = true;
+    const row = document.createElement("div");
+    row.className = "attn-item";
+    const head = document.createElement("span");
+    const pair = agentLabel(entry.link_from) + " → " + agentLabel(entry.link_to);
+    head.textContent = pair + " · " + (entry.allowed_action || "?") +
+      " · " + (node.state || "?");
+    row.appendChild(head);
+    if (writesEnabled && node.state === "open") {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = t("link_close_button");
+      close.addEventListener("click", () => openCloseLinkModal(linkId, pair));
+      row.appendChild(close);
+    }
+    host.appendChild(row);
+  }
+  if (!any) {
+    const none = document.createElement("p");
+    none.className = "note";
+    none.textContent = t("links_none");
+    host.appendChild(none);
+  }
+}
 
 // The editor's live preview is the exact line the launch composes for a skill,
 // and the counter names the ceiling before the server refuses it.
@@ -1725,6 +2015,11 @@ async function inspect(node) {
   // active (non-preset) role that can actually be staffed.
   runTab.hidden = !(isRole && launchEnabled && node.state === "active" &&
     !(node.attrs && node.attrs.template));
+  const linksTab = document.querySelector('#drawer-tabs button[data-panel="links"]');
+  linksTab.hidden = !isRole;
+  if (isRole) { paintLinks(node.id); }
+  document.getElementById("link-close-btn").hidden =
+    !(node.kind === "agent_link" && writesEnabled && node.state === "open");
   document.getElementById("run-result").textContent = "";
   showPanel("record");
   currentRole = null;
@@ -1877,8 +2172,19 @@ function renderAttentionItem(item) {
   kind.className = "attn-kind";
   kind.textContent = item.kind === "run_blocked" ? t("run_waiting")
     : item.kind === "proposal" ? t("role_proposal")
+    : item.kind === "config_broken" ? t("config_broken_kind")
     : (item.thread_type || t("needs_decision"));
   card.appendChild(kind);
+
+  if (item.kind === "config_broken") {
+    // The catalogue can be edited by hand outside the panel; a role holding a
+    // vanished skill fails its NEXT launch — warn before any run, with names.
+    const head = document.createElement("span");
+    head.textContent = (item.name || item.agent_id) + " — " +
+      t("config_broken_msg") + " " + (item.missing_skills || []).join(", ");
+    card.appendChild(head);
+    return card;
+  }
 
   if (item.kind === "run_blocked") {
     const head = document.createElement("span");

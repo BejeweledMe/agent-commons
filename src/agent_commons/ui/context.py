@@ -519,6 +519,34 @@ class UIContext:
                     "proposal": dict(proposal) if is_proposal else None,
                 }
             )
+        # Wave 1 item 8: a role holding a skill the catalogue no longer defines
+        # will fail its NEXT launch fail-closed.  Surface that here, before any
+        # run — the catalogue can be edited by hand, outside the panel.
+        if self._catalog_path is not None:
+            from agent_commons.catalog import catalog_ids
+
+            try:
+                known = catalog_ids(
+                    load_role_catalog(self._catalog_path, workspace_root=self.repo),
+                    "skills",
+                )
+            except CommonsError:
+                known = None
+            if known is not None:
+                for agent_id, record in sorted(snapshot.agents.items()):
+                    if record.get("state") != "active":
+                        continue
+                    missing = sorted(set(record.get("skills") or ()) - known)
+                    if missing:
+                        items.append(
+                            {
+                                "kind": "config_broken",
+                                "id": agent_id,
+                                "agent_id": agent_id,
+                                "name": record.get("name"),
+                                "missing_skills": missing,
+                            }
+                        )
         return {
             "items": [bounded_copy(item) for item in items],
             "count": len(items),
