@@ -427,29 +427,31 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <div id="catalog-editor" hidden>
       <p class="note warn" id="catalog-warning"></p>
-      <h3 class="subhead" data-i18n="catalog_add_heading">Add or replace an entry</h3>
-      <label class="field"><span data-i18n="catalog_kind_label">Kind</span>
-        <select id="catalog-section">
-          <option value="skills" data-i18n="catalog_option_skill">Skill — instructions every run of the role receives</option>
-          <option value="tools" data-i18n="catalog_option_tool">Tool — one of the profile's tools a role may keep</option>
-        </select></label>
-      <label class="field"><span data-i18n="catalog_id_label">Short id (lowercase, no spaces)</span>
-        <input type="text" id="catalog-id" autocomplete="off"></label>
-      <label class="field"><span data-i18n="catalog_title_label">Name people will see</span>
-        <input type="text" id="catalog-title" autocomplete="off"></label>
-      <label class="field"><span data-i18n="catalog_desc_label">What it is for</span>
-        <input type="text" id="catalog-description" autocomplete="off"></label>
-      <label class="field" id="catalog-instruction-field">
-        <span data-i18n="catalog_instruction_label">Instructions given to the agent (skills only)</span>
-        <textarea id="catalog-instruction"
-          data-i18n-placeholder="catalog_instruction_hint"></textarea>
-        <span class="note" id="catalog-counter"></span></label>
-      <div class="field" id="catalog-preview-field" hidden>
-        <span data-i18n="catalog_preview_label">Exactly what the model will receive</span>
-        <pre id="catalog-preview"></pre>
+      <div id="catalog-form">
+        <h3 class="subhead" data-i18n="catalog_add_heading">Add or replace an entry</h3>
+        <label class="field"><span data-i18n="catalog_kind_label">Kind</span>
+          <select id="catalog-section">
+            <option value="skills" data-i18n="catalog_option_skill">Skill — instructions every run of the role receives</option>
+            <option value="tools" data-i18n="catalog_option_tool">Tool — one of the profile's tools a role may keep</option>
+          </select></label>
+        <label class="field"><span data-i18n="catalog_id_label">Short id (lowercase, no spaces)</span>
+          <input type="text" id="catalog-id" autocomplete="off"></label>
+        <label class="field"><span data-i18n="catalog_title_label">Name people will see</span>
+          <input type="text" id="catalog-title" autocomplete="off"></label>
+        <label class="field"><span data-i18n="catalog_desc_label">What it is for</span>
+          <input type="text" id="catalog-description" autocomplete="off"></label>
+        <label class="field" id="catalog-instruction-field">
+          <span data-i18n="catalog_instruction_label">Instructions given to the agent (skills only)</span>
+          <textarea id="catalog-instruction"
+            data-i18n-placeholder="catalog_instruction_hint"></textarea>
+          <span class="note" id="catalog-counter"></span></label>
+        <div class="field" id="catalog-preview-field" hidden>
+          <span data-i18n="catalog_preview_label">Exactly what the model will receive</span>
+          <pre id="catalog-preview"></pre>
+        </div>
+        <button type="button" id="catalog-save" data-i18n="catalog_save">Save entry</button>
+        <p class="result" id="catalog-result"></p>
       </div>
-      <button type="button" id="catalog-save" data-i18n="catalog_save">Save entry</button>
-      <p class="result" id="catalog-result"></p>
     </div>
   </div>
 
@@ -944,6 +946,8 @@ const STRINGS = {
     preset_create_button: "Create a template…",
     preset_create_title: "New template",
     preset_saved: "template saved",
+    preset_save_button: "Save the template",
+    err_field_empty: "The “{field}” field cannot be empty.",
     hire_mode_label: "How",
     hire_mode_new: "A new agent — set it up from scratch",
     hire_mode_preset: "From the agent catalogue — a ready template",
@@ -1207,6 +1211,8 @@ const STRINGS = {
     preset_create_button: "Создать шаблон…",
     preset_create_title: "Новый шаблон",
     preset_saved: "шаблон сохранён",
+    preset_save_button: "Сохранить шаблон",
+    err_field_empty: "Поле «{field}» не может быть пустым.",
     hire_mode_label: "Как нанимаем",
     hire_mode_new: "Нового агента — настроить с нуля",
     hire_mode_preset: "Из каталога агентов — готовый шаблон",
@@ -1277,6 +1283,21 @@ async function post(path, body) {
       (t("request_failed") + " " + response.status));
   }
   return payload;
+}
+
+// The canonical refusal stays verbatim — that is the project's contract — but
+// the bare "<field> must be a non-empty string" names a wire field, not the
+// label the operator is looking at.  For that one known shape, lead with the
+// field's own label and keep the canonical text in brackets; any other
+// refusal passes through untouched (round 2, PM findings).
+function humanizeError(error, fieldLabels) {
+  const message = String(error.message || error);
+  const match = message.match(/^([a-z0-9_.\[\]]+) must be a non-empty string$/);
+  if (match && fieldLabels && fieldLabels[match[1]]) {
+    return t("err_field_empty").replace("{field}", t(fieldLabels[match[1]])) +
+      " (" + message + ")";
+  }
+  return message;
 }
 
 async function api(path) {
@@ -1632,18 +1653,50 @@ function applyHireMode() {
   document.getElementById("hire-grants").hidden = fromPreset;
 }
 
+// A catalogue hire still requires a non-empty rationale, and the template
+// already carries one: pull it into the editable field so the operator can
+// amend it instead of retyping it (round 2, PM findings).  "— none —" leaves
+// the field alone.
+function prefillPresetRationale() {
+  const presetId = document.getElementById("hire-preset").value;
+  const preset = ((catalog && catalog.presets) || [])
+    .find((entry) => entry.id === presetId);
+  if (preset) {
+    document.getElementById("hire-rationale").value = preset.rationale || "";
+  }
+}
+
 function showHire(open, options) {
   document.getElementById("hire-modal").hidden = !open;
   if (!open) { return; }
   const values = options || {};
   hireTemplate = Boolean(values.template);
+  // The modal is reused, so values from the previous opening leaked into the
+  // next one (round 2, PM findings).  Reset every field to its blank default
+  // first; what THIS opening asks for is applied below.
+  document.getElementById("hire-name").value = "";
+  document.getElementById("hire-rationale").value = "";
+  document.getElementById("hire-turnover_budget").value = "";
+  document.getElementById("hire-create_roles").value = "deny";
+  document.getElementById("hire-retire_roles").value = "deny";
+  document.getElementById("hire-open_links").value = "deny";
+  document.getElementById("hire-context_mode").value = "fresh";
+  document.getElementById("hire-mode").value = "new";
+  document.getElementById("hire-preset").value = "";
   // A template IS a from-scratch definition; hiring from one is the fast path.
   document.getElementById("hire-mode-field").hidden = hireTemplate;
   document.getElementById("hire-title").textContent =
     hireTemplate ? t("preset_create_title") : t("tab_hire");
+  // The button names what the click records: saving a template is not a hire.
+  // The dataset marker moves with it so a language switch keeps the right
+  // verb instead of restoring "Hire" (round 2, PM findings).
+  const save = document.getElementById("hire-save");
+  save.dataset.i18n = hireTemplate ? "preset_save_button" : "hire_button";
+  save.textContent = t(save.dataset.i18n);
   if (values.presetId) {
     document.getElementById("hire-mode").value = "preset";
     document.getElementById("hire-preset").value = values.presetId;
+    prefillPresetRationale();
   } else if (hireTemplate) {
     document.getElementById("hire-mode").value = "new";
   }
@@ -1712,6 +1765,7 @@ document.getElementById("setting-skills").addEventListener("change", () => {
 });
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
+document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
 document.getElementById("preset-create").addEventListener("click", () =>
   showHire(true, { template: true }));
 
@@ -1749,7 +1803,7 @@ document.getElementById("task-create-go").addEventListener("click", async () => 
     if (launchEnabled) { loadLaunch(); }
   } catch (error) {
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    result.textContent = humanizeError(error, { title: "task_title_label" });
   }
 });
 
@@ -1842,7 +1896,7 @@ document.getElementById("link-open-go").addEventListener("click", async () => {
     await refreshGraph();
   } catch (error) {
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    result.textContent = humanizeError(error, { reason: "link_reason_label" });
   }
 });
 
@@ -1881,7 +1935,7 @@ document.getElementById("close-link-go").addEventListener("click", async () => {
     await refreshGraph();
   } catch (error) {
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    result.textContent = humanizeError(error, { reason: "link_close_reason" });
   }
 });
 
@@ -2245,7 +2299,14 @@ async function hireRole() {
     // The refusal names the guard it tripped — a missing budget, a wider grant
     // than allowed — which is exactly what the operator needs to fix.
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    // A catalogue hire with no template chosen trips profile_id on the wire,
+    // but the field the operator left empty is "Template" (round 2, PM
+    // findings).
+    result.textContent = humanizeError(error, {
+      name: "hire_name_label",
+      rationale: "hire_rationale_label",
+      profile_id: fromPreset ? "hire_preset_label" : "hire_profile_label",
+    });
   }
 }
 
@@ -2362,7 +2423,10 @@ document.getElementById("settings-save").addEventListener("click", async () => {
     result.textContent = t("recorded");
   } catch (error) {
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    result.textContent = humanizeError(error, {
+      reason: "setting_reason_label",
+      "changes.name": "setting_name_label",
+    });
   }
 });
 
@@ -2752,7 +2816,10 @@ function paintCatalog() {
       host.appendChild(row);
     }
   }
-  document.getElementById("catalog-save").hidden = !catalogEditing;
+  // Read-only mode shows the banner alone: a live form under a "read only"
+  // notice invited edits that could only end in a refusal, so the whole form
+  // hides, not just its save button (round 2, PM findings).
+  document.getElementById("catalog-form").hidden = !catalogEditing;
   paintProfileReference();
   paintPresets();
 }
