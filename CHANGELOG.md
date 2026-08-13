@@ -35,6 +35,20 @@ Versioning once a stable release line is declared.
   only the fields that choice needs. Hiring from a template sends only
   `from_preset_id`, inheriting profile, permissions and budget, guarded by an
   HTTP test.
+- **A cold-run usability round drove nine fixes.** An independent PM-style
+  walkthrough (no source access, browser only) found the gaps a newcomer
+  actually hits, and the panel answers them: tasks are created from the board
+  (`POST /api/tasks` + a "+ Task" button beside hire — the chat form records a
+  thread, not a task, and could not put work on the board), the board's
+  buttons became a toolbar row so floating chrome can never cover a card's
+  link ports (a real drag died on exactly that), a link drop snaps to the
+  nearest role within reach instead of demanding a pixel-exact release, the
+  Links tab offers a button path ("Open a link with…") beside the drag, an
+  empty agent catalogue disables the "from the catalogue" hire mode with its
+  reason instead of a raw refusal, the catalogue editor no longer bleeds onto
+  other library views, Runs show role and task names with the run's canonical
+  summary line (ids stay in the tooltip), the header's trust wording collapsed
+  into an ⓘ tooltip, and the hire form's terms carry translated tooltips.
 - **Demo mode closes the loop without a provider.** `demo: true` in the
   operator runtime config swaps the provider CLI for a DemoRunner at the same
   runner seam: an implementation run completes with an honest

@@ -180,15 +180,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .doc li{font-size:13px; margin:0 0 5px}
 .listwrap{max-width:680px; margin:0 auto; padding:28px 24px 64px}
 .listwrap h1{font-size:16px; font-weight:650; margin:0 0 4px}
-/* Top-left, where reading starts (operator feedback), and the glyph is
-   grid-centred so no font metric can push it past the circle. */
+/* Top-left, where reading starts (operator feedback) — as a toolbar ROW that
+   takes real layout space, so floating chrome can never sit on top of a card
+   and eat its link ports (a real drag died on exactly that). */
+#view-board{display:flex; flex-direction:column}
+#view-board #canvas{flex:1; min-height:0}
+.board-bar{display:flex; gap:10px; align-items:center; padding:9px 14px; flex:none}
 #fab{
-  position:absolute; left:16px; top:12px; width:40px; height:40px;
+  width:36px; height:36px;
   border-radius:50%; background:var(--info); color:#0d1117; border:none;
-  font-size:20px; line-height:0; display:grid; place-items:center; padding:0;
-  cursor:pointer; z-index:5;
+  font-size:19px; line-height:0; display:grid; place-items:center; padding:0;
+  cursor:pointer;
 }
 #fab:hover{filter:brightness(1.1)}
+#task-fab{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:999px;
+  padding:7px 12px; font-size:12px; color:var(--fg); cursor:pointer;
+}
+#task-fab:hover{border-color:var(--info)}
 .dock-tabs{
   display:flex; gap:2px; padding:8px 10px 0; border-bottom:1px solid var(--border);
   flex:none;
@@ -291,6 +300,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
   <div id="center">
     <section class="view open" id="view-board">
+      <div class="board-bar">
+        <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
+        <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
+      </div>
       <svg id="canvas" role="img" aria-label="workspace graph"></svg>
       <div id="onboarding" hidden>
         <div class="onb-card">
@@ -308,7 +321,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first agent</button>
         </div>
       </div>
-      <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
       <svg id="linkband" hidden><path d=""></path></svg>
     </section>
 
@@ -492,6 +504,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <section class="panel" id="panel-links">
       <p class="note" data-i18n="links_note">Recorded permissions between this role and others.
         Closing keeps the history; nothing is deleted.</p>
+      <div class="actions" id="link-open-row" hidden>
+        <select id="link-open-with"></select>
+        <button type="button" id="link-open-with-go" data-i18n="link_open_with">Open a link with…</button>
+      </div>
       <div id="links-list"></div>
     </section>
 
@@ -592,11 +608,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <select id="hire-preset"></select></label>
       <label class="field"><span data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
-      <label class="field" id="hire-profile-field"><span data-i18n="hire_profile_label">Profile</span>
+      <label class="field" id="hire-profile-field"><span data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
         <select id="hire-profile"></select></label>
       <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
-      <label class="field" id="hire-context-field"><span data-i18n="hire_context_label">Context</span>
+      <label class="field" id="hire-context-field"><span data-i18n="hire_context_label" data-i18n-title="tip_hire_context">Context</span>
         <select id="hire-context_mode"></select></label>
       <div class="grants" id="hire-grants">
         <label class="field"><span data-i18n="create_roles_label">Create roles</span>
@@ -605,7 +621,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <select id="hire-retire_roles"></select></label>
         <label class="field"><span data-i18n="open_links_label">Open links</span>
           <select id="hire-open_links"></select></label>
-        <label class="field"><span data-i18n="hire_budget_label">Turnover budget (blank = none)</span>
+        <label class="field"><span data-i18n="hire_budget_label" data-i18n-title="tip_hire_budget">Turnover budget (blank = none)</span>
           <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
       </div>
       <div class="actions">
@@ -614,6 +630,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
       <p class="result" id="hire-result"></p>
     </section>
+  </div>
+</div>
+<div class="scrim" id="task-modal" hidden>
+  <div class="modal">
+    <h2 data-i18n="task_modal_title">New task</h2>
+    <p class="note" data-i18n="task_modal_note">A task is what a role gets run on: what to do, and how
+      we will know it is done. It lands on the board and in the history.</p>
+    <label class="field"><span data-i18n="task_title_label">Title</span>
+      <input type="text" id="task-title" autocomplete="off"></label>
+    <label class="field"><span data-i18n="task_desc_label">What to do</span>
+      <textarea id="task-desc"></textarea></label>
+    <label class="field"><span data-i18n="task_criteria_label">Done when (one criterion per line)</span>
+      <textarea id="task-criteria"></textarea></label>
+    <div class="actions">
+      <button type="button" id="task-create-go" data-i18n="task_create_button">Create the task</button>
+      <button type="button" id="task-cancel" data-i18n="hire_cancel">Cancel</button>
+    </div>
+    <p class="result" id="task-result"></p>
   </div>
 </div>
 <div class="scrim" id="link-modal" hidden>
@@ -914,6 +948,20 @@ const STRINGS = {
     hire_mode_new: "A new agent — set it up from scratch",
     hire_mode_preset: "From the agent catalogue — a ready template",
     hire_budget_short: "budget",
+    task_fab: "+ Task",
+    tip_task_fab: "Create a task: what to do and how we will know it is done.",
+    task_modal_title: "New task",
+    task_modal_note: "A task is what a role gets run on: what to do, and how we will know it is done. It lands on the board and in the history.",
+    task_title_label: "Title",
+    task_desc_label: "What to do",
+    task_criteria_label: "Done when (one criterion per line)",
+    task_create_button: "Create the task",
+    task_created: "task recorded",
+    link_open_with: "Open a link with…",
+    trust_short: "ⓘ trust model",
+    tip_hire_profile: "The profile fixes the provider, model and tool set. Profiles are operator-owned and never edited from the panel.",
+    tip_hire_context: "fresh — every run starts clean; accumulated — the role keeps context between runs (weaker isolation, needs a recorded reason to switch later).",
+    tip_hire_budget: "How many role creations and retirements this role may perform itself. Blank means none.",
   },
   ru: {
     tab_attention: "Внимание",
@@ -1163,6 +1211,20 @@ const STRINGS = {
     hire_mode_new: "Нового агента — настроить с нуля",
     hire_mode_preset: "Из каталога агентов — готовый шаблон",
     hire_budget_short: "бюджет",
+    task_fab: "+ Задача",
+    tip_task_fab: "Создать задачу: что сделать и как поймём, что готово.",
+    task_modal_title: "Новая задача",
+    task_modal_note: "Задача — то, на чём запускают роль: что сделать и как поймём, что готово. Она появится на борде и в истории.",
+    task_title_label: "Название",
+    task_desc_label: "Что сделать",
+    task_criteria_label: "Готово, когда (по одному критерию в строке)",
+    task_create_button: "Создать задачу",
+    task_created: "задача записана",
+    link_open_with: "Открыть связь с…",
+    trust_short: "ⓘ модель доверия",
+    tip_hire_profile: "Профиль фиксирует провайдера, модель и набор инструментов. Профили принадлежат оператору и из панели не редактируются.",
+    tip_hire_context: "fresh — каждый запуск с чистого листа; accumulated — роль копит контекст между запусками (слабее изоляция, смена позже требует записанной причины).",
+    tip_hire_budget: "Сколько созданий и увольнений ролей эта роль может совершить сама. Пусто — ноль.",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -1653,6 +1715,44 @@ document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("preset-create").addEventListener("click", () =>
   showHire(true, { template: true }));
 
+// --- task creation (PM run, finding 3): the chat records a thread, a task is
+// its own record — the board needs both doors, side by side.
+function showTaskModal(open) {
+  document.getElementById("task-modal").hidden = !open;
+  if (open) {
+    document.getElementById("task-result").textContent = "";
+    document.getElementById("task-title").focus();
+  }
+}
+document.getElementById("task-fab").addEventListener("click", () => showTaskModal(true));
+document.getElementById("task-cancel").addEventListener("click", () => showTaskModal(false));
+document.getElementById("task-modal").addEventListener("click", (event) => {
+  if (event.target === document.getElementById("task-modal")) { showTaskModal(false); }
+});
+document.getElementById("task-create-go").addEventListener("click", async () => {
+  const result = document.getElementById("task-result");
+  const criteria = document.getElementById("task-criteria").value
+    .split("\n").map((line) => line.trim()).filter(Boolean);
+  try {
+    const created = await post("/api/tasks", {
+      title: document.getElementById("task-title").value,
+      description: document.getElementById("task-desc").value,
+      acceptance_criteria: criteria,
+    });
+    result.className = "result ok";
+    result.textContent = t("task_created") + " " +
+      (created.entity_ref ? created.entity_ref.id : "");
+    document.getElementById("task-title").value = "";
+    document.getElementById("task-desc").value = "";
+    document.getElementById("task-criteria").value = "";
+    await refreshGraph();
+    if (launchEnabled) { loadLaunch(); }
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+});
+
 // --- board links: drag a port, drop on a role, record the permission -------
 // The rubber band lives in a screen-space overlay, so pan/zoom math never
 // touches it; the domain stays the judge of what a valid link is.
@@ -1680,16 +1780,26 @@ function startLinkDrag(node, event) {
     document.removeEventListener("pointermove", trace);
     band.hidden = true;
     band.firstElementChild.setAttribute("d", "");
-    const target = document.elementFromPoint(up.clientX, up.clientY);
-    const group = target && target.closest ? target.closest("g.node") : null;
     const from = linkDragFrom;
     linkDragFrom = null;
-    if (!group || !from) { return; }
-    if (group.getAttribute("data-node-kind") !== "agent") { return; }
-    if (group.getAttribute("data-node-state") !== "active") { return; }
-    const toId = group.getAttribute("data-node-id");
-    if (!toId || toId === from.id) { return; }
-    openLinkModal(from.id, toId);
+    if (!from) { return; }
+    // Forgiving drop, Miro-style: a stream repaint can shift cards mid-drag,
+    // so a release a few pixels off the edge still counts.  Snap to the
+    // nearest active role card within reach; genuinely empty space cancels.
+    let best = null;
+    for (const group of document.querySelectorAll("g.node.role")) {
+      if (group.getAttribute("data-node-state") !== "active") { continue; }
+      const toId = group.getAttribute("data-node-id");
+      if (!toId || toId === from.id) { continue; }
+      const box = group.getBoundingClientRect();
+      const dx = Math.max(box.left - up.clientX, 0, up.clientX - box.right);
+      const dy = Math.max(box.top - up.clientY, 0, up.clientY - box.bottom);
+      const distance = Math.hypot(dx, dy);
+      if (distance <= 48 && (!best || distance < best.distance)) {
+        best = { id: toId, distance: distance };
+      }
+    }
+    if (best) { openLinkModal(from.id, best.id); }
   };
   document.addEventListener("pointermove", trace);
   document.addEventListener("pointerup", finish, { once: true });
@@ -1781,6 +1891,21 @@ function paintLinks(agentId) {
   while (host.firstChild) { host.removeChild(host.firstChild); }
   const graph = lastGraph;
   if (!graph) { return; }
+  // A button path beside the drag (PM run, finding 7): pick a role, land in
+  // the same link form the rubber band opens.
+  const others = graph.nodes.filter((node) =>
+    node.kind === "agent" && node.state === "active" && node.id !== agentId &&
+    !(node.attrs && node.attrs.template));
+  const row = document.getElementById("link-open-row");
+  row.hidden = !writesEnabled || !others.length;
+  if (!row.hidden) {
+    fillSelect(document.getElementById("link-open-with"),
+      others.map((node) => ({ id: node.id, title: node.label || node.id })), null, false);
+    document.getElementById("link-open-with-go").onclick = () => {
+      const target = document.getElementById("link-open-with").value;
+      if (target) { openLinkModal(agentId, target); }
+    };
+  }
   const linksById = new Map();
   for (const edge of graph.edges) {
     if (edge.kind !== "link_from" && edge.kind !== "link_to") { continue; }
@@ -2021,10 +2146,26 @@ async function loadRuns() {
       (run.delegation_state ? " · " + run.delegation_state : "");
     card.appendChild(kind);
     const head = document.createElement("span");
+    // Names first, ids on demand (PM run, finding 6): the tooltip keeps the
+    // exact identifiers for anyone who needs them.
+    const targetNode = ((lastGraph && lastGraph.nodes) || [])
+      .find((node) => node.id === run.target_id);
     head.textContent = (run.profile_id || "?") +
-      (run.agent_id ? " · " + t("role_word") + " " + run.agent_id : "") +
-      (run.target_id ? " · " + t("on_word") + " " + run.target_kind + " " + run.target_id : "");
+      (run.agent_id ? " · " + t("role_word") + " " + agentLabel(run.agent_id) : "") +
+      (run.target_id
+        ? " · " + t("on_word") + " " +
+          ((targetNode && targetNode.label) || run.target_kind + " " + run.target_id)
+        : "");
+    head.title = (run.agent_id || "") + (run.target_id ? " → " + run.target_id : "");
     card.appendChild(head);
+    if (run.summary) {
+      // The one human-readable line the run left behind (finding 4) — the
+      // canonical delegation summary, agent prose written as text.
+      const summary = document.createElement("p");
+      summary.className = "note";
+      summary.textContent = run.summary;
+      card.appendChild(summary);
+    }
     host.appendChild(card);
   }
 }
@@ -2033,8 +2174,10 @@ async function loadRuns() {
 // launch loop is closed here rather than only in the CLI (M8). The panel could
 // reconfigure, retire, and message a role, but could not create one.
 function paintHire() {
-  // Hiring lives behind the board's + button, not a tab (redesign, item 6).
+  // Hiring lives behind the board's + button, not a tab (redesign, item 6);
+  // creating a task sits right next to it (PM run, finding 3).
   document.getElementById("fab").hidden = !writesEnabled;
+  document.getElementById("task-fab").hidden = !writesEnabled;
   if (!writesEnabled || !catalog) { return; }
   fillSelect(document.getElementById("hire-profile"), catalog.profiles || [], null, false);
   fillSelect(document.getElementById("hire-context_mode"),
@@ -2046,6 +2189,17 @@ function paintHire() {
   const presets = [{ id: "", title: t("preset_none") }].concat(
     (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
   fillSelect(document.getElementById("hire-preset"), presets, "", false);
+  // An empty catalogue disables the whole "from the catalogue" path with its
+  // reason, instead of letting the form run into a raw profile_id refusal
+  // (PM run, finding 2).
+  const presetMode = document.querySelector('#hire-mode option[value="preset"]');
+  const hasPresets = (catalog.presets || []).length > 0;
+  presetMode.disabled = !hasPresets;
+  presetMode.title = hasPresets ? "" : t("presets_none");
+  if (!hasPresets && document.getElementById("hire-mode").value === "preset") {
+    document.getElementById("hire-mode").value = "new";
+    applyHireMode();
+  }
 }
 
 async function hireRole() {
@@ -2551,7 +2705,12 @@ function paintCatalog() {
   // catalogue file — two doors, one store (redesign decision).
   const warning = document.getElementById("catalog-warning");
   const editor = document.getElementById("catalog-editor");
-  editor.hidden = !catalog;
+  // Visible only once mounted into a library slot: unhiding it while it still
+  // sits directly under #center painted it over every other view (PM run,
+  // finding 5 — the editor bled onto Runs).
+  const mounted = editor.parentElement &&
+    /-editor-slot$/.test(editor.parentElement.id || "");
+  editor.hidden = !catalog || !mounted;
   if (!catalog) { return; }
   warning.textContent = catalogEditing
     ? t("catalog_editing_note") + " " + (catalog.catalog_path || t("catalog_default_store")) + "."
@@ -2887,7 +3046,12 @@ function paintStatus() {
     : t("writes_disabled");
   document.title = writesEnabled ? t("title_writes") : t("title_readonly");
   if (metaInfo) {
-    document.getElementById("layers").textContent =
+    // The trust wording is canonical and stays verbatim — but as a tooltip,
+    // not a headline: the most visible line of the screen was security jargon
+    // a newcomer could not parse (PM run, finding 1).
+    const layers = document.getElementById("layers");
+    layers.textContent = t("trust_short");
+    layers.title =
       metaInfo.truth_layers.join(" › ") + " — " + metaInfo.trust_note + t("layers_suffix");
   }
 }

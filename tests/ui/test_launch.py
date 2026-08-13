@@ -228,7 +228,7 @@ def test_a_run_appears_on_the_live_runs_surface_and_moves_the_fingerprint(
     # No transcript/prompt/output field leaked onto the run surface.
     assert set(run) <= {
         "delegation_id", "attempt_id", "phase", "live", "profile_id",
-        "target_kind", "target_id", "agent_id", "delegation_state",
+        "target_kind", "target_id", "agent_id", "delegation_state", "summary",
     }
     # The runtime attempt moved the change detector, so the stream refreshes
     # during a run, not only on canonical events.

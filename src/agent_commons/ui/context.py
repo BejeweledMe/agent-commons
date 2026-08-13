@@ -699,6 +699,15 @@ class UIContext:
                     "target_id": record["correlation"].get("target_id"),
                     "agent_id": delegation.get("agent_id"),
                     "delegation_state": delegation.get("state"),
+                    # The one human-readable line a terminal run leaves behind
+                    # (canonical delegation summary, already public through the
+                    # entity route) — the PM run could not find any result
+                    # without opening raw JSON (finding 4).
+                    "summary": (
+                        str(delegation.get("summary"))[:500]
+                        if delegation.get("summary")
+                        else None
+                    ),
                 }
             )
         # Live runs first, then most-recently-seen; a person watches the moving
@@ -857,6 +866,15 @@ class UIContext:
                 changes.get("tool_allowlist"),
             )
         return manager.reconfigure_agent(agent_id, expected_revision, **fields)
+
+    def create_task(self, **fields: Any) -> dict[str, Any]:
+        """One task, recorded through the same manager the CLI uses.
+
+        The PM cold run's blocker: the chat form looked like task creation but
+        records a thread — a manager could not put work on the board at all.
+        """
+
+        return self.writer().create_task(**fields)
 
     def open_agent_link(self, **fields: Any) -> dict[str, Any]:
         """Open one directed link between two roles — a recorded permission.

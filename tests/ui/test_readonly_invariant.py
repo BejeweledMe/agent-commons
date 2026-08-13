@@ -304,3 +304,32 @@ def test_agent_links_open_and_close_through_the_one_write_path(
     )
     assert shown.status_code == 200
     assert shown.json()["record"]["state"] == "closed"
+
+
+def test_a_task_created_from_the_panel_lands_on_the_board(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """PM cold-run blocker: the chat form records a thread, not a task — a
+    manager could not put work on the board at all. POST /api/tasks is the
+    door, a thin adapter over create_task, sealed into the mutating surface."""
+
+    created = writable_client.post(
+        "/api/tasks",
+        json={
+            "title": "Добавить карту проезда",
+            "description": "Встроить карту на страницу-визитку",
+            "acceptance_criteria": ["на странице есть карта с меткой адреса"],
+        },
+        headers=authorized(),
+    )
+    assert created.status_code == 200, created.text
+    task_id = created.json()["entity_ref"]["id"]
+
+    shown = writable_client.get("/api/entities/task/" + task_id, headers=authorized())
+    assert shown.status_code == 200
+    record = shown.json()["record"]
+    assert record["title"] == "Добавить карту проезда"
+    assert record["state"] == "ready"
+
+    graph = writable_client.get("/api/graph", headers=authorized()).json()
+    assert task_id in {node["id"] for node in graph["nodes"]}

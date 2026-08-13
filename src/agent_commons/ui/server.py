@@ -65,6 +65,7 @@ MUTATING_ROUTES = (
     ("POST", "/api/agents/{agent_id}/messages"),
     ("POST", "/api/agent-links"),
     ("POST", "/api/agent-links/{link_id}/close"),
+    ("POST", "/api/tasks"),
 )
 
 #: Catalogue editing is behind its own gate, so it has its own allowlist.
@@ -354,6 +355,19 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             changes=body.get("changes") or {},
             reason=str(body.get("reason", "")),
             isolation_downgrade_reason=body.get("isolation_downgrade_reason"),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/tasks")
+    async def create_task(request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.create_task,
+            title=str(body.get("title", "")),
+            description=str(body.get("description", "")),
+            acceptance_criteria=tuple(
+                str(item) for item in (body.get("acceptance_criteria") or ())
+            ),
             idempotency_key=body.get("idempotency_key"),
         )
 
