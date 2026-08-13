@@ -218,6 +218,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   content:""; position:absolute; left:8px; right:8px; bottom:-1px; height:2px;
   background:var(--info); border-radius:2px;
 }
+#guide-tabs{padding:0; margin:0 0 18px; flex-wrap:wrap}
 #dock .panel.open{display:block; overflow-y:auto; padding:12px; min-height:0}
 #drawer{
   position:absolute; inset:0; background:var(--surface); z-index:3;
@@ -351,23 +352,102 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-guide">
       <div class="doc">
-        <h1 data-i18n="guide_title">Agent Commons, in short</h1>
-        <p class="dim" data-i18n="guide_sub">Two minutes, top-down, simple first.</p>
-        <h3 data-i18n="guide_what_h">What this is</h3>
-        <p data-i18n="guide_what_p"></p>
-        <h3 data-i18n="guide_how_h">How it fits together</h3>
-        <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
-        <p data-i18n="guide_how_p"></p>
-        <h3 data-i18n="guide_route_h">Your first route</h3>
-        <ol>
-          <li data-i18n="guide_route_1"></li>
-          <li data-i18n="guide_route_2"></li>
-          <li data-i18n="guide_route_3"></li>
-        </ol>
-        <h3 data-i18n="guide_next_h">Once you are comfortable</h3>
-        <p data-i18n="guide_next_p"></p>
-        <h3 data-i18n="guide_never_h">What this panel never does</h3>
-        <p data-i18n="guide_never_p"></p>
+        <!-- The overview as tabs: the short page stays first and untouched; the
+             deeper pages describe the actual backend mechanics, including what
+             is recorded but not yet consumed by the runtime. -->
+        <div class="dock-tabs" id="guide-tabs">
+          <button type="button" data-gpage="brief" aria-selected="true" data-i18n="guide_tab_brief">In short</button>
+          <button type="button" data-gpage="agents" aria-selected="false" data-i18n="guide_tab_agents">Agents and memory</button>
+          <button type="button" data-gpage="tasks" aria-selected="false" data-i18n="guide_tab_tasks">Tasks and runs</button>
+          <button type="button" data-gpage="links" aria-selected="false" data-i18n="guide_tab_links">Links</button>
+          <button type="button" data-gpage="limits" aria-selected="false" data-i18n="guide_tab_limits">Limits and safety</button>
+          <button type="button" data-gpage="catalog" aria-selected="false" data-i18n="guide_tab_catalog">Skills and tools</button>
+        </div>
+        <div id="gpage-brief">
+          <h1 data-i18n="guide_title">Agent Commons, in short</h1>
+          <p class="dim" data-i18n="guide_sub">Two minutes, top-down, simple first.</p>
+          <h3 data-i18n="guide_what_h">What this is</h3>
+          <p data-i18n="guide_what_p"></p>
+          <h3 data-i18n="guide_how_h">How it fits together</h3>
+          <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
+          <p data-i18n="guide_how_p"></p>
+          <h3 data-i18n="guide_route_h">Your first route</h3>
+          <ol>
+            <li data-i18n="guide_route_1"></li>
+            <li data-i18n="guide_route_2"></li>
+            <li data-i18n="guide_route_3"></li>
+          </ol>
+          <h3 data-i18n="guide_next_h">Once you are comfortable</h3>
+          <p data-i18n="guide_next_p"></p>
+          <h3 data-i18n="guide_never_h">What this panel never does</h3>
+          <p data-i18n="guide_never_p"></p>
+        </div>
+        <div id="gpage-agents" hidden>
+          <h3 data-i18n="guide_ag_role_h"></h3>
+          <p data-i18n="guide_ag_role_p"></p>
+          <p class="mono dim" data-i18n="guide_ag_role_ex"></p>
+          <h3 data-i18n="guide_ag_grants_h"></h3>
+          <p data-i18n="guide_ag_grants_p"></p>
+          <p class="mono dim" data-i18n="guide_ag_grants_ex"></p>
+          <h3 data-i18n="guide_ag_memory_h"></h3>
+          <p data-i18n="guide_ag_memory_p"></p>
+          <p class="mono dim" data-i18n="guide_ag_memory_ex"></p>
+          <h3 data-i18n="guide_ag_lineage_h"></h3>
+          <p data-i18n="guide_ag_lineage_p"></p>
+          <p class="mono dim" data-i18n="guide_ag_lineage_ex"></p>
+        </div>
+        <div id="gpage-tasks" hidden>
+          <h3 data-i18n="guide_tk_ledger_h"></h3>
+          <p data-i18n="guide_tk_ledger_p"></p>
+          <p class="mono dim" data-i18n="guide_tk_ledger_ex"></p>
+          <h3 data-i18n="guide_tk_run_h"></h3>
+          <p data-i18n="guide_tk_run_p"></p>
+          <p class="mono dim" data-i18n="guide_tk_run_ex"></p>
+          <h3 data-i18n="guide_tk_accept_h"></h3>
+          <p data-i18n="guide_tk_accept_p"></p>
+          <p class="mono dim" data-i18n="guide_tk_accept_ex"></p>
+          <h3 data-i18n="guide_tk_demo_h"></h3>
+          <p data-i18n="guide_tk_demo_p"></p>
+          <p class="mono dim" data-i18n="guide_tk_demo_ex"></p>
+        </div>
+        <div id="gpage-links" hidden>
+          <h3 data-i18n="guide_ln_record_h"></h3>
+          <p data-i18n="guide_ln_record_p"></p>
+          <p class="mono dim" data-i18n="guide_ln_record_ex"></p>
+          <h3 data-i18n="guide_ln_ask_h"></h3>
+          <p data-i18n="guide_ln_ask_p"></p>
+          <p class="mono dim" data-i18n="guide_ln_ask_ex"></p>
+          <h3 data-i18n="guide_ln_handoff_h"></h3>
+          <p data-i18n="guide_ln_handoff_p"></p>
+          <p class="mono dim" data-i18n="guide_ln_handoff_ex"></p>
+          <h3 data-i18n="guide_ln_deadline_h"></h3>
+          <p data-i18n="guide_ln_deadline_p"></p>
+        </div>
+        <div id="gpage-limits" hidden>
+          <h3 data-i18n="guide_lm_two_h"></h3>
+          <p data-i18n="guide_lm_two_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_two_ex"></p>
+          <h3 data-i18n="guide_lm_queue_h"></h3>
+          <p data-i18n="guide_lm_queue_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_queue_ex"></p>
+          <h3 data-i18n="guide_lm_panel_h"></h3>
+          <p data-i18n="guide_lm_panel_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_panel_ex"></p>
+          <h3 data-i18n="guide_lm_gates_h"></h3>
+          <p data-i18n="guide_lm_gates_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_gates_ex"></p>
+        </div>
+        <div id="gpage-catalog" hidden>
+          <h3 data-i18n="guide_ct_file_h"></h3>
+          <p data-i18n="guide_ct_file_p"></p>
+          <p class="mono dim" data-i18n="guide_ct_file_ex"></p>
+          <h3 data-i18n="guide_ct_skill_h"></h3>
+          <p data-i18n="guide_ct_skill_p"></p>
+          <p class="mono dim" data-i18n="guide_ct_skill_ex"></p>
+          <h3 data-i18n="guide_ct_tools_h"></h3>
+          <p data-i18n="guide_ct_tools_p"></p>
+          <p class="mono dim" data-i18n="guide_ct_tools_ex"></p>
+        </div>
       </div>
     </section>
 
@@ -904,6 +984,68 @@ const STRINGS = {
     guide_next_p: "Links between agents, independent reviews of each other's work, the skills and tools catalogue, role permissions — all of it joins in as you need it, not all at once.",
     guide_never_h: "What this panel never does",
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
+    guide_tab_brief: "In short",
+    guide_tab_agents: "Agents and memory",
+    guide_tab_tasks: "Tasks and runs",
+    guide_tab_links: "Links",
+    guide_tab_limits: "Limits and safety",
+    guide_tab_catalog: "Skills and tools",
+    guide_ag_role_h: "A role is a ledger record",
+    guide_ag_role_p: "Hiring writes one agent.created event: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no store beside the ledger — the current staff list is replayed from events, so history and state cannot disagree.",
+    guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
+    guide_ag_grants_h: "Permissions are derived, never propagated",
+    guide_ag_grants_p: "Three grants — create_roles, retire_roles, open_links — each deny, ask or auto, deny by default. What a role may actually do is effective_grants: the minimum across the role and every creator above it, recomputed on every call, so a downgrade binds work already running; a retired ancestor collapses the whole line to deny. The auto level is deliberately withheld: it is stored as written but takes effect as ask, so every automatic action still asks a person.",
+    guide_ag_grants_ex: "create_roles: ask → the run gets commons_propose_agent; the proposal lands in Attention; only your confirmation records agent.created",
+    guide_ag_memory_h: "What role memory really is",
+    guide_ag_memory_p: "Every run is a fresh provider process with the same bounded instruction; the runtime feeds no accumulated context into a launch, whichever context_mode the role declares. What the mode does today: creation and reconfiguration validate it (a created role cannot be less isolated than its creator; weakening it later requires a recorded isolation_downgrade), and every completed review carries producer_context_mode plus producer_prior_verdict_count — a verdict from an accumulated role never reads as a clean-slate one.",
+    guide_ag_memory_ex: "second review of the same target by the same role → producer_prior_verdict_count: 1 is shown beside the verdict",
+    guide_ag_lineage_h: "Lineage, narrowing, turnover",
+    guide_ag_lineage_p: "A role can only create a narrower role: PROFILE_NARROWING lets a builder create a builder or reviewer of the same provider, a reviewer only reviewers, and cross-provider is unreachable; grants, skills and tool_allowlist cannot widen past the creator. turnover_budget counts creations and explicit retirements below a role together, so a hire-and-fire cycle cannot walk past the ceiling. A task_scoped lifetime retires the role when its task closes — derived on replay, with no agent.retired event anyone could forget to write.",
+    guide_ag_lineage_ex: "codex-independent-reviewer proposes a codex-builder → refused: a created role cannot hold a wider provider profile",
+    guide_tk_ledger_h: "Everything is an event",
+    guide_tk_ledger_p: "The ledger is append-only JSON events; state is a projection replayed from them. Every write revalidates: record_event rebuilds the snapshot, runs validate_transition and a compare-and-swap on expected_revision inside one write lock, so a stale client cannot overwrite a newer record — it gets a legible conflict instead. Corrections and invalidations are themselves new events; history is never rewritten.",
+    guide_tk_ledger_ex: "task.created: ready · task.taken: assigned · task.started: active · task.submitted: review · task.accepted",
+    guide_tk_run_h: "A run is a bounded delegation",
+    guide_tk_run_p: "Run records delegation.requested: the exact target and its revision, purpose, limits, and an on_behalf_of relation binding the run to its role — fixed at request time and revalidated on every replay. The broker opens a child session; delegation.started carries child_session_id; the worker must finish through a canonical outcome tool. States: requested → active → succeeded, failed, timed_out, needs_operator, or input_needed (resumable).",
+    guide_tk_run_ex: "worker exits 0 without calling commons_succeed_delegation → needs_operator (invalid_result), never a silent success",
+    guide_tk_accept_h: "Success is not acceptance",
+    guide_tk_accept_p: "delegation.succeeded closes the run, not the task: the task stays exactly where it was, because acceptance is a human act. task.accepted demands a current, approved, independent review of the exact task revision whose author is outside work_author_session_ids; without one the write is refused. If the bound review later goes stale, the projection strips the acceptance on replay.",
+    guide_tk_accept_ex: "a green tick in the graph means accepted or approved only; succeeded stays informational blue",
+    guide_tk_demo_h: "Demo mode",
+    guide_tk_demo_p: "With demo: true in the operator config no provider is launched: a DemoRunner stands in at the exact runner seam the real broker uses — still the one launch path. It self-completes only implementation runs, with an honest summary saying no provider ran; it never fabricates a review or verification — those runs end needs_operator instead. Opt-in, never the default.",
+    guide_tk_demo_ex: "demo run of a reviewer role → no verdict is invented; the delegation ends needs_operator",
+    guide_ln_record_h: "What a link records",
+    guide_ln_record_p: "agent.link_opened writes from_agent_id, to_agent_id, allowed_action, deadline_seconds and a reason; agent.link_closed must name the revision it closes, so a blind close is refused. The domain validates the whole record: both roles active, no self-link, and the opener holds open_links. allowed_action is a typed enum — ask or handoff_work — never an open flag.",
+    guide_ln_record_ex: "close without expected_revision → refused; a link stays open until an explicit agent.link_closed",
+    guide_ln_ask_h: "ask is a recorded permission, not a channel",
+    guide_ln_ask_p: "An ask link permits one bounded question, but the runtime opens no channel for it: talk between roles travels through ordinary threads, and this panel says so plainly. Today no run can even receive commons_open_agent_link — that tool switches on only at open_links: auto, and the auto level is withheld — so links are opened by a person, from this panel.",
+    guide_ln_ask_ex: "open_links: ask → the run receives no link tool at all; a propose-a-link tool does not exist yet",
+    guide_ln_handoff_h: "handoff_work is actually consumed",
+    guide_ln_handoff_p: "Exactly one place in the lifecycle reads links: staffing a delegation. A session running as a role may staff itself or a role in its own lineage; an open handoff_work link from it to another role widens precisely that — nothing else. The check runs on delegation.requested and again on every replay.",
+    guide_ln_handoff_ex: "role A, no link → delegation on_behalf_of role B is refused; open handoff_work A→B and the same write passes",
+    guide_ln_deadline_h: "deadline_seconds is informative",
+    guide_ln_deadline_p: "Replay has no clock, so expiry is never enforced during validation — the same events must project the same way forever. A link ends only through an explicit agent.link_closed; the deadline is bounds-checked at write time and shown to people as intent.",
+    guide_lm_two_h: "Two layers of limits",
+    guide_lm_two_p: "Per-run limits are written into delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency and a budget in provider_units or micro_usd — and a child can only narrow them. Operator limits live in the runtime config and cap every broker sharing one state root: global_concurrency 2, per-provider and per-profile concurrency, parent_provider_units 4, parent_budget_microusd, and max_delegations_total 16 bounding the whole tree — which depth and fanout alone never did.",
+    guide_lm_two_ex: "provider_units budget below max_attempts → refused at launch: every permitted attempt must be payable",
+    guide_lm_queue_h: "Admission and backpressure",
+    guide_lm_queue_p: "Before any process starts, reserve checks every applicable ceiling under one exclusive lock — the strictest one wins. When capacity is missing the request queues; a full queue (queue_capacity 8) rejects outright, and waiting is bounded by queue_wait_seconds 30. Concurrency above 1 for a writable profile is refused at config load: two writers in one working tree would need worktree isolation, which does not exist.",
+    guide_lm_queue_ex: "request over capacity with a full queue → runtime admission queue is full; backpressure rejected request",
+    guide_lm_panel_h: "What this panel actually launches",
+    guide_lm_panel_p: "A UI run is one bounded leaf: max_depth 0, one attempt, 600 seconds of wall time, budget 1 provider_units — no children, no fan-out. It goes through the same DelegationRuntimeService the CLI broker uses, under the role's operator-allowlisted profile; the panel may change the wall time and nothing else.",
+    guide_lm_panel_ex: "Run on the board → delegation.requested at depth 0, then the provider process; state changes reach the panel over the event stream",
+    guide_lm_gates_h: "Three gates, loopback, no transcripts",
+    guide_lm_gates_p: "The server listens on loopback behind a bearer token held in memory and printed once. Read-only by default: only GET routes exist. --enable-writes opens the enumerated write routes; --enable-catalog-editing (plus --role-catalog) additionally lets the panel edit the catalogue; --enable-launch (plus --profile-config) additionally starts provider runs. Profiles are never editable from the UI at any gate. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
+    guide_lm_gates_ex: "read-only start → the app registers GET routes only; the stream without the token → 401",
+    guide_ct_file_h: "The catalogue is an operator file",
+    guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue (second gate), never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
+    guide_ct_file_ex: "a builder runs with write access to the workspace — a catalogue inside it would be a catalogue the agent can rewrite",
+    guide_ct_skill_h: "A skill is operator-authored instruction",
+    guide_ct_skill_p: "A skill entry carries up to 4000 characters of instruction text; a tool entry carries only an identity, because the tool it names is already fixed by the profile. At launch skill_instructions resolves each id fail-closed: an id the catalogue lacks refuses the launch, rather than silently running a different agent than the operator described. The resolved text joins the bounded instruction fed to the provider process over stdin — a role cannot write its own skill.",
+    guide_ct_skill_ex: "role requires a skill the catalogue lacks → launch refused: role selects skills the operator catalogue does not define",
+    guide_ct_tools_h: "Tools only narrow",
+    guide_ct_tools_p: "A role's tool_allowlist is intersected with the profile's fixed set — no selection can widen a capability. The outcome tools (commons_succeed_delegation, commons_delegation_needs_operator and kin) are exempt from narrowing: a role that cannot report a terminal result is broken, not narrower. Staff-changing tools switch on by exact grant level: create_roles: ask injects commons_propose_agent, create_roles: auto would inject commons_create_agent — withheld today along with the auto level itself.",
+    guide_ct_tools_ex: "allowlist names a tool outside the profile → launch refused; outcome tools survive any narrowing",
     skills_view_note: "Behaviour packages from the operator catalogue. An agent gets only what its settings grant.",
     tools_view_note: "From the same operator catalogue: what an agent may run on a task. Granted in agent settings.",
     sgr_note: "A library of structured-output schemas you will attach to agents. Subscription Claude Code and Codex cannot enforce structured output, so this arrives together with API providers (Anthropic, OpenAI, Google, OpenRouter, local vLLM).",
@@ -1183,6 +1325,68 @@ const STRINGS = {
     guide_next_p: "Связи между агентами, независимые ревью чужой работы, каталог скиллов и инструментов, права ролей — всё это подключается по мере надобности, не сразу.",
     guide_never_h: "Чего панель никогда не делает",
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
+    guide_tab_brief: "Коротко",
+    guide_tab_agents: "Агенты и память",
+    guide_tab_tasks: "Задачи и прогоны",
+    guide_tab_links: "Связи",
+    guide_tab_limits: "Лимиты и безопасность",
+    guide_tab_catalog: "Скиллы и туллы",
+    guide_ag_role_h: "Роль — это запись в леджере",
+    guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
+    guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
+    guide_ag_grants_h: "Права выводятся, а не хранятся",
+    guide_ag_grants_p: "Три гранта — create_roles, retire_roles, open_links — каждый deny, ask или auto, по умолчанию deny. Реальные права — effective_grants: минимум по роли и всем её создателям вверх по цепочке, пересчитывается на каждом вызове, поэтому понижение действует и на уже идущую работу; уволенный предок схлопывает всю линию до deny. Уровень auto сознательно удержан: он записывается как есть, но действует как ask — каждое автоматическое действие всё равно спрашивает человека.",
+    guide_ag_grants_ex: "create_roles: ask → запуск получает commons_propose_agent; предложение падает во «Внимание»; только ваше подтверждение записывает agent.created",
+    guide_ag_memory_h: "Что такое «память» роли на самом деле",
+    guide_ag_memory_p: "Каждый прогон — новый процесс провайдера с одной и той же ограниченной инструкцией; накопленный контекст рантайм в запуск не передаёт, какой бы context_mode роль ни объявляла. Что режим делает сегодня: его проверяют при создании и перенастройке (создаваемая роль не может быть менее изолированной, чем создатель; позднейшее ослабление требует записанного isolation_downgrade), а каждое завершённое ревью несёт producer_context_mode и producer_prior_verdict_count — вердикт «накопленной» роли не выглядит как вердикт с чистого листа.",
+    guide_ag_memory_ex: "второе ревью той же цели той же ролью → рядом с вердиктом видно producer_prior_verdict_count: 1",
+    guide_ag_lineage_h: "Линия, сужение, текучка",
+    guide_ag_lineage_p: "Роль может создать только более узкую роль: PROFILE_NARROWING разрешает билдеру билдера или ревьюера того же провайдера, ревьюеру — только ревьюеров, кросс-провайдер недостижим; grants, skills и tool_allowlist не могут стать шире, чем у создателя. turnover_budget считает вместе созданных и явно уволенных потомков, поэтому цикл «нанял-уволил» не обходит потолок. lifetime вида task_scoped увольняет роль вместе с закрытием задачи — это выводится при replay, события agent.retired нет, и забыть его записать некому.",
+    guide_ag_lineage_ex: "codex-independent-reviewer предлагает codex-builder → отказ: созданная роль не может держать более широкий профиль провайдера",
+    guide_tk_ledger_h: "Всё — события",
+    guide_tk_ledger_p: "Леджер — JSON-события только на дозапись; состояние — проекция, пересобираемая replay-ем. Каждая запись перепроверяется: record_event собирает снапшот, прогоняет validate_transition и compare-and-swap по expected_revision под одним локом записи, поэтому отставший клиент не затирает более новую запись — вместо этого он получает внятный конфликт. Исправления и инвалидации — сами новые события; история не переписывается.",
+    guide_tk_ledger_ex: "task.created: ready · task.taken: assigned · task.started: active · task.submitted: review · task.accepted",
+    guide_tk_run_h: "Прогон — ограниченное делегирование",
+    guide_tk_run_p: "Запуск записывает delegation.requested: точную цель и её ревизию, purpose, limits и связь on_behalf_of, привязывающую прогон к роли — она фиксируется в момент запроса и перепроверяется при каждом replay. Брокер открывает дочернюю сессию; delegation.started несёт child_session_id; воркер обязан завершиться каноническим туллом исхода. Состояния: requested → active → succeeded, failed, timed_out, needs_operator или input_needed (возобновимо).",
+    guide_tk_run_ex: "воркер вышел с кодом 0, не вызвав commons_succeed_delegation → needs_operator (invalid_result), а не тихий успех",
+    guide_tk_accept_h: "Успех — не приёмка",
+    guide_tk_accept_p: "delegation.succeeded закрывает прогон, но не задачу: задача остаётся ровно там, где была, потому что приёмка — действие человека. task.accepted требует актуального одобренного независимого ревью точной ревизии задачи, автор которого не входит в work_author_session_ids; без него запись отклоняется. Если привязанное ревью потом устареет, проекция снимает приёмку при replay.",
+    guide_tk_accept_ex: "зелёная галка в графе — только accepted или approved; succeeded остаётся информационным синим",
+    guide_tk_demo_h: "Demo-режим",
+    guide_tk_demo_p: "С demo: true в конфиге оператора провайдер не запускается: DemoRunner встаёт на тот же шов раннера, что и настоящий брокер, — путь запуска остаётся одним. Он сам завершает только implementation-прогоны с честным summary о том, что провайдер не запускался; ревью и верификации он не выдумывает — такие прогоны уходят в needs_operator. Включается явно и никогда не по умолчанию.",
+    guide_tk_demo_ex: "demo-прогон роли ревьюера → вердикт не выдумывается; делегирование уходит в needs_operator",
+    guide_ln_record_h: "Что записывает связь",
+    guide_ln_record_p: "agent.link_opened записывает from_agent_id, to_agent_id, allowed_action, deadline_seconds и причину; agent.link_closed обязан назвать ревизию, которую закрывает, — слепое закрытие отклоняется. Домен проверяет запись целиком: обе роли активны, связь не сама на себя, у открывающего есть open_links. allowed_action — типизированный enum (ask или handoff_work), а не флаг «открыто».",
+    guide_ln_record_ex: "закрытие без expected_revision → отказ; связь открыта до явного agent.link_closed",
+    guide_ln_ask_h: "ask — записанное разрешение, не канал",
+    guide_ln_ask_p: "Связь ask разрешает один ограниченный вопрос, но канал под него рантайм не открывает: разговор ролей идёт обычными тредами, и панель говорит об этом прямо. Сегодня ни один запуск даже не получает commons_open_agent_link — тулл включается только на open_links: auto, а уровень auto удержан, — так что связи открывает человек, из этой панели.",
+    guide_ln_ask_ex: "open_links: ask → запуск не получает никакого тулла связей; тулла «предложить связь» пока не существует",
+    guide_ln_handoff_h: "handoff_work реально потребляется",
+    guide_ln_handoff_p: "Ровно одно место в lifecycle читает связи: постановка роли на делегирование. Сессия, работающая как роль, может ставить себя или роль из своей линии; открытая handoff_work-связь от неё к другой роли расширяет ровно это — и ничего больше. Проверка выполняется на delegation.requested и заново при каждом replay.",
+    guide_ln_handoff_ex: "роль A без связи → делегирование on_behalf_of роли B отклоняется; откройте handoff_work A→B — та же запись проходит",
+    guide_ln_deadline_h: "deadline_seconds — информативный",
+    guide_ln_deadline_p: "У replay нет часов, поэтому истечение срока при валидации не применяется — одни и те же события обязаны проецироваться одинаково всегда. Связь заканчивается только явным agent.link_closed; дедлайн проверяется на границы при записи и показывается людям как намерение.",
+    guide_lm_two_h: "Два слоя лимитов",
+    guide_lm_two_p: "Лимиты прогона записываются в delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency и бюджет в provider_units или micro_usd — и потомок может их только сузить. Лимиты оператора живут в runtime-конфиге и накрывают все брокеры одного state root: global_concurrency 2, конкурентность по провайдеру и профилю, parent_provider_units 4, parent_budget_microusd и max_delegations_total 16, ограничивающий всё дерево целиком — чего depth и fanout сами по себе не делали.",
+    guide_lm_two_ex: "бюджет provider_units меньше max_attempts → отказ на запуске: каждая разрешённая попытка должна быть оплачиваемой",
+    guide_lm_queue_h: "Допуск и обратное давление",
+    guide_lm_queue_p: "До старта любого процесса reserve проверяет каждый применимый потолок под одним эксклюзивным локом — побеждает самый строгий. Если мощности нет, запрос встаёт в очередь; полная очередь (queue_capacity 8) отклоняет сразу, ожидание ограничено queue_wait_seconds 30. Конкурентность выше 1 для пишущего профиля отвергается при загрузке конфига: двум писателям в одном рабочем дереве нужна worktree-изоляция, которой нет.",
+    guide_lm_queue_ex: "запрос сверх мощности при полной очереди → runtime admission queue is full; backpressure rejected request",
+    guide_lm_panel_h: "Что реально запускает панель",
+    guide_lm_panel_p: "Запуск из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
+    guide_lm_panel_ex: "Run на борде → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
+    guide_lm_gates_h: "Три гейта, loopback, без транскриптов",
+    guide_lm_gates_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. По умолчанию только чтение: существуют только GET-маршруты. --enable-writes открывает перечисленные маршруты записи; --enable-catalog-editing (плюс --role-catalog) дополнительно даёт панели править каталог; --enable-launch (плюс --profile-config) дополнительно запускает прогоны провайдера. Профили из UI не редактируются ни при каком гейте. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
+    guide_lm_gates_ex: "запуск только на чтение → приложение регистрирует только GET-маршруты; стрим без токена → 401",
+    guide_ct_file_h: "Каталог — файл оператора",
+    guide_ct_file_p: "Скиллы и туллы живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог (второй гейт), но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
+    guide_ct_file_ex: "билдер работает с правом записи в workspace — каталог внутри него был бы каталогом, который агент может переписать",
+    guide_ct_skill_h: "Скилл — инструкция от оператора",
+    guide_ct_skill_p: "Запись скилла несёт до 4000 знаков инструкции; запись тулла — только идентификатор, потому что сам тулл уже зафиксирован профилем. На запуске skill_instructions разрешает каждый id fail-closed: id, которого нет в каталоге, отменяет запуск — вместо того чтобы молча запустить другого агента, чем описал оператор. Разрешённый текст входит в ограниченную инструкцию, подаваемую процессу провайдера через stdin, — роль не может написать себе скилл сама.",
+    guide_ct_skill_ex: "роль требует скилл, которого нет в каталоге → запуск отклонён: role selects skills the operator catalogue does not define",
+    guide_ct_tools_h: "Туллы только сужают",
+    guide_ct_tools_p: "tool_allowlist роли пересекается с фиксированным набором профиля — выбор не может расширить возможность. Туллы исхода (commons_succeed_delegation, commons_delegation_needs_operator и родственные) сужению не подлежат: роль, неспособная отчитаться о терминальном результате, — сломанная, а не более узкая. Штатные туллы включаются точным уровнем гранта: create_roles: ask даёт commons_propose_agent, create_roles: auto дал бы commons_create_agent — сегодня удержан вместе с самим уровнем auto.",
+    guide_ct_tools_ex: "в allowlist тулл вне профиля → запуск отклонён; туллы исхода переживают любое сужение",
     skills_view_note: "Пакеты поведения из операторского каталога. Агент получает только то, что выдано в его настройках.",
     tools_view_note: "Из того же операторского каталога: что агент может запускать на задаче. Выдаётся в настройках агента.",
     sgr_note: "Библиотека схем структурированного вывода для прикрепления к агентам. Подписочные Claude Code и Codex не умеют навязанный структурированный вывод, поэтому раздел появится вместе с API-провайдерами (Anthropic, OpenAI, Google, OpenRouter, локальный vLLM).",
@@ -1811,6 +2015,17 @@ document.getElementById("dock-tabs").addEventListener("click", (event) => {
 document.getElementById("drawer-tabs").addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button && !button.hidden) { switchGroup("drawer-tabs", button.dataset.panel); }
+});
+// Overview pages: same tab chrome, but the pages are static prose, not panels,
+// so they toggle by `hidden` instead of joining the panel-id namespace.
+document.getElementById("guide-tabs").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) { return; }
+  for (const tab of document.querySelectorAll("#guide-tabs button")) {
+    const active = tab === button;
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+    document.getElementById("gpage-" + tab.dataset.gpage).hidden = !active;
+  }
 });
 document.getElementById("sidebar").addEventListener("click", (event) => {
   const button = event.target.closest("button");

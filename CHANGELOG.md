@@ -5,6 +5,15 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **The Overview grew a CTO track.** The two-minute page stays as the first
+  tab; five more — agents and memory, tasks and runs, links, limits and
+  safety, skills and tools — explain the actual backend mechanics with
+  micro-examples in canonical names, verified against the code before
+  writing. Where a thing is recorded but not yet consumed, the page says so:
+  `auto` is withheld and acts as `ask`, `context_mode: accumulated` feeds no
+  context into a launch today, an `ask` link opens no channel and
+  `deadline_seconds` is enforced by no timer — while `handoff_work` is named
+  as the one link the lifecycle actually reads.
 - **A second cold run drove eight fixes toward a findable result.** The
   follow-up PM walkthrough passed hire → task → run → terminal state both
   ways, then failed to find the result anywhere; the panel now answers.
