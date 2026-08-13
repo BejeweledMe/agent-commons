@@ -128,6 +128,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .attn-item{border:1px solid var(--border); border-radius:6px; padding:8px; margin:0 0 8px}
 .attn-item.proposal{border-color:var(--info)}
 .attn-item.run_blocked{border-color:var(--warn)}
+.attn-item.work_returned{border-color:var(--warn)}
 /* Run cards open the run's record (round 2, PM finding 4): the cursor and the
    hover ring say so before the click. */
 #runs-list .attn-item{cursor:pointer}
@@ -135,6 +136,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 #task-runs-list .attn-item{cursor:pointer}
 #task-runs-list .attn-item:hover{border-color:var(--info)}
 .attn-kind{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+/* The acceptance chain sits above the raw record and is the reason the drawer
+   is open at all once a run has finished, so it reads as its own block rather
+   than as another paragraph of the record (round 3: both testers reached a
+   succeeded run and found nowhere to accept it). */
+#task-acceptance{
+  border:1px solid var(--border); border-radius:6px; padding:10px; margin:0 0 10px;
+}
+#task-acceptance h3{margin-top:0}
+#task-acceptance .actions{margin:8px 0 0}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
@@ -371,6 +381,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 data-i18n="guide_how_h">How it fits together</h3>
           <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
           <p data-i18n="guide_how_p"></p>
+          <!-- The rule round 3 found buried in the second tab, where nobody who
+               needed it looked: a finished run is not a finished task. -->
+          <p data-i18n="guide_accept_p"></p>
           <h3 data-i18n="guide_route_h">Your first route</h3>
           <ol>
             <li data-i18n="guide_route_1"></li>
@@ -585,6 +598,35 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
 
     <section class="panel open" id="panel-record">
+      <!-- Acceptance is a chain, not a button: the domain wants the task in
+           `review` and an approved independent review bound to its current
+           revision before `task.accepted` is legal.  The block says where the
+           task stands and what the next HUMAN step is; it never decides
+           anything itself (round 3, both testers' blocker). -->
+      <div id="task-acceptance" hidden>
+        <h3 class="subhead" data-i18n="accept_heading">Accepting this work</h3>
+        <p class="note" id="task-acceptance-state"></p>
+        <p class="note mono" id="task-acceptance-canonical"></p>
+        <div class="actions">
+          <button type="button" id="task-review-request" hidden
+            data-i18n="accept_send_review">Send for review</button>
+          <button type="button" id="task-accept" hidden data-i18n="accept_button">Accept</button>
+          <button type="button" id="task-reopen" hidden
+            data-i18n="accept_reopen">Send back to work</button>
+        </div>
+        <p class="note" id="task-acceptance-caveat" hidden data-i18n="accept_caveat"></p>
+        <label class="field" id="task-accept-field" hidden>
+          <span data-i18n="accept_summary_label">What are you accepting?</span>
+          <input type="text" id="task-accept-summary" autocomplete="off"></label>
+        <label class="field" id="task-reopen-field" hidden>
+          <span data-i18n="reopen_reason_label">Why send it back?</span>
+          <input type="text" id="task-reopen-reason" autocomplete="off"></label>
+        <div class="actions" id="task-acceptance-confirm" hidden>
+          <button type="button" id="task-acceptance-go" data-i18n="accept_confirm">Record it</button>
+          <button type="button" id="task-acceptance-cancel" data-i18n="hire_cancel">Cancel</button>
+        </div>
+        <p class="result" id="task-acceptance-result"></p>
+      </div>
       <!-- The human layer above the raw record: a task's runs land here, so the
            path from a finished run to its result is one click, not a graph hunt. -->
       <div id="task-runs" hidden>
@@ -1123,6 +1165,37 @@ const STRINGS = {
     board_hint: "Drag the canvas to pan; scroll to zoom.",
     board_only_shelf: "Nothing on the board yet — templates live in the Agent catalogue. Hire an agent to begin.",
     session_you_tip: "This is you — a human operator window; roles below answer to it.",
+    accept_heading: "Accepting this work",
+    accept_ledger_state: "state in the ledger",
+    accept_state_open: "The run finished, but nobody has accepted the work yet. Send it for review to start acceptance.",
+    accept_state_review: "Waiting on an independent review. Run a role whose profile is an independent reviewer against this task, then come back and accept.",
+    accept_state_accepted: "A person accepted this work. Nothing further is needed here.",
+    accept_state_closed: "This task is blocked or cancelled, so there is nothing to send for review.",
+    accept_state_other: "This task is not at a step you can act on from here.",
+    accept_send_review: "Send for review",
+    accept_button: "Accept",
+    accept_reopen: "Send back to work",
+    accept_caveat: "Acceptance can still be refused: the review must be approved, bound to this exact version of the task, and written by someone who neither asked for the work nor did it.",
+    accept_summary_label: "What are you accepting?",
+    accept_confirm: "Record it",
+    accept_needs_summary: "Acceptance needs one line saying what you are accepting; it stays in the history forever.",
+    reopen_reason_label: "Why send it back?",
+    reopen_needs_reason: "Sending work back needs a reason — whoever picks the task up reads it.",
+    accept_review_requested: "sent for review",
+    accept_review_next: "Now launch a role whose profile is an independent reviewer on this task.",
+    accept_recorded: "accepted — a person signed this work off",
+    reopen_recorded: "sent back to work",
+    err_needs_open_review: "This role reviews work, and there is no open review request for this task yet. Open the task and press “Send for review” first, then launch the reviewer.",
+    err_needs_approved_review: "Nobody has approved this work yet. Launch a role whose profile is an independent reviewer against this task; when its verdict is approved, “Accept” will go through.",
+    err_review_not_independent: "The review this task has is not an independent one. Send the task for review again and let a role outside the work do the checking.",
+    err_review_not_usable: "There is a review, but it cannot carry an acceptance yet — it is not approved, or it has gone stale. Wait for an approved verdict, or send the task for review again.",
+    err_review_stale_revision: "The task changed after the review. Send it for review again against the current version.",
+    err_review_by_author: "The review was written by whoever did the work. It has to come from someone else.",
+    err_task_state_illegal: "The task is not in a state where this step is legal right now; reload the drawer.",
+    work_returned_kind: "work handed back",
+    work_returned_head: "{role} handed work back — accept it or send it back.",
+    work_returned_open: "Open the task",
+    guide_accept_p: "One rule matters more than the rest in daily use: a run reaching succeeded does not finish a task. A person accepts the work, and only after an independent review of it. The “Tasks and runs” tab walks through that chain.",
     count_objectives: "objectives",
     count_tasks: "tasks",
     count_delegations: "delegations",
@@ -1462,6 +1535,37 @@ const STRINGS = {
     board_hint: "Холст можно перетаскивать; колесо мыши — масштаб.",
     board_only_shelf: "На борде пока пусто — шаблоны живут в Каталоге агентов. Наймите агента, чтобы начать.",
     session_you_tip: "Это вы — окно человека-оператора; роли ниже подчиняются ему.",
+    accept_heading: "Приёмка работы",
+    accept_ledger_state: "состояние в леджере",
+    accept_state_open: "Прогон закончился, но работу ещё никто не принял. Отправьте её на ревью — с этого начинается приёмка.",
+    accept_state_review: "Ждём независимое ревью. Запустите на этой задаче роль с профилем независимого ревьюера, а потом вернитесь сюда и примите работу.",
+    accept_state_accepted: "Эту работу принял человек. Здесь больше ничего не нужно.",
+    accept_state_closed: "Задача заблокирована или отменена — отправлять на ревью нечего.",
+    accept_state_other: "Задача сейчас не на том шаге, где отсюда можно что-то сделать.",
+    accept_send_review: "Отправить на ревью",
+    accept_button: "Принять",
+    accept_reopen: "Вернуть в работу",
+    accept_caveat: "В приёмке всё ещё могут отказать: ревью должно быть одобренным, привязанным именно к этой версии задачи и написанным тем, кто не заказывал работу и не делал её сам.",
+    accept_summary_label: "Что именно вы принимаете?",
+    accept_confirm: "Записать",
+    accept_needs_summary: "Приёмке нужна одна строка о том, что вы принимаете; она останется в истории навсегда.",
+    reopen_reason_label: "Почему возвращаете?",
+    reopen_needs_reason: "Возврату работы нужна причина — её прочитает тот, кто возьмёт задачу дальше.",
+    accept_review_requested: "отправлено на ревью",
+    accept_review_next: "Теперь запустите на этой задаче роль с профилем независимого ревьюера.",
+    accept_recorded: "принято — человек подписал эту работу",
+    reopen_recorded: "возвращено в работу",
+    err_needs_open_review: "Эта роль проверяет работу, а открытого запроса на ревью по задаче пока нет. Откройте задачу, нажмите «Отправить на ревью», и только потом запускайте ревьюера.",
+    err_needs_approved_review: "Работу пока никто не одобрил. Запустите на этой задаче роль с профилем независимого ревьюера; когда её вердикт станет approved, «Принять» пройдёт.",
+    err_review_not_independent: "Имеющееся ревью не является независимым. Отправьте задачу на ревью заново и дайте проверить роли, не участвовавшей в работе.",
+    err_review_not_usable: "Ревью есть, но принять по нему нельзя: оно не одобрено или устарело. Дождитесь одобренного вердикта или отправьте задачу на ревью заново.",
+    err_review_stale_revision: "Задача изменилась после ревью. Отправьте её на ревью заново — под текущую версию.",
+    err_review_by_author: "Ревью написал тот, кто делал работу. Оно должно прийти от кого-то другого.",
+    err_task_state_illegal: "Задача сейчас не в том состоянии, где этот шаг разрешён; перезагрузите карточку.",
+    work_returned_kind: "работу сдали",
+    work_returned_head: "{role} сдал работу — примите её или верните в работу.",
+    work_returned_open: "Открыть задачу",
+    guide_accept_p: "Одно правило в ежедневной работе важнее остальных: прогон, дошедший до succeeded, не завершает задачу. Работу принимает человек — и только после независимого ревью. Вся цепочка разобрана во вкладке «Задачи и прогоны».",
     count_objectives: "целей",
     count_tasks: "задач",
     count_delegations: "делегаций",
@@ -1528,12 +1632,32 @@ async function post(path, body) {
 // label the operator is looking at.  For that one known shape, lead with the
 // field's own label and keep the canonical text in brackets; any other
 // refusal passes through untouched (round 2, PM findings).
+// The acceptance chain's refusals are the ones an operator meets while trying
+// to close the loop, and they arrived raw and in English under a Russian panel:
+// a reviewer launched with no open review request said so in the vocabulary of
+// the lifecycle, not of the person (round 3, PM).  Each entry names the NEXT
+// action; the canonical text still follows in brackets.  Order is significant —
+// the narrower refusal must be matched before the family it belongs to.
+const REFUSAL_HINTS = [
+  ["an independent_review delegation requires an open independent review", "err_needs_open_review"],
+  ["task acceptance requires a current approved independent review", "err_needs_approved_review"],
+  ["task acceptance requires an independent review", "err_review_not_independent"],
+  ["task acceptance requires a current approved review", "err_review_not_usable"],
+  ["acceptance review does not bind the current task revision", "err_review_stale_revision"],
+  ["task acceptance requires a review completed outside the work-author principals",
+    "err_review_by_author"],
+  ["is not allowed from task state", "err_task_state_illegal"],
+];
+
 function humanizeError(error, fieldLabels) {
   const message = String(error.message || error);
   const match = message.match(/^([a-z0-9_.\[\]]+) must be a non-empty string$/);
   if (match && fieldLabels && fieldLabels[match[1]]) {
     return t("err_field_empty").replace("{field}", t(fieldLabels[match[1]])) +
       " (" + message + ")";
+  }
+  for (const [needle, key] of REFUSAL_HINTS) {
+    if (message.includes(needle)) { return t(key) + " (" + message + ")"; }
   }
   return message;
 }
@@ -2443,9 +2567,12 @@ async function runRole() {
     await loadRuns();
   } catch (error) {
     // The refusal names the guard — no such task, a reviewer role with no open
-    // review, an exhausted budget — which is what the operator needs.
+    // review, an exhausted budget — which is what the operator needs.  This is
+    // where the round-3 PM met the review-request refusal raw and in English
+    // while launching a reviewer, so it goes through the same humanising table
+    // as the acceptance chain, canonical text and all.
     result.className = "result bad";
-    result.textContent = String(error.message || error);
+    result.textContent = humanizeError(error);
   }
 }
 
@@ -2554,6 +2681,166 @@ function paintTaskRuns(node) {
     host.appendChild(row);
   }
 }
+
+// --- acceptance: a chain, not a button ------------------------------------
+// Round 3's blocker, found independently by both testers: a run reaches
+// `succeeded` and there is nowhere in the panel to accept the work.  The domain
+// will not record `task.accepted` without the task in `review` and an approved,
+// independent, non-stale review bound to the task's current revision — so the
+// panel offers the STEPS of that chain and lets the server judge each one.
+// Nothing here advances a task on its own, and nothing is assumed to have
+// succeeded: every repaint comes back from the record.
+let currentTask = null;
+let currentTaskNode = null;
+let acceptanceMode = null;   // null | "accept" | "reopen" — which confirm is open
+
+function taskRevision(record) {
+  return record.effective_revision || record.revision;
+}
+
+// The states are canonical vocabulary shared with the CLI and the ledger, so
+// they are grouped here rather than translated; the sentence is the gloss and
+// the state itself is printed beside it.
+const ACCEPT_OPEN_STATES = new Set(["ready", "assigned", "active", "completed"]);
+
+function setAcceptanceMode(mode) {
+  acceptanceMode = mode;
+  document.getElementById("task-accept-field").hidden = mode !== "accept";
+  document.getElementById("task-reopen-field").hidden = mode !== "reopen";
+  document.getElementById("task-acceptance-confirm").hidden = mode === null;
+}
+
+function paintTaskAcceptance() {
+  const host = document.getElementById("task-acceptance");
+  const record = currentTask;
+  host.hidden = !(record && writesEnabled);
+  setAcceptanceMode(null);
+  if (host.hidden) { return; }
+  const state = String(record.state || "");
+  const line = ACCEPT_OPEN_STATES.has(state) ? "accept_state_open"
+    : state === "review" ? "accept_state_review"
+    : state === "accepted" ? "accept_state_accepted"
+    : (state === "blocked" || state === "cancelled") ? "accept_state_closed"
+    : "accept_state_other";
+  document.getElementById("task-acceptance-state").textContent = t(line);
+  document.getElementById("task-acceptance-canonical").textContent =
+    t("accept_ledger_state") + ": " + (state || "—");
+  document.getElementById("task-review-request").hidden = line !== "accept_state_open";
+  document.getElementById("task-accept").hidden = line !== "accept_state_review";
+  document.getElementById("task-reopen").hidden = line !== "accept_state_review";
+  // Say up front why the domain can still refuse, so a refusal reads as a rule
+  // the operator was told about rather than as the panel breaking.
+  document.getElementById("task-acceptance-caveat").hidden = line !== "accept_state_review";
+}
+
+// Repaint from the server, never from a local guess about where the write left
+// the task: the revision moved, and the next step depends on the new state.
+async function repaintAfterAcceptanceWrite(node) {
+  await refreshGraph();
+  await loadAttention();
+  if (node) { await inspect(node); }
+}
+
+async function requestTaskReview() {
+  const result = document.getElementById("task-acceptance-result");
+  if (!currentTask) { return; }
+  const task = currentTask;
+  const node = currentTaskNode;
+  try {
+    const payload = await post(
+      "/api/tasks/" + encodeURIComponent(task.id) + "/review-request",
+      {
+        expected_revision: taskRevision(task),
+        // The task's own criteria are what a reviewer should be checking; an
+        // empty list lets the server apply its default rather than inventing one.
+        criteria: task.acceptance_criteria || [],
+        idempotency_key: null,
+      });
+    await repaintAfterAcceptanceWrite(node);
+    result.className = "result ok";
+    // The state and the ids come from the response — the panel reports what the
+    // server did, including how far the walk actually got.
+    result.textContent = t("accept_review_requested") + " · " + payload.task_state +
+      " · " + payload.review_id + " — " + t("accept_review_next");
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = humanizeError(error);
+  }
+}
+
+async function acceptTask() {
+  const result = document.getElementById("task-acceptance-result");
+  if (!currentTask) { return; }
+  const summary = document.getElementById("task-accept-summary").value.trim();
+  if (!summary) {
+    result.className = "result bad";
+    result.textContent = t("accept_needs_summary");
+    return;
+  }
+  const task = currentTask;
+  const node = currentTaskNode;
+  try {
+    await post("/api/tasks/" + encodeURIComponent(task.id) + "/accept", {
+      expected_revision: taskRevision(task),
+      summary: summary,
+      idempotency_key: null,
+    });
+    await repaintAfterAcceptanceWrite(node);
+    result.className = "result ok";
+    result.textContent = t("accept_recorded");
+  } catch (error) {
+    // The refusal names the missing link in the chain; humanizeError turns it
+    // into the next action and keeps the canonical sentence in brackets.
+    result.className = "result bad";
+    result.textContent = humanizeError(error);
+  }
+}
+
+async function reopenTask() {
+  const result = document.getElementById("task-acceptance-result");
+  if (!currentTask) { return; }
+  const reason = document.getElementById("task-reopen-reason").value.trim();
+  if (!reason) {
+    result.className = "result bad";
+    result.textContent = t("reopen_needs_reason");
+    return;
+  }
+  const task = currentTask;
+  const node = currentTaskNode;
+  try {
+    await post("/api/tasks/" + encodeURIComponent(task.id) + "/reopen", {
+      expected_revision: taskRevision(task),
+      reason: reason,
+      idempotency_key: null,
+    });
+    await repaintAfterAcceptanceWrite(node);
+    result.className = "result ok";
+    result.textContent = t("reopen_recorded");
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = humanizeError(error);
+  }
+}
+
+document.getElementById("task-review-request").addEventListener("click", requestTaskReview);
+document.getElementById("task-accept").addEventListener("click", () => {
+  document.getElementById("task-acceptance-result").textContent = "";
+  document.getElementById("task-accept-summary").value = "";
+  setAcceptanceMode("accept");
+  document.getElementById("task-accept-summary").focus();
+});
+document.getElementById("task-reopen").addEventListener("click", () => {
+  document.getElementById("task-acceptance-result").textContent = "";
+  document.getElementById("task-reopen-reason").value = "";
+  setAcceptanceMode("reopen");
+  document.getElementById("task-reopen-reason").focus();
+});
+document.getElementById("task-acceptance-cancel").addEventListener("click",
+  () => setAcceptanceMode(null));
+document.getElementById("task-acceptance-go").addEventListener("click", () => {
+  if (acceptanceMode === "accept") { acceptTask(); }
+  else if (acceptanceMode === "reopen") { reopenTask(); }
+});
 
 // Hiring a role: the caller for POST /api/agents that the panel lacked, so the
 // launch loop is closed here rather than only in the CLI (M8). The panel could
@@ -2671,6 +2958,13 @@ async function inspect(node) {
   showPanel("record");
   paintTaskRuns(node);
   currentRole = null;
+  // The acceptance chain waits for the record: which step is offered depends on
+  // the task's state, and guessing it from the graph node would be the panel
+  // inventing domain behaviour.
+  currentTask = null;
+  currentTaskNode = null;
+  paintTaskAcceptance();
+  document.getElementById("task-acceptance-result").textContent = "";
   document.getElementById("message-result").textContent = "";
   document.getElementById("settings-result").textContent = "";
   document.getElementById("message-note").textContent = isRole ? t("message_note_role") : "";
@@ -2682,6 +2976,11 @@ async function inspect(node) {
     if (isRole) {
       currentRole = payload.record;
       if (writesEnabled) { paintSettings(payload.record); }
+    }
+    if (node.kind === "task") {
+      currentTask = payload.record;
+      currentTaskNode = node;
+      paintTaskAcceptance();
     }
   } catch (error) {
     body.textContent = String(error);
@@ -2824,8 +3123,44 @@ function renderAttentionItem(item) {
   kind.textContent = item.kind === "run_blocked" ? t("run_waiting")
     : item.kind === "proposal" ? t("role_proposal")
     : item.kind === "config_broken" ? t("config_broken_kind")
+    : item.kind === "work_returned" ? t("work_returned_kind")
     : (item.thread_type || t("needs_decision"));
   card.appendChild(kind);
+
+  if (item.kind === "work_returned") {
+    // A finished run left the task exactly where it was, and round 3 found that
+    // this leaves nothing anywhere saying the work is now waiting on a person.
+    // The card carries the decision, not the run's phase.
+    const head = document.createElement("span");
+    head.textContent = t("work_returned_head").replace("{role}",
+      item.agent_name || item.agent_id || t("unknown"));
+    card.appendChild(head);
+    const what = document.createElement("p");
+    what.className = "note";
+    // Title for the human, canonical state beside it for the record.
+    what.textContent = (item.title || item.task_id) +
+      (item.task_state ? " · " + item.task_state : "");
+    card.appendChild(what);
+    const why = document.createElement("p");
+    why.className = "note warn";
+    why.hidden = true;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.textContent = t("work_returned_open");
+    open.addEventListener("click", () => {
+      const node = ((lastGraph && lastGraph.nodes) || [])
+        .find((candidate) => candidate.id === item.task_id);
+      // A trimmed graph is not a dead button: say the task is not on the board
+      // rather than clicking into nothing.
+      if (!node) { why.hidden = false; why.textContent = t("not_on_graph"); return; }
+      selected = node.id;
+      inspect(node);
+      render(lastGraph);
+    });
+    card.appendChild(open);
+    card.appendChild(why);
+    return card;
+  }
 
   if (item.kind === "config_broken") {
     // The catalogue can be edited by hand outside the panel; a role holding a
@@ -3510,6 +3845,9 @@ function applyLanguage() {
   if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
   paintCatalog();
   paintHire();
+  // The open task drawer's acceptance block is painted from JS, so it needs the
+  // same repaint as the rest of the chrome.
+  paintTaskAcceptance();
   loadRuns();
   loadChat();
   loadAttention();

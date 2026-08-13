@@ -213,6 +213,91 @@ def test_the_two_panel_languages_translate_exactly_the_same_keys() -> None:
     assert en_keys == ru_keys, en_keys ^ ru_keys
 
 
+def test_the_spa_carries_the_whole_acceptance_chain() -> None:
+    """Round 3's blocker: both blind testers reached a `succeeded` run and found
+    nowhere to accept the work.  Acceptance is a chain -- request a review, run
+    an independent reviewer, then accept or send back -- so the drawer must call
+    all three routes, not offer one button."""
+
+    body = read_spa()
+    assert 'id="task-acceptance"' in body
+    for route in ("/review-request", "/accept", "/reopen"):
+        assert '"/api/tasks/" + encodeURIComponent(task.id) + "' + route + '"' in body, route
+    # Every step names the task revision it was written against, so a stale
+    # drawer gets a conflict instead of overwriting a newer record.
+    assert body.count("expected_revision: taskRevision(task)") == 3
+    # The state drives what is offered; nothing is advanced client-side.
+    assert 'state === "review" ? "accept_state_review"' in body
+    assert "async function repaintAfterAcceptanceWrite" in body
+
+
+def test_the_panel_never_records_an_acceptance_without_a_summary() -> None:
+    """Acceptance is the human decision the whole design protects; the line
+    saying what was accepted stays in the ledger forever, so the panel refuses
+    to post without one rather than sending an empty summary."""
+
+    body = read_spa()
+    accept = body.split("async function acceptTask() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'document.getElementById("task-accept-summary").value.trim()' in accept
+    guard = accept.index("accept_needs_summary")
+    assert guard < accept.index('"/accept"'), "the summary guard must precede the write"
+    assert "return;" in accept[:guard + 200]
+
+
+def test_the_acceptance_refusals_are_humanised_without_losing_the_canonical_text() -> None:
+    """The domain's refusals arrived raw and in English under a Russian panel
+    (round 3, PM).  Each one is mapped to a sentence naming the next action, in
+    both languages, with the canonical message kept one glance away."""
+
+    body = read_spa()
+    hints = body.split("const REFUSAL_HINTS = [", 1)[1].split("\n];", 1)[0]
+    for needle in (
+        "an independent_review delegation requires an open independent review",
+        "task acceptance requires a current approved independent review",
+        "task acceptance requires an independent review",
+        "acceptance review does not bind the current task revision",
+        "task acceptance requires a review completed outside the work-author principals",
+        "is not allowed from task state",
+    ):
+        assert needle in hints, needle
+    # The narrower refusal must be matched before the family it belongs to.
+    assert hints.index("a current approved independent review") < hints.index(
+        '["task acceptance requires an independent review"'
+    )
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    for key in re.findall(r'"(err_[a-z0-9_]+)"\]?,?\n?', hints):
+        for block in ("en: {", "ru: {"):
+            language = table.split(block, 1)[1].split("\n  },", 1)[0]
+            assert re.search(rf'^\s*{key}: "', language, re.MULTILINE), (key, block)
+    assert 'return t(key) + " (" + message + ")";' in body
+
+
+def test_returned_work_reaches_the_attention_queue_and_opens_its_task() -> None:
+    """A finished run leaves the task where it was, so the queue is the only
+    place that can say the work is waiting on a person (round 3, designer)."""
+
+    body = read_spa()
+    assert 'item.kind === "work_returned"' in body
+    assert 'work_returned_head").replace("{role}"' in body
+    # Not a dead button when the graph was trimmed: it says so instead.
+    returned = body.split('if (item.kind === "work_returned") {', 1)[1].split("\n  }\n", 1)[0]
+    assert "not_on_graph" in returned
+    assert "inspect(node);" in returned
+
+
+def test_the_first_guide_page_states_that_success_is_not_acceptance() -> None:
+    """The most practically important rule was buried in the second tab."""
+
+    body = read_spa()
+    assert 'data-i18n="guide_accept_p"' in body
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    english = table.split("en: {", 1)[1].split("\n  },", 1)[0]
+    line = re.search(r'^\s*guide_accept_p: "(.*)",$', english, re.MULTILINE)
+    assert line is not None
+    # The canonical state is named, not translated away.
+    assert "succeeded" in line.group(1)
+
+
 def test_the_panel_carries_a_language_toggle_that_persists() -> None:
     """The header offers en/ru, static chrome re-renders through data-i18n
     markers, and the choice survives a reload via localStorage."""

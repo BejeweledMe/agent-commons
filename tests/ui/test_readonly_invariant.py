@@ -20,6 +20,16 @@ from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import MUTATING_ROUTES
 from tests.ui.conftest import authorized, tree_digest
 
+# The acceptance chain's setup lives beside the acceptance tests rather than
+# being copied here: one recipe for "a task with a qualifying review", so a
+# change to the chain cannot leave this invariant asserting against a shape the
+# panel no longer produces.
+from tests.ui.test_acceptance_chain import (
+    approve_independently,
+    create_task,
+    send_for_review,
+)
+
 
 def test_api_traffic_does_not_change_any_canonical_file(  # type: ignore[no-untyped-def]
     client, workspace: dict[str, Any]
@@ -140,6 +150,7 @@ def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
 
 def test_every_mutating_route_dies_without_the_manager_write_path(
     writable_client,  # type: ignore[no-untyped-def]
+    workspace: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """No route reaches durable state by any other means.
@@ -155,6 +166,19 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
     assert created.status_code == 200, created.text
     agent_id = created.json()["entity_ref"]["id"]
     revision = created.json()["revision"]
+    # Acceptance is the newest write and the one with the most machinery behind
+    # it, so it is named here explicitly rather than trusted to be thin.  It has
+    # to be driven all the way to a qualifying review first: refused early, it
+    # would never reach the write path this test removes, and the route would
+    # look sealed for the wrong reason.
+    task = create_task(writable_client)
+    chain = send_for_review(writable_client, task["id"], task["revision"]).json()
+    approve_independently(
+        workspace,
+        review_id=chain["review_id"],
+        review_revision=chain["review_revision"],
+        target_revision=chain["task_revision"],
+    )
 
     monkeypatch.setattr(CommonsManager, "record_event", explode)
     calls = (
@@ -165,6 +189,10 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ),
         (f"/api/agents/{agent_id}/retire", {"reason": "x"}),
         (f"/api/agents/{agent_id}/messages", {"body": "please look at this"}),
+        (
+            f"/api/tasks/{task['id']}/accept",
+            {"expected_revision": chain["task_revision"], "summary": "looks right to me"},
+        ),
     )
     for path, body in calls:
         with pytest.raises(AssertionError, match="outside CommonsManager"):

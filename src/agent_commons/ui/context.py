@@ -19,7 +19,12 @@ from typing import Any
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
-from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
+from agent_commons.errors import (
+    CommonsError,
+    ConfigurationError,
+    LifecycleConflictError,
+    ValidationError,
+)
 from agent_commons.runtime.model import profile_tool_summary
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.graph import build_graph
@@ -503,6 +508,38 @@ class UIContext:
                     "deadline": (operation or {}).get("deadline"),
                 }
             )
+        # A run that reached `succeeded` left nothing anywhere on screen, so the
+        # loop looked closed while the work was still waiting on a person to
+        # accept it or send it back — the blocker both round-3 testers hit
+        # (finding 3).  It belongs in the same list as every other thing waiting
+        # on you, so the footer count and the amber ring stay one source.  One
+        # item per task, not per run: ids sort chronologically, so the last one
+        # seen is the run whose result is actually being asked about.
+        returned: dict[str, dict[str, Any]] = {}
+        for delegation_id, record in sorted(snapshot.delegations.items()):
+            if record.get("state") != "succeeded":
+                continue
+            target = record.get("target_ref") or {}
+            if target.get("kind") != "task":
+                continue
+            task_id = str(target.get("id") or "")
+            task = snapshot.tasks.get(task_id)
+            if task is None or task.get("state") in {"accepted", "cancelled"}:
+                continue
+            agent_id = record.get("agent_id")
+            agent = snapshot.agents.get(str(agent_id)) if agent_id else None
+            returned[task_id] = {
+                "kind": "work_returned",
+                "id": task_id,
+                "task_id": task_id,
+                "title": task.get("title"),
+                "task_state": task.get("state"),
+                "task_revision": str(task.get("effective_revision") or task.get("revision")),
+                "delegation_id": delegation_id,
+                "agent_id": agent_id,
+                "agent_name": agent.get("name") if agent else None,
+            }
+        items.extend(returned.values())
         for thread_id, record in sorted(snapshot.threads.items()):
             if not thread_awaits_human(record):
                 continue
@@ -875,6 +912,171 @@ class UIContext:
         """
 
         return self.writer().create_task(**fields)
+
+    #: Which manager transitions carry a task from where it is to `review`.
+    #: Acceptance is only legal from `review`, so the panel's one button has to
+    #: walk the whole way rather than pretend the task is already there — and it
+    #: walks by calling the same transitions the CLI calls, never by writing a
+    #: state.  `blocked`, `accepted` and `cancelled` are absent on purpose: each
+    #: gets its own refusal below, because "nothing happened" is the worst
+    #: possible answer to a click.
+    _REVIEW_WALK: dict[str, tuple[str, ...]] = {
+        "ready": ("start_task", "complete_task", "submit_task"),
+        "assigned": ("start_task", "complete_task", "submit_task"),
+        "active": ("complete_task", "submit_task"),
+        "completed": ("submit_task",),
+        "review": (),
+    }
+
+    #: What the ledger will say this operator did.  Canonical text, so it stays
+    #: English and honest: the panel sent the work onward, it did not do it.
+    _WALK_SUMMARY = "the operator sent this work for review from the panel"
+
+    @staticmethod
+    def _step_key(idempotency_key: str | None, step: str) -> str | None:
+        """One caller key, one distinct key per recorded event.
+
+        Reusing the caller's key across the walk would make the second step
+        collide with the first's receipt; deriving keeps a retried click
+        idempotent end to end.
+        """
+
+        return None if not idempotency_key else f"{idempotency_key}:{step}"
+
+    @staticmethod
+    def _task_or_refuse(manager: CommonsManager, task_id: str) -> Mapping[str, Any]:
+        record = manager.snapshot().tasks.get(task_id)
+        if record is None:
+            raise ValidationError(f"no such task: {task_id}")
+        return record
+
+    def request_task_review(
+        self,
+        *,
+        task_id: str,
+        expected_revision: str,
+        criteria: Any = (),
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Send finished work for an independent review, from wherever it sits.
+
+        Both round-3 testers stopped at the same wall: a run reaches `succeeded`
+        and nothing in the panel can accept the work, because acceptance needs a
+        task already in `review` and an approved independent review bound to its
+        current revision.  This is the first half of that chain.  It records
+        nothing itself — every step is a `CommonsManager` transition, and the
+        review it opens is the one an independent reviewer then answers.  The
+        caller's revision is spent on the *first* step so a drawer that has gone
+        stale is refused by the domain rather than quietly overwritten; each
+        later step re-reads the revision the previous one produced.
+        """
+
+        manager = self.writer()
+        record = self._task_or_refuse(manager, task_id)
+        state = str(record.get("state", ""))
+        if state == "blocked":
+            raise ValidationError(
+                "this task is blocked; unblock it before sending the work for review"
+            )
+        walk = self._REVIEW_WALK.get(state)
+        if walk is None:
+            raise ValidationError(
+                f"this task is {state or 'in an unknown state'}; "
+                "there is nothing to send for review"
+            )
+        if not walk:
+            # Already in `review`, so no transition will test the caller's
+            # revision for us.  Refuse a stale drawer here in the same words the
+            # domain would have used.
+            current = {str(record.get("revision")), str(record.get("effective_revision") or "")}
+            if str(expected_revision) not in current:
+                raise LifecycleConflictError(
+                    f"stale expected revision {expected_revision}; "
+                    f"current revision is {record.get('revision')}"
+                )
+        steps: list[str] = []
+        revision = str(expected_revision)
+        for step in walk:
+            arguments: dict[str, Any] = {"idempotency_key": self._step_key(idempotency_key, step)}
+            if step in {"complete_task", "submit_task"}:
+                arguments["summary"] = self._WALK_SUMMARY
+            getattr(manager, step)(task_id, revision, **arguments)
+            steps.append(step)
+            # A transition names the record's `revision`; the review that follows
+            # binds its `effective_revision`.  The two differ only once a
+            # correction lands, which is exactly when reusing one for the other
+            # would bind the review to work nobody did.
+            record = self._task_or_refuse(manager, task_id)
+            revision = str(record.get("revision"))
+        target_revision = str(record.get("effective_revision") or record.get("revision"))
+        chosen = tuple(str(item) for item in criteria or () if str(item).strip())
+        if not chosen:
+            chosen = tuple(str(item) for item in record.get("acceptance_criteria") or ())
+        if not chosen:
+            # `request_review` requires something to judge against, and a task
+            # with no criteria still has a description a reviewer can read.
+            chosen = ("the work meets the task description",)
+        review = manager.request_review(
+            target_ref={"kind": "task", "id": task_id},
+            target_revision=target_revision,
+            criteria=chosen,
+            independent=True,
+            idempotency_key=self._step_key(idempotency_key, "request_review"),
+        )
+        steps.append("request_review")
+        return {
+            "task_id": task_id,
+            "task_state": str(record.get("state", "")),
+            "task_revision": target_revision,
+            "review_id": str(review["entity_ref"]["id"]),
+            "review_revision": str(review["revision"]),
+            "steps": steps,
+        }
+
+    def accept_task(
+        self,
+        *,
+        task_id: str,
+        expected_revision: str,
+        summary: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Accept the work. The manager picks the review; the panel never does.
+
+        Deliberately thin: which review qualifies — approved, independent, not
+        stale, bound to this exact revision, completed outside the principals
+        that authored the work — is the domain's judgement, and the refusal when
+        none qualifies is the property the whole design exists to protect.  It
+        reaches the operator as the guard that fired.
+        """
+
+        if not summary.strip():
+            raise ValidationError("an acceptance needs a summary of what you accepted")
+        return self.writer().accept_task(
+            task_id,
+            expected_revision,
+            summary=summary,
+            idempotency_key=idempotency_key,
+        )
+
+    def reopen_task(
+        self,
+        *,
+        task_id: str,
+        expected_revision: str,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Send the work back. The other half of the decision, recorded the same way."""
+
+        if not reason.strip():
+            raise ValidationError("sending work back needs a reason the role can act on")
+        return self.writer().reopen_task(
+            task_id,
+            expected_revision,
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
 
     def open_agent_link(self, **fields: Any) -> dict[str, Any]:
         """Open one directed link between two roles — a recorded permission.

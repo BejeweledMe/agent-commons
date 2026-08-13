@@ -66,6 +66,9 @@ MUTATING_ROUTES = (
     ("POST", "/api/agent-links"),
     ("POST", "/api/agent-links/{link_id}/close"),
     ("POST", "/api/tasks"),
+    ("POST", "/api/tasks/{task_id}/review-request"),
+    ("POST", "/api/tasks/{task_id}/accept"),
+    ("POST", "/api/tasks/{task_id}/reopen"),
 )
 
 #: Catalogue editing is behind its own gate, so it has its own allowlist.
@@ -368,6 +371,43 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             acceptance_criteria=tuple(
                 str(item) for item in (body.get("acceptance_criteria") or ())
             ),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    # The acceptance chain, in the order a person walks it: send the work for an
+    # independent review, then accept the verdict or send the work back.  Each
+    # is a thin adapter over the manager; the refusal when no qualifying review
+    # exists is the domain's, and reaches the panel as the guard that fired.
+    @app.post("/api/tasks/{task_id}/review-request")
+    async def request_task_review(task_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.request_task_review,
+            task_id=task_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            criteria=tuple(str(item) for item in (body.get("criteria") or ())),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/tasks/{task_id}/accept")
+    async def accept_task(task_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.accept_task,
+            task_id=task_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            summary=str(body.get("summary", "")),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/tasks/{task_id}/reopen")
+    async def reopen_task(task_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.reopen_task,
+            task_id=task_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            reason=str(body.get("reason", "")),
             idempotency_key=body.get("idempotency_key"),
         )
 
