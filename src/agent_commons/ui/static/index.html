@@ -145,6 +145,24 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 }
 #task-acceptance h3{margin-top:0}
 #task-acceptance .actions{margin:8px 0 0}
+/* The human layer above the raw record.  Round 3, both testers: opening a node
+   met a ledger record rather than an answer, so every kind now leads with a
+   short summary and the JSON moves behind a toggle.  Two columns, the label
+   narrow and the value free to wrap, so the drawer stays its width. */
+#record-summary{margin:0 0 10px}
+.sumline{display:grid; grid-template-columns:104px 1fr; gap:8px; margin:0 0 5px}
+.sumkey{font-size:11px; color:var(--muted)}
+.sumval{font-size:12px; word-break:break-word; white-space:pre-wrap}
+.sumval ul{margin:0; padding-left:16px}
+/* The required marker is a class, never a markup style the CSP would drop, and
+   the field-level refusal sits under the input it is about: round 3 met a Hire
+   button that looked dead because its refusal rendered past the fold. */
+.req::after{content:" *"; color:var(--warn)}
+.field-error{font-size:11px; color:var(--bad); margin:3px 0 0}
+/* The hire result on the board's bar stays one line: wrapped, it pushed the
+   two + buttons apart.  The id is long, so the line ellipsizes and carries the
+   whole text as its tooltip — and the role it names is selected on the board. */
+#board-result{margin:0; max-width:32ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
@@ -322,6 +340,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
         <button type="button" id="board-fit" data-i18n="board_fit" data-i18n-title="tip_board_fit">Fit</button>
         <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom.</span>
+        <!-- A successful hire closes its modal, so the result has to land
+             somewhere that outlives it: the bar above the board the new role
+             just appeared on (round 3, designer). -->
+        <span class="result" id="board-result"></span>
       </div>
       <svg id="canvas" role="img" aria-label="workspace graph"></svg>
       <div id="onboarding" hidden>
@@ -633,7 +655,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <h3 class="subhead" data-i18n="task_runs_heading">Runs on this task</h3>
         <div id="task-runs-list"></div>
       </div>
-      <pre id="inspector-body"></pre>
+      <!-- What a person came to find out, ahead of the ledger's own words.  The
+           summary is built from the fetched record only: a field the server did
+           not send loses its line rather than printing a placeholder. -->
+      <div id="record-summary"></div>
+      <div class="actions">
+        <button type="button" id="record-json-toggle" aria-expanded="false"
+          data-i18n="record_show_json">Show record</button>
+      </div>
+      <pre id="inspector-body" hidden></pre>
       <div class="actions">
         <button type="button" id="link-close-btn" hidden data-i18n="link_close_button">Close the link</button>
       </div>
@@ -737,6 +767,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
         profile and can only narrow it; a role that may create or retire other
         roles needs a turnover budget.</p>
+      <!-- The rationale is required by the server and was unmarked, so the
+           refusal read as a dead button (round 3, both testers). -->
+      <p class="note" data-i18n="required_note">Fields marked * are required.</p>
       <label class="field" id="hire-mode-field"><span data-i18n="hire_mode_label">How</span>
         <select id="hire-mode">
           <option value="new" data-i18n="hire_mode_new">A new agent — set it up from scratch</option>
@@ -744,11 +777,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         </select></label>
       <label class="field" id="hire-preset-field" hidden><span data-i18n="hire_preset_label">Template</span>
         <select id="hire-preset"></select></label>
-      <label class="field"><span data-i18n="hire_name_label">Name</span>
+      <label class="field"><span class="req" data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
-      <label class="field" id="hire-profile-field"><span data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
+      <label class="field" id="hire-profile-field"><span class="req" data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
         <select id="hire-profile"></select></label>
-      <label class="field"><span data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
+      <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
       <label class="field" id="hire-context-field"><span data-i18n="hire_context_label" data-i18n-title="tip_hire_context">Context</span>
         <select id="hire-context_mode"></select></label>
@@ -775,11 +808,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <h2 data-i18n="task_modal_title">New task</h2>
     <p class="note" data-i18n="task_modal_note">A task is what a role gets run on: what to do, and how
       we will know it is done. It lands on the board and in the history.</p>
-    <label class="field"><span data-i18n="task_title_label">Title</span>
+    <!-- All three are marked because the server refuses all three: `title` and
+         `description` are non-empty strings in the payload schema, and
+         `acceptance_criteria` goes through the manager's non-empty-list guard.
+         Nothing is marked that the domain would in fact accept blank. -->
+    <p class="note" data-i18n="required_note">Fields marked * are required.</p>
+    <label class="field"><span class="req" data-i18n="task_title_label">Title</span>
       <input type="text" id="task-title" autocomplete="off"></label>
-    <label class="field"><span data-i18n="task_desc_label">What to do</span>
+    <label class="field"><span class="req" data-i18n="task_desc_label">What to do</span>
       <textarea id="task-desc"></textarea></label>
-    <label class="field"><span data-i18n="task_criteria_label">Done when (one criterion per line)</span>
+    <label class="field"><span class="req" data-i18n="task_criteria_label">Done when (one criterion per line)</span>
       <textarea id="task-criteria"></textarea></label>
     <div class="actions">
       <button type="button" id="task-create-go" data-i18n="task_create_button">Create the task</button>
@@ -1196,6 +1234,66 @@ const STRINGS = {
     work_returned_head: "{role} handed work back — accept it or send it back.",
     work_returned_open: "Open the task",
     guide_accept_p: "One rule matters more than the rest in daily use: a run reaching succeeded does not finish a task. A person accepts the work, and only after an independent review of it. The “Tasks and runs” tab walks through that chain.",
+    required_note: "Fields marked * are required.",
+    record_show_json: "Show record",
+    record_hide_json: "Hide record",
+    sum_what: "What it is",
+    sum_state: "State",
+    sum_id: "Id",
+    sum_role: "Role",
+    sum_purpose: "Purpose",
+    sum_target: "On",
+    sum_summary: "It says",
+    sum_criteria: "Judged against",
+    sum_done_when: "Done when",
+    sum_rationale: "Why it exists",
+    sum_verdict: "Verdict",
+    sum_independent: "Independence",
+    sum_independent_yes: "independent — written outside the work",
+    sum_independent_no: "not independent",
+    sum_from_to: "Between",
+    sum_action: "May",
+    sum_skills: "Required skills",
+    sum_tools: "Allowed tools",
+    sum_origin: "Hired by",
+    gl_ready: "nobody has taken it yet",
+    gl_assigned: "taken, not started",
+    gl_active: "being worked on",
+    gl_agent_active: "a standing role, available for work",
+    gl_completed: "the work is done, not yet sent for review",
+    gl_review: "waiting on an independent review",
+    gl_accepted: "a person signed this work off",
+    gl_blocked: "stuck, waiting on something",
+    gl_cancelled: "dropped; the history stays",
+    gl_requested: "asked for, not started",
+    gl_running: "in progress right now",
+    gl_succeeded: "the run finished cleanly — which is not acceptance",
+    gl_failed: "the run did not finish",
+    gl_timed_out: "the run ran past its wall time",
+    gl_input_needed: "the run is waiting on a person",
+    gl_needs_operator: "it cannot go on without you",
+    gl_approved: "the reviewer approved the work",
+    gl_rejected: "the reviewer turned the work down",
+    gl_changes_requested: "the reviewer wants changes first",
+    gl_abstained: "the reviewer would not judge it",
+    gl_retired: "no longer employed; the history stays",
+    gl_link_open: "the permission is in force",
+    gl_link_closed: "the permission was withdrawn",
+    gl_link_expired: "the permission lapsed",
+    gl_link_ask: "may put questions to this role",
+    gl_link_handoff: "may pass work to this role",
+    gl_deny: "never, and it is not asked",
+    gl_ask: "only after a human says yes",
+    gl_auto: "on its own, without asking",
+    gl_fresh: "starts each run with a clean slate",
+    gl_accumulated: "carries its earlier context forward",
+    gl_origin_human: "a person hired it",
+    gl_origin_agent: "another role created it",
+    gl_implementation: "doing the work",
+    gl_independent_review: "checking someone else's work",
+    gl_verification: "reproducing a claim",
+    gl_builder: "does the work",
+    gl_reviewer: "reviews work it did not do",
     count_objectives: "objectives",
     count_tasks: "tasks",
     count_delegations: "delegations",
@@ -1566,6 +1664,66 @@ const STRINGS = {
     work_returned_head: "{role} сдал работу — примите её или верните в работу.",
     work_returned_open: "Открыть задачу",
     guide_accept_p: "Одно правило в ежедневной работе важнее остальных: прогон, дошедший до succeeded, не завершает задачу. Работу принимает человек — и только после независимого ревью. Вся цепочка разобрана во вкладке «Задачи и прогоны».",
+    required_note: "Поля со звёздочкой * обязательны.",
+    record_show_json: "Показать запись",
+    record_hide_json: "Скрыть запись",
+    sum_what: "Что это",
+    sum_state: "Состояние",
+    sum_id: "Идентификатор",
+    sum_role: "Роль",
+    sum_purpose: "Зачем",
+    sum_target: "По чему",
+    sum_summary: "Итог",
+    sum_criteria: "Проверяется по",
+    sum_done_when: "Готово, когда",
+    sum_rationale: "Зачем нужна",
+    sum_verdict: "Вердикт",
+    sum_independent: "Независимость",
+    sum_independent_yes: "независимое — писал тот, кто не делал работу",
+    sum_independent_no: "не независимое",
+    sum_from_to: "Между",
+    sum_action: "Может",
+    sum_skills: "Обязательных навыков",
+    sum_tools: "Разрешённых инструментов",
+    sum_origin: "Кто нанял",
+    gl_ready: "задачу ещё никто не взял",
+    gl_assigned: "взята, но не начата",
+    gl_active: "в работе",
+    gl_agent_active: "постоянная роль, готова к работе",
+    gl_completed: "работа сделана, на ревью ещё не отправлена",
+    gl_review: "ждём независимое ревью",
+    gl_accepted: "работу подписал человек",
+    gl_blocked: "застряло, чего-то ждёт",
+    gl_cancelled: "отменено; история остаётся",
+    gl_requested: "запрошено, ещё не начато",
+    gl_running: "выполняется прямо сейчас",
+    gl_succeeded: "прогон завершился чисто — это ещё не приёмка",
+    gl_failed: "прогон не дошёл до конца",
+    gl_timed_out: "прогон вышел за отведённое время",
+    gl_input_needed: "прогон ждёт человека",
+    gl_needs_operator: "без вас дальше не пойдёт",
+    gl_approved: "ревьюер одобрил работу",
+    gl_rejected: "ревьюер отклонил работу",
+    gl_changes_requested: "ревьюер просит сначала правки",
+    gl_abstained: "ревьюер не стал выносить суждение",
+    gl_retired: "больше не работает; история остаётся",
+    gl_link_open: "разрешение действует",
+    gl_link_closed: "разрешение отозвано",
+    gl_link_expired: "разрешение истекло",
+    gl_link_ask: "может задавать вопросы этой роли",
+    gl_link_handoff: "может передавать работу этой роли",
+    gl_deny: "никогда, и даже не спрашивает",
+    gl_ask: "только после согласия человека",
+    gl_auto: "сама, ничего не спрашивая",
+    gl_fresh: "каждый прогон начинает с чистого листа",
+    gl_accumulated: "переносит прежний контекст дальше",
+    gl_origin_human: "роль нанял человек",
+    gl_origin_agent: "роль создала другая роль",
+    gl_implementation: "делает работу",
+    gl_independent_review: "проверяет чужую работу",
+    gl_verification: "воспроизводит заявленный результат",
+    gl_builder: "делает работу",
+    gl_reviewer: "проверяет работу, которую не делала",
     count_objectives: "целей",
     count_tasks: "задач",
     count_delegations: "делегаций",
@@ -1632,6 +1790,24 @@ async function post(path, body) {
 // label the operator is looking at.  For that one known shape, lead with the
 // field's own label and keep the canonical text in brackets; any other
 // refusal passes through untouched (round 2, PM findings).
+// Round 3 found the same complaint twice over: an empty field is refused in
+// three different sentences, depending on which guard fired first — the string
+// guard, the manager's non-empty-list guard, and the payload schema's own.  All
+// three name a wire field, so all three are matched here rather than only the
+// first, and the panel can put the refusal AT that field.
+const FIELD_REFUSALS = [
+  /^([a-z0-9_.[\]]+) must be a non-empty string$/,
+  /^([a-z0-9_.[\]]+) must contain non-empty values$/,
+  /^commons\.payload\.[a-z0-9.]+: \/([a-z0-9_]+): .* should be non-empty$/,
+];
+
+function refusedField(message) {
+  for (const pattern of FIELD_REFUSALS) {
+    const match = message.match(pattern);
+    if (match) { return match[1]; }
+  }
+  return null;
+}
 // The acceptance chain's refusals are the ones an operator meets while trying
 // to close the loop, and they arrived raw and in English under a Russian panel:
 // a reviewer launched with no open review request said so in the vocabulary of
@@ -1651,15 +1827,59 @@ const REFUSAL_HINTS = [
 
 function humanizeError(error, fieldLabels) {
   const message = String(error.message || error);
-  const match = message.match(/^([a-z0-9_.\[\]]+) must be a non-empty string$/);
-  if (match && fieldLabels && fieldLabels[match[1]]) {
-    return t("err_field_empty").replace("{field}", t(fieldLabels[match[1]])) +
-      " (" + message + ")";
+  const field = refusedField(message);
+  if (field && fieldLabels && fieldLabels[field]) {
+    // No canonical text in brackets here, and only here: the sentence already
+    // names the field the refusal is about, so repeating "title must be a
+    // non-empty string" after it says nothing twice — which is the leaked
+    // server text round 3 read in the New task modal.  Every refusal the panel
+    // cannot name a field for still carries its canonical sentence, below.
+    return t("err_field_empty").replace("{field}", t(fieldLabels[field]));
   }
   for (const [needle, key] of REFUSAL_HINTS) {
     if (message.includes(needle)) { return t(key) + " (" + message + ")"; }
   }
   return message;
+}
+
+// --- refusals, put where the operator can act on them ----------------------
+// Round 3, both testers, on both modals: the refusal rendered on a result line
+// below the buttons, at the bottom of a form tall enough to scroll, so the
+// button looked dead and nothing said which field was wrong.  A refusal that
+// names a wire field now paints a line under THAT field and takes the operator
+// back to it; anything else stays on the result line but is scrolled into view,
+// because being off-screen was the actual complaint either way.
+//
+// Each form declares one table: the wire field, the label it goes by on screen,
+// and the input to return to.  `humanizeError` only ever needed the labels.
+function fieldLabelsOf(fields) {
+  const labels = {};
+  for (const name of Object.keys(fields)) { labels[name] = fields[name][0]; }
+  return labels;
+}
+
+function clearFieldErrors(root) {
+  for (const line of root.querySelectorAll(".field-error")) { line.remove(); }
+}
+
+function showFormError(error, fields, result) {
+  const text = humanizeError(error, fieldLabelsOf(fields));
+  const entry = fields[refusedField(String(error.message || error))];
+  const input = entry ? document.getElementById(entry[1]) : null;
+  if (!input) {
+    result.className = "result bad";
+    result.textContent = text;
+    result.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  result.textContent = "";
+  const field = input.closest("label.field") || input.parentElement;
+  const line = document.createElement("p");
+  line.className = "field-error";
+  line.textContent = text;
+  field.appendChild(line);
+  field.scrollIntoView({ block: "nearest" });
+  input.focus();
 }
 
 async function api(path) {
@@ -1704,6 +1924,58 @@ function stateLabel(node) {
   }
   return base;
 }
+
+// One vocabulary, extended rather than duplicated: `stateLabel` already decides
+// how the canonical word is spelled and qualified, and this says what it MEANS.
+// The gloss stands BESIDE the ledger's word, never in place of it — canonical
+// names are not translated (plan item 20's recorded compromise), and a state
+// with no entry here simply arrives bare rather than being invented a meaning.
+const STATE_GLOSS = {
+  ready: "gl_ready", assigned: "gl_assigned", active: "gl_active",
+  completed: "gl_completed", review: "gl_review", accepted: "gl_accepted",
+  blocked: "gl_blocked", cancelled: "gl_cancelled",
+  requested: "gl_requested", running: "gl_running", succeeded: "gl_succeeded",
+  failed: "gl_failed", timed_out: "gl_timed_out", input_needed: "gl_input_needed",
+  needs_operator: "gl_needs_operator",
+  approved: "gl_approved", rejected: "gl_rejected",
+  changes_requested: "gl_changes_requested", abstained: "gl_abstained",
+  retired: "gl_retired",
+};
+// A canonical word can mean different things on different kinds — `active` on a
+// task is work in progress, on a role it is a standing hire — so a kind may
+// override the shared gloss.  Picking one meaning and being wrong half the time
+// would be worse than the bare state was.
+const KIND_STATE_GLOSS = {
+  agent: { active: "gl_agent_active" },
+  agent_link: { open: "gl_link_open", closed: "gl_link_closed", expired: "gl_link_expired" },
+};
+// Grant levels, context modes, link actions and profile ids are canonical too,
+// and the same rule applies: the gloss is an addition, never a replacement.
+const VALUE_GLOSS = {
+  deny: "gl_deny", ask: "gl_ask", auto: "gl_auto",
+  fresh: "gl_fresh", accumulated: "gl_accumulated",
+  human: "gl_origin_human", agent: "gl_origin_agent",
+  implementation: "gl_implementation", independent_review: "gl_independent_review",
+  verification: "gl_verification",
+  "claude-builder": "gl_builder", "codex-builder": "gl_builder",
+  "claude-independent-reviewer": "gl_reviewer",
+  "codex-independent-reviewer": "gl_reviewer",
+};
+
+function glossed(canonical, glossKey) {
+  const value = String(canonical === null || canonical === undefined ? "" : canonical);
+  return glossKey ? value + " — " + t(glossKey) : value;
+}
+function stateWithGloss(node) {
+  const perKind = KIND_STATE_GLOSS[node.kind] || {};
+  return glossed(stateLabel(node), perKind[node.state] || STATE_GLOSS[node.state]);
+}
+function valueWithGloss(value) {
+  return value ? glossed(value, VALUE_GLOSS[value]) : "";
+}
+// `ask` means one thing as a grant level and another as a link action, so link
+// actions have their own glosses rather than reading the shared table.
+const LINK_ACTION_GLOSS = { ask: "gl_link_ask", handoff_work: "gl_link_handoff" };
 
 // --- rendering ------------------------------------------------------------
 const canvas = document.getElementById("canvas");
@@ -2047,13 +2319,23 @@ function applyHireMode() {
 // already carries one: pull it into the editable field so the operator can
 // amend it instead of retyping it (round 2, PM findings).  "— none —" leaves
 // the field alone.
+//
+// It must not overwrite a rationale the operator wrote, though: that is one of
+// the three ways round 3 saw the modal "prefill unexpectedly" — type a reason,
+// then pick a template, and the sentence you wrote is gone.  The last text this
+// function put there is remembered, so a field still holding it is fair game
+// and a field holding anything else is the operator's.
+let presetRationale = "";
+
 function prefillPresetRationale() {
   const presetId = document.getElementById("hire-preset").value;
   const preset = ((catalog && catalog.presets) || [])
     .find((entry) => entry.id === presetId);
-  if (preset) {
-    document.getElementById("hire-rationale").value = preset.rationale || "";
-  }
+  if (!preset) { return; }
+  const field = document.getElementById("hire-rationale");
+  if (field.value.trim() && field.value !== presetRationale) { return; }
+  presetRationale = preset.rationale || "";
+  field.value = presetRationale;
 }
 
 function showHire(open, options) {
@@ -2073,10 +2355,20 @@ function showHire(open, options) {
   document.getElementById("hire-context_mode").value = "fresh";
   document.getElementById("hire-mode").value = "new";
   document.getElementById("hire-preset").value = "";
+  presetRationale = "";
+  clearFieldErrors(document.getElementById("hire-modal"));
   // A template IS a from-scratch definition; hiring from one is the fast path.
   document.getElementById("hire-mode-field").hidden = hireTemplate;
-  document.getElementById("hire-title").textContent =
-    hireTemplate ? t("preset_create_title") : t("tab_hire");
+  // The heading goes through `dataset.i18n` for the same reason the button does,
+  // and round 3 caught what happens when it does not: this file's rule is that
+  // an element is owned by data-i18n OR by a JS write, never both, and a raw
+  // write here lost the race.  `applyI18n()` runs on EVERY stream snapshot —
+  // about every two seconds while a run moves — so "Create a template" reverted
+  // to "Hire" a moment after opening, with no click behind it.  That is one
+  // half of the modal changing state on its own.
+  const title = document.getElementById("hire-title");
+  title.dataset.i18n = hireTemplate ? "preset_create_title" : "tab_hire";
+  title.textContent = t(title.dataset.i18n);
   // The button names what the click records: saving a template is not a hire.
   // The dataset marker moves with it so a language switch keeps the right
   // verb instead of restoring "Hire" (round 2, PM findings).
@@ -2151,9 +2443,28 @@ document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 document.getElementById("fab").addEventListener("click", () => showHire(true));
 document.getElementById("onb-cta").addEventListener("click", () => showHire(true));
 document.getElementById("hire-cancel").addEventListener("click", () => showHire(false));
-document.getElementById("hire-modal").addEventListener("click", (event) => {
-  if (event.target === document.getElementById("hire-modal")) { showHire(false); }
-});
+
+// The other half of "the modal closed on its own", and the half that cost work.
+// A `click` is delivered to the nearest common ancestor of where the button went
+// down and where it came up, so pressing inside the form and releasing outside
+// it — dragging to select text in a field and letting go past the modal's edge,
+// or overshooting a select — targeted the scrim and dismissed the dialog with
+// everything typed in it.  Nothing on screen suggested a dismissal had been
+// asked for.  A backdrop dismissal now requires the press to have landed on the
+// backdrop too, which is what "clicking outside" means.
+function dismissOnBackdrop(scrimId, close) {
+  const scrim = document.getElementById(scrimId);
+  let pressedBackdrop = false;
+  scrim.addEventListener("pointerdown", (event) => {
+    pressedBackdrop = event.target === scrim;
+  });
+  scrim.addEventListener("click", (event) => {
+    const outside = pressedBackdrop && event.target === scrim;
+    pressedBackdrop = false;
+    if (outside) { close(); }
+  });
+}
+dismissOnBackdrop("hire-modal", () => showHire(false));
 document.getElementById("tools-mode-full").addEventListener("change", () => {
   document.getElementById("tools-checklist").hidden = true;
 });
@@ -2176,16 +2487,27 @@ function showTaskModal(open) {
   document.getElementById("task-modal").hidden = !open;
   if (open) {
     document.getElementById("task-result").textContent = "";
+    clearFieldErrors(document.getElementById("task-modal"));
     document.getElementById("task-title").focus();
   }
 }
+// Every field the server refuses, with the label it goes by and the input the
+// operator has to come back to.  All three are genuinely required: `title` and
+// `description` by the payload schema, `acceptance_criteria` by the manager's
+// non-empty-list guard, whose refusal is worded differently and was therefore
+// invisible to the old single-shape match.
+const TASK_FIELDS = {
+  title: ["task_title_label", "task-title"],
+  description: ["task_desc_label", "task-desc"],
+  acceptance_criteria: ["task_criteria_label", "task-criteria"],
+};
 document.getElementById("task-fab").addEventListener("click", () => showTaskModal(true));
 document.getElementById("task-cancel").addEventListener("click", () => showTaskModal(false));
-document.getElementById("task-modal").addEventListener("click", (event) => {
-  if (event.target === document.getElementById("task-modal")) { showTaskModal(false); }
-});
+dismissOnBackdrop("task-modal", () => showTaskModal(false));
 document.getElementById("task-create-go").addEventListener("click", async () => {
   const result = document.getElementById("task-result");
+  clearFieldErrors(document.getElementById("task-modal"));
+  result.textContent = "";
   const criteria = document.getElementById("task-criteria").value
     .split("\n").map((line) => line.trim()).filter(Boolean);
   try {
@@ -2203,8 +2525,7 @@ document.getElementById("task-create-go").addEventListener("click", async () => 
     await refreshGraph();
     if (launchEnabled) { loadLaunch(); }
   } catch (error) {
-    result.className = "result bad";
-    result.textContent = humanizeError(error, { title: "task_title_label" });
+    showFormError(error, TASK_FIELDS, result);
   }
 });
 
@@ -2546,9 +2867,14 @@ async function loadLaunch() {
   launchEnabled = Boolean(options.launch_enabled);
   launchTasks = options.tasks || [];
   const picker = document.getElementById("run-task");
+  // The same clobber as the hire pickers, and this one fires on every stream
+  // snapshot: `loadLaunch` runs about every two seconds while a run moves, and
+  // re-selecting the default took the operator's chosen task off the Run tab
+  // mid-decision.  Keep whatever is selected; a task that has left the list
+  // falls back to the first, as it always did.
   fillSelect(picker,
     launchTasks.map((task) => ({ id: task.id, title: (task.title || task.id) + " · " + task.state })),
-    null, false);
+    picker.value || null, false);
 }
 
 async function runRole() {
@@ -2680,6 +3006,9 @@ function paintTaskRuns(node) {
     row.addEventListener("click", () => openRunRecord(run.delegation_id));
     host.appendChild(row);
   }
+  // The count goes back to the caller so the summary above can say the task has
+  // runs without filtering the same list a second time.
+  return matched.length;
 }
 
 // --- acceptance: a chain, not a button ------------------------------------
@@ -2851,16 +3180,29 @@ function paintHire() {
   document.getElementById("fab").hidden = !writesEnabled;
   document.getElementById("task-fab").hidden = !writesEnabled;
   if (!writesEnabled || !catalog) { return; }
-  fillSelect(document.getElementById("hire-profile"), catalog.profiles || [], null, false);
+  // The third way round 3 saw the modal change state on its own, and the one
+  // that silently widened a decision: `fillSelect` drops every option and
+  // re-selects the default, so any repaint reaching here while the form was
+  // open — a language switch, the catalogue reload after saving a template —
+  // put the profile, the grants, the context mode and the chosen template back
+  // to their defaults under the operator's hands.  Repainting the pickers is
+  // still right; overwriting a human's choice is not, so what is selected now
+  // is what is re-selected, and a value the new options no longer carry falls
+  // back exactly as it did before.
+  const held = (id, fallback) =>
+    document.getElementById("hire-modal").hidden ? fallback : document.getElementById(id).value;
+  fillSelect(document.getElementById("hire-profile"), catalog.profiles || [],
+    held("hire-profile", null), false);
   fillSelect(document.getElementById("hire-context_mode"),
-    catalog.context_modes || ["fresh", "accumulated"], "fresh", false);
+    catalog.context_modes || ["fresh", "accumulated"], held("hire-context_mode", "fresh"), false);
   const levels = catalog.grant_levels || ["deny", "ask", "auto"];
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
-    fillSelect(document.getElementById("hire-" + name), levels, "deny", false);
+    fillSelect(document.getElementById("hire-" + name), levels,
+      held("hire-" + name, "deny"), false);
   }
   const presets = [{ id: "", title: t("preset_none") }].concat(
     (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
-  fillSelect(document.getElementById("hire-preset"), presets, "", false);
+  fillSelect(document.getElementById("hire-preset"), presets, held("hire-preset", ""), false);
   // An empty catalogue disables the whole "from the catalogue" path with its
   // reason, instead of letting the form run into a raw profile_id refusal
   // (PM run, finding 2).
@@ -2876,6 +3218,10 @@ function paintHire() {
 
 async function hireRole() {
   const result = document.getElementById("hire-result");
+  // Last submit's field errors go before this one is judged; leaving them would
+  // have the form complain about a field the operator has since filled in.
+  clearFieldErrors(document.getElementById("hire-modal"));
+  result.textContent = "";
   const fromPreset =
     document.getElementById("hire-mode").value === "preset" && !hireTemplate;
   const body = {
@@ -2898,13 +3244,22 @@ async function hireRole() {
     };
     body.turnover_budget = budgetRaw === "" ? null : Number(budgetRaw);
   }
+  // A catalogue hire with no template chosen trips profile_id on the wire, but
+  // the field the operator left empty is "Template" (round 2, PM findings).
+  const fields = Object.assign({
+    name: ["hire_name_label", "hire-name"],
+    rationale: ["hire_rationale_label", "hire-rationale"],
+  }, fromPreset
+    ? { profile_id: ["hire_preset_label", "hire-preset"] }
+    : { profile_id: ["hire_profile_label", "hire-profile"] });
+  const hiredName = document.getElementById("hire-name").value.trim();
   try {
     const created = await post("/api/agents", body);
-    result.className = "result ok";
-    result.textContent = (hireTemplate ? t("preset_saved") : t("hired")) + " " +
-      (created.entity_ref ? created.entity_ref.id : "");
-    document.getElementById("hire-name").value = "";
-    document.getElementById("hire-rationale").value = "";
+    const newId = created.entity_ref ? created.entity_ref.id : "";
+    // The modal is finished with, so it goes (round 3, designer): leaving it
+    // open with a success line inside asked the operator to dismiss a dialog
+    // whose work was already done, and read as a form that had not submitted.
+    showHire(false);
     await loadAttention();
     if (hireTemplate) {
       // The new template joins the catalogue payload; repaint the pickers.
@@ -2913,22 +3268,243 @@ async function hireRole() {
       paintHire();
     }
     await refreshGraph();
+    // The result outlives the modal on the board's own bar, and the role stays
+    // findable: if it landed on the graph, it is selected and its drawer opens
+    // on the summary, so the name and the id are one glance away rather than
+    // gone with the dialog.  A template lives on the shelf, off the board, so
+    // the line is all there is — and it says which one was saved.
+    reportOnBoard((hireTemplate ? t("preset_saved") : t("hired")) +
+      (hiredName ? " · " + hiredName : "") + (newId ? " · " + newId : ""));
+    openNodeById(newId);
   } catch (error) {
     // The refusal names the guard it tripped — a missing budget, a wider grant
-    // than allowed — which is exactly what the operator needs to fix.
-    result.className = "result bad";
-    // A catalogue hire with no template chosen trips profile_id on the wire,
-    // but the field the operator left empty is "Template" (round 2, PM
-    // findings).
-    result.textContent = humanizeError(error, {
-      name: "hire_name_label",
-      rationale: "hire_rationale_label",
-      profile_id: fromPreset ? "hire_preset_label" : "hire_profile_label",
-    });
+    // than allowed — which is exactly what the operator needs to fix, and it
+    // now lands on the field it is about rather than under the buttons.
+    showFormError(error, fields, result);
   }
 }
 
+// The board's own line: the one place a modal's result can survive the modal.
+function reportOnBoard(text) {
+  const line = document.getElementById("board-result");
+  line.className = "result ok";
+  line.textContent = text;
+  line.title = text;
+}
+
+// Select and open a freshly recorded entity, when the board actually carries it.
+// Silent when it does not: a template is deliberately off the board, and the
+// panel must not claim to have opened something it did not.
+function openNodeById(entityId) {
+  const node = ((lastGraph && lastGraph.nodes) || [])
+    .find((candidate) => candidate.id === entityId);
+  if (!node) { return; }
+  selected = node.id;
+  inspect(node);
+  render(lastGraph);
+}
+
 document.getElementById("hire-save").addEventListener("click", hireRole);
+
+// --- the record, read as an answer first -----------------------------------
+// Round 3, both testers: a person who opened a node met a ledger record, not an
+// answer to whatever they clicked for.  The task drawer already did the right
+// thing — its runs, and then its acceptance chain, above the JSON — and this
+// generalises that to every kind.  The record itself keeps its place, behind a
+// toggle, because it is still the truth this panel reports on.
+//
+// Two rules keep it honest.  Nothing is invented: a line exists only when the
+// server actually sent the field, so an absent field loses its line instead of
+// printing a dash down the whole block.  And nothing canonical is translated: a
+// state, a grant level, a profile id keeps the ledger's spelling with the
+// panel's gloss beside it (plan item 20).
+
+function summaryRow(host, labelKey, value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  if (!text.trim()) { return; }
+  const row = document.createElement("div");
+  row.className = "sumline";
+  const key = document.createElement("span");
+  key.className = "sumkey";
+  key.textContent = t(labelKey);
+  const shown = document.createElement("span");
+  shown.className = "sumval";
+  shown.textContent = text;
+  row.appendChild(key);
+  row.appendChild(shown);
+  host.appendChild(row);
+}
+
+function summaryList(host, labelKey, values) {
+  const items = (values || []).map((value) => String(value)).filter((value) => value.trim());
+  if (!items.length) { return; }
+  const row = document.createElement("div");
+  row.className = "sumline";
+  const key = document.createElement("span");
+  key.className = "sumkey";
+  key.textContent = t(labelKey);
+  const shown = document.createElement("span");
+  shown.className = "sumval";
+  const list = document.createElement("ul");
+  for (const item of items) {
+    const entry = document.createElement("li");
+    entry.textContent = item;
+    list.appendChild(entry);
+  }
+  shown.appendChild(list);
+  row.appendChild(key);
+  row.appendChild(shown);
+  host.appendChild(row);
+}
+
+// Prose an agent wrote runs to any length; the summary wants the top of it and
+// the record behind the toggle has the rest, unabridged.
+function clipped(text, limit) {
+  const value = String(text || "").trim();
+  return value.length > limit ? value.slice(0, limit).trimEnd() + "…" : value;
+}
+
+// A reference points at another record: name it the way the board names it when
+// the board has it, and fall back to the canonical kind and id when it does not.
+function refLabel(ref) {
+  if (!ref || !ref.id) { return ""; }
+  const node = ((lastGraph && lastGraph.nodes) || []).find((c) => c.id === ref.id);
+  if (node && node.label) { return ref.kind + " · " + node.label; }
+  return (ref.kind ? ref.kind + " " : "") + ref.id;
+}
+
+// How many runs `paintTaskRuns` just listed, so the summary above can say the
+// task has some without filtering the same list a second time.
+let taskRunCount = 0;
+
+// What the drawer is currently summarising.  The summary is painted from JS, so
+// like the acceptance block it has to be repainted on a language switch rather
+// than sitting in the language the drawer happened to open in.
+let shownRecord = null;
+
+function summarizeTask(host, node, record) {
+  summaryRow(host, "task_title_label", record.title);
+  summaryRow(host, "task_desc_label", clipped(record.description, 280));
+  summaryList(host, "sum_done_when", record.acceptance_criteria);
+  summaryRow(host, "sum_state", stateWithGloss(node));
+  if (taskRunCount) { summaryRow(host, "task_runs_heading", taskRunCount); }
+}
+
+const AGENT_GRANTS = [
+  ["create_roles", "create_roles_label"],
+  ["retire_roles", "retire_roles_label"],
+  ["open_links", "open_links_label"],
+];
+
+function summarizeAgent(host, node, record) {
+  summaryRow(host, "hire_name_label", record.name);
+  summaryRow(host, "hire_profile_label", valueWithGloss(record.profile_id));
+  // What the role MAY DO is the question its card is opened with, so this is the
+  // effective grant — what an ancestor's downgrade actually leaves it — and not
+  // the stored one the settings form edits.
+  const grants = record.effective_grants || record.grants;
+  if (grants) {
+    for (const [name, labelKey] of AGENT_GRANTS) {
+      summaryRow(host, labelKey, valueWithGloss(grants[name]));
+    }
+  }
+  summaryRow(host, "hire_context_label", valueWithGloss(record.context_mode));
+  // The server omits both lists when they are empty rather than sending [], so
+  // the presence of the field is the only honest test; a printed 0 would be the
+  // panel answering a question the record did not.
+  if (record.skills) { summaryRow(host, "sum_skills", record.skills.length); }
+  if (record.tool_allowlist) { summaryRow(host, "sum_tools", record.tool_allowlist.length); }
+  summaryRow(host, "sum_rationale", record.rationale);
+  summaryRow(host, "sum_origin", valueWithGloss(record.origin));
+  summaryRow(host, "sum_state", stateWithGloss(node));
+}
+
+function summarizeDelegation(host, node, record) {
+  if (record.agent_id) { summaryRow(host, "sum_role", agentLabel(record.agent_id)); }
+  summaryRow(host, "hire_profile_label", valueWithGloss(record.target_profile));
+  summaryRow(host, "sum_purpose", valueWithGloss(record.purpose));
+  summaryRow(host, "sum_target", refLabel(record.target_ref));
+  summaryRow(host, "sum_state", stateWithGloss(node));
+  summaryRow(host, "sum_summary", record.summary);
+}
+
+function summarizeReview(host, node, record) {
+  summaryRow(host, "sum_target", refLabel(record.target_ref));
+  summaryList(host, "sum_criteria", record.criteria);
+  // A verdict and a review state speak the same canonical vocabulary, so they
+  // read from the same gloss table rather than from a second one.
+  if (record.verdict) {
+    summaryRow(host, "sum_verdict", glossed(record.verdict, STATE_GLOSS[record.verdict]));
+  }
+  summaryRow(host, "sum_state", stateWithGloss(node));
+  if (typeof record.independent === "boolean") {
+    summaryRow(host, "sum_independent",
+      t(record.independent ? "sum_independent_yes" : "sum_independent_no"));
+  }
+  summaryRow(host, "sum_summary", record.summary);
+}
+
+function summarizeLink(host, node, record) {
+  if (record.from_agent_id && record.to_agent_id) {
+    summaryRow(host, "sum_from_to",
+      agentLabel(record.from_agent_id) + " → " + agentLabel(record.to_agent_id));
+  }
+  summaryRow(host, "sum_action",
+    glossed(record.allowed_action, LINK_ACTION_GLOSS[record.allowed_action]));
+  summaryRow(host, "sum_state", stateWithGloss(node));
+  summaryRow(host, "link_reason_label", record.reason);
+}
+
+// Everything not special-cased above — objectives, threads, findings, decisions,
+// artifacts, handoffs, verifications, sessions — gets the same three lines: the
+// field that identifies the record to a person, its state, and its id.  The
+// first field the record actually carries wins; a record with none of them
+// still gets its state and its id rather than an empty block.
+const IDENTIFYING_FIELDS = [
+  "title", "subject", "name", "summary", "claim", "proposal", "resolution", "role",
+];
+
+function summarizeGeneric(host, node, record) {
+  for (const field of IDENTIFYING_FIELDS) {
+    if (record[field]) { summaryRow(host, "sum_what", clipped(record[field], 400)); break; }
+  }
+  summaryRow(host, "sum_state", stateWithGloss(node));
+  summaryRow(host, "sum_id", record.id || node.id);
+}
+
+const RECORD_SUMMARIES = {
+  task: summarizeTask,
+  agent: summarizeAgent,
+  delegation: summarizeDelegation,
+  review: summarizeReview,
+  agent_link: summarizeLink,
+};
+
+function paintRecordSummary(node, record) {
+  const host = document.getElementById("record-summary");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  shownRecord = record ? { node: node, record: record } : null;
+  if (!record) { return; }
+  (RECORD_SUMMARIES[node.kind] || summarizeGeneric)(host, node, record);
+  // A record that carried none of the fields its own builder looks for would
+  // leave an empty block, which reads worse than the JSON did.
+  if (!host.firstChild) { summarizeGeneric(host, node, record); }
+}
+
+// The record keeps its place behind the toggle, collapsed on every opening: the
+// state is deliberately not remembered, so the drawer always opens on the answer
+// rather than on whatever the previous node was left showing.
+function showRecordJson(open) {
+  const button = document.getElementById("record-json-toggle");
+  document.getElementById("inspector-body").hidden = !open;
+  button.setAttribute("aria-expanded", open ? "true" : "false");
+  button.dataset.i18n = open ? "record_hide_json" : "record_show_json";
+  button.textContent = t(button.dataset.i18n);
+}
+
+document.getElementById("record-json-toggle").addEventListener("click", () => {
+  showRecordJson(document.getElementById("inspector-body").hidden);
+});
 
 async function inspect(node) {
   const title = document.getElementById("inspector-title");
@@ -2956,7 +3532,11 @@ async function inspect(node) {
     !(node.kind === "agent_link" && writesEnabled && node.state === "open");
   document.getElementById("run-result").textContent = "";
   showPanel("record");
-  paintTaskRuns(node);
+  taskRunCount = paintTaskRuns(node);
+  // The summary waits for the record, like the acceptance block does, and the
+  // JSON starts collapsed on every opening.
+  paintRecordSummary(node, null);
+  showRecordJson(false);
   currentRole = null;
   // The acceptance chain waits for the record: which step is offered depends on
   // the task's state, and guessing it from the graph node would be the panel
@@ -2973,6 +3553,7 @@ async function inspect(node) {
     const payload = await api("/api/entities/" + encodeURIComponent(node.kind) + "/" +
       encodeURIComponent(node.id));
     body.textContent = JSON.stringify(payload.record, null, 2);
+    paintRecordSummary(node, payload.record);
     if (isRole) {
       currentRole = payload.record;
       if (writesEnabled) { paintSettings(payload.record); }
@@ -2984,6 +3565,12 @@ async function inspect(node) {
     }
   } catch (error) {
     body.textContent = String(error);
+    // The summary block is where the drawer's eye lands now, so a fetch that
+    // failed says so there rather than behind a collapsed toggle.
+    const failure = document.createElement("p");
+    failure.className = "result bad";
+    failure.textContent = String(error);
+    document.getElementById("record-summary").appendChild(failure);
   }
 }
 
@@ -3846,8 +4433,10 @@ function applyLanguage() {
   paintCatalog();
   paintHire();
   // The open task drawer's acceptance block is painted from JS, so it needs the
-  // same repaint as the rest of the chrome.
+  // same repaint as the rest of the chrome — and so does the record summary
+  // above it, whose labels and glosses are the panel's own words.
   paintTaskAcceptance();
+  if (shownRecord) { paintRecordSummary(shownRecord.node, shownRecord.record); }
   loadRuns();
   loadChat();
   loadAttention();

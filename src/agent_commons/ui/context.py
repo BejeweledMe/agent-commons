@@ -37,6 +37,26 @@ def _iso_now() -> str:
     return datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
 
 
+def _elapsed_seconds(started_at: Any, ended_at: Any) -> float | None:
+    """Seconds between two attempt timestamps, or None when that is not honest.
+
+    The attempt store writes ISO-8601 strings, but this surface reads a file it
+    does not own: a record written by an older build, a foreign clock, or a
+    half-flushed write can carry something else.  A timestamp that will not
+    parse, or an interval that runs backwards, is not a duration — it is an
+    unknown, and the panel is better off showing nothing than a number nobody
+    can explain.  Never raises: a display field must not take the run list down.
+    """
+
+    try:
+        start = datetime.fromisoformat(str(started_at).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(ended_at).replace("Z", "+00:00"))
+        elapsed = (end - start).total_seconds()
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return elapsed if elapsed >= 0 else None
+
+
 def _session_state(session: Any) -> str:
     """Effective session state: a session whose TTL lapsed is not still active."""
 
@@ -725,17 +745,45 @@ class UIContext:
             record = attempt.as_dict()
             delegation_id = str(record["correlation"]["delegation_id"])
             delegation = delegations.get(delegation_id) or {}
+            live = store.process_is_live(record.get("pid"))
             found.append(
                 {
                     "delegation_id": delegation_id,
                     "attempt_id": record["attempt_id"],
                     "phase": record["state"],
-                    "live": store.process_is_live(record.get("pid")),
+                    "live": live,
+                    # When the attempt started and when it was last touched, read
+                    # off the operational attempt store.  That store is not the
+                    # ledger: canonical events carry no wall clock and replay
+                    # never sees these values, which is exactly why the run
+                    # panel — an operational view — is where they belong
+                    # (finding 28).
+                    "started_at": record.get("created_at"),
+                    "updated_at": record.get("updated_at"),
+                    # How long a finished run took.  A live run gets None rather
+                    # than a number: any duration computed here is stale the
+                    # moment it is rendered, and a caller that wants a ticking
+                    # figure has `started_at` to count up from.
+                    "duration_seconds": (
+                        None
+                        if live
+                        else _elapsed_seconds(record.get("created_at"), record.get("updated_at"))
+                    ),
                     "profile_id": record.get("profile_id"),
                     "target_kind": record["correlation"].get("target_kind"),
                     "target_id": record["correlation"].get("target_id"),
                     "agent_id": delegation.get("agent_id"),
                     "delegation_state": delegation.get("state"),
+                    # What the run was for, and the bounds it was launched
+                    # under, exactly as the canonical delegation records them.
+                    # `limits` is a launch-time CAP and nothing else — its
+                    # `budget` says what the run was permitted to use, never
+                    # what it used.  Nothing in this codebase records consumed
+                    # provider units or money, so no spend is reported here;
+                    # an estimate would read like a measurement, and there is
+                    # no measurement to report.
+                    "purpose": delegation.get("purpose"),
+                    "limits": delegation.get("limits") or None,
                     # The one human-readable line a terminal run leaves behind
                     # (canonical delegation summary, already public through the
                     # entity route) — the PM run could not find any result

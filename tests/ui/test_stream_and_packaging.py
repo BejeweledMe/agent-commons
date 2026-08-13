@@ -272,6 +272,208 @@ def test_the_acceptance_refusals_are_humanised_without_losing_the_canonical_text
     assert 'return t(key) + " (" + message + ")";' in body
 
 
+def test_every_entity_panel_leads_with_a_summary_and_puts_the_record_behind_it() -> None:
+    """Round 3, both testers: opening a node met a raw ledger record rather than
+    an answer.  The task drawer already led with its runs and its acceptance
+    chain; this generalises that, so every kind gets a short per-kind summary
+    and the JSON moves behind a toggle that is collapsed on each opening."""
+
+    body = read_spa()
+    assert 'id="record-summary"' in body
+    assert 'id="record-json-toggle"' in body
+    # Collapsed in the markup, and re-collapsed by every `inspect`: the drawer
+    # opens on the answer, never on what the previous node was left showing.
+    assert '<pre id="inspector-body" hidden></pre>' in body
+    assert "showRecordJson(false);" in body
+    summaries = body.split("const RECORD_SUMMARIES = {", 1)[1].split("};", 1)[0]
+    for kind in ("task", "agent", "delegation", "review", "agent_link"):
+        assert f"{kind}: summarize" in summaries, kind
+    # Any kind without its own builder still gets an answer rather than JSON.
+    assert "(RECORD_SUMMARIES[node.kind] || summarizeGeneric)(host, node, record);" in body
+    # Nothing is invented: a field the server did not send loses its line rather
+    # than printing a placeholder down the whole block.
+    row = body.split("function summaryRow(", 1)[1].split("\n}\n", 1)[0]
+    assert "if (!text.trim()) { return; }" in row
+
+
+def test_a_summary_glosses_a_canonical_value_and_never_replaces_it() -> None:
+    """States, grant levels, context modes and profile ids are canonical names
+    shared with the CLI and the ledger, so the panel puts its sentence BESIDE
+    them (plan item 20's recorded compromise) instead of translating them away.
+    The gloss tables are keyed by the canonical token for exactly that reason."""
+
+    body = read_spa()
+    assert 'return glossKey ? value + " — " + t(glossKey) : value;' in body
+    values = body.split("const VALUE_GLOSS = {", 1)[1].split("};", 1)[0]
+    for token in ("deny", "ask", "auto", "fresh", "accumulated"):
+        assert f"{token}: " in values, token
+    states = body.split("const STATE_GLOSS = {", 1)[1].split("};", 1)[0]
+    for token in ("ready", "review", "accepted", "succeeded", "approved"):
+        assert f"{token}: " in states, token
+    # `stateLabel` stays the single place that decides how a state is spelled;
+    # the gloss is layered on top of it rather than beside a second vocabulary.
+    assert "glossed(stateLabel(node), perKind[node.state] || STATE_GLOSS[node.state])" in body
+
+
+def test_the_hire_modal_marks_its_required_fields_and_closes_on_success() -> None:
+    """Round 3, both testers: the rationale was required by the server and
+    unmarked, and a successful hire left the modal open with a line inside it.
+    The markers come from a class the CSP allows, not an inline style."""
+
+    body = read_spa()
+    hire = body.split('id="hire-modal"', 1)[1].split('id="task-modal"', 1)[0]
+    assert hire.count('class="req"') == 3
+    assert 'data-i18n="required_note"' in hire
+    assert ".req::after{content:" in body
+
+    hire_fn = body.split("async function hireRole() {", 1)[1].split("\n}\n", 1)[0]
+    assert "showHire(false);" in hire_fn
+    # Only after the write landed: a modal that closes on a refusal would take
+    # the refusal with it.
+    assert hire_fn.index("showHire(false);") > hire_fn.index('post("/api/agents"')
+    # The result outlives the modal, and the role stays findable.
+    assert "reportOnBoard(" in hire_fn
+    assert "openNodeById(" in hire_fn
+    assert 'id="board-result"' in body
+
+
+def test_a_field_shaped_refusal_lands_on_its_field_not_only_on_the_result_line() -> None:
+    """Round 3, both testers, on both modals: the refusal rendered below the
+    buttons at the bottom of a form tall enough to scroll, so the button read as
+    dead and nothing said which field was wrong."""
+
+    body = read_spa()
+    show = body.split("function showFormError(", 1)[1].split("\n}\n", 1)[0]
+    assert 'line.className = "field-error";' in show
+    assert 'input.closest("label.field")' in show
+    assert 'field.scrollIntoView({ block: "nearest" });' in show
+    assert "input.focus();" in show
+    # A refusal the panel cannot attribute to a field still shows -- and is
+    # scrolled to, because being off-screen was the complaint either way.
+    assert 'result.scrollIntoView({ block: "nearest" });' in show
+    assert "showFormError(error, TASK_FIELDS, result)" in body
+    assert "showFormError(error, fields, result)" in body
+    # Stale errors are cleared on the next submit and on every modal opening.
+    assert body.count("clearFieldErrors(") >= 5
+
+
+def test_a_named_field_refusal_stops_repeating_the_canonical_text() -> None:
+    """The designer flagged the canonical server text leaking in brackets.  It
+    stays everywhere it is the actionable detail; it goes only where the
+    humanised sentence has already named the very field it is about."""
+
+    body = read_spa()
+    human = body.split("function humanizeError(", 1)[1].split("\n}\n", 1)[0]
+    assert 'return t("err_field_empty").replace("{field}", t(fieldLabels[field]));' in human
+    assert 'return t(key) + " (" + message + ")";' in human
+
+
+def test_the_panels_field_refusal_shapes_still_match_what_the_domain_says(
+    writable,  # type: ignore[no-untyped-def]
+) -> None:
+    """An empty field is refused in three different sentences depending on which
+    guard fires first -- the payload's string guard, the manager's non-empty-list
+    guard, and the payload schema's own.  Matching only the first, which is all
+    the panel used to do, left New task unable to say which field was wrong.  The
+    shapes belong to the domain, so they are checked against it rather than
+    transcribed into the frontend and left to drift."""
+
+    from agent_commons.errors import ValidationError
+
+    block = read_spa().split("const FIELD_REFUSALS = [", 1)[1].split("\n];", 1)[0]
+    patterns = [re.compile(source) for source in re.findall(r"^\s*/(.+)/,$", block, re.MULTILINE)]
+    assert len(patterns) == 3
+
+    def field_named_by(call) -> str | None:  # type: ignore[no-untyped-def]
+        with pytest.raises(ValidationError) as caught:
+            call()
+        for pattern in patterns:
+            found = pattern.match(str(caught.value))
+            if found:
+                return found.group(1)
+        return str(caught.value)
+
+    cases = {
+        "title": lambda: writable.create_task(
+            title="", description="d", acceptance_criteria=("c",)
+        ),
+        "description": lambda: writable.create_task(
+            title="t", description="", acceptance_criteria=("c",)
+        ),
+        "acceptance_criteria": lambda: writable.create_task(
+            title="t", description="d", acceptance_criteria=()
+        ),
+        "name": lambda: writable.create_agent(
+            name="", profile_id="claude-builder", rationale="r"
+        ),
+        "rationale": lambda: writable.create_agent(
+            name="n", profile_id="claude-builder", rationale=""
+        ),
+    }
+    for expected, call in cases.items():
+        assert field_named_by(call) == expected
+
+
+def test_new_task_marks_exactly_the_fields_the_domain_refuses_blank(
+    writable,  # type: ignore[no-untyped-def]
+) -> None:
+    """A required marker is a claim about the server, so it is checked against
+    the server: every field the modal marks is one `create_task` actually
+    refuses empty, including the criteria, whose guard lives in the manager
+    rather than in the payload schema."""
+
+    from agent_commons.errors import ValidationError
+
+    body = read_spa()
+    modal = body.split('id="task-modal"', 1)[1].split('id="link-modal"', 1)[0]
+    marked = set(re.findall(r'<span class="req" data-i18n="([a-z0-9_]+)"', modal))
+    fields = body.split("const TASK_FIELDS = {", 1)[1].split("};", 1)[0]
+    blank = {
+        "title": {"title": "", "description": "d", "acceptance_criteria": ("c",)},
+        "description": {"title": "t", "description": "", "acceptance_criteria": ("c",)},
+        "acceptance_criteria": {"title": "t", "description": "d", "acceptance_criteria": ()},
+    }
+    for wire, arguments in blank.items():
+        label = re.search(rf'{wire}: \["([a-z0-9_]+)"', fields)
+        assert label is not None, wire
+        assert label.group(1) in marked, wire
+        with pytest.raises(ValidationError):
+            writable.create_task(**arguments)
+    assert len(marked) == len(blank), marked
+
+
+def test_a_repaint_cannot_change_the_hire_modal_under_the_operator() -> None:
+    """Both round-3 testers saw the modal self-close or prefill unexpectedly, and
+    it did, three ways.  `applyI18n` runs on every stream snapshot and rewrote a
+    heading a JS write had claimed, against this file's own rule that an element
+    is owned by data-i18n or by JS and never both.  `fillSelect` drops every
+    option and re-selects the default, so any repaint reaching the open form put
+    the profile, grants, context mode and template back.  And a `click` is
+    delivered to the nearest common ancestor of press and release, so a drag that
+    began in a field and ended on the backdrop dismissed the dialog."""
+
+    body = read_spa()
+    assert 'title.dataset.i18n = hireTemplate ? "preset_create_title" : "tab_hire";' in body
+
+    paint = body.split("function paintHire() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'document.getElementById("hire-modal").hidden ? fallback' in paint
+    for picker in ("hire-profile", "hire-context_mode", "hire-preset"):
+        assert f'held("{picker}"' in paint, picker
+
+    assert "function dismissOnBackdrop(" in body
+    assert 'scrim.addEventListener("pointerdown"' in body
+    assert "const outside = pressedBackdrop && event.target === scrim;" in body
+    for scrim in ("hire-modal", "task-modal"):
+        assert f'dismissOnBackdrop("{scrim}"' in body, scrim
+    # The Run tab's task picker had the same clobber, and `loadLaunch` runs on
+    # every snapshot -- it took the operator's chosen task off the tab mid-run.
+    assert "picker.value || null, false);" in body
+    # A typed rationale is the operator's; only the template's own text is
+    # replaced when another template is chosen.
+    prefill = body.split("function prefillPresetRationale() {", 1)[1].split("\n}\n", 1)[0]
+    assert "if (field.value.trim() && field.value !== presetRationale) { return; }" in prefill
+
+
 def test_returned_work_reaches_the_attention_queue_and_opens_its_task() -> None:
     """A finished run leaves the task where it was, so the queue is the only
     place that can say the work is waiting on a person (round 3, designer)."""
