@@ -1019,10 +1019,13 @@ def _validate_role_binding(
     if acting in {str(record["id"]) for record in lineage(snapshot.agents, agent_id)}:
         return
     # An open link is the one thing that widens this, which is what a typed
-    # action was for.  Its deadline is not checked here: replay has no clock,
-    # and using one would make the same events project differently over time --
-    # the reason session liveness is excluded from replay too.  A link is closed
-    # explicitly, and an expired one is surfaced where a clock exists.
+    # action was for.  There is no expiry to check: replay has no clock, and
+    # using one would make the same events project differently over time -- the
+    # reason session liveness is excluded from replay too.  A link ends only
+    # when it is explicitly closed; `deadline_seconds` is optional recorded
+    # intent that constrains nothing (the earlier promise to surface expiry
+    # elsewhere was never kept, and the bounds that do hold agents are attempts,
+    # provider units and depth).
     if not any(
         link.get("state") == "open"
         and link.get("allowed_action") == "handoff_work"

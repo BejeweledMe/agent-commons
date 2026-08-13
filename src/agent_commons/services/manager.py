@@ -1914,25 +1914,30 @@ class CommonsManager:
         from_agent_id: str,
         to_agent_id: str,
         allowed_action: str = "ask",
-        deadline_seconds: int,
+        deadline_seconds: int | None = None,
         reason: str,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("agent.link_opened", idempotency_key)
         link_id = self._new_entity_id("agent_link", "agent.link_opened", key)
+        payload: dict[str, Any] = {
+            "link_id": link_id,
+            "from_agent_id": from_agent_id,
+            "to_agent_id": to_agent_id,
+            # A typed action, never an open/closed flag: adding
+            # `handoff_work` later extends this enum instead of reshaping
+            # the record.
+            "allowed_action": allowed_action,
+            "reason": reason,
+        }
+        # Optional, and recorded only when an operator actually stated one: a
+        # horizon nothing can enforce (replay has no clock) is intent, not a
+        # rule, and a required field nobody reads is a tax on every caller.
+        if deadline_seconds is not None:
+            payload["deadline_seconds"] = deadline_seconds
         return self.record_event(
             "agent.link_opened",
-            {
-                "link_id": link_id,
-                "from_agent_id": from_agent_id,
-                "to_agent_id": to_agent_id,
-                # A typed action, never an open/closed flag: adding
-                # `handoff_work` later extends this enum instead of reshaping
-                # the record.
-                "allowed_action": allowed_action,
-                "deadline_seconds": deadline_seconds,
-                "reason": reason,
-            },
+            payload,
             idempotency_key=key,
             relations=[
                 self._relation(

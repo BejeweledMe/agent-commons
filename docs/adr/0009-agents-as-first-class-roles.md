@@ -497,11 +497,17 @@ It also turned out to be the thing that made the model necessary rather than
 decorative — staffing a run with a role is an authority, so a link that widens
 who may do it needs a typed action rather than an open/closed flag.
 
-A link's deadline is deliberately **not** checked in the lifecycle. Replay has
-no clock, and using one would make the same events project differently over
-time; this is the same reason mutable session liveness is excluded from replay.
-A link is ended by an explicit `agent.link_closed`, and an expired one is
-surfaced where a clock exists. The exchange itself runs over the existing bounded
+A link has no expiry, and `deadline_seconds` is optional. Replay has no clock,
+and using one would make the same events project differently over time; this is
+the same reason mutable session liveness is excluded from replay. So nothing can
+retire a permission on a schedule: a link is ended by an explicit
+`agent.link_closed`. The field remains readable — history carries it, and an
+operator may record an intended horizon — but requiring it only made four
+callers invent a number no reader consumed, and the bounds that actually hold a
+run are attempts, provider units, depth and its wall-time guard, none of which
+are calendar time. An earlier edition of this ADR promised expiry would be
+"surfaced where a clock exists"; nothing ever surfaced it, so the promise is
+withdrawn rather than restated. The exchange itself runs over the existing bounded
 communication channel; only the grant is canonical. Its consumer exists: an ask
 with no live session on the other side surfaces in the human panel with the
 blocked outline, so it is answered rather than dropped.

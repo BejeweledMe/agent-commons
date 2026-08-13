@@ -1148,13 +1148,14 @@ def build_server(
         to_agent_id: str,
         reason: str,
         idempotency_key: str,
-        deadline_seconds: int = 900,
+        deadline_seconds: int | None = None,
     ) -> dict[str, Any]:
-        """Open a bounded temporary link to another role.
+        """Open a link to another role; it lives until explicitly closed.
 
         The link records the action it permits -- today, one bounded question --
         rather than an open/closed flag, so a later "hand over work" mode
-        extends the enum instead of reshaping the record.
+        extends the enum instead of reshaping the record.  Any deadline is
+        recorded intent: no reader has a clock to enforce it against.
         """
 
         return commons.open_agent_link(

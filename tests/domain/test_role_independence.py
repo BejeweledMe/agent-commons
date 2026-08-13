@@ -882,3 +882,49 @@ def test_a_role_binding_on_a_non_requested_delegation_event_is_ignored_on_replay
     # The forged binding is ignored: the run acts for no role.
     assert snapshot.delegations[delegation["entity_ref"]["id"]].get("agent_id") is None
     assert acting_agent_id(snapshot, str(worker.session_id)) is None
+
+
+def test_a_link_needs_no_deadline_and_never_expires(workspace: dict[str, Any]) -> None:
+    """A permission nothing can enforce on a schedule should not demand a
+    number for one. `deadline_seconds` is optional now: a link opened without
+    it is valid and stays open — it ends only when someone closes it — while
+    an operator who does state a horizon still gets it recorded."""
+
+    operator: CommonsManager = workspace["operator"]
+    author = operator.create_agent(
+        name="Author",
+        profile_id="claude-builder",
+        rationale="writes the docs",
+        idempotency_key="deadline-author",
+    )
+    reviewer = operator.create_agent(
+        name="Reviewer",
+        profile_id="claude-independent-reviewer",
+        rationale="reviews the docs",
+        idempotency_key="deadline-reviewer",
+    )
+
+    opened = operator.open_agent_link(
+        from_agent_id=author["entity_ref"]["id"],
+        to_agent_id=reviewer["entity_ref"]["id"],
+        allowed_action="handoff_work",
+        reason="hand the docs over for review",
+        idempotency_key="link-without-deadline",
+    )
+    record = operator.snapshot().agent_links[opened["entity_ref"]["id"]]
+    assert record["state"] == "open"
+    assert record.get("deadline_seconds") is None
+
+    # An operator may still record an intended horizon; it is bounds-checked
+    # and stored, and it still does not end the link.
+    with_horizon = operator.open_agent_link(
+        from_agent_id=reviewer["entity_ref"]["id"],
+        to_agent_id=author["entity_ref"]["id"],
+        allowed_action="ask",
+        deadline_seconds=3600,
+        reason="ask the author back",
+        idempotency_key="link-with-horizon",
+    )
+    stored = operator.snapshot().agent_links[with_horizon["entity_ref"]["id"]]
+    assert stored["deadline_seconds"] == 3600
+    assert stored["state"] == "open"

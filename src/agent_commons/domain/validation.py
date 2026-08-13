@@ -220,7 +220,10 @@ EVENT_SPECS: dict[str, EventSpec] = {
         "policy",
     ),
     "agent.link_opened": EventSpec(
-        ("link_id", "from_agent_id", "to_agent_id", "allowed_action", "deadline_seconds", "reason"),
+        # `deadline_seconds` is optional: no reader ever had a clock to enforce
+        # it against, so requiring it only made four callers invent a number
+        # nothing consumes.  A link lives until it is explicitly closed.
+        ("link_id", "from_agent_id", "to_agent_id", "allowed_action", "reason"),
         "agent_link",
         "link_id",
         "policy",
@@ -698,7 +701,10 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
             raise ValidationError("invalid link allowed_action")
         if payload["from_agent_id"] == payload["to_agent_id"]:
             raise ValidationError("a link requires two distinct roles")
-        _bounded_integer(
-            payload["deadline_seconds"], "deadline_seconds", minimum=1, maximum=604_800
-        )
+        # Still bounded when supplied -- history carries it, and an operator may
+        # record an intended horizon -- but never required and never enforced.
+        if payload.get("deadline_seconds") is not None:
+            _bounded_integer(
+                payload["deadline_seconds"], "deadline_seconds", minimum=1, maximum=604_800
+            )
     return spec

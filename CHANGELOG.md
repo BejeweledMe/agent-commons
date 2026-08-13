@@ -5,6 +5,15 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **Agent links stopped asking for a deadline they cannot keep.**
+  `deadline_seconds` is optional now: replay has no clock, so no reader ever
+  enforced expiry, and requiring the field only made the panel, the CLI, the
+  MCP tool and the manager invent a number nothing consumed. A link lives
+  until an explicit `agent.link_closed`; the field stays readable for the
+  history that carries it and for an operator who wants to record an intended
+  horizon. Agents are bounded by attempts, `provider_units`, depth and a live
+  run's wall-time guard — not by calendar time. The ADR's old promise to
+  "surface expiry where a clock exists" is withdrawn rather than restated.
 - **The Overview grew a CTO track.** The two-minute page stays as the first
   tab; five more — agents and memory, tasks and runs, links, limits and
   safety, skills and tools — explain the actual backend mechanics with

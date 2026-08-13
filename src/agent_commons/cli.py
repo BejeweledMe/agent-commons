@@ -1411,7 +1411,13 @@ def agent_retire(
     show_default=True,
     help="What the link permits: a bounded question, or handing work over.",
 )
-@click.option("--deadline-seconds", type=int, required=True)
+@click.option(
+    "--deadline-seconds",
+    type=int,
+    default=None,
+    help="Optional intended horizon, recorded only. Nothing enforces it: a link "
+    "lives until it is explicitly closed.",
+)
 @click.option("--reason", required=True)
 @_idem
 @click.pass_obj
@@ -1420,11 +1426,11 @@ def agent_link(
     from_agent_id: str,
     to_agent_id: str,
     allowed_action: str,
-    deadline_seconds: int,
+    deadline_seconds: int | None,
     reason: str,
     idempotency_key: str | None,
 ) -> None:
-    """Open a bounded temporary link between two roles."""
+    """Open a link between two roles; it lives until explicitly closed."""
 
     state.emit(
         state.manager().open_agent_link(

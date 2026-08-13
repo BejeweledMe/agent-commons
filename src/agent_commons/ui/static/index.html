@@ -757,10 +757,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <span data-i18n="link_type_ask">Ask — may put questions to this role</span></label>
     <label><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
       <span data-i18n="link_type_handoff">Hand off work — may pass work to this role</span></label>
-    <label class="field"><span data-i18n="link_deadline_label">Deadline, hours</span>
-      <input type="number" id="link-hours" min="1" max="168" value="24">
-      <small class="note" data-i18n="link_deadline_note">Informative — required by the record, not
-        enforced by a timer.</small></label>
     <label class="field"><span data-i18n="link_reason_label">Why this link</span>
       <input type="text" id="link-reason" autocomplete="off"></label>
     <div class="actions">
@@ -1023,8 +1019,8 @@ const STRINGS = {
     guide_ln_handoff_h: "handoff_work is actually consumed",
     guide_ln_handoff_p: "Exactly one place in the lifecycle reads links: staffing a delegation. A session running as a role may staff itself or a role in its own lineage; an open handoff_work link from it to another role widens precisely that — nothing else. The check runs on delegation.requested and again on every replay.",
     guide_ln_handoff_ex: "role A, no link → delegation on_behalf_of role B is refused; open handoff_work A→B and the same write passes",
-    guide_ln_deadline_h: "deadline_seconds is informative",
-    guide_ln_deadline_p: "Replay has no clock, so expiry is never enforced during validation — the same events must project the same way forever. A link ends only through an explicit agent.link_closed; the deadline is bounds-checked at write time and shown to people as intent.",
+    guide_ln_deadline_h: "A link ends only when you close it",
+    guide_ln_deadline_p: "There is no expiry. Replay has no clock, and giving it one would let the same events project differently over time, so nothing can retire a permission on a schedule — only an explicit agent.link_closed does. The optional deadline_seconds field records an intended horizon for people to read; it constrains nothing, which is why the panel no longer asks for it. Bounds on agents are counted in attempts, provider units and depth, not in hours.",
     guide_lm_two_h: "Two layers of limits",
     guide_lm_two_p: "Per-run limits are written into delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency and a budget in provider_units or micro_usd — and a child can only narrow them. Operator limits live in the runtime config and cap every broker sharing one state root: global_concurrency 2, per-provider and per-profile concurrency, parent_provider_units 4, parent_budget_microusd, and max_delegations_total 16 bounding the whole tree — which depth and fanout alone never did.",
     guide_lm_two_ex: "provider_units budget below max_attempts → refused at launch: every permitted attempt must be payable",
@@ -1086,8 +1082,6 @@ const STRINGS = {
     link_type_label: "Type",
     link_type_ask: "Ask — may put questions to this role",
     link_type_handoff: "Hand off work — may pass work to this role",
-    link_deadline_label: "Deadline, hours",
-    link_deadline_note: "Informative — required by the record, not enforced by a timer.",
     link_reason_label: "Why this link",
     link_open_button: "Open the link",
     link_close_button: "Close the link",
@@ -1364,8 +1358,8 @@ const STRINGS = {
     guide_ln_handoff_h: "handoff_work реально потребляется",
     guide_ln_handoff_p: "Ровно одно место в lifecycle читает связи: постановка роли на делегирование. Сессия, работающая как роль, может ставить себя или роль из своей линии; открытая handoff_work-связь от неё к другой роли расширяет ровно это — и ничего больше. Проверка выполняется на delegation.requested и заново при каждом replay.",
     guide_ln_handoff_ex: "роль A без связи → делегирование on_behalf_of роли B отклоняется; откройте handoff_work A→B — та же запись проходит",
-    guide_ln_deadline_h: "deadline_seconds — информативный",
-    guide_ln_deadline_p: "У replay нет часов, поэтому истечение срока при валидации не применяется — одни и те же события обязаны проецироваться одинаково всегда. Связь заканчивается только явным agent.link_closed; дедлайн проверяется на границы при записи и показывается людям как намерение.",
+    guide_ln_deadline_h: "Связь заканчивается только закрытием",
+    guide_ln_deadline_p: "Истечения нет. У replay нет часов, а если их дать, одни и те же события начнут проецироваться по-разному со временем — поэтому снять полномочие по расписанию невозможно, только явным agent.link_closed. Необязательное поле deadline_seconds фиксирует намеренный горизонт для чтения людьми; оно ничего не ограничивает, поэтому панель его больше не спрашивает. Границы агентов считаются в попытках, provider units и глубине, а не в часах.",
     guide_lm_two_h: "Два слоя лимитов",
     guide_lm_two_p: "Лимиты прогона записываются в delegation.requested — max_depth, wall_time_seconds, max_attempts, max_concurrency и бюджет в provider_units или micro_usd — и потомок может их только сузить. Лимиты оператора живут в runtime-конфиге и накрывают все брокеры одного state root: global_concurrency 2, конкурентность по провайдеру и профилю, parent_provider_units 4, parent_budget_microusd и max_delegations_total 16, ограничивающий всё дерево целиком — чего depth и fanout сами по себе не делали.",
     guide_lm_two_ex: "бюджет provider_units меньше max_attempts → отказ на запуске: каждая разрешённая попытка должна быть оплачиваемой",
@@ -1427,8 +1421,6 @@ const STRINGS = {
     link_type_label: "Тип",
     link_type_ask: "Спросить — может задавать вопросы этой роли",
     link_type_handoff: "Передать работу — может передавать работу этой роли",
-    link_deadline_label: "Срок, часов",
-    link_deadline_note: "Информативный — обязателен для записи, таймером не исполняется.",
     link_reason_label: "Зачем эта связь",
     link_open_button: "Открыть связь",
     link_close_button: "Закрыть связь",
@@ -2156,7 +2148,6 @@ function openLinkModal(fromId, toId) {
   document.getElementById("link-pair").textContent =
     agentLabel(fromId) + " → " + agentLabel(toId);
   document.getElementById("link-type-ask").checked = true;
-  document.getElementById("link-hours").value = "24";
   document.getElementById("link-reason").value = "";
   document.getElementById("link-result").textContent = "";
   document.getElementById("link-modal").hidden = false;
@@ -2174,7 +2165,6 @@ document.getElementById("link-open-go").addEventListener("click", async () => {
       to_agent_id: linkPair.to,
       allowed_action:
         document.getElementById("link-type-handoff").checked ? "handoff_work" : "ask",
-      deadline_seconds: Number(document.getElementById("link-hours").value || 24) * 3600,
       reason: document.getElementById("link-reason").value,
     });
     document.getElementById("link-modal").hidden = true;
