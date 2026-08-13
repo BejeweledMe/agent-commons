@@ -128,6 +128,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .attn-item{border:1px solid var(--border); border-radius:6px; padding:8px; margin:0 0 8px}
 .attn-item.proposal{border-color:var(--info)}
 .attn-item.run_blocked{border-color:var(--warn)}
+/* Run cards open the run's record (round 2, PM finding 4): the cursor and the
+   hover ring say so before the click. */
+#runs-list .attn-item{cursor:pointer}
+#runs-list .attn-item:hover{border-color:var(--info)}
+#task-runs-list .attn-item{cursor:pointer}
+#task-runs-list .attn-item:hover{border-color:var(--info)}
 .attn-kind{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
@@ -499,6 +505,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       </div>
 
     <section class="panel open" id="panel-record">
+      <!-- The human layer above the raw record: a task's runs land here, so the
+           path from a finished run to its result is one click, not a graph hunt. -->
+      <div id="task-runs" hidden>
+        <h3 class="subhead" data-i18n="task_runs_heading">Runs on this task</h3>
+        <div id="task-runs-list"></div>
+      </div>
       <pre id="inspector-body"></pre>
       <div class="actions">
         <button type="button" id="link-close-btn" hidden data-i18n="link_close_button">Close the link</button>
@@ -762,6 +774,8 @@ const STRINGS = {
     hired: "hired",
     preset_none: "— none —",
     runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
+    runs_open_tip: "Open the run's record.",
+    task_runs_heading: "Runs on this task",
     live: "live",
     role_word: "role",
     on_word: "on",
@@ -1039,6 +1053,8 @@ const STRINGS = {
     hired: "нанята",
     preset_none: "— нет —",
     runs_note: "Текущие и недавние запуски провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
+    runs_open_tip: "Открыть запись прогона.",
+    task_runs_heading: "Прогоны по этой задаче",
     live: "в работе",
     role_word: "роль",
     on_word: "на",
@@ -2235,6 +2251,24 @@ document.getElementById("run-go").addEventListener("click", runRole);
 // through launching -> running -> succeeded/failed without a reload.
 let runs = [];
 
+// The run's record is the result surface; the task's state is a human decision
+// and never advances itself (round 2, PM findings). Clicking a run therefore
+// opens the delegation record instead of pretending the task moved.
+function openRunRecord(delegationId) {
+  const node = ((lastGraph && lastGraph.nodes) || [])
+    .find((candidate) => candidate.id === delegationId);
+  if (node) {
+    selected = node.id;
+    inspect(node);
+    render(lastGraph);
+    return;
+  }
+  // The node may have been trimmed from the graph; inspect() fetches the
+  // record from /api/entities on its own, so the drawer still opens.
+  selected = delegationId;
+  inspect({ kind: "delegation", id: delegationId, label: "", awaits_human: false, attrs: {} });
+}
+
 async function loadRuns() {
   try { runs = (await api("/api/runs")) || []; } catch (error) { runs = []; }
   // The nav item stays visible even with zero runs: an empty view that says
@@ -2274,7 +2308,45 @@ async function loadRuns() {
       summary.textContent = run.summary;
       card.appendChild(summary);
     }
+    // One click from the run to its record (round 2, PM finding 4). The loop
+    // variable is per-iteration, so the closure captures this run only.
+    card.setAttribute("title", t("runs_open_tip"));
+    card.addEventListener("click", () => openRunRecord(run.delegation_id));
     host.appendChild(card);
+  }
+}
+
+// The same runs, filtered to the task under inspection: the human layer above
+// the raw record in the drawer, so a finished run's result is one click away.
+function paintTaskRuns(node) {
+  const host = document.getElementById("task-runs-list");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const matched = runs.filter((run) => run.target_id === node.id);
+  // Hidden entirely for non-tasks and for tasks with no runs: no empty noise.
+  document.getElementById("task-runs").hidden = !(node.kind === "task" && matched.length);
+  for (const run of matched) {
+    const row = document.createElement("div");
+    row.className = "attn-item";
+    const kind = document.createElement("div");
+    kind.className = "attn-kind";
+    // Phase and delegation state are canonical strings, never translated.
+    kind.textContent = (run.live ? "● " + t("live") + " · " : "○ ") + run.phase +
+      (run.delegation_state ? " · " + run.delegation_state : "");
+    row.appendChild(kind);
+    const head = document.createElement("span");
+    head.textContent = (run.profile_id || "?") +
+      (run.agent_id ? " · " + t("role_word") + " " + agentLabel(run.agent_id) : "");
+    row.appendChild(head);
+    if (run.summary) {
+      // Agent prose, written as text.
+      const summary = document.createElement("p");
+      summary.className = "note";
+      summary.textContent = run.summary;
+      row.appendChild(summary);
+    }
+    row.setAttribute("title", t("runs_open_tip"));
+    row.addEventListener("click", () => openRunRecord(run.delegation_id));
+    host.appendChild(row);
   }
 }
 
@@ -2392,6 +2464,7 @@ async function inspect(node) {
     !(node.kind === "agent_link" && writesEnabled && node.state === "open");
   document.getElementById("run-result").textContent = "";
   showPanel("record");
+  paintTaskRuns(node);
   currentRole = null;
   document.getElementById("message-result").textContent = "";
   document.getElementById("settings-result").textContent = "";
