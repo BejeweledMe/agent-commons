@@ -148,6 +148,12 @@ def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
     assert found == set(MUTATING_ROUTES)
 
 
+def create_agent(client, *, name: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    response = client.post("/api/agents", json=_agent_body(name=name), headers=authorized())
+    assert response.status_code == 200, response.text
+    return {"id": response.json()["entity_ref"]["id"], "revision": response.json()["revision"]}
+
+
 def test_every_mutating_route_dies_without_the_manager_write_path(
     writable_client,  # type: ignore[no-untyped-def]
     workspace: dict[str, Any],
@@ -180,7 +186,30 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         target_revision=chain["task_revision"],
     )
 
+    second_task = create_task(writable_client, title="Вторая задача")
+    other_id = create_agent(writable_client, name="Other")["id"]
+    link = writable_client.post(
+        "/api/agent-links",
+        json={
+            "from_agent_id": agent_id,
+            "to_agent_id": other_id,
+            "allowed_action": "ask",
+            "reason": "so the close route has something to close",
+        },
+        headers=authorized(),
+    ).json()
+    # The chat route names its field `message`, not `body`; a real thread id is
+    # needed so the reply route below is exercised against something that exists.
+    thread = writable_client.post(
+        "/api/chat", json={"subject": "Kickoff", "message": "start"}, headers=authorized()
+    ).json()
+    thread_id = thread.get("entity_ref", {}).get("id") or thread.get("thread_id")
+    thread_revision = str(thread.get("revision", ""))
+
     monkeypatch.setattr(CommonsManager, "record_event", explode)
+    # Every route in the sealed tuple, not a sample of it: the docstring's claim
+    # is only true if the list below is the list up there. A route missing from
+    # here is a route that could stop being thin without this test noticing.
     calls = (
         ("/api/agents", _agent_body(name="Second")),
         (
@@ -189,14 +218,66 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ),
         (f"/api/agents/{agent_id}/retire", {"reason": "x"}),
         (f"/api/agents/{agent_id}/messages", {"body": "please look at this"}),
+        ("/api/chat", {"subject": "Second chat", "message": "hello"}),
+        (
+            f"/api/chat/{thread_id}/messages",
+            {"expected_revision": thread_revision, "message": "another line"},
+        ),
+        (
+            "/api/agent-links",
+            {"from_agent_id": agent_id, "to_agent_id": other_id, "reason": "x"},
+        ),
+        (
+            f"/api/agent-links/{link['entity_ref']['id']}/close",
+            {"expected_revision": link["revision"], "reason": "done"},
+        ),
+        ("/api/tasks", {"title": "Third", "description": "d", "acceptance_criteria": ["c"]}),
+        (
+            f"/api/tasks/{second_task['id']}/review-request",
+            {"expected_revision": second_task["revision"]},
+        ),
         (
             f"/api/tasks/{task['id']}/accept",
             {"expected_revision": chain["task_revision"], "summary": "looks right to me"},
         ),
+        (
+            f"/api/tasks/{task['id']}/reopen",
+            {"expected_revision": chain["task_revision"], "reason": "one more pass"},
+        ),
     )
+    # Two routes refuse on a missing subject before they reach any write, so
+    # driving them here would prove nothing about the write path; they are
+    # exercised end to end elsewhere (a real proposal thread in
+    # tests/ui/test_role_graph.py, a real pending operation in
+    # tests/ui/test_blockers.py). Naming them keeps the equality below exact:
+    # a NEW route cannot be added without being either exercised or exempted.
+    exempt = {
+        ("POST", "/api/agents/proposals/{thread_id}/approve"),
+        ("POST", "/api/operations/{operation_id}/answer"),
+    }
+    covered = {
+        ("POST", "/api/agents"),
+        ("POST", "/api/agents/{agent_id}/reconfigure"),
+        ("POST", "/api/agents/{agent_id}/retire"),
+        ("POST", "/api/agents/{agent_id}/messages"),
+        ("POST", "/api/chat"),
+        ("POST", "/api/chat/{thread_id}/messages"),
+        ("POST", "/api/agent-links"),
+        ("POST", "/api/agent-links/{link_id}/close"),
+        ("POST", "/api/tasks"),
+        ("POST", "/api/tasks/{task_id}/review-request"),
+        ("POST", "/api/tasks/{task_id}/accept"),
+        ("POST", "/api/tasks/{task_id}/reopen"),
+    }
+    assert covered | exempt == set(MUTATING_ROUTES)
+    assert len(calls) == len(covered)
     for path, body in calls:
-        with pytest.raises(AssertionError, match="outside CommonsManager"):
+        try:
             writable_client.post(path, json=body, headers=authorized())
+        except AssertionError as exc:
+            assert "outside CommonsManager" in str(exc), path
+        else:
+            raise AssertionError(f"{path} reached a terminal answer without the write path")
 
 
 def test_each_mutating_route_lands_its_event_in_the_ledger(

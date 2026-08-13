@@ -978,7 +978,16 @@ class UIContext:
 
     #: What the ledger will say this operator did.  Canonical text, so it stays
     #: English and honest: the panel sent the work onward, it did not do it.
-    _WALK_SUMMARY = "the operator sent this work for review from the panel"
+    #: Two sentences, because `complete_task` is a claim that the work is done
+    #: and the two ways of arriving at it are not the same claim.  A run that
+    #: finished is evidence; without one the operator is asserting completion
+    #: themselves -- legitimate (they may have done the work by hand) but it
+    #: must not be recorded as though a run produced it.
+    _WALK_SUMMARY = "the operator sent finished work for review from the panel"
+    _WALK_SUMMARY_UNRUN = (
+        "the operator judged this work done and sent it for review from the panel; "
+        "no run had finished on it"
+    )
 
     @staticmethod
     def _step_key(idempotency_key: str | None, step: str) -> str | None:
@@ -990,6 +999,21 @@ class UIContext:
         """
 
         return None if not idempotency_key else f"{idempotency_key}:{step}"
+
+    @staticmethod
+    def _task_has_finished_run(manager: CommonsManager, task_id: str) -> bool:
+        """Did any delegation on this task actually reach a successful end?
+
+        The evidence the panel needs before it will claim a task is completed.
+        Only `succeeded` counts: a run that ended `needs_operator` or `failed`
+        produced no result to review.
+        """
+
+        target = {"kind": "task", "id": task_id}
+        return any(
+            record.get("state") == "succeeded" and record.get("target_ref") == target
+            for record in manager.snapshot().delegations.values()
+        )
 
     @staticmethod
     def _task_or_refuse(manager: CommonsManager, task_id: str) -> Mapping[str, Any]:
@@ -1044,10 +1068,17 @@ class UIContext:
                 )
         steps: list[str] = []
         revision = str(expected_revision)
+        # Decided once, before the walk moves anything: afterwards the task's own
+        # state has changed and the question "was there evidence?" is muddier.
+        summary = (
+            self._WALK_SUMMARY
+            if self._task_has_finished_run(manager, task_id)
+            else self._WALK_SUMMARY_UNRUN
+        )
         for step in walk:
             arguments: dict[str, Any] = {"idempotency_key": self._step_key(idempotency_key, step)}
             if step in {"complete_task", "submit_task"}:
-                arguments["summary"] = self._WALK_SUMMARY
+                arguments["summary"] = summary
             getattr(manager, step)(task_id, revision, **arguments)
             steps.append(step)
             # A transition names the record's `revision`; the review that follows

@@ -177,6 +177,35 @@ compromises were built and are marked [done] inside those entries.
     would be less honest, not more. **[done]** instead: group them visually as
     forthcoming. (Designer 20.)
 
+## Post-implementation verification (2026-08-14)
+
+An independent verifier read the seven implementation commits against this
+plan and the invariants. It confirmed the domain and services are untouched
+across the range (`git diff --stat` over both trees is empty), one write path,
+CSP clean, 520-key locale parity, and 714 tests passing. It also found three
+real defects, all fixed before the push:
+
+- **A language switch discarded a half-typed acceptance summary.**
+  `paintTaskAcceptance()` closed the confirm form on every repaint, and it is
+  a language surface — so switching locale mid-acceptance hid the typed text
+  and the next click wiped it. This contradicted the rule the file states
+  about itself: a repainted surface rewrites labels, never an operator's
+  input. The reset is now conditional on the shown task actually changing.
+- **The one-write-path test covered five of fourteen routes while claiming
+  all of them.** It now exercises twelve and names the two it cannot — a
+  proposal approval and an operation answer both refuse on a missing subject
+  before reaching any write, and are driven end to end elsewhere. The
+  exemptions are asserted as a set, so a new route cannot be added without
+  being either exercised or explicitly exempted.
+- **The review walk recorded `task.completed` with the same sentence whether
+  or not any run had finished.** Judgment call, since the verifier asked for
+  one: refusing the walk would have been wrong — an operator may legitimately
+  have done the work by hand, and the panel cannot know otherwise. But the two
+  are not the same claim, so the ledger now records which one it was: "the
+  operator sent finished work for review" when a run succeeded, and "the
+  operator judged this work done… no run had finished on it" when none did.
+  Honest attribution rather than a refusal that would block a real flow.
+
 ## Landed before this plan (do not redo)
 
 From rounds 1–2, already shipped and verified live: task creation from the

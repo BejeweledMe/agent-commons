@@ -346,3 +346,48 @@ def test_finished_work_waits_in_attention_until_somebody_accepts_it(
 
     after = writable_client.get("/api/attention", headers=authorized()).json()
     assert [item for item in after["items"] if item["kind"] == "work_returned"] == []
+
+
+def test_the_ledger_says_which_of_the_two_claims_this_was(
+    writable_client, workspace: dict[str, Any]  # type: ignore[no-untyped-def]
+) -> None:
+    """`complete_task` asserts the work is done, and there are two ways to
+    arrive at it: a run finished, or the operator judged it done by hand. Both
+    are legitimate — an operator may have written the code themselves — but they
+    are not the same claim, so the summary the ledger keeps says which one it
+    was rather than implying a run that never happened."""
+
+    from agent_commons.services import CommonsManager
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+
+    unrun = create_task(writable_client, title="Никто не запускался")
+    send_for_review(writable_client, unrun["id"], unrun["revision"])
+    said = [
+        str(record.get("summary", ""))
+        for record in manager.snapshot().tasks.values()
+        if record["id"] == unrun["id"]
+    ]
+    assert said and "no run had finished" in said[0], said
+    assert "judged this work done" in said[0]
+
+
+def test_a_language_switch_keeps_a_half_typed_acceptance(  # noqa: D401
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """The panel's own rule, asserted on the surface table: a repaint driven by
+    the language picker may rewrite labels but must never take an operator's
+    half-finished input with it. `paintTaskAcceptance` used to close the confirm
+    unconditionally, which hid a typed summary and then wiped it."""
+
+    from agent_commons.ui import read_spa
+
+    body = read_spa()
+    table = body.split("const LANGUAGE_SURFACES", 1)[1].split("];", 1)[0]
+    assert "paintTaskAcceptance" in table, "the acceptance surface must repaint on a switch"
+    guard = body.split("function paintTaskAcceptance", 1)[1].split("\n}", 1)[0]
+    # The reset is conditional on the task actually changing.
+    assert "sameTask" in guard, guard[:400]
+    assert "setAcceptanceMode(null)" not in guard.replace(
+        "setAcceptanceMode(sameTask ? acceptanceMode : null)", ""
+    )

@@ -4493,11 +4493,21 @@ function setAcceptanceMode(mode) {
   document.getElementById("task-acceptance-confirm").hidden = mode === null;
 }
 
+// Which task the acceptance block was last painted for, so a repaint can tell
+// "the operator opened another task" from "the same task, painted again".
+let acceptanceTaskId = null;
+
 function paintTaskAcceptance() {
   const host = document.getElementById("task-acceptance");
   const record = currentTask;
   host.hidden = !(record && writesEnabled);
-  setAcceptanceMode(null);
+  // A language switch repaints this surface, and closing the confirm would
+  // take a half-typed summary off screen with it -- the very thing the surface
+  // table above forbids. Keep the operator's open form when the task has not
+  // changed; reset it only when a different task is being shown.
+  const sameTask = Boolean(record) && acceptanceTaskId === String(record.id || "");
+  acceptanceTaskId = record ? String(record.id || "") : null;
+  setAcceptanceMode(sameTask ? acceptanceMode : null);
   if (host.hidden) { return; }
   const state = String(record.state || "");
   const line = ACCEPT_OPEN_STATES.has(state) ? "accept_state_open"
