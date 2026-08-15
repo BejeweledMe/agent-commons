@@ -168,18 +168,17 @@ def test_the_rationale_says_it_is_a_record_and_not_an_instruction() -> None:
     )[0]
     assert between.count("<") == 2, between
 
-    # ...and directly above where the skills picker lands in wave 2, so the two
-    # things the sentence names sit next to it rather than somewhere else in the
-    # form.  The slot is marked, and today the context row follows it with no
-    # element in between.
-    assert "Wave 2 lands the skills picker here" in hire
+    # ...and directly above the skills picker it names, which wave 2 landed in
+    # the slot this test used to hold open with a marker comment.  The sentence
+    # points at the skills and at the task form; the skills are now the very
+    # next thing on screen, with no element in between.
     assert (
         hire.index('data-i18n="hire_rationale_help"')
-        < hire.index("Wave 2 lands the skills picker here")
+        < hire.index('id="hire-skills-block"')
         < hire.index('id="hire-context-field"')
     )
     after = stripped.split('data-i18n="hire_rationale_help"', 1)[1].split(
-        'id="hire-context-field"', 1
+        'id="hire-skills-block"', 1
     )[0]
     assert after.count("<") == 2, after
 
@@ -273,8 +272,8 @@ def test_the_turnover_budget_is_marked_when_it_becomes_required() -> None:
 
 
 def test_the_hire_form_asks_its_questions_in_the_order_the_plan_settled() -> None:
-    """How -> Template -> Name* -> Profile* -> Why* -> (skills, wave 2) ->
-    Context -> Grants -> Budget.  Identity before behaviour before permissions,
+    """How -> Template -> Name* -> Profile* -> Why* -> Skills -> Context ->
+    Grants -> Budget.  Identity before behaviour before permissions,
     with the two visual groups carried by `.subhead` -- collapsing blocks was
     refused, because a collapsed block holding a field the server can refuse
     needs a rule that forces it open and new aria machinery inside the focus
@@ -291,7 +290,7 @@ def test_the_hire_form_asks_its_questions_in_the_order_the_plan_settled() -> Non
         'id="hire-profile-field"',
         'id="hire-rationale"',
         'data-i18n="hire_rationale_help"',
-        "Wave 2 lands the skills picker here",
+        'id="hire-skills-field"',
         'id="hire-context-field"',
         'data-i18n="hire_group_rights"',
         'id="hire-grants"',

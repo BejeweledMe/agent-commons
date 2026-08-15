@@ -307,6 +307,21 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .gref::before{content:"?"}
 .gref:hover{border-color:var(--info); color:var(--info)}
 .field > .gref{position:absolute; top:-1px; right:0}
+/* The answer brought to the field, instead of the field taken away from the
+   operator to reach the answer (round 4, finding 1).  ONE node lives at the end
+   of the body and is moved into whichever `.field` was asked, so its place on
+   screen is decided by this rule and by
+   nothing else: `style-src 'nonce-…'` carries no `style-src-attr`, so a computed
+   `left`/`top` written from JS would be dropped on the floor and the panel would
+   show a box in the corner.  `top:100%` puts it under the field it explains
+   rather than over the control the operator was just using. */
+.gpop{
+  position:absolute; top:100%; left:0; right:0; z-index:5; margin-top:2px;
+  background:var(--surface); border:1px solid var(--info); border-radius:6px;
+  padding:8px 10px; box-shadow:0 8px 24px rgba(0,0,0,.45);
+}
+.gpop .note{margin:0 0 6px; color:var(--fg)}
+.gpop .actions{margin:0}
 /* A field's own control fills the field's width — and that is all this says.
    Written as a descendant it also caught the RADIO and CHECKBOX inside a row
    nested in a field, stretching a 13px dot into a 324px styled box that pushed
@@ -1342,7 +1357,30 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="note" data-i18n="hire_rationale_help">A note for the log and for people: why this
         role exists. The role never receives it as an instruction — what it must do is set by its
         skills and by the text of the task.</p>
-      <!-- Wave 2 lands the skills picker here, directly under the line above. -->
+      <!-- Round 4, finding 3: the catalogue held skills and the hire form had
+           nowhere to choose them, so the one thing that DOES decide behaviour
+           could only be set after the role existed, in another panel.  The
+           picker is the settings panel's, verbatim — same label, same mark,
+           same contract line, same warning past three — because they are the
+           same decision made at two moments, and a second vocabulary for it
+           would be a second thing to learn.  The block travels as one and
+           leaves with the rest of the setup on the template path: a template
+           carries its own skills, and a picker that REPLACES them (the backend
+           fills only what the payload leaves unset) would read as "add to". -->
+      <div id="hire-skills-block">
+        <label class="field" id="hire-skills-field"><span data-i18n="setting_skills_label">Skills every run of this role receives</span>
+          <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-skill"
+            data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
+          <select id="hire-skills" multiple size="4"></select></label>
+        <!-- Written from JS for the same reason the settings one is: the second
+             half of the sentence depends on the catalogue-editing gate. -->
+        <p class="note" id="hire-skills-empty" hidden></p>
+        <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions
+          on every run. Changes apply from the next run, never retroactively.</p>
+        <p class="note warn" id="hire-skills-count" hidden data-i18n="skills_too_many">More than three
+          skills compete for the role's attention; conflicting playbooks quietly
+          degrade the work.</p>
+      </div>
       <!-- The same four marks as the settings panel, plus the turnover budget,
            because this form is where an operator meets all five for the first
            time.  A mark inside a dialog leaves the dialog, so it goes through
@@ -1460,6 +1498,22 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <button type="button" id="close-link-cancel" data-i18n="hire_cancel">Cancel</button>
     </div>
     <p class="result" id="close-link-result"></p>
+  </div>
+</div>
+<!-- One help popover for the whole panel, parked here and moved into whichever
+     `.field` asked for it.  One node rather than one per mark: the text, the
+     two buttons and the language switch then have a single owner, and there is
+     never a second popover to close.  It is a DESCENDANT of the dialog while it
+     is open, which is what makes the existing focus trap pick its buttons up
+     and what keeps the backdrop dismissal from firing under it — both
+     mechanisms are DOM-shaped and needed no change.  `aria-live` announces the
+     text without moving focus: the operator was typing, and taking the caret
+     out of the field to read a definition is the complaint, not the fix. -->
+<div class="gpop" id="gpop" hidden aria-live="polite">
+  <p class="note" id="gpop-text"></p>
+  <div class="actions">
+    <button type="button" id="gpop-more" data-i18n="gpop_more">Read the whole paragraph</button>
+    <button type="button" id="gpop-close" data-i18n="gpop_close">Close</button>
   </div>
 </div>
 <script nonce="__CSP_NONCE__">
@@ -1746,6 +1800,10 @@ const STRINGS = {
     gref_skills: "What a skill is, and where it comes from. Opens the Overview.",
     gref_tools: "Why choosing tools can only narrow, never widen. Opens the Overview.",
     gref_run_states: "requested, active, succeeded, needs_operator — what a run’s states mean. Opens the Overview.",
+    // The two words the popover adds. Everything it SAYS is the gref_* line the
+    // mark already carried, so a mark that opens it needs no second string.
+    gpop_more: "Read the whole paragraph",
+    gpop_close: "Close",
     guide_ag_role_h: "A role is a ledger record",
     guide_ag_role_p: "Hiring writes one agent.created event: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no store beside the ledger — the current staff list is replayed from events, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
@@ -2273,6 +2331,8 @@ const STRINGS = {
     gref_skills: "Что такое навык и откуда он берётся. Откроет «Обзор».",
     gref_tools: "Почему выбор инструментов может только сужать, но не расширять. Откроет «Обзор».",
     gref_run_states: "requested, active, succeeded, needs_operator — что значат состояния прогона. Откроет «Обзор».",
+    gpop_more: "Читать полностью",
+    gpop_close: "Закрыть",
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
@@ -2635,6 +2695,22 @@ function refusedField(message) {
   }
   return null;
 }
+// The refusals above name a wire field and are all about a field left blank, so
+// a match rewrites the sentence.  This one names no field and is not about
+// blankness: the catalogue check refuses a skill nobody installed, and its
+// sentence is already precise.  So it is matched for PLACEMENT only — the text
+// stays verbatim and lands under the picker it is about rather than under the
+// buttons, which is where a refusal about a control was worth nothing (round 3).
+const REFUSED_CONTROLS = [
+  [/^these skills are not in the operator catalogue: /, "skills"],
+];
+
+function refusedControl(message) {
+  for (const [pattern, field] of REFUSED_CONTROLS) {
+    if (pattern.test(message)) { return field; }
+  }
+  return null;
+}
 // The acceptance chain's refusals are the ones an operator meets while trying
 // to close the loop, and they arrived raw and in English under a Russian panel:
 // a reviewer launched with no open review request said so in the vocabulary of
@@ -2691,7 +2767,8 @@ function clearFieldErrors(root) {
 
 function showFormError(error, fields, result) {
   const text = humanizeError(error, fieldLabelsOf(fields));
-  const entry = fields[refusedField(String(error.message || error))];
+  const message = String(error.message || error);
+  const entry = fields[refusedField(message)] || fields[refusedControl(message)];
   const input = entry ? document.getElementById(entry[1]) : null;
   if (!input) {
     result.className = "result bad";
@@ -3410,6 +3487,11 @@ function applyHireMode() {
   document.getElementById("hire-preset-field").hidden = !fromPreset;
   document.getElementById("hire-preset-empty").hidden = !(wantsPreset && !hasPresets);
   document.getElementById("hire-profile-field").hidden = fromPreset;
+  // The skills block leaves with the rest of what a template decides.  The
+  // backend fills only the fields the payload leaves unset, so a picker offered
+  // here would REPLACE the template's skills rather than add to them — and it
+  // would say neither which ones it was replacing nor that it was replacing.
+  document.getElementById("hire-skills-block").hidden = fromPreset;
   document.getElementById("hire-context-field").hidden = fromPreset;
   document.getElementById("hire-rights").hidden = fromPreset;
 }
@@ -3466,6 +3548,14 @@ function showHire(open, options) {
   document.getElementById("hire-retire_roles").value = "deny";
   document.getElementById("hire-open_links").value = "deny";
   document.getElementById("hire-context_mode").value = "fresh";
+  // A multiple select has no single value to blank, so the reset is per option —
+  // and it has to happen, or the skills of the last role hired would be the
+  // opening state of the next form, which is the leak this whole block exists
+  // to close.  The warning goes with them.
+  for (const option of document.getElementById("hire-skills").options) {
+    option.selected = false;
+  }
+  paintSkillCount("hire-skills", "hire-skills-count");
   document.getElementById("hire-mode").value = "new";
   document.getElementById("hire-preset").value = "";
   presetRationale = "";
@@ -3591,9 +3681,76 @@ function openGuide(page, anchorId) {
   void heading.offsetWidth;
   heading.classList.add("flash");
 }
+
+// --- the same answer, without leaving the form -----------------------------
+// Round 4, finding 1: the mark beside "Memory between runs" took the operator
+// out of the hire dialog to read one sentence, and the guard above then asked
+// them to choose between the definition and everything they had typed.  Outside
+// a dialog the guide is still the right answer and nothing here changes.  Inside
+// one, the sentence the mark already carries as its tooltip is brought to the
+// field, and the guide stays one button away — through the same departure guard,
+// because reading the whole page IS leaving the form.
+//
+// The popover remembers the KEY, not the text: a language switch repaints it in
+// place (LANGUAGE_SURFACES below) instead of closing it, which would be the same
+// interruption in a smaller form.
+let gpopKey = null;
+let gpopTarget = null;
+
+function paintGuidePopover() {
+  if (gpopKey) { document.getElementById("gpop-text").textContent = t(gpopKey); }
+}
+
+function openGuidePopover(link) {
+  const pop = document.getElementById("gpop");
+  gpopKey = link.dataset.i18nTitle;
+  gpopTarget = { page: link.dataset.guidePage, anchor: link.dataset.guideAnchor };
+  // Into the FIELD, not next to the mark: the field is the element already made
+  // `position:relative` for the mark itself, so the class does the placing.
+  (link.closest(".field") || link.parentElement).appendChild(pop);
+  paintGuidePopover();
+  pop.hidden = false;
+}
+
+// Back to the body, always.  Left inside the dialog's markup it would be hidden
+// along with the dialog and then reappear, still parented to a field nobody is
+// looking at, the next time any dialog opened.
+function closeGuidePopover() {
+  const pop = document.getElementById("gpop");
+  pop.hidden = true;
+  gpopKey = null;
+  gpopTarget = null;
+  document.body.appendChild(pop);
+}
+
 document.addEventListener("click", (event) => {
   const link = event.target.closest("[data-guide-anchor]");
-  if (link) { openGuide(link.dataset.guidePage, link.dataset.guideAnchor); }
+  if (!link) { return; }
+  // A mark with no tooltip key has nothing to show in place and would open an
+  // empty box; it falls through to the guide, which is where it went before.
+  const inDialog = openModalId &&
+    document.getElementById(openModalId).contains(link) && link.dataset.i18nTitle;
+  if (inDialog) { openGuidePopover(link); return; }
+  openGuide(link.dataset.guidePage, link.dataset.guideAnchor);
+});
+document.getElementById("gpop-close").addEventListener("click", closeGuidePopover);
+document.getElementById("gpop-more").addEventListener("click", () => {
+  if (!gpopTarget) { return; }
+  // Nothing is closed here: a departure that goes through closes the dialog,
+  // and `closeModal` takes the popover with it.  A departure the operator
+  // cancels at the `confirm_discard` leaves both exactly as they were.
+  openGuide(gpopTarget.page, gpopTarget.anchor);
+});
+// A press anywhere else is the operator moving on, and only the popover goes.
+// It cannot dismiss the dialog underneath: `dismissOnBackdrop` requires the
+// press to land on the scrim itself, and the popover is a descendant of the
+// `.modal`.  The mark is excluded because the delegate above owns it — it moves
+// the popover to another field rather than closing it here and reopening.
+document.addEventListener("pointerdown", (event) => {
+  const pop = document.getElementById("gpop");
+  if (pop.hidden || pop.contains(event.target)) { return; }
+  if (event.target.closest && event.target.closest("[data-guide-anchor]")) { return; }
+  closeGuidePopover();
 });
 document.getElementById("sidebar").addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -3671,6 +3828,10 @@ function openModal(scrimId, focusId) {
 
 function closeModal(scrimId) {
   document.getElementById(scrimId).hidden = true;
+  // The popover is a descendant of whatever dialog it was opened in, so it has
+  // to be handed back before the dialog goes — otherwise it travels with the
+  // markup and surfaces inside the next dialog that opens.
+  closeGuidePopover();
   if (openModalId !== scrimId) { return; }
   openModalId = null;
   modalOpenedAs = null;
@@ -3698,7 +3859,12 @@ window.addEventListener("keydown", (event) => {
   const scrim = document.getElementById(openModalId);
   if (event.key === "Escape") {
     event.preventDefault();
-    dismissOpenModal();
+    // The innermost thing closes first.  A popover is open because the operator
+    // stopped to read one definition, so the press that ends the reading must
+    // not also take the form away — that is the very loss this popover exists
+    // to stop.  The second press is the ordinary one, guard and all.
+    if (!document.getElementById("gpop").hidden) { closeGuidePopover(); }
+    else { dismissOpenModal(); }
     return;
   }
   if (event.key !== "Tab") { return; }
@@ -3746,10 +3912,20 @@ document.getElementById("tools-mode-full").addEventListener("change", () => {
 document.getElementById("tools-mode-narrow").addEventListener("change", () => {
   document.getElementById("tools-checklist").hidden = false;
 });
-document.getElementById("setting-skills").addEventListener("change", () => {
-  document.getElementById("skills-count-note").hidden =
-    selectedValues(document.getElementById("setting-skills")).length <= 3;
-});
+// Past three skills a role's attention is split, and that is true wherever the
+// choice is made: the warning is one function on both pickers rather than two
+// copies that can drift apart (round 4, finding 3).
+function paintSkillCount(pickerId, noteId) {
+  document.getElementById(noteId).hidden =
+    selectedValues(document.getElementById(pickerId)).length <= 3;
+}
+for (const [pickerId, noteId] of [
+  ["setting-skills", "skills-count-note"],
+  ["hire-skills", "hire-skills-count"],
+]) {
+  document.getElementById(pickerId).addEventListener("change",
+    () => paintSkillCount(pickerId, noteId));
+}
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
@@ -4783,8 +4959,16 @@ function paintHire() {
   // still right; overwriting a human's choice is not, so what is selected now
   // is what is re-selected, and a value the new options no longer carry falls
   // back exactly as it did before.
-  const held = (id, fallback) =>
-    document.getElementById("hire-modal").hidden ? fallback : document.getElementById(id).value;
+  // A multiple select holds a SET, and `.value` is only its first selected
+  // option: handing that back to `fillSelect` would re-select one skill and drop
+  // every other one the operator had chosen — the same clobber this guard
+  // exists to prevent, quieter and harder to notice.  `fillSelect` already takes
+  // an array for a multiple, so the two shapes meet where they belong.
+  const held = (id, fallback) => {
+    const element = document.getElementById(id);
+    return document.getElementById("hire-modal").hidden ? fallback
+      : (element.multiple ? selectedValues(element) : element.value);
+  };
   fillSelect(document.getElementById("hire-profile"), catalog.profiles || [],
     held("hire-profile", null), false);
   fillSelect(document.getElementById("hire-context_mode"),
@@ -4799,6 +4983,19 @@ function paintHire() {
   // back to `deny` — so the mark is recomputed from what the selects now hold
   // rather than left saying what they held before.
   paintTurnoverRequirement();
+  // The skills picker, and the settings panel's empty state with it: an empty
+  // catalogue renders this control as an empty box that reads as broken, so the
+  // box gives way to the line that says what a skill is and where skills come
+  // from.  The line is written here rather than carried as `data-i18n` because
+  // its second half depends on the catalogue-editing gate — and because being
+  // written here is what repaints it on a language switch.
+  const skills = catalog.skills || [];
+  fillSelect(document.getElementById("hire-skills"), skills, held("hire-skills", []), true);
+  document.getElementById("hire-skills-field").hidden = !skills.length;
+  document.getElementById("hire-skills-empty").hidden = skills.length > 0;
+  document.getElementById("hire-skills-empty").textContent = t("skills_empty") + " " +
+    (catalogEditing ? t("catalog_add_here") : t("catalog_readonly"));
+  paintSkillCount("hire-skills", "hire-skills-count");
   const presets = [{ id: "", title: t("preset_none") }].concat(
     (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
   fillSelect(document.getElementById("hire-preset"), presets, held("hire-preset", ""), false);
@@ -4846,12 +5043,23 @@ async function hireRole() {
       open_links: document.getElementById("hire-open_links").value,
     };
     body.turnover_budget = budgetRaw === "" ? null : Number(budgetRaw);
+    // Nothing chosen is not a choice: the key is left off the wire entirely
+    // rather than sent as an empty list, which is the discipline the settings
+    // panel already keeps for the same picker (an empty select must never wipe
+    // what it cannot display).  `tool_allowlist` deliberately stays out of this
+    // form — narrowing tools needs the profile's own tool reference, which is
+    // loaded per role, and a hire has no role yet.
+    const skills = selectedValues(document.getElementById("hire-skills"));
+    if (skills.length) { body.skills = skills; }
   }
   // A catalogue hire with no template chosen trips profile_id on the wire, but
   // the field the operator left empty is "Template" (round 2, PM findings).
   const fields = Object.assign({
     name: ["hire_name_label", "hire-name"],
     rationale: ["hire_rationale_label", "hire-rationale"],
+    // A refusal about the skills selection belongs under the picker, by the
+    // label the operator is reading, exactly like the other three.
+    skills: ["setting_skills_label", "hire-skills"],
   }, fromPreset
     ? { profile_id: ["hire_preset_label", "hire-preset"] }
     : { profile_id: ["hire_profile_label", "hire-profile"] });
@@ -6267,6 +6475,9 @@ const LANGUAGE_SURFACES = [
   ["legend", () => paintGlyphLegend()],
   ["catalogue", () => paintCatalog()],
   ["hire", () => paintHire()],
+  // The popover keeps the KEY it was opened with, so a language switch rewrites
+  // the sentence where it stands instead of closing it under the reader.
+  ["help_popover", () => paintGuidePopover()],
   ["links", () => { if (shownNode && shownNode.kind === "agent") { paintLinks(shownNode.id); } }],
   ["settings", () => { if (currentRole) { paintSettingsLabels(currentRole); } }],
   ["drawer", () => paintDrawerChrome()],

@@ -680,6 +680,16 @@ def test_an_empty_catalogue_explains_the_skills_box_instead_of_showing_an_empty_
     assert "if (!summary.narrowable.length) {" in paint
     assert 't("tools_none_narrowable")' in paint
 
+    # And so does the hire form's copy of the picker (round 4, finding 3): the
+    # same box with the same hole, so the same empty state, in the same words --
+    # written from JS there too, because the second half of the sentence still
+    # depends on the catalogue-editing gate.
+    hire = body.split("function paintHire() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'document.getElementById("hire-skills-field").hidden = !skills.length;' in hire
+    assert 'document.getElementById("hire-skills-empty").hidden = skills.length > 0;' in hire
+    assert 'catalogEditing ? t("catalog_add_here") : t("catalog_readonly")' in hire
+    assert '<p class="note" id="hire-skills-empty" hidden></p>' in body
+
     table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
     for key in ("skills_empty", "catalog_add_here", "tools_none_narrowable"):
         for block in ("en: {", "ru: {"):
@@ -702,8 +712,14 @@ def test_a_repaint_cannot_change_the_hire_modal_under_the_operator() -> None:
 
     paint = body.split("function paintHire() {", 1)[1].split("\n}\n", 1)[0]
     assert 'document.getElementById("hire-modal").hidden ? fallback' in paint
-    for picker in ("hire-profile", "hire-context_mode", "hire-preset"):
+    for picker in ("hire-profile", "hire-context_mode", "hire-preset", "hire-skills"):
         assert f'held("{picker}"' in paint, picker
+    # The skills picker is a multiple select, so what it holds is a SET.  `.value`
+    # on a multiple select is only its first selected option: handing that back
+    # would re-select one skill and silently drop the rest -- the same clobber,
+    # in the one control where it is hardest to notice.
+    assert "element.multiple ? selectedValues(element) : element.value" in paint
+    assert 'held("hire-skills", [])' in paint
 
     assert "function dismissOnBackdrop(" in body
     assert 'scrim.addEventListener("pointerdown"' in body
@@ -1021,6 +1037,9 @@ LANGUAGE_SURFACES = {
     "legend",
     "catalogue",
     "hire",
+    # The help popover keeps the key it was opened with, so a language switch
+    # rewrites the sentence in place instead of closing it under the reader.
+    "help_popover",
     "links",
     "settings",
     "drawer",
@@ -1797,8 +1816,10 @@ def test_every_guide_deep_link_lands_on_a_heading_that_actually_exists() -> None
         assert f'id="{anchor}"' in section, (page, anchor)
 
     # One mechanism, not a handler per link: `openGuide` is defined once and
-    # called once, from a single delegated listener.
-    assert body.count("openGuide(") == 2
+    # called from exactly two places -- the single delegated listener, and the
+    # popover's "read the whole paragraph" button, which is the same departure
+    # taken deliberately (round 4, finding 1).
+    assert body.count("openGuide(") == 3
     assert 'const link = event.target.closest("[data-guide-anchor]");' in body
     opener = body.split("function openGuide(page, anchorId) {", 1)[1].split("\n}\n", 1)[0]
     assert "viewShow(\"guide\");" in opener
