@@ -343,11 +343,17 @@ def test_a_field_shaped_refusal_lands_on_its_field_not_only_on_the_result_line()
     dead and nothing said which field was wrong."""
 
     body = read_spa()
+    # The line and its placement live in one function, because round 4 gave the
+    # link dialog refusals it can raise before it writes: those have to land
+    # looking and behaving exactly like the server's, or there are two places to
+    # look for one answer.
+    place = body.split("function showFieldNote(inputId, text) {", 1)[1].split("\n}\n", 1)[0]
+    assert 'line.className = "field-error";' in place
+    assert 'input.closest("label.field")' in place
+    assert 'field.scrollIntoView({ block: "nearest" });' in place
+    assert "input.focus();" in place
     show = body.split("function showFormError(", 1)[1].split("\n}\n", 1)[0]
-    assert 'line.className = "field-error";' in show
-    assert 'input.closest("label.field")' in show
-    assert 'field.scrollIntoView({ block: "nearest" });' in show
-    assert "input.focus();" in show
+    assert "showFieldNote(entry[1], text);" in show, "the server's refusal uses another placer"
     # A refusal the panel cannot attribute to a field still shows -- and is
     # scrolled to, because being off-screen was the complaint either way.
     assert 'result.scrollIntoView({ block: "nearest" });' in show

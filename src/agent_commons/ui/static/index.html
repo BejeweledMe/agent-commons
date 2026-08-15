@@ -150,6 +150,13 @@ footer .foot-gloss{color:var(--faint)}
 #linkband{position:absolute; inset:0; width:100%; height:100%;
   pointer-events:none; z-index:6}
 #linkband path{fill:none; stroke:var(--info); stroke-width:1.5; stroke-dasharray:5 4}
+/* The card the release would actually land on, marked while the band is still
+   moving.  The drop is forgiving on purpose, and a forgiving drop that shows
+   nothing looks exactly like a miss until it is too late to aim again — so the
+   promise is drawn from the SAME search that keeps it (nearestDropTarget).
+   Written as a class, never as a computed style: `style-src 'nonce-…'` carries
+   no `style-src-attr`, and an inline stroke would simply be dropped. */
+.node.droptarget rect{stroke:var(--info); stroke-width:3.5}
 .edge.faded{opacity:.07}
 .edge.incident{stroke:var(--info); stroke-width:2.2; opacity:1}
 button{
@@ -1513,7 +1520,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 <div class="scrim" id="link-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
     <h2 data-i18n="link_modal_title" id="link-modal-title" tabindex="-1">Open a link</h2>
-    <p class="note" id="link-pair"></p>
+    <!-- Both sides are choosable, not only the one the pointer happened to
+         reach (round 4, finding 6).  The pair used to be a static sentence, so
+         a permission between two roles the layout kept apart could not be
+         opened at all, and a release that fell short cancelled in silence.  The
+         options come from the same candidate list the drawer's picker offers,
+         built once in `linkCandidates`, so the dialog can never name a role the
+         board would refuse to drop on.  The "not chosen yet" option is left in
+         the markup with its own `data-i18n`: the roles below it are proper
+         names nobody translates, and this one line is not — keeping it here
+         hands it to `applyI18n` instead of inventing a repaint for a dialog. -->
+    <label class="field"><span data-i18n="link_from_label">Who gets the permission</span>
+      <select id="link-from">
+        <option value="" data-i18n="link_pick_placeholder">— pick a role —</option>
+      </select></label>
+    <div class="actions">
+      <button type="button" id="link-swap" data-i18n="link_swap">⇄ Swap the sides</button>
+    </div>
+    <label class="field"><span data-i18n="link_to_label">Whom they may reach</span>
+      <select id="link-to">
+        <option value="" data-i18n="link_pick_placeholder">— pick a role —</option>
+      </select></label>
     <p class="note" data-i18n="link_permission_note">A link is a recorded permission in the journal;
       it does not open a communication channel yet.</p>
     <!-- `ask` and `handoff_work` are a typed enum, not a pair of English words;
@@ -1970,6 +1997,13 @@ const STRINGS = {
     links_note: "Recorded permissions between this role and others. Closing keeps the history; nothing is deleted.",
     links_none: "No links yet. Drag a port on the card's edge to another role — or approve one a role proposes.",
     link_modal_title: "Open a link",
+    link_from_label: "Who gets the permission",
+    link_to_label: "Whom they may reach",
+    link_pick_placeholder: "— pick a role —",
+    link_swap: "⇄ Swap the sides",
+    link_needs_role: "Pick the role on this side of the link.",
+    link_same_role: "A link joins two different roles; it does not open onto itself.",
+    link_already_open: "The board already shows this permission open. If your view is behind, press again — the journal answers, not the panel.",
     link_permission_note: "A link is a recorded permission in the journal; it does not open a communication channel yet.",
     link_type_label: "What this link permits",
     link_type_ask: "ask — may put questions to this role",
@@ -2518,6 +2552,13 @@ const STRINGS = {
     links_note: "Записанные разрешения между этой ролью и другими. Закрытие сохраняет историю; ничего не удаляется.",
     links_none: "Связей пока нет. Протяните точку с края карточки к другой роли — или подтвердите предложенную ролью.",
     link_modal_title: "Открыть связь",
+    link_from_label: "Какая роль получает разрешение",
+    link_to_label: "К кому она сможет обратиться",
+    link_pick_placeholder: "— выберите роль —",
+    link_swap: "⇄ Поменять стороны местами",
+    link_needs_role: "Выберите роль на этой стороне связи.",
+    link_same_role: "Связь соединяет две разные роли; саму на себя она не открывается.",
+    link_already_open: "На доске такое разрешение уже открыто. Если ваш снимок отстал — нажмите ещё раз: отвечает журнал, а не панель.",
     link_permission_note: "Связь — запись разрешения в журнале; канал общения она пока не открывает.",
     link_type_label: "Что разрешает эта связь",
     link_type_ask: "ask — может задавать вопросы этой роли",
@@ -2859,6 +2900,21 @@ function clearFieldErrors(root) {
   for (const line of root.querySelectorAll(".field-error")) { line.remove(); }
 }
 
+// The line itself, and where it goes.  Named on its own because a form can know
+// some of its refusals before it writes — a blank side of a link, or both sides
+// naming the same role — and those have to arrive looking and landing exactly
+// like the server's, or the operator learns two places to look for one answer.
+function showFieldNote(inputId, text) {
+  const input = document.getElementById(inputId);
+  const field = input.closest("label.field") || input.parentElement;
+  const line = document.createElement("p");
+  line.className = "field-error";
+  line.textContent = text;
+  field.appendChild(line);
+  field.scrollIntoView({ block: "nearest" });
+  input.focus();
+}
+
 function showFormError(error, fields, result) {
   const text = humanizeError(error, fieldLabelsOf(fields));
   const message = String(error.message || error);
@@ -2871,13 +2927,7 @@ function showFormError(error, fields, result) {
     return;
   }
   result.textContent = "";
-  const field = input.closest("label.field") || input.parentElement;
-  const line = document.createElement("p");
-  line.className = "field-error";
-  line.textContent = text;
-  field.appendChild(line);
-  field.scrollIntoView({ block: "nearest" });
-  input.focus();
+  showFieldNote(entry[1], text);
 }
 
 // --- confirmations, said in words -----------------------------------------
@@ -4191,6 +4241,53 @@ async function refreshGraph() {
   } catch (error) { /* the stream will repaint on its next snapshot */ }
 }
 
+// Forgiving drop, Miro-style: a stream repaint can shift cards mid-drag, so a
+// release a few pixels off the edge still counts.  Snap to the nearest active
+// role card within reach.
+//
+// The reach is in SCREEN pixels and so does not shrink with the zoom — but the
+// card does, and a miss that looks small beside a fitted card is a
+// proportionally large one, which is half of why both round-3 testers failed
+// the drag.  Nearest-box-wins keeps the wider reach unambiguous.
+//
+// It stays 64 and is not widened (round 4, finding 6): a longer reach buys
+// nothing now that a miss opens the dialog instead of cancelling, and every
+// pixel of it is another chance to land on the card beside the one intended.
+const DROP_REACH = 64;
+
+// The one nearest-card search in the file.  The highlight during the drag and
+// the decision at the release read it, in that order and from the same code:
+// two copies would let the card that lights up and the card the drop lands on
+// disagree, which is worse than no highlight at all — it would be a promise the
+// release does not keep.
+function nearestDropTarget(clientX, clientY, fromId) {
+  let best = null;
+  for (const group of document.querySelectorAll("g.node.role")) {
+    if (group.getAttribute("data-node-state") !== "active") { continue; }
+    const toId = group.getAttribute("data-node-id");
+    if (!toId || toId === fromId) { continue; }
+    const box = group.getBoundingClientRect();
+    const dx = Math.max(box.left - clientX, 0, clientX - box.right);
+    const dy = Math.max(box.top - clientY, 0, clientY - box.bottom);
+    const distance = Math.hypot(dx, dy);
+    if (distance <= DROP_REACH && (!best || distance < best.distance)) {
+      best = { id: toId, group: group, distance: distance };
+    }
+  }
+  return best;
+}
+
+// At most one card wears the mark, and nothing wears it once the drag is over.
+// A repaint mid-drag rewrites every group's class and takes the mark with it;
+// the next pointermove puts it back, which is why this is idempotent rather
+// than incremental.
+function markDropTarget(best) {
+  for (const group of document.querySelectorAll("g.node.droptarget")) {
+    if (!best || group !== best.group) { group.classList.remove("droptarget"); }
+  }
+  if (best) { best.group.classList.add("droptarget"); }
+}
+
 function startLinkDrag(node, event) {
   linkDragFrom = node;
   const band = document.getElementById("linkband");
@@ -4200,72 +4297,173 @@ function startLinkDrag(node, event) {
   const trace = (move) => {
     const x = move.clientX - bounds.left, y = move.clientY - bounds.top;
     band.firstElementChild.setAttribute("d", "M " + x0 + " " + y0 + " L " + x + " " + y);
+    markDropTarget(nearestDropTarget(move.clientX, move.clientY, node.id));
   };
   const finish = (up) => {
     document.removeEventListener("pointermove", trace);
     band.hidden = true;
     band.firstElementChild.setAttribute("d", "");
+    markDropTarget(null);
     const from = linkDragFrom;
     linkDragFrom = null;
     if (!from) { return; }
-    // Forgiving drop, Miro-style: a stream repaint can shift cards mid-drag,
-    // so a release a few pixels off the edge still counts.  Snap to the
-    // nearest active role card within reach; genuinely empty space cancels.
-    //
-    // The reach is in SCREEN pixels and so does not shrink with the zoom — but
-    // the card does, and a miss that looks small beside a fitted card is a
-    // proportionally large one, which is half of why both round-3 testers
-    // failed the drag.  Nearest-box-wins keeps the wider reach unambiguous.
-    const DROP_REACH = 64;
-    let best = null;
-    for (const group of document.querySelectorAll("g.node.role")) {
-      if (group.getAttribute("data-node-state") !== "active") { continue; }
-      const toId = group.getAttribute("data-node-id");
-      if (!toId || toId === from.id) { continue; }
-      const box = group.getBoundingClientRect();
-      const dx = Math.max(box.left - up.clientX, 0, up.clientX - box.right);
-      const dy = Math.max(box.top - up.clientY, 0, up.clientY - box.bottom);
-      const distance = Math.hypot(dx, dy);
-      if (distance <= DROP_REACH && (!best || distance < best.distance)) {
-        best = { id: toId, distance: distance };
-      }
-    }
-    if (best) { openLinkModal(from.id, best.id); }
+    const best = nearestDropTarget(up.clientX, up.clientY, from.id);
+    // A release into empty space used to cancel without a word: the operator
+    // aimed, missed, and the panel behaved exactly as if they had never
+    // dragged.  It opens the same dialog now, with the side they dragged FROM
+    // already filled and the other side left for them to pick — which is also
+    // the only way to reach a role the layout put off-screen.
+    openLinkModal(from.id, best ? best.id : "");
   };
   document.addEventListener("pointermove", trace);
   document.addEventListener("pointerup", finish, { once: true });
 }
-
-let linkPair = null;
 
 function agentLabel(agentId) {
   const node = ((lastGraph && lastGraph.nodes) || []).find((n) => n.id === agentId);
   return node && node.label ? node.label : agentId;
 }
 
+// Who a link may be drawn between, in one place: the drawer's picker, both
+// sides of the dialog, and nothing else.  A second reading of the same rule
+// would eventually offer a role on one surface that the other refuses.
+function linkCandidates(excludeId) {
+  return ((lastGraph && lastGraph.nodes) || []).filter((node) =>
+    node.kind === "agent" && node.state === "active" && node.id !== excludeId &&
+    !(node.attrs && node.attrs.template));
+}
+
+// The roles go in under the placeholder the markup owns, never over it: the
+// blank option is the only translated line in these selects, and removing it
+// would leave a JS-written string in a dialog nothing repaints on a language
+// switch.  An id the board no longer carries falls back to blank rather than
+// standing selected but unofferable.
+function fillRoleSelect(element, roles, selected) {
+  for (const option of Array.from(element.options)) {
+    if (option.value) { element.removeChild(option); }
+  }
+  for (const role of roles) {
+    const option = document.createElement("option");
+    option.value = role.id;
+    option.textContent = role.label || role.id;
+    element.appendChild(option);
+  }
+  element.value = roles.some((role) => role.id === selected) ? selected : "";
+}
+
+// The pair the operator has already been warned about, as from|to|action.  See
+// the warning itself, at the submit, for why it is remembered at all.
+let linkWarnedPair = null;
+
 function openLinkModal(fromId, toId) {
-  linkPair = { from: fromId, to: toId };
-  document.getElementById("link-pair").textContent =
-    agentLabel(fromId) + " → " + agentLabel(toId);
+  const modal = document.getElementById("link-modal");
+  clearFieldErrors(modal);
+  linkWarnedPair = null;
+  const roles = linkCandidates(null);
+  // Filled BEFORE `openModal`, and this order is load-bearing: the dismissal
+  // guard samples the dialog's fields as it opens, so selects filled afterwards
+  // would be sampled blank and the prefilled pair would read as an edit the
+  // operator never made — Esc would then ask about discarding nothing.
+  fillRoleSelect(document.getElementById("link-from"), roles, fromId || "");
+  fillRoleSelect(document.getElementById("link-to"), roles, toId || "");
   document.getElementById("link-type-ask").checked = true;
   document.getElementById("link-reason").value = "";
   document.getElementById("link-result").textContent = "";
-  openModal("link-modal", "link-reason");
+  // A drag that reached a card has both sides already, so the caret belongs in
+  // the reason; a drag that missed has the far side to answer first.
+  openModal("link-modal", toId ? "link-reason" : "link-to");
 }
 
 document.getElementById("link-cancel").addEventListener("click", () => {
   closeModal("link-modal");
 });
+// Direction is the whole meaning of the record — `from` may reach `to`, not the
+// other way about — and it is the one thing a drag fixes before the operator
+// has read anything. One button, so correcting it is not a re-drag.
+document.getElementById("link-swap").addEventListener("click", () => {
+  const from = document.getElementById("link-from");
+  const to = document.getElementById("link-to");
+  const held = from.value;
+  from.value = to.value;
+  to.value = held;
+  clearFieldErrors(document.getElementById("link-modal"));
+});
+// A stale line under a select the operator has just changed is worse than none.
+for (const side of ["link-from", "link-to"]) {
+  document.getElementById(side).addEventListener("change", () => {
+    clearFieldErrors(document.getElementById("link-modal"));
+  });
+}
+
+// What the server can refuse about this form, and the control each refusal
+// belongs under.  `reason` was already mapped; the two sides are mapped now
+// that they are fields an operator can get wrong rather than a fixed sentence.
+const LINK_FIELDS = {
+  from_agent_id: ["link_from_label", "link-from"],
+  to_agent_id: ["link_to_label", "link-to"],
+  reason: ["link_reason_label", "link-reason"],
+};
+
+// One reading of the link edges, shared with the Links tab: the tab lists them
+// and the dialog warns on one that is already there, and two readings would
+// disagree about which links exist.
+function linksFromEdges(graph) {
+  const linksById = new Map();
+  for (const edge of (graph && graph.edges) || []) {
+    if (edge.kind !== "link_from" && edge.kind !== "link_to") { continue; }
+    const entry = linksById.get(edge.from) || {};
+    entry[edge.kind] = edge.to;
+    entry.allowed_action = (edge.attrs || {}).allowed_action || entry.allowed_action;
+    linksById.set(edge.from, entry);
+  }
+  return linksById;
+}
+
+// Matched on the action too, because `ask` and `handoff_work` between the same
+// two roles are two different permissions, not one recorded twice.
+function permissionAlreadyOpen(fromId, toId, action) {
+  const graph = lastGraph;
+  if (!graph) { return false; }
+  for (const [linkId, entry] of linksFromEdges(graph)) {
+    const node = (graph.nodes || []).find((n) => n.id === linkId);
+    if (!node || node.state !== "open") { continue; }
+    if (entry.link_from === fromId && entry.link_to === toId &&
+        entry.allowed_action === action) { return true; }
+  }
+  return false;
+}
+
 document.getElementById("link-open-go").addEventListener("click", async () => {
-  if (!linkPair) { return; }
   const result = document.getElementById("link-result");
+  clearFieldErrors(document.getElementById("link-modal"));
+  result.textContent = "";
+  const fromId = document.getElementById("link-from").value;
+  const toId = document.getElementById("link-to").value;
   const action =
     document.getElementById("link-type-handoff").checked ? "handoff_work" : "ask";
-  const pair = { from: agentLabel(linkPair.from), to: agentLabel(linkPair.to) };
+  // Answered here rather than by a round trip: a blank side and a self-link are
+  // things the form can see, and the domain's own refusal for them arrives as a
+  // sentence about wire fields with the dialog still full of untouched input.
+  if (!fromId) { showFieldNote("link-from", t("link_needs_role")); return; }
+  if (!toId) { showFieldNote("link-to", t("link_needs_role")); return; }
+  if (fromId === toId) { showFieldNote("link-to", t("link_same_role")); return; }
+  // Advice, and only ever advice.  The domain records a second permission for
+  // the same pair without complaint, so a hard stop here would be the panel
+  // enforcing a rule the ledger does not have; and `lastGraph` is a snapshot
+  // that can be behind, so the stop would sometimes be about a link that has
+  // already been closed.  So: the first press says what the board shows, the
+  // same press again goes through, and the journal is what answers.
+  const pair = fromId + "|" + toId + "|" + action;
+  if (pair !== linkWarnedPair && permissionAlreadyOpen(fromId, toId, action)) {
+    linkWarnedPair = pair;
+    showFieldNote("link-to", t("link_already_open"));
+    return;
+  }
+  const named = { from: agentLabel(fromId), to: agentLabel(toId) };
   try {
     const opened = await post("/api/agent-links", {
-      from_agent_id: linkPair.from,
-      to_agent_id: linkPair.to,
+      from_agent_id: fromId,
+      to_agent_id: toId,
       allowed_action: action,
       reason: document.getElementById("link-reason").value,
     });
@@ -4275,12 +4473,11 @@ document.getElementById("link-open-go").addEventListener("click", async () => {
     // where the link it describes has just been drawn.  The permission keeps
     // its canonical name with the panel's gloss beside it, never instead of it.
     reportOnBoard(
-      said("link_opened_named", pair) + " · " +
+      said("link_opened_named", named) + " · " +
         glossed(action, LINK_ACTION_GLOSS[action]),
       opened && opened.entity_ref ? opened.entity_ref.id : "");
   } catch (error) {
-    result.className = "result bad";
-    result.textContent = humanizeError(error, { reason: "link_reason_label" });
+    showFormError(error, LINK_FIELDS, result);
   }
 });
 
@@ -4336,9 +4533,7 @@ function paintLinks(agentId) {
   if (!graph) { return; }
   // A button path beside the drag (PM run, finding 7): pick a role, land in
   // the same link form the rubber band opens.
-  const others = graph.nodes.filter((node) =>
-    node.kind === "agent" && node.state === "active" && node.id !== agentId &&
-    !(node.attrs && node.attrs.template));
+  const others = linkCandidates(agentId);
   const row = document.getElementById("link-open-row");
   row.hidden = !writesEnabled || !others.length;
   if (!row.hidden) {
@@ -4354,14 +4549,7 @@ function paintLinks(agentId) {
       if (target) { openLinkModal(agentId, target); }
     };
   }
-  const linksById = new Map();
-  for (const edge of graph.edges) {
-    if (edge.kind !== "link_from" && edge.kind !== "link_to") { continue; }
-    const entry = linksById.get(edge.from) || {};
-    entry[edge.kind] = edge.to;
-    entry.allowed_action = (edge.attrs || {}).allowed_action || entry.allowed_action;
-    linksById.set(edge.from, entry);
-  }
+  const linksById = linksFromEdges(graph);
   let any = false;
   for (const [linkId, entry] of linksById) {
     if (entry.link_from !== agentId && entry.link_to !== agentId) { continue; }
