@@ -323,7 +323,23 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 .note.warn{color:var(--warn)}
 .result{font-size:11px; margin:8px 0 0; word-break:break-word}
 .result.ok{color:var(--ok)} .result.bad{color:var(--bad)}
-.grants{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+/* Three same-shaped pickers, and the grid is sized by what fits rather than by
+   a fixed count (round 4, finding 2: two fixed columns inside a 420px dialog
+   gave each cell 188px, which clipped "deny — никогда, и даже не…" mid-word and
+   left the columns ending at different heights).
+   `auto-fit` drops to one column when the container cannot hold two of 220px,
+   so a narrow panel gets full-width selects instead of clipped ones.
+   `min-width:0` is the load-bearing half: a grid item's automatic minimum is its
+   MIN-CONTENT width, and a <select>'s min-content is its longest option — so
+   without this the longest gloss would widen the track past the container and
+   push a horizontal scrollbar onto whatever holds it.
+   `align-items:end` puts the controls on one line when one caption wraps to two
+   and its neighbours do not, which is the ragged row the operator photographed. */
+.grants{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:6px;
+  align-items:end;
+}
+.grants > *{min-width:0}
 .band-label{fill:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em}
 /* "you", on the operator's own card.  Anchored to the card's right edge so it
    never collides with the label growing from the left. */
@@ -547,6 +563,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 #sidebar button .chip{flex:none}
 .attn-item{overflow-wrap:anywhere}
 .modal{max-width:92vw}
+/* The hire form is the widest dialog the panel has, and at 420px its grant
+   cells came out at 188px — under the 220px the grid now asks for, so the grid
+   would fold to a single column and spend twice the height.  560px gives two
+   cells of 258px, with room for a caption that wraps, and `min()` keeps the
+   existing 92vw rule in force on a narrow screen rather than
+   fighting it: below ~609px the viewport wins and the grid folds to one column. */
+#hire-modal .modal{width:min(560px,92vw)}
 
 /* --- surviving a longer language ------------------------------------------
    Russian runs about a third longer than the English these strings were sized
@@ -1050,8 +1073,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="panel open" id="panel-chat">
       <p class="note" id="chat-note"></p>
+      <!-- Round 4, finding 9: the composer's two boxes both read as "the task",
+           so the operator could not tell what the second one was for.  The chat
+           now names its own field "Subject" and nothing here calls itself a
+           task; the one place the word belongs is the other surface, and this
+           button is the door to it — offered exactly where the confusion
+           happened, in the empty state where the chat asks to be started. -->
+      <div class="actions" id="chat-empty-actions" hidden>
+        <button type="button" id="chat-new-task"
+          data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
+      </div>
       <div id="chat-messages"></div>
-      <label class="field" id="chat-subject-field" hidden><span data-i18n="chat_subject_label">What is the task?</span>
+      <label class="field" id="chat-subject-field" hidden><span data-i18n="chat_subject_label">Subject</span>
         <input type="text" id="chat-subject" autocomplete="off"></label>
       <label class="field"><span data-i18n="chat_message_label">Message</span>
         <textarea id="chat-body"></textarea></label>
@@ -1174,10 +1207,17 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="panel" id="panel-settings">
       <p class="note" id="settings-note"></p>
-      <!-- Three grants and a context mode: four words an operator meets here and
-           cannot guess, and each carries the mark that opens the paragraph
-           defining it.  The three grants share one target because the guide
-           explains deny/ask/auto once, for all three (round 3, designer). -->
+      <!-- Four words an operator meets here and cannot guess, and each carries
+           the mark that opens the paragraph defining it.  The three grants share
+           one target because the guide explains deny/ask/auto once, for all
+           three (round 3, designer).  The context mode has a row of its own:
+           the grid is for the three same-shaped grants, and a fourth control
+           answering a different question inside it read as a fourth permission
+           and left the row ragged (round 4, finding 2, mirrored from hiring). -->
+      <label class="field"><span data-i18n="hire_context_label">Context</span>
+        <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
+          data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
+        <select id="setting-context_mode"></select></label>
       <div class="grants">
         <label class="field"><span data-i18n="create_roles_label">Create roles</span>
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
@@ -1191,10 +1231,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
             data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-open_links"></select></label>
-        <label class="field"><span data-i18n="hire_context_label">Context</span>
-          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
-            data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
-          <select id="setting-context_mode"></select></label>
       </div>
       <label class="field"><span data-i18n="setting_name_label">Display name</span>
         <input type="text" id="setting-name" autocomplete="off"></label>
@@ -1285,12 +1321,28 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" id="hire-preset-create"
           data-i18n="hire_preset_create">Set one up from scratch and save it as a template</button>
       </div>
+      <!-- Two visual groups, and a flat form (round 4, finding 2).  Progressive
+           disclosure was refused: a collapsed block holding a field the server
+           can refuse needs a rule that forces it open on refusal, and new aria
+           machinery inside the focus trap.  A `.subhead` gives the same reading
+           order for the price of a heading. -->
+      <h3 class="subhead" data-i18n="hire_group_who">Who this is</h3>
       <label class="field"><span class="req" data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
       <label class="field" id="hire-profile-field"><span class="req" data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
         <select id="hire-profile"></select></label>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
+      <!-- Round 4, finding 8: the operator read this field as a system prompt
+           and could not tell whether what they wrote would reach the role.  It
+           does not, so the form says so where the question is asked, and points
+           at the two things that DO decide behaviour.  It sits between the
+           field it explains and the skills picker it names, so the two things
+           it points at are the next block and the task form. -->
+      <p class="note" data-i18n="hire_rationale_help">A note for the log and for people: why this
+        role exists. The role never receives it as an instruction — what it must do is set by its
+        skills and by the text of the task.</p>
+      <!-- Wave 2 lands the skills picker here, directly under the line above. -->
       <!-- The same four marks as the settings panel, plus the turnover budget,
            because this form is where an operator meets all five for the first
            time.  A mark inside a dialog leaves the dialog, so it goes through
@@ -1299,23 +1351,46 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
           data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
         <select id="hire-context_mode"></select></label>
-      <div class="grants" id="hire-grants">
-        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
-          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
-            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
-          <select id="hire-create_roles"></select></label>
-        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
-          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
-            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
-          <select id="hire-retire_roles"></select></label>
-        <label class="field"><span data-i18n="open_links_label">Open links</span>
-          <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
-            data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
-          <select id="hire-open_links"></select></label>
-        <label class="field"><span data-i18n="hire_budget_label" data-i18n-title="tip_hire_budget">Turnover budget (blank = none)</span>
+      <!-- The permissions group travels as one: a hire from a template takes
+           all four values from the template, so the heading, the grid, the
+           budget and its line leave together rather than stranding a heading
+           over nothing. -->
+      <div id="hire-rights">
+        <h3 class="subhead" data-i18n="hire_group_rights">What it may do</h3>
+        <!-- Three grants and nothing else.  A fourth field of a different shape —
+             the turnover budget, a number — sat in this grid and left the row
+             ragged: a half-empty second column, columns of different heights, and
+             a budget that read as a fourth permission (round 4, finding 2).  The
+             grid now holds one kind of control, and the budget has a row of its
+             own directly beneath the grants it belongs to. -->
+        <div class="grants" id="hire-grants">
+          <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+            <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+              data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
+            <select id="hire-create_roles"></select></label>
+          <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+            <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+              data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
+            <select id="hire-retire_roles"></select></label>
+          <label class="field"><span data-i18n="open_links_label">Open links</span>
+            <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
+              data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
+            <select id="hire-open_links"></select></label>
+        </div>
+        <label class="field" id="hire-budget-field">
+          <span id="hire-budget-caption" data-i18n="hire_budget_label" data-i18n-title="tip_hire_budget">Turnover budget (blank = none)</span>
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-lineage"
             data-i18n-title="gref_turnover" data-i18n-aria="gref_turnover"></button>
           <input type="number" id="hire-turnover_budget" min="0" max="1024"></label>
+        <!-- The budget is what makes either turnover grant usable: above `deny`
+             the domain refuses a hire that carries no budget.  So the mark and
+             this line arrive exactly when the refusal becomes possible — and the
+             FIELD itself never appears or disappears, because a control that
+             comes and goes under the operator's hands is the class of bug round 3
+             found three times in this very modal. -->
+        <p class="note warn" id="hire-budget-required" hidden
+          data-i18n="hire_budget_required">Anything above deny needs this number: a role allowed to
+          hire or retire other roles is refused without a ceiling on how many.</p>
       </div>
       <div class="actions">
         <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
@@ -1468,12 +1543,12 @@ const STRINGS = {
     band_delegated: "delegated · depth ",
     stale: "stale",
     not_accepted: "not accepted",
-    chat_subject_label: "What is the task?",
+    chat_subject_label: "Subject",
     chat_message_label: "Message",
     send: "Send",
-    start_work: "Start the work",
+    start_work: "Open the chat",
     recorded: "recorded",
-    chat_empty_writable: "No main chat yet. State the task here; it is addressed to every role that answers to you.",
+    chat_empty_writable: "No main chat yet. Write here and every role that answers to you is addressed at once — this is the conversation, not the work. Work with a done-when of its own goes through “+ Task”.",
     chat_empty_readonly: "No main chat yet. Start the UI with --enable-writes to open one.",
     addressed_roles: "addressed roles",
     unaddressed_prefix: ". Roles created since this chat opened are not addressed in it: ",
@@ -1484,11 +1559,15 @@ const STRINGS = {
     hire_name_label: "Name",
     hire_profile_label: "Profile",
     hire_rationale_label: "Why this role exists (kept forever)",
+    hire_rationale_help: "A note for the log and for people: why this role exists. The role never receives it as an instruction — what it must do is set by its skills and by the text of the task.",
+    hire_group_who: "Who this is",
+    hire_group_rights: "What it may do",
     hire_context_label: "Memory between runs",
     create_roles_label: "May hire other roles",
     retire_roles_label: "May take other roles out of service",
     open_links_label: "May open links to other roles",
     hire_budget_label: "How many roles it may hire or retire in total (blank = none)",
+    hire_budget_required: "Anything above deny needs this number: a role allowed to hire or retire other roles is refused without a ceiling on how many.",
     hire_button: "Hire",
     preset_none: "— none —",
     runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
@@ -1787,7 +1866,7 @@ const STRINGS = {
     task_fab: "+ Task",
     tip_task_fab: "Create a task: what to do and how we will know it is done.",
     task_modal_title: "New task",
-    task_modal_note: "A task is what a role gets run on: what to do, and how we will know it is done. It lands on the board and in the history.",
+    task_modal_note: "A task is what a role gets run on: what to do, and how we will know it is done. It lands on the board and in the history. A message with no done-when of its own is a conversation, and belongs in the chat in the dock.",
     task_title_label: "Short name for this task",
     task_desc_label: "What to do",
     task_criteria_label: "Done when (one criterion per line)",
@@ -1908,6 +1987,11 @@ const STRINGS = {
     gl_auto: "on its own, without asking",
     gl_fresh: "starts each run with a clean slate",
     gl_accumulated: "carries its earlier context forward",
+    gp_deny: "not at all",
+    gp_ask: "only if you agree",
+    gp_auto: "on its own",
+    gp_fresh: "clean slate each run",
+    gp_accumulated: "keeps its context",
     gl_origin_human: "a person hired it",
     gl_origin_agent: "another role created it",
     gl_implementation: "doing the work",
@@ -1986,12 +2070,12 @@ const STRINGS = {
     band_delegated: "делегировано · глубина ",
     stale: "устарело",
     not_accepted: "не принято",
-    chat_subject_label: "В чём задача?",
+    chat_subject_label: "Тема",
     chat_message_label: "Сообщение",
     send: "Отправить",
-    start_work: "Начать работу",
+    start_work: "Открыть чат",
     recorded: "записано",
-    chat_empty_writable: "Общего чата пока нет. Сформулируйте задачу здесь — она адресована каждой роли, которая вам подчиняется.",
+    chat_empty_writable: "Общего чата пока нет. Напишите здесь — и обращение уйдёт сразу каждой роли, которая вам подчиняется. Это разговор, а не работа: работу со своим критерием готовности заводят кнопкой «+ Задача».",
     chat_empty_readonly: "Общего чата пока нет. Запустите интерфейс с --enable-writes, чтобы открыть его.",
     addressed_roles: "адресовано ролям",
     unaddressed_prefix: ". Роли, созданные после открытия этого чата, в нём не адресованы: ",
@@ -2002,11 +2086,15 @@ const STRINGS = {
     hire_name_label: "Имя",
     hire_profile_label: "Профиль",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
+    hire_rationale_help: "Запись для журнала и для людей: почему эта роль существует. Как инструкцию роль её не получает — что она обязана делать, задают её навыки и текст задачи.",
+    hire_group_who: "Кто это",
+    hire_group_rights: "Что ей разрешено",
     hire_context_label: "Память между прогонами",
     create_roles_label: "Может нанимать другие роли",
     retire_roles_label: "Может выводить другие роли из работы",
     open_links_label: "Может открывать связи с другими ролями",
     hire_budget_label: "Сколько ролей может нанять и уволить всего (пусто — ни одной)",
+    hire_budget_required: "Всё, что выше deny, требует этого числа: роли, которой разрешено нанимать или выводить из работы другие роли, без потолка откажут.",
     hire_button: "Нанять",
     preset_none: "— нет —",
     runs_note: "Текущие и недавние прогоны провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
@@ -2305,7 +2393,7 @@ const STRINGS = {
     task_fab: "+ Задача",
     tip_task_fab: "Создать задачу: что сделать и как поймём, что готово.",
     task_modal_title: "Новая задача",
-    task_modal_note: "Задача — то, на чём запускают роль: что сделать и как поймём, что готово. Она появится на доске и в истории.",
+    task_modal_note: "Задача — то, на чём запускают роль: что сделать и как поймём, что готово. Она появится на доске и в истории. Сообщение без своего критерия готовности — это разговор, ему место в чате в доке.",
     task_title_label: "Короткое название задачи",
     task_desc_label: "Что сделать",
     task_criteria_label: "Готово, когда (по одному критерию в строке)",
@@ -2426,6 +2514,11 @@ const STRINGS = {
     gl_auto: "сама, ничего не спрашивая",
     gl_fresh: "каждый прогон начинает с чистого листа",
     gl_accumulated: "переносит прежний контекст дальше",
+    gp_deny: "нельзя",
+    gp_ask: "с вашего согласия",
+    gp_auto: "сама, не спрашивая",
+    gp_fresh: "с чистого листа",
+    gp_accumulated: "помнит прежнее",
     gl_origin_human: "роль нанял человек",
     gl_origin_agent: "роль создала другая роль",
     gl_implementation: "делает работу",
@@ -2730,6 +2823,19 @@ const VALUE_GLOSS = {
   "claude-builder": "gl_builder", "codex-builder": "gl_builder",
   "claude-independent-reviewer": "gl_reviewer",
   "codex-independent-reviewer": "gl_reviewer",
+};
+
+// The same gloss, cut to what a closed <select> can actually show.  A picker is
+// one line wide, and the full sentence arrived clipped mid-word — "deny —
+// никогда, и даже не…" (round 4, finding 2), which is worse than no gloss: it
+// stops exactly where the meaning turns.  Removing the gloss from the picker was
+// refused — it is the point of decision, and item 20's compromise says the
+// canonical token must be readable there — so the SENTENCE is what gives way.
+// The full one still stands in the summary, the drawer and the guide, and the
+// option's VALUE is the bare canonical token in both tables alike.
+const PICKER_GLOSS = {
+  deny: "gp_deny", ask: "gp_ask", auto: "gp_auto",
+  fresh: "gp_fresh", accumulated: "gp_accumulated",
 };
 
 function glossed(canonical, glossKey) {
@@ -3305,7 +3411,22 @@ function applyHireMode() {
   document.getElementById("hire-preset-empty").hidden = !(wantsPreset && !hasPresets);
   document.getElementById("hire-profile-field").hidden = fromPreset;
   document.getElementById("hire-context-field").hidden = fromPreset;
-  document.getElementById("hire-grants").hidden = fromPreset;
+  document.getElementById("hire-rights").hidden = fromPreset;
+}
+
+// The turnover budget is required exactly when either turnover grant is above
+// `deny`: the domain refuses the hire otherwise, and round 4 (finding 2) found
+// the field sitting in the grants grid with nothing saying when it mattered.
+//
+// The MARK and the LINE come and go; the FIELD does not.  Making the control
+// itself appear on a grant change would put back the class of bug round 3 found
+// three times in this modal — the form rearranging under the operator's hands
+// mid-decision — and it would also hide the one field the refusal is about.
+function paintTurnoverRequirement() {
+  const required = ["hire-create_roles", "hire-retire_roles"]
+    .some((id) => document.getElementById(id).value !== "deny");
+  document.getElementById("hire-budget-caption").classList.toggle("req", required);
+  document.getElementById("hire-budget-required").hidden = !required;
 }
 
 // A catalogue hire still requires a non-empty rationale, and the template
@@ -3375,6 +3496,9 @@ function showHire(open, options) {
     document.getElementById("hire-mode").value = "new";
   }
   applyHireMode();
+  // After the reset above, so a fresh opening starts with the mark and the line
+  // off — the three grants are back at `deny` and nothing is required yet.
+  paintTurnoverRequirement();
   document.getElementById("hire-result").textContent = "";
   // Unhidden last, once the form holds what THIS opening asks for: the dirty
   // guard samples the fields as it opens, and a sample taken before the reset
@@ -3516,11 +3640,16 @@ function focusablesIn(scrim) {
 
 // What "changed from the value it opened with" means, in one string: every
 // control the dialog carries, checkboxes and radios by their checked state.
+// The separator is written as an ESCAPE, not as the byte itself.  Spelled
+// literally it was the only NUL in this file, which made every grep-family tool
+// treat the asset as binary and skip it silently — and any tool that strips the
+// byte on the way through would collapse the separator to "" and glue adjacent
+// fields together, weakening the guard it exists to serve.
 function modalFieldState(scrim) {
   return Array.from(scrim.querySelectorAll("input, select, textarea"))
     .map((field) => (field.type === "checkbox" || field.type === "radio"
       ? (field.checked ? "1" : "0") : field.value))
-    .join(" ");
+    .join("\u0000");
 }
 
 function openModal(scrimId, focusId) {
@@ -3624,6 +3753,9 @@ document.getElementById("setting-skills").addEventListener("change", () => {
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
+for (const id of ["hire-create_roles", "hire-retire_roles"]) {
+  document.getElementById(id).addEventListener("change", paintTurnoverRequirement);
+}
 document.getElementById("preset-create").addEventListener("click", () =>
   showHire(true, { template: true }));
 // The way out of an empty catalogue is the way INTO one: the same from-scratch
@@ -3651,6 +3783,9 @@ const TASK_FIELDS = {
   acceptance_criteria: ["task_criteria_label", "task-criteria"],
 };
 document.getElementById("task-fab").addEventListener("click", () => showTaskModal(true));
+// The same door, from the empty chat: one modal, so the two surfaces cannot
+// drift into two ways of creating the same record (round 4, finding 9).
+document.getElementById("chat-new-task").addEventListener("click", () => showTaskModal(true));
 document.getElementById("task-cancel").addEventListener("click", () => showTaskModal(false));
 dismissOnBackdrop("task-modal", () => showTaskModal(false));
 document.getElementById("task-create-go").addEventListener("click", async () => {
@@ -3937,11 +4072,11 @@ function paintSettings(record) {
   const stored = record.grants || {};
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
     fillSelect(document.getElementById("grant-" + name),
-      glossedOptions(levels, VALUE_GLOSS), stored[name] || "deny", false);
+      glossedOptions(levels, PICKER_GLOSS), stored[name] || "deny", false);
   }
   fillSelect(
     document.getElementById("setting-context_mode"),
-    glossedOptions((catalog && catalog.context_modes) || ["fresh", "accumulated"], VALUE_GLOSS),
+    glossedOptions((catalog && catalog.context_modes) || ["fresh", "accumulated"], PICKER_GLOSS),
     record.context_mode || "fresh",
     false
   );
@@ -4036,7 +4171,7 @@ function paintSettingsLabels(record) {
   for (const id of ["grant-create_roles", "grant-retire_roles", "grant-open_links",
     "setting-context_mode"]) {
     for (const option of document.getElementById(id).options) {
-      option.textContent = glossed(option.value, VALUE_GLOSS[option.value]);
+      option.textContent = glossed(option.value, PICKER_GLOSS[option.value]);
     }
   }
   // The model is a property of the operator-owned profile, not of the role: a
@@ -4653,13 +4788,17 @@ function paintHire() {
   fillSelect(document.getElementById("hire-profile"), catalog.profiles || [],
     held("hire-profile", null), false);
   fillSelect(document.getElementById("hire-context_mode"),
-    glossedOptions(catalog.context_modes || ["fresh", "accumulated"], VALUE_GLOSS),
+    glossedOptions(catalog.context_modes || ["fresh", "accumulated"], PICKER_GLOSS),
     held("hire-context_mode", "fresh"), false);
   const levels = catalog.grant_levels || ["deny", "ask", "auto"];
   for (const name of ["create_roles", "retire_roles", "open_links"]) {
-    fillSelect(document.getElementById("hire-" + name), glossedOptions(levels, VALUE_GLOSS),
+    fillSelect(document.getElementById("hire-" + name), glossedOptions(levels, PICKER_GLOSS),
       held("hire-" + name, "deny"), false);
   }
+  // A repaint can move a grant — a value the new options no longer carry falls
+  // back to `deny` — so the mark is recomputed from what the selects now hold
+  // rather than left saying what they held before.
+  paintTurnoverRequirement();
   const presets = [{ id: "", title: t("preset_none") }].concat(
     (catalog.presets || []).map((p) => ({ id: p.id, title: p.name || p.id })));
   fillSelect(document.getElementById("hire-preset"), presets, held("hire-preset", ""), false);
@@ -5394,6 +5533,11 @@ async function loadChat() {
   try { chats = (await api("/api/chat")) || []; } catch (error) { chats = []; }
   engagement = chats.length ? chats[chats.length - 1] : null;
   document.getElementById("chat-subject-field").hidden = Boolean(engagement) || !writesEnabled;
+  // The door to the other surface, offered where the two were confused for each
+  // other (round 4, finding 9).  Gated on writes exactly as `task-fab` is: a
+  // read-only panel must not offer a button whose only outcome is a refusal.
+  document.getElementById("chat-empty-actions").hidden =
+    Boolean(engagement) || !writesEnabled;
   send.textContent = engagement ? t("send") : t("start_work");
   if (!engagement) {
     note.className = "note";

@@ -1072,7 +1072,10 @@ def test_switching_language_repaints_every_surface_the_panel_paints_itself() -> 
     # The pickers' option labels still change language -- rewritten in place, so
     # the selected value survives while its gloss is translated.
     labels = body.split("function paintSettingsLabels(record) {", 1)[1].split("\n}\n", 1)[0]
-    assert "option.textContent = glossed(option.value, VALUE_GLOSS[option.value]);" in labels
+    # The picker's own shorter gloss, and the same one `fillSelect` put there:
+    # relabelling from VALUE_GLOSS here would swap the short sentence for the
+    # long one on a language switch, which is the clipped option all over again.
+    assert "option.textContent = glossed(option.value, PICKER_GLOSS[option.value]);" in labels
     assert "fillSelect(" not in labels
 
     # The search view repaints only while it is the view on screen: re-running a
@@ -1190,12 +1193,35 @@ def test_a_canonical_value_shown_to_a_person_carries_its_gloss() -> None:
     assert body.count("glossedOptions(") == 5
     for fragment in (
         'fillSelect(document.getElementById("grant-" + name),\n'
-        "      glossedOptions(levels, VALUE_GLOSS)",
+        "      glossedOptions(levels, PICKER_GLOSS)",
         'glossedOptions((catalog && catalog.context_modes)',
         'glossedOptions(catalog.context_modes',
-        'glossedOptions(levels, VALUE_GLOSS),\n      held("hire-" + name, "deny"), false);',
+        'glossedOptions(levels, PICKER_GLOSS),\n      held("hire-" + name, "deny"), false);',
     ):
         assert fragment in body, fragment
+
+    # Round 4, finding 2: the full sentence arrived clipped inside the closed
+    # select -- "deny -- никогда, и даже не..." -- so every picker reads the
+    # SHORT table and the long one keeps the surfaces with room for it.  The
+    # compromise itself is unchanged: both tables are keyed by the canonical
+    # token and both append to it, so the option's value is still bare.
+    picker = body.split("const PICKER_GLOSS = {", 1)[1].split("};", 1)[0]
+    value = body.split("const VALUE_GLOSS = {", 1)[1].split("};", 1)[0]
+    canonical = set(re.findall(r"(\w+): \"g[lp]_", picker))
+    assert canonical == {"deny", "ask", "auto", "fresh", "accumulated"}, canonical
+    assert canonical <= set(re.findall(r"(\w+): \"g[lp]_", value)), canonical
+    english, russian = _language_tables()
+    for token in sorted(canonical):
+        for block in (english, russian):
+            short = _value(block, f"gp_{token}")
+            assert short, token
+            # Short enough to survive a one-line control, and never longer than
+            # the sentence it was cut down from.
+            assert len(short) <= 32, (token, short)
+            assert len(short) < len(_value(block, f"gl_{token}")), (token, short)
+    # And the long gloss still reaches the surfaces that have room: the summary
+    # rows and the drawer read VALUE_GLOSS through `valueWithGloss`.
+    assert "return value ? glossed(value, VALUE_GLOSS[value]) : \"\";" in body
 
     # A node card has no room for a sentence, so its gloss is the tooltip and the
     # visible line keeps the bare canonical state.  Both halves are pinned: a
@@ -1382,6 +1408,53 @@ def test_the_dock_survives_a_language_a_third_longer_than_english() -> None:
     # And the margin those three rules are sized to is stated beside them, so
     # the next person testing this file knows what to test it at.
     assert "+30% IS THE DESIGN MARGIN" in body
+
+    # Rule four, added in round 4 (finding 2): the widest dialog the panel has
+    # must hold its grant grid at the same margin, at the two widths the
+    # operator ran it at.  The geometry is arithmetic on the rules above, so it
+    # is computed here rather than asserted as a screenshot.
+    modal_padding, modal_border, gap, track_minimum = 18, 1, 6, 220
+    for viewport in (1024, 900):
+        modal = min(560, 0.92 * viewport)
+        # The dialog never outgrows the viewport, so the page itself cannot
+        # gain a second axis -- `min()` keeps the existing 92vw cap in force.
+        assert modal <= 0.92 * viewport, viewport
+        # box-sizing is border-box for everything, so the padding and the
+        # border come out of the declared width rather than adding to it.
+        content = modal - 2 * modal_padding - 2 * modal_border
+        # `auto-fit` fits as many tracks of at least 220px as the gaps allow.
+        columns = int((content + gap) // (track_minimum + gap))
+        assert columns == 2, (viewport, columns)
+        track = (content - gap * (columns - 1)) / columns
+        assert track >= track_minimum, (viewport, track)
+
+        # What a closed <select> can show: the track less its own padding,
+        # border and the platform's dropdown arrow.  6.0px per character is a
+        # deliberately generous average advance for the 12px face these controls
+        # are set in, and the Russian label has to fit with the panel's +30%
+        # still in hand.
+        text_box = track - 2 * 6 - 2 * 1 - 20
+        for token in ("deny", "ask", "auto", "fresh", "accumulated"):
+            label = f"{token} — " + _value(russian, f"gp_{token}")
+            assert len(label) * 1.3 * 6.0 <= text_box, (viewport, label)
+            # The full sentence is what did NOT fit -- that is the clipped
+            # "deny — никогда, и даже не…" the operator photographed, and the
+            # reason the picker reads the short table.
+            english_label = f"{token} — " + _value(english, f"gp_{token}")
+            assert len(english_label) * 6.0 <= text_box, (viewport, english_label)
+
+    # A child of the grid may never be wider than its track: a grid item's
+    # automatic minimum is its MIN-CONTENT width, and a select's min-content is
+    # its longest option, so without this one rule the longest gloss -- not the
+    # font, not the language -- is what would push the row sideways.
+    assert ".grants > *{min-width:0}" in body
+    assert "grid-template-columns:repeat(auto-fit,minmax(220px,1fr))" in body
+    assert "#hire-modal .modal{width:min(560px,92vw)}" in body
+    assert "*{box-sizing:border-box}" in body
+    fields = body.split(".field > input,.field > select,.field > textarea{", 1)[1].split(
+        "}", 1
+    )[0]
+    assert "width:100%" in fields, fields
 
 
 def test_a_radio_row_keeps_its_dot_beside_its_label() -> None:
