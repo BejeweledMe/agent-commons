@@ -356,6 +356,20 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 }
 .grants > *{min-width:0}
 .band-label{fill:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em}
+/* The runtime's own words, appended to the rank caption rather than put in its
+   place: what a row IS is domain and is said always, while "delegated · depth 2"
+   describes the shape of a launch and stays tied to the runtime nodes. */
+.band-runtime{fill:var(--muted); opacity:.65}
+/* The board's "?".  A rank caption is SVG, so the chrome's `.gref` button cannot
+   stand beside it and `::before` cannot carry its glyph — CSS generated content
+   does not reach an SVG text node.  This is the same control drawn in the only
+   language this layer speaks; the data attributes are identical, which is all
+   the delegated listener reads. */
+.bandhelp{cursor:pointer}
+.bandhelp-disc{fill:var(--surface-2); stroke:var(--border)}
+.bandhelp-q{fill:var(--muted); font-size:9px; text-anchor:middle}
+.bandhelp:hover .bandhelp-disc{stroke:var(--info)}
+.bandhelp:hover .bandhelp-q{fill:var(--info)}
 /* "you", on the operator's own card.  Anchored to the card's right edge so it
    never collides with the label growing from the left. */
 .youbadge{fill:var(--info); font-size:9px; letter-spacing:.06em; text-anchor:end}
@@ -768,6 +782,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              is the opposite of translating it away (item 20). -->
         <div id="legend-rows"></div>
         <p class="note" data-i18n="legend_note"></p>
+        <!-- The rows were the board's other unexplained language (round 4,
+             finding 7): the marks had a key and the layout had none, so the
+             order of the cards read as arbitrary.  This states the rule the
+             comparator in `layout` actually applies. -->
+        <p class="note" data-i18n="legend_bands"></p>
       </div>
       <svg id="linkband" hidden><path d=""></path></svg>
     </section>
@@ -826,6 +845,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
                onboarding.  Saying so costs nothing and stops the five pages
                being read as a tutorial that does not teach. -->
           <span class="tabsplit" data-i18n="guide_ref_label">Reference</span>
+          <!-- First on the reference side, and reference is the right side of
+               the rule: the page defines vocabulary rather than teaching a
+               route, so it carries `guide_ref_lead` like its neighbours — and
+               "In short" must not (a test pins that).  It opens the reference
+               because the four pages after it spend the words it settles. -->
+          <button type="button" data-gpage="units" aria-selected="false" data-i18n="guide_tab_units">The system's units</button>
           <button type="button" data-gpage="agents" aria-selected="false" data-i18n="guide_tab_agents">Agents and memory</button>
           <button type="button" data-gpage="tasks" aria-selected="false" data-i18n="guide_tab_tasks">Tasks and runs</button>
           <button type="button" data-gpage="links" aria-selected="false" data-i18n="guide_tab_links">Links</button>
@@ -904,6 +929,30 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              these ids, and `openGuide` does the rest.  An id here is a promise —
              a test compares the set of ids against the set of link targets, so a
              renamed heading breaks the build rather than the link. -->
+        <!-- Finding 10: nothing anywhere listed what kinds of thing the system
+             has, which is also the root of finding 9 — the composer's two fields
+             read as one question asked twice because nobody had said that a
+             conversation and a piece of work are different records.  The
+             canonical names are the ledger's own and are given untranslated,
+             with the human word beside them. -->
+        <div id="gpage-units" hidden>
+          <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
+          <h3 id="g-ov-kinds" data-i18n="guide_ov_kinds_h"></h3>
+          <p data-i18n="guide_ov_kinds_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_kinds_ex"></p>
+          <h3 id="g-ov-task" data-i18n="guide_ov_task_h"></h3>
+          <p data-i18n="guide_ov_task_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_task_ex"></p>
+          <h3 id="g-ov-agent" data-i18n="guide_ov_agent_h"></h3>
+          <p data-i18n="guide_ov_agent_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_agent_ex"></p>
+          <h3 id="g-ov-delegation" data-i18n="guide_ov_delegation_h"></h3>
+          <p data-i18n="guide_ov_delegation_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_delegation_ex"></p>
+          <h3 id="g-ov-review" data-i18n="guide_ov_review_h"></h3>
+          <p data-i18n="guide_ov_review_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_review_ex"></p>
+        </div>
         <div id="gpage-agents" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
           <h3 id="g-ag-role" data-i18n="guide_ag_role_h"></h3>
@@ -1594,6 +1643,7 @@ const STRINGS = {
     loading: "loading…",
     empty_workspace: "No canonical entities in this workspace yet.",
     band_operator: "reports to operator",
+    band_rank: "rank {n}: what the rank above it set up or started",
     band_delegated: "delegated · depth ",
     stale: "stale",
     not_accepted: "not accepted",
@@ -1775,6 +1825,7 @@ const STRINGS = {
     guide_never_h: "What this panel never does",
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     guide_tab_brief: "In short",
+    guide_tab_units: "The system’s units",
     guide_tab_agents: "Roles and memory",
     guide_tab_tasks: "Tasks and runs",
     guide_tab_links: "Links",
@@ -1792,18 +1843,41 @@ const STRINGS = {
     guide_map_notdone: "not done yet",
     guide_map_decide: "your decision",
     guide_map_back: "sent back",
-    gref_grants: "deny, ask, auto — what the three permission levels actually do. Opens the Overview.",
-    gref_context: "context_mode — what a role’s memory really is. Opens the Overview.",
-    gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. Opens the Overview.",
-    gref_accept: "Why a finished run has not finished the task. Opens the Overview.",
-    gref_link_type: "ask and handoff_work — what a link actually records. Opens the Overview.",
-    gref_skills: "What a skill is, and where it comes from. Opens the Overview.",
-    gref_tools: "Why choosing tools can only narrow, never widen. Opens the Overview.",
-    gref_run_states: "requested, active, succeeded, needs_operator — what a run’s states mean. Opens the Overview.",
+    gref_grants: "deny, ask, auto — what the three permission levels actually do. The full account is in the Overview.",
+    gref_context: "context_mode — what a role’s memory really is. The full account is in the Overview.",
+    gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. The full account is in the Overview.",
+    gref_accept: "Why a finished run has not finished the task. The full account is in the Overview.",
+    gref_link_type: "ask and handoff_work — what a link actually records. The full account is in the Overview.",
+    gref_skills: "What a skill is, and where it comes from. The full account is in the Overview.",
+    gref_tools: "Why choosing tools can only narrow, never widen. The full account is in the Overview.",
+    gref_run_states: "requested, active, succeeded, needs_operator — what a run’s states mean. The full account is in the Overview.",
+    // The board's mark. It reaches the reader as an SVG <title>, so it is a
+    // tooltip and nothing else: the caption beside it already carries the short
+    // answer, and this says where the long one is.
+    gref_bands: "What the rows are, and how a rank is worked out from the ledger. The full account is in the Overview.",
     // The two words the popover adds. Everything it SAYS is the gref_* line the
     // mark already carried, so a mark that opens it needs no second string.
     gpop_more: "Read the whole paragraph",
     gpop_close: "Close",
+    // Finding 10, and the root of finding 9: the pairs an operator actually
+    // confuses, each given as the ledger's own name with the human word beside
+    // it rather than in place of it.  The thirteen kinds are the authoritative
+    // list from _ENTITY_KINDS (ui/server.py) and the projection's collections.
+    guide_ov_kinds_h: "Thirteen kinds, one list",
+    guide_ov_kinds_p: "The panel opens thirteen kinds of record. Twelve are projections of the ledger — they exist because an event was written, and they outlive every process that wrote them. The thirteenth, session, is operational state with a lifetime: it says who is at a keyboard now, expires on its own, and is not a ledger event at all. Every canonical name below is the ledger's own spelling and is never translated; the human word stands beside it, not in place of it.",
+    guide_ov_kinds_ex: "objective · task · thread · delegation · review · verification · finding · decision · artifact · handoff · agent · agent_link · session",
+    guide_ov_task_h: "task and thread: the work, and the talk about it",
+    guide_ov_task_p: "task is the unit of WORK: what to do, who owns it, and when it counts as done — it carries a state and an acceptance chain, and it closes by a deliberate act. thread is the unit of CONVERSATION: the main chat, and every addressed thread beside it. A conversation can produce work and is often where a result is argued over, but no message finishes anything: only the task's own state does. That is why the composer asks two different things — the subject of a conversation, and, separately, a task.",
+    guide_ov_task_ex: "thread: agreeing what to fix · task: fix the export, ready → accepted",
+    guide_ov_agent_h: "agent and session: the standing role, and the window typing now",
+    guide_ov_agent_p: "agent is the unit of ROLE: a standing member of staff with a profile, grants, skills and a lifetime, recorded once and replayed for good. session is the unit of WINDOW: whoever is writing at this moment. A session carries a TTL, is not a ledger event, and goes quiet on its own; a role does not. One role lives through many sessions, and a session with no role behind it is a person at the panel.",
+    guide_ov_agent_ex: "agent: the Typesetter role, set up once · session: the window opened at 14:20, gone when its TTL runs out",
+    guide_ov_delegation_h: "delegation and task: one bounded attempt, and the work itself",
+    guide_ov_delegation_p: "delegation is the unit of PROCESS: a single bounded attempt with a target, limits and a terminal outcome — succeeded, failed, timed_out, needs_operator. A person watches it as a run. The task outlives its attempts: three runs against one task are three delegations and one task, and a finished delegation moves the task nowhere. What moves the task is acceptance, and acceptance is a human act.",
+    guide_ov_delegation_ex: "one task · three delegations, each with its own outcome · the task still waits for a review and for you",
+    guide_ov_review_h: "review and verification: a judgement, and a repeatable check",
+    guide_ov_review_p: "review is an independent judgement of a result, bound to the exact revision it judged: a person or another role reads the work and records a verdict. verification is a repeatable check with its evidence: a command anyone can run again, and what it printed. Neither stands in for the other — a check that passes does not mean the work was accepted, and a reviewer's approval does not make the result reproducible. Acceptance demands the review; the verification is what keeps the review honest.",
+    guide_ov_review_ex: "review: approved against revision 7 · verification: the command, its exit status and its output, re-runnable by anyone",
     guide_ag_role_h: "A role is a ledger record",
     guide_ag_role_p: "Hiring writes one agent.created event: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no store beside the ledger — the current staff list is replayed from events, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
@@ -1936,7 +2010,7 @@ const STRINGS = {
     tip_hire_budget: "Hires and retirements are counted against the same number and it never resets, so a hire-and-fire cycle cannot walk past it.",
     board_fit: "Fit",
     tip_board_fit: "Bring every card into view.",
-    board_hint: "Drag the canvas to pan; scroll to zoom. To link two roles, drag a port on a card's edge — or use the role's Links tab.",
+    board_hint: "Drag the canvas to pan; scroll to zoom. To link two roles, drag a port on a card's edge — or use the role's Links tab. Rows run top to bottom by rank: each one holds what the rank above it set up or started.",
     runtime_nodes: "Runtime nodes",
     tip_runtime_nodes: "Sessions and delegations — the machinery a run leaves behind. Hidden by default so the board shows your team; the number says how many nodes it covers.",
     port_tip: "Drag to another role's card to open a link between them. Prefer buttons? The role's Links tab opens the same form.",
@@ -2064,6 +2138,7 @@ const STRINGS = {
     tip_legend: "What the marks on the cards mean.",
     legend_title: "What the marks mean",
     legend_note: "The states beside each mark are the ledger's own words, and are never translated.",
+    legend_bands: "The rows are ranks, and inside a row the order never changes: roles first, then tasks, then everything else; live before finished, and older before newer. Nothing is sorted by name, so switching the language never moves a card.",
     lg_pending: "not started yet",
     lg_moving: "under way",
     lg_waiting: "waiting on a person",
@@ -2125,6 +2200,7 @@ const STRINGS = {
     loading: "загрузка…",
     empty_workspace: "В этом рабочем пространстве пока нет канонических записей.",
     band_operator: "подчиняется оператору",
+    band_rank: "уровень {n}: то, что заведено или запущено уровнем выше",
     band_delegated: "делегировано · глубина ",
     stale: "устарело",
     not_accepted: "не принято",
@@ -2306,6 +2382,7 @@ const STRINGS = {
     guide_never_h: "Чего панель никогда не делает",
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     guide_tab_brief: "Коротко",
+    guide_tab_units: "Единицы системы",
     guide_tab_agents: "Роли и память",
     guide_tab_tasks: "Задачи и прогоны",
     guide_tab_links: "Связи",
@@ -2323,16 +2400,32 @@ const STRINGS = {
     guide_map_notdone: "ещё не готово",
     guide_map_decide: "ваше решение",
     guide_map_back: "назад в работу",
-    gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Откроет «Обзор».",
-    gref_context: "context_mode — что такое «память» роли на самом деле. Откроет «Обзор».",
-    gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Откроет «Обзор».",
-    gref_accept: "Почему закончившийся прогон не завершает задачу. Откроет «Обзор».",
-    gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Откроет «Обзор».",
-    gref_skills: "Что такое навык и откуда он берётся. Откроет «Обзор».",
-    gref_tools: "Почему выбор инструментов может только сужать, но не расширять. Откроет «Обзор».",
-    gref_run_states: "requested, active, succeeded, needs_operator — что значат состояния прогона. Откроет «Обзор».",
+    gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Полный разбор — в «Обзоре».",
+    gref_context: "context_mode — что такое «память» роли на самом деле. Полный разбор — в «Обзоре».",
+    gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Полный разбор — в «Обзоре».",
+    gref_accept: "Почему закончившийся прогон не завершает задачу. Полный разбор — в «Обзоре».",
+    gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Полный разбор — в «Обзоре».",
+    gref_skills: "Что такое навык и откуда он берётся. Полный разбор — в «Обзоре».",
+    gref_tools: "Почему выбор инструментов может только сужать, но не расширять. Полный разбор — в «Обзоре».",
+    gref_run_states: "requested, active, succeeded, needs_operator — что значат состояния прогона. Полный разбор — в «Обзоре».",
+    gref_bands: "Что такое ряды и как уровень выводится из леджера. Полный разбор — в «Обзоре».",
     gpop_more: "Читать полностью",
     gpop_close: "Закрыть",
+    guide_ov_kinds_h: "Тринадцать видов, один список",
+    guide_ov_kinds_p: "Панель открывает тринадцать видов записи. Двенадцать — проекции леджера: они существуют потому, что записано событие, и переживают любой процесс, который его записал. Тринадцатый, session, — операционное состояние со сроком жизни: он говорит, кто сейчас за клавиатурой, гаснет сам и событием леджера не является вовсе. Канонические имена ниже — написание самого леджера, они не переводятся; человеческое слово стоит рядом, а не вместо.",
+    guide_ov_kinds_ex: "objective · task · thread · delegation · review · verification · finding · decision · artifact · handoff · agent · agent_link · session",
+    guide_ov_task_h: "task и thread: работа и разговор о ней",
+    guide_ov_task_p: "task — единица РАБОТЫ: что сделать, кто владелец и когда это считается сделанным; у неё есть состояние и цепочка приёмки, и закрывается она отдельным действием. thread — единица РАЗГОВОРА: главный чат и любые адресные нити рядом с ним. Разговор может породить работу и часто он же — место, где о результате спорят, но ни одно сообщение ничего не завершает: завершает только состояние самой задачи. Поэтому в форме два разных вопроса — тема разговора и, отдельно, задача.",
+    guide_ov_task_ex: "thread — договорились, что чинить · task — починить экспорт, ready → accepted",
+    guide_ov_agent_h: "agent и session: постоянная роль и окно, которое пишет сейчас",
+    guide_ov_agent_p: "agent — единица РОЛИ: постоянный сотрудник с профилем, правами, навыками и сроком службы; запись делается один раз и воспроизводится навсегда. session — единица ОКНА: тот, кто пишет прямо сейчас. У сессии есть TTL, она не событие леджера и гаснет сама; роль — нет. Одна роль живёт много сессий, а сессия, за которой роли нет, — это человек за панелью.",
+    guide_ov_agent_ex: "agent — роль «Верстальщик», заведена один раз · session — окно, открытое в 14:20, гаснет по TTL",
+    guide_ov_delegation_h: "delegation и task: одна ограниченная попытка и сама работа",
+    guide_ov_delegation_p: "delegation — единица ПРОЦЕССА: одна ограниченная попытка с целью, лимитами и терминальным исходом — succeeded, failed, timed_out, needs_operator. Человек видит её как прогон. Задача переживает свои попытки: три прогона по одной задаче — это три delegation и одна task, и закончившийся прогон не двигает задачу никуда. Двигает её приёмка, а приёмка — действие человека.",
+    guide_ov_delegation_ex: "одна task · три delegation, у каждой свой исход · задача всё ещё ждёт review и вас",
+    guide_ov_review_h: "review и verification: суждение и воспроизводимая проверка",
+    guide_ov_review_p: "review — независимое суждение о результате, привязанное к точной ревизии, которую судили: человек или другая роль читает работу и записывает вердикт. verification — воспроизводимая проверка с доказательством: команда, которую любой может перезапустить, и то, что она напечатала. Одно не заменяет другого: пройденная проверка не означает, что работу приняли, а согласие рецензента не делает результат воспроизводимым. Приёмка требует review; verification — то, что удерживает review честным.",
+    guide_ov_review_ex: "review — approved по ревизии 7 · verification — команда, её код возврата и вывод, повторимые кем угодно",
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
@@ -2465,7 +2558,7 @@ const STRINGS = {
     tip_hire_budget: "Наймы и увольнения считаются одним и тем же счётчиком, и он не обнуляется, поэтому цикл «нанял-уволил» не обходит потолок.",
     board_fit: "Вписать",
     tip_board_fit: "Вписать все карточки в окно.",
-    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб. Чтобы связать две роли, потяните точку с края карточки — или откройте вкладку «Связи» у роли.",
+    board_hint: "Холст можно перетаскивать; колесо мыши — масштаб. Чтобы связать две роли, потяните точку с края карточки — или откройте вкладку «Связи» у роли. Ряды сверху вниз — уровни: в каждом лежит то, что заведено или запущено уровнем выше.",
     runtime_nodes: "Узлы рантайма",
     tip_runtime_nodes: "Сессии и delegation — механика, которую оставляет после себя прогон. По умолчанию скрыты, чтобы на доске была видна команда; число — сколько узлов под этим скрыто.",
     port_tip: "Потяните к карточке другой роли, чтобы открыть связь между ними. Не любите перетаскивание? На вкладке «Связи» у роли открывается та же форма.",
@@ -2593,6 +2686,7 @@ const STRINGS = {
     tip_legend: "Что означают значки на карточках.",
     legend_title: "Что означают значки",
     legend_note: "Состояния рядом со значком — слова самого леджера, они не переводятся.",
+    legend_bands: "Ряды — уровни, и внутри ряда порядок всегда один: сначала роли, потом задачи, потом остальное; незавершённое раньше завершённого, старое раньше нового. По имени не сортируется ничего, поэтому смена языка карточки не двигает.",
     lg_pending: "ещё не начато",
     lg_moving: "идёт сейчас",
     lg_waiting: "ждёт человека",
@@ -3016,6 +3110,38 @@ function text(x, y, value, className) {
   return element;
 }
 
+// The board's own "?", beside every rank caption (round 4, finding 7): the rows
+// are the one thing on this surface that has a meaning and no words.  It carries
+// the SAME two data attributes as every `.gref` button in the chrome, so the one
+// delegated listener picks it up unchanged — `closest` and `dataset` work on SVG
+// elements exactly as they do on HTML ones — and it sits outside every scrim, so
+// it takes the ordinary route into the guide rather than the in-dialog popover.
+//
+// It is a pointer affordance and nothing more: the canvas is `role="img"`, so
+// assistive technology reads the board as one picture and a control drawn inside
+// it could not be reached anyway.  The same paragraph stays one Tab away through
+// the Overview tab, and through the "?" beside the turnover budget in the hire
+// form, which is where the same anchor is already linked.
+const BAND_CAPTION_X = 20;
+
+function bandHelpMark(y) {
+  const mark = document.createElementNS(SVGNS, "g");
+  mark.setAttribute("class", "bandhelp");
+  mark.setAttribute("data-guide-page", "agents");
+  mark.setAttribute("data-guide-anchor", "g-ag-lineage");
+  const tip = document.createElementNS(SVGNS, "title");
+  tip.textContent = t("gref_bands");
+  mark.appendChild(tip);
+  const disc = document.createElementNS(SVGNS, "circle");
+  disc.setAttribute("class", "bandhelp-disc");
+  disc.setAttribute("cx", 6);
+  disc.setAttribute("cy", y - 13);
+  disc.setAttribute("r", 6);
+  mark.appendChild(disc);
+  mark.appendChild(text(6, y - 10, "?", "bandhelp-q"));
+  return mark;
+}
+
 // A band is a rank in the chain of command: 0 answers to the operator, each
 // step down is one delegation further away.  Wide ranks wrap onto further rows
 // rather than running off to the right, which is what made 328 nodes read as
@@ -3036,6 +3162,48 @@ function bandColumns(count) {
   return Math.max(1, Math.min(count, columns));
 }
 
+// Which card sits where INSIDE a rank, decided here and nowhere else (round 4,
+// finding 7: "непонятная сортировка").  Until now a rank kept whatever order the
+// projection handed back — stable for one snapshot, but not an order anybody
+// could name, so the board read as shuffled.  Roles first, because a rank is a
+// chain of command and the roles are who is standing in it; then the work; then
+// everything else.
+//
+// Nothing here sorts by NAME.  A `localeCompare(lang)` would restack the whole
+// board the moment the language toggle moved — which is the very complaint being
+// fixed, in a form that would be harder to explain than the original.
+const BAND_KIND_ORDER = { agent: 0, task: 1 };
+// Settled means nothing more happens here unless somebody starts something new,
+// so it sinks below what is still live.  Mirrors `_TERMINAL_STATES` in
+// ui/graph.py — the set the server already sheds by — because two notions of
+// "finished" across one seam would be worse than one shared list; a test
+// compares them.
+const BAND_SETTLED = new Set([
+  "succeeded", "failed", "cancelled", "timed_out",
+  "accepted", "completed", "closed", "expired"
+]);
+
+function bandKindRank(node) {
+  const known = BAND_KIND_ORDER[node.kind];
+  return known === undefined ? 2 : known;
+}
+
+// Byte order, not collation: `recorded_at` is ISO-8601 and an id is a ULID, so
+// plain comparison is already chronological and cannot move under a language.
+// The id decides every remaining tie, and ids are unique, so the order is total:
+// the same snapshot lays out the same way however the nodes arrive.
+function bandCompare(left, right) {
+  const kind = bandKindRank(left) - bandKindRank(right);
+  if (kind !== 0) { return kind; }
+  const settled =
+    (BAND_SETTLED.has(left.state) ? 1 : 0) - (BAND_SETTLED.has(right.state) ? 1 : 0);
+  if (settled !== 0) { return settled; }
+  const when = String(left.recorded_at || "");
+  const other = String(right.recorded_at || "");
+  if (when !== other) { return when < other ? -1 : 1; }
+  return String(left.id) < String(right.id) ? -1 : 1;
+}
+
 function layout(nodes) {
   const bands = new Map();
   for (const node of nodes) {
@@ -3047,7 +3215,7 @@ function layout(nodes) {
   const ordered = [...bands.keys()].sort((a, b) => a - b);
   let row = 0;
   for (const band of ordered) {
-    const members = bands.get(band);
+    const members = bands.get(band).slice().sort(bandCompare);
     const columns = bandColumns(members.length);
     members.forEach((node, index) => {
       placed.set(node.id, {
@@ -3244,16 +3412,32 @@ function render(graph) {
     const position = positions.get(node.id);
     if (!position || seenBands.has(position.band)) { continue; }
     seenBands.add(position.band);
-    // "delegated · depth 2" is the shape of a launch, not of a team: the depth
-    // captions are the runtime's own vocabulary, so they come and go with the
-    // runtime nodes (round 3, designer 5).  Rank 0 keeps its caption — that one
-    // says who the operator is, which is domain, not plumbing.
-    if (position.band !== 0 && !showRuntime) { continue; }
+    // The caption is computed from the RANK, never from the node that happened
+    // to come first in it.  `_reporting_ranks` (ui/graph.py) files work into the
+    // same band as roles, by `owner_session_id`, so "hired by the rank above"
+    // would be a lie about half the cards; "set up or started by the rank above"
+    // is true of a role, a task and a run alike.
     const caption = position.band === 0
       ? t("band_operator")
-      : t("band_delegated") + position.band;
+      : t("band_rank").replace("{n}", position.band);
+    // The mark LEADS the caption.  SVG text has no width until it is laid out,
+    // and measuring one string per band on every two-second repaint, only to put
+    // a "?" after it, buys nothing an operator can see.
+    captions.appendChild(bandHelpMark(position.y));
     // Above the rank, not beside it: to the left it collided with the first node.
-    captions.appendChild(text(0, position.y - 10, caption, "band-label"));
+    const label = text(BAND_CAPTION_X, position.y - 10, caption, "band-label");
+    // Two vocabularies on one line, and the runtime's does not stand in for the
+    // domain's.  "delegated · depth 2" is the shape of a launch, not of a team,
+    // so it still comes and goes with the runtime nodes (round 3, designer 5);
+    // what the row IS is domain and is now said either way.  Rank 0 has no
+    // depth to add — it is the rank that answers to a person.
+    if (showRuntime && position.band !== 0) {
+      const depth = document.createElementNS(SVGNS, "tspan");
+      depth.setAttribute("class", "band-runtime");
+      depth.textContent = " · " + t("band_delegated") + position.band;
+      label.appendChild(depth);
+    }
+    captions.appendChild(label);
   }
 
   for (const edge of graph.edges) {
@@ -3726,6 +3910,10 @@ function closeGuidePopover() {
 document.addEventListener("click", (event) => {
   const link = event.target.closest("[data-guide-anchor]");
   if (!link) { return; }
+  // The board's mark shares the canvas with the pan gesture, and a pan that
+  // happens to end over it must not carry the operator off to the guide.  Same
+  // flag the focus-mode click already honours: it says the pointer travelled.
+  if (suppressClick && canvas.contains(link)) { return; }
   // A mark with no tooltip key has nothing to show in place and would open an
   // empty box; it falls through to the guide, which is where it went before.
   const inDialog = openModalId &&

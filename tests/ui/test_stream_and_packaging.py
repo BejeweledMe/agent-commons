@@ -913,9 +913,14 @@ def test_the_board_shows_the_team_and_holds_the_runtime_behind_a_toggle() -> Non
     assert 't("runtime_nodes") + " (" + runtime + ")"' in body
     assert "localStorage.getItem(RUNTIME_KEY)" in body
     assert 'localStorage.setItem(RUNTIME_KEY, showRuntime ? "1" : "0")' in body
-    # The depth captions are the runtime's own vocabulary and go with it; rank 0
-    # names the operator, which is domain.
-    assert "if (position.band !== 0 && !showRuntime) { continue; }" in body
+    # The depth captions are the runtime's own vocabulary and go with it, and
+    # they are now APPENDED to the rank caption rather than standing in for it:
+    # what a row is is domain and is said whether the runtime is shown or not
+    # (round 4, finding 7).  Rank 0 names the operator and has no depth to add.
+    assert 'depth.setAttribute("class", "band-runtime");' in body
+    assert 'depth.textContent = " · " + t("band_delegated") + position.band;' in body
+    assert "if (showRuntime && position.band !== 0) {" in body
+    assert "if (position.band !== 0 && !showRuntime) { continue; }" not in body
     # ... and the run's own record stays reachable with the node off the board:
     # both entry points read the whole graph, never the board's filtered view,
     # and fall back to the record when the node is not there at all.
@@ -1756,7 +1761,7 @@ def _guide_markup() -> str:
     )[0]
 
 
-GUIDE_DEEP_PAGES = ("agents", "tasks", "links", "limits", "catalog")
+GUIDE_DEEP_PAGES = ("units", "agents", "tasks", "links", "limits", "catalog")
 
 
 def test_the_guide_says_out_loud_which_of_its_pages_are_reference() -> None:
