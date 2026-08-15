@@ -154,6 +154,12 @@ class UIContext:
         self._seq = 0
         self._fingerprint = ""
         self._graph: dict[str, Any] | None = None
+        # Operator profile config is read once and kept here, next to the graph
+        # it is served beside.  It is a file outside the workspace that only the
+        # operator can change, and it cannot change under a running server the
+        # way the ledger can -- so re-reading it per request would buy nothing
+        # and put a syscall on the hot catalogue path.
+        self._profile_info: dict[str, dict[str, Any]] | None = None
         # Background launch threads, kept so a test can await them; daemon so
         # they never hold the server open.
         self._launch_threads: list[threading.Thread] = []
@@ -314,6 +320,57 @@ class UIContext:
 
     # -- catalogue ------------------------------------------------------------
 
+    def profile_info(self) -> dict[str, dict[str, Any]]:
+        """Which provider and which model each profile would run -- nothing else.
+
+        A role selects a profile and never names a model, so the only honest way
+        to answer "what will actually run?" is to read the operator's own
+        profile config.  Two fields leave here and no more: a profile body also
+        carries the executable path, the sandbox or permission mode, and the
+        argv a launch is built from, and every one of those tells a bearer of
+        this token something about the operator's machine and about the
+        narrowing that protects it.  Provider and model answer the question the
+        panel asks; the rest stays where it is configured.
+
+        Read through the same guarded loader the launch path uses, so a config
+        this surface would accept is exactly one a launch would accept.  The
+        `--enable-launch` gate is deliberately not consulted: permission to
+        spawn a billable process and permission to say which model a profile
+        names are different privileges, and the config is operator-owned either
+        way.
+
+        Never raises.  A missing, unreadable, or malformed config makes this
+        empty, and the panel then says the model is fixed in the profile rather
+        than inventing a name -- an unreadable operator file is a reason to know
+        less, not a reason to fail a read-only catalogue request.
+        """
+
+        with self._guard:
+            cached = self._profile_info
+        if cached is not None:
+            return cached
+
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+        summary: dict[str, dict[str, Any]] = {}
+        try:
+            config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+            for profile_id in config.profiles.profile_ids:
+                profile = config.profiles.get(profile_id)
+                model = getattr(profile, "model", None)
+                summary[str(profile_id)] = {
+                    "provider": str(profile.provider),
+                    "model": str(model) if model is not None else None,
+                }
+        except (CommonsError, OSError, ValueError) as exc:
+            # The detail names an operator path and the reason it was refused;
+            # that belongs in the operator's own log, not in a response.
+            _LOG.warning("profile config not readable, serving no profile detail: %s", exc)
+            summary = {}
+        with self._guard:
+            self._profile_info = summary
+        return summary
+
     def catalog(self) -> dict[str, Any]:
         """What the gear panel may offer, and who owns each half of it.
 
@@ -348,6 +405,10 @@ class UIContext:
             "catalog_editing_enabled": self.catalog_editing_enabled,
             "catalog_path": str(self._catalog_path) if self._catalog_path else None,
             "profiles": sorted(PROFILE_NARROWING),
+            # Provider and model per profile, so the hire form can say what a
+            # choice actually starts.  Empty when the operator config could not
+            # be read: the panel falls back to "fixed in the profile".
+            "profile_info": self.profile_info(),
             # Read-only reference: the same composition a launch receives, so
             # the Tools view can never drift from what actually runs.
             "profile_tools": profile_tool_summary(),
