@@ -969,6 +969,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-ov-review" data-i18n="guide_ov_review_h"></h3>
           <p data-i18n="guide_ov_review_p"></p>
           <p class="mono dim" data-i18n="guide_ov_review_ex"></p>
+          <!-- Round 5: the words the panel shows and never defined — the budget
+               units, the broker, the runtime-node toggle, and the rank/depth
+               captions.  Each was quoted back verbatim as not understood. -->
+          <h3 id="g-ov-budget" data-i18n="guide_ov_budget_h"></h3>
+          <p data-i18n="guide_ov_budget_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_budget_ex"></p>
+          <h3 id="g-ov-broker" data-i18n="guide_ov_broker_h"></h3>
+          <p data-i18n="guide_ov_broker_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_broker_ex"></p>
+          <h3 id="g-ov-rank" data-i18n="guide_ov_rank_h"></h3>
+          <p data-i18n="guide_ov_rank_p"></p>
+          <p class="mono dim" data-i18n="guide_ov_rank_ex"></p>
         </div>
         <div id="gpage-agents" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
@@ -1969,6 +1981,15 @@ const STRINGS = {
     guide_ov_review_h: "review and verification: a judgement, and a repeatable check",
     guide_ov_review_p: "review is an independent judgement of a result, bound to the exact revision it judged: a person or another role reads the work and records a verdict. verification is a repeatable check with its evidence: a command anyone can run again, and what it printed. Neither stands in for the other — a check that passes does not mean the work was accepted, and a reviewer's approval does not make the result reproducible. Acceptance demands the review; the verification is what keeps the review honest.",
     guide_ov_review_ex: "review: approved against revision 7 · verification: the command, its exit status and its output, re-runnable by anyone",
+    guide_ov_budget_h: "provider_units and micro_usd: what a budget counts",
+    guide_ov_budget_p: "provider_units counts starts of the provider process: a budget of 1 provider_units means the run may start the provider once. It is a launch counter, not money, and nothing here measures spending. micro_usd is the opposite — an explicit money cap counted in millionths of a dollar, used only when the operator opts into a provider-native cost limit. Every budget on a card is the cap a run was permitted, never what it used.",
+    guide_ov_budget_ex: "budget: 1 provider_units → one permitted start of the provider process; no money is being counted",
+    guide_ov_broker_h: "broker and runtime nodes: the machinery around a run",
+    guide_ov_broker_p: "The broker is the local dispatcher on the operator's machine that starts and watches provider processes — the same one the CLI uses. It is a program, not a role and not a record. On the board a run shows as its own card, and the Runtime nodes toggle folds the machinery cards away — the sessions and delegation records runs leave behind; the number on the toggle says how many cards are folded, so the team stays readable.",
+    guide_ov_broker_ex: "Runtime nodes (12) → twelve machinery cards sit behind the toggle; the board keeps showing the team",
+    guide_ov_rank_h: "rank and depth: how the board stacks its rows",
+    guide_ov_rank_p: "The board's rows are ranks: the top row answers to you, the operator, and every row below holds what the row above set up or started — the caption on each row says exactly that. depth is the run's own version of the same idea: a run started straight from the panel is depth 0, and children it might spawn would be depth 1. Neither number is a judgement; they only say how far from your own hands a card sits.",
+    guide_ov_rank_ex: "rank 1 · delegated · depth 1 → set up by the row above; the run sits one step below your own launch",
     guide_ag_role_h: "A role is a ledger record",
     guide_ag_role_p: "Hiring writes one agent.created event into the ledger — the shared history every page here reads from: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no staff list stored beside that history — the current team is rebuilt by re-reading it, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
@@ -2543,6 +2564,15 @@ const STRINGS = {
     guide_ov_review_h: "review и verification: суждение и воспроизводимая проверка",
     guide_ov_review_p: "review — независимое суждение о результате, привязанное к точной ревизии, которую судили: человек или другая роль читает работу и записывает вердикт. verification — воспроизводимая проверка с доказательством: команда, которую любой может перезапустить, и то, что она напечатала. Одно не заменяет другого: пройденная проверка не означает, что работу приняли, а согласие рецензента не делает результат воспроизводимым. Приёмка требует review; verification — то, что удерживает review честным.",
     guide_ov_review_ex: "review — approved по ревизии 7 · verification — команда, её код возврата и вывод, повторимые кем угодно",
+    guide_ov_budget_h: "provider_units и micro_usd: что считает бюджет",
+    guide_ov_budget_p: "provider_units считает старты процесса провайдера: бюджет 1 provider_units значит, что прогон может стартовать провайдера один раз. Это счётчик стартов, не деньги, и расход здесь никто не измеряет. micro_usd — наоборот: явный денежный потолок в миллионных долях доллара, и только когда оператор сам включил провайдерский лимит стоимости. Любой бюджет на карточке — разрешённый потолок, никогда не «потрачено».",
+    guide_ov_budget_ex: "бюджет: 1 provider_units → один разрешённый старт процесса провайдера; деньги не считаются",
+    guide_ov_broker_h: "broker и узлы рантайма: механика вокруг прогона",
+    guide_ov_broker_p: "Брокер — локальный диспетчер на машине оператора, который стартует и сторожит процессы провайдера; тот же самый, что у CLI. Это программа, не роль и не запись. На доске прогон виден отдельной карточкой, а переключатель «Узлы рантайма» прячет карточки механики — сессии и записи delegation, которые прогоны оставляют после себя; число на переключателе говорит, сколько карточек спрятано, чтобы команда оставалась читаемой.",
+    guide_ov_broker_ex: "Узлы рантайма (12) → двенадцать карточек механики спрятаны за переключателем; на доске остаётся команда",
+    guide_ov_rank_h: "rank и depth: как доска складывает ряды",
+    guide_ov_rank_p: "Ряды доски — уровни: верхний — это вы, оператор, а каждый ряд ниже держит то, что завёл или запустил ряд выше, — подпись у ряда говорит ровно это. depth — та же идея для прогона: прогон, запущенный прямо из панели, имеет depth 0, а его потомки были бы depth 1. Ни то ни другое не оценка; числа лишь говорят, насколько далеко карточка от ваших собственных рук.",
+    guide_ov_rank_ex: "уровень 1 · делегировано · глубина 1 → заведено рядом выше; прогон на один шаг ниже вашего собственного старта",
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает в леджер — общую историю, из которой читает каждая страница здесь, — одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного списка штата рядом с этой историей нет — текущая команда собирается её перечитыванием, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
@@ -3317,8 +3347,11 @@ const BAND_CAPTION_X = 20;
 function bandHelpMark(y) {
   const mark = document.createElementNS(SVGNS, "g");
   mark.setAttribute("class", "bandhelp");
-  mark.setAttribute("data-guide-page", "agents");
-  mark.setAttribute("data-guide-anchor", "g-ag-lineage");
+  // Lands on the glossary's own rank/depth entry, which explains the rows in
+  // board words; the lineage mechanics stay one page over for whoever needs
+  // them (round 5: the caption itself was quoted back as not understood).
+  mark.setAttribute("data-guide-page", "units");
+  mark.setAttribute("data-guide-anchor", "g-ov-rank");
   const tip = document.createElementNS(SVGNS, "title");
   tip.textContent = t("gref_bands");
   mark.appendChild(tip);

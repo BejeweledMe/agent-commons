@@ -187,12 +187,15 @@ def test_the_board_carries_its_own_mark_into_the_guide() -> None:
 
     body = read_spa()
     mark = _function(body, "function bandHelpMark(y) {")
-    assert 'mark.setAttribute("data-guide-page", "agents");' in mark
-    assert 'mark.setAttribute("data-guide-anchor", "g-ag-lineage");' in mark
+    # Round 5: the caption was quoted back verbatim as not understood, so the
+    # mark now lands on the glossary's own rank/depth entry, which explains the
+    # rows in board words; the lineage mechanics stay one page over.
+    assert 'mark.setAttribute("data-guide-page", "units");' in mark
+    assert 'mark.setAttribute("data-guide-anchor", "g-ov-rank");' in mark
     assert 't("gref_bands")' in mark
     # The anchor is a heading that exists, on the page named beside it.
-    agents = body.split('<div id="gpage-agents"', 1)[1].split("\n        </div>", 1)[0]
-    assert 'id="g-ag-lineage"' in agents
+    units = body.split('<div id="gpage-units"', 1)[1].split("\n        </div>", 1)[0]
+    assert 'id="g-ov-rank"' in units
 
     # `closest` walks up from the circle or the glyph to the group that carries
     # the attributes, so the ONE listener catches it unchanged.
@@ -250,9 +253,10 @@ def test_the_units_page_separates_the_four_pairs_an_operator_confuses() -> None:
     # an element is owned by `data-i18n` or by a JS write, never both, and a
     # hardcoded English default would show through under a Russian panel.
     elements = re.findall(r"<(p|h3)\b([^>]*)>([^<]*)</\1>", page)
-    # One reference lead, then five headings each with its paragraph and its
-    # example, in the shape the four pages beside it already use.
-    assert len(elements) == 16, elements
+    # One reference lead, then eight headings each with its paragraph and its
+    # example, in the shape the four pages beside it already use.  (Round 5
+    # added the budget units, the broker, and the rank/depth rows.)
+    assert len(elements) == 25, elements
     for _, attributes, shown in elements:
         assert "data-i18n=" in attributes, attributes
         assert shown.strip() == "", shown
@@ -373,3 +377,34 @@ def test_the_reference_pages_explain_their_terms_instead_of_assuming_them() -> N
     # The run's card, not the run's "node": the form speaks in board words.
     assert "card" in _value(english, "run_note")
     assert "узле" not in _value(russian, "run_note")
+
+
+def test_the_units_glossary_defines_the_words_the_panel_shows_undefined() -> None:
+    """Round 5, the glossary half: "1 provider_units — units of what?",
+    "broker of what?", "run node?", and the rank caption read in capitals.
+    Each now has its own entry on the units page, in both languages, saying
+    what the thing on screen means in board words — and the board's own "?"
+    beside a rank caption lands on the rank entry."""
+
+    body = read_spa()
+    page = body.split('<div id="gpage-units"', 1)[1].split("\n        </div>", 1)[0]
+    for anchor in ("g-ov-budget", "g-ov-broker", "g-ov-rank"):
+        assert f'<h3 id="{anchor}"' in page, anchor
+    for stem in ("budget", "broker", "rank"):
+        _in_both_tables(f"guide_ov_{stem}_h", f"guide_ov_{stem}_p", f"guide_ov_{stem}_ex")
+
+    english, russian = _language_tables()
+    # provider_units is a launch counter and says so; money is counted only by
+    # the unit that names money.
+    assert "not money" in _value(english, "guide_ov_budget_p")
+    assert "не деньги" in _value(russian, "guide_ov_budget_p")
+    assert "micro_usd" in _value(english, "guide_ov_budget_p")
+    # The broker introduces itself the same way the run form now does.
+    assert "local dispatcher" in _value(english, "guide_ov_broker_p")
+    assert "локальный диспетчер" in _value(russian, "guide_ov_broker_p").lower()
+    # The runtime-node toggle's number is explained where the word is defined.
+    assert "Runtime nodes" in _value(english, "guide_ov_broker_ex")
+    assert "Узлы рантайма" in _value(russian, "guide_ov_broker_ex")
+    # Rank and depth are explained through the caption the tester actually read.
+    assert "depth 0" in _value(english, "guide_ov_rank_p")
+    assert "depth 0" in _value(russian, "guide_ov_rank_p")
