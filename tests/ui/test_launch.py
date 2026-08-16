@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
     AttemptStore,
     ProcessResult,
@@ -21,7 +22,6 @@ from agent_commons.runtime import (
     RunReason,
     default_profile_registry,
 )
-from agent_commons.errors import ConfigurationError
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui.context import UIContext
