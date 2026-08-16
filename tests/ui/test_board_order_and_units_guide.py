@@ -326,3 +326,50 @@ def test_a_mark_no_longer_promises_a_page_it_may_not_open() -> None:
     body = read_spa()
     assert 'document.getElementById("gpop-text").textContent = t(gpopKey);' in body
     _in_both_tables("gpop_more", "gpop_close")
+
+
+# --- round 5: the reference pages, readable by the person they were for ------
+
+
+def test_the_reference_pages_explain_their_terms_instead_of_assuming_them() -> None:
+    """Round 5: four testers independently could not read the reference tabs —
+    the quoted misses were the ledger, "a projection rebuilt by replay", the
+    compare-and-swap sentence, the worker's canonical outcome tool, the
+    DemoRunner "runner seam", and "broker of what?".  The mechanics stay; the
+    words that carried them are now the panel's own, and each canonical term
+    that remains is explained in the sentence where it first appears."""
+
+    english, russian = _language_tables()
+
+    # The phrases quoted back verbatim as not-understood are gone.
+    for gone in ("compare-and-swap", "write lock", "runner seam", "on every replay"):
+        assert gone not in _value(english, "guide_tk_ledger_p"), gone
+        assert gone not in _value(english, "guide_tk_demo_p"), gone
+        assert gone not in _value(english, "guide_tk_run_p"), gone
+    for gone in ("replay-ем", "compare-and-swap", "локом записи", "воркер", "шов"):
+        offenders = [line.strip() for line in russian.split("\n") if gone in line.lower()]
+        assert offenders == [], (gone, offenders)
+
+    # The ledger is defined where it is first met: on the units page that opens
+    # the reference, and beside the canonical state line in the drawer.
+    assert "shared history" in _value(english, "guide_ov_kinds_p")
+    assert "общей истории" in _value(russian, "guide_ov_kinds_p")
+    assert "shared history" in _value(english, "accept_ledger_state")
+    assert "общей истории" in _value(russian, "accept_ledger_state")
+
+    # The broker says what it is at first use — in the reference and on the run
+    # form, which is where "broker of what?" was actually asked.
+    for block, saying in ((english, "local dispatcher"), (russian, "локальный диспетчер")):
+        assert saying in _value(block, "guide_tk_run_p"), saying
+        assert saying in _value(block, "run_note"), saying
+
+    # The canonical field names that stay carry their explanation beside them.
+    assert "none of the sessions that did the work" in _value(english, "guide_tk_accept_p")
+    assert "work_author_session_ids" in _value(russian, "guide_tk_accept_p")
+    assert "не теми сессиями" in _value(russian, "guide_tk_accept_p")
+    assert "it is not money" in _value(english, "guide_lm_two_p")
+    assert "не деньги" in _value(russian, "guide_lm_two_p")
+
+    # The run's card, not the run's "node": the form speaks in board words.
+    assert "card" in _value(english, "run_note")
+    assert "узле" not in _value(russian, "run_note")
