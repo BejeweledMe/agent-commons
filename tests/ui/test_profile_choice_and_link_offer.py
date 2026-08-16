@@ -420,3 +420,32 @@ def test_the_offer_cannot_outlive_the_role_or_the_moment_it_names() -> None:
     assert "parentElement.removeChild(button)" in clear
     assert "#board-result .followup{" in body
     assert 'button.className = "followup";' in offer
+
+
+def test_the_flat_team_and_the_handoff_right_explain_themselves() -> None:
+    """Round 5, two multi-role testers independently: both went looking for a
+    team-lead control and both read handoff_work as an automatic transfer.
+    The hire form now says the flat start is deliberate and carries a mark
+    into the lineage paragraph; the link dialog and the reference both say a
+    handoff_work link is a right, not a process — nothing moves until a run
+    is actually launched."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    note = _hire_modal(body).split('id="hire-chain-note"', 1)[1].split("</p>", 1)[0]
+    assert 'data-guide-anchor="g-ag-lineage"' in note
+    assert 'data-i18n-title="gref_chain"' in note
+    assert "on purpose" in _value(english, "hire_chain_note")
+    assert "намеренно" in _value(russian, "hire_chain_note")
+    _in_both_tables("gref_chain")
+    # The popover parks under the note, so the note is its positioned ancestor.
+    assert "#hire-chain-note{position:relative}" in body
+
+    # The right-not-a-process sentence sits where the choice is made AND in the
+    # reference, in both languages.
+    assert "a right, not a process" in _value(english, "link_permission_note")
+    assert "право, а не процесс" in _value(russian, "link_permission_note")
+    assert "a right, not a process" in _value(english, "guide_ln_handoff_p")
+    assert "право, а не процесс" in _value(russian, "guide_ln_handoff_p")
+    assert "hands nothing over" in _value(english, "guide_ln_handoff_p")

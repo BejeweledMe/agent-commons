@@ -339,6 +339,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 }
 .gpop .note{margin:0 0 6px; color:var(--fg)}
 .gpop .actions{margin:0}
+/* The flat-team note carries a mark of its own, so the popover needs the note
+   to be the positioned ancestor it parks under. */
+#hire-chain-note{position:relative}
 /* A field's own control fills the field's width — and that is all this says.
    Written as a descendant it also caught the RADIO and CHECKBOX inside a row
    nested in a field, stretching a 13px dot into a 324px styled box that pushed
@@ -1550,9 +1553,17 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            answers to another only through a proposal a person approved.  The
            relation that CAN be recorded is offered after the hire, as its own
            deliberate step. -->
-      <p class="note" id="hire-chain-note" data-i18n="hire_chain_note">A role hired here answers to you. One role comes
-        to answer to another only through a proposal that role makes and a person approves — this
-        form creates no such rank.</p>
+      <!-- Round 5, both multi-role testers: they went looking for a team-lead
+           control here.  The note now says the flat start is deliberate, and
+           its mark opens the lineage paragraph that says how a rank is really
+           built.  The i18n marker moves to an inner span so applyI18n cannot
+           overwrite the mark. -->
+      <p class="note" id="hire-chain-note"><span data-i18n="hire_chain_note">A role hired here
+          answers to you — there is no team-lead control, on purpose. One role comes to answer to
+          another only through a proposal that role makes and a person approves; this form creates
+          no such rank.</span>
+        <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-lineage"
+          data-i18n-title="gref_chain" data-i18n-aria="gref_chain"></button></p>
       <div class="actions">
         <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
         <button type="button" id="hire-cancel" data-i18n="hire_cancel">Cancel</button>
@@ -1764,7 +1775,8 @@ const STRINGS = {
     hire_profile_model_fixed: "fixed in the profile",
     hire_profile_unconfigured: "not in the operator's config (runtime.yaml)",
     hire_profile_missing: "This profile is not in the operator's config, so a run of this role cannot start yet. Profiles are added by the operator in runtime.yaml; hiring the role is still recorded.",
-    hire_chain_note: "A role hired here answers to you. One role comes to answer to another only through a proposal that role makes and a person approves — this form creates no such rank.",
+    hire_chain_note: "A role hired here answers to you — there is no team-lead control, on purpose. One role comes to answer to another only through a proposal that role makes and a person approves; this form creates no such rank.",
+    gref_chain: "Why the team starts flat, and how a rank between roles is really built. The full account is in the Overview.",
     hire_rationale_label: "Why this role exists (kept forever)",
     hire_rationale_help: "A note for the log and for people: why this role exists. The role never receives it as an instruction — what it must do is set by its skills and by the text of the task.",
     hire_group_who: "Who this is",
@@ -2029,8 +2041,8 @@ const STRINGS = {
     guide_ln_ask_h: "ask is a recorded permission, not a channel",
     guide_ln_ask_p: "An ask link permits one bounded question, but the runtime opens no channel for it: talk between roles travels through ordinary threads, and this panel says so plainly. Today no run can even receive commons_open_agent_link — that tool switches on only at open_links: auto, and the auto level is withheld — so links are opened by a person, from this panel.",
     guide_ln_ask_ex: "open_links: ask → the run receives no link tool at all; a propose-a-link tool does not exist yet",
-    guide_ln_handoff_h: "handoff_work is actually consumed",
-    guide_ln_handoff_p: "Exactly one place in the lifecycle reads links: staffing a delegation. A session running as a role may staff itself or a role in its own lineage; an open handoff_work link from it to another role widens precisely that — nothing else. The check runs on delegation.requested and again whenever the picture is rebuilt.",
+    guide_ln_handoff_h: "handoff_work is a right, and one place consumes it",
+    guide_ln_handoff_p: "An open handoff_work link is a right, not a process: opening it hands nothing over, and no work moves by itself. Exactly one place in the lifecycle reads links — deciding on whose behalf a run may be launched. A session running as a role may launch for itself or for a role in its own lineage; an open handoff_work link from it to another role widens precisely that, nothing else. The check runs on delegation.requested and again whenever the picture is rebuilt.",
     guide_ln_handoff_ex: "role A, no link → delegation on_behalf_of role B is refused; open handoff_work A→B and the same write passes",
     guide_ln_deadline_h: "A link ends only when you close it",
     guide_ln_deadline_p: "There is no expiry. Rebuilding the picture from the history has no clock — give it one and the same events would read differently over time — so nothing can retire a permission on a schedule; only an explicit agent.link_closed does. The optional deadline_seconds field records an intended horizon for people to read; it constrains nothing, which is why the panel no longer asks for it. Bounds on roles are counted in attempts, provider units and depth, not in hours.",
@@ -2098,7 +2110,7 @@ const STRINGS = {
     link_needs_role: "Pick the role on this side of the link.",
     link_same_role: "A link joins two different roles; it does not open onto itself.",
     link_already_open: "The board already shows this permission open. If your view is behind, press again — the journal answers, not the panel.",
-    link_permission_note: "A link is a recorded permission in the journal; it does not open a communication channel yet.",
+    link_permission_note: "A link is a recorded permission in the journal; it does not open a communication channel yet. handoff_work, too, is a right, not a process: opening it hands nothing over — it only widens on whose behalf a run may be launched, and work moves only when such a run actually starts.",
     link_type_label: "What this link permits",
     link_type_ask: "ask — may put questions to this role",
     link_type_handoff: "handoff_work — may pass work to this role",
@@ -2357,7 +2369,8 @@ const STRINGS = {
     hire_profile_model_fixed: "закреплена в профиле",
     hire_profile_unconfigured: "нет в конфиге оператора (runtime.yaml)",
     hire_profile_missing: "Этого профиля нет в конфиге оператора, поэтому прогон такой роли пока не запустится. Профили оператор добавляет в runtime.yaml; нанять роль всё равно можно.",
-    hire_chain_note: "Роль, нанятая здесь, подчиняется оператору. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком, — эта форма такого ранга не создаёт.",
+    hire_chain_note: "Роль, нанятая здесь, подчиняется оператору — поля «тимлид» нет намеренно. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком; эта форма такого ранга не создаёт.",
+    gref_chain: "Почему команда начинается плоской и откуда берётся ранг между ролями. Полный разбор — в «Обзоре».",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
     hire_rationale_help: "Запись для журнала и для людей: почему эта роль существует. Как инструкцию роль её не получает — что она обязана делать, задают её навыки и текст задачи.",
     hire_group_who: "Кто это",
@@ -2613,8 +2626,8 @@ const STRINGS = {
     guide_ln_ask_h: "ask — записанное разрешение, не канал",
     guide_ln_ask_p: "Связь ask разрешает один ограниченный вопрос, но канал под него рантайм не открывает: разговор ролей идёт обычными тредами, и панель говорит об этом прямо. Сегодня ни один прогон даже не получает commons_open_agent_link — инструмент включается только на open_links: auto, а уровень auto удержан, — так что связи открывает человек, из этой панели.",
     guide_ln_ask_ex: "open_links: ask → прогон не получает никакого инструмента связей; инструмента «предложить связь» пока не существует",
-    guide_ln_handoff_h: "handoff_work реально потребляется",
-    guide_ln_handoff_p: "Ровно одно место в lifecycle читает связи: постановка роли на делегирование. Сессия, работающая как роль, может ставить себя или роль из своей линии; открытая handoff_work-связь от неё к другой роли расширяет ровно это — и ничего больше. Проверка выполняется на delegation.requested и заново при каждой пересборке картины.",
+    guide_ln_handoff_h: "handoff_work — право, и потребляется оно в одном месте",
+    guide_ln_handoff_p: "Открытая handoff_work-связь — право, а не процесс: открытие само ничего не передаёт, и работа сама никуда не движется. Ровно одно место в жизненном цикле читает связи — решение, от чьего имени можно стартовать прогон. Сессия, работающая как роль, может стартовать за себя или за роль из своей линии; открытая handoff_work-связь от неё к другой роли расширяет ровно это, и ничего больше. Проверка выполняется на delegation.requested и заново при каждой пересборке картины.",
     guide_ln_handoff_ex: "роль A без связи → делегирование on_behalf_of роли B отклоняется; откройте handoff_work A→B — та же запись проходит",
     guide_ln_deadline_h: "Связь заканчивается только закрытием",
     guide_ln_deadline_p: "Истечения нет. У пересборки картины из истории нет часов — будь они, одни и те же события со временем читались бы по-разному, — поэтому снять полномочие по расписанию невозможно, только явным agent.link_closed. Необязательное поле deadline_seconds фиксирует намеренный горизонт для чтения людьми; оно ничего не ограничивает, поэтому панель его больше не спрашивает. Границы ролей считаются в попытках, provider units и глубине, а не в часах.",
@@ -2682,7 +2695,7 @@ const STRINGS = {
     link_needs_role: "Выберите роль на этой стороне связи.",
     link_same_role: "Связь соединяет две разные роли; саму на себя она не открывается.",
     link_already_open: "На доске такое разрешение уже открыто. Если ваш снимок отстал — нажмите ещё раз: отвечает журнал, а не панель.",
-    link_permission_note: "Связь — запись разрешения в журнале; канал общения она пока не открывает.",
+    link_permission_note: "Связь — запись разрешения в журнале; канал общения она пока не открывает. handoff_work — тоже право, а не процесс: открытие само ничего не передаёт — оно лишь расширяет, от чьего имени можно ставить прогон, и работа переходит только когда такой прогон действительно стартует.",
     link_type_label: "Что разрешает эта связь",
     link_type_ask: "ask — может задавать вопросы этой роли",
     link_type_handoff: "handoff_work — может передавать работу этой роли",
