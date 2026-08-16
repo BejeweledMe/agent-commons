@@ -1219,9 +1219,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <div class="actions">
           <button type="button" id="task-review-request" hidden
             data-i18n="accept_send_review">Send for review</button>
-          <button type="button" id="task-accept" hidden data-i18n="accept_button">Accept</button>
+          <!-- The trailing ellipsis is a promise: these two only open a form.
+               The live tester pressed "Accept" a second time expecting it to
+               record and the press wiped the half-typed summary, so while the
+               form is open the openers leave the screen entirely. -->
+          <button type="button" id="task-accept" hidden data-i18n="accept_button">Accept…</button>
           <button type="button" id="task-reopen" hidden
-            data-i18n="accept_reopen">Send back to work</button>
+            data-i18n="accept_reopen">Send back to work…</button>
         </div>
         <p class="note" id="task-acceptance-caveat" hidden data-i18n="accept_caveat"></p>
         <label class="field" id="task-accept-field" hidden>
@@ -1230,8 +1234,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <label class="field" id="task-reopen-field" hidden>
           <span data-i18n="reopen_reason_label">Why send it back?</span>
           <input type="text" id="task-reopen-reason" autocomplete="off"></label>
+        <p class="note" id="task-acceptance-pending" hidden
+          data-i18n="accept_nothing_recorded">Nothing is recorded yet</p>
         <div class="actions" id="task-acceptance-confirm" hidden>
-          <button type="button" id="task-acceptance-go" data-i18n="accept_confirm">Record it</button>
+          <button type="button" id="task-acceptance-go"
+            data-i18n="accept_confirm_accept">Record the acceptance</button>
           <button type="button" id="task-acceptance-cancel" data-i18n="hire_cancel">Cancel</button>
         </div>
         <p class="result" id="task-acceptance-result"></p>
@@ -2106,11 +2113,13 @@ const STRINGS = {
     accept_state_closed: "This task is blocked or cancelled, so there is nothing to send for review.",
     accept_state_other: "This task is not at a step you can act on from here.",
     accept_send_review: "Send for review",
-    accept_button: "Accept",
-    accept_reopen: "Send back to work",
+    accept_button: "Accept…",
+    accept_reopen: "Send back to work…",
     accept_caveat: "Acceptance can still be refused: the review must be approved, bound to this exact version of the task, and written by someone who neither asked for the work nor did it.",
     accept_summary_label: "What are you accepting?",
-    accept_confirm: "Record it",
+    accept_nothing_recorded: "Nothing is recorded yet — the button below is the one that records.",
+    accept_confirm_accept: "Record the acceptance",
+    accept_confirm_reopen: "Record the return",
     accept_needs_summary: "Acceptance needs one line saying what you are accepting; it stays in the history forever.",
     reopen_reason_label: "Why send it back?",
     reopen_needs_reason: "Sending work back needs a reason — whoever picks the task up reads it.",
@@ -2672,11 +2681,13 @@ const STRINGS = {
     accept_state_closed: "Задача заблокирована или отменена — отправлять на ревью нечего.",
     accept_state_other: "Задача сейчас не на том шаге, где отсюда можно что-то сделать.",
     accept_send_review: "Отправить на ревью",
-    accept_button: "Принять",
-    accept_reopen: "Вернуть в работу",
+    accept_button: "Принять…",
+    accept_reopen: "Вернуть в работу…",
     accept_caveat: "В приёмке всё ещё могут отказать: ревью должно быть одобренным, привязанным именно к этой версии задачи и написанным тем, кто не заказывал работу и не делал её сам.",
     accept_summary_label: "Что именно вы принимаете?",
-    accept_confirm: "Записать",
+    accept_nothing_recorded: "Пока ничего не записано — записывает кнопка ниже.",
+    accept_confirm_accept: "Записать приёмку",
+    accept_confirm_reopen: "Записать возврат",
     accept_needs_summary: "Приёмке нужна одна строка о том, что вы принимаете; она останется в истории навсегда.",
     reopen_reason_label: "Почему возвращаете?",
     reopen_needs_reason: "Возврату работы нужна причина — её прочитает тот, кто возьмёт задачу дальше.",
@@ -5294,11 +5305,27 @@ function taskRevision(record) {
 // the state itself is printed beside it.
 const ACCEPT_OPEN_STATES = new Set(["ready", "assigned", "active", "completed"]);
 
+// Whether the current task sits at the one step where Accept/Send-back apply;
+// painted by paintTaskAcceptance, read here so a mode change can restore the
+// openers without re-deriving the task state.
+let acceptanceReviewStep = false;
+
 function setAcceptanceMode(mode) {
   acceptanceMode = mode;
   document.getElementById("task-accept-field").hidden = mode !== "accept";
   document.getElementById("task-reopen-field").hidden = mode !== "reopen";
   document.getElementById("task-acceptance-confirm").hidden = mode === null;
+  document.getElementById("task-acceptance-pending").hidden = mode === null;
+  // The opener and the recorder are never on screen together: the live tester
+  // pressed "Accept" again expecting it to record, and the second press wiped
+  // the half-typed summary. With the form open, recording is the only button.
+  document.getElementById("task-accept").hidden = mode !== null || !acceptanceReviewStep;
+  document.getElementById("task-reopen").hidden = mode !== null || !acceptanceReviewStep;
+  // The recorder names what it records; the dataset key keeps the label
+  // mode-correct across the applyI18n pass every stream snapshot runs.
+  const go = document.getElementById("task-acceptance-go");
+  go.dataset.i18n = mode === "reopen" ? "accept_confirm_reopen" : "accept_confirm_accept";
+  go.textContent = t(go.dataset.i18n);
 }
 
 // Which task the acceptance block was last painted for, so a repaint can tell
@@ -5309,6 +5336,14 @@ function paintTaskAcceptance() {
   const host = document.getElementById("task-acceptance");
   const record = currentTask;
   host.hidden = !(record && writesEnabled);
+  const state = record ? String(record.state || "") : "";
+  const line = !record ? null
+    : ACCEPT_OPEN_STATES.has(state) ? "accept_state_open"
+    : state === "review" ? "accept_state_review"
+    : state === "accepted" ? "accept_state_accepted"
+    : (state === "blocked" || state === "cancelled") ? "accept_state_closed"
+    : "accept_state_other";
+  acceptanceReviewStep = !host.hidden && line === "accept_state_review";
   // A language switch repaints this surface, and closing the confirm would
   // take a half-typed summary off screen with it -- the very thing the surface
   // table above forbids. Keep the operator's open form when the task has not
@@ -5317,18 +5352,10 @@ function paintTaskAcceptance() {
   acceptanceTaskId = record ? String(record.id || "") : null;
   setAcceptanceMode(sameTask ? acceptanceMode : null);
   if (host.hidden) { return; }
-  const state = String(record.state || "");
-  const line = ACCEPT_OPEN_STATES.has(state) ? "accept_state_open"
-    : state === "review" ? "accept_state_review"
-    : state === "accepted" ? "accept_state_accepted"
-    : (state === "blocked" || state === "cancelled") ? "accept_state_closed"
-    : "accept_state_other";
   document.getElementById("task-acceptance-state").textContent = t(line);
   document.getElementById("task-acceptance-canonical").textContent =
     t("accept_ledger_state") + ": " + (state ? glossed(state, STATE_GLOSS[state]) : "—");
   document.getElementById("task-review-request").hidden = line !== "accept_state_open";
-  document.getElementById("task-accept").hidden = line !== "accept_state_review";
-  document.getElementById("task-reopen").hidden = line !== "accept_state_review";
   // Say up front why the domain can still refuse, so a refusal reads as a rule
   // the operator was told about rather than as the panel breaking.
   document.getElementById("task-acceptance-caveat").hidden = line !== "accept_state_review";
@@ -5390,6 +5417,9 @@ async function acceptTask() {
       idempotency_key: null,
     });
     await repaintAfterAcceptanceWrite(node);
+    // The write landed, so the form has done its job; leaving it open would
+    // offer a second recording of a decision already in the history.
+    setAcceptanceMode(null);
     reportResult(result, "ok",
       said("accept_recorded_named", { title: task.title || task.id }), task.id);
   } catch (error) {
@@ -5418,6 +5448,7 @@ async function reopenTask() {
       idempotency_key: null,
     });
     await repaintAfterAcceptanceWrite(node);
+    setAcceptanceMode(null);
     reportResult(result, "ok",
       said("reopen_recorded_named", { title: task.title || task.id }), task.id);
   } catch (error) {
