@@ -759,7 +759,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              folds away because a permanent key would spend the work surface. -->
         <button type="button" id="board-legend" aria-expanded="false" aria-controls="legend-panel"
           data-i18n="legend_open" data-i18n-title="tip_legend">Marks</button>
-        <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom. To link two agents, drag a port on a card's edge — or use the role's Links tab.</span>
+        <span class="note" data-i18n="board_hint">Drag the canvas to pan; scroll to zoom. To link two roles, drag a port on a card's edge — or use the role's Links tab. Rows run top to bottom by rank: each one holds what the rank above it set up or started.</span>
         <!-- A successful hire closes its modal, so the result has to land
              somewhere that outlives it: the bar above the board the new role
              just appeared on (round 3, designer). -->
@@ -768,17 +768,17 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <svg id="canvas" role="img" aria-label="workspace graph" data-i18n-aria="board_aria"></svg>
       <div id="onboarding" hidden>
         <div class="onb-card">
-          <h2 data-i18n="onb_title">This is your agent team's headquarters</h2>
-          <p class="note" data-i18n="onb_lead">Hire agents, give them tasks, watch work reach a result.</p>
+          <h2 data-i18n="onb_title">This is your team's headquarters</h2>
+          <p class="note" data-i18n="onb_lead">Hire roles, give them tasks, and watch the work reach a result. Every step is recorded in a shared history.</p>
           <div class="step"><span class="n">1</span><div>
-            <b data-i18n="onb_s1_t">Hire your first agent</b>
+            <b data-i18n="onb_s1_t">Hire your first role</b>
             <p data-i18n="onb_s1_p">The + button on the board. The profile decides who it is and what it may do.</p></div></div>
           <div class="step"><span class="n">2</span><div>
             <b data-i18n="onb_s2_t">Create a task</b>
             <p data-i18n="onb_s2_p">Briefly: what to do and how we will know it is done.</p></div></div>
           <div class="step"><span class="n">3</span><div>
             <b data-i18n="onb_s3_t">Run it</b>
-            <p data-i18n="onb_s3_p">The agent takes the task. The run shows up live in Runs.</p></div></div>
+            <p data-i18n="onb_s3_p">The role takes the task. The run shows up live in Runs.</p></div></div>
           <!-- The card now waits for a hire rather than for any node at all, so
                it can land over a board that already carries tasks or sessions.
                It must therefore be possible to put aside — an opaque overlay
@@ -786,7 +786,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
                unreachable board.  Set aside for this window only; a reload
                brings the first step back until it has actually been taken. -->
           <div class="actions">
-            <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first agent</button>
+            <button type="button" class="cta" id="onb-cta" data-i18n="onb_cta">Hire the first role</button>
             <button type="button" id="onb-dismiss" data-i18n="onb_dismiss">Look at the board first</button>
           </div>
         </div>
@@ -832,7 +832,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <div class="runs-filters">
           <label class="field"><span data-i18n="runs_filter_status_label">Show</span>
             <select id="runs-filter-status"></select></label>
-          <label class="field"><span data-i18n="runs_filter_role_label">Run by</span>
+          <label class="field"><span data-i18n="runs_filter_role_label">Which role ran it</span>
             <select id="runs-filter-role"></select></label>
           <label class="choice"><input type="checkbox" id="runs-group-task">
             <span data-i18n="runs_group_task">Group by task</span></label>
@@ -867,8 +867,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
                route, so it carries `guide_ref_lead` like its neighbours — and
                "In short" must not (a test pins that).  It opens the reference
                because the four pages after it spend the words it settles. -->
-          <button type="button" data-gpage="units" aria-selected="false" data-i18n="guide_tab_units">The system's units</button>
-          <button type="button" data-gpage="agents" aria-selected="false" data-i18n="guide_tab_agents">Agents and memory</button>
+          <button type="button" data-gpage="units" aria-selected="false" data-i18n="guide_tab_units">The system’s units</button>
+          <button type="button" data-gpage="agents" aria-selected="false" data-i18n="guide_tab_agents">Roles and memory</button>
           <button type="button" data-gpage="tasks" aria-selected="false" data-i18n="guide_tab_tasks">Tasks and runs</button>
           <button type="button" data-gpage="links" aria-selected="false" data-i18n="guide_tab_links">Links</button>
           <button type="button" data-gpage="limits" aria-selected="false" data-i18n="guide_tab_limits">Limits and safety</button>
@@ -876,11 +876,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         </div>
         <div id="gpage-brief">
           <h1 data-i18n="guide_title">Agent Commons, in short</h1>
-          <p class="dim" data-i18n="guide_sub">Two minutes, top-down, simple first.</p>
+          <p class="dim" data-i18n="guide_sub">Two minutes, top-down, simple things first.</p>
           <h3 data-i18n="guide_what_h">What this is</h3>
           <p data-i18n="guide_what_p"></p>
           <h3 data-i18n="guide_how_h">How it fits together</h3>
-          <p class="mono dim" data-i18n="guide_ladder">Agents → Tasks → Runs → Reviews</p>
+          <p class="mono dim" data-i18n="guide_ladder">Roles → Tasks → Runs → Reviews</p>
           <!-- The guide's one picture (item 33), and it draws the one thing both
                blind testers got wrong: a run that succeeded has not finished the
                task.  The lifecycle wins over a board/dock/drawer map because the
@@ -1055,7 +1055,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 
     <section class="view" id="view-presets">
       <div class="listwrap">
-        <h1 data-i18n="nav_presets">Agent catalogue</h1>
+        <h1 data-i18n="nav_presets">Role catalogue</h1>
         <p class="note" data-i18n="presets_note">Ready-made role templates. Hire from one in two
           clicks instead of filling the form from scratch; the template fixes
           the profile, permissions and budget, you give the name.</p>
@@ -1100,12 +1100,8 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="listwrap">
         <h1 data-i18n="sgr_title">SGR — Schema-Guided Reasoning</h1>
         <p class="note" data-i18n="sgr_note"></p>
-        <h3 class="subhead" data-i18n="sgr_now_heading">How agents hand back structured results today</h3>
-        <p class="note" data-i18n="sgr_now_body">Through typed outcome tools: an agent finishes a run by
-          calling commons_succeed_delegation with a typed result reference, and a
-          reviewer records its verdict through commons_complete_review. That is
-          the only typed result channel on subscription CLIs — provider stdout is
-          never parsed or stored, by design.</p>
+        <h3 class="subhead" data-i18n="sgr_now_heading">How roles hand back structured results today</h3>
+        <p class="note" data-i18n="sgr_now_body">Through typed outcome tools: a role finishes a run by calling commons_succeed_delegation with a typed result reference, and a reviewer records its verdict through commons_complete_review. That is the only typed result channel on subscription CLIs — provider stdout is never parsed or stored, by design.</p>
         <button type="button" id="sgr-to-runs" data-i18n="sgr_see_runs">See them in Runs</button>
       </div>
     </section>
@@ -1141,7 +1137,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <label class="field"><span data-i18n="catalog_desc_label">What it is for</span>
           <input type="text" id="catalog-description" autocomplete="off"></label>
         <label class="field" id="catalog-instruction-field">
-          <span data-i18n="catalog_instruction_label">Instructions given to the agent (skills only)</span>
+          <span data-i18n="catalog_instruction_label">Instructions given to the role (skills only)</span>
           <textarea id="catalog-instruction"
             data-i18n-placeholder="catalog_instruction_hint"></textarea>
           <span class="note" id="catalog-counter"></span></label>
@@ -1279,7 +1275,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         uses. Progress appears on the run's node as its state changes.</p>
       <label class="field"><span data-i18n="run_task_label">Task</span>
         <select id="run-task"></select></label>
-      <label class="field"><span data-i18n="run_wall_label">Wall-time seconds (blank = default)</span>
+      <label class="field"><span data-i18n="run_wall_label">Stop the run after this many seconds (blank = default)</span>
         <input type="number" id="run-wall" min="1" max="86400"></label>
       <button type="button" id="run-go" data-i18n="run_go">Run this role on the task</button>
       <p class="result" id="run-result"></p>
@@ -1304,27 +1300,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            the grid is for the three same-shaped grants, and a fourth control
            answering a different question inside it read as a fourth permission
            and left the row ragged (round 4, finding 2, mirrored from hiring). -->
-      <label class="field"><span data-i18n="hire_context_label">Context</span>
+      <label class="field"><span data-i18n="hire_context_label">Memory between runs</span>
         <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-memory"
           data-i18n-title="gref_context" data-i18n-aria="gref_context"></button>
         <select id="setting-context_mode"></select></label>
       <div class="grants">
-        <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+        <label class="field"><span data-i18n="create_roles_label">May hire other roles</span>
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
             data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-create_roles"></select></label>
-        <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+        <label class="field"><span data-i18n="retire_roles_label">May take other roles out of service</span>
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
             data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-retire_roles"></select></label>
-        <label class="field"><span data-i18n="open_links_label">Open links</span>
+        <label class="field"><span data-i18n="open_links_label">May open links to other roles</span>
           <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
             data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
           <select id="grant-open_links"></select></label>
       </div>
-      <label class="field"><span data-i18n="setting_name_label">Display name</span>
+      <label class="field"><span data-i18n="setting_name_label">Name you will see on the board</span>
         <input type="text" id="setting-name" autocomplete="off"></label>
-      <label class="field" id="setting-skills-field"><span data-i18n="setting_skills_label">Required skills (operator catalogue)</span>
+      <label class="field" id="setting-skills-field"><span data-i18n="setting_skills_label">Skills every run of this role receives</span>
         <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-skill"
           data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
         <select id="setting-skills" multiple size="4"></select></label>
@@ -1333,13 +1329,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            says what a skill is and where skills come from — written from JS
            because the second half depends on the catalogue-editing gate. -->
       <p class="note" id="settings-skills-empty" hidden></p>
-      <p class="note" data-i18n="skill_contract_line">Skills are glued into the agent's instructions on
+      <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions on
         every run. Changes apply from the next run, never retroactively.</p>
-      <p class="note warn" id="skills-count-note" hidden data-i18n="skills_too_many">More than three
-        skills compete for the agent's attention; conflicting playbooks quietly
-        degrade the work.</p>
+      <p class="note warn" id="skills-count-note" hidden data-i18n="skills_too_many">More than three skills compete for the role's attention; conflicting playbooks quietly degrade the work.</p>
       <div class="field" id="tools-access-field">
-        <span data-i18n="setting_tools_label">Tools (narrows the profile, never widens)</span>
+        <span data-i18n="setting_tools_label">Which of the profile's tools this role may use</span>
         <button type="button" class="gref" data-guide-page="catalog" data-guide-anchor="g-ct-tools"
           data-i18n-title="gref_tools" data-i18n-aria="gref_tools"></button>
         <label class="choice"><input type="radio" name="tools-mode" id="tools-mode-full" checked>
@@ -1359,7 +1353,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <label class="field"><span data-i18n="setting_reason_label">Reason for this change</span>
         <input type="text" id="setting-reason" autocomplete="off"></label>
       <label class="field" id="downgrade-field" hidden>
-        <span data-i18n="downgrade_label">Weakening isolation — recorded reason (needs agent:isolation_downgrade)</span>
+        <span data-i18n="downgrade_label">You are weakening this role's isolation — say why (kept forever; needs agent:isolation_downgrade)</span>
         <input type="text" id="setting-downgrade" autocomplete="off"></label>
       <div class="actions">
         <button type="button" id="settings-save" data-i18n="settings_save">Save</button>
@@ -1387,16 +1381,14 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="hire-title">
     <h2 data-i18n="tab_hire" id="hire-title" tabindex="-1">Hire</h2>
     <section class="panel open" id="panel-hire">
-      <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted
-        profile and can only narrow it; a role that may create or retire other
-        roles needs a turnover budget.</p>
+      <p class="note" data-i18n="hire_note">Hire a standing role. It selects one operator-allowlisted profile and can only narrow it; a role that may hire or retire other roles needs a budget for it.</p>
       <!-- The rationale is required by the server and was unmarked, so the
            refusal read as a dead button (round 3, both testers). -->
       <p class="note" data-i18n="required_note">Fields marked * are required.</p>
-      <label class="field" id="hire-mode-field"><span data-i18n="hire_mode_label">How</span>
+      <label class="field" id="hire-mode-field"><span data-i18n="hire_mode_label">Where this role comes from</span>
         <select id="hire-mode">
-          <option value="new" data-i18n="hire_mode_new">A new agent — set it up from scratch</option>
-          <option value="preset" data-i18n="hire_mode_preset">From the agent catalogue — a ready template</option>
+          <option value="new" data-i18n="hire_mode_new">A new role — set it up from scratch</option>
+          <option value="preset" data-i18n="hire_mode_preset">From the role catalogue — a ready template</option>
         </select></label>
       <label class="field" id="hire-preset-field" hidden><span data-i18n="hire_preset_label">Template</span>
         <select id="hire-preset"></select></label>
@@ -1406,10 +1398,9 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            that answer, and the button is the route this modal already has —
            the from-scratch form with "save as a template" turned on. -->
       <div class="field" id="hire-preset-empty" hidden>
-        <p class="note" data-i18n="hire_preset_empty">A template is a saved role setup — profile,
-          permissions and budget under one name. There are none yet.</p>
+        <p class="note" data-i18n="hire_preset_empty">A template is a saved role setup — one profile with its permissions and its budget, under a name. There are none yet.</p>
         <button type="button" id="hire-preset-create"
-          data-i18n="hire_preset_create">Set one up from scratch and save it as a template</button>
+          data-i18n="hire_preset_create">Set a role up from scratch and save it as the first template</button>
       </div>
       <!-- Two visual groups, and a flat form (round 4, finding 2).  Progressive
            disclosure was refused: a collapsed block holding a field the server
@@ -1490,15 +1481,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              grid now holds one kind of control, and the budget has a row of its
              own directly beneath the grants it belongs to. -->
         <div class="grants" id="hire-grants">
-          <label class="field"><span data-i18n="create_roles_label">Create roles</span>
+          <label class="field"><span data-i18n="create_roles_label">May hire other roles</span>
             <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
               data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
             <select id="hire-create_roles"></select></label>
-          <label class="field"><span data-i18n="retire_roles_label">Retire roles</span>
+          <label class="field"><span data-i18n="retire_roles_label">May take other roles out of service</span>
             <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
               data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
             <select id="hire-retire_roles"></select></label>
-          <label class="field"><span data-i18n="open_links_label">Open links</span>
+          <label class="field"><span data-i18n="open_links_label">May open links to other roles</span>
             <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-grants"
               data-i18n-title="gref_grants" data-i18n-aria="gref_grants"></button>
             <select id="hire-open_links"></select></label>
@@ -1550,7 +1541,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
          `acceptance_criteria` goes through the manager's non-empty-list guard.
          Nothing is marked that the domain would in fact accept blank. -->
     <p class="note" data-i18n="required_note">Fields marked * are required.</p>
-    <label class="field"><span class="req" data-i18n="task_title_label">Title</span>
+    <label class="field"><span class="req" data-i18n="task_title_label">Short name for this task</span>
       <input type="text" id="task-title" autocomplete="off"></label>
     <label class="field"><span class="req" data-i18n="task_desc_label">What to do</span>
       <textarea id="task-desc"></textarea></label>
@@ -1591,13 +1582,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       it does not open a communication channel yet.</p>
     <!-- `ask` and `handoff_work` are a typed enum, not a pair of English words;
          the mark opens the paragraph that says what the record actually holds. -->
-    <label class="field"><span data-i18n="link_type_label">Type</span>
+    <label class="field"><span data-i18n="link_type_label">What this link permits</span>
       <button type="button" class="gref" data-guide-page="links" data-guide-anchor="g-ln-record"
         data-i18n-title="gref_link_type" data-i18n-aria="gref_link_type"></button></label>
     <label class="choice"><input type="radio" name="link-type" id="link-type-ask" value="ask" checked>
-      <span data-i18n="link_type_ask">Ask — may put questions to this role</span></label>
+      <span data-i18n="link_type_ask">ask — may put questions to this role</span></label>
     <label class="choice"><input type="radio" name="link-type" id="link-type-handoff" value="handoff_work">
-      <span data-i18n="link_type_handoff">Hand off work — may pass work to this role</span></label>
+      <span data-i18n="link_type_handoff">handoff_work — may pass work to this role</span></label>
     <label class="field"><span data-i18n="link_reason_label">Why this link</span>
       <input type="text" id="link-reason" autocomplete="off"></label>
     <div class="actions">
@@ -4440,8 +4431,21 @@ function startLinkDrag(node, event) {
     // the only way to reach a role the layout put off-screen.
     openLinkModal(from.id, best ? best.id : "");
   };
+  // A browser can take a gesture away mid-drag (a system gesture, a lost
+  // capture, a touch turning into a scroll). Without this the rubber band
+  // stays painted on the board and `trace` keeps listening for a pointer that
+  // is never coming back, so the next click drags a line from nowhere.
+  const abandon = () => {
+    document.removeEventListener("pointermove", trace);
+    document.removeEventListener("pointerup", finish);
+    band.hidden = true;
+    band.firstElementChild.setAttribute("d", "");
+    markDropTarget(null);
+    linkDragFrom = null;
+  };
   document.addEventListener("pointermove", trace);
   document.addEventListener("pointerup", finish, { once: true });
+  document.addEventListener("pointercancel", abandon, { once: true });
 }
 
 function agentLabel(agentId) {

@@ -2055,3 +2055,48 @@ def test_the_forthcoming_sections_are_grouped_yet_neither_hidden_nor_disabled() 
         assert f'data-i18n="{note}"' in body, note
         for block in (english, russian):
             assert re.search(rf'^\s*{note}: "', block, re.MULTILINE), note
+
+
+def test_a_cancelled_link_gesture_cleans_up_like_a_finished_one() -> None:
+    """A browser can take a gesture away mid-drag — a system gesture, a lost
+    capture, a touch that becomes a scroll. Verification (round 4, D4) found
+    only `pointerup` handled, so a cancelled drag left the rubber band painted
+    and `trace` still listening for a pointer that never returns: the next
+    click would draw a line from nowhere. The cancel path removes both
+    listeners, hides the band and drops the pending source."""
+
+    body = read_spa()
+    drag = body.split("function startLinkDrag", 1)[1].split("\nfunction ", 1)[0]
+    assert 'addEventListener("pointercancel"' in drag
+    abandon = drag.split("const abandon", 1)[1].split("};", 1)[0]
+    for cleanup in (
+        'removeEventListener("pointermove", trace)',
+        'removeEventListener("pointerup", finish)',
+        "band.hidden = true",
+        "linkDragFrom = null",
+    ):
+        assert cleanup in abandon, cleanup
+
+
+def test_a_markup_fallback_never_contradicts_the_table_it_falls_back_to() -> None:
+    """Static markup carries English text that `applyI18n` overwrites from the
+    table. When the table moves and the markup does not, the file states two
+    different sentences for one key — and the stale one is what a reader of the
+    source believes. Round 4, D1: two settings strings had drifted, one of them
+    into vocabulary the glossary forbids ("agent's" for a role's)."""
+
+    body = read_spa()
+    english, _ = _language_tables()
+    import re
+
+    drift = []
+    for match in re.finditer(r'data-i18n="([a-z0-9_]+)">([^<]+)<', body):
+        key, markup_text = match.group(1), " ".join(match.group(2).split())
+        table_text = _value(english, key)
+        if table_text is None or not markup_text:
+            continue
+        # The markup may hold the opening of a longer sentence, but it must not
+        # say something the table does not.
+        if not table_text.startswith(markup_text):
+            drift.append((key, markup_text, table_text[: len(markup_text) + 10]))
+    assert drift == [], drift
