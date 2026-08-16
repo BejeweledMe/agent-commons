@@ -21,6 +21,7 @@ from agent_commons.runtime import (
     RunReason,
     default_profile_registry,
 )
+from agent_commons.errors import ConfigurationError
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui.context import UIContext
@@ -449,3 +450,37 @@ def test_demo_profile_closes_the_loop_without_a_provider(
     # The summary tells the truth: no provider ran.
     assert "demo" in str(delegation.get("summary", "")).lower()
     assert "no provider" in str(delegation.get("summary", "")).lower()
+
+
+def test_a_launch_that_never_starts_says_so_instead_of_looking_pending(
+    workspace: dict[str, Any],
+) -> None:
+    """A live tester waited twenty-five minutes on a run that had failed in its
+    first second: the operator's profile config had no reviewer profile, the
+    background thread logged the refusal, and the delegation sat at `requested`
+    looking exactly like work in progress. The panel is the only witness a
+    person has, so a launch that cannot start records `needs_operator` with the
+    reason attached."""
+
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+
+    def refuse(_manager: CommonsManager) -> None:
+        raise ConfigurationError("runner profile is not configured: claude-independent-reviewer")
+
+    context._runtime_factory = refuse  # the launch dies where a real one would
+
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={"agent_id": fixture["role_id"], "task_id": fixture["task_id"]},
+            headers=authorized(),
+        )
+    assert response.status_code == 200, response.text
+    delegation_id = response.json()["delegation_id"]
+    context.await_launches()
+
+    record = fixture["manager"].get_delegation(delegation_id)
+    assert record["state"] == "needs_operator"
+    assert "could not start" in str(record.get("summary", ""))
+    assert "claude-independent-reviewer" in str(record.get("summary", ""))

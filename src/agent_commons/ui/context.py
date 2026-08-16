@@ -962,6 +962,30 @@ class UIContext:
                 )
             except Exception as exc:  # a launch failure is reported, never silent
                 _LOG.warning("UI launch of %s failed: %s", delegation_id, exc)
+                # The log is the operator's last resort, not their first: this
+                # thread is the only witness, and a delegation left `requested`
+                # looks pending forever.  A live tester waited twenty-five
+                # minutes on a run that had failed in its first second, because
+                # the panel had nothing else to show.  Record the refusal where
+                # a person will see it -- `needs_operator` is legal from
+                # `requested` and is exactly what this is: work only a human can
+                # unblock.  Best effort: if even this write fails, the log stays
+                # the last resort it always was.
+                try:
+                    self.writer().mark_delegation_needs_operator(
+                        delegation_id,
+                        str(delegation["revision"]),
+                        reason_code="launch_failed",
+                        summary=f"the panel could not start this run: {exc}",
+                        idempotency_key=f"{launch_key}:launch-failed",
+                    )
+                    self.invalidate()
+                except CommonsError as write_failure:  # pragma: no cover - defence
+                    _LOG.warning(
+                        "UI launch failure of %s could not be recorded: %s",
+                        delegation_id,
+                        write_failure,
+                    )
             finally:
                 self.invalidate()
 
