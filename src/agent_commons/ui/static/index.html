@@ -1200,6 +1200,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <div class="drawer-head">
         <h2 id="inspector-title">—</h2>
         <span class="pill blocked" id="blocked-pill" hidden data-i18n="waiting_on_you">waiting on you</span>
+        <!-- Round 5: the rename field exists — Settings, "Name you will see on
+             the board" — and nobody found it there.  The pencil leads to that
+             same field; it adds no second write path. -->
+        <button type="button" id="drawer-rename" hidden data-i18n-title="drawer_rename"
+          data-i18n-aria="drawer_rename">✎</button>
         <button type="button" id="drawer-close" data-i18n-title="drawer_close">✕</button>
       </div>
       <div class="actions">
@@ -1894,6 +1899,7 @@ const STRINGS = {
     chip_later: "later",
     hire_cancel: "Cancel",
     drawer_close: "Close",
+    drawer_rename: "Rename this role — opens Settings on its name field",
     fab_hire: "Hire a role: name, profile — and it appears on the board.",
     tip_board: "Your team and its work. Click an entity for details; the wiring is the org chart.",
     tip_runs: "Every provider run: what is moving now and how it ended. State only — no prompts or transcripts.",
@@ -2486,6 +2492,7 @@ const STRINGS = {
     chip_later: "позже",
     hire_cancel: "Отмена",
     drawer_close: "Закрыть",
+    drawer_rename: "Переименовать роль — откроет «Настройки» на поле имени",
     fab_hire: "Нанять роль: имя, профиль — и она появляется на доске.",
     tip_board: "Ваша команда и её работа. Клик по сущности — детали; связи — это оргсхема.",
     tip_runs: "Все прогоны провайдеров: что движется сейчас и чем закончилось. Только состояние — без промптов и транскриптов.",
@@ -4191,6 +4198,15 @@ document.getElementById("sidebar").addEventListener("click", (event) => {
   if (button) { viewShow(button.dataset.view); }
 });
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+// The rename lives on the Settings tab as "Name you will see on the board",
+// and round 5 could not find it there. The pencil goes to that same field and
+// selects it, rather than opening a second place where a name can be written.
+document.getElementById("drawer-rename").addEventListener("click", () => {
+  showPanel("settings");
+  const field = document.getElementById("setting-name");
+  field.focus();
+  field.select();
+});
 document.getElementById("fab").addEventListener("click", () => showHire(true));
 document.getElementById("onb-cta").addEventListener("click", () => showHire(true));
 document.getElementById("onb-dismiss").addEventListener("click", () => {
@@ -6065,6 +6081,8 @@ async function inspect(node) {
   const runTab = document.querySelector('#drawer-tabs button[data-panel="run"]');
   messageTab.hidden = !(isRole && writesEnabled);
   settingsTab.hidden = !(isRole && writesEnabled);
+  // The pencil is a pointer to the Settings tab, so it comes and goes with it.
+  document.getElementById("drawer-rename").hidden = settingsTab.hidden;
   // Run appears on a role only when the launch gate is on, and only for an
   // active (non-preset) role that can actually be staffed.
   runTab.hidden = !(isRole && launchEnabled && node.state === "active" &&

@@ -2127,3 +2127,31 @@ def test_a_markup_fallback_never_contradicts_the_table_it_falls_back_to() -> Non
         if not table_text.startswith(markup_text):
             drift.append((key, markup_text, table_text[: len(markup_text) + 10]))
     assert drift == [], drift
+
+
+def test_the_role_rename_is_reachable_from_the_drawer_header() -> None:
+    """Round 5: "my card is forever Telegram-bot…" — the rename field exists,
+    as Settings' "Name you will see on the board", and the tester never found
+    it.  The pencil in the drawer head leads to that same field and selects
+    it; it adds no second write path, and it comes and goes with the Settings
+    tab, so a read-only panel or a non-role card never shows it."""
+
+    body = read_spa()
+    head = body.split('<div class="drawer-head">', 1)[1].split("</div>", 1)[0]
+    assert 'id="drawer-rename"' in head
+    assert 'data-i18n-title="drawer_rename"' in head
+    assert 'data-i18n-aria="drawer_rename"' in head
+    assert (
+        body.count('document.getElementById("drawer-rename").hidden = settingsTab.hidden;')
+        == 1
+    )
+    handler = body.split('document.getElementById("drawer-rename").addEventListener', 1)[1]
+    handler = handler.split("});", 1)[0]
+    assert 'showPanel("settings");' in handler
+    assert 'document.getElementById("setting-name")' in handler
+    assert "field.focus();" in handler
+    assert "field.select();" in handler
+    table = body.split("const STRINGS = {", 1)[1].split("\n};", 1)[0]
+    for block in ("en: {", "ru: {"):
+        language = table.split(block, 1)[1].split("\n  },", 1)[0]
+        assert re.search(r'^\s*drawer_rename: "', language, re.MULTILINE), block
