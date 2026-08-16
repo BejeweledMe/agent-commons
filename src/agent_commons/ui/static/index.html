@@ -293,6 +293,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 #board-result .idchip{margin-left:0}
+/* The one follow-up this line ever offers (round 4, finding 5): a link out of
+   the role that was just hired.  Its own row rather than beside the chip — a
+   ULID and a sentence do not share 44ch, and a button wrapped across two lines
+   reads as two buttons.  The label ellipsizes for the reason the sentence above
+   it does: a long role name must not widen the bar and push the + buttons
+   apart.  It is short-lived by design, so the row it adds is too. */
+#board-result .followup{
+  display:block; margin:3px 0 0; padding:1px 6px; font-size:11px;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 /* Catalogue sub-headings, styled here rather than with a markup or CSSOM style
    the nonce'd CSP blocks (L6). */
 .subhead{font-size:12px; margin:12px 0 4px}
@@ -965,6 +975,15 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-ag-role" data-i18n="guide_ag_role_h"></h3>
           <p data-i18n="guide_ag_role_p"></p>
           <p class="mono dim" data-i18n="guide_ag_role_ex"></p>
+          <!-- Round 4, finding 4, in full: the picker's four ids are the whole
+               choice, and this says what each one decides, why there are four
+               and not a list the operator can extend, and why no reasoning
+               level appears anywhere.  It sits right after "a role is a record"
+               because the profile is the field of that record which decides
+               what actually runs. -->
+          <h3 id="g-ag-profile" data-i18n="guide_ag_profile_h"></h3>
+          <p data-i18n="guide_ag_profile_p"></p>
+          <p class="mono dim" data-i18n="guide_ag_profile_ex"></p>
           <h3 id="g-ag-grants" data-i18n="guide_ag_grants_h"></h3>
           <p data-i18n="guide_ag_grants_p"></p>
           <p class="mono dim" data-i18n="guide_ag_grants_ex"></p>
@@ -1401,7 +1420,20 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <label class="field"><span class="req" data-i18n="hire_name_label">Name</span>
         <input type="text" id="hire-name" autocomplete="off"></label>
       <label class="field" id="hire-profile-field"><span class="req" data-i18n="hire_profile_label" data-i18n-title="tip_hire_profile">Profile</span>
+        <button type="button" class="gref" data-guide-page="agents" data-guide-anchor="g-ag-profile"
+          data-i18n-title="gref_profile" data-i18n-aria="gref_profile"></button>
         <select id="hire-profile"></select></label>
+      <!-- Round 4, finding 4: the operator wanted to pick a model and a
+           reasoning level here.  The model is not the panel's to pick — it is
+           fixed by the profile, in a file the panel may not write — and there
+           is no reasoning field anywhere in a runner profile to pick from.  So
+           the form says which of the two questions has an answer and where that
+           answer lives, instead of offering a control that would either lie or
+           be refused.  The options themselves name the model when the server
+           knows it; this line says why that is all there is. -->
+      <p class="note" id="hire-profile-help" data-i18n="hire_profile_help">The profile decides which process and which
+        model a run of this role uses. That is set by the operator in runtime.yaml, a file outside
+        the workspace, and never from here.</p>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
       <!-- Round 4, finding 8: the operator read this field as a system prompt
@@ -1486,6 +1518,20 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           data-i18n="hire_budget_required">Anything above deny needs this number: a role allowed to
           hire or retire other roles is refused without a ceiling on how many.</p>
       </div>
+      <!-- Round 4, finding 5: the operator looked for a place to set the new
+           role's position in a hierarchy and found none.  There is none to
+           give.  A direct hire carries no `created_by_agent_id`, and the rank a
+           card sits in on the board is computed from exactly that field — so a
+           "reports to" control here would write a rank the ledger cannot back,
+           which is the same class of lie as a green tick on a process that
+           merely exited zero.  What is true is said instead, last, at the
+           moment the operator commits: this role answers to them, and one role
+           answers to another only through a proposal a person approved.  The
+           relation that CAN be recorded is offered after the hire, as its own
+           deliberate step. -->
+      <p class="note" id="hire-chain-note" data-i18n="hire_chain_note">A role hired here answers to you. One role comes
+        to answer to another only through a proposal that role makes and a person approves — this
+        form creates no such rank.</p>
       <div class="actions">
         <button type="button" id="hire-save" data-i18n="hire_button">Hire</button>
         <button type="button" id="hire-cancel" data-i18n="hire_cancel">Cancel</button>
@@ -1689,6 +1735,13 @@ const STRINGS = {
     hire_preset_label: "Template",
     hire_name_label: "Name",
     hire_profile_label: "Profile",
+    hire_profile_help: "The profile decides which process and which model a run of this role uses. That is set by the operator in runtime.yaml, a file outside the workspace, and never from here.",
+    // Two halves of one option line, kept apart so the second can be the honest
+    // answer: the panel prints the model the server named, or says where the
+    // model is fixed — it never puts a name of its own in that slot.
+    hire_profile_model: "model: {model}",
+    hire_profile_model_fixed: "fixed in the profile",
+    hire_chain_note: "A role hired here answers to you. One role comes to answer to another only through a proposal that role makes and a person approves — this form creates no such rank.",
     hire_rationale_label: "Why this role exists (kept forever)",
     hire_rationale_help: "A note for the log and for people: why this role exists. The role never receives it as an instruction — what it must do is set by its skills and by the text of the task.",
     hire_group_who: "Who this is",
@@ -1872,6 +1925,7 @@ const STRINGS = {
     guide_map_back: "sent back",
     gref_grants: "deny, ask, auto — what the three permission levels actually do. The full account is in the Overview.",
     gref_context: "context_mode — what a role’s memory really is. The full account is in the Overview.",
+    gref_profile: "profile_id — what the four profiles decide, and why neither the model nor a reasoning level is chosen here. The full account is in the Overview.",
     gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. The full account is in the Overview.",
     gref_accept: "Why a finished run has not finished the task. The full account is in the Overview.",
     gref_link_type: "ask and handoff_work — what a link actually records. The full account is in the Overview.",
@@ -1908,6 +1962,9 @@ const STRINGS = {
     guide_ag_role_h: "A role is a ledger record",
     guide_ag_role_p: "Hiring writes one agent.created event: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no store beside the ledger — the current staff list is replayed from events, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
+    guide_ag_profile_h: "A variant is a profile",
+    guide_ag_profile_p: "There is no separate choice of model, sandbox or spend: one profile_id fixes all of them at once, and the picker names the model beside each id when the operator’s config is readable. Today the set is fixed at four — two providers × builder or independent reviewer — because the narrowing rule that lets a role create only a narrower role is keyed by exactly those ids; new variants are described by the operator in runtime.yaml, and widening the set is a change to that rule rather than to this panel. A reasoning level is not offered because no runner profile carries such a field: a control for it would set nothing.",
+    guide_ag_profile_ex: "hire → profile_id: claude-builder; the model shown beside it is what runtime.yaml names — with no such config the picker says the model is fixed in the profile rather than naming one",
     guide_ag_grants_h: "Permissions are derived, never propagated",
     guide_ag_grants_p: "Three grants — create_roles, retire_roles, open_links — each deny, ask or auto, deny by default. What a role may actually do is effective_grants: the minimum across the role and every creator above it, recomputed on every call, so a downgrade binds work already running; a retired ancestor collapses the whole line to deny. The auto level is deliberately withheld: it is stored as written but takes effect as ask, so every automatic action still asks a person.",
     guide_ag_grants_ex: "create_roles: ask → the run gets commons_propose_agent; the proposal lands in Attention; only your confirmation records agent.created",
@@ -2083,6 +2140,9 @@ const STRINGS = {
     onb_dismiss: "Look at the board first",
     id_chip_tip: "The canonical id. Select it to copy.",
     hired_named: "Hired {name}. The role is on the board.",
+    // The direction is the whole meaning of the record, so the label says which
+    // side the new role is on rather than only that a link is involved.
+    open_link_from: "Open a link from {name}…",
     preset_saved_named: "Saved the template {name}. Hiring from it is two clicks.",
     task_created_named: "Created the task “{title}”. It is on the board and in the history.",
     link_opened_named: "{from} may now reach {to}. The permission is recorded.",
@@ -2253,6 +2313,10 @@ const STRINGS = {
     hire_preset_label: "Шаблон",
     hire_name_label: "Имя",
     hire_profile_label: "Профиль",
+    hire_profile_help: "Профиль решает, какой процесс и какая модель работают в прогоне этой роли. Это задаёт оператор в runtime.yaml — файле вне workspace — и никогда не отсюда.",
+    hire_profile_model: "модель: {model}",
+    hire_profile_model_fixed: "закреплена в профиле",
+    hire_chain_note: "Роль, нанятая здесь, подчиняется оператору. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком, — эта форма такого ранга не создаёт.",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
     hire_rationale_help: "Запись для журнала и для людей: почему эта роль существует. Как инструкцию роль её не получает — что она обязана делать, задают её навыки и текст задачи.",
     hire_group_who: "Кто это",
@@ -2436,6 +2500,7 @@ const STRINGS = {
     guide_map_back: "назад в работу",
     gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Полный разбор — в «Обзоре».",
     gref_context: "context_mode — что такое «память» роли на самом деле. Полный разбор — в «Обзоре».",
+    gref_profile: "profile_id — что решают четыре профиля и почему ни модель, ни уровень ризонинга не выбираются здесь. Полный разбор — в «Обзоре».",
     gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Полный разбор — в «Обзоре».",
     gref_accept: "Почему закончившийся прогон не завершает задачу. Полный разбор — в «Обзоре».",
     gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Полный разбор — в «Обзоре».",
@@ -2463,6 +2528,9 @@ const STRINGS = {
     guide_ag_role_h: "Роль — это запись в леджере",
     guide_ag_role_p: "Найм записывает одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного хранилища нет — текущий штат пересобирается проекцией из событий, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
+    guide_ag_profile_h: "Вариант — это профиль",
+    guide_ag_profile_p: "Отдельного выбора модели, песочницы или потолка трат нет: один profile_id закрепляет всё сразу, а рядом с каждым id в списке стоит модель — если операторский конфиг читается. Сегодня набор фиксирован четырьмя — два провайдера × исполнитель или независимый проверяющий, — потому что правило сужения (роль может создать только более узкую роль) устроено именно по этим id; новые варианты описывает оператор в runtime.yaml, и расширение набора — правка того правила, а не панели. Уровень ризонинга не предлагается, потому что такого поля нет ни в одном профиле процесса: он бы ничего не задавал.",
+    guide_ag_profile_ex: "найм → profile_id: claude-builder; модель рядом — та, что названа в runtime.yaml, а без такого конфига список говорит, что модель закреплена в профиле, и не называет её",
     guide_ag_grants_h: "Права выводятся, а не хранятся",
     guide_ag_grants_p: "Три гранта — create_roles, retire_roles, open_links — каждый deny, ask или auto, по умолчанию deny. Реальные права — effective_grants: минимум по роли и всем её создателям вверх по цепочке, пересчитывается на каждом вызове, поэтому понижение действует и на уже идущую работу; уволенный предок схлопывает всю линию до deny. Уровень auto сознательно удержан: он записывается как есть, но действует как ask — каждое автоматическое действие всё равно спрашивает человека.",
     guide_ag_grants_ex: "create_roles: ask → прогон получает commons_propose_agent; предложение падает во «Внимание»; только ваше подтверждение записывает agent.created",
@@ -2638,6 +2706,7 @@ const STRINGS = {
     onb_dismiss: "Сначала посмотреть доску",
     id_chip_tip: "Канонический идентификатор. Выделите, чтобы скопировать.",
     hired_named: "{name} нанят. Роль появилась на доске.",
+    open_link_from: "Открыть связь от «{name}»…",
     preset_saved_named: "Шаблон «{name}» сохранён. Наём по нему — два клика.",
     task_created_named: "Задача «{title}» создана. Она на доске и в истории.",
     link_opened_named: "{from} теперь может обратиться к {to}. Разрешение записано.",
@@ -3083,6 +3152,47 @@ function glossedOptions(values, table) {
   return values.map((value) => ({ id: value, title: glossed(value, table[value]) }));
 }
 
+// Round 4, finding 4: the profile picker offered four ids and said nothing
+// about what any of them would start, so "who is going to run this" had no
+// answer in the panel at all.  `/api/catalog` answers it now — `profile_info`
+// carries the provider and the model the operator's config actually names — and
+// this is the one gloss in the panel that is COMPOSED rather than looked up in a
+// table, because no table can hold what another machine's config says.  It obeys
+// the rule `glossed` encodes all the same: the canonical `profile_id` leads, the
+// human words follow the dash, and the option's VALUE stays the bare id, since
+// that id is what goes to POST /api/agents.
+//
+// The role-shape gloss for the same four ids (`gl_builder` / `gl_reviewer`)
+// deliberately does NOT join this line.  It is the PICKER_GLOSS decision again:
+// a closed select is one line wide, and "claude-builder — claude · делает
+// работу · модель: …" arrives clipped where the meaning turns.  The picker
+// answers the question the id cannot — which process, which model — and the
+// role-shape gloss keeps the surfaces with room, where `valueWithGloss` already
+// prints it against `hire_profile_label` in the drawer summary.
+//
+// Nothing here is inferred.  A model the server did not name is reported as
+// fixed in the profile rather than guessed, which is the whole point: the panel
+// must not name a model that is not the one that will run.
+const PROFILE_PROVIDER = {
+  "claude-builder": "claude", "claude-independent-reviewer": "claude",
+  "codex-builder": "codex", "codex-independent-reviewer": "codex",
+};
+
+function profileOptions(profiles, info) {
+  return profiles.map((id) => {
+    const known = info[id] || {};
+    // The provider falls back to this map only because the id set is CLOSED:
+    // `BuiltinProfileId` is a fixed enum of exactly these four, and
+    // `PROFILE_NARROWING` is keyed by them.  An id outside it claims no
+    // provider rather than reading one out of its own spelling.
+    const provider = known.provider || PROFILE_PROVIDER[id] || "";
+    const model = known.model || t("hire_profile_model_fixed");
+    const parts = (provider ? [provider] : [])
+      .concat(said("hire_profile_model", { model: model }));
+    return { id: id, title: id + " — " + parts.join(" · ") };
+  });
+}
+
 // --- what the marks mean --------------------------------------------------
 // Round 3, designer 18: the glyphs above are the board's whole status language
 // and nothing anywhere explained them.  One meaning per GLYPH rather than per
@@ -3391,6 +3501,9 @@ let onboardingSetAside = false;
 
 function render(graph) {
   lastGraph = graph;
+  // Every snapshot passes here, so this is where an offer that has outlived its
+  // role is dropped — one filter, and only while an offer is standing.
+  pruneLinkOffer();
   // Cold start gets a guided three-step card instead of a bare empty graph:
   // the newcomer should know where they landed and what to do first (item 3).
   //
@@ -3721,6 +3834,13 @@ function applyHireMode() {
   document.getElementById("hire-preset-field").hidden = !fromPreset;
   document.getElementById("hire-preset-empty").hidden = !(wantsPreset && !hasPresets);
   document.getElementById("hire-profile-field").hidden = fromPreset;
+  // The line under the picker explains the picker, so it goes when the picker
+  // goes: a template already decided the profile, and a sentence about which
+  // process a choice starts would be a sentence about a control not on screen.
+  document.getElementById("hire-profile-help").hidden = fromPreset;
+  // Saving a template hires nobody, so the sentence about who a hired role
+  // answers to has nothing to be about on that path.
+  document.getElementById("hire-chain-note").hidden = hireTemplate;
   // The skills block leaves with the rest of what a template decides.  The
   // backend fills only the fields the payload leaves unset, so a picker offered
   // here would REPLACE the template's skills rather than add to them — and it
@@ -4049,6 +4169,11 @@ function modalFieldState(scrim) {
 
 function openModal(scrimId, focusId) {
   const scrim = document.getElementById(scrimId);
+  // Opening any dialog is the next action, and the hire's follow-up belongs to
+  // the one before it.  The link dialog it opens itself is no exception: the
+  // button clears the offer before opening, so this only ever finds a button
+  // the operator walked away from.
+  clearLinkOffer();
   // Re-entrant on purpose: the empty-catalogue route re-opens the hire modal in
   // template mode from a button inside it, and remembering THAT button as the
   // opener would restore focus to something hidden when the dialog closes.
@@ -5345,7 +5470,12 @@ function paintHire() {
     return document.getElementById("hire-modal").hidden ? fallback
       : (element.multiple ? selectedValues(element) : element.value);
   };
-  fillSelect(document.getElementById("hire-profile"), catalog.profiles || [],
+  // The option text is rebuilt on every repaint, and a language switch is a
+  // repaint (LANGUAGE_SURFACES), so "модель: закреплена в профиле" follows the
+  // toggle without the picker losing what the operator chose: `held` re-selects
+  // by the bare id, which is the same token in both languages.
+  fillSelect(document.getElementById("hire-profile"),
+    profileOptions(catalog.profiles || [], catalog.profile_info || {}),
     held("hire-profile", null), false);
   fillSelect(document.getElementById("hire-context_mode"),
     glossedOptions(catalog.context_modes || ["fresh", "accumulated"], PICKER_GLOSS),
@@ -5466,6 +5596,12 @@ async function hireRole() {
         { name: hiredName || (newId || "—") }),
       newId);
     openNodeById(newId);
+    // And the second step, as a step: the relation the operator was looking for
+    // in the form is offered here, where the role it would start from exists.
+    // Not on the template path — a template is shelf stock, not a role, and
+    // `linkCandidates` excludes it by that same rule, so there is nothing for a
+    // link to start from until somebody hires from it.
+    if (!hireTemplate) { offerLinkFrom(newId, hiredName || newId); }
   } catch (error) {
     // The refusal names the guard it tripped — a missing budget, a wider grant
     // than allowed — which is exactly what the operator needs to fix, and it
@@ -5479,8 +5615,62 @@ async function hireRole() {
 // both for the case where the line is too narrow to show them (round 3).
 function reportOnBoard(sentence, canonicalId) {
   const line = document.getElementById("board-result");
+  // A new line replaces the old one whole, and any offer standing on it goes
+  // with it: `reportResult` empties the host, so the flag has to be dropped
+  // here or it would outlive the button it names.
+  boardOfferedRole = null;
   reportResult(line, "ok", sentence, canonicalId);
   line.title = sentence + (canonicalId ? " · " + canonicalId : "");
+}
+
+// --- the link a hire does not write ----------------------------------------
+// Round 4, finding 5, second half.  Hiring and linking stay two writes, and the
+// panel does not chain them: a chain has a half-state — role hired, link
+// refused — which would then need a sentence explaining a thing that half
+// happened.  A button has no such state.  Pressed, it opens the dialog from
+// wave 3 item 10 with `from` already set and `to` deliberately blank, because
+// who the new role may reach is the question, not an answer the panel can guess.
+//
+// It carries no arrow and no "reports to": the record it opens is
+// `agent_link`, a permission to reach, which is the relation the ledger has —
+// the rank on the board comes from `created_by_agent_id`, and a direct hire
+// does not carry one.
+let boardOfferedRole = null;
+
+function offerLinkFrom(agentId, name) {
+  // Silent when the board does not carry the role as a role a link can start
+  // from — the same rule `openNodeById` keeps.  A button that opened the dialog
+  // with an empty "from" would be a button that lost the thing it named.
+  if (!linkCandidates(null).some((role) => role.id === agentId)) { return; }
+  boardOfferedRole = agentId;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "followup";
+  button.textContent = said("open_link_from", { name: name });
+  button.title = button.textContent;
+  button.addEventListener("click", () => {
+    // Spent on the first press: it names one moment's role, and a second press
+    // after the operator has moved on would reopen a decision they left.
+    clearLinkOffer();
+    openLinkModal(agentId, "");
+  });
+  document.getElementById("board-result").appendChild(button);
+}
+
+function clearLinkOffer() {
+  boardOfferedRole = null;
+  const button = document.querySelector("#board-result .followup");
+  if (button) { button.parentElement.removeChild(button); }
+}
+
+// The other end of its life: a repaint that no longer lists the role — retired,
+// or trimmed off the graph — takes the button away rather than leaving one that
+// leads to a dialog it can no longer fill in.
+function pruneLinkOffer() {
+  if (!boardOfferedRole) { return; }
+  if (!linkCandidates(null).some((role) => role.id === boardOfferedRole)) {
+    clearLinkOffer();
+  }
 }
 
 // Select and open a freshly recorded entity, when the board actually carries it.
