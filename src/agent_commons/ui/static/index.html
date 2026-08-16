@@ -1770,6 +1770,10 @@ const STRINGS = {
     run_took_tip: "Between the first and last operational record of this attempt; last touched",
     run_still_running: "still running",
     run_still_running_tip: "A duration is recorded only once the run stops; until then, count up from the start time.",
+    run_elapsed_word: "running for",
+    run_elapsed_tip: "Counted on this screen from the start time; the exact duration is recorded once the run stops.",
+    run_live_tip: "● — the process behind this run is alive right now.",
+    run_not_live_tip: "○ — no process is behind this run right now.",
     run_purpose_word: "for",
     run_budget_word: "budget",
     run_budget_tip: "The cap this run was launched under, not what it consumed \u2014 consumption is recorded nowhere in this system.",
@@ -2347,6 +2351,10 @@ const STRINGS = {
     run_took_tip: "Между первой и последней операционной записью этой попытки; последнее касание",
     run_still_running: "ещё идёт",
     run_still_running_tip: "Длительность записывается только когда прогон остановился; до тех пор считайте от времени начала.",
+    run_elapsed_word: "идёт уже",
+    run_elapsed_tip: "Считается на этом экране от времени начала; точная длительность записывается, когда прогон остановится.",
+    run_live_tip: "● — процесс этого прогона сейчас жив.",
+    run_not_live_tip: "○ — за этим прогоном сейчас нет живого процесса.",
     run_purpose_word: "цель",
     run_budget_word: "бюджет",
     run_budget_tip: "Предел, с которым этот прогон начали, а не то, что он потратил \u2014 расход в этой системе нигде не записывается.",
@@ -5051,12 +5059,22 @@ function budgetText(budget) {
 }
 
 function metaPart(host, label, value, tip) {
-  if (value === "" || value === null || value === undefined) { return; }
+  if (value === "" || value === null || value === undefined) { return null; }
   const part = document.createElement("span");
   part.className = "runmeta-part";
   part.textContent = label + ": " + value;
   if (tip) { part.title = tip; }
   host.appendChild(part);
+  return part;
+}
+
+// How long a run has been going, counted here from its own start time: the
+// operational store only writes a duration once the run stops, and a live run
+// that shows nothing for two minutes reads as a hang (live run, blocker 2).
+function elapsedText(startedAt) {
+  const start = Date.parse(startedAt);
+  if (!Number.isFinite(start)) { return t("run_still_running"); }
+  return formatDuration((Date.now() - start) / 1000);
 }
 
 // One meta line, shared by the Runs view and the drawer's "Runs on this task",
@@ -5068,6 +5086,14 @@ function runMetaLine(card, run) {
   if (run.duration_seconds !== null && run.duration_seconds !== undefined) {
     metaPart(meta, t("run_took_word"), formatDuration(run.duration_seconds),
       run.updated_at ? t("run_took_tip") + " " + run.updated_at : t("run_took_tip"));
+  } else if (run.live && run.started_at) {
+    // Counted up on the client between stream frames; the ticker below keeps
+    // it moving so a quiet 90-second run still visibly breathes.
+    const part = metaPart(meta, t("run_elapsed_word"), elapsedText(run.started_at),
+      t("run_elapsed_tip"));
+    part.classList.add("run-elapsed");
+    part.dataset.startedAt = run.started_at;
+    part.dataset.label = t("run_elapsed_word");
   } else if (run.live) {
     metaPart(meta, t("run_took_word"), t("run_still_running"), t("run_still_running_tip"));
   }
@@ -5124,6 +5150,10 @@ function runCard(run) {
   const kind = document.createElement("div");
   kind.className = "attn-kind";
   kind.textContent = runStatusText(run);
+  // The filled dot is a claim about the PROCESS, not about the record: say so
+  // where the operator hovers, because "is it even alive?" was the question a
+  // 90-second silent run left unanswered (live run, blocker 2).
+  kind.title = t(run.live ? "run_live_tip" : "run_not_live_tip");
   card.appendChild(kind);
   const head = document.createElement("span");
   // Names first, ids on demand (PM run, finding 6): the tooltip keeps the
@@ -5242,6 +5272,15 @@ for (const id of ["runs-filter-status", "runs-filter-role", "runs-group-task"]) 
   document.getElementById(id).addEventListener("change", paintRunsList);
 }
 
+// One ticker re-counts every elapsed mark from its own start time, touching
+// only those spans: a full repaint every second would fight the operator's
+// clicks, and a frozen number would bring back the silence this line removes.
+setInterval(() => {
+  for (const part of document.querySelectorAll(".run-elapsed")) {
+    part.textContent = part.dataset.label + ": " + elapsedText(part.dataset.startedAt);
+  }
+}, 1000);
+
 // The same runs, filtered to the task under inspection: the human layer above
 // the raw record in the drawer, so a finished run's result is one click away.
 function paintTaskRuns(node) {
@@ -5258,6 +5297,7 @@ function paintTaskRuns(node) {
     // Phase and delegation state are canonical strings, never translated — and
     // never doubled either; `runStatusText` is where that is decided.
     kind.textContent = runStatusText(run);
+    kind.title = t(run.live ? "run_live_tip" : "run_not_live_tip");
     row.appendChild(kind);
     const head = document.createElement("span");
     head.textContent =

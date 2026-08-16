@@ -1721,6 +1721,33 @@ def test_a_run_card_says_when_it_ran_and_never_invents_a_spend() -> None:
     assert 'role.value || ""' in refill
 
 
+def test_a_live_run_counts_up_from_its_own_start_time() -> None:
+    """Live run, blocker 2: while a provider worked for 40-120 seconds the
+    panel said only the state word — no elapsed time and no sign the process
+    was alive.  The store deliberately writes a duration only once a run stops
+    (`duration_seconds` stays None while live), so the card counts up from
+    `started_at` on the client, and one ticker keeps only those marks moving
+    between stream frames instead of repainting the list every second."""
+
+    body = read_spa()
+    english, russian = _language_tables()
+
+    meta = body.split("function runMetaLine(card, run) {", 1)[1].split("\n}\n", 1)[0]
+    assert "run.live && run.started_at" in meta
+    assert "elapsedText(run.started_at)" in meta
+    counter = body.split("function elapsedText(startedAt) {", 1)[1].split("\n}\n", 1)[0]
+    assert "Date.parse(startedAt)" in counter
+    assert "formatDuration(" in counter
+    # The ticker touches the elapsed marks alone, never the whole list.
+    assert 'document.querySelectorAll(".run-elapsed")' in body
+    # The liveness dot explains itself where the operator hovers, on both card
+    # renderers — the Runs view and the task drawer.
+    assert body.count('t(run.live ? "run_live_tip" : "run_not_live_tip")') == 2
+    for key in ("run_elapsed_word", "run_elapsed_tip", "run_live_tip", "run_not_live_tip"):
+        for block in (english, russian):
+            assert _value(block, key), key
+
+
 def test_the_header_names_the_workspace_and_keeps_both_ulids_one_click_away() -> None:
     """Round 3, designer 18: the header spent half its width on two ULIDs and
     neither said which workspace this was.  There is no workspace name in this
