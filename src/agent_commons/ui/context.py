@@ -156,9 +156,12 @@ class UIContext:
         self._graph: dict[str, Any] | None = None
         # Operator profile config is read once and kept here, next to the graph
         # it is served beside.  It is a file outside the workspace that only the
-        # operator can change, and it cannot change under a running server the
-        # way the ledger can -- so re-reading it per request would buy nothing
-        # and put a syscall on the hot catalogue path.
+        # operator can change, and unlike the ledger nothing in a session is
+        # expected to move it -- so re-reading it per request would buy a
+        # syscall on the hot catalogue path and almost never a new answer.  The
+        # cost is that an edit made while the server runs is not picked up until
+        # it restarts, and so is a read that failed; `profile_info` says why
+        # that trade is the right way round for this field.
         self._profile_info: dict[str, dict[str, Any]] | None = None
         # Background launch threads, kept so a test can await them; daemon so
         # they never hold the server open.
@@ -343,6 +346,15 @@ class UIContext:
         empty, and the panel then says the model is fixed in the profile rather
         than inventing a name -- an unreadable operator file is a reason to know
         less, not a reason to fail a read-only catalogue request.
+
+        A refusal is cached exactly like a success, and that is a real cost
+        stated rather than hidden: a transient failure -- a read racing the
+        operator's own save -- leaves the panel saying "fixed in the profile"
+        until the server restarts.  It is the trade this surface wants.  The
+        alternative is retrying on every catalogue request, which turns a
+        misconfigured or hostile path into a syscall per poll, and the degraded
+        answer is the truthful one either way: the panel knows no model, and
+        says so, instead of naming one it could not read.
         """
 
         with self._guard:

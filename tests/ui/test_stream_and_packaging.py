@@ -1440,23 +1440,62 @@ def test_the_dock_survives_a_language_a_third_longer_than_english() -> None:
     assert "+30% IS THE DESIGN MARGIN" in body
 
     # Rule four, added in round 4 (finding 2): the widest dialog the panel has
-    # must hold its grant grid at the same margin, at the two widths the
-    # operator ran it at.  The geometry is arithmetic on the rules above, so it
-    # is computed here rather than asserted as a screenshot.
-    modal_padding, modal_border, gap, track_minimum = 18, 1, 6, 220
-    for viewport in (1024, 900):
-        modal = min(560, 0.92 * viewport)
-        # The dialog never outgrows the viewport, so the page itself cannot
-        # gain a second axis -- `min()` keeps the existing 92vw cap in force.
-        assert modal <= 0.92 * viewport, viewport
-        # box-sizing is border-box for everything, so the padding and the
-        # border come out of the declared width rather than adding to it.
+    # must hold its grant grid at the same margin, at the two sizes the operator
+    # ran it at.  The geometry is arithmetic on the rules above, so it is
+    # computed here rather than asserted as a screenshot -- but every number in
+    # that arithmetic is READ OUT OF THE FILE.  Retyped as literals they would
+    # go on agreeing with a stylesheet that had moved underneath them, which is
+    # a green test about a dialog nobody had measured.
+    modal_rule = body.split(".modal{", 1)[1].split("}", 1)[0]
+    hire_rule = body.split("#hire-modal .modal{", 1)[1].split("}", 1)[0]
+    grants_rule = body.split(".grants{", 1)[1].split("}", 1)[0]
+    modal_padding = int(re.search(r"padding:(\d+)px", modal_rule).group(1))
+    modal_border = int(re.search(r"border:(\d+)px", modal_rule).group(1))
+    gap = int(re.search(r"gap:(\d+)px", grants_rule).group(1))
+    track_minimum = int(re.search(r"minmax\((\d+)px,", grants_rule).group(1))
+    declared, cap = (
+        int(value) for value in re.search(r"min\((\d+)px,(\d+)vw\)", hire_rule).groups()
+    )
+
+    def tracks_at(viewport_width: int) -> tuple[float, int, float]:
+        """Dialog width, column count and track width at a viewport width."""
+
+        modal = min(declared, cap / 100 * viewport_width)
+        # box-sizing is border-box for everything, so the padding and the border
+        # come out of the declared width rather than adding to it.
         content = modal - 2 * modal_padding - 2 * modal_border
-        # `auto-fit` fits as many tracks of at least 220px as the gaps allow.
-        columns = int((content + gap) // (track_minimum + gap))
+        # `auto-fit` fits as many tracks of at least `track_minimum` as the gaps
+        # allow, and never fewer than one.
+        columns = max(1, int((content + gap) // (track_minimum + gap)))
+        return modal, columns, (content - gap * (columns - 1)) / columns
+
+    for viewport in (1024, 900):
+        modal, columns, track = tracks_at(viewport)
         assert columns == 2, (viewport, columns)
-        track = (content - gap * (columns - 1)) / columns
         assert track >= track_minimum, (viewport, track)
+
+    # The `min()` is load-bearing, and this is what proves the two assertions
+    # above are not arithmetic about a constant.  Narrow the viewport past the
+    # point where 92vw beats the declared width and the dialog must shrink with
+    # it -- the grid then folds to one full-width column rather than keeping two
+    # clipped ones or pushing the page sideways.
+    fold = int(declared * 100 / cap) + 1
+    assert tracks_at(fold)[0] == declared, fold
+    narrow_modal, narrow_columns, narrow_track = tracks_at(fold - 120)
+    assert narrow_modal < declared, narrow_modal
+    assert narrow_columns == 1, narrow_columns
+    assert narrow_track >= track_minimum, narrow_track
+
+    # The other axis, at the height the operator ran it at: a form this tall
+    # scrolls INSIDE the dialog.  Without the cap the dialog would grow past
+    # 768px and take the page's own scrollbar with it, which is the second axis
+    # this whole rule exists to prevent.
+    vertical_cap = int(re.search(r"max-height:(\d+)vh", modal_rule).group(1))
+    assert vertical_cap / 100 * 768 < 768
+    assert "overflow-y:auto" in modal_rule, modal_rule
+
+    for viewport in (1024, 900):
+        _, _, track = tracks_at(viewport)
 
         # What a closed <select> can show: the track less its own padding,
         # border and the platform's dropdown arrow.  6.0px per character is a
