@@ -1329,7 +1329,21 @@ def build_server(
 
         if worker is not None and delegation_id != worker.get("id"):
             raise LifecycleConflictError("worker outcome is outside its delegation scope")
-        if worker is not None and workspace is not None:
+        # The unchanged-workspace assertion belongs to a REVIEW, whose verdict is
+        # only trustworthy if the reviewer judged the tree it was handed and did
+        # not edit it -- the refusal even says "after reviewer snapshot
+        # creation".  Applying it to every worker made the implementation path
+        # impossible in production: a builder's entire job is to change the
+        # workspace, so its terminal tool refused, and the run fell to
+        # `needs_operator` with the work already on disk.  Found by the first
+        # real provider run this project ever made; every earlier test used a
+        # fake runner that called the manager directly and never crossed this
+        # tool.
+        if (
+            worker is not None
+            and workspace is not None
+            and str(worker.get("purpose")) != "implementation"
+        ):
             workspace.assert_unchanged()
         return commons.mark_delegation_input_needed(
             delegation_id,
@@ -1350,7 +1364,21 @@ def build_server(
 
         if worker is not None and delegation_id != worker.get("id"):
             raise LifecycleConflictError("worker outcome is outside its delegation scope")
-        if worker is not None and workspace is not None:
+        # The unchanged-workspace assertion belongs to a REVIEW, whose verdict is
+        # only trustworthy if the reviewer judged the tree it was handed and did
+        # not edit it -- the refusal even says "after reviewer snapshot
+        # creation".  Applying it to every worker made the implementation path
+        # impossible in production: a builder's entire job is to change the
+        # workspace, so its terminal tool refused, and the run fell to
+        # `needs_operator` with the work already on disk.  Found by the first
+        # real provider run this project ever made; every earlier test used a
+        # fake runner that called the manager directly and never crossed this
+        # tool.
+        if (
+            worker is not None
+            and workspace is not None
+            and str(worker.get("purpose")) != "implementation"
+        ):
             workspace.assert_unchanged()
         return commons.succeed_delegation(
             delegation_id,

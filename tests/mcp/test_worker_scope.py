@@ -752,3 +752,82 @@ def test_a_reviewer_never_receives_a_private_key_body(tmp_path) -> None:
         reader = _repo_reader(tmp_path / f"case{hash(body) & 0xFFFF}", body)
         content = reader.read("id_rsa")["content"]
         assert secret not in content, body
+
+
+def test_a_builder_reports_success_after_changing_the_workspace(tmp_path: Path) -> None:
+    """An implementation worker's whole job is to change the workspace, so its
+    terminal tool must not demand the workspace be unchanged.
+
+    The unchanged-snapshot assertion exists for a REVIEW: a verdict is only
+    worth recording if the reviewer judged the tree it was handed. It was
+    applied to every worker, which made the implementation path impossible in
+    production -- a builder wrote its file, called
+    `commons_succeed_delegation`, was refused, and the run fell to
+    `needs_operator` with the work already on disk. Every earlier test used a
+    fake runner that called the manager directly and never crossed this tool,
+    so the first real provider run this project ever made is what found it.
+    """
+
+    workspace = _workspace(tmp_path)
+    parent: CommonsManager = workspace["parent"]
+    task = parent.create_task(
+        title="Write a page",
+        description="the builder is expected to create a file",
+        acceptance_criteria=("the file exists",),
+        idempotency_key="builder-outcome-task",
+    )
+    delegation = parent.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 300,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "provider_units", "limit": 1},
+        },
+        idempotency_key="builder-outcome-delegation",
+    )
+    builder_session = parent.start_session(
+        stable_instance_id="builder-outcome-child",
+        principal="worker",
+        client="claude",
+        software="claude-code",
+        role="implementation-author",
+    )
+    started = parent.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=builder_session["session_id"],
+        attempt=1,
+        idempotency_key="builder-outcome-start",
+    )
+    child = CommonsManager(
+        workspace["repo"],
+        session_id=builder_session["session_id"],
+        state_root=parent.paths.state_root,
+    )
+    server = build_server(
+        workspace["repo"],
+        manager=child,
+        runtime=FakeRuntime(),
+        delegation_id=delegation["entity_ref"]["id"],
+        binding_wait_seconds=0,
+        server_factory=FakeServer,
+    )
+    assert isinstance(server, FakeServer)
+
+    # The builder does its job: the workspace is no longer what it was handed.
+    (workspace["repo"] / "clock.html").write_text("<h1>now</h1>\n", encoding="utf-8")
+
+    result = server.tools["commons_succeed_delegation"](
+        delegation["entity_ref"]["id"],
+        started["revision"],
+        "Created clock.html",
+        [f"task:{task['entity_ref']['id']}"],
+        "builder-outcome-succeed",
+    )
+    assert result["entity_ref"]["id"] == delegation["entity_ref"]["id"]
+    assert parent.get_delegation(delegation["entity_ref"]["id"])["state"] == "succeeded"
