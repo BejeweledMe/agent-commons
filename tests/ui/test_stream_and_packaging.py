@@ -2155,3 +2155,35 @@ def test_the_role_rename_is_reachable_from_the_drawer_header() -> None:
     for block in ("en: {", "ru: {"):
         language = table.split(block, 1)[1].split("\n  },", 1)[0]
         assert re.search(r'^\s*drawer_rename: "', language, re.MULTILINE), block
+
+
+def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
+    """Round 5, the three small ones.  (a) The Panel toggle opens an overlay at
+    the far edge of the window while the eye is still on the button, so the
+    button now wears its pressed state.  (b) The sections overlay sits over the
+    very view a click chooses, and the tester was escaping it with Esc;
+    choosing a section closes it.  (c) Following the printed URL in an
+    already-open tab is a fragment-only navigation that never reloads the
+    page — the tab now takes the fresh token from the hash and boots again,
+    and the unauthorized pill says the tab will pick the token up rather than
+    prescribing the exact step that was just seen not to work."""
+
+    body = read_spa()
+    # (a) The pressed state is stated in CSS, on the aria attribute the
+    # toggles already maintain for assistive technology.
+    assert '#shell-toggles button[aria-expanded="true"]{' in body
+    # (b) Choosing a section closes the overlay through the same applyShell
+    # the toggles use — and only on a narrow window.
+    sidebar = body.split('document.getElementById("sidebar").addEventListener("click"', 1)[1]
+    sidebar = sidebar.split("});", 1)[0]
+    assert "window.matchMedia(NARROW_SHELL).matches" in sidebar
+    assert "shellOpen.sidebar = false;" in sidebar
+    assert "applyShell();" in sidebar
+    # (c) A hash that arrives after load carries a fresh token into a reload.
+    assert 'window.addEventListener("hashchange"' in body
+    taker = body.split('window.addEventListener("hashchange"', 1)[1].split("});", 1)[0]
+    assert 'sessionStorage.setItem("ac_ui_token", fresh);' in taker
+    assert "location.reload();" in taker
+    english, russian = _language_tables()
+    assert "token" in _value(english, "stream_unauthorized")
+    assert "токен" in _value(russian, "stream_unauthorized")

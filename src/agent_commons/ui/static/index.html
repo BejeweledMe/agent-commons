@@ -661,6 +661,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
    and measures a shown one where it actually is, so an overlay subtracts the
    part of the canvas it covers exactly as a column did. */
 #shell-toggles{display:none; gap:6px}
+/* The toggle must answer the press where the eye already is: the overlay opens
+   at the far edge of the window, and a button that looks the same pressed and
+   unpressed reads as a click that did nothing (round 5, minor a). */
+#shell-toggles button[aria-expanded="true"]{
+  background:var(--surface-2); border-color:var(--info); color:var(--fg);
+}
 /* Ordered narrowest LAST: both queries match an 800px window, and a shell that
    still declared three columns there would quietly undo the collapse. */
 @media (max-width:1100px){ main{grid-template-columns:176px 1fr 320px} }
@@ -1722,7 +1728,7 @@ const STRINGS = {
     stream_reconnecting: "reconnecting",
     stream_gap_resume: "resumed with a gap",
     stream_unavailable: "live updates unavailable — reload to refresh",
-    stream_unauthorized: "unauthorized — reopen the printed URL",
+    stream_unauthorized: "no access — open the printed URL again; this tab picks up its token",
     writes_disabled: "writes disabled",
     writes_enabled: "writes enabled",
     writes_enabled_tip: "This panel may record events in the ledger. The session it writes as is one click behind the workspace name.",
@@ -2319,7 +2325,7 @@ const STRINGS = {
     stream_reconnecting: "переподключение",
     stream_gap_resume: "возобновлено с пропуском",
     stream_unavailable: "живые обновления недоступны — перезагрузите страницу",
-    stream_unauthorized: "нет доступа — заново откройте напечатанную ссылку",
+    stream_unauthorized: "нет доступа — откройте напечатанную ссылку ещё раз; вкладка подхватит из неё токен",
     writes_disabled: "запись отключена",
     writes_enabled: "запись включена",
     writes_enabled_tip: "Панель может записывать события в журнал. Сессия, от имени которой она пишет, \u2014 в одном щелчке за именем рабочего пространства.",
@@ -2925,6 +2931,18 @@ const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
 if (hashToken) { sessionStorage.setItem("ac_ui_token", hashToken); }
 const TOKEN = hashToken || sessionStorage.getItem("ac_ui_token") || "";
 history.replaceState(null, "", location.pathname);
+// Following the printed URL while this tab is already open changes only the
+// fragment, and a fragment-only navigation never reloads the page: the round-5
+// tester did exactly that, held a fresh token, and stayed "unauthorized" while
+// the pill told them to do the thing they had just done. Take the token and
+// boot again.
+window.addEventListener("hashchange", () => {
+  const fresh = new URLSearchParams(location.hash.slice(1)).get("t");
+  if (!fresh) { return; }
+  sessionStorage.setItem("ac_ui_token", fresh);
+  history.replaceState(null, "", location.pathname);
+  location.reload();
+});
 
 function authHeaders(extra) {
   const headers = Object.assign({ "Authorization": "Bearer " + TOKEN }, extra || {});
@@ -4208,7 +4226,15 @@ document.addEventListener("pointerdown", (event) => {
 });
 document.getElementById("sidebar").addEventListener("click", (event) => {
   const button = event.target.closest("button");
-  if (button) { viewShow(button.dataset.view); }
+  if (!button) { return; }
+  viewShow(button.dataset.view);
+  // On a narrow window the sidebar is an overlay sitting over the very view
+  // the click just chose; left open it hides its own result, and the round-5
+  // tester was escaping it with Esc. Choosing a section closes it.
+  if (window.matchMedia(NARROW_SHELL).matches) {
+    shellOpen.sidebar = false;
+    applyShell();
+  }
 });
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 // The rename lives on the Settings tab as "Name you will see on the board",
