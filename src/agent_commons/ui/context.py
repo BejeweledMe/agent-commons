@@ -883,7 +883,13 @@ class UIContext:
             if rec.get("state") == "active" and not rec.get("template")
         ]
         # A run needs an open target; a finished task is not something to staff.
-        open_states = {"ready", "assigned", "active", "blocked"}
+        # `review` belongs here even though the work is done: the acceptance
+        # chain tells the operator in as many words to "run a role whose profile
+        # is an independent reviewer against this task", and a task that has
+        # just been sent for review is exactly when that must be possible.
+        # Leaving it out made the panel point at an action its own picker
+        # refused to offer (vibecoder round, blocker 1).
+        open_states = {"ready", "assigned", "active", "blocked", "review"}
         tasks = [
             {"id": tid, "title": rec.get("title"), "state": rec.get("state")}
             for tid, rec in sorted(snapshot.tasks.items())

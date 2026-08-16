@@ -391,3 +391,22 @@ def test_a_language_switch_keeps_a_half_typed_acceptance(  # noqa: D401
     assert "setAcceptanceMode(null)" not in guard.replace(
         "setAcceptanceMode(sameTask ? acceptanceMode : null)", ""
     )
+
+
+def test_the_task_sent_for_review_is_still_pickable_for_a_reviewer(
+    writable_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """The panel tells the operator to run an independent reviewer against a
+    task it has just moved to `review`. A vibecoder followed that instruction
+    and hit "no such task": the launch picker offered only open states and
+    dropped the task the moment it was sent. The instruction and the picker
+    have to agree, or the chain has a step nobody can take."""
+
+    task = create_task(writable_client)
+    chain = send_for_review(writable_client, task["id"], task["revision"]).json()
+    assert chain["task_state"] == "review"
+
+    options = writable_client.get("/api/launch", headers=authorized()).json()
+    offered = {item["id"]: item["state"] for item in options["tasks"]}
+    assert task["id"] in offered, offered
+    assert offered[task["id"]] == "review"
