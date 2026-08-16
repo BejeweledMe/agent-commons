@@ -164,6 +164,43 @@ def test_a_named_model_reaches_the_option_and_the_value_stays_the_bare_id() -> N
     assert unknown[0]["title"] == "mystery-profile — model: fixed in the profile"
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="no node to run profileOptions() in")
+def test_a_profile_the_operator_config_does_not_carry_says_so_in_the_option() -> None:
+    """The live run's dead end: the picker offered all four enum ids, the
+    operator's runtime.yaml configured fewer, and the tester hired a reviewer
+    no launch could ever start.  With the config readable, an id it does not
+    carry is marked in its own option — the absence takes the model slot — and
+    a warning under the picker says what to do.  With the config unreadable
+    the panel knows nothing and marks nothing (the case pinned above)."""
+
+    info = {"claude-builder": {"provider": "claude", "model": "m"}}
+    options = _options("en", ["claude-builder", "claude-independent-reviewer"], info)
+    assert options[0]["title"] == "claude-builder — claude · model: m"
+    assert options[1]["title"] == (
+        "claude-independent-reviewer — claude · not in the operator's config (runtime.yaml)"
+    )
+    russian = _options("ru", ["claude-independent-reviewer"], info)
+    assert russian[0]["title"] == (
+        "claude-independent-reviewer — claude · нет в конфиге оператора (runtime.yaml)"
+    )
+
+    body = read_spa()
+    modal = _hire_modal(body)
+    assert 'id="hire-profile-missing"' in modal
+    assert 'data-i18n="hire_profile_missing"' in modal
+    availability = _function(body, "function paintProfileAvailability() {")
+    assert "catalog.profile_info" in availability
+    assert "Object.keys(info).length > 0" in availability
+    # The warning follows the picker off screen on the template path, where the
+    # profile is already decided.
+    mode = _function(body, "function applyHireMode() {")
+    assert 'document.getElementById("hire-profile-missing").hidden = true;' in mode
+    _in_both_tables("hire_profile_unconfigured", "hire_profile_missing")
+    english, russian_table = _language_tables()
+    for block in (english, russian_table):
+        assert "runtime.yaml" in _value(block, "hire_profile_missing")
+
+
 def test_the_option_carries_its_gloss_and_the_long_one_keeps_its_surface() -> None:
     """The composed line is the picker's gloss, and it obeys the same rule the
     table-driven ones do: canonical token first, human words after the dash,

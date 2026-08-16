@@ -1432,6 +1432,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="note" id="hire-profile-help" data-i18n="hire_profile_help">The profile decides which process and which
         model a run of this role uses. That is set by the operator in runtime.yaml, a file outside
         the workspace, and never from here.</p>
+      <!-- Said only when the chosen profile is absent from the operator's own
+           config: the live tester hired a reviewer, and only the launch — a
+           screen later — refused. The warning belongs where the choice is. -->
+      <p class="note warn" id="hire-profile-missing" hidden data-i18n="hire_profile_missing">This
+        profile is not in the operator's config, so a run of this role cannot start yet.</p>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
       <!-- Round 4, finding 8: the operator read this field as a system prompt
@@ -1739,6 +1744,8 @@ const STRINGS = {
     // model is fixed — it never puts a name of its own in that slot.
     hire_profile_model: "model: {model}",
     hire_profile_model_fixed: "fixed in the profile",
+    hire_profile_unconfigured: "not in the operator's config (runtime.yaml)",
+    hire_profile_missing: "This profile is not in the operator's config, so a run of this role cannot start yet. Profiles are added by the operator in runtime.yaml; hiring the role is still recorded.",
     hire_chain_note: "A role hired here answers to you. One role comes to answer to another only through a proposal that role makes and a person approves — this form creates no such rank.",
     hire_rationale_label: "Why this role exists (kept forever)",
     hire_rationale_help: "A note for the log and for people: why this role exists. The role never receives it as an instruction — what it must do is set by its skills and by the text of the task.",
@@ -2320,6 +2327,8 @@ const STRINGS = {
     hire_profile_help: "Профиль решает, какой процесс и какая модель работают в прогоне этой роли. Это задаёт оператор в runtime.yaml — файле вне workspace — и никогда не отсюда.",
     hire_profile_model: "модель: {model}",
     hire_profile_model_fixed: "закреплена в профиле",
+    hire_profile_unconfigured: "нет в конфиге оператора (runtime.yaml)",
+    hire_profile_missing: "Этого профиля нет в конфиге оператора, поэтому прогон такой роли пока не запустится. Профили оператор добавляет в runtime.yaml; нанять роль всё равно можно.",
     hire_chain_note: "Роль, нанятая здесь, подчиняется оператору. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком, — эта форма такого ранга не создаёт.",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
     hire_rationale_help: "Запись для журнала и для людей: почему эта роль существует. Как инструкцию роль её не получает — что она обязана делать, задают её навыки и текст задачи.",
@@ -3189,6 +3198,11 @@ const PROFILE_PROVIDER = {
 };
 
 function profileOptions(profiles, info) {
+  // The four ids are the domain's whole menu; which of them can actually START
+  // is the operator's runtime.yaml, and that is what `profile_info` reports.
+  // An empty info means the config was unreadable — then the panel knows
+  // nothing about any profile and marks none, rather than marking all four.
+  const readable = Object.keys(info).length > 0;
   return profiles.map((id) => {
     const known = info[id] || {};
     // The provider falls back to this map only because the id set is CLOSED:
@@ -3197,8 +3211,13 @@ function profileOptions(profiles, info) {
     // provider rather than reading one out of its own spelling.
     const provider = known.provider || PROFILE_PROVIDER[id] || "";
     const model = known.model || t("hire_profile_model_fixed");
-    const parts = (provider ? [provider] : [])
-      .concat(said("hire_profile_model", { model: model }));
+    const parts = (provider ? [provider] : []);
+    // The live tester hired a reviewer no launch could ever start, because the
+    // option said nothing about the config not carrying it.  The absence takes
+    // the model slot: a model line about a profile with no config entry would
+    // dress the missing thing in the words of a present one.
+    if (readable && !info[id]) { parts.push(t("hire_profile_unconfigured")); }
+    else { parts.push(said("hire_profile_model", { model: model })); }
     return { id: id, title: id + " — " + parts.join(" · ") };
   });
 }
@@ -3831,6 +3850,17 @@ function closeDrawer() {
 // first, and the fields follow it.
 let hireTemplate = false;
 
+// Whether the profile the operator is about to hire can actually start a run:
+// `profile_info` is read from the operator's runtime.yaml, so a chosen id it
+// does not carry gets its warning HERE, not a screen later at launch.  An empty
+// info means the config was unreadable and the panel honestly knows nothing.
+function paintProfileAvailability() {
+  const info = (catalog && catalog.profile_info) || {};
+  const chosen = document.getElementById("hire-profile").value;
+  const missing = Object.keys(info).length > 0 && Boolean(chosen) && !info[chosen];
+  document.getElementById("hire-profile-missing").hidden = !missing;
+}
+
 function applyHireMode() {
   const wantsPreset =
     document.getElementById("hire-mode").value === "preset" && !hireTemplate;
@@ -3848,6 +3878,8 @@ function applyHireMode() {
   // goes: a template already decided the profile, and a sentence about which
   // process a choice starts would be a sentence about a control not on screen.
   document.getElementById("hire-profile-help").hidden = fromPreset;
+  if (fromPreset) { document.getElementById("hire-profile-missing").hidden = true; }
+  else { paintProfileAvailability(); }
   // Saving a template hires nobody, so the sentence about who a hired role
   // answers to has nothing to be about on that path.
   document.getElementById("hire-chain-note").hidden = hireTemplate;
@@ -4302,6 +4334,7 @@ for (const [pickerId, noteId] of [
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
+document.getElementById("hire-profile").addEventListener("change", paintProfileAvailability);
 for (const id of ["hire-create_roles", "hire-retire_roles"]) {
   document.getElementById(id).addEventListener("change", paintTurnoverRequirement);
 }
@@ -5552,6 +5585,7 @@ function paintHire() {
   fillSelect(document.getElementById("hire-profile"),
     profileOptions(catalog.profiles || [], catalog.profile_info || {}),
     held("hire-profile", null), false);
+  paintProfileAvailability();
   fillSelect(document.getElementById("hire-context_mode"),
     glossedOptions(catalog.context_modes || ["fresh", "accumulated"], PICKER_GLOSS),
     held("hire-context_mode", "fresh"), false);
