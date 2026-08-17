@@ -572,7 +572,7 @@ GET  /api/profiles                   operator allowlist — READ ONLY
 if last_event_id is None:
     yield sse("snapshot", store.snapshot(run_id))
 elif store.can_replay_from(run_id, last_event_id):
-    cursor = last_event_id                    # точный догон
+    cursor = last_event_id  # точный догон
 else:
     yield sse("snapshot", store.snapshot(run_id))
     yield sse("resume_gap", {"from": last_event_id, "to": store.head_seq(run_id)})
