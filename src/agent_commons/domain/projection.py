@@ -570,6 +570,11 @@ def _built_upon_event_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
     guards may only ever aim at an acceptance nothing was built upon; a
     stripped acceptance that a later re-acceptance deliberately bypassed
     (binding the submit again) has no successor and stays strippable.
+
+    Callers must feed this APPLIED events only.  Counting every recorded
+    event lets a write that never applied — say, two conflicting reopens
+    naming the same acceptance — shield a live acceptance from its own
+    staleness guard (finding.1J0VT9597NVS6SKRMFQTSQSH3E).
     """
 
     built_upon: set[str] = set()
@@ -583,8 +588,19 @@ def _built_upon_event_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
     return built_upon
 
 
-def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
-    """Identify acceptances bound to a superseded review revision before CAS grouping."""
+def _stale_task_acceptance_ids(
+    events: Iterable[Mapping[str, Any]],
+    *,
+    exempt_acceptance_ids: frozenset[str] = frozenset(),
+) -> set[str]:
+    """Identify acceptances bound to a superseded review revision before CAS grouping.
+
+    ``exempt_acceptance_ids`` names the acceptances a successor demonstrably
+    built upon — computed by ``project_events`` from a lenient probe pass, so
+    only successors that actually APPLIED count.  Deriving the exemption here,
+    from every recorded event, let a write that never applied shield a live
+    acceptance from this guard (finding.1J0VT9597NVS6SKRMFQTSQSH3E).
+    """
 
     current_review_revisions: dict[str, str] = {}
     materialized = list(events)
@@ -604,7 +620,6 @@ def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
                 event.get("_effective_correction_id") or event_id
             )
 
-    built_upon = _built_upon_event_ids(materialized)
     stale: set[str] = set()
     for event in materialized:
         if event.get("event_type") != "task.accepted":
@@ -619,10 +634,11 @@ def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
         if not isinstance(review_ref, Mapping):
             continue
         event_id = str(event.get("event_id", ""))
-        # An acceptance a successor built upon is history: the reopen after it
-        # already took the claim back, so a review revision that moved on
-        # cannot make it retroactively wrong without rejecting that successor.
-        if event_id in built_upon:
+        # An acceptance an APPLIED successor built upon is history: the reopen
+        # after it already took the claim back, so a review revision that
+        # moved on cannot make it retroactively wrong without rejecting that
+        # successor.
+        if event_id in exempt_acceptance_ids:
             continue
         review_id = review_ref.get("id")
         revision = binding.get("revision")
@@ -778,6 +794,7 @@ def _project_events_once(
     *,
     known_manifest_ids: Iterable[str] | None = None,
     forced_stale_acceptance_ids: frozenset[str] = frozenset(),
+    exempt_acceptance_ids: frozenset[str] = frozenset(),
 ) -> ProjectSnapshot:
     raw = sorted(
         (dict(event) for event in events),
@@ -896,7 +913,9 @@ def _project_events_once(
             continue
         effective.append(revision.effective_event)
 
-    stale_acceptance_ids = _stale_task_acceptance_ids(effective) | set(forced_stale_acceptance_ids)
+    stale_acceptance_ids = _stale_task_acceptance_ids(
+        effective, exempt_acceptance_ids=exempt_acceptance_ids
+    ) | set(forced_stale_acceptance_ids)
     conflicted_event_ids, conflict_issues = _cas_conflicts(
         event for event in effective if str(event.get("event_id", "")) not in stale_acceptance_ids
     )
@@ -988,23 +1007,50 @@ def project_events(
 
     materialized = list(events)
     manifests = tuple(known_manifest_ids) if known_manifest_ids is not None else None
-    snapshot = _project_events_once(materialized, known_manifest_ids=manifests)
+    passes = 0
+
+    # Only an acceptance a successor demonstrably built upon is exempt from
+    # the staleness guards: stripping such an acceptance rejects the
+    # already-applied reopen as stale-expected and truncates the whole chain
+    # after it (finding.026GYJFW71EAK7QTWDA0E1T6PR).  "Demonstrably" means
+    # the successor APPLIED — counted from a lenient probe pass in which
+    # every acceptance stands, because counting merely-recorded events let
+    # two conflicting reopens that never applied shield a live acceptance
+    # from its own guard (finding.1J0VT9597NVS6SKRMFQTSQSH3E).  The probe
+    # runs only when some event names an acceptance as its expected
+    # revision; most histories never do.
+    acceptance_ids = {
+        str(event.get("event_id", ""))
+        for event in materialized
+        if event.get("event_type") == "task.accepted"
+    }
+    pattern_present = any(
+        isinstance(event.get("payload"), Mapping)
+        and str((event.get("payload") or {}).get("expected_revision", "")) in acceptance_ids
+        for event in materialized
+    )
+    exempt: frozenset[str] = frozenset()
+    if pattern_present:
+        probe = _project_events_once(
+            materialized,
+            known_manifest_ids=manifests,
+            exempt_acceptance_ids=frozenset(acceptance_ids),
+        )
+        passes += 1
+        applied_successor_targets = _built_upon_event_ids(
+            event
+            for event in materialized
+            if str(event.get("event_id", "")) in probe.effective_event_revisions
+        )
+        exempt = frozenset(applied_successor_targets & acceptance_ids)
+
+    snapshot = _project_events_once(
+        materialized, known_manifest_ids=manifests, exempt_acceptance_ids=exempt
+    )
+    passes += 1
     stale_review_ids = {
         identifier for identifier, review in snapshot.reviews.items() if review.get("stale") is True
     }
-    # Only an acceptance nothing was built upon can be holding the task
-    # accepted, so only it may be stripped.  An acceptance a successor already
-    # used as its expected revision was superseded by that successor;
-    # stripping it here rejected the already-applied reopen as stale-expected
-    # and truncated the whole chain after it
-    # (finding.026GYJFW71EAK7QTWDA0E1T6PR).  Computed over the events the
-    # first pass actually applied, so a rejected write cannot shield an
-    # acceptance by merely naming it.
-    built_upon = _built_upon_event_ids(
-        event
-        for event in materialized
-        if str(event.get("event_id", "")) in snapshot.effective_event_revisions
-    )
     stale_acceptance_ids: set[str] = set()
     for event in materialized:
         if event.get("event_type") != "task.accepted":
@@ -1019,7 +1065,7 @@ def project_events(
             and ref.get("id") in stale_review_ids
             and task is not None
             and task.get("state") == "accepted"
-            and str(event.get("event_id", "")) not in built_upon
+            and str(event.get("event_id", "")) not in exempt
         ):
             stale_acceptance_ids.add(str(event.get("event_id", "")))
     if stale_acceptance_ids:
@@ -1027,7 +1073,10 @@ def project_events(
             materialized,
             known_manifest_ids=manifests,
             forced_stale_acceptance_ids=frozenset(stale_acceptance_ids),
+            exempt_acceptance_ids=exempt,
         )
-        final.replay_metrics["fixed_point_passes"] = 2
+        passes += 1
+        final.replay_metrics["fixed_point_passes"] = passes
         return final
+    snapshot.replay_metrics["fixed_point_passes"] = passes
     return snapshot

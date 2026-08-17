@@ -1109,7 +1109,9 @@ def test_an_acceptance_superseded_by_a_reopen_is_history_not_a_live_claim() -> N
     assert snapshot.reviews[second_review]["stale"] is False
     assert ("event", accepted_once["event_id"]) not in snapshot.stale_refs
     assert not any("is stale and was not applied" in warning for warning in snapshot.warnings)
-    assert snapshot.replay_metrics["fixed_point_passes"] == 1
+    # Two passes: the lenient probe that measures which successors actually
+    # apply, then the real projection with the earned exemptions.
+    assert snapshot.replay_metrics["fixed_point_passes"] == 2
 
     # The same causality holds for the binding-revision guard: correcting the
     # FIRST review's completion moves its revision, and that must not reach
@@ -1660,3 +1662,143 @@ def test_event_correction_and_invalidation_stale_bound_truth_but_keep_history() 
     assert invalidated.findings[finding_id]["stale"] is True
     assert invalidated.decisions[decision_id]["state"] == "accepted"
     assert invalidated.decisions[decision_id]["stale"] is True
+
+
+def test_a_rejected_successor_cannot_shield_a_live_acceptance() -> None:
+    """Round-2 review of the causal guard (finding.1J0VT9597NVS6SKRMFQTSQSH3E):
+    the built-upon exemption used to count every RECORDED event, so two
+    conflicting reopens that never applied still shielded the live acceptance
+    from the binding guard after its review was corrected, and the projection
+    wrongly stayed accepted.  Only a successor that actually applied — probed
+    with the acceptance standing — may exempt it."""
+
+    task_id = "task.00000000000000000000000001"
+    review_id = "review.00000000000000000000000001"
+
+    created = event(
+        1,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Shielded task",
+            "description": "conflicting reopens must not shield the acceptance",
+            "acceptance_criteria": ["works"],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    started = event(
+        2,
+        "task.started",
+        {"task_id": task_id, "expected_revision": created["event_id"]},
+        "task",
+        task_id,
+    )
+    completed = event(
+        3,
+        "task.completed",
+        {"task_id": task_id, "expected_revision": started["event_id"], "summary": "done"},
+        "task",
+        task_id,
+    )
+    submitted = event(
+        4,
+        "task.submitted",
+        {"task_id": task_id, "expected_revision": completed["event_id"], "summary": "ready"},
+        "task",
+        task_id,
+    )
+    requested = event(
+        5,
+        "review.requested",
+        {
+            "review_id": review_id,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": submitted["event_id"],
+            "criteria": ["correctness"],
+            "independent": True,
+        },
+        "review",
+        review_id,
+    )
+    approved = event(
+        6,
+        "review.completed",
+        {
+            "review_id": review_id,
+            "expected_revision": requested["event_id"],
+            "target_revision": submitted["event_id"],
+            "verdict": "approved",
+            "summary": "approved",
+        },
+        "review",
+        review_id,
+    )
+    approved["actor"] = {"session_id": "session.reviewer", "role_id": "reviewer"}
+    accepted = event(
+        7,
+        "task.accepted",
+        {
+            "task_id": task_id,
+            "expected_revision": submitted["event_id"],
+            "summary": "accepted",
+            "acceptance_review": {
+                "ref": {"kind": "review", "id": review_id},
+                "revision": approved["event_id"],
+            },
+        },
+        "task",
+        task_id,
+    )
+    # Two concurrent reopens naming the same expected revision: fail-closed,
+    # neither applies — and neither may therefore vouch for the acceptance.
+    reopen_a = event(
+        8,
+        "task.reopened",
+        {"task_id": task_id, "expected_revision": accepted["event_id"], "reason": "fork a"},
+        "task",
+        task_id,
+    )
+    reopen_b = event(
+        9,
+        "task.reopened",
+        {"task_id": task_id, "expected_revision": accepted["event_id"], "reason": "fork b"},
+        "task",
+        task_id,
+    )
+    corrected_review = event(
+        10,
+        "event.corrected",
+        {
+            "target_event_id": approved["event_id"],
+            "expected_target_sha256": canonical_sha256(approved),
+            "replacement_payload": {**approved["payload"], "summary": "approved, reworded"},
+        },
+        "event",
+        approved["event_id"],
+    )
+
+    snapshot = project_events(
+        [
+            created,
+            started,
+            completed,
+            submitted,
+            requested,
+            approved,
+            accepted,
+            reopen_a,
+            reopen_b,
+            corrected_review,
+        ]
+    )
+    # The conflicting reopens fail closed, as before.
+    assert any(issue.code == "concurrent_transition_conflict" for issue in snapshot.issues), [
+        issue.message for issue in snapshot.issues
+    ]
+    # And they buy the acceptance nothing: its binding no longer matches the
+    # corrected review, no APPLIED successor built on it, so it is stripped
+    # and the task honestly returns to review.
+    assert ("event", accepted["event_id"]) in snapshot.stale_refs
+    assert snapshot.tasks[task_id]["state"] == "review"
