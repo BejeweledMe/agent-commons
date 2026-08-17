@@ -562,6 +562,29 @@ def _cas_conflicts(
     return conflicted, issues
 
 
+def _built_upon_event_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
+    """Event ids some later event already used as its expected revision.
+
+    An acceptance that a reopen (or any successor) built upon is history, not
+    a live claim: stripping it retroactively rejects that already-applied
+    successor as stale-expected and truncates the rest of the chain — the
+    collapse recorded as finding.026GYJFW71EAK7QTWDA0E1T6PR.  Staleness
+    guards may only ever aim at an acceptance nothing was built upon; a
+    stripped acceptance that a later re-acceptance deliberately bypassed
+    (binding the submit again) has no successor and stays strippable.
+    """
+
+    built_upon: set[str] = set()
+    for event in events:
+        payload = event.get("payload") or {}
+        if not isinstance(payload, Mapping):
+            continue
+        expected = payload.get("expected_revision")
+        if isinstance(expected, str) and expected:
+            built_upon.add(expected)
+    return built_upon
+
+
 def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
     """Identify acceptances bound to a superseded review revision before CAS grouping."""
 
@@ -583,6 +606,7 @@ def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
                 event.get("_effective_correction_id") or event_id
             )
 
+    built_upon = _built_upon_event_ids(materialized)
     stale: set[str] = set()
     for event in materialized:
         if event.get("event_type") != "task.accepted":
@@ -596,6 +620,12 @@ def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
         review_ref = binding.get("ref") or {}
         if not isinstance(review_ref, Mapping):
             continue
+        event_id = str(event.get("event_id", ""))
+        # An acceptance a successor built upon is history: the reopen after it
+        # already took the claim back, so a review revision that moved on
+        # cannot make it retroactively wrong without rejecting that successor.
+        if event_id in built_upon:
+            continue
         review_id = review_ref.get("id")
         revision = binding.get("revision")
         if (
@@ -603,7 +633,7 @@ def _stale_task_acceptance_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
             and isinstance(revision, str)
             and current_review_revisions.get(review_id) != revision
         ):
-            stale.add(str(event.get("event_id", "")))
+            stale.add(event_id)
     return stale
 
 
@@ -964,6 +994,19 @@ def project_events(
     stale_review_ids = {
         identifier for identifier, review in snapshot.reviews.items() if review.get("stale") is True
     }
+    # Only an acceptance nothing was built upon can be holding the task
+    # accepted, so only it may be stripped.  An acceptance a successor already
+    # used as its expected revision was superseded by that successor;
+    # stripping it here rejected the already-applied reopen as stale-expected
+    # and truncated the whole chain after it
+    # (finding.026GYJFW71EAK7QTWDA0E1T6PR).  Computed over the events the
+    # first pass actually applied, so a rejected write cannot shield an
+    # acceptance by merely naming it.
+    built_upon = _built_upon_event_ids(
+        event
+        for event in materialized
+        if str(event.get("event_id", "")) in snapshot.effective_event_revisions
+    )
     stale_acceptance_ids: set[str] = set()
     for event in materialized:
         if event.get("event_type") != "task.accepted":
@@ -978,6 +1021,7 @@ def project_events(
             and ref.get("id") in stale_review_ids
             and task is not None
             and task.get("state") == "accepted"
+            and str(event.get("event_id", "")) not in built_upon
         ):
             stale_acceptance_ids.add(str(event.get("event_id", "")))
     if stale_acceptance_ids:

@@ -959,6 +959,194 @@ def test_task_acceptance_keeps_qualifying_review_fresh_until_reopen() -> None:
     assert reopened_snapshot.reviews[review_id]["stale"] is True
 
 
+def test_an_acceptance_superseded_by_a_reopen_is_history_not_a_live_claim() -> None:
+    """finding.026GYJFW71EAK7QTWDA0E1T6PR, reproduced from the live ledger: a
+    task whose chain held accept -> reopen -> resubmit collapsed the moment a
+    SECOND acceptance landed.  The first acceptance's review was stale at the
+    end of history, the guard stripped that acceptance retroactively, the
+    already-applied reopen became stale-expected and the whole chain after it
+    was rejected — doctor red, unrelated writes blocked.  A superseded
+    acceptance is history: only the LIVE acceptance may be stripped."""
+
+    task_id = "task.00000000000000000000000001"
+    first_review = "review.00000000000000000000000001"
+    second_review = "review.00000000000000000000000002"
+
+    def task_event(number: int, event_type: str, payload: dict) -> dict:
+        return event(number, event_type, {"task_id": task_id, **payload}, "task", task_id)
+
+    created = task_event(
+        1,
+        "task.created",
+        {
+            "title": "Twice-accepted task",
+            "description": "accept, reopen, rework, accept again",
+            "acceptance_criteria": ["works"],
+            "priority": "normal",
+        },
+    )
+    started = task_event(2, "task.started", {"expected_revision": created["event_id"]})
+    completed = task_event(
+        3, "task.completed", {"expected_revision": started["event_id"], "summary": "done"}
+    )
+    submitted = task_event(
+        4, "task.submitted", {"expected_revision": completed["event_id"], "summary": "ready"}
+    )
+    requested = event(
+        5,
+        "review.requested",
+        {
+            "review_id": first_review,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": submitted["event_id"],
+            "criteria": ["correctness"],
+            "independent": True,
+        },
+        "review",
+        first_review,
+    )
+    approved = event(
+        6,
+        "review.completed",
+        {
+            "review_id": first_review,
+            "expected_revision": requested["event_id"],
+            "target_revision": submitted["event_id"],
+            "verdict": "approved",
+            "summary": "approved",
+        },
+        "review",
+        first_review,
+    )
+    approved["actor"] = {"session_id": "session.reviewer", "role_id": "reviewer"}
+    accepted_once = task_event(
+        7,
+        "task.accepted",
+        {
+            "expected_revision": submitted["event_id"],
+            "summary": "accepted the first delivery",
+            "acceptance_review": {
+                "ref": {"kind": "review", "id": first_review},
+                "revision": approved["event_id"],
+            },
+        },
+    )
+    reopened = task_event(
+        8,
+        "task.reopened",
+        {"expected_revision": accepted_once["event_id"], "reason": "a defect surfaced"},
+    )
+    restarted = task_event(9, "task.started", {"expected_revision": reopened["event_id"]})
+    recompleted = task_event(
+        10, "task.completed", {"expected_revision": restarted["event_id"], "summary": "reworked"}
+    )
+    resubmitted = task_event(
+        11, "task.submitted", {"expected_revision": recompleted["event_id"], "summary": "again"}
+    )
+    requested_again = event(
+        12,
+        "review.requested",
+        {
+            "review_id": second_review,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": resubmitted["event_id"],
+            "criteria": ["correctness"],
+            "independent": True,
+        },
+        "review",
+        second_review,
+    )
+    approved_again = event(
+        13,
+        "review.completed",
+        {
+            "review_id": second_review,
+            "expected_revision": requested_again["event_id"],
+            "target_revision": resubmitted["event_id"],
+            "verdict": "approved",
+            "summary": "approved after rework",
+        },
+        "review",
+        second_review,
+    )
+    approved_again["actor"] = {"session_id": "session.reviewer", "role_id": "reviewer"}
+    accepted_again = task_event(
+        14,
+        "task.accepted",
+        {
+            "expected_revision": resubmitted["event_id"],
+            "summary": "accepted the rework",
+            "acceptance_review": {
+                "ref": {"kind": "review", "id": second_review},
+                "revision": approved_again["event_id"],
+            },
+        },
+    )
+
+    chain = [
+        created, started, completed, submitted, requested, approved, accepted_once,
+        reopened, restarted, recompleted, resubmitted,
+        requested_again, approved_again, accepted_again,
+    ]
+    snapshot = project_events(chain)
+    # The second acceptance lands and NOTHING in the chain is rejected: the
+    # first review is honestly stale, but the acceptance it carried was
+    # superseded by the reopen and stays applied history.
+    assert snapshot.tasks[task_id]["state"] == "accepted"
+    assert snapshot.issues == [], [issue.message for issue in snapshot.issues]
+    assert snapshot.reviews[first_review]["stale"] is True
+    assert snapshot.reviews[second_review]["stale"] is False
+    assert ("event", accepted_once["event_id"]) not in snapshot.stale_refs
+    assert not any("is stale and was not applied" in warning for warning in snapshot.warnings)
+    assert snapshot.replay_metrics["fixed_point_passes"] == 1
+
+    # The same causality holds for the binding-revision guard: correcting the
+    # FIRST review's completion moves its revision, and that must not reach
+    # back through the reopen either.
+    corrected_first = event(
+        15,
+        "event.corrected",
+        {
+            "target_event_id": approved["event_id"],
+            "expected_target_sha256": canonical_sha256(approved),
+            "replacement_payload": {
+                **approved["payload"],
+                "summary": "approved, wording clarified much later",
+            },
+        },
+        "event",
+        approved["event_id"],
+    )
+    corrected_snapshot = project_events([*chain, corrected_first])
+    assert corrected_snapshot.tasks[task_id]["state"] == "accepted"
+    assert corrected_snapshot.issues == [], [
+        issue.message for issue in corrected_snapshot.issues
+    ]
+    assert ("event", accepted_once["event_id"]) not in corrected_snapshot.stale_refs
+
+    # And the guard still bites where it must: the LIVE acceptance loses its
+    # review and the acceptance is stripped, without collapsing the history
+    # before it — the original Batch 0 guarantee, intact.
+    corrected_second = event(
+        15,
+        "event.corrected",
+        {
+            "target_event_id": approved_again["event_id"],
+            "expected_target_sha256": canonical_sha256(approved_again),
+            "replacement_payload": {
+                **approved_again["payload"],
+                "summary": "approved after rework, corrected",
+            },
+        },
+        "event",
+        approved_again["event_id"],
+    )
+    stripped_snapshot = project_events([*chain, corrected_second])
+    assert stripped_snapshot.tasks[task_id]["state"] == "review"
+    assert ("event", accepted_again["event_id"]) in stripped_snapshot.stale_refs
+    assert not any("rejected by lifecycle" in warning for warning in stripped_snapshot.warnings)
+
+
 def test_conflicting_corrections_fail_closed_until_one_event_supersedes_all_heads() -> None:
     task_id = "task.00000000000000000000000001"
     created = event(

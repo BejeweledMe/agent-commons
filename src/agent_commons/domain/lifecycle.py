@@ -301,7 +301,15 @@ def validate_transition(
             snapshot, str(review_ref.get("kind", "")), str(review_ref.get("id", ""))
         )
         review_revision = review.get("effective_revision", review.get("revision"))
-        if acceptance_review.get("revision") != review_revision:
+        # A later non-structural correction folds into the review's replay
+        # position and rewrites its effective revision — an id that did not
+        # exist when the acceptance was written.  The binding therefore may
+        # name either the current effective head or the raw event it
+        # corrected: corrections cannot change structural fields, so both
+        # spell the same verdict against the same target.  Without the root
+        # id here, correcting a review's wording retroactively rejected every
+        # acceptance bound to it (finding.026GYJFW71EAK7QTWDA0E1T6PR).
+        if acceptance_review.get("revision") not in {review_revision, review.get("revision")}:
             raise LifecycleConflictError(
                 "task acceptance is not bound to the current review revision"
             )
@@ -312,7 +320,9 @@ def validate_transition(
         if review.get("target_ref") != {"kind": "task", "id": identifier}:
             raise LifecycleConflictError("acceptance review targets a different task")
         subject_revision = current.get("effective_revision", current.get("revision"))
-        if review.get("target_revision") != subject_revision:
+        # The same correction tolerance, mirrored: a corrected task event moves
+        # the subject's effective revision under a review that bound the raw id.
+        if review.get("target_revision") not in {subject_revision, current.get("revision")}:
             raise LifecycleConflictError(
                 "acceptance review does not bind the current task revision"
             )
