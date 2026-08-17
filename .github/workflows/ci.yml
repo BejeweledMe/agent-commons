@@ -31,6 +31,13 @@ jobs:
       - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
+      # Node runs the behaviour harnesses for the UI asset (profileOptions,
+      # layout). Installed explicitly from the version file: without it those
+      # tests skip, and a skip in CI is lost coverage, not a convenience —
+      # tests/test_ci_environment.py turns that silence into a failure.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
       - run: uv sync --locked --extra test
       - run: make check
 
