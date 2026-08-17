@@ -701,9 +701,7 @@ class DelegationRuntimeService:
         return (
             tuple(str(name) for name in role.get("tool_allowlist") or ()),
             effective_grants(snapshot.agents, agent_id),
-            skill_instructions(
-                self.catalog, tuple(str(name) for name in role.get("skills") or ())
-            ),
+            skill_instructions(self.catalog, tuple(str(name) for name in role.get("skills") or ())),
         )
 
     @staticmethod
@@ -1053,9 +1051,7 @@ alone is not task acceptance.
             role_tools, role_grants, role_skills = self._role_scope(delegation)
             # Validate executable, trust mode, argv, and budget support before
             # allocating a child session or durable operational reservation.
-            instruction = self._instruction(
-                delegation, profile_id=profile_id, skills=role_skills
-            )
+            instruction = self._instruction(delegation, profile_id=profile_id, skills=role_skills)
             profile.build_invocation(
                 instruction,
                 workspace_root=self.manager.repo_root,

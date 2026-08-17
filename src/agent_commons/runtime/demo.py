@@ -56,9 +56,7 @@ class DemoRunner:
             on_started(_DEMO_PID)
         from agent_commons.services import CommonsManager
 
-        child = CommonsManager(
-            Path(cwd), session_id=child_session_id, state_root=self._state_root
-        )
+        child = CommonsManager(Path(cwd), session_id=child_session_id, state_root=self._state_root)
         bound = [
             record
             for record in child.snapshot().delegations.values()

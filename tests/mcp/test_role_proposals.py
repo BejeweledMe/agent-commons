@@ -36,6 +36,7 @@ _AUTOMATIC_LEVEL_WITHHELD = (
     "restored later in this branch"
 )
 
+
 class FakeServer:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -159,8 +160,17 @@ def test_a_proposal_changes_nothing_until_a_person_confirms_it(tmp_path: Path) -
     runner = CliRunner()
     listed = runner.invoke(
         cli,
-        ["--repo", str(workspace["repo"]), "--state-root", str(workspace["state_root"]),
-         "--session-id", parent.session_id, "--json", "agent", "proposals"],
+        [
+            "--repo",
+            str(workspace["repo"]),
+            "--state-root",
+            str(workspace["state_root"]),
+            "--session-id",
+            parent.session_id,
+            "--json",
+            "agent",
+            "proposals",
+        ],
     )
     assert listed.exit_code == 0, listed.output
     pending = json.loads(listed.output)
@@ -169,9 +179,20 @@ def test_a_proposal_changes_nothing_until_a_person_confirms_it(tmp_path: Path) -
 
     approved = runner.invoke(
         cli,
-        ["--repo", str(workspace["repo"]), "--state-root", str(workspace["state_root"]),
-         "--session-id", parent.session_id, "--json", "agent", "approve",
-         pending[0]["thread_id"], "--idempotency-key", "approve-one"],
+        [
+            "--repo",
+            str(workspace["repo"]),
+            "--state-root",
+            str(workspace["state_root"]),
+            "--session-id",
+            parent.session_id,
+            "--json",
+            "agent",
+            "approve",
+            pending[0]["thread_id"],
+            "--idempotency-key",
+            "approve-one",
+        ],
     )
     assert approved.exit_code == 0, approved.output
     created = parent.get_agent(json.loads(approved.output)["entity_ref"]["id"])

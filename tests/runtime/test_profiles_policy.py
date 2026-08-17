@@ -403,9 +403,7 @@ def test_a_role_tool_selection_narrows_the_launched_argv(tmp_path: Path) -> None
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
         role_tools=("commons_repo_read", "commons_complete_review"),
     )
-    allowed = set(
-        invocation.argv[invocation.argv.index("--allowed-tools") + 1].split(",")
-    )
+    allowed = set(invocation.argv[invocation.argv.index("--allowed-tools") + 1].split(","))
 
     assert "mcp__agent-commons__commons_repo_read" in allowed
     assert "mcp__agent-commons__commons_complete_review" in allowed

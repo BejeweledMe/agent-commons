@@ -66,7 +66,7 @@ def test_a_rank_lays_out_in_one_named_order_that_no_language_can_move() -> None:
     compare = _function(body, "function bandCompare(left, right) {")
     # Roles first, then work, then everything else -- and the three buckets are
     # named where a reader will look for them rather than inlined as magic.
-    assert 'const BAND_KIND_ORDER = { agent: 0, task: 1 };' in body
+    assert "const BAND_KIND_ORDER = { agent: 0, task: 1 };" in body
     assert "bandKindRank(left) - bandKindRank(right)" in compare
     assert "BAND_SETTLED.has(left.state)" in compare
     assert "left.recorded_at" in compare and "right.recorded_at" in compare
@@ -97,9 +97,7 @@ def test_the_same_snapshot_lays_out_the_same_way_however_the_nodes_arrive() -> N
             # The ordering slab: the two tables, the rank helper and the
             # comparator all sit between the constant and layout() itself.
             "const BAND_KIND_ORDER"
-            + body.split("const BAND_KIND_ORDER", 1)[1].split(
-                "function layout(nodes) {", 1
-            )[0],
+            + body.split("const BAND_KIND_ORDER", 1)[1].split("function layout(nodes) {", 1)[0],
             _function(body, "function bandColumns(count) {"),
             _function(body, "function layout(nodes) {"),
             "const placed = layout(JSON.parse(process.argv[1])).placed;",
@@ -122,8 +120,13 @@ def test_the_same_snapshot_lays_out_the_same_way_however_the_nodes_arrive() -> N
     nodes = [
         {"id": "01T", "kind": "task", "state": "ready", "recorded_at": "2026-08-01", "band": 1},
         {"id": "01A", "kind": "agent", "state": "active", "recorded_at": "2026-08-03", "band": 1},
-        {"id": "01D", "kind": "delegation", "state": "succeeded",
-         "recorded_at": "2026-08-02", "band": 1},
+        {
+            "id": "01D",
+            "kind": "delegation",
+            "state": "succeeded",
+            "recorded_at": "2026-08-02",
+            "band": 1,
+        },
         {"id": "01B", "kind": "agent", "state": "retired", "recorded_at": "2026-08-01", "band": 0},
         {"id": "01C", "kind": "task", "state": "accepted", "recorded_at": "2026-07-30", "band": 1},
         {"id": "01E", "kind": "session", "state": "", "recorded_at": "2026-08-04", "band": 0},
@@ -268,8 +271,12 @@ def test_the_units_page_separates_the_four_pairs_an_operator_confuses() -> None:
     # The canonical names are the ledger's own spelling in BOTH languages: this
     # page's whole job is teaching that vocabulary, which is the opposite of
     # translating it away (item 20).
-    for pair in (("task", "thread"), ("agent", "session"),
-                 ("delegation", "task"), ("review", "verification")):
+    for pair in (
+        ("task", "thread"),
+        ("agent", "session"),
+        ("delegation", "task"),
+        ("review", "verification"),
+    ):
         stem = pair[0]
         for block in (english, russian):
             heading = _value(block, f"guide_ov_{stem}_h")
@@ -315,8 +322,14 @@ def test_a_mark_no_longer_promises_a_page_it_may_not_open() -> None:
 
     english, russian = _language_tables()
     marks = [
-        "gref_grants", "gref_context", "gref_turnover", "gref_accept",
-        "gref_link_type", "gref_skills", "gref_tools", "gref_run_states",
+        "gref_grants",
+        "gref_context",
+        "gref_turnover",
+        "gref_accept",
+        "gref_link_type",
+        "gref_skills",
+        "gref_tools",
+        "gref_run_states",
     ]
     for key in marks:
         assert _value(english, key).endswith("The full account is in the Overview.")

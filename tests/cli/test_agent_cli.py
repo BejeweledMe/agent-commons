@@ -32,6 +32,7 @@ _AUTOMATIC_LEVEL_WITHHELD = (
     "restored later in this branch"
 )
 
+
 def _invoke(runner: CliRunner, repo: Path, session_id: str, *args: str) -> Result:
     return runner.invoke(cli, ["--repo", str(repo), "--session-id", session_id, "--json", *args])
 
@@ -184,15 +185,24 @@ def test_requesting_auto_warns_that_the_level_is_withheld(
     result = workspace["runner"].invoke(
         cli,
         [
-            "--repo", str(workspace["repo"]),
-            "--session-id", workspace["human"]["session_id"],
-            "agent", "create",
-            "--name", "Autonomous?",
-            "--profile", "claude-builder",
-            "--rationale", "wants auto",
-            "--create-roles", "auto",
-            "--turnover-budget", "4",
-            "--idempotency-key", "auto-warn",
+            "--repo",
+            str(workspace["repo"]),
+            "--session-id",
+            workspace["human"]["session_id"],
+            "agent",
+            "create",
+            "--name",
+            "Autonomous?",
+            "--profile",
+            "claude-builder",
+            "--rationale",
+            "wants auto",
+            "--create-roles",
+            "auto",
+            "--turnover-budget",
+            "4",
+            "--idempotency-key",
+            "auto-warn",
         ],
     )
     assert result.exit_code == 0, result.output

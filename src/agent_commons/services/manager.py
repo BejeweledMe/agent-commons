@@ -639,9 +639,7 @@ class CommonsManager:
             }
         with SQLiteIndex(self.paths, self.events, self.manifests) as index:
             synchronized = asdict(index.sync())
-            results, match = index.search_events(
-                query, limit=limit, subject_kind=subject_kind
-            )
+            results, match = index.search_events(query, limit=limit, subject_kind=subject_kind)
         return {
             "query": query,
             "results": results,
@@ -1779,9 +1777,7 @@ class CommonsManager:
                 str(thread.get("effective_revision") or thread["revision"]),
                 resolution="accepted",
                 summary=f"confirmed role {created['entity_ref']['id']}",
-                idempotency_key=(
-                    f"{idempotency_key}:resolve" if idempotency_key else None
-                ),
+                idempotency_key=(f"{idempotency_key}:resolve" if idempotency_key else None),
             )
             return created
 
@@ -1841,9 +1837,7 @@ class CommonsManager:
         with self._canonical_write_lock():
             snapshot = self.snapshot()
             require_entity(snapshot, "agent", agent_id)
-            targets = (
-                [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
-            )
+            targets = [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
             targets = [identifier for identifier in targets if identifier in snapshot.agents]
             # Leaves-first: order by distance from the human root, deepest first,
             # so a role is always retired before the creator it reports to.

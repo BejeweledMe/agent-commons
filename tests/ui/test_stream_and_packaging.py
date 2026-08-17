@@ -241,7 +241,7 @@ def test_the_panel_never_records_an_acceptance_without_a_summary() -> None:
     assert 'document.getElementById("task-accept-summary").value.trim()' in accept
     guard = accept.index("accept_needs_summary")
     assert guard < accept.index('"/accept"'), "the summary guard must precede the write"
-    assert "return;" in accept[:guard + 200]
+    assert "return;" in accept[: guard + 200]
 
 
 def test_the_acceptance_refusals_are_humanised_without_losing_the_canonical_text() -> None:
@@ -409,9 +409,7 @@ def test_the_panels_field_refusal_shapes_still_match_what_the_domain_says(
         "acceptance_criteria": lambda: writable.create_task(
             title="t", description="d", acceptance_criteria=()
         ),
-        "name": lambda: writable.create_agent(
-            name="", profile_id="claude-builder", rationale="r"
-        ),
+        "name": lambda: writable.create_agent(name="", profile_id="claude-builder", rationale="r"),
         "rationale": lambda: writable.create_agent(
             name="n", profile_id="claude-builder", rationale=""
         ),
@@ -612,9 +610,7 @@ def test_the_onboarding_card_waits_for_a_hire_not_for_an_empty_graph(
 
     body = read_spa()
     assert "graph.nodes.length > 0 || !writesEnabled" not in body
-    render = body.split("function render(graph) {", 1)[1].split(
-        "function paintFocusChrome", 1
-    )[0]
+    render = body.split("function render(graph) {", 1)[1].split("function paintFocusChrome", 1)[0]
     assert 'node.kind === "agent" && !(node.attrs && node.attrs.template)' in render
     assert "hasHire || onboardingSetAside || !writesEnabled" in render
     # The card can now land over a board that already carries work, so it must
@@ -776,7 +772,7 @@ def test_the_panel_carries_a_language_toggle_that_persists() -> None:
     assert 'data-i18n="' in body
     assert 'data-i18n-placeholder="' in body
     assert "function applyI18n" in body
-    assert 'localStorage.getItem(LANG_KEY)' in body
+    assert "localStorage.getItem(LANG_KEY)" in body
     assert "localStorage.setItem(LANG_KEY, lang)" in body
 
 
@@ -843,7 +839,9 @@ def test_the_stream_pairs_a_sequence_with_the_graph_it_describes(context: UICont
 
 
 def test_every_stream_connection_receives_each_update_not_only_the_first(
-    context: UIContext, workspace, monkeypatch: pytest.MonkeyPatch  # type: ignore[no-untyped-def]
+    context: UIContext,
+    workspace,
+    monkeypatch: pytest.MonkeyPatch,  # type: ignore[no-untyped-def]
 ) -> None:
     """Round 2: refresh_if_changed is a one-shot consumer of a shared fingerprint,
     so whichever connection polled first after a write got the frame and the rest
@@ -1134,8 +1132,14 @@ def test_the_panel_uses_one_word_per_concept_in_each_language() -> None:
 
     # The glossary is a comment block ahead of the table it governs.
     glossary = body.split("// One thing, one word.", 1)[1].split("const STRINGS = {", 1)[0]
-    for concept in ("role           роль", "run            прогон", "skill          навык",
-                    "tool           инструмент", "task           задача", "board          доска"):
+    for concept in (
+        "role           роль",
+        "run            прогон",
+        "skill          навык",
+        "tool           инструмент",
+        "task           задача",
+        "board          доска",
+    ):
         assert concept in glossary, concept
     # And it states the one distinction that keeps a canonical name canonical:
     # the record keeps the ledger's word, the activity gets the human one.
@@ -1212,7 +1216,7 @@ def test_a_canonical_value_shown_to_a_person_carries_its_gloss() -> None:
     assert "glossed(state, STATE_GLOSS[state])" in status
 
     # The attention card, the acceptance line and the launch picker.
-    assert 'glossed(item.task_state, STATE_GLOSS[item.task_state])' in body
+    assert "glossed(item.task_state, STATE_GLOSS[item.task_state])" in body
     assert 'glossed(state, STATE_GLOSS[state]) : "—"' in body
     assert "glossed(task.state, STATE_GLOSS[task.state])" in body
 
@@ -1224,8 +1228,8 @@ def test_a_canonical_value_shown_to_a_person_carries_its_gloss() -> None:
     for fragment in (
         'fillSelect(document.getElementById("grant-" + name),\n'
         "      glossedOptions(levels, PICKER_GLOSS)",
-        'glossedOptions((catalog && catalog.context_modes)',
-        'glossedOptions(catalog.context_modes',
+        "glossedOptions((catalog && catalog.context_modes)",
+        "glossedOptions(catalog.context_modes",
         'glossedOptions(levels, PICKER_GLOSS),\n      held("hire-" + name, "deny"), false);',
     ):
         assert fragment in body, fragment
@@ -1251,7 +1255,7 @@ def test_a_canonical_value_shown_to_a_person_carries_its_gloss() -> None:
             assert len(short) < len(_value(block, f"gl_{token}")), (token, short)
     # And the long gloss still reaches the surfaces that have room: the summary
     # rows and the drawer read VALUE_GLOSS through `valueWithGloss`.
-    assert "return value ? glossed(value, VALUE_GLOSS[value]) : \"\";" in body
+    assert 'return value ? glossed(value, VALUE_GLOSS[value]) : "";' in body
 
     # A node card has no room for a sentence, so its gloss is the tooltip and the
     # visible line keeps the bare canonical state.  Both halves are pinned: a
@@ -1329,9 +1333,17 @@ def test_form_microcopy_says_what_the_operator_is_deciding() -> None:
 
     # What replaced them says what the role may DO, in a person's words.
     for block in (english, russian):
-        for key in ("create_roles_label", "retire_roles_label", "open_links_label",
-                    "hire_budget_label", "hire_context_label", "setting_tools_label",
-                    "setting_skills_label", "run_wall_label", "link_type_label"):
+        for key in (
+            "create_roles_label",
+            "retire_roles_label",
+            "open_links_label",
+            "hire_budget_label",
+            "hire_context_label",
+            "setting_tools_label",
+            "setting_skills_label",
+            "run_wall_label",
+            "link_type_label",
+        ):
             assert len(_value(block, key)) > 12, (key, _value(block, key))
     assert _value(english, "create_roles_label").startswith("May hire")
     assert _value(english, "retire_roles_label").startswith("May take")
@@ -1520,9 +1532,7 @@ def test_the_dock_survives_a_language_a_third_longer_than_english() -> None:
     assert "grid-template-columns:repeat(auto-fit,minmax(220px,1fr))" in body
     assert "#hire-modal .modal{width:min(560px,92vw)}" in body
     assert "*{box-sizing:border-box}" in body
-    fields = body.split(".field > input,.field > select,.field > textarea{", 1)[1].split(
-        "}", 1
-    )[0]
+    fields = body.split(".field > input,.field > select,.field > textarea{", 1)[1].split("}", 1)[0]
     assert "width:100%" in fields, fields
 
 
@@ -1550,9 +1560,7 @@ def test_a_radio_row_keeps_its_dot_beside_its_label() -> None:
     # The <br> spacers those rows used are gone with the class that replaced
     # them; a flex row does not need one, and one left behind would open a blank
     # line between every tool.
-    checklist = body.split("const checklist = document.getElementById", 1)[1].split(
-        "\n  }\n", 1
-    )[0]
+    checklist = body.split("const checklist = document.getElementById", 1)[1].split("\n  }\n", 1)[0]
     assert 'createElement("br")' not in checklist
 
 
@@ -1572,9 +1580,7 @@ def test_the_settings_tab_wears_its_glyph_in_css_not_in_its_label() -> None:
     assert _value(russian, "tab_settings") == "Настройки"
     assert 'data-i18n="tab_settings">Settings</button>' in body
 
-    glyph = body.split('.dock-tabs button[data-panel="settings"]::before{', 1)[1].split(
-        "}", 1
-    )[0]
+    glyph = body.split('.dock-tabs button[data-panel="settings"]::before{', 1)[1].split("}", 1)[0]
     assert 'content:"\\2699"' in glyph
     assert "line-height:1.2" in glyph
     assert "vertical-align:baseline" in glyph
@@ -1828,9 +1834,11 @@ def test_the_shell_collapses_below_the_breakpoint_and_fit_still_measures_it() ->
 def _guide_markup() -> str:
     """The Overview section, from its `<section>` to the next one."""
 
-    return read_spa().split('<section class="view" id="view-guide">', 1)[1].split(
-        "\n    </section>", 1
-    )[0]
+    return (
+        read_spa()
+        .split('<section class="view" id="view-guide">', 1)[1]
+        .split("\n    </section>", 1)[0]
+    )
 
 
 GUIDE_DEEP_PAGES = ("units", "agents", "tasks", "links", "limits", "catalog")
@@ -1880,9 +1888,7 @@ def test_every_guide_deep_link_lands_on_a_heading_that_actually_exists() -> None
 
     ids = set(re.findall(r'<h3 id="(g-[a-z-]+)"', guide))
     assert len(ids) >= 19, ids
-    links = re.findall(
-        r'data-guide-page="([a-z]+)"\s*\n?\s*data-guide-anchor="([a-z-]+)"', body
-    )
+    links = re.findall(r'data-guide-page="([a-z]+)"\s*\n?\s*data-guide-anchor="([a-z-]+)"', body)
     assert links, "no term in the panel links into the guide"
     assert {anchor for _, anchor in links} <= ids, {a for _, a in links} - ids
 
@@ -1899,9 +1905,9 @@ def test_every_guide_deep_link_lands_on_a_heading_that_actually_exists() -> None
     assert body.count("openGuide(") == 3
     assert 'const link = event.target.closest("[data-guide-anchor]");' in body
     opener = body.split("function openGuide(page, anchorId) {", 1)[1].split("\n}\n", 1)[0]
-    assert "viewShow(\"guide\");" in opener
+    assert 'viewShow("guide");' in opener
     assert "guideShowPage(page);" in opener
-    assert "heading.scrollIntoView({ block: \"start\" });" in opener
+    assert 'heading.scrollIntoView({ block: "start" });' in opener
     # A dialog is left through the guard Esc uses, never over typed work.
     assert "if (openModalId && !dismissOpenModal()) { return; }" in opener
     # The heading it lands on is marked, in CSS, for long enough to be seen.
@@ -1929,14 +1935,14 @@ def test_the_terms_an_operator_cannot_guess_carry_their_link_where_they_appear()
         "tools": body.split('id="view-tools"', 1)[1].split("\n    </section>", 1)[0],
     }
     for region, anchor in (
-        ("hire", "g-ag-memory"),      # context_mode
-        ("hire", "g-ag-lineage"),     # turnover_budget
+        ("hire", "g-ag-memory"),  # context_mode
+        ("hire", "g-ag-lineage"),  # turnover_budget
         ("settings", "g-ag-memory"),
         ("settings", "g-ct-skill"),
         ("settings", "g-ct-tools"),
-        ("link", "g-ln-record"),      # ask / handoff_work
+        ("link", "g-ln-record"),  # ask / handoff_work
         ("acceptance", "g-tk-accept"),
-        ("runs", "g-tk-run"),         # the run states
+        ("runs", "g-tk-run"),  # the run states
         ("skills", "g-ct-skill"),
         ("tools", "g-ct-tools"),
     ):
@@ -1953,7 +1959,7 @@ def test_the_terms_an_operator_cannot_guess_carry_their_link_where_they_appear()
 
     # Each mark is a control a screen reader can name, and its glyph is drawn in
     # CSS rather than carried as an untranslated character inside the chrome.
-    assert ".gref::before{content:\"?\"}" in body
+    assert '.gref::before{content:"?"}' in body
     english, russian = _language_tables()
     for key in re.findall(r'class="gref"[^>]*data-i18n-title="([a-z_]+)"', body):
         for block in (english, russian):
@@ -2141,10 +2147,7 @@ def test_the_role_rename_is_reachable_from_the_drawer_header() -> None:
     assert 'id="drawer-rename"' in head
     assert 'data-i18n-title="drawer_rename"' in head
     assert 'data-i18n-aria="drawer_rename"' in head
-    assert (
-        body.count('document.getElementById("drawer-rename").hidden = settingsTab.hidden;')
-        == 1
-    )
+    assert body.count('document.getElementById("drawer-rename").hidden = settingsTab.hidden;') == 1
     handler = body.split('document.getElementById("drawer-rename").addEventListener', 1)[1]
     handler = handler.split("});", 1)[0]
     assert 'showPanel("settings");' in handler

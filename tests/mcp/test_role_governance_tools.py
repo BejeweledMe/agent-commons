@@ -35,6 +35,7 @@ _AUTOMATIC_LEVEL_WITHHELD = (
     "restored later in this branch"
 )
 
+
 class FakeServer:
     def __init__(self, name: str) -> None:
         self.name = name

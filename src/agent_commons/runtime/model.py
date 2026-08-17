@@ -186,9 +186,7 @@ def _worker_tools(
     if not role_tools:
         return tools
     allowed = {str(name) for name in role_tools}
-    unknown = sorted(
-        allowed - {tool.removeprefix(_MCP_TOOL_PREFIX) for tool in tools}
-    )
+    unknown = sorted(allowed - {tool.removeprefix(_MCP_TOOL_PREFIX) for tool in tools})
     if unknown:
         raise ConfigurationError(
             "role tool selection is not part of this profile: " + ", ".join(unknown)
@@ -196,8 +194,7 @@ def _worker_tools(
     return tuple(
         tool
         for tool in tools
-        if tool in _CLAUDE_COMMONS_OUTCOME_TOOLS
-        or tool.removeprefix(_MCP_TOOL_PREFIX) in allowed
+        if tool in _CLAUDE_COMMONS_OUTCOME_TOOLS or tool.removeprefix(_MCP_TOOL_PREFIX) in allowed
     )
 
 
@@ -214,9 +211,7 @@ def profile_tool_summary() -> dict[str, dict[str, Any]]:
 
     values: dict[str, dict[str, Any]] = {}
     for profile_id in BuiltinProfileId:
-        purpose = (
-            "independent_review" if profile_id.independent_reviewer else "implementation"
-        )
+        purpose = "independent_review" if profile_id.independent_reviewer else "implementation"
         tools = _worker_tools(profile_id, purpose)
         values[profile_id.value] = {
             "purpose": purpose,

@@ -1311,9 +1311,7 @@ def agent_proposals(state: CLIState) -> None:
 def agent_approve(state: CLIState, thread_id: str, idempotency_key: str | None) -> None:
     """Create exactly the role a proposal asked for, crediting its proposer."""
 
-    state.emit(
-        state.manager().approve_agent_proposal(thread_id, idempotency_key=idempotency_key)
-    )
+    state.emit(state.manager().approve_agent_proposal(thread_id, idempotency_key=idempotency_key))
 
 
 @agent_group.command("list")

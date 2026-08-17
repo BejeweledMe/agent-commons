@@ -40,10 +40,7 @@ def _grant_grids(body: str) -> list[str]:
     opening tag is the block's own.
     """
 
-    return [
-        chunk.split("</div>", 1)[0]
-        for chunk in body.split('<div class="grants"')[1:]
-    ]
+    return [chunk.split("</div>", 1)[0] for chunk in body.split('<div class="grants"')[1:]]
 
 
 # --- finding 9: the chat and the task are two surfaces, with two names -------
@@ -236,8 +233,7 @@ def test_the_turnover_budget_is_marked_when_it_becomes_required() -> None:
     assert '["hire-create_roles", "hire-retire_roles"]' in paint
     assert '.some((id) => document.getElementById(id).value !== "deny")' in paint
     assert (
-        'document.getElementById("hire-budget-caption").classList.toggle("req", required);'
-        in paint
+        'document.getElementById("hire-budget-caption").classList.toggle("req", required);' in paint
     )
     assert 'document.getElementById("hire-budget-required").hidden = !required;' in paint
 

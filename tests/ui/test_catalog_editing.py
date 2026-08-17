@@ -23,7 +23,9 @@ from tests.ui.conftest import PORT, authorized
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
     from fastapi.testclient import TestClient
 
-    return TestClient(create_app(context, token="test-token", port=PORT), base_url=f"http://127.0.0.1:{PORT}")
+    return TestClient(
+        create_app(context, token="test-token", port=PORT), base_url=f"http://127.0.0.1:{PORT}"
+    )
 
 
 @pytest.fixture
@@ -222,10 +224,7 @@ def test_profile_tools_in_the_catalog_match_a_launch_bit_for_bit(
     for profile in BuiltinProfileId:
         entry = summary[profile.value]
         purpose = entry["purpose"]
-        launched = [
-            tool.removeprefix(_MCP_TOOL_PREFIX)
-            for tool in _worker_tools(profile, purpose)
-        ]
+        launched = [tool.removeprefix(_MCP_TOOL_PREFIX) for tool in _worker_tools(profile, purpose)]
         assert sorted(entry["fixed"] + entry["narrowable"]) == sorted(launched)
         # Outcome tools are how a role hands work back: they must all be fixed.
         assert entry["fixed"], profile.value
@@ -252,9 +251,7 @@ def test_a_granted_selection_the_next_launch_would_refuse_is_a_422_now(
     write_role_catalog(
         catalog_file,
         {
-            "skills": [
-                {"id": "pytest-runner", "title": "Pytest", "instruction": "run the tests"}
-            ],
+            "skills": [{"id": "pytest-runner", "title": "Pytest", "instruction": "run the tests"}],
             "tools": [],
         },
     )

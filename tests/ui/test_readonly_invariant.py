@@ -319,9 +319,7 @@ def test_each_mutating_route_lands_its_event_in_the_ledger(
     )
     assert retired.status_code == 200, retired.text
 
-    recorded = [
-        record.event["event_type"] for record in writable.writer().events.iter_events()
-    ]
+    recorded = [record.event["event_type"] for record in writable.writer().events.iter_events()]
     assert "agent.created" in recorded
     assert "agent.reconfigured" in recorded
     assert "thread.opened" in recorded and "thread.replied" in recorded
@@ -408,9 +406,7 @@ def test_agent_links_open_and_close_through_the_one_write_path(
     )
     assert closed.status_code == 200, closed.text
 
-    shown = writable_client.get(
-        "/api/entities/agent_link/" + link_id, headers=authorized()
-    )
+    shown = writable_client.get("/api/entities/agent_link/" + link_id, headers=authorized())
     assert shown.status_code == 200
     assert shown.json()["record"]["state"] == "closed"
 

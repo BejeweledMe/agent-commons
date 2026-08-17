@@ -50,12 +50,12 @@ def test_a_mark_inside_a_dialog_answers_in_place_instead_of_taking_the_form_away
     assert body.count('id="gpop"') == 1
     assert body.count('id="gpop-text"') == 1
     tail = body.split('id="close-link-modal"', 1)[1]
-    assert tail.index('id="gpop"') < tail.index('<script nonce'), "the popover is inside a dialog"
+    assert tail.index('id="gpop"') < tail.index("<script nonce"), "the popover is inside a dialog"
 
     # The delegate splits on where the mark is, and only there.
-    listener = body.split(
-        'const link = event.target.closest("[data-guide-anchor]");', 1
-    )[1].split("\n});", 1)[0]
+    listener = body.split('const link = event.target.closest("[data-guide-anchor]");', 1)[1].split(
+        "\n});", 1
+    )[0]
     assert "document.getElementById(openModalId).contains(link)" in listener
     assert "if (inDialog) { openGuidePopover(link); return; }" in listener
     assert "openGuide(link.dataset.guidePage, link.dataset.guideAnchor);" in listener
@@ -210,13 +210,9 @@ def test_the_hire_form_chooses_skills_in_the_settings_panel_s_own_words() -> Non
     # field, so it is matched for PLACEMENT only: the sentence stays verbatim
     # and lands under the picker instead of under the buttons.
     assert '[/^these skills are not in the operator catalogue: /, "skills"],' in body
-    place = body.split("function showFormError(error, fields, result) {", 1)[1].split(
-        "\n}\n", 1
-    )[0]
+    place = body.split("function showFormError(error, fields, result) {", 1)[1].split("\n}\n", 1)[0]
     assert "fields[refusedField(message)] || fields[refusedControl(message)]" in place
-    humanize = body.split("function humanizeError(error, fieldLabels) {", 1)[1].split(
-        "\n}\n", 1
-    )[0]
+    humanize = body.split("function humanizeError(error, fieldLabels) {", 1)[1].split("\n}\n", 1)[0]
     assert "refusedControl" not in humanize, "a precise refusal must not be rewritten as 'blank'"
     # Tools stay out of this form: narrowing needs the profile's tool reference,
     # which is loaded per role, and a hire has no role yet.  (The code, not the
@@ -254,9 +250,7 @@ def test_a_hire_carrying_a_skill_records_it_through_the_route_that_existed(
     write_role_catalog(
         catalog_file,
         {
-            "skills": [
-                {"id": "pytest-runner", "title": "Pytest", "instruction": "run the tests"}
-            ],
+            "skills": [{"id": "pytest-runner", "title": "Pytest", "instruction": "run the tests"}],
             "tools": [],
         },
     )

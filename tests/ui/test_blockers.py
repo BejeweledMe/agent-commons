@@ -387,7 +387,8 @@ def test_a_role_asking_the_operator_still_appears_in_the_queue(
 
 
 def test_a_role_holding_a_vanished_skill_is_flagged_before_any_run(
-    workspace: dict[str, Any], tmp_path,  # type: ignore[no-untyped-def]
+    workspace: dict[str, Any],
+    tmp_path,  # type: ignore[no-untyped-def]
 ) -> None:
     """Wave 1 item 8: the catalogue is an operator file and can be edited by
     hand, outside the panel. A role granted a skill the catalogue no longer
@@ -427,16 +428,12 @@ def test_a_role_holding_a_vanished_skill_is_flagged_before_any_run(
         state_root=workspace["state_root"],
         catalog_path=catalog_file,
     )
-    assert not [
-        item for item in context.attention()["items"] if item["kind"] == "config_broken"
-    ]
+    assert not [item for item in context.attention()["items"] if item["kind"] == "config_broken"]
 
     # The operator edits the file by hand and drops the skill.
     write_role_catalog(catalog_file, {"skills": [], "tools": []})
 
-    broken = [
-        item for item in context.attention()["items"] if item["kind"] == "config_broken"
-    ]
+    broken = [item for item in context.attention()["items"] if item["kind"] == "config_broken"]
     assert len(broken) == 1
     assert broken[0]["missing_skills"] == ["pytest-runner"]
     assert broken[0]["name"] == "Backend owner"

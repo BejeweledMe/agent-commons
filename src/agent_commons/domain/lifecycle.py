@@ -500,9 +500,7 @@ def acting_agent_id(snapshot: ProjectSnapshot, actor_session_id: str) -> str | N
     if not bound:
         return None
     live = [
-        delegation
-        for delegation in bound
-        if delegation.get("state") in {"active", "input_needed"}
+        delegation for delegation in bound if delegation.get("state") in {"active", "input_needed"}
     ]
     latest = max(live or bound, key=lambda delegation: str(delegation.get("id", "")))
     return str(latest["agent_id"])
@@ -651,9 +649,10 @@ def _validate_agent_creation(
                 f"a created role cannot add {field} entries its creator lacks: "
                 + ", ".join(widened)
             )
-    if CONTEXT_MODES[str(payload["context_mode"])] < CONTEXT_MODES[
-        str(creator.get("context_mode", "accumulated"))
-    ]:
+    if (
+        CONTEXT_MODES[str(payload["context_mode"])]
+        < CONTEXT_MODES[str(creator.get("context_mode", "accumulated"))]
+    ):
         raise LifecycleConflictError("a created role cannot weaken its creator's context isolation")
     # A missing budget is the narrowest case, not an unbounded one: payload
     # validation already refuses a role that may create or retire without one,
@@ -672,9 +671,7 @@ def _validate_agent_creation(
         )
     blocked = turnover_blockers(snapshot.agents, str(creator_id))
     if blocked:
-        raise LifecycleConflictError(
-            "role turnover budget is exhausted for: " + ", ".join(blocked)
-        )
+        raise LifecycleConflictError("role turnover budget is exhausted for: " + ", ".join(blocked))
 
 
 def _validate_agent_reconfiguration(
@@ -688,9 +685,11 @@ def _validate_agent_reconfiguration(
     acting = acting_agent_id(snapshot, actor_session_id)
     if acting is not None:
         raise LifecycleConflictError("a role's configuration is changed by a human, not by a role")
-    if "context_mode" in changes and CONTEXT_MODES[str(changes["context_mode"])] < CONTEXT_MODES[
-        str(current.get("context_mode", "accumulated"))
-    ]:
+    if (
+        "context_mode" in changes
+        and CONTEXT_MODES[str(changes["context_mode"])]
+        < CONTEXT_MODES[str(current.get("context_mode", "accumulated"))]
+    ):
         # Weakening isolation is the change a later "optimisation" makes by
         # accident, so it costs an explicit gate and a recorded reason.
         if payload.get("isolation_downgrade") is None:

@@ -79,9 +79,9 @@ def test_both_sides_of_the_link_are_fields_fed_by_one_candidate_list() -> None:
     assert 'node.kind === "agent" && node.state === "active"' not in links
 
     # The submit reads the controls, not a remembered pair.
-    submit = body.split(
-        'document.getElementById("link-open-go").addEventListener', 1
-    )[1].split("\n});", 1)[0]
+    submit = body.split('document.getElementById("link-open-go").addEventListener', 1)[1].split(
+        "\n});", 1
+    )[0]
     assert 'const fromId = document.getElementById("link-from").value;' in submit
     assert 'const toId = document.getElementById("link-to").value;' in submit
     assert "from_agent_id: fromId," in submit
@@ -128,9 +128,9 @@ def test_one_button_reverses_a_link_that_was_drawn_the_wrong_way() -> None:
     the operator has read a word of the dialog."""
 
     body = read_spa()
-    swap = body.split(
-        'document.getElementById("link-swap").addEventListener', 1
-    )[1].split("\n});", 1)[0]
+    swap = body.split('document.getElementById("link-swap").addEventListener', 1)[1].split(
+        "\n});", 1
+    )[0]
     assert "const held = from.value;" in swap
     assert "from.value = to.value;" in swap
     assert "to.value = held;" in swap
@@ -209,9 +209,9 @@ def test_the_highlight_during_the_drag_is_the_same_search_as_the_drop() -> None:
 
 def test_the_form_answers_a_blank_side_and_a_self_link_before_it_writes() -> None:
     body = read_spa()
-    submit = body.split(
-        'document.getElementById("link-open-go").addEventListener', 1
-    )[1].split("\n});", 1)[0]
+    submit = body.split('document.getElementById("link-open-go").addEventListener', 1)[1].split(
+        "\n});", 1
+    )[0]
 
     assert 'if (!fromId) { showFieldNote("link-from", t("link_needs_role")); return; }' in submit
     assert 'if (!toId) { showFieldNote("link-to", t("link_needs_role")); return; }' in submit
@@ -240,9 +240,9 @@ def test_an_already_open_permission_is_a_warning_and_never_a_veto() -> None:
     through, and the journal answers."""
 
     body = read_spa()
-    submit = body.split(
-        'document.getElementById("link-open-go").addEventListener', 1
-    )[1].split("\n});", 1)[0]
+    submit = body.split('document.getElementById("link-open-go").addEventListener', 1)[1].split(
+        "\n});", 1
+    )[0]
 
     # Remembered, and compared against, so the second press is not stopped again.
     assert 'const pair = fromId + "|" + toId + "|" + action;' in submit

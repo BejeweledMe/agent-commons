@@ -178,9 +178,7 @@ def session_agent_map(
     return {session_id: frozenset(agents) for session_id, agents in bindings.items()}
 
 
-def principals(
-    bindings: Mapping[str, frozenset[str]], session_ids: Iterable[str]
-) -> set[str]:
+def principals(bindings: Mapping[str, frozenset[str]], session_ids: Iterable[str]) -> set[str]:
     """Who a set of sessions really is.
 
     Independence is a property of the judge, not of the process that happened to

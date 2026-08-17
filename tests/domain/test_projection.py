@@ -1084,9 +1084,20 @@ def test_an_acceptance_superseded_by_a_reopen_is_history_not_a_live_claim() -> N
     )
 
     chain = [
-        created, started, completed, submitted, requested, approved, accepted_once,
-        reopened, restarted, recompleted, resubmitted,
-        requested_again, approved_again, accepted_again,
+        created,
+        started,
+        completed,
+        submitted,
+        requested,
+        approved,
+        accepted_once,
+        reopened,
+        restarted,
+        recompleted,
+        resubmitted,
+        requested_again,
+        approved_again,
+        accepted_again,
     ]
     snapshot = project_events(chain)
     # The second acceptance lands and NOTHING in the chain is rejected: the
@@ -1119,9 +1130,7 @@ def test_an_acceptance_superseded_by_a_reopen_is_history_not_a_live_claim() -> N
     )
     corrected_snapshot = project_events([*chain, corrected_first])
     assert corrected_snapshot.tasks[task_id]["state"] == "accepted"
-    assert corrected_snapshot.issues == [], [
-        issue.message for issue in corrected_snapshot.issues
-    ]
+    assert corrected_snapshot.issues == [], [issue.message for issue in corrected_snapshot.issues]
     assert ("event", accepted_once["event_id"]) not in corrected_snapshot.stale_refs
 
     # And the guard still bites where it must: the LIVE acceptance loses its

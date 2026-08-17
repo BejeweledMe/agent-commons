@@ -119,9 +119,7 @@ def test_a_fresh_task_walks_to_review_and_opens_an_independent_request(
     assert shown.status_code == 200
     assert shown.json()["record"]["state"] == "review"
 
-    review = writable_client.get(
-        f"/api/entities/review/{chain['review_id']}", headers=authorized()
-    )
+    review = writable_client.get(f"/api/entities/review/{chain['review_id']}", headers=authorized())
     assert review.status_code == 200, review.text
     record = review.json()["record"]
     assert record["state"] == "requested"
@@ -349,7 +347,8 @@ def test_finished_work_waits_in_attention_until_somebody_accepts_it(
 
 
 def test_the_ledger_says_which_of_the_two_claims_this_was(
-    writable_client, workspace: dict[str, Any]  # type: ignore[no-untyped-def]
+    writable_client,
+    workspace: dict[str, Any],  # type: ignore[no-untyped-def]
 ) -> None:
     """`complete_task` asserts the work is done, and there are two ways to
     arrive at it: a run finished, or the operator judged it done by hand. Both

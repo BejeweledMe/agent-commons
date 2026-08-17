@@ -25,6 +25,7 @@ _AUTOMATIC_LEVEL_WITHHELD = (
     "restored later in this branch"
 )
 
+
 def _writer(workspace: dict[str, Any], suffix: str) -> CommonsManager:
     manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
     session = manager.start_session(

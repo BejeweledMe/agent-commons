@@ -211,9 +211,7 @@ def _shed(
 
 #: Thread kinds that are an agent asking a human to decide something, rather
 #: than agents talking among themselves.
-_HUMAN_DECISION_THREADS = frozenset(
-    {"decision_request", "question", "help_request", "proposal"}
-)
+_HUMAN_DECISION_THREADS = frozenset({"decision_request", "question", "help_request", "proposal"})
 
 #: A recipient that means the human is being asked, not a role.
 _HUMAN_RECIPIENTS = frozenset({"operator", "*"})

@@ -334,12 +334,13 @@ def test_the_hire_form_states_who_the_new_role_answers_to() -> None:
     # own chat reaching every role; `hire_chain_note` is the sentence above.  A
     # fifth claim of rank has to justify itself here before it reaches a screen.
     claims = {
-        line.strip().split(":", 1)[0]
-        for line in russian.split("\n")
-        if "подчин" in line.lower()
+        line.strip().split(":", 1)[0] for line in russian.split("\n") if "подчин" in line.lower()
     }
     assert claims == {
-        "band_operator", "session_you_tip", "chat_empty_writable", "hire_chain_note"
+        "band_operator",
+        "session_you_tip",
+        "chat_empty_writable",
+        "hire_chain_note",
     }, claims
     # The one rank flag the panel draws is read off the node the server sent and
     # is never assembled here: `reports_to_operator` is computed in ui/graph.py
@@ -347,7 +348,7 @@ def test_the_hire_form_states_who_the_new_role_answers_to() -> None:
     assert set(re.findall(r"(\w*\.)?reports_to_operator", body)) == {"node."}
     # The lineage field is READ in one place -- the drawer, off the record the
     # server sent -- and written nowhere: no hire payload carries it.
-    assert 'body.created_by_agent_id' not in body
+    assert "body.created_by_agent_id" not in body
     hire = _function(body, "async function hireRole() {")
     assert "created_by" not in hire
 
@@ -364,7 +365,7 @@ def test_the_link_after_a_hire_is_a_button_and_not_a_second_request() -> None:
     assert hire.count("post(") == 1
     assert 'await post("/api/agents", body)' in hire
     assert "openLinkModal" not in hire, "the hire must not open the link itself"
-    assert 'if (!hireTemplate) { offerLinkFrom(newId, hiredName || newId); }' in hire
+    assert "if (!hireTemplate) { offerLinkFrom(newId, hiredName || newId); }" in hire
 
     offer = _function(body, "function offerLinkFrom(agentId, name) {")
     assert 'openLinkModal(agentId, "");' in offer

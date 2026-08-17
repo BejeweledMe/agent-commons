@@ -199,9 +199,7 @@ def _apply(
     # the authorship of record for every kind that has no curated author list of
     # its own.
     authors = {
-        str(session_id)
-        for session_id in current.get("author_session_ids", [])
-        if str(session_id)
+        str(session_id) for session_id in current.get("author_session_ids", []) if str(session_id)
     }
     actor_session = str((event.get("actor") or {}).get("session_id", ""))
     if actor_session:

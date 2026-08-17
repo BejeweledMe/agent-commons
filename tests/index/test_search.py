@@ -56,8 +56,15 @@ def workspace(tmp_path: Path) -> dict[str, Any]:
 def _search(workspace: dict[str, Any], *args: str) -> dict[str, Any]:
     result = CliRunner().invoke(
         cli,
-        ["--repo", str(workspace["repo"]), "--session-id", workspace["session_id"], "--json",
-         "search", *args],
+        [
+            "--repo",
+            str(workspace["repo"]),
+            "--session-id",
+            workspace["session_id"],
+            "--json",
+            "search",
+            *args,
+        ],
     )
     assert result.exit_code == 0, result.output
     return json.loads(result.output)

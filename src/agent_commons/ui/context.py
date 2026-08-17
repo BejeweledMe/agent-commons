@@ -411,9 +411,8 @@ class UIContext:
         return {
             "schema": CATALOG_SCHEMA,
             "editable_here": editable,
-            "operator_owned": ["profiles"] + (
-                [] if self.catalog_editing_enabled else list(CATALOG_SECTIONS)
-            ),
+            "operator_owned": ["profiles"]
+            + ([] if self.catalog_editing_enabled else list(CATALOG_SECTIONS)),
             "catalog_editing_enabled": self.catalog_editing_enabled,
             "catalog_path": str(self._catalog_path) if self._catalog_path else None,
             "profiles": sorted(PROFILE_NARROWING),
@@ -439,8 +438,7 @@ class UIContext:
     def _require_catalog_editing(self) -> Path:
         if not self.catalog_editing_enabled:
             raise ConfigurationError(
-                "catalogue editing is off; restart with --role-catalog and "
-                "--enable-catalog-editing"
+                "catalogue editing is off; restart with --role-catalog and --enable-catalog-editing"
             )
         # Not an assert: catalog_editing_enabled already guarantees a path, but
         # `python -O` strips assertions, and a stripped guard here would let
@@ -489,9 +487,7 @@ class UIContext:
         # next launch, far from the click that caused it.
         users = self._catalog_users(section, entry_id)
         if users:
-            raise ValidationError(
-                f"{entry_id} is required by active roles: " + ", ".join(users)
-            )
+            raise ValidationError(f"{entry_id} is required by active roles: " + ", ".join(users))
         catalogue = load_role_catalog(path, workspace_root=self.repo)
         catalogue[section] = [item for item in catalogue[section] if item["id"] != entry_id]
         write_role_catalog(path, catalogue, workspace_root=self.repo)
@@ -533,9 +529,7 @@ class UIContext:
             operations = ()
         # Scopes store a deterministic pseudonym, not the registry session id,
         # so the comparison has to be made in the same space.
-        answerable = (
-            _participant_id(str(self.writer_session_id)) if self.writer_session_id else ""
-        )
+        answerable = _participant_id(str(self.writer_session_id)) if self.writer_session_id else ""
         found = []
         for record in operations:
             if record.get("state") not in {"open", "replied"}:
@@ -725,14 +719,15 @@ class UIContext:
         if selected_tools and profile_id:
             summary = profile_tool_summary().get(str(profile_id))
             if summary is not None:
-                available = set(summary["fixed"]) | set(summary["narrowable"]) | set(
-                    summary["grant_tools"].values()
+                available = (
+                    set(summary["fixed"])
+                    | set(summary["narrowable"])
+                    | set(summary["grant_tools"].values())
                 )
                 outside = sorted(set(selected_tools) - available)
                 if outside:
                     raise ValidationError(
-                        "role tool selection is not part of this profile: "
-                        + ", ".join(outside)
+                        "role tool selection is not part of this profile: " + ", ".join(outside)
                     )
 
     def create_agent(self, *, from_preset_id: str | None = None, **fields: Any) -> dict[str, Any]:
@@ -862,9 +857,7 @@ class UIContext:
                     # entity route) — the PM run could not find any result
                     # without opening raw JSON (finding 4).
                     "summary": (
-                        str(delegation.get("summary"))[:500]
-                        if delegation.get("summary")
-                        else None
+                        str(delegation.get("summary"))[:500] if delegation.get("summary") else None
                     ),
                 }
             )

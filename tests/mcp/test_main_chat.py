@@ -232,13 +232,27 @@ def test_the_chat_is_reachable_from_the_command_line(workspace: dict[str, Any]) 
     _architects(workspace)
     runner = CliRunner()
     base = [
-        "--repo", str(workspace["repo"]), "--state-root", str(workspace["state_root"]),
-        "--session-id", workspace["human"].session_id, "--json",
+        "--repo",
+        str(workspace["repo"]),
+        "--state-root",
+        str(workspace["state_root"]),
+        "--session-id",
+        workspace["human"].session_id,
+        "--json",
     ]
     opened = runner.invoke(
         cli,
-        [*base, "chat", "open", "--subject", "Ship it", "--message", "Here is the task.",
-         "--idempotency-key", "cli-chat"],
+        [
+            *base,
+            "chat",
+            "open",
+            "--subject",
+            "Ship it",
+            "--message",
+            "Here is the task.",
+            "--idempotency-key",
+            "cli-chat",
+        ],
     )
     assert opened.exit_code == 0, opened.output
 

@@ -139,8 +139,16 @@ def test_catalogue_editing_is_a_separate_switch_from_role_writes(
     result = CliRunner().invoke(
         cli,
         [
-            "--repo", str(repo), "--session-id", _session(repo), "--json", "ui",
-            "--no-browser", "--enable-writes", "--role-catalog", str(catalogue),
+            "--repo",
+            str(repo),
+            "--session-id",
+            _session(repo),
+            "--json",
+            "ui",
+            "--no-browser",
+            "--enable-writes",
+            "--role-catalog",
+            str(catalogue),
         ],
     )
 
