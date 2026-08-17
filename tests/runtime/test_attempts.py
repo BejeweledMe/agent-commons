@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import stat
+import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -102,6 +104,20 @@ def test_attempt_reservation_is_private_atomic_and_idempotent(tmp_path: Path) ->
         )
 
 
+def _dead_pid() -> int:
+    """A pid that belonged to a real process which has already exited.
+
+    A hardcoded number gambles on the host: pid 123 is a live system daemon on
+    GitHub's macOS runners, and reconcile honestly refuses to terminalize an
+    attempt whose recorded process still answers `kill -0`.  A just-reaped
+    child is the one pid the OS is least likely to hand out again immediately.
+    """
+
+    probe = subprocess.Popen([sys.executable, "-c", ""])
+    probe.wait()
+    return probe.pid
+
+
 def test_attempt_lifecycle_reconcile_and_retry_are_bounded(tmp_path: Path) -> None:
     store = AttemptStore(tmp_path / "state", clock=Clock())
     parent, _ = policies()
@@ -111,13 +127,14 @@ def test_attempt_lifecycle_reconcile_and_retry_are_bounded(tmp_path: Path) -> No
         AttemptState.LAUNCHING,
         reason="process_starting",
     )
+    dead_pid = _dead_pid()
     running = store.transition(
         launching.attempt_id,
         AttemptState.RUNNING,
         reason="process_started",
-        pid=123,
+        pid=dead_pid,
     )
-    assert running.pid == 123
+    assert running.pid == dead_pid
 
     reconciled = store.reconcile()
     assert reconciled[0].state is AttemptState.NEEDS_OPERATOR

@@ -75,9 +75,13 @@ def _options(lang: str, profiles: list[str], info: dict[str, object]) -> list[di
     """The real `profileOptions`, over the real tables, under node."""
 
     body = read_spa()
+    # The script travels over stdin, not as an argv element: it embeds the
+    # whole STRINGS table, which has outgrown Linux's 128 KiB per-argument
+    # ceiling (E2BIG on the CI runners).  With a stdin program node spells
+    # argv as [node, "-", ...args], so the user arguments start at index 2.
     harness = "\n".join(
         [
-            "let lang = process.argv[1];",
+            "let lang = process.argv[2];",
             # The tables themselves, so the sentence under test is the sentence
             # an operator reads and not a fixture that agrees with it.
             "const STRINGS = {"
@@ -89,12 +93,13 @@ def _options(lang: str, profiles: list[str], info: dict[str, object]) -> list[di
             + body.split("const PROFILE_PROVIDER = {", 1)[1].split("};", 1)[0]
             + "};",
             _function(body, "function profileOptions(profiles, info) {"),
-            "const argv = JSON.parse(process.argv[2]);",
+            "const argv = JSON.parse(process.argv[3]);",
             "console.log(JSON.stringify(profileOptions(argv.profiles, argv.info)));",
         ]
     )
     done = subprocess.run(
-        ["node", "-e", harness, "--", lang, json.dumps({"profiles": profiles, "info": info})],
+        ["node", "-", lang, json.dumps({"profiles": profiles, "info": info})],
+        input=harness,
         capture_output=True,
         text=True,
         check=True,
