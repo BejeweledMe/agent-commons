@@ -67,10 +67,13 @@ not preferences; treat them as part of the definition of done.
   string you know is present) before trusting any "no matches" answer.
 - Scripts fed to node must travel over stdin, not as an argv element: Linux
   enforces a 128 KiB per-argument ceiling and the embedded STRINGS table is
-  already past it.
-- Tests must not hardcode pids or assume one is free; GitHub's macOS runners
-  keep a live daemon at pid 123. Spawn and reap a child when a dead pid is
-  needed.
+  already past it. A stdin program finds its first user argument at
+  `process.argv[2]`.
+- Tests must never ASSUME a hardcoded pid is dead or free: GitHub's macOS
+  runners keep a live daemon at pid 123, and a liveness probe will honestly
+  report it alive. Where deadness matters, spawn and reap a child and use its
+  pid. A pid stored as inert metadata (a recorded ProcessResult, a fixture
+  field nothing probes) is fine.
 
 ### The workspace CLI
 

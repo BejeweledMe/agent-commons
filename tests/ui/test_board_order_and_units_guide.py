@@ -100,7 +100,10 @@ def test_the_same_snapshot_lays_out_the_same_way_however_the_nodes_arrive() -> N
             + body.split("const BAND_KIND_ORDER", 1)[1].split("function layout(nodes) {", 1)[0],
             _function(body, "function bandColumns(count) {"),
             _function(body, "function layout(nodes) {"),
-            "const placed = layout(JSON.parse(process.argv[1])).placed;",
+            # The script travels over stdin like every node harness here (the
+            # repo rule exists because argv elements cap at 128 KiB on Linux);
+            # a stdin program finds its first user argument at index 2.
+            "const placed = layout(JSON.parse(process.argv[2])).placed;",
             # A Map keeps insertion order, and insertion order IS the order the
             # comparator produced -- so this carries both the coordinates and
             # the sequence, and a shuffle has to reproduce both.
@@ -110,7 +113,8 @@ def test_the_same_snapshot_lays_out_the_same_way_however_the_nodes_arrive() -> N
 
     def place(nodes: list[dict[str, object]]) -> object:
         done = subprocess.run(
-            ["node", "-e", harness, "--", json.dumps(nodes)],
+            ["node", "-", json.dumps(nodes)],
+            input=harness,
             capture_output=True,
             text=True,
             check=True,
