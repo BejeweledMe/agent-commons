@@ -1200,7 +1200,7 @@ def build_server(
         target_profile: str,
         purpose: str,
         idempotency_key: str,
-        max_depth: int = 1,
+        max_depth: int = 0,
         wall_time_seconds: int = 1800,
         max_attempts: int = 1,
         max_concurrency: int = 1,
@@ -1210,8 +1210,9 @@ def build_server(
     ) -> dict[str, Any]:
         """Request bounded work against an exact target revision.
 
-        This records intent only.  Launching remains a separate broker action,
-        and the supplied idempotency key must be stable for identical retries.
+        This records one leaf only: max_depth must be zero because workers do
+        not receive child-delegation tools. Launching remains a separate broker
+        action, and the supplied idempotency key must be stable for retries.
         """
 
         limits = {

@@ -11,12 +11,13 @@ from agent_commons.cli import cli
 from agent_commons.services import CommonsManager
 
 LIMITS = {
-    "max_depth": 1,
+    "max_depth": 0,
     "wall_time_seconds": 600,
     "max_attempts": 1,
     "max_concurrency": 1,
     "budget": {"unit": "tokens", "limit": 8000},
 }
+UNSUPPORTED_CHILD_LIMITS = {**LIMITS, "max_depth": 1}
 BOUNDED_LIMITS = {
     "max_depth": 0,
     "wall_time_seconds": 600,
@@ -86,6 +87,36 @@ def test_cli_delegation_create_help_has_a_complete_bounded_limits_example() -> N
     assert "Complete bounded limits example (copy/paste):" in result.output
     assert f"--limits-json '{example}'" in result.output
     assert json.loads(example) == BOUNDED_LIMITS
+
+
+def test_new_delegations_reject_unimplemented_child_depth(tmp_path: Path) -> None:
+    repo, manager, parent, _ = _workspace(tmp_path)
+    task = _task(manager, "cli-leaf-only-target")
+
+    result = _invoke(
+        CliRunner(),
+        repo,
+        parent["session_id"],
+        "delegation",
+        "create",
+        "--target-ref",
+        f"task:{task['entity_ref']['id']}",
+        "--target-revision",
+        task["revision"],
+        "--target-profile",
+        "claude-builder",
+        "--purpose",
+        "implementation",
+        "--limits-json",
+        json.dumps(UNSUPPORTED_CHILD_LIMITS),
+        "--idempotency-key",
+        "cli-leaf-only-create",
+    )
+
+    assert result.exit_code != 0, result.output
+    assert "max_depth > 0 is not supported" in result.output
+    assert "set max_depth to 0" in result.output
+    assert manager.list_delegations() == []
 
 
 def test_human_delegation_create_prints_safe_requester_launch_commands(tmp_path: Path) -> None:

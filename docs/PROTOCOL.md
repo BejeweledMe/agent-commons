@@ -192,10 +192,11 @@ included in the launch-plan fingerprint; the child session is re-opened through
 that same root before provider startup. An external `--state-root` therefore
 cannot silently fall back to repository-local operational state.
 The delegation carries hard depth, wall-time, attempt, concurrency, and budget
-limits. Descendants can only reduce those limits, an active child may create
-only correctly linked descendants, and the default operating depth is one.
-Do not create recursive Codex/Claude ping-pong or use a second client to escape
-lineage and budget accounting.
+limits. The current supported writer accepts only `max_depth: 0`: every new
+delegation is one leaf worker, and worker profiles receive no delegation-create
+or broker-run tools. The ledger continues to replay older parent/child records,
+but new recursive Codex/Claude chains are rejected until parent-sliced budgets,
+fanout accounting, and worker authority are implemented together.
 
 Those request limits never define their own global authority. Every broker using
 one state root shares operator-owned global, per-provider, per-profile,

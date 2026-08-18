@@ -1134,6 +1134,7 @@ _BOUNDED_DELEGATION_LIMITS_EXAMPLE = (
 )
 _DELEGATION_CREATE_HELP = (
     "Create a requested delegation bound to one exact target revision.\n\n\b\n"
+    "This release launches leaf workers only: max_depth must be 0.\n\n\b\n"
     "Complete bounded limits example (copy/paste):\n"
     f"  --limits-json '{_BOUNDED_DELEGATION_LIMITS_EXAMPLE}'"
 )
@@ -1152,7 +1153,7 @@ def delegation_group() -> None:
 @click.option(
     "--limits-json",
     required=True,
-    help="Bounded depth, time, attempt, concurrency, and provider budget object.",
+    help="Bounded time, attempt, concurrency, provider budget, and max_depth=0 object.",
 )
 @click.option("--parent-delegation-id")
 @click.option(

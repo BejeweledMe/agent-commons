@@ -95,8 +95,8 @@ that the bytes match the exact registered artifacts/evidence bound to the
 subject revision; otherwise the reviewer gets a quiescent worktree or immutable
 snapshot. Before delegating writable work, the parent also obtains the relevant
 claims and stops writing
-the transferred paths. The first rollout defaults to depth one and one writable
-worker in a checkout. An independent reviewer receives a read-only provider
+the transferred paths. The current rollout accepts only `max_depth: 0`: one
+leaf worker in a checkout, with no child-delegation authority. An independent reviewer receives a read-only provider
 profile and an immutable worker-scoped MCP limited to its own delegation,
 review/outcome, and bounded repository list/read/literal-search. It receives no
 native filesystem, edit, shell, web, subagent, runtime, or delegation-creation

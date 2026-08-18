@@ -19,7 +19,7 @@ from agent_commons.errors import LifecycleConflictError
 from agent_commons.services import CommonsManager
 
 LIMITS = {
-    "max_depth": 1,
+    "max_depth": 0,
     "wall_time_seconds": 600,
     "max_attempts": 1,
     "max_concurrency": 1,
@@ -363,15 +363,10 @@ def test_acceptance_refuses_a_review_from_the_role_that_did_the_work(
         )
 
 
-def test_a_role_cannot_staff_a_run_with_a_role_it_did_not_create(
+def test_a_bound_worker_cannot_staff_any_follow_on_run(
     workspace: dict[str, Any],
 ) -> None:
-    """Acting for a role is holding its authority, so naming one is a privilege.
-
-    Without this, any session able to open a delegation could name the most
-    privileged role in the workspace and hand a session of its choosing
-    everything that role may do.
-    """
+    """A leaf worker cannot escape its bound run through a new root request."""
 
     operator: CommonsManager = workspace["operator"]
     privileged = operator.create_agent(
@@ -395,7 +390,7 @@ def test_a_role_cannot_staff_a_run_with_a_role_it_did_not_create(
         acceptance_criteria=("done",),
         idempotency_key="staff-task",
     )
-    parent = _bind_run(
+    _bind_run(
         workspace,
         agent_id=modest["entity_ref"]["id"],
         worker=worker,
@@ -414,30 +409,27 @@ def test_a_role_cannot_staff_a_run_with_a_role_it_did_not_create(
         acceptance_criteria=("done",),
         idempotency_key="staff-follow-task",
     )
-    with pytest.raises(LifecycleConflictError, match="may staff only itself"):
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
         worker.create_delegation(
             target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
             target_revision=follow_on["revision"],
             target_profile="claude-builder",
             purpose="implementation",
             limits=LIMITS,
-            parent_delegation_id=parent["entity_ref"]["id"],
             on_behalf_of_agent_id=privileged["entity_ref"]["id"],
             idempotency_key="staff-reach",
         )
 
-    # Its own role is still fine, which is what keeps multi-step work possible.
-    allowed = worker.create_delegation(
-        target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
-        target_revision=follow_on["revision"],
-        target_profile="claude-builder",
-        purpose="implementation",
-        limits=LIMITS,
-        parent_delegation_id=parent["entity_ref"]["id"],
-        on_behalf_of_agent_id=modest["entity_ref"]["id"],
-        idempotency_key="staff-own",
-    )
-    assert allowed["event_type"] == "delegation.requested"
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
+        worker.create_delegation(
+            target_ref={"kind": "task", "id": follow_on["entity_ref"]["id"]},
+            target_revision=follow_on["revision"],
+            target_profile="claude-builder",
+            purpose="implementation",
+            limits=LIMITS,
+            on_behalf_of_agent_id=modest["entity_ref"]["id"],
+            idempotency_key="staff-own",
+        )
 
 
 def test_a_human_window_may_still_staff_any_active_role(workspace: dict[str, Any]) -> None:
@@ -468,15 +460,10 @@ def test_a_human_window_may_still_staff_any_active_role(workspace: dict[str, Any
     assert created["event_type"] == "delegation.requested"
 
 
-def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
+def test_a_handoff_link_does_not_reenable_worker_delegation(
     workspace: dict[str, Any],
 ) -> None:
-    """The typed action earns its keep: it grants exactly the refused thing.
-
-    Before the link the same call is refused, after it the same call succeeds,
-    and an `ask` link does not do it -- which is why the record carries an
-    action rather than an open/closed flag.
-    """
+    """A staffing link cannot widen a leaf worker into an orchestrator."""
 
     operator: CommonsManager = workspace["operator"]
     backend = operator.create_agent(
@@ -498,7 +485,7 @@ def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
         acceptance_criteria=("done",),
         idempotency_key="link-task",
     )
-    parent = _bind_run(
+    _bind_run(
         workspace,
         agent_id=backend["entity_ref"]["id"],
         worker=worker,
@@ -522,12 +509,11 @@ def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
             target_profile="claude-builder",
             purpose="implementation",
             limits=LIMITS,
-            parent_delegation_id=parent["entity_ref"]["id"],
             on_behalf_of_agent_id=frontend["entity_ref"]["id"],
             idempotency_key=key,
         )
 
-    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
         hand_over("link-before")
 
     # An `ask` link is a different grant and does not widen staffing.
@@ -539,7 +525,7 @@ def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
         reason="one bounded question",
         idempotency_key="link-ask",
     )
-    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
         hand_over("link-with-ask")
     operator.close_agent_link(
         asking["entity_ref"]["id"],
@@ -556,7 +542,8 @@ def test_a_handoff_link_is_what_widens_staffing_beyond_a_lineage(
         reason="the frontend half is theirs",
         idempotency_key="link-handoff",
     )
-    assert hand_over("link-after")["event_type"] == "delegation.requested"
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
+        hand_over("link-after")
 
 
 def test_closing_the_link_takes_the_widening_back(workspace: dict[str, Any]) -> None:
@@ -594,7 +581,7 @@ def test_closing_the_link_takes_the_widening_back(workspace: dict[str, Any]) -> 
         acceptance_criteria=("done",),
         idempotency_key="revoke-task",
     )
-    parent = _bind_run(
+    _bind_run(
         workspace,
         agent_id=backend["entity_ref"]["id"],
         worker=worker,
@@ -604,14 +591,13 @@ def test_closing_the_link_takes_the_widening_back(workspace: dict[str, Any]) -> 
         purpose="implementation",
         key="revoke-run",
     )
-    with pytest.raises(LifecycleConflictError, match="handoff_work link"):
+    with pytest.raises(LifecycleConflictError, match="cannot escape its lineage"):
         worker.create_delegation(
             target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
             target_revision=task["revision"],
             target_profile="claude-builder",
             purpose="implementation",
             limits=LIMITS,
-            parent_delegation_id=parent["entity_ref"]["id"],
             on_behalf_of_agent_id=frontend["entity_ref"]["id"],
             idempotency_key="revoke-attempt",
         )

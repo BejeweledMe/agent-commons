@@ -288,7 +288,7 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "claude-independent-reviewer",
         "independent_review",
         "review-task-01",
-        1,
+        0,
         600,
         1,
         1,
@@ -301,7 +301,7 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "id": "task.01K00000000000000000000000",
     }
     assert created["limits"] == {
-        "max_depth": 1,
+        "max_depth": 0,
         "wall_time_seconds": 600,
         "max_attempts": 1,
         "max_concurrency": 1,
@@ -390,6 +390,7 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
         "idempotency_key",
     }
     assert "command" not in request_schema["properties"]
+    assert request_schema["properties"]["max_depth"]["default"] == 0
     assert "environment" not in request_schema["properties"]
     assert "prompt" not in request_schema["properties"]
     reply_schema = by_name["commons_reply_to_input"].model_dump()["inputSchema"]

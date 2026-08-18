@@ -1548,6 +1548,12 @@ class CommonsManager:
         on_behalf_of_agent_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        max_depth = limits.get("max_depth")
+        if isinstance(max_depth, int) and not isinstance(max_depth, bool) and max_depth > 0:
+            raise ValidationError(
+                "max_depth > 0 is not supported: delegated workers cannot create or run child "
+                "delegations in the current release; set max_depth to 0 for one bounded leaf"
+            )
         key = self._idempotency_key("delegation.requested", idempotency_key)
         delegation_id = self._new_entity_id("delegation", "delegation.requested", key)
         session = self._active_session()

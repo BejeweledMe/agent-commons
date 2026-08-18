@@ -11,7 +11,7 @@ from agent_commons.ui.context import UIContext
 from tests.ui.conftest import authorized
 
 LIMITS = {
-    "max_depth": 1,
+    "max_depth": 0,
     "wall_time_seconds": 600,
     "max_attempts": 1,
     "max_concurrency": 1,

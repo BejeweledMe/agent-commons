@@ -287,12 +287,14 @@ ceiling; Commons neither selects the account nor changes its billing.
 
 ### Recursive delegation and resource exhaustion
 
-Agents may create a Codex-to-Claude-to-Codex loop, evade limits through another
-client, flood the queue, or consume unbounded time and provider budget. Every
-delegation records parent, root, and depth; self/ancestor targets are rejected;
-depth, concurrency, attempts, wall time, and provider budget are bounded and
-cannot be widened by descendants. Broker-global and per-profile ceilings still
-apply, and the initial rollout defaults to depth one.
+Recursive workers would create a Codex-to-Claude-to-Codex loop, evade limits
+through another client, flood the queue, or consume budget that no parent
+actually sliced. The ledger can replay parent, root, and depth for older
+records, but the supported creation path now requires `max_depth: 0` and worker
+profiles expose no delegation-creation or broker-run tools. Broker-global and
+per-profile ceilings still apply to every leaf. Recursive execution remains
+disabled until budget partitioning, total fanout accounting, and worker
+authority are enforced as one contract.
 
 ### False consensus and circular review
 

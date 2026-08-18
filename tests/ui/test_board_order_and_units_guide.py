@@ -390,6 +390,10 @@ def test_the_reference_pages_explain_their_terms_instead_of_assuming_them() -> N
     assert "не теми сессиями" in _value(russian, "guide_tk_accept_p")
     assert "it is not money" in _value(english, "guide_lm_two_p")
     assert "не деньги" in _value(russian, "guide_lm_two_p")
+    assert "requires max_depth 0" in _value(english, "guide_lm_two_p")
+    assert "требует max_depth 0" in _value(russian, "guide_lm_two_p")
+    assert "cannot spawn children" in _value(english, "guide_ov_rank_p")
+    assert "не могут порождать дочерние" in _value(russian, "guide_ov_rank_p")
 
     # The run's card, not the run's "node": the form speaks in board words.
     assert "card" in _value(english, "run_note")

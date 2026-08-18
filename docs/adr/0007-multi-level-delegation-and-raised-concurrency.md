@@ -2,6 +2,11 @@
 
 Status: proposed.
 
+Current implementation note (2026-08-18): supported delegation creation is
+leaf-only and requires `max_depth: 0`. This proposal describes prerequisites for
+reenabling child delegation; runtime policy primitives alone do not make that
+workflow available to workers.
+
 ## Context
 
 The visual orchestrator described in

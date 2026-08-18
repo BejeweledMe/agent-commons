@@ -4,6 +4,11 @@
 - Date: 2026-07-20
 - Scope: MVP-2 local service and provider adapters
 
+Current implementation note (2026-08-18): the supported creation path accepts
+only `max_depth: 0`. The ledger still replays the parent/child shape designed
+below, but workers receive no child-delegation tools. Text below that describes
+depth-one creation is retained as the original design, not a shipped capability.
+
 ## Context
 
 Agent Commons currently lets separate Codex, Claude Code, and other agent windows
@@ -140,7 +145,7 @@ The broker also applies operator-configured global, per-provider, per-profile,
 aggregate parent-budget, queue-capacity, and queue-wait limits shared through
 the operational state root. Effective child authority and budgets are the
 minimum of the parent grant, delegation, target profile, and operator policy.
-The first rollout uses depth 1 by default. A child may not create a sibling
+The original rollout design used depth 1 by default. A child may not create a sibling
 through a second client to evade lineage or budget checks.
 
 Every worker gets a newly registered Commons session. Launching a reviewer does

@@ -9,7 +9,7 @@ from agent_commons.errors import LifecycleConflictError, SecurityPolicyError
 from agent_commons.services import CommonsManager
 
 LIMITS = {
-    "max_depth": 1,
+    "max_depth": 0,
     "wall_time_seconds": 900,
     "max_attempts": 2,
     "max_concurrency": 1,
