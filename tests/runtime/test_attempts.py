@@ -296,7 +296,7 @@ def test_tampered_request_body_is_detected(tmp_path: Path) -> None:
         store.list_attempts()
 
 
-def test_failure_diagnostic_is_closed_and_raw_provider_content_is_not_persisted(
+def test_failure_persists_only_a_bounded_sanitized_stderr_diagnostic_tail(
     tmp_path: Path,
 ) -> None:
     state_root = tmp_path / "state"
@@ -311,7 +311,11 @@ def test_failure_diagnostic_is_closed_and_raw_provider_content_is_not_persisted(
         pid=123,
     )
 
-    secret = "sk-ant-api03-never-persist-this"
+    secret = "sk-proj-never-persist-this000000"
+    safe_error = "ERROR MCP handshake failed during required server initialization"
+    raw_stderr = (
+        f"{safe_error}\ncredential={secret}\ninternal path=/private/tmp/project/file.py"
+    ).encode()
     finished = store.finish(
         attempt.attempt_id,
         ProcessResult(
@@ -321,21 +325,57 @@ def test_failure_diagnostic_is_closed_and_raw_provider_content_is_not_persisted(
             pid=123,
             duration_seconds=0.1,
             stdout=b"",
-            stderr=(
-                f"MCP handshake failed; credential={secret}; internal path=/private/tmp/x"
-            ).encode(),
+            stderr=raw_stderr,
             stdout_bytes_seen=0,
-            stderr_bytes_seen=96,
-            output_truncated=False,
+            stderr_bytes_seen=9000,
+            output_truncated=True,
+            stderr_tail=raw_stderr,
+            stderr_tail_truncated=True,
         ),
     )
 
     assert finished.diagnostic_code is DiagnosticCode.MCP_HANDSHAKE_FAILED
+    assert safe_error in str(finished.stderr_diagnostic_tail)
+    assert "redacted unsafe diagnostic line" in str(finished.stderr_diagnostic_tail)
+    assert "redacted path" in str(finished.stderr_diagnostic_tail)
+    assert finished.stderr_diagnostic_tail_truncated is True
+    assert finished.stderr_diagnostic_tail_redacted is True
     persisted = next((state_root / "runtime" / "requests").glob("*.json")).read_text()
     assert secret not in persisted
     assert "/private/tmp/x" not in persisted
-    assert "MCP handshake failed" not in persisted
+    assert "/private/tmp/project/file.py" not in persisted
+    assert safe_error in persisted
     assert '"diagnostic_code":"mcp_handshake_failed"' in persisted
+
+
+def test_successful_provider_stderr_is_never_persisted(tmp_path: Path) -> None:
+    state_root = tmp_path / "state"
+    store = AttemptStore(state_root, clock=Clock())
+    parent, _ = policies()
+    attempt = store.reserve(spec(tmp_path), parent_policy=parent).attempt
+    store.transition(attempt.attempt_id, AttemptState.LAUNCHING, reason="process_starting")
+    store.transition(attempt.attempt_id, AttemptState.RUNNING, reason="process_started", pid=123)
+
+    finished = store.finish(
+        attempt.attempt_id,
+        ProcessResult(
+            outcome=RunOutcome.SUCCEEDED,
+            reason=RunReason.COMPLETED,
+            exit_code=0,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=b"provider response must remain ephemeral",
+            stderr=b"debug line must remain ephemeral too",
+            stdout_bytes_seen=39,
+            stderr_bytes_seen=36,
+            output_truncated=False,
+        ),
+    )
+
+    assert finished.stderr_diagnostic_tail is None
+    persisted = next((state_root / "runtime" / "requests").glob("*.json")).read_text()
+    assert "provider response" not in persisted
+    assert "debug line" not in persisted
 
 
 def test_v2_attempt_is_upgraded_in_memory_and_rewritten_on_next_transition(
@@ -351,6 +391,9 @@ def test_v2_attempt_is_upgraded_in_memory_and_rewritten_on_next_transition(
     for attempt in document["attempts"]:
         attempt["schema"] = "agent_commons.runtime_attempt.v2"
         attempt.pop("diagnostic_code")
+        attempt.pop("stderr_diagnostic_tail")
+        attempt.pop("stderr_diagnostic_tail_truncated")
+        attempt.pop("stderr_diagnostic_tail_redacted")
     path.write_text(
         json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
@@ -430,6 +473,9 @@ def test_state_written_before_the_tree_was_recorded_still_reads(tmp_path: Path) 
     for attempt in document["attempts"]:
         attempt["schema"] = "agent_commons.runtime_attempt.v3"
         attempt["correlation"].pop("root_delegation_id", None)
+        attempt.pop("stderr_diagnostic_tail")
+        attempt.pop("stderr_diagnostic_tail_truncated")
+        attempt.pop("stderr_diagnostic_tail_redacted")
     document["semantic_sha256"] = hashlib.sha256(
         (
             json.dumps(document["spec"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))

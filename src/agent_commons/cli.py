@@ -26,7 +26,9 @@ from agent_commons.platform_support import require_supported_platform
 from agent_commons.runtime import (
     ATTEMPT_SCHEMA,
     REQUEST_SCHEMA,
+    AttemptStore,
     BuiltinProfileId,
+    TerminalToolAuditStore,
     error_safe_next_actions,
     preflight_profile,
 )
@@ -1536,9 +1538,23 @@ def delegation_list(state: CLIState, state_filter: str | None) -> None:
 @click.argument("delegation_id")
 @click.pass_obj
 def delegation_show(state: CLIState, delegation_id: str) -> None:
-    """Show one projected delegation."""
+    """Show one delegation with bounded local runtime diagnostics."""
 
-    state.emit(state.manager().get_delegation(delegation_id))
+    manager = state.manager()
+    service = DelegationRuntimeService(
+        manager,
+        attempts=AttemptStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=True,
+        ),
+        tool_audit=TerminalToolAuditStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=True,
+        ),
+    )
+    state.emit(service.show_delegation(delegation_id))
 
 
 def _delegation_transition(
@@ -1972,7 +1988,7 @@ def broker_stop(
 @click.option(
     "--diagnostic",
     is_flag=True,
-    help="Include only fixed allowlisted diagnostic hints; raw provider output is unavailable.",
+    help="Add fixed recovery hints to the sanitized local failure diagnostics.",
 )
 @_profile_config
 @click.pass_obj
@@ -1981,7 +1997,7 @@ def broker_attempts(
     diagnostic: bool,
     profile_config: Path | None,
 ) -> None:
-    """List bounded operational attempt metadata; no provider content is retained."""
+    """List attempts with bounded, sanitized local failure diagnostics."""
 
     state.emit(_runtime_service(state, profile_config).list_attempts(diagnostic=diagnostic))
 

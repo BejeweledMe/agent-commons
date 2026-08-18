@@ -137,8 +137,12 @@ is never silently deleted.
 See
 [Troubleshooting](https://github.com/BejeweledMe/agent-commons/blob/main/docs/TROUBLESHOOTING.md)
 for diagnostic codes, read-only recovery, state-root checks, and the manual
-fallback. Share only the secret-free `support`/`doctor` output; prompts,
-responses, tool payloads, environment, and raw stdout/stderr are not retained.
+fallback. Share only the secret-free `support`/`doctor` output. Prompts,
+responses, tool payloads, environment, stdout, and successful-run stderr are
+not retained. An unsuccessful local provider attempt keeps a private sanitized
+stderr tail of at most 4 KiB: absolute paths and complete secret/PII-bearing
+lines are redacted, and truncation/redaction are marked explicitly. Review even
+that diagnostic before sharing it outside the machine.
 
 ## Experimental local broker (manual opt-in)
 

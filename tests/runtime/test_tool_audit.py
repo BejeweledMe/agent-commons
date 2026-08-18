@@ -25,8 +25,27 @@ def test_terminal_tool_audit_is_private_content_free_and_fail_closed(tmp_path: P
     body = path.read_text(encoding="utf-8")
     assert "summary" not in body and "result_refs" not in body
 
+    store.record(delegation_id, "commons_delegation_needs_operator", "called")
+    audit = store.record(
+        delegation_id,
+        "commons_delegation_needs_operator",
+        "rejected",
+        error_type="LifecycleConflictError",
+        message=(
+            "expected revision changed; credential=sk-proj-never-store-this000000; "
+            "source=/private/tmp/customer/review.json"
+        ),
+    )
+    assert audit.terminal_tool_rejections == 1
+    assert audit.rejection_details[0].ordinal == 1
+    assert audit.rejection_details[0].error_type == "LifecycleConflictError"
+    assert audit.rejection_details[0].message == "details redacted by security policy"
+    body = path.read_text(encoding="utf-8")
+    assert "sk-proj-never-store-this" not in body
+    assert "/private/tmp/customer" not in body
+
     value = json.loads(body)
-    value["terminal_tool_rejections"] = 2
+    value["terminal_tool_rejections"] = 3
     path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
     with pytest.raises(IntegrityError, match="outcomes exceed calls"):
         store.get(delegation_id)

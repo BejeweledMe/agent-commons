@@ -8,6 +8,7 @@ or persisted.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -20,8 +21,21 @@ from agent_commons.errors import (
     SecurityPolicyError,
     ValidationError,
 )
+from agent_commons.security import SecurityPolicy
 
-from .subprocess_runner import ProcessResult, RunOutcome, RunReason
+from .subprocess_runner import PROVIDER_STDERR_TAIL_BYTES, ProcessResult, RunOutcome, RunReason
+
+_ANSI_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+_POSIX_ABSOLUTE_PATH = re.compile(
+    r"(?<![A-Za-z0-9_.-])/(?:[^\s/:;,()\[\]{}<>\"']+/)+[^\s:;,()\[\]{}<>\"']*"
+)
+_WINDOWS_ABSOLUTE_PATH = re.compile(
+    r"(?<![A-Za-z0-9_.-])[A-Za-z]:\\(?:[^\s:;,()\[\]{}<>\"']+\\)+"
+    r"[^\s:;,()\[\]{}<>\"']*"
+)
+_CONTROL_CHARACTER = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_REDACTED_DIAGNOSTIC_LINE = "[agent-commons redacted unsafe diagnostic line]"
+_REDACTED_PATH = "[agent-commons redacted path]"
 
 
 class DiagnosticCode(StrEnum):
@@ -285,6 +299,67 @@ def classify_process_result(result: ProcessResult) -> SafeDiagnostic:
     else:
         code = DiagnosticCode.PROVIDER_NONZERO_UNKNOWN
     return SafeDiagnostic.create(code)
+
+
+def _utf8_tail(value: str, limit: int) -> tuple[str, bool]:
+    encoded = value.encode("utf-8")
+    if len(encoded) <= limit:
+        return value, False
+    tail = encoded[-limit:]
+    while tail and (tail[0] & 0xC0) == 0x80:
+        tail = tail[1:]
+    return tail.decode("utf-8", "replace"), True
+
+
+def sanitize_provider_stderr_tail(
+    result: ProcessResult,
+    *,
+    policy: SecurityPolicy | None = None,
+) -> tuple[str | None, bool, bool]:
+    """Return a bounded local-only diagnostic tail for an unsuccessful run.
+
+    Provider stdout remains ineligible because it can be a response or
+    transcript.  Stderr is retained only for non-successful processes, has ANSI
+    and control bytes removed, replaces absolute paths, and redacts complete
+    secret/PII-bearing lines before the attempt document sees it.  A final
+    fail-closed scan prevents a sanitizer regression from persisting unsafe
+    content.
+    """
+
+    if result.outcome is RunOutcome.SUCCEEDED:
+        return None, False, False
+    raw = result.stderr_tail or result.stderr[-PROVIDER_STDERR_TAIL_BYTES:]
+    if not raw:
+        return None, bool(result.stderr_tail_truncated), False
+    text = raw.decode("utf-8", "replace")
+    rendered = _ANSI_ESCAPE.sub("", text)
+    rendered = _CONTROL_CHARACTER.sub("�", rendered)
+    rendered, paths = _POSIX_ABSOLUTE_PATH.subn(_REDACTED_PATH, rendered)
+    rendered, windows_paths = _WINDOWS_ABSOLUTE_PATH.subn(_REDACTED_PATH, rendered)
+    redacted = rendered != text or paths > 0 or windows_paths > 0
+    security = policy or SecurityPolicy()
+    blocked_lines: set[int] = set()
+    for start_line, end_line, finding in security.scan_text_lines(rendered):
+        if finding.classification in security.blocked_classifications:
+            blocked_lines.update(range(start_line, end_line + 1))
+    lines: list[str] = []
+    for number, line in enumerate(rendered.splitlines(keepends=True), start=1):
+        if number not in blocked_lines:
+            lines.append(line)
+            continue
+        ending = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+        lines.append(_REDACTED_DIAGNOSTIC_LINE + ending)
+        redacted = True
+    safe = "".join(lines).strip()
+    if not safe:
+        return None, bool(result.stderr_tail_truncated), redacted
+    safe, capped = _utf8_tail(safe, PROVIDER_STDERR_TAIL_BYTES)
+    try:
+        security.assert_safe(safe, context="provider stderr diagnostic tail")
+    except SecurityPolicyError:
+        safe = _REDACTED_DIAGNOSTIC_LINE
+        redacted = True
+    return safe, bool(result.stderr_tail_truncated or capped), redacted
 
 
 def diagnostic_hint(code: str | DiagnosticCode) -> str:

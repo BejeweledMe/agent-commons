@@ -791,15 +791,16 @@ class UIContext:
         )
 
     def runs(self) -> list[dict[str, Any]]:
-        """Live and recent provider runs, phase only -- never any provider output.
+        """Live and recent provider runs with bounded local failure diagnostics.
 
         Reads the operational attempt store (metadata: phase, pid liveness,
-        target) and joins each to its canonical delegation state.  This is the
-        live run surface (MUST-5); by design it carries no prompts, transcripts,
-        or tool arguments, only the state a person needs to see a run move.
+        target) and joins each to its canonical delegation state.  Unsuccessful
+        runs may include the attempt store's sanitized 4 KiB stderr diagnostic
+        tail and bounded terminal-tool rejection messages.  It never exposes
+        stdout, prompts, transcripts, reasoning, or tool arguments.
         """
 
-        from agent_commons.runtime import AttemptStore
+        from agent_commons.runtime import AttemptStore, TerminalToolAuditStore
 
         manager = self.manager()
         store = AttemptStore(manager.paths.state_root, read_only=True)
@@ -808,12 +809,35 @@ class UIContext:
         except (CommonsError, OSError):
             return []
         delegations = manager.snapshot().delegations
+        audit_store = TerminalToolAuditStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=True,
+        )
         found: list[dict[str, Any]] = []
         for attempt in attempts:
             record = attempt.as_dict()
             delegation_id = str(record["correlation"]["delegation_id"])
             delegation = delegations.get(delegation_id) or {}
             live = store.process_is_live(record.get("pid"))
+            try:
+                audit = audit_store.get(delegation_id)
+                rejection_details = [
+                    {
+                        "ordinal": detail.ordinal,
+                        "tool": detail.tool,
+                        "error_type": detail.error_type,
+                        "message": detail.message,
+                        "recorded_at": detail.recorded_at,
+                    }
+                    for detail in audit.rejection_details
+                ]
+                rejection_count = audit.terminal_tool_rejections
+                rejection_details_truncated = audit.rejection_details_truncated
+            except (CommonsError, OSError):
+                rejection_details = []
+                rejection_count = 0
+                rejection_details_truncated = False
             found.append(
                 {
                     "delegation_id": delegation_id,
@@ -859,6 +883,20 @@ class UIContext:
                     "summary": (
                         str(delegation.get("summary"))[:500] if delegation.get("summary") else None
                     ),
+                    # This is deliberately not raw provider output. AttemptStore
+                    # only persists this field for unsuccessful processes after
+                    # bounding, path removal, secret/PII line redaction, and a
+                    # fail-closed security scan.
+                    "stderr_diagnostic_tail": record.get("stderr_diagnostic_tail"),
+                    "stderr_diagnostic_tail_truncated": bool(
+                        record.get("stderr_diagnostic_tail_truncated", False)
+                    ),
+                    "stderr_diagnostic_tail_redacted": bool(
+                        record.get("stderr_diagnostic_tail_redacted", False)
+                    ),
+                    "terminal_tool_rejections": rejection_count,
+                    "terminal_tool_rejection_details": rejection_details,
+                    "terminal_tool_rejection_details_truncated": (rejection_details_truncated),
                 }
             )
         # Live runs first, then most-recently-seen; a person watches the moving

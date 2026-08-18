@@ -380,12 +380,15 @@ user's behalf.
 
 Provider streams and diagnostics may contain prompts, reasoning, source, secrets,
 tool payloads, environment values, or terminal output. Canonical events retain
-only bounded state, safe reason codes, summaries, and typed references. Runtime
-logs are disabled or bounded by default, stored only in ignored local state with
-restricted permissions and explicit retention. OpenTelemetry is optional and
-metadata-only by default; prompts, responses, reasoning, transcripts, file
-contents, tool arguments/results, shell commands, environment variables,
-credentials, and raw stdout/stderr are excluded. Export endpoints and credentials
+only bounded state, safe reason codes, summaries, and typed references. For an
+unsuccessful provider process, ignored local operational state retains only the
+final 4 KiB of stderr after ANSI/control cleanup, absolute-path replacement,
+whole-line secret/PII redaction, and a fail-closed security scan. Stdout and
+successful-run stderr are never persisted; truncation and redaction are explicit.
+Terminal-tool audit stores at most 32 sanitized exception messages (512 bytes
+each), never call arguments, and marks missing earlier details. These files are
+private (0700 directories, 0600 files) and never enter canonical events or
+telemetry. OpenTelemetry remains metadata-only. Export endpoints and credentials
 are operator configuration and never ledger data.
 
 ### Provider and protocol drift

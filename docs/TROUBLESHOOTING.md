@@ -67,10 +67,13 @@ returns status 2 when a process exits without the exact terminal MCP result.
 
 ## Closed diagnostic codes
 
-Agent Commons inspects only its bounded in-memory provider buffers and persists
-one closed code. It never stores the matched fragment, prompt, response,
-reasoning, file content, tool payload, path, environment, credential, stdout, or
-stderr.
+Agent Commons inspects only bounded in-memory provider buffers and persists one
+closed code. For an unsuccessful process it also keeps a private sanitized final
+4 KiB stderr diagnostic tail: absolute paths and complete secret/PII-bearing
+lines are replaced, and truncation/redaction are explicit. It never persists
+stdout or successful-run stderr, and no provider diagnostic enters canonical
+history or telemetry. `delegation show` joins this local diagnostic to the
+canonical record; `broker attempts --diagnostic` adds fixed recovery guidance.
 
 | Code | Meaning / next safe step |
 | --- | --- |
@@ -189,3 +192,5 @@ Include:
 
 Exclude raw provider output, prompts/responses, reasoning, credentials, private
 paths, environment variables, customer data, and complete operational state.
+The stored stderr tail is sanitized but still untrusted local diagnostic text;
+review it before sharing.

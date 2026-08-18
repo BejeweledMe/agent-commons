@@ -38,6 +38,8 @@ _SAFE_HOST_ENVIRONMENT = frozenset(
     }
 )
 
+PROVIDER_STDERR_TAIL_BYTES = 4 * 1024
+
 
 class RunOutcome(StrEnum):
     SUCCEEDED = "succeeded"
@@ -200,6 +202,7 @@ class _BoundedOutput:
         self._lock = threading.Lock()
         self._values = {"stdout": bytearray(), "stderr": bytearray()}
         self._seen = {"stdout": 0, "stderr": 0}
+        self._stderr_tail = bytearray()
 
     def consume(self, channel: str, data: bytes) -> None:
         with self._lock:
@@ -207,6 +210,11 @@ class _BoundedOutput:
             retained = data[: self._remaining]
             self._values[channel].extend(retained)
             self._remaining -= len(retained)
+            if channel == "stderr":
+                self._stderr_tail.extend(data)
+                excess = len(self._stderr_tail) - PROVIDER_STDERR_TAIL_BYTES
+                if excess > 0:
+                    del self._stderr_tail[:excess]
 
     def value(self, channel: str) -> bytes:
         with self._lock:
@@ -215,6 +223,15 @@ class _BoundedOutput:
     def seen(self, channel: str) -> int:
         with self._lock:
             return self._seen[channel]
+
+    def stderr_tail(self) -> bytes:
+        with self._lock:
+            return bytes(self._stderr_tail)
+
+    @property
+    def stderr_tail_truncated(self) -> bool:
+        with self._lock:
+            return self._seen["stderr"] > len(self._stderr_tail)
 
     @property
     def truncated(self) -> bool:
@@ -234,6 +251,12 @@ class ProcessResult:
     stdout_bytes_seen: int
     stderr_bytes_seen: int
     output_truncated: bool
+    # Kept separately from the shared stdout/stderr classification buffer so a
+    # noisy stdout stream cannot evict the final provider error.  These bytes
+    # remain ephemeral until AttemptStore applies its stricter local-diagnostic
+    # sanitizer; stdout is never eligible for persistence.
+    stderr_tail: bytes = b""
+    stderr_tail_truncated: bool = False
 
 
 class SubprocessRunner:
@@ -442,4 +465,6 @@ class SubprocessRunner:
             stdout_bytes_seen=output.seen("stdout"),
             stderr_bytes_seen=output.seen("stderr"),
             output_truncated=output.truncated,
+            stderr_tail=output.stderr_tail(),
+            stderr_tail_truncated=output.stderr_tail_truncated,
         )

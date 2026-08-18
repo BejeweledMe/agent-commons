@@ -344,18 +344,23 @@ cannot change canonical behavior.
 The implemented signals are lifecycle kind/state/reason, duration, PID/exit code,
 bounded-output byte counts/truncation, provider/profile, correlation IDs, queue
 wait/depth, canonical finalization phase/state/reason, process/canonical
-mismatch, and content-free terminal-tool call/rejection/completion counters.
+mismatch, terminal-tool call/rejection/completion counters, and bounded local
+failure diagnostics.
 Provider-reported budget totals and long-lived causal spans remain future
 additions. Unique task, session, delegation, and attempt IDs must not become
 metrics labels with unbounded cardinality.
 
 Prompts, responses, reasoning, complete conversations, file contents, tool
-arguments/results, shell commands, environment variables, credentials, and raw
-stdout/stderr are excluded by default. If bounded provider logs are enabled for
-local diagnosis, they live below ignored operational state with restrictive
-permissions and explicit retention. Export endpoints and credentials are
-operator configuration and pass through the normal secret boundary, never the
-ledger.
+arguments/results, shell commands, environment variables, credentials, stdout,
+and raw stderr are excluded. An unsuccessful process keeps only a sanitized
+final 4 KiB stderr diagnostic tail below ignored operational state: ANSI/control
+bytes are removed, absolute paths and secret/PII-bearing lines are redacted, and
+the result is scanned again before a private atomic write. Successful-run stderr
+is discarded. Terminal-tool rejection diagnostics contain only a bounded
+exception type/message, never the call arguments, retain at most 32 entries, and
+mark omitted earlier details. Neither diagnostic enters canonical history or
+telemetry. Export endpoints and credentials are operator configuration and pass
+through the normal secret boundary, never the ledger.
 
 ## Compatibility, migration, and rollback
 

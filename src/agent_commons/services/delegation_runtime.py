@@ -448,7 +448,7 @@ class DelegationRuntimeService:
         for value in values:
             delegation_id = str(value["correlation"]["delegation_id"])
             delegation = canonical.get(delegation_id)
-            audit = self._tool_audit_metadata(delegation_id)
+            audit = self._tool_audit_metadata(delegation_id, include_details=True)
             value.update(
                 {
                     "canonical_state": delegation.get("state") if delegation else None,
@@ -467,6 +467,17 @@ class DelegationRuntimeService:
                 value["diagnostic_hint"] = diagnostic_hint(workflow_code)
                 value["safe_next_actions"] = diagnostic_safe_next_actions(workflow_code)
         return values
+
+    def show_delegation(self, delegation_id: str) -> dict[str, Any]:
+        """Join one canonical delegation to its private local diagnostics."""
+
+        canonical = dict(self.manager.get_delegation(delegation_id))
+        canonical["runtime_attempts"] = [
+            attempt
+            for attempt in self.list_attempts(diagnostic=True)
+            if attempt["correlation"]["delegation_id"] == delegation_id
+        ]
+        return canonical
 
     @staticmethod
     def _workflow_diagnostic_code(value: Mapping[str, Any]) -> DiagnosticCode:
@@ -512,22 +523,48 @@ class DelegationRuntimeService:
             return 1
         return 0
 
-    def _tool_audit_metadata(self, delegation_id: str) -> dict[str, int | bool]:
+    def _tool_audit_metadata(
+        self,
+        delegation_id: str,
+        *,
+        include_details: bool = False,
+    ) -> dict[str, Any]:
         try:
             audit = self.tool_audit.get(delegation_id)
         except Exception:
-            return {
+            missing: dict[str, Any] = {
                 "terminal_tool_calls": 0,
                 "terminal_tool_rejections": 0,
                 "terminal_tool_completions": 0,
                 "terminal_tool_audit_available": False,
             }
-        return {
+            if include_details:
+                missing.update(
+                    terminal_tool_rejection_details=[],
+                    terminal_tool_rejection_details_truncated=False,
+                )
+            return missing
+        metadata: dict[str, Any] = {
             "terminal_tool_calls": audit.terminal_tool_calls,
             "terminal_tool_rejections": audit.terminal_tool_rejections,
             "terminal_tool_completions": audit.terminal_tool_completions,
             "terminal_tool_audit_available": True,
         }
+        if include_details:
+            metadata.update(
+                terminal_tool_rejection_details=[
+                    {
+                        "ordinal": detail.ordinal,
+                        "tool": detail.tool,
+                        "error_type": detail.error_type,
+                        "message": detail.message,
+                        "recorded_at": detail.recorded_at,
+                    }
+                    for detail in audit.rejection_details
+                ],
+                terminal_tool_rejection_details_truncated=(audit.rejection_details_truncated),
+            )
+        return metadata
 
     def _finalization_event(
         self,
@@ -946,7 +983,10 @@ alone is not task acceptance.
                 "process_canonical_mismatch": self._process_canonical_mismatch(
                     result.attempt.state, canonical
                 ),
-                **self._tool_audit_metadata(result.attempt.correlation.delegation_id),
+                **self._tool_audit_metadata(
+                    result.attempt.correlation.delegation_id,
+                    include_details=True,
+                ),
             }
         )
         workflow_code = self._workflow_diagnostic_code(attempt)

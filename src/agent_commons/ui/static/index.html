@@ -239,6 +239,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   font-size:11px; color:var(--muted);
 }
 .runmeta-part{white-space:nowrap}
+.run-diagnostic{margin:8px 0 0; padding:8px; border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--bad); background:var(--panel)}
 /* The Runs view's own controls.  A row that wraps, because three controls with
    Russian labels do not fit an 800px centre (item 23's margin applies here as
    much as anywhere). */
@@ -1811,6 +1812,11 @@ const STRINGS = {
     run_started_word: "started",
     run_took_word: "took",
     run_took_tip: "Between the first and last operational record of this attempt; last touched",
+    run_stderr_heading: "Provider error (sanitized stderr tail)",
+    run_stderr_truncated: "Earlier stderr was omitted; showing the last 4 KiB.",
+    run_stderr_redacted: "Sensitive lines or private paths were redacted.",
+    run_terminal_rejections: "Terminal result calls rejected",
+    run_terminal_rejection_truncated: "Earlier rejection details were omitted.",
     run_still_running: "still running",
     run_still_running_tip: "A duration is recorded only once the run stops; until then, count up from the start time.",
     run_elapsed_word: "running for",
@@ -1920,7 +1926,7 @@ const STRINGS = {
     drawer_rename: "Rename this role — opens Settings on its name field",
     fab_hire: "Hire a role: name, profile — and it appears on the board.",
     tip_board: "Your team and its work. Click an entity for details; the wiring is the org chart.",
-    tip_runs: "Every provider run: what is moving now and how it ended. State only — no prompts or transcripts.",
+    tip_runs: "Every provider run: what is moving now, how it ended, and a bounded sanitized error when it fails — no prompts or transcripts.",
     tip_guide: "A two-minute explanation of the whole system: what it is, how it fits, where to start.",
     tip_skills: "Behaviour packages from the operator catalogue. Granted to roles in their settings.",
     tip_tools: "Tools from the same catalogue: what a role may run on a task.",
@@ -1949,7 +1955,7 @@ const STRINGS = {
     guide_next_h: "Once you are comfortable",
     guide_next_p: "Links between roles, independent reviews of each other's work, the skills and tools catalogue, role permissions — all of it joins in as you need it, not all at once.",
     guide_never_h: "What this panel never does",
-    guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
+    guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. For an unsuccessful provider process it keeps only a private, sanitized final 4 KiB of stderr: secrets, PII and absolute paths are redacted; stdout is never stored. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     guide_tab_brief: "In short",
     guide_tab_units: "The system’s units",
     guide_tab_agents: "Roles and memory",
@@ -2405,6 +2411,11 @@ const STRINGS = {
     run_started_word: "начат",
     run_took_word: "занял",
     run_took_tip: "Между первой и последней операционной записью этой попытки; последнее касание",
+    run_stderr_heading: "Ошибка провайдера (очищенный хвост stderr)",
+    run_stderr_truncated: "Ранний stderr опущен; показаны последние 4 КиБ.",
+    run_stderr_redacted: "Чувствительные строки или приватные пути скрыты.",
+    run_terminal_rejections: "Отклонено вызовов завершения",
+    run_terminal_rejection_truncated: "Ранние причины отказов опущены.",
     run_still_running: "ещё идёт",
     run_still_running_tip: "Длительность записывается только когда прогон остановился; до тех пор считайте от времени начала.",
     run_elapsed_word: "идёт уже",
@@ -2514,7 +2525,7 @@ const STRINGS = {
     drawer_rename: "Переименовать роль — откроет «Настройки» на поле имени",
     fab_hire: "Нанять роль: имя, профиль — и она появляется на доске.",
     tip_board: "Ваша команда и её работа. Клик по сущности — детали; связи — это оргсхема.",
-    tip_runs: "Все прогоны провайдеров: что движется сейчас и чем закончилось. Только состояние — без промптов и транскриптов.",
+    tip_runs: "Все прогоны провайдеров: что движется сейчас, чем закончилось и очищенная ошибка при сбое — без промптов и транскриптов.",
     tip_guide: "Объяснение всей системы за две минуты: что это, как устроено, с чего начать.",
     tip_skills: "Пакеты поведения из операторского каталога. Выдаются ролям в их настройках.",
     tip_tools: "Инструменты из того же каталога: что роль может запускать на задаче.",
@@ -2543,7 +2554,7 @@ const STRINGS = {
     guide_next_h: "Когда освоитесь",
     guide_next_p: "Связи между ролями, независимые ревью чужой работы, каталог навыков и инструментов, права ролей — всё это подключается по мере надобности, не сразу.",
     guide_never_h: "Чего панель никогда не делает",
-    guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
+    guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Для неуспешного процесса провайдера хранится только приватный очищенный хвост stderr до 4 КиБ: секреты, персональные данные и абсолютные пути скрываются; stdout не сохраняется. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     guide_tab_brief: "Коротко",
     guide_tab_units: "Единицы системы",
     guide_tab_agents: "Роли и память",
@@ -5239,6 +5250,58 @@ function runStatusText(run) {
     t("run_state_word") + " " + glossed(state, STATE_GLOSS[state]);
 }
 
+// Failed runs used to stop at a byte count even though the broker had already
+// seen the explanation.  The backend now supplies only the private sanitized
+// tail and sanitized guard messages: never stdout, a prompt, a transcript, or
+// tool arguments.  Paint them as text, not HTML, because provider diagnostics
+// remain untrusted even after privacy redaction.
+function appendRunDiagnostics(card, run) {
+  if (run.stderr_diagnostic_tail) {
+    const heading = document.createElement("div");
+    heading.className = "note warn";
+    heading.textContent = t("run_stderr_heading");
+    card.appendChild(heading);
+    const body = document.createElement("pre");
+    body.className = "run-diagnostic";
+    body.textContent = run.stderr_diagnostic_tail;
+    card.appendChild(body);
+    if (run.stderr_diagnostic_tail_truncated) {
+      const note = document.createElement("div");
+      note.className = "note warn";
+      note.textContent = t("run_stderr_truncated");
+      card.appendChild(note);
+    }
+    if (run.stderr_diagnostic_tail_redacted) {
+      const note = document.createElement("div");
+      note.className = "note warn";
+      note.textContent = t("run_stderr_redacted");
+      card.appendChild(note);
+    }
+  }
+  const rejections = run.terminal_tool_rejection_details || [];
+  if (run.terminal_tool_rejections || rejections.length) {
+    const heading = document.createElement("div");
+    heading.className = "note warn";
+    heading.textContent = t("run_terminal_rejections") + ": " +
+      String(run.terminal_tool_rejections || rejections.length);
+    card.appendChild(heading);
+    if (rejections.length) {
+      const body = document.createElement("pre");
+      body.className = "run-diagnostic";
+      body.textContent = rejections.map((item) =>
+        "#" + item.ordinal + " " + item.tool + " — " + item.error_type + ": " + item.message
+      ).join("\n");
+      card.appendChild(body);
+    }
+    if (run.terminal_tool_rejection_details_truncated) {
+      const note = document.createElement("div");
+      note.className = "note warn";
+      note.textContent = t("run_terminal_rejection_truncated");
+      card.appendChild(note);
+    }
+  }
+}
+
 // The run's record is the result surface; the task's state is a human decision
 // and never advances itself (round 2, PM findings). Clicking a run therefore
 // opens the delegation record instead of pretending the task moved.
@@ -5290,6 +5353,7 @@ function runCard(run) {
   // When it started, how long it took, what it was launched to do and under
   // what cap (item 28).
   runMetaLine(card, run);
+  appendRunDiagnostics(card, run);
   if (run.summary) {
     // The one human-readable line the run left behind (finding 4) — the
     // canonical delegation summary, agent prose written as text.

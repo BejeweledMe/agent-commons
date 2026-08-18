@@ -125,6 +125,26 @@ def test_runner_uses_explicit_cwd_sanitized_child_identity_and_bounded_output(
     }
 
 
+def test_runner_keeps_the_final_four_kib_of_stderr_even_when_shared_output_fills(
+    tmp_path: Path,
+) -> None:
+    prefix = b"first-error\n"
+    final = b"F" * 4096
+    process = FakeProcess(stdout=b"x" * 8192, stderr=prefix + final)
+    runner = SubprocessRunner(process_factory=lambda argv, cwd, env: process)
+
+    result = runner.run(
+        invocation(),
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=10,
+        max_output_bytes=8,
+    )
+
+    assert result.stderr_tail == final
+    assert result.stderr_tail_truncated is True
+
+
 def test_runner_cancels_the_process_group(tmp_path: Path) -> None:
     clock = Clock()
     token = CancellationToken()

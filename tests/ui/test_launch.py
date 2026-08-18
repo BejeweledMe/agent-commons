@@ -20,10 +20,12 @@ from agent_commons.runtime import (
     ProcessResult,
     RunOutcome,
     RunReason,
+    TerminalToolAuditStore,
     default_profile_registry,
 )
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
+from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import LAUNCH_ROUTES, MUTATING_ROUTES, create_app
 from tests.ui.conftest import PORT, authorized
@@ -48,6 +50,12 @@ _RUN_FIELDS = {
     "purpose",
     "limits",
     "summary",
+    "stderr_diagnostic_tail",
+    "stderr_diagnostic_tail_truncated",
+    "stderr_diagnostic_tail_redacted",
+    "terminal_tool_rejections",
+    "terminal_tool_rejection_details",
+    "terminal_tool_rejection_details_truncated",
 }
 
 
@@ -252,11 +260,71 @@ def test_a_run_appears_on_the_live_runs_surface_and_moves_the_fingerprint(
     assert run["profile_id"] == "claude-builder"
     assert run["agent_id"] == fixture["role_id"]
     assert run["target_id"] == fixture["task_id"]
-    # No transcript/prompt/output field leaked onto the run surface.
+    # No stdout/transcript/prompt field leaked onto the run surface. The only
+    # content-bearing field is the separately sanitized failed-run diagnostic.
     assert set(run) == _RUN_FIELDS
+    assert run["stderr_diagnostic_tail"] is None
     # The runtime attempt moved the change detector, so the stream refreshes
     # during a run, not only on canonical events.
     assert ledger_fingerprint(context.paths()) != before
+
+
+def test_a_failed_run_surfaces_sanitized_stderr_and_each_terminal_rejection(
+    workspace: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _finished_run(workspace)
+    original = AttemptStore.list_attempts
+
+    def failed(self: AttemptStore, *args: Any, **values: Any) -> tuple[Any, ...]:
+        return tuple(
+            replace(
+                attempt,
+                stderr_diagnostic_tail="ERROR MCP handshake closed",
+                stderr_diagnostic_tail_truncated=True,
+                stderr_diagnostic_tail_redacted=True,
+            )
+            for attempt in original(self, *args, **values)
+        )
+
+    monkeypatch.setattr(AttemptStore, "list_attempts", failed)
+    delegation_id = fixture["context"].runs()[0]["delegation_id"]
+    audit = TerminalToolAuditStore(workspace["state_root"])
+    audit.record(delegation_id, "commons_succeed_delegation", "called")
+    audit.record(
+        delegation_id,
+        "commons_succeed_delegation",
+        "rejected",
+        error_type="LifecycleConflictError",
+        message="the expected delegation revision is stale",
+    )
+
+    run = fixture["context"].runs()[0]
+
+    assert run["stderr_diagnostic_tail"] == "ERROR MCP handshake closed"
+    assert run["stderr_diagnostic_tail_truncated"] is True
+    assert run["stderr_diagnostic_tail_redacted"] is True
+    assert run["terminal_tool_rejections"] == 1
+    assert run["terminal_tool_rejection_details"] == [
+        {
+            "ordinal": 1,
+            "tool": "commons_succeed_delegation",
+            "error_type": "LifecycleConflictError",
+            "message": "the expected delegation revision is stale",
+            "recorded_at": run["terminal_tool_rejection_details"][0]["recorded_at"],
+        }
+    ]
+
+
+def test_the_run_card_renders_failure_diagnostics_as_untrusted_text() -> None:
+    body = read_spa()
+    diagnostic = body.split("function appendRunDiagnostics(card, run) {", 1)[1].split("\n}", 1)[0]
+    card = body.split("function runCard(run) {", 1)[1].split("\n}", 1)[0]
+
+    assert "run.stderr_diagnostic_tail" in diagnostic
+    assert "terminal_tool_rejection_details" in diagnostic
+    assert "body.textContent = run.stderr_diagnostic_tail;" in diagnostic
+    assert "appendRunDiagnostics(card, run);" in card
 
 
 def _finished_run(workspace: dict[str, Any]) -> dict[str, Any]:

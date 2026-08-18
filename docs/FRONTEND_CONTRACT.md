@@ -72,8 +72,11 @@ tests will teach it to you one failure at a time.
 - A budget is the cap a run was permitted, never a spend — nothing measures
   consumption, so nothing may display one.
   (`test_a_run_card_says_when_it_ran_and_never_invents_a_spend`)
-- Nothing here stores prompts or transcripts; the Runs surface shows phases
-  and metadata only.
+- Nothing here stores prompts or transcripts. The Runs surface may show the
+  private attempt store's sanitized final 4 KiB stderr tail for an unsuccessful
+  process and bounded sanitized terminal-tool rejection messages. It never
+  receives stdout, successful-run stderr, or tool arguments; truncation and
+  redaction must be visible beside the diagnostic.
 
 ## Testing the asset
 

@@ -10,6 +10,19 @@ import pytest
 from click.testing import CliRunner
 
 from agent_commons.cli import cli
+from agent_commons.runtime import (
+    AttemptSpec,
+    AttemptState,
+    AttemptStore,
+    BuiltinProfileId,
+    CorrelationIds,
+    ProcessResult,
+    Provider,
+    RunOutcome,
+    RunReason,
+    RuntimePolicy,
+    checkout_fingerprint,
+)
 from agent_commons.services import CommonsManager
 
 
@@ -235,6 +248,86 @@ def test_broker_run_sanitizes_rejected_operator_values_in_json_and_human_errors(
     assert manager.get_delegation(str(delegation["entity_ref"]["id"]))["state"] == "requested"
     runtime = manager.paths.state_root / "runtime" / "requests"
     assert not runtime.exists() or list(runtime.glob("*.json")) == []
+
+
+def test_delegation_show_includes_the_sanitized_failed_attempt_diagnostic(
+    tmp_path: Path,
+) -> None:
+    repo, manager, parent, delegation = _requested_builder_delegation(
+        tmp_path,
+        workspace_name="delegation-show-stderr",
+    )
+    delegation_id = str(delegation["entity_ref"]["id"])
+    projected = manager.get_delegation(delegation_id)
+    policy = RuntimePolicy(
+        remaining_depth=1,
+        max_fanout=1,
+        max_attempts=1,
+        max_concurrency=1,
+    )
+    child = policy.derive_child()
+    store = AttemptStore(manager.paths.state_root)
+    reserved = store.reserve(
+        AttemptSpec(
+            idempotency_key="delegation-show-stderr-attempt",
+            profile_id=BuiltinProfileId.CODEX_BUILDER,
+            provider=Provider.CODEX,
+            correlation=CorrelationIds(
+                delegation_id=delegation_id,
+                target_kind="task",
+                target_id=str(projected["target_ref"]["id"]),
+                target_revision=str(projected["target_revision"]),
+                parent_session_id=str(parent["session_id"]),
+                child_session_id="session.childdelegationshow000000000001",
+            ),
+            parent_policy=policy,
+            child_policy=child,
+            checkout_fingerprint=checkout_fingerprint(repo),
+        ),
+        parent_policy=policy,
+    ).attempt
+    store.transition(reserved.attempt_id, AttemptState.LAUNCHING, reason="process_starting")
+    store.transition(
+        reserved.attempt_id,
+        AttemptState.RUNNING,
+        reason="process_started",
+        pid=321,
+    )
+    store.finish(
+        reserved.attempt_id,
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=321,
+            duration_seconds=0.1,
+            stdout=b"",
+            stderr=b"ERROR required MCP server failed to initialize",
+            stdout_bytes_seen=0,
+            stderr_bytes_seen=46,
+            output_truncated=False,
+        ),
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--session-id",
+            str(parent["session_id"]),
+            "--json",
+            "delegation",
+            "show",
+            delegation_id,
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    attempt = json.loads(result.output)["runtime_attempts"][0]
+    assert attempt["stderr_diagnostic_tail"] == ("ERROR required MCP server failed to initialize")
+    assert attempt["stderr_diagnostic_tail_truncated"] is False
+    assert attempt["workflow_diagnostic_code"] == "provider_nonzero_unknown"
 
 
 def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: Path) -> None:

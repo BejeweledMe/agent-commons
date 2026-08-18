@@ -625,10 +625,16 @@ def build_server(
                     try:
                         require_live_worker()
                         result = function(*args, **kwargs)
-                    except Exception:
+                    except Exception as exc:
                         if terminal and terminal_audit is not None:
                             try:
-                                terminal_audit.record(delegation, function.__name__, "rejected")
+                                terminal_audit.record(
+                                    delegation,
+                                    function.__name__,
+                                    "rejected",
+                                    error_type=type(exc).__name__,
+                                    message=str(exc),
+                                )
                             except Exception:
                                 pass
                         raise

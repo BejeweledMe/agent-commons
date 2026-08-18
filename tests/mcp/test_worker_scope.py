@@ -739,6 +739,21 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
     assert audit.terminal_tool_rejections == 0
 
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
+        server.tools["commons_delegation_needs_operator"](
+            delegation_id,
+            ended["revision"],
+            "invalid_result",
+            "A second terminal result must be rejected.",
+            "worker-scope-second-terminal-result",
+        )
+    audit = TerminalToolAuditStore(workspace["parent"].paths.state_root).get(delegation_id)
+    assert audit.terminal_tool_calls == 2
+    assert audit.terminal_tool_rejections == 1
+    assert audit.rejection_details[0].tool == "commons_delegation_needs_operator"
+    assert audit.rejection_details[0].error_type == "LifecycleConflictError"
+    assert "worker MCP authority ended" in audit.rejection_details[0].message
+
+    with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
         server.tools["commons_repo_read"]("src/app.py", None)
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
         server.tools["commons_complete_review"](

@@ -28,25 +28,25 @@ from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
 
-from .diagnostics import DiagnosticCode, classify_process_result
+from .diagnostics import DiagnosticCode, classify_process_result, sanitize_provider_stderr_tail
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .subprocess_runner import ProcessResult, RunOutcome
 
-# v4 records the delegation tree (``root_delegation_id``) so budget and subtree
-# ceilings can be charged against the tree rather than the requesting session.
-# The version is bumped because that field genuinely changes the stored shape:
-# an older reader must refuse the document with a diagnosable schema error
-# rather than a confusing complaint about an unknown field.
-REQUEST_SCHEMA = "agent_commons.runtime_request.v4"
-ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v4"
+# v5 adds a sanitized, bounded provider stderr diagnostic tail to terminal
+# attempts.  It is local operational state, never canonical history or
+# telemetry.  Older schemas remain readable and upgrade on the next write.
+REQUEST_SCHEMA = "agent_commons.runtime_request.v5"
+ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v5"
 _READABLE_REQUEST_SCHEMAS = (
     REQUEST_SCHEMA,
+    "agent_commons.runtime_request.v4",
     "agent_commons.runtime_request.v3",
     "agent_commons.runtime_request.v2",
 )
 _READABLE_ATTEMPT_SCHEMAS = (
     ATTEMPT_SCHEMA,
+    "agent_commons.runtime_attempt.v4",
     "agent_commons.runtime_attempt.v3",
     "agent_commons.runtime_attempt.v2",
 )
@@ -247,6 +247,9 @@ class Attempt:
     stderr_bytes_seen: int
     output_truncated: bool
     diagnostic_code: DiagnosticCode
+    stderr_diagnostic_tail: str | None
+    stderr_diagnostic_tail_truncated: bool
+    stderr_diagnostic_tail_redacted: bool
     created_at: str
     updated_at: str
 
@@ -271,6 +274,9 @@ class Attempt:
             "stderr_bytes_seen": self.stderr_bytes_seen,
             "output_truncated": self.output_truncated,
             "diagnostic_code": self.diagnostic_code.value,
+            "stderr_diagnostic_tail": self.stderr_diagnostic_tail,
+            "stderr_diagnostic_tail_truncated": self.stderr_diagnostic_tail_truncated,
+            "stderr_diagnostic_tail_redacted": self.stderr_diagnostic_tail_redacted,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -335,11 +341,27 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
         "stderr_bytes_seen",
         "output_truncated",
         "diagnostic_code",
+        "stderr_diagnostic_tail",
+        "stderr_diagnostic_tail_truncated",
+        "stderr_diagnostic_tail_redacted",
         "created_at",
         "updated_at",
     }
-    legacy = value.get("schema") == _LEGACY_ATTEMPT_SCHEMA
-    if set(value) != (expected - {"diagnostic_code"} if legacy else expected):
+    schema = value.get("schema")
+    legacy_diagnostic = schema == _LEGACY_ATTEMPT_SCHEMA
+    legacy_stderr = schema != ATTEMPT_SCHEMA
+    missing = set()
+    if legacy_diagnostic:
+        missing.add("diagnostic_code")
+    if legacy_stderr:
+        missing.update(
+            {
+                "stderr_diagnostic_tail",
+                "stderr_diagnostic_tail_truncated",
+                "stderr_diagnostic_tail_redacted",
+            }
+        )
+    if set(value) != expected - missing:
         raise IntegrityError("stored runtime attempt has an invalid shape")
     try:
         attempt = Attempt(
@@ -363,8 +385,15 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
             output_truncated=bool(value["output_truncated"]),
             diagnostic_code=(
                 DiagnosticCode.LEGACY_UNCLASSIFIED
-                if legacy
+                if legacy_diagnostic
                 else DiagnosticCode(str(value["diagnostic_code"]))
+            ),
+            stderr_diagnostic_tail=(None if legacy_stderr else value["stderr_diagnostic_tail"]),
+            stderr_diagnostic_tail_truncated=(
+                False if legacy_stderr else bool(value["stderr_diagnostic_tail_truncated"])
+            ),
+            stderr_diagnostic_tail_redacted=(
+                False if legacy_stderr else bool(value["stderr_diagnostic_tail_redacted"])
             ),
             created_at=str(value["created_at"]),
             updated_at=str(value["updated_at"]),
@@ -386,11 +415,21 @@ def _attempt_from_mapping(value: Mapping[str, Any]) -> Attempt:
         or isinstance(value["stdout_bytes_seen"], bool)
         or isinstance(value["stderr_bytes_seen"], bool)
         or not isinstance(value["output_truncated"], bool)
+        or (not legacy_stderr and not isinstance(value["stderr_diagnostic_tail_truncated"], bool))
+        or (not legacy_stderr and not isinstance(value["stderr_diagnostic_tail_redacted"], bool))
         or attempt.number < 1
         or attempt.stdout_bytes_seen < 0
         or attempt.stderr_bytes_seen < 0
     ):
         raise IntegrityError("stored runtime attempt counters are invalid")
+    if attempt.stderr_diagnostic_tail is not None and (
+        not isinstance(attempt.stderr_diagnostic_tail, str)
+        or not attempt.stderr_diagnostic_tail
+        or len(attempt.stderr_diagnostic_tail.encode("utf-8")) > 4 * 1024
+    ):
+        raise IntegrityError("stored runtime stderr diagnostic tail is invalid")
+    if attempt.stderr_diagnostic_tail is None and attempt.stderr_diagnostic_tail_redacted:
+        raise IntegrityError("stored runtime stderr redaction marker has no diagnostic tail")
     if (value["pid"] is not None and (isinstance(value["pid"], bool) or attempt.pid < 1)) or (
         value["exit_code"] is not None and isinstance(value["exit_code"], bool)
     ):
@@ -472,6 +511,9 @@ class AttemptStore:
                         **attempt,
                         "schema": ATTEMPT_SCHEMA,
                         "diagnostic_code": DiagnosticCode.LEGACY_UNCLASSIFIED.value,
+                        "stderr_diagnostic_tail": None,
+                        "stderr_diagnostic_tail_truncated": False,
+                        "stderr_diagnostic_tail_redacted": False,
                     }
                     for attempt in value["attempts"]
                 ],
@@ -484,7 +526,14 @@ class AttemptStore:
                 **value,
                 "schema": REQUEST_SCHEMA,
                 "attempts": [
-                    {**attempt, "schema": ATTEMPT_SCHEMA} for attempt in value["attempts"]
+                    {
+                        **attempt,
+                        "schema": ATTEMPT_SCHEMA,
+                        "stderr_diagnostic_tail": None,
+                        "stderr_diagnostic_tail_truncated": False,
+                        "stderr_diagnostic_tail_redacted": False,
+                    }
+                    for attempt in value["attempts"]
                 ],
             }
         return value
@@ -810,6 +859,9 @@ class AttemptStore:
             stderr_bytes_seen=0,
             output_truncated=False,
             diagnostic_code=DiagnosticCode.NONE,
+            stderr_diagnostic_tail=None,
+            stderr_diagnostic_tail_truncated=False,
+            stderr_diagnostic_tail_redacted=False,
             created_at=timestamp,
             updated_at=timestamp,
         )
@@ -990,6 +1042,9 @@ class AttemptStore:
         stderr_bytes_seen: int = 0,
         output_truncated: bool = False,
         diagnostic_code: DiagnosticCode | str | None = None,
+        stderr_diagnostic_tail: str | None = None,
+        stderr_diagnostic_tail_truncated: bool = False,
+        stderr_diagnostic_tail_redacted: bool = False,
     ) -> Attempt:
         self._require_writable()
         target = AttemptState(target)
@@ -998,6 +1053,16 @@ class AttemptStore:
             raise ValidationError("runtime process id is invalid")
         if stdout_bytes_seen < 0 or stderr_bytes_seen < 0:
             raise ValidationError("runtime output counters cannot be negative")
+        if stderr_diagnostic_tail is not None and (
+            not isinstance(stderr_diagnostic_tail, str)
+            or not stderr_diagnostic_tail
+            or len(stderr_diagnostic_tail.encode("utf-8")) > 4 * 1024
+        ):
+            raise ValidationError("runtime stderr diagnostic tail is invalid")
+        if not isinstance(stderr_diagnostic_tail_truncated, bool) or not isinstance(
+            stderr_diagnostic_tail_redacted, bool
+        ):
+            raise ValidationError("runtime stderr diagnostic markers must be booleans")
         normalized_diagnostic = (
             DiagnosticCode(diagnostic_code) if diagnostic_code is not None else None
         )
@@ -1015,6 +1080,11 @@ class AttemptStore:
                             or current.stdout_bytes_seen != stdout_bytes_seen
                             or current.stderr_bytes_seen != stderr_bytes_seen
                             or current.output_truncated != bool(output_truncated)
+                            or current.stderr_diagnostic_tail != stderr_diagnostic_tail
+                            or current.stderr_diagnostic_tail_truncated
+                            != stderr_diagnostic_tail_truncated
+                            or current.stderr_diagnostic_tail_redacted
+                            != stderr_diagnostic_tail_redacted
                             or (
                                 normalized_diagnostic is not None
                                 and current.diagnostic_code is not normalized_diagnostic
@@ -1044,6 +1114,9 @@ class AttemptStore:
                             if normalized_diagnostic is not None
                             else current.diagnostic_code
                         ),
+                        stderr_diagnostic_tail=stderr_diagnostic_tail,
+                        stderr_diagnostic_tail_truncated=stderr_diagnostic_tail_truncated,
+                        stderr_diagnostic_tail_redacted=stderr_diagnostic_tail_redacted,
                         updated_at=_iso(self.clock()),
                     )
                     attempts = list(document["attempts"])
@@ -1060,6 +1133,10 @@ class AttemptStore:
             RunOutcome.TIMED_OUT: AttemptState.TIMED_OUT,
         }[result.outcome]
         diagnostic = classify_process_result(result)
+        stderr_tail, stderr_truncated, stderr_redacted = sanitize_provider_stderr_tail(
+            result,
+            policy=self.security_policy,
+        )
         return self.transition(
             attempt_id,
             target,
@@ -1070,6 +1147,9 @@ class AttemptStore:
             stderr_bytes_seen=result.stderr_bytes_seen,
             output_truncated=result.output_truncated,
             diagnostic_code=diagnostic.code,
+            stderr_diagnostic_tail=stderr_tail,
+            stderr_diagnostic_tail_truncated=stderr_truncated,
+            stderr_diagnostic_tail_redacted=stderr_redacted,
         )
 
     @staticmethod
