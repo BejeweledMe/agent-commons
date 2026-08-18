@@ -1,0 +1,397 @@
+# План работ по итогам аудита качества кода
+
+**Замороженный коммит:** `4e0ec8f` (`codex/code-quality-audit`).
+
+**Вход:** пять независимых проходов по всему `src/`: structure — Claude Opus,
+types — Codex `gpt-5.6-sol`, deadweight — Claude Sonnet, efficiency — Codex
+`gpt-5.6-terra`, readability — Codex `gpt-5.6-luna`. Финальная версия
+deadweight-отчёта получена повторным проходом без доступа к peer-отчётам; первый
+связанный черновик в репозиторий не включён.
+
+## 1. Сводка и работа рубрики
+
+| Линза | Пришло |
+|---|---:|
+| Структура | 17 |
+| Типы | 6 |
+| Мёртвый вес / объяснения | 9 |
+| Эффективность | 2 |
+| Читаемость | 5 |
+| **Итого** | **39** |
+
+Отсеяна **1 находка из 39**:
+
+- `deadweight-report.md §1.2`, немедленно удалить публичный
+  `SchemaRegistry.from_schema_files`: поиск не доказал отсутствие внешних
+  embedders, а правка не предлагает обязательное окно совместимости. Наблюдение
+  о нулевых внутренних потребителях остаётся входом для решения человека, но
+  предложенная правка рубрику не проходит.
+
+Остальные 38 находок имеют конкретные место, цену, правку и область риска либо,
+для тестовых кандидатов, называемую мутацию. Одиннадцать записей были точными
+дублями и склеены в пять находок: `CommonsManager`, `build_server`, `UIContext`,
+операционное файловое состояние и фазы projection/lifecycle. Это убрало шесть
+дублирующих записей; 32 самостоятельных результата ниже сгруппированы в рабочие
+пакеты, а не разложены в длинный backlog.
+
+**Честная оценка рубрики:** отсев 1/39 — почти нулевой. По критерию владельца
+рубрика как финальный фильтр **не сработала**: она задала форму отчётов и помогла
+ревьюерам самоотсеяться до сдачи, но почти не различила качество уже пришедших
+находок. Для следующего аудита нужен проверяемый rejection gate до сдачи отчёта:
+отдельная таблица «кандидат → цена → контракт → решение оставить/отбросить» и
+автоматическая проверка наличия всех полей.
+
+## 2. Находки с несколькими независимыми свидетельствами
+
+### 2.1 Операционное файловое состояние разошлось по безопасности — critical
+
+**Свидетельства:** structure П5/П6/П8, deadweight §2.1/§2.2, readability R-5.
+
+`sessions.py`, `attempts.py` и `communication.py` независимо реализуют приватный
+каталог, canonical bytes и exclusive lock. Копия sessions не проверяет symlink,
+не использует `O_NOFOLLOW` и process-local mutex; две более строгие копии тоже
+расходятся в вычислении lock identity. Соседние модули импортируют приватные
+имена друг у друга. Это уже различие поведения на границе хранилища идентичности,
+а не эстетическое дублирование.
+
+Общий модуль нужен, но перенос и ужесточение нельзя смешивать: сначала
+characterization tests и единый механический владелец байтов/времени/замка,
+затем отдельный поведенческий коммит для symlink, `O_NOFOLLOW`, mutex и strict
+JSON rejection.
+
+### 2.2 Projection/lifecycle одновременно трудны для чтения, нетипизированы и дороги
+
+**Свидетельства:** structure П9, types P2–P4, efficiency E1–E2, readability R-4.
+
+Один и тот же горячий путь несёт четыре цены: цикл между двумя крупными
+доменными модулями, `Mapping[str, Any]` после уже успешной schema-validation,
+неименованные фазы replay/transition и двух-/трёхкратные полные
+`O(n log n)` проходы. SQLite verified read дополнительно держит несколько
+представлений всего ledger в памяти.
+
+Здесь нельзя делать отдельные «красивые» helpers, typed rewrite и streaming
+optimization параллельно. Нужен один порядок: benchmark/characterization →
+именованные фазы и `ProjectSnapshot` в собственный модуль → typed event boundary
+и record-типы вертикальными срезами → устранение лишней materialization →
+оптимизация fixed-point replay. Integrity checks, порядок событий и persisted
+JSON остаются прежними.
+
+### 2.3 `CommonsManager` скрывает пятнадцать причин меняться
+
+**Свидетельства:** structure П17, readability R-1; types P6 подтверждает цену
+нетипизированной публичной поверхности.
+
+93 публичных метода и 3058 строк объединяют lifecycle сущностей, запись событий,
+projection, sessions/claims, evidence и runtime-facing операции. Structure дала
+полную карту из 15 тем и проверила 37 потребителей; readability независимо
+подтвердила потерю нити на сквозных маршрутах.
+
+Шаг A — только механический перенос тел по тематическим command-модулям с тем же
+`CommonsManager`, сигнатурами и `self.record_event`. Шаг B — отдельная публичная
+миграция к сотрудникам (`manager.tasks`, `manager.roles`, …) через трёхшаговое
+окно. Эти шаги не объединяются в один проект или коммит.
+
+### 2.4 `UIContext` смешивает кэш, read models и пишущие workflow
+
+**Свидетельства:** structure П15, readability R-3, types P6.
+
+55 методов и 1406 строк связывают fingerprint/cache, представления, каталог,
+команды и provider launch; наружу выходят разные неименованные словари. Сначала
+отделяются read adapters, затем actions/launch coordinator; `UIContext` остаётся
+совместимым фасадом. Typed DTO появляются в памяти после стабилизации projection;
+JSON shape и статический клиент в структурном коммите не меняются.
+
+### 2.5 `build_server` скрывает binding, scope и 30 регистраций инструментов
+
+**Свидетельства:** structure П14, readability R-2.
+
+Функция на 1016 строк держит одновременно каноническую привязку worker,
+repository scope, grants и каталог инструментов. Порядок выноса:
+`ScopedRepoReader` → entrypoint → `WorkerScope` → тематические `register_*`.
+`server.py` остаётся фасадом; MCP tool names, schemas и catalog handshake не
+меняются.
+
+### 2.6 Состояния и публичные словари имеют несколько источников истины
+
+**Свидетельства:** structure П1/П2, types P3–P6, readability R-3.
+
+Пять копий `kind → collection`, несколько наборов delegation states и broad
+dict-контракты позволяют новому виду сущности или состоянию молча потеряться в
+projection, broker либо UI. Сначала централизуются существующие значения без
+изменения поведения; затем вводятся in-memory enum/record/DTO. JSON по-прежнему
+содержит те же строки и ключи.
+
+## 3. Три потока работы
+
+### Поток А — структурные переезды
+
+Это один упорядоченный поток. Каждый пункт завершается отдельным
+поведенчески нейтральным коммитом и `make check`; изменения поведения из потока
+В в такой коммит не попадают.
+
+#### A0. До первого переезда — зафиксировать поведение
+
+- Добавить characterization tests для event payload/replay, lifecycle transitions,
+  MCP tool catalog, UI JSON shapes и всех трёх вариантов private storage.
+- Добавить large-ledger benchmark двух-/трёхпроходного replay и peak allocation.
+- Выполнить мутационные проверки трёх веток `ReceiptRecovery.status`; тесты
+  добавлять только если названные мутации выживают.
+- Получить решения В1–В4 ниже, иначе структурный перенос будет скрыто менять
+  поведение.
+
+#### A1. Убрать дубли, которые иначе размножатся при разбиении
+
+1. Один `kind → collection` и именованные множества delegation states.
+2. Один unsafe-path predicate для `ScopedRepoReader`.
+3. Классификацию process/workflow diagnostics собрать в
+   `runtime/diagnostics.py`.
+4. Общие timestamp/canonical-bytes/private-directory/lock примитивы собрать у
+   одного владельца после решения В1. Механический перенос и ужесточение —
+   разные коммиты.
+5. `ProjectSnapshot` перенести в `domain/snapshot.py` с реэкспортом из
+   `projection.py`; этим убрать цикл с lifecycle.
+
+Это обязательный первый пакет: иначе копии констант и файловых примитивов
+разъедутся по новым модулям.
+
+#### A2. Доказать разбиение `CommonsManager`
+
+1. Сначала вынести чистый выбор qualifying review из `accept_task` в
+   `domain/acceptance.py`; иначе `tasks.py` будет зависеть от `reviews.py`.
+2. Минимальный доказательный коммит: `services/roles.py`, `RoleCommands`, 11
+   методов и `_agent_view`, дословные сигнатуры, тот же `CommonsManager`.
+3. Затем `delegations.py` — после roles из-за общей зависимости от
+   `agent_delegations` и non-terminal states.
+4. Затем `tasks.py` — после `domain/acceptance.py`.
+5. Затем механические темы: threads, artifacts, reviews, findings, decisions,
+   handoffs, objectives, maintenance и receipts.
+6. Sessions/claims — последними. Тонкие прокси заменяются доступом к уже
+   существующим службам; проверка живых делегаций при завершении сессии остаётся
+   в ядре.
+
+Шаг A заканчивается, когда тела распределены, а публичная поверхность
+`CommonsManager` и поведение полностью прежние. Только после этого разрешён
+ISP-шаг A8.
+
+#### A3. Собрать доменное понятие роли
+
+После появления сервисного шва собрать `domain/roles.py` из логики в
+`agents.py`, validation и lifecycle. Старый `domain/agents.py` остаётся
+реэкспортом на окно. Сервисный и доменный переезды — разные коммиты, чтобы
+откат одного не откатывал другой.
+
+#### A4. Разложить composition roots и presentation
+
+Порядок внутри пакета:
+
+1. MCP: `ScopedRepoReader` → entrypoint → scope → tool registration modules.
+2. UI: read models → actions → launch coordinator; `UIContext` делегирует.
+3. CLI: `_shared.py`/workspace, затем agent и broker, затем остальные группы;
+   `agent_commons.cli:cli` остаётся тем же импортом.
+4. Малые перемещения: demo runner из runtime в services, presentation из
+   корневого `views.py`; eval harness — только после решения В5.
+
+MCP и CLI можно выполнять параллельными ветками после A2: они не должны
+одновременно менять публичные имена или payloads.
+
+#### A5. Типизировать доменную границу вертикальными срезами
+
+1. Typed delegation/maintenance envelope после schema-validation.
+2. Task/review, затем thread/handoff, truth/evidence и roles.
+3. Frozen projected records и тематические reducers по тем же срезам.
+4. Единый typed `TransitionSpec`; entity-specific validators вызываются из
+   него, а не содержат параллельные таблицы строк.
+
+Каждый parser/serializer обязан round-trip существующие fixtures без изменения
+JSON. Не делать «всё сразу»: один срез — один зелёный коммит.
+
+#### A6. Оптимизировать replay только на стабилизированной модели
+
+1. Убрать вторую materialization между verified SQLite read и replay, не
+   ослабляя hash/workspace checks.
+2. Переиспользовать одну ordered normalized sequence между fixed-point passes.
+3. Лишь затем сокращать число полных проходов; benchmark и peak-RSS budget
+   обязаны доказать эффект на десятках тысяч событий.
+
+#### A7. Ввести узкие публичные DTO
+
+После typed projection: manager → MCP/CLI, затем manager → UI/views. Это
+in-memory `TypedDict`/frozen dataclass поверх прежнего wire shape.
+
+#### A8. Мигрировать от фасада к сотрудникам
+
+Новые `manager.tasks`, `manager.roles`, … появляются рядом; старые 93 метода
+делегируют и предупреждают; удаление — отдельный третий шаг после окна. Только
+здесь потребители получают узкие Protocol, а не во время механического A2.
+
+### Поток Б — точечные правки
+
+Эти пакеты можно раздать независимо, учитывая gates из потока В:
+
+- Строго разобрать `ClaimStatus`/`SessionStatus` после решения о legacy
+  records без status.
+- Связать `TypedRef.kind` с префиксом ID; extension refs оставить явной
+  отдельной веткой.
+- Удалить неиспользуемый `CommonsManager._receipt_issues` либо отдельно
+  решить, нужна ли его safety-проверка на живом пути.
+- Для `EventSpec.truth_layer` выбрать одно: удалить действительно мёртвое поле
+  или завести реального потребителя отдельным поведенческим проектом. Не
+  оставлять псевдоконтракт.
+- Объяснить вырожденный `MetricsAggregate.pass_power_k` (k=1), не выдавая его
+  за многократный эксперимент.
+- Проверить mutmut названными мутациями для conflicting receipt,
+  legacy-conflict и reconciled-tombstone warning; решение о тестах принимать по
+  результату, не по вкусу.
+- Сохранить и распространять существующий стиль frozen dataclass, `StrEnum`,
+  `| None` и узких Protocol; новые dependencies не нужны.
+
+### Поток В — решения человека и изменения поведения
+
+#### В1. Какой строгий контракт у private operational storage?
+
+Выбрать единое поведение symlink, `O_NOFOLLOW`, process-local mutex, lock
+identity и invalid JSON. Рекомендация отчётов — строгий вариант attempts /
+communication. Сначала механический общий модуль, затем отдельный
+поведенческий коммит с негативными и concurrency tests.
+
+#### В2. Поддерживаются ли старые session/claim records без `status`?
+
+Вариант A: legacy parser явно подставляет `active`; вариант B: отсутствие поля
+— integrity error. Новые записи в обоих вариантах имеют обязательный enum.
+
+#### В3. Должны ли ring и Attention показывать один и тот же набор?
+
+Сейчас ring знает два источника, Attention — четыре. Объединение включит ring
+для `work_returned` и `config_broken`, то есть изменит наблюдаемое UI-поведение.
+Рекомендация structure — один доменный predicate, но решение и regression
+tests должны быть отдельными от переноса UIContext.
+
+#### В4. Меняем ли режим generated views и момент отказа на invalid JSON?
+
+Переход на общий atomic writer сделает file mode детерминированным; переход на
+strict canonical bytes начнёт раньше отвергать `NaN`/нестроковые ключи. Оба
+изменения полезны, но не являются структурным переносом.
+
+#### В5. Является ли `agent_commons.evals` публичной поверхностью?
+
+Structure предлагает перенести единственного внутреннего потребителя в tests;
+deadweight подтверждает, что пакет не мёртв и внутренне согласован. Если есть
+внешний потребитель — оставить пакет или дать deprecation window/extra. Если
+нет — переместить harness, не удаляя тестовую ценность.
+
+#### В6. Когда закрывать окна публичной миграции?
+
+Отдельно утвердить сроки для manager collaborators, `DemoRunner`, presentation,
+CLI/MCP/HTTP names. Старое имя работает и предупреждает, новое рядом, удаление
+третьим шагом. Ни один структурный коммит не является разрешением на flag day.
+
+## 4. Конфликты между линзами
+
+### Какой блок `CommonsManager` выносить первым
+
+- Structure: roles — крупнейший связный блок, дешёвый доказательный шов.
+- Readability: начать с read-only группы, чтобы снизить риск записи.
+
+**Рекомендация:** принять структуру как более проверяемую гипотезу: механически
+вынести `RoleCommands`, но до него зафиксировать read-only characterization и
+payload/revision equivalence tests. Ядровые read-only методы snapshot/orient/
+doctor остаются в manager и не образуют самостоятельной command-темы.
+
+### Централизовать transition table или дробить `validate_transition`
+
+- Types: один typed `TransitionSpec` как источник from/to state и parser.
+- Structure/readability: entity-specific функции и именованные фазы вместо
+  монолита.
+
+**Рекомендация:** не выбирать одно вместо другого. Сначала typed spec с
+прежними значениями, затем validators по entity family, которые читают spec.
+Запрещено создавать отдельную таблицу в каждом новом модуле.
+
+### Streaming replay или полный проверенный snapshot
+
+- Efficiency: iterator/normalized sequence, чтобы убрать дубли памяти.
+- Healthy-выводы structure/types: fail-closed schema/hash verification и полный
+  snapshot — сильная граница, которую нельзя ослаблять.
+
+**Рекомендация:** сначала убрать повторную materialization и повторно
+использовать immutable ordered sequence. Не превращать replay в streaming до
+benchmark и доказательства эквивалентности integrity checks.
+
+### Где должен жить общий local-storage primitive
+
+- Structure: `storage/opstate.py`, потому что потребители есть в coordination и
+  runtime.
+- Deadweight/readability: общий private-storage helper рядом с runtime или
+  `storage/atomic.py`.
+
+**Рекомендация:** `storage/opstate.py`: это механизм публикации/блокировки, а не
+runtime lifecycle. `storage/atomic.py` остаётся здоровым низкоуровневым
+примитивом; opstate строится поверх него.
+
+### Переносить ли `evals/`
+
+- Structure: единственный внутренний потребитель — tests, значит harness не
+  должен ехать в wheel.
+- Deadweight: пакет живой, согласованный и имеет тестовую ценность.
+
+**Рекомендация:** это не конфликт «удалить/оставить код». Не удалять; решить В5
+о публичности и затем либо переместить с окном, либо оформить поддерживаемый
+extra.
+
+## 5. Что здорово и не подлежит широкой уборке
+
+- `core/`: strict canonical serialization/parser, IDs, refs и schema registry
+  имеют узкие границы. Исправлять только kind↔prefix и подтверждённые обходы
+  canonical bytes; не переписывать пакет.
+- `storage/` чист по слоям; EventStore, ManifestStore, IdempotencyStore и
+  ReceiptRecovery разделены по ответственности. `atomic.py` правильно
+  различает immutable publish и replace. Не ослаблять validation/fsync/hash.
+- `coordination/claims.py` — образец одной причины меняться; frozen `Claim` и
+  нормализация ресурсов разделены.
+- `security/policy.py` — один владелец classification/scan/assert-safe.
+- `index/sqlite.py`: incremental sync, одна транзакция, bounded FTS search и
+  read-only path здоровы. Оптимизация касается containers вокруг verified
+  projection, не integrity или запросов.
+- `runtime/subprocess_runner.py` ограничивает stderr во время чтения 4 KiB;
+  `broker.py`, `exec_gate.py`, `policy.py`, `telemetry.py` имеют честные
+  границы.
+- Все проверенные Protocol имеют реальные вторые реализации, внешние границы
+  или test doubles. Удалять их ради количества строк не надо.
+- `ui/server.py` уже разложен по темам. `src/agent_commons/ui/static/index.html`
+  не входит в этот cleanup и остаётся под отдельным frontend contract.
+- Комментарии в целом объясняют инварианты и инциденты; сокращать их нельзя.
+  Частный лживый/неполный текст исправляется точечно.
+- Приватные helpers CLI/views/config/MCP, проверенные deadweight-линзой, живы;
+  массовая «чистка» по имени с подчёркиванием не нужна.
+- `runtime/model.py`, attempts/communication dataclasses и `StrEnum` — локальный
+  образец для типизации; pydantic/attrs не нужны.
+- `evals/` не мёртв. Вопрос только в поставке и публичности, а не в удалении.
+
+## 6. Объём и практический порядок
+
+Поток A — несколько недель и десятки зелёных коммитов, а не один rewrite.
+Первые работы — A0/A1 и доказательный `RoleCommands`: они уменьшают дубли и
+проверяют шов до массового перемещения. Затем A2 полностью завершается до
+публичного ISP; MCP/UI/CLI раскладываются на стабильном фасаде; typed event и
+projection идут вертикальными срезами; performance — только после benchmark и
+typed normalized representation; публичные DTO/сотрудники — последними.
+
+Поток Б можно выполнять параллельно по непересекающимся файлам после решений
+В1/В2. Поток В должен дать ранние ответы, но его поведенческие коммиты не входят
+в структурные переезды. «Первые 20%» здесь — A0, A1, защита status/ref и один
+`RoleCommands`-коммит; это начало полного плана, а не отказ от оставшихся 80%.
+
+## 7. Persisted format и семантика событий
+
+Ни одна принятая структурная находка не требует менять формат записанных
+событий, schema names, event names или семантику replay. Typed envelope,
+`StrEnum`, projected records и DTO существуют только в памяти; serializer
+обязан выдавать прежний JSON byte-for-byte, а старые fixtures — round-trip без
+изменений.
+
+Отдельного решения требуют только read-path старых session/claim records без
+`status` и более ранний отказ на невалидном operational JSON; это не миграция
+canonical event ledger. Если при разбиении lifecycle обнаружится необходимость
+изменить from/to state или смысл события, работа останавливается и оформляется
+как отдельная миграция данных/семантики в потоке В. Она не может быть частью
+ни A1–A8, ни типизации.
