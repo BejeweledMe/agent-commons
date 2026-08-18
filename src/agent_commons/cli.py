@@ -1102,6 +1102,15 @@ _DELEGATION_REASON_CODES = (
     "orphaned",
     "unknown",
 )
+_BOUNDED_DELEGATION_LIMITS_EXAMPLE = (
+    '{"max_depth":0,"wall_time_seconds":600,"max_attempts":1,'
+    '"max_concurrency":1,"budget":{"unit":"provider_units","limit":1}}'
+)
+_DELEGATION_CREATE_HELP = (
+    "Create a requested delegation bound to one exact target revision.\n\n\b\n"
+    "Complete bounded limits example (copy/paste):\n"
+    f"  --limits-json '{_BOUNDED_DELEGATION_LIMITS_EXAMPLE}'"
+)
 
 
 @cli.group("delegation")
@@ -1109,12 +1118,16 @@ def delegation_group() -> None:
     """Record bounded cross-agent delegation lifecycles."""
 
 
-@delegation_group.command("create")
+@delegation_group.command("create", help=_DELEGATION_CREATE_HELP)
 @click.option("--target-ref", required=True)
 @click.option("--target-revision", required=True)
 @click.option("--target-profile", type=click.Choice(_DELEGATION_PROFILES), required=True)
 @click.option("--purpose", type=click.Choice(_DELEGATION_PURPOSES), required=True)
-@click.option("--limits-json", required=True)
+@click.option(
+    "--limits-json",
+    required=True,
+    help="Bounded depth, time, attempt, concurrency, and provider budget object.",
+)
 @click.option("--parent-delegation-id")
 @click.option(
     "--on-behalf-of",
@@ -1136,18 +1149,61 @@ def delegation_create(
 ) -> None:
     """Create a requested delegation bound to one exact target revision."""
 
-    state.emit(
-        state.manager().create_delegation(
-            target_ref=_ref(target_ref, field="target_ref"),
-            target_revision=target_revision,
-            target_profile=target_profile,
-            purpose=purpose,
-            limits=_json_object(limits_json, "limits_json"),
-            parent_delegation_id=parent_delegation_id,
-            on_behalf_of_agent_id=on_behalf_of_agent_id,
-            idempotency_key=idempotency_key,
-        )
+    result = state.manager().create_delegation(
+        target_ref=_ref(target_ref, field="target_ref"),
+        target_revision=target_revision,
+        target_profile=target_profile,
+        purpose=purpose,
+        limits=_json_object(limits_json, "limits_json"),
+        parent_delegation_id=parent_delegation_id,
+        on_behalf_of_agent_id=on_behalf_of_agent_id,
+        idempotency_key=idempotency_key,
     )
+    state.emit(result)
+    if state.json_output:
+        return
+
+    delegation_id = str(result["entity_ref"]["id"])
+    requested_revision = str(result["revision"])
+    requester_session_id = str(state.session_id)
+    command_prefix = [sys.executable, "-m", "agent_commons", "--repo", str(state.repo)]
+    if state.state_root is not None:
+        command_prefix.extend(("--state-root", str(state.state_root)))
+    elif state.state_base is not None:
+        command_prefix.extend(("--state-base", str(state.state_base)))
+    preflight = [
+        *command_prefix,
+        "broker",
+        "preflight",
+        target_profile,
+        "--purpose",
+        purpose,
+    ]
+    launch = [
+        *command_prefix,
+        "broker",
+        "run",
+        delegation_id,
+        requested_revision,
+        "--idempotency-key",
+        f"launch-{delegation_id}",
+    ]
+    click.echo()
+    click.echo(
+        "Only the canonical requester session may launch this delegation, "
+        "and it must remain active."
+    )
+    click.echo("Safe next actions:")
+    click.echo("  1. In a shell where that session is still active, select it:")
+    click.echo(f"     export AGENT_COMMONS_SESSION_ID={shlex.quote(requester_session_id)}")
+    click.echo(
+        "  If you use a non-default operator config, add "
+        "--profile-config /absolute/path/runtime.yaml to both commands below."
+    )
+    click.echo("  2. Check the provider/runtime without consuming an attempt:")
+    click.echo(f"     {shlex.join(preflight)}")
+    click.echo("  3. Launch this exact delegation revision:")
+    click.echo(f"     {shlex.join(launch)}")
 
 
 _GRANT_LEVELS = ("deny", "ask", "auto")

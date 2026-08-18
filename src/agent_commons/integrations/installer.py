@@ -226,6 +226,7 @@ def _plan_owned_file(
     relative_path: str,
     replace_existing: bool,
     replacement_option: str = "replace_onboarding",
+    product_checkout: bool = False,
 ) -> _PlannedWrite:
     _validate_regular_or_missing(path, label=relative_path)
     if not path.exists():
@@ -234,11 +235,28 @@ def _plan_owned_file(
     if current == content:
         return _PlannedWrite(path, content, relative_path, "unchanged", current)
     if not replace_existing:
+        project_hint = (
+            "; this target looks like the Agent Commons product checkout, so initialize "
+            "a separate customer project and point --repo at that project"
+            if product_checkout
+            else ""
+        )
         raise ConfigurationError(
             f"refusing to replace locally modified {relative_path}; "
             f"pass {replacement_option}=True only after reviewing the canonical content"
+            f"{project_hint}"
         )
     return _PlannedWrite(path, content, relative_path, "updated", current)
+
+
+def _looks_like_product_checkout(root: Path) -> bool:
+    """Recognize the source checkout well enough to give a safer init hint."""
+
+    return (
+        (root / "pyproject.toml").is_file()
+        and (root / "src" / "agent_commons" / "integrations" / "installer.py").is_file()
+        and (root / "tests").is_dir()
+    )
 
 
 def _plan_integration_file(
@@ -459,6 +477,7 @@ def _initialize_workspace_locked(
     selected = _normalize_integrations(integrations)
     workspace = root / ".agent-commons"
     _validate_workspace_path(root, workspace)
+    product_checkout = _looks_like_product_checkout(root)
 
     name = _normalize_workspace_name(root.name if workspace_name is None else workspace_name)
 
@@ -474,12 +493,14 @@ def _initialize_workspace_locked(
             onboarding,
             relative_path=".agent-commons/ONBOARDING.md",
             replace_existing=replace_onboarding,
+            product_checkout=product_checkout,
         ),
         _plan_owned_file(
             workspace / ".gitignore",
             _template_text("WORKSPACE_GITIGNORE"),
             relative_path=".agent-commons/.gitignore",
             replace_existing=replace_onboarding,
+            product_checkout=product_checkout,
         ),
     ]
 
@@ -535,6 +556,7 @@ def _initialize_workspace_locked(
                         relative_path=relative.as_posix(),
                         replace_existing=replace_skills,
                         replacement_option="replace_skills",
+                        product_checkout=product_checkout,
                     )
                 )
 

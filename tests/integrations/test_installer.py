@@ -205,6 +205,30 @@ def test_locally_modified_onboarding_requires_explicit_replacement(tmp_path: Pat
     assert onboarding.read_text(encoding="utf-8").startswith("# Agent Commons onboarding")
 
 
+def test_product_checkout_conflict_points_to_a_separate_customer_project(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "agent-commons"\n')
+    product_module = tmp_path / "src" / "agent_commons" / "integrations" / "installer.py"
+    product_module.parent.mkdir(parents=True)
+    product_module.write_text("# product source marker\n")
+    (tmp_path / "tests").mkdir()
+    workspace = tmp_path / ".agent-commons"
+    workspace.mkdir()
+    onboarding = workspace / "ONBOARDING.md"
+    onboarding.write_text("product checkout guidance\n")
+
+    with pytest.raises(ConfigurationError) as raised:
+        initialize_workspace(tmp_path, integrations=())
+
+    message = str(raised.value)
+    assert "refusing to replace locally modified .agent-commons/ONBOARDING.md" in message
+    assert "initialize a separate customer project" in message
+    assert "point --repo at that project" in message
+    assert onboarding.read_text() == "product checkout guidance\n"
+    assert sorted(path.name for path in workspace.iterdir()) == ["ONBOARDING.md"]
+
+
 def test_locally_modified_skill_requires_explicit_replacement(tmp_path: Path) -> None:
     initialize_workspace(tmp_path, integrations=("codex",))
     skill = tmp_path / ".agents" / "skills" / "commons-start" / "SKILL.md"

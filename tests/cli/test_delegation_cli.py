@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shlex
+import sys
 from pathlib import Path
 
 from click.testing import CliRunner, Result
@@ -14,6 +16,13 @@ LIMITS = {
     "max_attempts": 1,
     "max_concurrency": 1,
     "budget": {"unit": "tokens", "limit": 8000},
+}
+BOUNDED_LIMITS = {
+    "max_depth": 0,
+    "wall_time_seconds": 600,
+    "max_attempts": 1,
+    "max_concurrency": 1,
+    "budget": {"unit": "provider_units", "limit": 1},
 }
 
 
@@ -62,6 +71,97 @@ def _task(manager: CommonsManager, key: str) -> dict:
     )
 
 
+def test_cli_delegation_create_help_has_a_complete_bounded_limits_example() -> None:
+    example = (
+        '{"max_depth":0,"wall_time_seconds":600,"max_attempts":1,'
+        '"max_concurrency":1,"budget":{"unit":"provider_units","limit":1}}'
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        ["delegation", "create", "--help"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Complete bounded limits example (copy/paste):" in result.output
+    assert f"--limits-json '{example}'" in result.output
+    assert json.loads(example) == BOUNDED_LIMITS
+
+
+def test_human_delegation_create_prints_safe_requester_launch_commands(tmp_path: Path) -> None:
+    repo, manager, parent, _ = _workspace(tmp_path)
+    task = _task(manager, "cli-delegation-guidance-target")
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--session-id",
+            parent["session_id"],
+            "delegation",
+            "create",
+            "--target-ref",
+            f"task:{task['entity_ref']['id']}",
+            "--target-revision",
+            task["revision"],
+            "--target-profile",
+            "claude-builder",
+            "--purpose",
+            "implementation",
+            "--limits-json",
+            json.dumps(BOUNDED_LIMITS),
+            "--idempotency-key",
+            "cli-delegation-guidance-create",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    delegation = manager.list_delegations()[0]
+    delegation_id = delegation["id"]
+    revision = delegation["revision"]
+    prefix = [sys.executable, "-m", "agent_commons", "--repo", str(repo)]
+    assert (
+        "Only the canonical requester session may launch this delegation, and it must remain "
+        "active."
+    ) in result.output
+    assert "In a shell where that session is still active, select it:" in result.output
+    assert (
+        "If you use a non-default operator config, add --profile-config "
+        "/absolute/path/runtime.yaml to both commands below."
+    ) in result.output
+    assert f"export AGENT_COMMONS_SESSION_ID={shlex.quote(parent['session_id'])}" in result.output
+    assert (
+        shlex.join(
+            [
+                *prefix,
+                "broker",
+                "preflight",
+                "claude-builder",
+                "--purpose",
+                "implementation",
+            ]
+        )
+        in result.output
+    )
+    assert (
+        shlex.join(
+            [
+                *prefix,
+                "broker",
+                "run",
+                delegation_id,
+                revision,
+                "--idempotency-key",
+                f"launch-{delegation_id}",
+            ]
+        )
+        in result.output
+    )
+    assert parent["nonce"] not in result.output
+
+
 def test_cli_delegation_create_show_list_start_and_succeed(tmp_path: Path) -> None:
     repo, manager, parent, child = _workspace(tmp_path)
     runner = CliRunner()
@@ -90,6 +190,17 @@ def test_cli_delegation_create_show_list_start_and_succeed(tmp_path: Path) -> No
         )
     )
     assert isinstance(created, dict)
+    assert set(created) == {
+        "event_id",
+        "event_type",
+        "entity_ref",
+        "revision",
+        "idempotency_key",
+        "created",
+        "repaired",
+        "index",
+    }
+    assert set(created["index"]) == {"mode", "synchronized", "next_action"}
     delegation_id = created["entity_ref"]["id"]
 
     shown = _json(
