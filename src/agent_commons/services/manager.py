@@ -53,7 +53,7 @@ from agent_commons.platform_support import lock_exclusive, require_supported_pla
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage import EventRecord, EventStore, ManifestStore, ReceiptRecovery
 from agent_commons.storage.events import semantic_event_body
-from agent_commons.views import inbox_view, orientation, render_views
+from agent_commons.views import addressed_spellings, inbox_view, orientation, render_views
 
 PAYLOAD_SCHEMAS = {
     "objective": "commons.payload.objective.v1",
@@ -806,7 +806,10 @@ class CommonsManager:
         if event_type == "handoff.acknowledged":
             handoff = entity(snapshot, "handoff", str(payload["handoff_id"])) or {}
             recipients = set(map(str, handoff.get("to") or []))
-            if not recipients.intersection({"*", session.session_id, session.role}):
+            # Recipients may be spelled bare or kind-prefixed; both must reach
+            # the same session, or a "role:"-addressed handoff is a message
+            # nobody can ever acknowledge (finding.7B0CXG5QTQ5SCY2JMCTW7W2SVH).
+            if not recipients.intersection(addressed_spellings(session.role, session.session_id)):
                 raise LifecycleConflictError(
                     "handoff can only be acknowledged by its session or role recipient"
                 )

@@ -118,6 +118,30 @@ def _addressed_items(
     )
 
 
+def addressed_spellings(
+    role: str, session_id: str, acting_agent_ids: Iterable[Any] = ()
+) -> set[str]:
+    """Every spelling a recipient list may use to reach this session.
+
+    Recipients arrive bare — a role name, a session id, an agent id — or
+    kind-prefixed, the way references are spelled everywhere else
+    ("role:independent-reviewer").  The matchers compared bare names only, so
+    a prefixed handoff was unacknowledgeable and invisible in every inbox
+    (finding.7B0CXG5QTQ5SCY2JMCTW7W2SVH).
+    """
+
+    spellings = {"*", role, session_id, f"role:{role}", f"session:{session_id}"}
+    for item in acting_agent_ids:
+        name = str(item)
+        spellings.add(name)
+        spellings.add(f"agent:{name}")
+    spellings.discard("")
+    spellings.discard("role:")
+    spellings.discard("session:")
+    spellings.discard("agent:")
+    return spellings
+
+
 def _compact_record(item: Mapping[str, Any]) -> dict[str, Any]:
     """Return a stable, action-oriented entity summary without actor or prose payloads."""
 
@@ -211,10 +235,8 @@ def _verbose_orientation(
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
     # A thread addressed to a standing role must reach the session running as
-    # it.  Matching only the session id and the self-declared label would leave
-    # the main chat invisible to the very roles it is addressed to.
-    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
-    addressed.discard("")
+    # it, whichever spelling the sender used — bare or kind-prefixed.
+    addressed = addressed_spellings(role, session_id, acting_agent_ids)
     objectives = list(
         islice(
             (item for item in snapshot.objectives.values() if item.get("state") == "active"),
@@ -387,10 +409,8 @@ def orientation(
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
     # A thread addressed to a standing role must reach the session running as
-    # it.  Matching only the session id and the self-declared label would leave
-    # the main chat invisible to the very roles it is addressed to.
-    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
-    addressed.discard("")
+    # it, whichever spelling the sender used — bare or kind-prefixed.
+    addressed = addressed_spellings(role, session_id, acting_agent_ids)
     objectives_all = sorted(snapshot.objectives.values(), key=lambda item: str(item.get("id", "")))
     objectives = [
         _compact_record(item)
@@ -579,10 +599,8 @@ def inbox_view(
     role = str((session or {}).get("role_id", ""))
     session_id = str((session or {}).get("session_id", ""))
     # A thread addressed to a standing role must reach the session running as
-    # it.  Matching only the session id and the self-declared label would leave
-    # the main chat invisible to the very roles it is addressed to.
-    addressed = {"*", role, session_id, *(str(item) for item in acting_agent_ids)}
-    addressed.discard("")
+    # it, whichever spelling the sender used — bare or kind-prefixed.
+    addressed = addressed_spellings(role, session_id, acting_agent_ids)
     all_threads = _addressed_items(
         snapshot.threads.values(), addressed=addressed, max_items=max(1, len(snapshot.threads))
     )

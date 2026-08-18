@@ -18,6 +18,7 @@ from agent_commons.errors import (
     ValidationError,
 )
 from agent_commons.services import CommonsManager
+from agent_commons.views import inbox_view
 
 
 def _open(
@@ -582,6 +583,55 @@ def test_handoff_acknowledgement_is_recipient_only(
         idempotency_key="handoff-ack",
     )
     assert acknowledged["event_type"] == "handoff.acknowledged"
+
+
+def test_a_role_prefixed_handoff_reaches_the_role_it_names(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """finding.7B0CXG5QTQ5SCY2JMCTW7W2SVH: a handoff addressed to
+    "role:independent-reviewer" could never be acknowledged by anyone — the
+    matcher compared bare role names only, so the prefixed spelling that every
+    other reference uses produced a message with no reachable recipient.  Both
+    spellings now reach the same session, and a session holding a different
+    role is still refused."""
+
+    repo, state_root, builder, reviewer = workspace
+    outsider, _ = _open(repo, state_root, name="outsider", role="observer")
+
+    prefixed = builder.create_handoff(
+        to=("role:reviewer",),
+        next_actions=("review the work",),
+        idempotency_key="handoff-role-prefixed",
+    )
+    prefixed_id = prefixed["entity_ref"]["id"]
+
+    with pytest.raises(LifecycleConflictError, match="recipient"):
+        outsider.acknowledge_handoff(
+            prefixed_id,
+            prefixed["revision"],
+            note="not mine either way",
+            idempotency_key="handoff-prefixed-wrong-recipient",
+        )
+    acknowledged = reviewer.acknowledge_handoff(
+        prefixed_id,
+        prefixed["revision"],
+        note="received via the prefixed spelling",
+        idempotency_key="handoff-prefixed-ack",
+    )
+    assert acknowledged["event_type"] == "handoff.acknowledged"
+
+    # And the prefixed spelling is visible where the recipient actually looks:
+    # the inbox filters by the same addressed set as the acknowledgement gate.
+    another = builder.create_handoff(
+        to=("role:reviewer",),
+        next_actions=("read the follow-up",),
+        idempotency_key="handoff-role-prefixed-inbox",
+    )
+    listed = inbox_view(
+        reviewer.snapshot(),
+        session={"role_id": "reviewer", "session_id": "session.whoever"},
+    )
+    assert another["entity_ref"]["id"] in {item.get("id") for item in listed.get("handoffs", [])}
 
 
 def test_correction_cannot_rewrite_handoff_recipients(
