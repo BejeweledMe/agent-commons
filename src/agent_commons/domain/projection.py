@@ -73,6 +73,22 @@ AGENT_LINK_STATES = {
 #: recording it: there is no writer to forget, and no path that can skip it.
 _LIFETIME_CLOSING_TASK_STATES = frozenset({"accepted", "cancelled"})
 
+#: The semantics version THIS build replays with.  Bumped only when replay
+#: semantics change such that an older reader would misjudge a healthy
+#: history — v2 is the causal acceptance guard: a v1 reader replays a
+#: twice-accepted chain into a false integrity failure
+#: (finding.026GYJFW71EAK7QTWDA0E1T6PR, seen live on 17 Aug 2026 when an old
+#: checkout's CLI read a newer ledger red).  A ledger stamped above this
+#: number makes the projection say "update agent-commons" instead of
+#: reporting integrity findings it cannot judge.
+LEDGER_SEMANTICS_VERSION = 2
+
+#: Event types whose replay depends on newer-than-v1 semantics, and the
+#: version each one requires.  Writers consult this to stamp the ledger
+#: exactly when a write starts depending on the newer behaviour — never
+#: earlier, so an untouched workspace stays readable by old code.
+SEMANTICS_SENSITIVE_EVENTS = {"task.accepted": 2}
+
 
 @dataclass(frozen=True)
 class ProjectionIssue:
@@ -117,6 +133,9 @@ class ProjectSnapshot:
     known_event_ids: set[str] = field(default_factory=set)
     known_manifest_ids: set[str] = field(default_factory=set)
     replay_metrics: dict[str, int] = field(default_factory=dict)
+    # The highest semantics version any effective stamp in this ledger names;
+    # 1 is everything written before stamps existed.
+    semantics_required: int = 1
 
     def entity_revision(self, kind: str, identifier: str) -> str | None:
         collection = getattr(
@@ -162,6 +181,7 @@ class ProjectSnapshot:
             "stale_refs": [
                 {"kind": kind, "id": identifier} for kind, identifier in sorted(self.stale_refs)
             ],
+            "semantics_required": self.semantics_required,
         }
 
 
@@ -334,6 +354,14 @@ def _annotate_review_producer(
 def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) -> None:
     event_type = str(event["event_type"])
     payload = event["payload"]
+    if event_type == "workspace.semantics_required":
+        # A monotone floor, not an entity: the ledger remembers the newest
+        # semantics any write has depended on, and readers compare themselves
+        # against it before trusting their own replay.
+        snapshot.semantics_required = max(
+            snapshot.semantics_required, int(payload.get("semantics_version", 0) or 0)
+        )
+        return
     if event_type == "objective.created":
         _apply(snapshot.objectives, str(payload["objective_id"]), event, "active")
     elif event_type == "objective.revised":
@@ -988,6 +1016,25 @@ def _project_events_once(
 
     _mark_bound_evidence_stale(snapshot)
     _fail_closed_decision_conflicts(snapshot)
+    if snapshot.semantics_required > LEDGER_SEMANTICS_VERSION:
+        # This build replays with older semantics than some write in the
+        # ledger depends on, so every integrity finding above is a possible
+        # misdiagnosis — the 17 Aug incident read a healthy twice-accepted
+        # chain as a lifecycle failure.  Say the one true thing instead.
+        gate = ProjectionIssue(
+            code="ledger_ahead_of_code",
+            severity="error",
+            message=(
+                f"this ledger requires agent-commons semantics version "
+                f"{snapshot.semantics_required}, but this build supports "
+                f"{LEDGER_SEMANTICS_VERSION} — update agent-commons before "
+                f"writing; integrity findings from an outdated reader are "
+                f"unreliable and have been suppressed"
+            ),
+            repairable=False,
+        )
+        snapshot.issues = [gate]
+        snapshot.warnings = [gate.message]
     snapshot.replay_metrics = {
         "events_replayed": len(raw),
         "corrections_indexed": len(corrections),

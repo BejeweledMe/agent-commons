@@ -18,6 +18,14 @@ class EventSpec:
 
 
 EVENT_SPECS: dict[str, EventSpec] = {
+    # The ledger's own floor: the newest semantics version any write depends
+    # on.  Not an entity lifecycle — replay folds it into a monotone maximum.
+    "workspace.semantics_required": EventSpec(
+        ("workspace_id", "semantics_version", "reason"),
+        "workspace",
+        "workspace_id",
+        "policy",
+    ),
     "objective.created": EventSpec(
         ("objective_id", "title", "description", "acceptance_criteria"),
         "objective",

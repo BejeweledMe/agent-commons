@@ -122,6 +122,15 @@ def validate_transition(
     actor_session_id: str,
     relations: Sequence[Mapping[str, Any]] = (),
 ) -> None:
+    if event_type == "workspace.semantics_required":
+        # The floor only rises.  A stamp at or below the current requirement
+        # is refused at write time, so replay never meets a redundant one and
+        # the ledger carries exactly one stamp per version step.
+        if int(payload.get("semantics_version", 0) or 0) <= snapshot.semantics_required:
+            raise LifecycleConflictError(
+                "the ledger already requires this semantics version or newer"
+            )
+        return
     if event_type.endswith(".created") or event_type in {
         "thread.opened",
         "artifact.registered",

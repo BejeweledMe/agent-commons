@@ -634,6 +634,76 @@ def test_a_role_prefixed_handoff_reaches_the_role_it_names(
     assert another["entity_ref"]["id"] in {item.get("id") for item in listed.get("handoffs", [])}
 
 
+def test_an_acceptance_stamps_the_semantics_floor_exactly_once(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """The two-checkout incident, prevented forward: a reader older than the
+    causal acceptance guard misjudges a healthy acceptance chain, so the
+    first write that depends on that guard stamps the ledger with the
+    semantics version it needs.  Never earlier — an untouched workspace stays
+    readable by old code — and never twice."""
+
+    from agent_commons.domain.projection import LEDGER_SEMANTICS_VERSION
+
+    _, _, builder, reviewer = workspace
+    assert builder.snapshot().semantics_required == 1
+
+    def accepted_task(tag: str) -> None:
+        created = builder.create_task(
+            title=f"Stamped {tag}",
+            description="acceptance raises the semantics floor",
+            acceptance_criteria=("reviewed",),
+            idempotency_key=f"stamp-task-{tag}",
+        )
+        task_id = created["entity_ref"]["id"]
+        started = builder.start_task(
+            task_id, created["revision"], idempotency_key=f"stamp-start-{tag}"
+        )
+        completed = builder.complete_task(
+            task_id, started["revision"], summary="done", idempotency_key=f"stamp-complete-{tag}"
+        )
+        submitted = builder.submit_task(
+            task_id, completed["revision"], summary="ready", idempotency_key=f"stamp-submit-{tag}"
+        )
+        requested = builder.request_review(
+            target_ref={"kind": "task", "id": task_id},
+            target_revision=submitted["revision"],
+            criteria=("correctness",),
+            idempotency_key=f"stamp-review-request-{tag}",
+        )
+        reviewer.complete_review(
+            requested["entity_ref"]["id"],
+            requested["revision"],
+            target_revision=submitted["revision"],
+            verdict="approved",
+            summary="approved",
+            idempotency_key=f"stamp-review-complete-{tag}",
+        )
+        reviewer.accept_task(
+            task_id,
+            submitted["revision"],
+            summary="accepted",
+            idempotency_key=f"stamp-accept-{tag}",
+        )
+
+    def stamp_count() -> int:
+        return sum(
+            1
+            for item in builder.events.iter_events()
+            if getattr(item, "event", item)["event_type"] == "workspace.semantics_required"
+        )
+
+    accepted_task("one")
+    assert builder.snapshot().semantics_required == LEDGER_SEMANTICS_VERSION
+    assert stamp_count() == 1
+    assert builder.doctor()["ok"] is True
+
+    # A second acceptance finds the floor already high enough and adds nothing.
+    accepted_task("two")
+    assert stamp_count() == 1
+    assert builder.snapshot().semantics_required == LEDGER_SEMANTICS_VERSION
+
+
 def test_correction_cannot_rewrite_handoff_recipients(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
 ) -> None:

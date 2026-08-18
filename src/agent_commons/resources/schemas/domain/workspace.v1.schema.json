@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:workspace:v1",
+  "x-schema-name": "commons.payload.workspace.v1",
+  "x-event-types": ["workspace.semantics_required"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workspace_id", "semantics_version", "reason"],
+  "properties": {
+    "workspace_id": {"type": "string", "pattern": "^workspace\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "semantics_version": {"type": "integer", "minimum": 2},
+    "reason": {"type": "string", "minLength": 1},
+    "extensions": {"type": "object"}
+  }
+}

@@ -166,7 +166,10 @@ def test_two_isolated_agents_coordinate_review_and_handoff_end_to_end(
     assert approved_review["stale"] is False
     assert acknowledged["state"] == "acknowledged"
     assert doctor["ok"] is True
-    assert doctor["event_count"] == 13
+    # 13 coordination events plus the one workspace.semantics_required stamp
+    # the first acceptance writes, so an older reader is told to update
+    # instead of misjudging the accepted chain.
+    assert doctor["event_count"] == 14
 
 
 def test_work_author_cannot_approve_after_submitter_handoff(tmp_path: Path) -> None:

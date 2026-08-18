@@ -37,7 +37,12 @@ from agent_commons.domain.lifecycle import (
     require_entity,
     validate_transition,
 )
-from agent_commons.domain.projection import ProjectionIssue, ProjectSnapshot, project_events
+from agent_commons.domain.projection import (
+    SEMANTICS_SENSITIVE_EVENTS,
+    ProjectionIssue,
+    ProjectSnapshot,
+    project_events,
+)
 from agent_commons.domain.revisions import resolve_revision, structural_correction_changes
 from agent_commons.domain.validation import validate_payload
 from agent_commons.errors import (
@@ -68,6 +73,7 @@ PAYLOAD_SCHEMAS = {
     "delegation": "commons.payload.delegation.v1",
     "agent": "commons.payload.agent.v1",
     "event": "commons.payload.maintenance.v1",
+    "workspace": "commons.payload.workspace.v1",
 }
 
 _COLLECTIONS = {
@@ -1365,6 +1371,35 @@ class CommonsManager:
             **kwargs,
         )
 
+    def _require_ledger_semantics(self, event_type: str) -> None:
+        """Stamp the ledger before a write whose replay needs newer semantics.
+
+        The stamp rises exactly when a write starts depending on the newer
+        behaviour — never earlier, so an untouched workspace stays readable by
+        old code.  From then on a reader older than the stamp is told to
+        update instead of misjudging the history it cannot replay.
+        """
+
+        needed = SEMANTICS_SENSITIVE_EVENTS.get(event_type, 1)
+        if needed <= 1 or self.snapshot().semantics_required >= needed:
+            return
+        try:
+            self.record_event(
+                "workspace.semantics_required",
+                {
+                    "workspace_id": self.workspace_id,
+                    "semantics_version": needed,
+                    "reason": f"replay of {event_type} depends on semantics version {needed}",
+                },
+                idempotency_key=f"semantics-v{needed}",
+                tags=("workspace",),
+            )
+        except LifecycleConflictError:
+            # Another session raised the floor first; that is the outcome the
+            # stamp exists for, not a failure of this write.
+            if self.snapshot().semantics_required < needed:
+                raise
+
     def accept_task(
         self, task_id: str, expected_revision: str, *, summary: str, **kwargs: Any
     ) -> dict[str, Any]:
@@ -1373,6 +1408,7 @@ class CommonsManager:
             raise ValidationError(
                 "unsupported task acceptance fields: " + ", ".join(sorted(kwargs))
             )
+        self._require_ledger_semantics("task.accepted")
         key = self._idempotency_key("task.accepted", idempotency_key)
         session = self._active_session()
         namespace = self._namespace(session)

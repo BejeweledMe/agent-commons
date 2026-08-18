@@ -1802,3 +1802,77 @@ def test_a_rejected_successor_cannot_shield_a_live_acceptance() -> None:
     # and the task honestly returns to review.
     assert ("event", accepted["event_id"]) in snapshot.stale_refs
     assert snapshot.tasks[task_id]["state"] == "review"
+
+
+def test_a_ledger_ahead_of_the_code_says_update_instead_of_misdiagnosing() -> None:
+    """The 17 Aug incident, prevented forward: an old checkout's CLI read a
+    healthy ledger written under newer replay semantics and reported a false
+    lifecycle failure.  A stamped ledger now makes an older reader say the one
+    true thing — update — and suppresses the integrity findings it cannot
+    judge; a reader at or above the stamp behaves exactly as before."""
+
+    from agent_commons.domain.projection import LEDGER_SEMANTICS_VERSION
+
+    workspace_id = "workspace.00000000000000000000000001"
+    task_id = "task.00000000000000000000000001"
+    created = event(
+        1,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Skewed task",
+            "description": "read by an older build",
+            "acceptance_criteria": ["works"],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    # A genuinely broken write, to prove misdiagnoses are suppressed: its
+    # expected revision names an event that is not the current one.
+    broken = event(
+        2,
+        "task.started",
+        {"task_id": task_id, "expected_revision": "evt." + "9" * 26},
+        "task",
+        task_id,
+    )
+
+    ahead = event(
+        3,
+        "workspace.semantics_required",
+        {
+            "workspace_id": workspace_id,
+            "semantics_version": LEDGER_SEMANTICS_VERSION + 1,
+            "reason": "written by a newer build",
+        },
+        "workspace",
+        workspace_id,
+    )
+    skewed = project_events([created, broken, ahead])
+    assert [issue.code for issue in skewed.issues] == ["ledger_ahead_of_code"]
+    message = skewed.issues[0].message
+    assert str(LEDGER_SEMANTICS_VERSION + 1) in message
+    assert str(LEDGER_SEMANTICS_VERSION) in message
+    assert "update agent-commons" in message
+    assert skewed.issues[0].repairable is False
+    assert skewed.semantics_required == LEDGER_SEMANTICS_VERSION + 1
+    assert not any("rejected by lifecycle" in warning for warning in skewed.warnings)
+
+    # The same history stamped at the reader's own version: the reader is
+    # trusted to judge it, so the genuinely broken write IS reported.
+    current = event(
+        3,
+        "workspace.semantics_required",
+        {
+            "workspace_id": workspace_id,
+            "semantics_version": LEDGER_SEMANTICS_VERSION,
+            "reason": "written by this build",
+        },
+        "workspace",
+        workspace_id,
+    )
+    level = project_events([created, broken, current])
+    assert level.semantics_required == LEDGER_SEMANTICS_VERSION
+    assert any("rejected by lifecycle" in issue.message for issue in level.issues)
+    assert not any(issue.code == "ledger_ahead_of_code" for issue in level.issues)

@@ -349,6 +349,11 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "invalidation_event_id": EVENT_ID,
         "reason": "new evidence restored the assertion",
     },
+    "workspace.semantics_required": {
+        "workspace_id": WORKSPACE_ID,
+        "semantics_version": 2,
+        "reason": "replay of task.accepted depends on semantics version 2",
+    },
 }
 
 
