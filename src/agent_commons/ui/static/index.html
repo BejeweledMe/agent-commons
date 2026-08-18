@@ -1900,6 +1900,10 @@ const STRINGS = {
     replied: "replied",
     answered: "answered",
     proposal_approved: "role created, crediting its proposer",
+    proposal_decline_reason: "Why decline this proposal?",
+    proposal_decline_button: "Decline proposal",
+    proposal_decline_needs_reason: "Declining needs a reason; it stays with the proposal in history.",
+    proposal_declined: "proposal declined; its history remains",
     matches: "matches",
     match_any: " matching any term, not all of them,",
     match_phrase: " matching the whole phrase,",
@@ -2504,6 +2508,10 @@ const STRINGS = {
     replied: "ответ отправлен",
     answered: "ответ записан",
     proposal_approved: "роль создана, авторство предложившего сохранено",
+    proposal_decline_reason: "Почему отклоняете это предложение?",
+    proposal_decline_button: "Отклонить предложение",
+    proposal_decline_needs_reason: "Для отклонения нужна причина; она останется с предложением в истории.",
+    proposal_declined: "предложение отклонено; его история сохранена",
     matches: "совпадений",
     match_any: " по любому из слов, не по всем сразу,",
     match_phrase: " по фразе целиком,",
@@ -6574,6 +6582,15 @@ function renderAttentionItem(item) {
       button.textContent = t("confirm_role_button");
       button.addEventListener("click", () => approveProposal(item.id));
       card.appendChild(button);
+      const reason = document.createElement("input");
+      reason.type = "text";
+      reason.placeholder = t("proposal_decline_reason");
+      card.appendChild(reason);
+      const decline = document.createElement("button");
+      decline.type = "button";
+      decline.textContent = t("proposal_decline_button");
+      decline.addEventListener("click", () => declineProposal(item.id, reason.value));
+      card.appendChild(decline);
     } else {
       const why = document.createElement("p");
       why.className = "note";
@@ -6648,6 +6665,25 @@ async function approveProposal(threadId) {
     // otherwise: the panel reports what it was actually told, never a guess.
     reportResult(result, "ok", t("proposal_approved"),
       approved && approved.entity_ref ? approved.entity_ref.id : threadId);
+    await loadAttention();
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+  }
+}
+
+async function declineProposal(threadId, reason) {
+  const result = document.getElementById("attention-result");
+  if (!reason.trim()) {
+    result.className = "result bad";
+    result.textContent = t("proposal_decline_needs_reason");
+    return;
+  }
+  try {
+    await post(
+      "/api/agents/proposals/" + encodeURIComponent(threadId) + "/decline",
+      { reason: reason });
+    reportResult(result, "ok", t("proposal_declined"), threadId);
     await loadAttention();
   } catch (error) {
     result.className = "result bad";

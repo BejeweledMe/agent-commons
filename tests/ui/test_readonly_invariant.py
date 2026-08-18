@@ -260,6 +260,7 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
     # a NEW route cannot be added without being either exercised or exempted.
     exempt = {
         ("POST", "/api/agents/proposals/{thread_id}/approve"),
+        ("POST", "/api/agents/proposals/{thread_id}/decline"),
         ("POST", "/api/operations/{operation_id}/answer"),
     }
     covered = {

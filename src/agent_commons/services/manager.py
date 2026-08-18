@@ -1842,6 +1842,30 @@ class CommonsManager:
             )
             return created
 
+    def decline_agent_proposal(
+        self,
+        thread_id: str,
+        *,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve an open role proposal without creating the proposed role."""
+
+        snapshot = self.snapshot()
+        thread = require_entity(snapshot, "thread", thread_id)
+        proposal = (thread.get("extensions") or {}).get("staff_proposal")
+        if thread.get("state") != "open":
+            raise LifecycleConflictError("this role proposal is already resolved")
+        if not isinstance(proposal, Mapping) or proposal.get("action") != "create_role":
+            raise LifecycleConflictError("thread carries no role-creation proposal")
+        return self.resolve_thread(
+            thread_id,
+            str(thread.get("effective_revision") or thread["revision"]),
+            resolution="rejected",
+            summary=reason,
+            idempotency_key=idempotency_key,
+        )
+
     def reconfigure_agent(
         self,
         agent_id: str,

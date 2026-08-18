@@ -60,6 +60,7 @@ MUTATING_ROUTES = (
     ("POST", "/api/chat/{thread_id}/messages"),
     ("POST", "/api/agents"),
     ("POST", "/api/agents/proposals/{thread_id}/approve"),
+    ("POST", "/api/agents/proposals/{thread_id}/decline"),
     ("POST", "/api/agents/{agent_id}/reconfigure"),
     ("POST", "/api/agents/{agent_id}/retire"),
     ("POST", "/api/agents/{agent_id}/messages"),
@@ -346,6 +347,16 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
         return await _record(
             context.approve_agent_proposal,
             thread_id=thread_id,
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/agents/proposals/{thread_id}/decline")
+    async def decline_proposal(thread_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.decline_agent_proposal,
+            thread_id=thread_id,
+            reason=str(body.get("reason", "")),
             idempotency_key=body.get("idempotency_key"),
         )
 

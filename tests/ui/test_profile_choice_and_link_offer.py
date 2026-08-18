@@ -388,7 +388,7 @@ def test_the_link_after_a_hire_is_a_button_and_not_a_second_request() -> None:
     # already existed, and the second one is the dialog's, reached by a press.
     assert ("POST", "/api/agents") in set(MUTATING_ROUTES)
     assert ("POST", "/api/agent-links") in set(MUTATING_ROUTES)
-    assert len(MUTATING_ROUTES) == 15, len(MUTATING_ROUTES)
+    assert len(MUTATING_ROUTES) == 16, len(MUTATING_ROUTES)
 
 
 def test_the_offer_cannot_outlive_the_role_or_the_moment_it_names() -> None:

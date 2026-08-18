@@ -796,6 +796,18 @@ def test_task_drawer_edits_create_a_revision_and_warn_about_stale_reviews() -> N
         assert "stale" in note or "устар" in note
 
 
+def test_attention_proposals_can_be_declined_without_deleting_history() -> None:
+    body = read_spa()
+    proposal = body.split('} else if (item.kind === "proposal") {', 1)[1].split("\n  } else {", 1)[
+        0
+    ]
+    assert 't("proposal_decline_button")' in proposal
+    assert "declineProposal(item.id, reason.value)" in proposal
+    decline = body.split("async function declineProposal", 1)[1].split("\n}\n", 1)[0]
+    assert 'encodeURIComponent(threadId) + "/decline"' in decline
+    assert 't("proposal_declined")' in decline
+
+
 def test_the_client_does_not_re_prefix_the_event_id() -> None:
     """Regression: the id already carries instance:seq, so re-prefixing produced
     instance:instance:seq, which never matched and made every reconnect report a

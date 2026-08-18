@@ -232,6 +232,44 @@ def test_approving_a_proposal_consumes_it_so_a_second_click_mints_no_duplicate(
     assert [item["name"] for item in parent.list_agents()].count("Backend") == 1
 
 
+def test_cross_provider_refusal_names_the_policy_and_proposal_can_be_declined(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path, level="ask")
+    parent: CommonsManager = workspace["parent"]
+    workspace["server"].tools["commons_propose_agent"](
+        name="Codex helper",
+        profile_id="codex-builder",
+        rationale="use the other local provider",
+        idempotency_key="cross-provider-proposal",
+    )
+    thread_id = parent.list_agent_proposals()[0]["thread_id"]
+
+    with pytest.raises(LifecycleConflictError) as refusal:
+        parent.approve_agent_proposal(thread_id, idempotency_key="cross-provider-approve")
+    message = str(refusal.value)
+    assert "provider-specific execution authority" in message
+    assert "creator profile claude-builder" in message
+    assert "requested profile codex-builder" in message
+    assert "allowed child profiles: claude-builder, claude-independent-reviewer" in message
+    assert "create codex-builder directly as a human-owned role" in message.lower()
+
+    declined = parent.decline_agent_proposal(
+        thread_id,
+        reason="Cross-provider staffing must be created directly by the operator.",
+        idempotency_key="cross-provider-decline",
+    )
+    assert declined["event_type"] == "thread.resolved"
+    assert parent.list_agent_proposals() == []
+    direct = parent.create_agent(
+        name="Codex helper",
+        profile_id="codex-builder",
+        rationale="the operator owns the cross-provider choice",
+        idempotency_key="cross-provider-direct-hire",
+    )
+    assert direct["event_type"] == "agent.created"
+
+
 def test_provenance_cannot_be_claimed_without_a_proposal_to_point_at(
     tmp_path: Path,
 ) -> None:

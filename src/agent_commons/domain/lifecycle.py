@@ -643,11 +643,18 @@ def _validate_agent_creation(
         raise LifecycleConflictError(
             "an automatically created role must hold a strictly narrower create_roles grant"
         )
-    if str(payload["profile_id"]) not in PROFILE_NARROWING.get(
-        str(creator.get("profile_id", "")), frozenset()
-    ):
+    creator_profile = str(creator.get("profile_id", ""))
+    requested_profile = str(payload["profile_id"])
+    allowed_profiles = PROFILE_NARROWING.get(creator_profile, frozenset())
+    if requested_profile not in allowed_profiles:
+        allowed = ", ".join(sorted(allowed_profiles)) or "none"
         raise LifecycleConflictError(
-            "a created role cannot hold a wider provider profile than its creator"
+            "a created role cannot hold a wider provider profile than its creator: role "
+            "profiles are provider-specific execution authority, so cross-provider profiles "
+            "are intentionally incomparable; "
+            f"creator profile {creator_profile}; requested profile {requested_profile}; "
+            f"allowed child profiles: {allowed}. To use another provider, create "
+            f"{requested_profile} directly as a human-owned role instead."
         )
     for field in ("tool_allowlist", "skills"):
         creator_values = creator.get(field)

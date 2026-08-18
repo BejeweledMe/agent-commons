@@ -322,10 +322,19 @@ def test_the_attention_queue_carries_a_role_proposal(
     )
     with _client(context) as client:
         attention = client.get("/api/attention", headers=authorized()).json()
+        proposal = next(item for item in attention["items"] if item["kind"] == "proposal")
+        declined = client.post(
+            f"/api/agents/proposals/{proposal['id']}/decline",
+            json={"reason": "the operator chose a different staffing plan"},
+            headers=authorized(),
+        )
+        assert declined.status_code == 200, declined.text
+        after_decline = client.get("/api/attention", headers=authorized()).json()
 
     proposals = [item for item in attention["items"] if item["kind"] == "proposal"]
     assert len(proposals) == 1
     assert proposals[0]["proposal"]["name"] == "Requested helper"
+    assert not [item for item in after_decline["items"] if item["kind"] == "proposal"]
 
 
 def test_a_directive_the_operator_sends_a_role_does_not_inflate_their_own_queue(

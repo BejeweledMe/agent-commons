@@ -1396,6 +1396,28 @@ def agent_approve(state: CLIState, thread_id: str, idempotency_key: str | None) 
     state.emit(state.manager().approve_agent_proposal(thread_id, idempotency_key=idempotency_key))
 
 
+@agent_group.command("decline")
+@click.argument("thread_id")
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def agent_decline(
+    state: CLIState,
+    thread_id: str,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Reject a role proposal and remove it from the open queue."""
+
+    state.emit(
+        state.manager().decline_agent_proposal(
+            thread_id,
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
 @agent_group.command("list")
 @click.option("--include-retired", is_flag=True, help="Show roles that have left service.")
 @click.pass_obj

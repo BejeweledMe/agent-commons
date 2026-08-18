@@ -1070,6 +1070,9 @@ class UIContext:
     def approve_agent_proposal(self, *, thread_id: str, **fields: Any) -> dict[str, Any]:
         return self.writer().approve_agent_proposal(thread_id, **fields)
 
+    def decline_agent_proposal(self, *, thread_id: str, **fields: Any) -> dict[str, Any]:
+        return self.writer().decline_agent_proposal(thread_id, **fields)
+
     def reconfigure_agent(self, *, agent_id: str, **fields: Any) -> dict[str, Any]:
         expected_revision = fields.pop("expected_revision")
         manager = self.writer()
