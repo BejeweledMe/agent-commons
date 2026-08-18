@@ -557,6 +557,77 @@ def test_task_author_cannot_review_after_another_session_submits(
     assert accepted_event["payload"]["acceptance_review"]["revision"] == approved["revision"]
 
 
+def test_revising_task_text_makes_an_approved_review_stale(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    _, _, author, independent = workspace
+    created = author.create_task(
+        title="Ship the first draft",
+        description="Render the original copy",
+        acceptance_criteria=("the original copy is visible",),
+        idempotency_key="revise-task-create",
+    )
+    task_id = created["entity_ref"]["id"]
+    started = author.start_task(task_id, created["revision"], idempotency_key="revise-start")
+    completed = author.complete_task(
+        task_id,
+        started["revision"],
+        summary="original draft complete",
+        idempotency_key="revise-complete",
+    )
+    submitted = author.submit_task(
+        task_id,
+        completed["revision"],
+        summary="original draft submitted",
+        idempotency_key="revise-submit",
+    )
+    requested = author.request_review(
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=submitted["revision"],
+        criteria=("the original copy is visible",),
+        independent=True,
+        idempotency_key="revise-review-request",
+    )
+    independent.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=submitted["revision"],
+        verdict="approved",
+        summary="the original draft meets its criterion",
+        idempotency_key="revise-review-complete",
+    )
+
+    revised = author.revise_task(
+        task_id,
+        submitted["revision"],
+        changes={
+            "description": "Render the corrected copy",
+            "acceptance_criteria": ["the corrected copy is visible"],
+        },
+        idempotency_key="revise-task-content",
+    )
+
+    task = next(item for item in author.list_tasks() if item["id"] == task_id)
+    review = next(
+        item for item in author.list_reviews() if item["id"] == requested["entity_ref"]["id"]
+    )
+    assert revised["revision"] != submitted["revision"]
+    assert task["description"] == "Render the corrected copy"
+    assert task["acceptance_criteria"] == ["the corrected copy is visible"]
+    assert review["state"] == "approved"
+    assert review["stale"] is True
+    with pytest.raises(
+        LifecycleConflictError,
+        match="task acceptance requires a current approved independent review",
+    ):
+        author.accept_task(
+            task_id,
+            revised["revision"],
+            summary="must not accept using the old verdict",
+            idempotency_key="revise-task-accept-stale",
+        )
+
+
 def test_handoff_acknowledgement_is_recipient_only(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
 ) -> None:

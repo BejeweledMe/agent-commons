@@ -26,6 +26,7 @@ TASK_STATES = {
 }
 
 TASK_AUTHORING_EVENTS = {
+    "task.revised",
     "task.taken",
     "task.started",
     "task.blocked",
@@ -378,6 +379,29 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
         )
     elif event_type == "objective.closed":
         _apply(snapshot.objectives, str(payload["objective_id"]), event, "closed")
+    elif event_type == "task.revised":
+        task_id = str(payload["task_id"])
+        current = snapshot.tasks.get(task_id) or {}
+        work_author_session_ids = {
+            str(session_id)
+            for session_id in current.get("work_author_session_ids", [])
+            if str(session_id)
+        }
+        actor_session_id = str((event.get("actor") or {}).get("session_id", ""))
+        if actor_session_id:
+            work_author_session_ids.add(actor_session_id)
+        revised_payload = {
+            **dict(payload),
+            **deepcopy(dict(payload["changes"])),
+            "work_author_session_ids": sorted(work_author_session_ids),
+        }
+        revised_payload.pop("changes", None)
+        _apply(
+            snapshot.tasks,
+            task_id,
+            {**event, "payload": revised_payload},
+            str(current.get("state", "ready")),
+        )
     elif event_type in TASK_STATES:
         task_id = str(payload["task_id"])
         current = snapshot.tasks.get(task_id) or {}

@@ -35,6 +35,7 @@ _COLLECTIONS = {
 }
 
 _TASK_ALLOWED = {
+    "task.revised": {"ready", "assigned", "active", "blocked", "completed", "review"},
     "task.taken": {"ready"},
     "task.started": {"ready", "assigned"},
     "task.blocked": {"assigned", "active"},

@@ -867,6 +867,30 @@ def task_list(state: CLIState, state_filter: str | None) -> None:
     state.emit(state.manager().list_tasks(state=state_filter))
 
 
+@task_group.command("revise")
+@_expected
+@click.option("--changes-json", required=True)
+@_idem
+@click.pass_obj
+def task_revise(
+    state: CLIState,
+    entity_id: str,
+    expected_revision: str,
+    changes_json: str,
+    idempotency_key: str | None,
+) -> None:
+    """Revise task wording with exact revision CAS."""
+
+    state.emit(
+        state.manager().revise_task(
+            entity_id,
+            expected_revision,
+            changes=_json_object(changes_json, "changes_json"),
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
 def _simple_task_transition(
     state: CLIState,
     method: str,

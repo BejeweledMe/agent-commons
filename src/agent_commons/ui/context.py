@@ -1095,6 +1095,12 @@ class UIContext:
 
         return self.writer().create_task(**fields)
 
+    def revise_task(self, *, task_id: str, **fields: Any) -> dict[str, Any]:
+        """Revise task content through the canonical immutable event path."""
+
+        expected_revision = fields.pop("expected_revision")
+        return self.writer().revise_task(task_id, expected_revision, **fields)
+
     #: Which manager transitions carry a task from where it is to `review`.
     #: Acceptance is only legal from `review`, so the panel's one button has to
     #: walk the whole way rather than pretend the task is already there — and it

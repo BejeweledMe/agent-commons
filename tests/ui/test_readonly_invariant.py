@@ -233,6 +233,13 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ),
         ("/api/tasks", {"title": "Third", "description": "d", "acceptance_criteria": ["c"]}),
         (
+            f"/api/tasks/{second_task['id']}/revise",
+            {
+                "expected_revision": second_task["revision"],
+                "changes": {"description": "revised description"},
+            },
+        ),
+        (
             f"/api/tasks/{second_task['id']}/review-request",
             {"expected_revision": second_task["revision"]},
         ),
@@ -265,6 +272,7 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/agent-links"),
         ("POST", "/api/agent-links/{link_id}/close"),
         ("POST", "/api/tasks"),
+        ("POST", "/api/tasks/{task_id}/revise"),
         ("POST", "/api/tasks/{task_id}/review-request"),
         ("POST", "/api/tasks/{task_id}/accept"),
         ("POST", "/api/tasks/{task_id}/reopen"),

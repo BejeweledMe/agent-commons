@@ -1279,6 +1279,28 @@ class CommonsManager:
     def list_tasks(self, *, state: str | None = None) -> list[dict[str, Any]]:
         return self._list("task", state=state)
 
+    def revise_task(
+        self,
+        task_id: str,
+        expected_revision: str,
+        *,
+        changes: Mapping[str, Any],
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Revise task wording and move its immutable revision boundary."""
+
+        key = self._idempotency_key("task.revised", idempotency_key)
+        return self.record_event(
+            "task.revised",
+            {
+                "task_id": task_id,
+                "expected_revision": expected_revision,
+                "changes": dict(changes),
+            },
+            idempotency_key=key,
+            tags=("task",),
+        )
+
     def _task_transition(
         self,
         task_id: str,

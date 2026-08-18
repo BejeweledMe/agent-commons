@@ -82,6 +82,14 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "acceptance_criteria": ["returns 200"],
         "priority": "normal",
     },
+    "task.revised": {
+        "task_id": TASK_ID,
+        "expected_revision": EVENT_ID,
+        "changes": {
+            "description": "Build the corrected health endpoint",
+            "acceptance_criteria": ["returns 200 with the corrected body"],
+        },
+    },
     "task.taken": {
         "task_id": TASK_ID,
         "expected_revision": EVENT_ID,
@@ -457,6 +465,7 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
     current_states = {
         "objective.revised": "active",
         "objective.closed": "active",
+        "task.revised": "review",
         "task.taken": "ready",
         "task.started": "ready",
         "task.blocked": "active",

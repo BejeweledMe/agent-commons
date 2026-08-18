@@ -66,6 +66,7 @@ MUTATING_ROUTES = (
     ("POST", "/api/agent-links"),
     ("POST", "/api/agent-links/{link_id}/close"),
     ("POST", "/api/tasks"),
+    ("POST", "/api/tasks/{task_id}/revise"),
     ("POST", "/api/tasks/{task_id}/review-request"),
     ("POST", "/api/tasks/{task_id}/accept"),
     ("POST", "/api/tasks/{task_id}/reopen"),
@@ -371,6 +372,17 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             acceptance_criteria=tuple(
                 str(item) for item in (body.get("acceptance_criteria") or ())
             ),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @app.post("/api/tasks/{task_id}/revise")
+    async def revise_task(task_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.revise_task,
+            task_id=task_id,
+            expected_revision=str(body.get("expected_revision", "")),
+            changes=body.get("changes") or {},
             idempotency_key=body.get("idempotency_key"),
         )
 

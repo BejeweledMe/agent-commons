@@ -41,6 +41,7 @@ EVENT_SPECS: dict[str, EventSpec] = {
     "task.created": EventSpec(
         ("task_id", "title", "description", "acceptance_criteria", "priority"), "task", "task_id"
     ),
+    "task.revised": EventSpec(("task_id", "expected_revision", "changes"), "task", "task_id"),
     "task.taken": EventSpec(
         ("task_id", "expected_revision", "owner_session_id"), "task", "task_id"
     ),
@@ -328,6 +329,7 @@ _STRING_LIST_FIELDS = {
 _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
 
 _OBJECTIVE_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "extensions"}
+_TASK_CHANGE_FIELDS = {"title", "description", "acceptance_criteria"}
 
 _DELEGATION_TARGET_PROFILES = {
     "codex-builder",
@@ -545,6 +547,19 @@ def _validate_objective_changes(value: Any) -> None:
         raise ValidationError("changes.extensions must be an object")
 
 
+def _validate_task_changes(value: Any) -> None:
+    if not isinstance(value, Mapping) or not value:
+        raise ValidationError("changes must be a non-empty object")
+    unsupported = sorted(set(value).difference(_TASK_CHANGE_FIELDS))
+    if unsupported:
+        raise ValidationError("changes contains unsupported task fields: " + ", ".join(unsupported))
+    for field in ("title", "description"):
+        if field in value and (not isinstance(value[field], str) or not value[field].strip()):
+            raise ValidationError(f"changes.{field} must be a non-empty string")
+    if "acceptance_criteria" in value:
+        _validate_string_list(value["acceptance_criteria"], "changes.acceptance_criteria")
+
+
 def _bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValidationError(f"{field} must be an integer")
@@ -626,6 +641,8 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         raise ValidationError("extensions must be an object")
     if event_type == "objective.revised":
         _validate_objective_changes(payload["changes"])
+    if event_type == "task.revised":
+        _validate_task_changes(payload["changes"])
     if event_type == "event.corrected":
         if not isinstance(payload["replacement_payload"], Mapping):
             raise ValidationError("replacement_payload must be an object")

@@ -55,6 +55,7 @@ def test_cli_exposes_complete_manager_surface() -> None:
         "task": {
             "create",
             "list",
+            "revise",
             "take",
             "start",
             "block",

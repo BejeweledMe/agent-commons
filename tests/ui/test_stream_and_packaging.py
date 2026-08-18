@@ -225,7 +225,8 @@ def test_the_spa_carries_the_whole_acceptance_chain() -> None:
         assert '"/api/tasks/" + encodeURIComponent(task.id) + "' + route + '"' in body, route
     # Every step names the task revision it was written against, so a stale
     # drawer gets a conflict instead of overwriting a newer record.
-    assert body.count("expected_revision: taskRevision(task)") == 3
+    # Editing uses the same CAS boundary as the three acceptance-chain writes.
+    assert body.count("expected_revision: taskRevision(task)") == 4
     # The state drives what is offered; nothing is advanced client-side.
     assert 'state === "review" ? "accept_state_review"' in body
     assert "async function repaintAfterAcceptanceWrite" in body
@@ -779,6 +780,20 @@ def test_the_panel_carries_a_language_toggle_that_persists() -> None:
 def test_stale_acceptance_loses_its_acceptance_tone() -> None:
     body = read_spa()
     assert 'if (node.stale && tone === "ok") { return ["▨", "warn"]; }' in body
+
+
+def test_task_drawer_edits_create_a_revision_and_warn_about_stale_reviews() -> None:
+    body = read_spa()
+    assert 'id="task-edit-open"' in body
+    assert 'id="task-edit-description"' in body
+    assert 'id="task-edit-criteria"' in body
+    assert '"/revise"' in body
+    assert "expected_revision: taskRevision(task)" in body
+    english, russian = _language_tables()
+    for table in (english, russian):
+        note = _value(table, "task_edit_stale_note").lower()
+        assert "review" in note or "ревью" in note
+        assert "stale" in note or "устар" in note
 
 
 def test_the_client_does_not_re_prefix_the_event_id() -> None:

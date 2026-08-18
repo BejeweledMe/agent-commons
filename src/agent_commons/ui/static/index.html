@@ -1269,6 +1269,25 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <button type="button" id="task-acceptance-cancel" data-i18n="hire_cancel">Cancel</button>
         </div>
         <p class="result" id="task-acceptance-result"></p>
+        <div id="task-edit" hidden>
+          <div class="actions">
+            <button type="button" id="task-edit-open" data-i18n="task_edit_open">Edit task…</button>
+          </div>
+          <div id="task-edit-form" hidden>
+            <label class="field"><span data-i18n="task_title_label">Short name for this task</span>
+              <input type="text" id="task-edit-title" autocomplete="off"></label>
+            <label class="field"><span data-i18n="task_desc_label">What to do</span>
+              <textarea id="task-edit-description"></textarea></label>
+            <label class="field"><span data-i18n="task_criteria_label">Done when (one criterion per line)</span>
+              <textarea id="task-edit-criteria"></textarea></label>
+            <p class="note" data-i18n="task_edit_stale_note"></p>
+            <div class="actions">
+              <button type="button" id="task-edit-save" data-i18n="task_edit_save">Save a new revision</button>
+              <button type="button" id="task-edit-cancel" data-i18n="hire_cancel">Cancel</button>
+            </div>
+          </div>
+          <p class="result" id="task-edit-result"></p>
+        </div>
       </div>
       <!-- The human layer above the raw record: a task's runs land here, so the
            path from a finished run to its result is one click, not a graph hunt. -->
@@ -2155,6 +2174,11 @@ const STRINGS = {
     task_desc_label: "What to do",
     task_criteria_label: "Done when (one criterion per line)",
     task_create_button: "Create the task",
+    task_edit_open: "Edit task…",
+    task_edit_save: "Save a new revision",
+    task_edit_stale_note: "Saving creates a new task revision. Earlier reviews remain in history, become stale, and cannot be used for acceptance.",
+    task_edit_saved: "Saved a new task revision. Earlier reviews are now stale; send this version for review again.",
+    task_edit_needs_fields: "Name, description, and at least one done-when criterion are required.",
     link_open_with: "Open a link with…",
     trust_short: "ⓘ trust model",
     tip_hire_profile: "The profile fixes the provider, model and tool set. Profiles are operator-owned and never edited from the panel.",
@@ -2745,6 +2769,11 @@ const STRINGS = {
     task_desc_label: "Что сделать",
     task_criteria_label: "Готово, когда (по одному критерию в строке)",
     task_create_button: "Создать задачу",
+    task_edit_open: "Изменить задачу…",
+    task_edit_save: "Сохранить новую ревизию",
+    task_edit_stale_note: "Сохранение создаёт новую ревизию задачи. Прежние ревью остаются в истории, устаревают и больше не годятся для приёмки.",
+    task_edit_saved: "Новая ревизия задачи сохранена. Прежние ревью устарели; отправьте эту версию на ревью заново.",
+    task_edit_needs_fields: "Нужны название, описание и хотя бы один критерий готовности.",
     link_open_with: "Открыть связь с…",
     trust_short: "ⓘ модель доверия",
     tip_hire_profile: "Профиль фиксирует провайдера, модель и набор инструментов. Профили принадлежат оператору и из панели не редактируются.",
@@ -5530,6 +5559,37 @@ function taskRevision(record) {
 // they are grouped here rather than translated; the sentence is the gloss and
 // the state itself is printed beside it.
 const ACCEPT_OPEN_STATES = new Set(["ready", "assigned", "active", "completed"]);
+const TASK_EDITABLE_STATES = new Set([
+  "ready", "assigned", "active", "blocked", "completed", "review",
+]);
+let taskEditOpen = false;
+let taskEditTaskId = null;
+
+function setTaskEditMode(open) {
+  taskEditOpen = open;
+  document.getElementById("task-edit-form").hidden = !open;
+  document.getElementById("task-edit-open").hidden = open;
+}
+
+function paintTaskEdit(record) {
+  const host = document.getElementById("task-edit");
+  const editable = Boolean(record) && writesEnabled &&
+    TASK_EDITABLE_STATES.has(String(record.state || ""));
+  host.hidden = !editable;
+  if (!editable) { setTaskEditMode(false); taskEditTaskId = null; return; }
+  const sameTask = taskEditTaskId === String(record.id || "");
+  if (!sameTask) {
+    taskEditTaskId = String(record.id || "");
+    setTaskEditMode(false);
+    document.getElementById("task-edit-result").textContent = "";
+  }
+  if (!taskEditOpen) {
+    document.getElementById("task-edit-title").value = record.title || "";
+    document.getElementById("task-edit-description").value = record.description || "";
+    document.getElementById("task-edit-criteria").value =
+      (record.acceptance_criteria || []).join("\n");
+  }
+}
 
 // Whether the current task sits at the one step where Accept/Send-back apply;
 // painted by paintTaskAcceptance, read here so a mode change can restore the
@@ -5561,6 +5621,7 @@ let acceptanceTaskId = null;
 function paintTaskAcceptance() {
   const host = document.getElementById("task-acceptance");
   const record = currentTask;
+  paintTaskEdit(record);
   host.hidden = !(record && writesEnabled);
   const state = record ? String(record.state || "") : "";
   const line = !record ? null
@@ -5586,6 +5647,45 @@ function paintTaskAcceptance() {
   // the operator was told about rather than as the panel breaking.
   document.getElementById("task-acceptance-caveat").hidden = line !== "accept_state_review";
 }
+
+document.getElementById("task-edit-open").addEventListener("click", () => {
+  if (!currentTask) { return; }
+  paintTaskEdit(currentTask);
+  setTaskEditMode(true);
+  document.getElementById("task-edit-title").focus();
+});
+document.getElementById("task-edit-cancel").addEventListener("click", () => {
+  setTaskEditMode(false);
+  if (currentTask) { paintTaskEdit(currentTask); }
+});
+document.getElementById("task-edit-save").addEventListener("click", async () => {
+  const result = document.getElementById("task-edit-result");
+  if (!currentTask) { return; }
+  const task = currentTask;
+  const node = currentTaskNode;
+  const title = document.getElementById("task-edit-title").value.trim();
+  const description = document.getElementById("task-edit-description").value.trim();
+  const criteria = document.getElementById("task-edit-criteria").value
+    .split("\n").map((item) => item.trim()).filter(Boolean);
+  if (!title || !description || !criteria.length) {
+    result.className = "result bad";
+    result.textContent = t("task_edit_needs_fields");
+    return;
+  }
+  try {
+    await post("/api/tasks/" + encodeURIComponent(task.id) + "/revise", {
+      expected_revision: taskRevision(task),
+      changes: { title: title, description: description, acceptance_criteria: criteria },
+      idempotency_key: null,
+    });
+    setTaskEditMode(false);
+    await repaintAfterAcceptanceWrite(node);
+    reportResult(document.getElementById("task-edit-result"), "ok", t("task_edit_saved"), task.id);
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = humanizeError(error);
+  }
+});
 
 // Repaint from the server, never from a local guess about where the write left
 // the task: the revision moved, and the next step depends on the new state.

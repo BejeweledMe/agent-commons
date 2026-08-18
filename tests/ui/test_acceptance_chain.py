@@ -130,6 +130,50 @@ def test_a_fresh_task_walks_to_review_and_opens_an_independent_request(
     assert record["criteria"] == ["the page loads and shows the address"]
 
 
+def test_revising_a_task_marks_the_old_review_stale_and_blocks_acceptance(
+    writable_client,  # type: ignore[no-untyped-def]
+    workspace: dict[str, Any],
+) -> None:
+    task = create_task(writable_client)
+    sent = send_for_review(writable_client, task["id"], task["revision"])
+    assert sent.status_code == 200, sent.text
+    chain = sent.json()
+    approve_independently(
+        workspace,
+        review_id=chain["review_id"],
+        review_revision=chain["review_revision"],
+        target_revision=chain["task_revision"],
+    )
+
+    revised = writable_client.post(
+        f"/api/tasks/{task['id']}/revise",
+        json={
+            "expected_revision": chain["task_revision"],
+            "changes": {
+                "description": "corrected page copy",
+                "acceptance_criteria": ["the corrected copy is visible"],
+            },
+        },
+        headers=authorized(),
+    )
+    assert revised.status_code == 200, revised.text
+    revised_revision = revised.json()["revision"]
+    assert revised_revision != chain["task_revision"]
+
+    shown_review = writable_client.get(
+        f"/api/entities/review/{chain['review_id']}", headers=authorized()
+    )
+    assert shown_review.status_code == 200, shown_review.text
+    assert shown_review.json()["record"]["stale"] is True
+    refused = writable_client.post(
+        f"/api/tasks/{task['id']}/accept",
+        json={"expected_revision": revised_revision, "summary": "accept stale verdict"},
+        headers=authorized(),
+    )
+    assert refused.status_code == 409, refused.text
+    assert "current approved independent review" in refused.json()["error"]["message"]
+
+
 def test_a_task_with_no_criteria_still_gets_something_to_judge_against(
     writable_client,  # type: ignore[no-untyped-def]
 ) -> None:
