@@ -4,6 +4,13 @@ This guide adds Agent Commons to an existing Git project and walks through one
 manual author/reviewer cycle. It needs no broker, MCP server, API key, or paid
 provider call.
 
+If your first goal is to have one direct worker build something, use
+[First delegation: one coordinator, one worker](tutorials/FIRST_DELEGATION.md).
+It starts in a clean customer repository, preflights a writable provider before
+recording the delegation, limits the hierarchy to two levels, and includes a
+manual two-window fallback. Return here for the independent author/reviewer
+governance cycle.
+
 ## 1. Install and initialize
 
 Clone and install from the Agent Commons source checkout:
@@ -166,3 +173,8 @@ requiring the second interactive window. First read the
 [Snake tutorial](tutorials/CODEX_CLAUDE_SNAKE.md), run `broker preflight`, and
 keep the same exact-revision, distinct-session, quiescence, and acceptance
 rules.
+
+For a smaller implementation example, the
+[first-delegation tutorial](tutorials/FIRST_DELEGATION.md) shows one coordinator
+and one direct writable worker, the upfront `trusted_workspace` decision, exact
+requester-session recovery, bounded `provider_units`, and result checks.

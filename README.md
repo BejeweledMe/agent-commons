@@ -82,6 +82,10 @@ submitted revision—not with a provider process exit.
 
 The complete copy/paste flow, expected states, and session cleanup are in the
 [Quickstart](https://github.com/BejeweledMe/agent-commons/blob/main/docs/QUICKSTART.md).
+To try the optional runtime from a clean customer repository, follow
+[First delegation: one coordinator, one worker](https://github.com/BejeweledMe/agent-commons/blob/main/docs/tutorials/FIRST_DELEGATION.md).
+It checks the writable-profile trust boundary before recording work and keeps a
+manual two-window path beside every launch blocker.
 The larger worked example is
 [Build Snake with Codex and Claude Code](https://github.com/BejeweledMe/agent-commons/blob/main/docs/tutorials/CODEX_CLAUDE_SNAKE.md).
 
