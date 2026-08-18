@@ -38,16 +38,24 @@ def _executable(path: Path, body: str) -> Path:
 
 
 @pytest.mark.parametrize(
-    ("profile_id", "provider_fixture", "budget"),
+    ("profile_id", "provider_fixture", "purpose", "budget"),
     (
         (
             BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
             "fake_claude_mcp_provider.py",
+            "independent_review",
             {"unit": "micro_usd", "limit": 50_000},
         ),
         (
             BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
             "fake_codex_mcp_provider.py",
+            "independent_review",
+            {"unit": "provider_units", "limit": 1},
+        ),
+        (
+            BuiltinProfileId.CODEX_BUILDER,
+            "fake_codex_mcp_provider.py",
+            "implementation",
             {"unit": "provider_units", "limit": 1},
         ),
     ),
@@ -56,6 +64,7 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
     tmp_path: Path,
     profile_id: BuiltinProfileId,
     provider_fixture: str,
+    purpose: str,
     budget: dict[str, int | str],
 ) -> None:
     repo = tmp_path / "repo"
@@ -96,18 +105,23 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
         priority="high",
         idempotency_key="real-stdio-task",
     )
-    review = manager.request_review(
-        target_ref=task["entity_ref"],
-        target_revision=task["revision"],
-        criteria=("Inspect the exact scoped source",),
-        independent=True,
-        idempotency_key="real-stdio-review",
+    review = (
+        manager.request_review(
+            target_ref=task["entity_ref"],
+            target_revision=task["revision"],
+            criteria=("Inspect the exact scoped source",),
+            independent=True,
+            idempotency_key="real-stdio-review",
+        )
+        if purpose == "independent_review"
+        else None
     )
+    target = review if review is not None else task
     delegation = manager.create_delegation(
-        target_ref=review["entity_ref"],
-        target_revision=review["revision"],
+        target_ref=target["entity_ref"],
+        target_revision=target["revision"],
         target_profile=profile_id.value,
-        purpose="independent_review",
+        purpose=purpose,
         limits={
             "max_depth": 0,
             "wall_time_seconds": 60,
@@ -132,7 +146,11 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
             executable=str(provider),
             mcp_executable=str(mcp),
             git_executable="/usr/bin/git",
-            sandbox=CodexSandbox.READ_ONLY,
+            sandbox=(
+                CodexSandbox.READ_ONLY
+                if profile_id.independent_reviewer
+                else CodexSandbox.WORKSPACE_WRITE
+            ),
             trusted_workspace=True,
         )
     )
@@ -148,8 +166,9 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
 
     assert result["process"]["outcome"] == "succeeded"
     assert result["delegation"]["state"] == "succeeded"
-    assert result["delegation"]["result_refs"] == [review["entity_ref"]]
-    assert manager.list_reviews(state="approved")[0]["id"] == review["entity_ref"]["id"]
+    assert result["delegation"]["result_refs"] == [target["entity_ref"]]
+    if review is not None:
+        assert manager.list_reviews(state="approved")[0]["id"] == review["entity_ref"]["id"]
     assert result["attempt"]["diagnostic_code"] == "none"
     assert "canonical outcome recorded" not in str(result)
     joined = service.list_attempts(diagnostic=True)

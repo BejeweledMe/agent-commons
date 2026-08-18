@@ -54,20 +54,22 @@ async def _run() -> None:
     delegation_id = mcp_arguments[mcp_arguments.index("--delegation-id") + 1]
     enabled_tools = set(body["enabled_tools"])
     required_tools = {
-        "commons_list_reviews",
-        "commons_show_review",
         "commons_show_delegation",
         "commons_repo_files",
         "commons_repo_read",
-        "commons_complete_review",
         "commons_succeed_delegation",
     }
     if not required_tools.issubset(enabled_tools):
         raise RuntimeError("Codex enabled_tools contract is incomplete")
+    # Real Codex does not forward the provider process environment verbatim to
+    # configured MCP children.  Keep this fixture honest: delegated identity
+    # must travel in the generated MCP argv, not only in the broker env.
+    mcp_env = dict(os.environ)
+    mcp_env.pop("AGENT_COMMONS_SESSION_ID", None)
     parameters = StdioServerParameters(
         command=body["command"],
         args=mcp_arguments,
-        env=dict(os.environ),
+        env=mcp_env,
     )
     async with stdio_client(parameters) as (reader, writer):
         async with ClientSession(reader, writer) as session:
@@ -76,15 +78,10 @@ async def _run() -> None:
             if not enabled_tools.issubset(names):
                 raise RuntimeError("worker MCP tool contract is incomplete")
 
-            reviews = _value(
-                await session.call_tool("commons_list_reviews", {"state": "requested"})
-            )
-            if len(reviews) != 1:
-                raise RuntimeError("worker MCP did not expose exactly one review")
-            review = _value(
+            delegation = _value(
                 await session.call_tool(
-                    "commons_show_review",
-                    {"review_id": reviews[0]["id"]},
+                    "commons_show_delegation",
+                    {"delegation_id": delegation_id},
                 )
             )
             files = _value(
@@ -103,37 +100,47 @@ async def _run() -> None:
             if "return 42" not in read["content"]:
                 raise RuntimeError("scoped source read returned unexpected content")
 
-            _value(
-                await session.call_tool(
-                    "commons_complete_review",
-                    {
-                        "review_id": review["id"],
-                        "expected_revision": review["revision"],
-                        "target_revision": review["target_revision"],
-                        "verdict": "approved",
-                        "summary": (
-                            "Hermetic Codex provider inspected the exact scoped source "
-                            "over real MCP stdio."
-                        ),
-                        "idempotency_key": "hermetic-codex-review-complete",
-                        "evidence_refs": None,
-                    },
+            if "commons_complete_review" in enabled_tools:
+                reviews = _value(
+                    await session.call_tool("commons_list_reviews", {"state": "requested"})
                 )
-            )
-            delegation = _value(
-                await session.call_tool(
-                    "commons_show_delegation",
-                    {"delegation_id": delegation_id},
+                if len(reviews) != 1:
+                    raise RuntimeError("worker MCP did not expose exactly one review")
+                review = _value(
+                    await session.call_tool(
+                        "commons_show_review",
+                        {"review_id": reviews[0]["id"]},
+                    )
                 )
-            )
+                _value(
+                    await session.call_tool(
+                        "commons_complete_review",
+                        {
+                            "review_id": review["id"],
+                            "expected_revision": review["revision"],
+                            "target_revision": review["target_revision"],
+                            "verdict": "approved",
+                            "summary": (
+                                "Hermetic Codex provider inspected the exact scoped source "
+                                "over real MCP stdio."
+                            ),
+                            "idempotency_key": "hermetic-codex-review-complete",
+                            "evidence_refs": None,
+                        },
+                    )
+                )
+                result_refs = [f"review:{review['id']}"]
+            else:
+                target = delegation["target_ref"]
+                result_refs = [f"{target['kind']}:{target['id']}"]
             _value(
                 await session.call_tool(
                     "commons_succeed_delegation",
                     {
                         "delegation_id": delegation["id"],
                         "expected_revision": delegation["revision"],
-                        "summary": "Hermetic Codex real-stdio review completed.",
-                        "result_refs": [f"review:{review['id']}"],
+                        "summary": "Hermetic Codex real-stdio work completed.",
+                        "result_refs": result_refs,
                         "idempotency_key": "hermetic-codex-delegation-succeed",
                     },
                 )

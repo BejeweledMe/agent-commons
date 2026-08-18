@@ -493,6 +493,7 @@ def build_server(
     communication: CommunicationService | None = None,
     enable_controls: bool = True,
     delegation_id: str | None = None,
+    catalog_only_purpose: str | None = None,
     binding_wait_seconds: float = 5.0,
     git_executable: str = "/usr/bin/git",
     server_factory: Callable[[str], ServerT] | None = None,
@@ -500,15 +501,32 @@ def build_server(
     """Build a local stdio server with an intentionally bounded tool set."""
 
     commons = manager or CommonsManager(repo_root, session_id=session_id)
+    if catalog_only_purpose not in {None, "implementation", "independent_review", "verification"}:
+        raise ConfigurationError("MCP catalog-only purpose is invalid")
+    if catalog_only_purpose is not None and not commons.read_only:
+        raise ConfigurationError("MCP catalog-only handshake requires read-only state")
     communication_service = communication
-    if communication_service is None and isinstance(commons, CommonsManager):
+    if (
+        communication_service is None
+        and isinstance(commons, CommonsManager)
+        and catalog_only_purpose is None
+    ):
         communication_service = CommunicationRuntimeService(commons)
     factory = server_factory or _fastmcp_factory
     server = factory("agent-commons")
     active_session_id = getattr(commons, "session_id", None)
     requested_binding = delegation_id or os.environ.get("AGENT_COMMONS_DELEGATION_ID")
-    worker: dict[str, Any] | None = None
-    if requested_binding is not None:
+    worker: dict[str, Any] | None = (
+        {
+            "id": "delegation.preflight",
+            "purpose": catalog_only_purpose,
+            "target_ref": {"kind": "task", "id": "task.preflight"},
+            "target_revision": "evt.preflight",
+        }
+        if catalog_only_purpose is not None
+        else None
+    )
+    if catalog_only_purpose is None and requested_binding is not None:
         if active_session_id is None:
             raise ConfigurationError("delegated MCP binding requires an active child session")
         if binding_wait_seconds < 0 or binding_wait_seconds > 30:
@@ -534,7 +552,7 @@ def build_server(
                     "delegated MCP binding was not canonically started before the deadline"
                 )
             time.sleep(0.01)
-    else:
+    elif catalog_only_purpose is None:
         worker_matches = [
             candidate
             for candidate in commons.list_delegations(state=None)
@@ -546,7 +564,9 @@ def build_server(
             raise ConfigurationError("one child session cannot own multiple active delegations")
         worker = worker_matches[0] if worker_matches else None
     workspace = (
-        ScopedRepoReader(commons, git_executable=git_executable) if worker is not None else None
+        ScopedRepoReader(commons, git_executable=git_executable)
+        if worker is not None and catalog_only_purpose is None
+        else None
     )
     terminal_audit = (
         TerminalToolAuditStore(
@@ -554,7 +574,7 @@ def build_server(
             security_policy=commons.policy,
             read_only=commons.read_only,
         )
-        if worker is not None
+        if worker is not None and catalog_only_purpose is None
         else None
     )
 
@@ -1497,6 +1517,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Validate imports and the root tool catalog without opening stdio or writing state.",
     )
     parser.add_argument(
+        "--stdio-preflight-purpose",
+        choices=("implementation", "independent_review", "verification"),
+        help="Run a read-only stdio handshake exposing one worker tool catalog.",
+    )
+    parser.add_argument(
         "--session-id",
         default=os.environ.get("AGENT_COMMONS_SESSION_ID"),
         help="Active writer session; defaults to AGENT_COMMONS_SESSION_ID.",
@@ -1544,7 +1569,7 @@ def main(argv: list[str] | None = None) -> int:
             arguments.repo.expanduser().resolve(),
             session_id=arguments.session_id,
             state_root=arguments.state_root,
-            read_only=arguments.preflight,
+            read_only=arguments.preflight or arguments.stdio_preflight_purpose is not None,
         )
         if arguments.preflight:
             git = resolve_trusted_executable(
@@ -1603,6 +1628,7 @@ def main(argv: list[str] | None = None) -> int:
             manager=manager,
             runtime=runtime,
             delegation_id=arguments.delegation_id,
+            catalog_only_purpose=arguments.stdio_preflight_purpose,
             git_executable=arguments.git_executable,
             enable_controls=not arguments.disable_controls,
         )

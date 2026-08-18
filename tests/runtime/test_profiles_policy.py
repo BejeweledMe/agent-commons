@@ -62,6 +62,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
         workspace_root=tmp_path,
         state_root=tmp_path / "external-state",
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        child_session_id="session.01KXZZZZZZZZZZZZZZZZZZZZZZ",
     )
     assert invocation.argv[1:5] == (
         "--ask-for-approval",
@@ -86,6 +87,8 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
         "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
         "--git-executable",
         "/usr/bin/true",
+        "--session-id",
+        "session.01KXZZZZZZZZZZZZZZZZZZZZZZ",
     ]
     assert invocation.stdin == b"Implement the exact submitted task"
     assert "Implement" not in " ".join(invocation.argv)
@@ -104,6 +107,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
         workspace_root=tmp_path,
         state_root=tmp_path / "external-state",
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        child_session_id="session.01KXZZZZZZZZZZZZZZZZZZZZZZ",
         max_budget_microusd=250_000,
     )
     assert invocation.stdin == b"Review it"
@@ -119,6 +123,7 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     assert str(tmp_path / "external-state") in mcp_config
     assert str(tmp_path.resolve()) in mcp_config
     assert "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ" in mcp_config
+    assert '"--session-id","session.01KXZZZZZZZZZZZZZZZZZZZZZZ"' in mcp_config
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
         invocation.argv
     )

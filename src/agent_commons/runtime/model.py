@@ -238,6 +238,7 @@ def _resolved_worker_mcp(
     workspace_root: Path,
     state_root: Path | None,
     delegation_id: str,
+    child_session_id: str | None,
     mcp_executable: str,
     git_executable: str,
 ) -> tuple[str, tuple[str, ...]]:
@@ -256,7 +257,7 @@ def _resolved_worker_mcp(
         .expanduser()
         .resolve()
     )
-    return resolved_mcp, (
+    arguments = [
         "--repo",
         str(workspace_root.resolve()),
         "--state-root",
@@ -265,7 +266,10 @@ def _resolved_worker_mcp(
         delegation_id,
         "--git-executable",
         resolved_git,
-    )
+    ]
+    if child_session_id is not None:
+        arguments.extend(("--session-id", _safe_identifier("child_session_id", child_session_id)))
+    return resolved_mcp, tuple(arguments)
 
 
 def _toml_literal(value: object) -> str:
@@ -449,6 +453,7 @@ class RunnerProfile(Protocol):
         workspace_root: Path,
         state_root: Path | None = None,
         delegation_id: str | None = None,
+        child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
         role_tools: Sequence[str] | None = None,
@@ -499,6 +504,7 @@ class CodexRunnerProfile:
         workspace_root: Path,
         state_root: Path | None = None,
         delegation_id: str | None = None,
+        child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
         role_tools: Sequence[str] | None = None,
@@ -518,6 +524,7 @@ class CodexRunnerProfile:
             workspace_root=workspace_root,
             state_root=state_root,
             delegation_id=delegation_id,
+            child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
             git_executable=self.git_executable,
         )
@@ -611,6 +618,7 @@ class ClaudeRunnerProfile:
         workspace_root: Path,
         state_root: Path | None = None,
         delegation_id: str | None = None,
+        child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
         worker_purpose: str | None = None,
         role_tools: Sequence[str] | None = None,
@@ -641,12 +649,14 @@ class ClaudeRunnerProfile:
             workspace_root=workspace_root,
             state_root=state_root,
             delegation_id=delegation_id,
+            child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
             git_executable=self.git_executable,
         )
         # Pass the sole MCP server as immutable argv material.  Strict mode
-        # excludes ambient user/project MCP configuration, while the server
-        # inherits only the broker-selected child session identity.
+        # excludes ambient user/project MCP configuration.  The broker-selected
+        # child session is also carried explicitly in argv because providers do
+        # not promise to forward their own environment to MCP children.
         mcp_config = json.dumps(
             {
                 "mcpServers": {

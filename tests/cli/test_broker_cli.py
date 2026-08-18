@@ -468,6 +468,7 @@ def test_broker_preflight_validates_the_generated_codex_mcp_contract(
     body = json.loads(result.output)
     assert body["ok"] is True
     assert body["checks"]["mcp_contract"]["ok"] is True
+    assert body["checks"]["mcp_handshake"]["ok"] is True
     assert body["provider_work_process_started"] is False
 
 

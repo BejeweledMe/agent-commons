@@ -164,6 +164,7 @@ class LocalBroker:
             workspace_root=request.cwd,
             state_root=request.state_root,
             delegation_id=request.correlation.delegation_id,
+            child_session_id=request.correlation.child_session_id,
             max_budget_microusd=request.child_policy.max_budget_microusd,
             worker_purpose=request.purpose,
             role_tools=request.role_tools,

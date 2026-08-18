@@ -71,6 +71,58 @@ _CODEX_EXEC_HELP_FLAGS = ("--config", "--ignore-user-config", "--strict-config",
 
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_PREFIX = "mcp_servers.agent-commons."
+_MCP_PROTOCOL_VERSION = "2025-06-18"
+
+
+def _mcp_handshake_stdin() -> bytes:
+    messages = (
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": _MCP_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {"name": "agent-commons-preflight", "version": "1"},
+            },
+        },
+        {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    )
+    return b"".join(
+        json.dumps(message, separators=(",", ":")).encode("utf-8") + b"\n" for message in messages
+    )
+
+
+def _parse_mcp_handshake(output: bytes) -> set[str]:
+    responses: dict[int, Mapping[str, Any]] = {}
+    for raw_line in output.splitlines():
+        if not raw_line.strip():
+            continue
+        message = json.loads(raw_line)
+        if isinstance(message, Mapping) and isinstance(message.get("id"), int):
+            responses[int(message["id"])] = message
+    initialized = responses[1]
+    listed = responses[2]
+    if "error" in initialized or "error" in listed:
+        raise ValueError("MCP handshake returned an error")
+    initialize_result = initialized.get("result")
+    tools_result = listed.get("result")
+    if not isinstance(initialize_result, Mapping) or not isinstance(tools_result, Mapping):
+        raise TypeError("MCP handshake response is invalid")
+    if not isinstance(initialize_result.get("protocolVersion"), str):
+        raise TypeError("MCP initialize response has no protocol version")
+    tools = tools_result.get("tools")
+    if not isinstance(tools, list):
+        raise TypeError("MCP tools/list response is invalid")
+    names = {
+        str(tool["name"])
+        for tool in tools
+        if isinstance(tool, Mapping) and isinstance(tool.get("name"), str) and tool["name"]
+    }
+    if len(names) != len(tools):
+        raise TypeError("MCP tools/list contains invalid or duplicate names")
+    return names
 
 
 def _help_has_flag(help_text: str, flag: str) -> bool:
@@ -275,14 +327,15 @@ def preflight_profile(
         tomllib.TOMLDecodeError,
     ):
         checks["mcp_contract"] = _safe_failure(DiagnosticCode.MCP_CONFIG_INVALID)
+        checks["mcp_handshake"] = _safe_failure(DiagnosticCode.MCP_CONFIG_INVALID)
     else:
-        mcp_args.append("--preflight")
+        contract_args = [*mcp_args, "--preflight"]
         mcp_result = _run_probe(
             probe,
             RunnerInvocation(
                 provider=invocation.provider,
                 profile_id=invocation.profile_id,
-                argv=(mcp_command, *mcp_args),
+                argv=(mcp_command, *contract_args),
                 stdin=b"",
             ),
             cwd=root,
@@ -345,6 +398,42 @@ def preflight_profile(
                 ),
                 "missing_tool_count": missing_tool_count,
                 "unexpected_tool_count": unexpected_tool_count,
+            }
+        )
+
+        handshake_result = _run_probe(
+            probe,
+            RunnerInvocation(
+                provider=invocation.provider,
+                profile_id=invocation.profile_id,
+                argv=(mcp_command, *mcp_args, "--stdio-preflight-purpose", effective_purpose),
+                stdin=_mcp_handshake_stdin(),
+            ),
+            cwd=root,
+        )
+        handshake_tools: set[str] = set()
+        handshake_ok = False
+        if handshake_result.outcome is RunOutcome.SUCCEEDED:
+            try:
+                handshake_tools = _parse_mcp_handshake(handshake_result.stdout)
+                handshake_ok = expected_tools.issubset(handshake_tools)
+            except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+                handshake_ok = False
+        checks["mcp_handshake"] = (
+            {
+                "ok": True,
+                "protocol": "initialized",
+                "required_tools": "available",
+                "tool_count": len(handshake_tools),
+            }
+            if handshake_ok
+            else {
+                **_safe_failure(
+                    DiagnosticCode.MCP_SPAWN_FAILED
+                    if handshake_result.pid is None
+                    else DiagnosticCode.MCP_HANDSHAKE_FAILED
+                ),
+                "missing_tool_count": len(expected_tools - handshake_tools),
             }
         )
 

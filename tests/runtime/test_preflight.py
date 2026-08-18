@@ -82,6 +82,22 @@ def _mcp_preflight_body() -> dict[str, object]:
     }
 
 
+def _mcp_handshake_output(tool_names: frozenset[str]) -> bytes:
+    responses = (
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
+        },
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {"tools": [{"name": name} for name in sorted(tool_names)]},
+        },
+    )
+    return b"".join(json.dumps(response).encode() + b"\n" for response in responses)
+
+
 class ProbeRunner:
     def __init__(
         self,
@@ -89,11 +105,13 @@ class ProbeRunner:
         missing_provider_flags: tuple[str, ...] = (),
         legacy_mcp_contract: bool = False,
         mcp_body: object = _DEFAULT_MCP_BODY,
+        handshake_exit_code: int = 0,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.missing_provider_flags = missing_provider_flags
         self.legacy_mcp_contract = legacy_mcp_contract
         self.mcp_body = mcp_body
+        self.handshake_exit_code = handshake_exit_code
 
     def run(self, invocation, **_kwargs) -> ProcessResult:
         self.calls.append(invocation.argv)
@@ -102,6 +120,11 @@ class ProbeRunner:
                 flag for flag in _CLAUDE_HELP_FLAGS if flag not in self.missing_provider_flags
             )
             return _result(output=flags.encode())
+        if invocation.stdin:
+            return _result(
+                output=_mcp_handshake_output(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+                exit_code=self.handshake_exit_code,
+            )
         if self.mcp_body is not _DEFAULT_MCP_BODY:
             body = self.mcp_body
         elif self.legacy_mcp_contract:
@@ -155,10 +178,34 @@ def test_preflight_validates_provider_flags_and_mcp_without_an_attempt(tmp_path:
             ).hexdigest(),
             "tool_count": len(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
         },
+        "mcp_handshake": {
+            "ok": True,
+            "protocol": "initialized",
+            "required_tools": "available",
+            "tool_count": len(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+        },
     }
-    assert len(runner.calls) == 2
+    assert len(runner.calls) == 3
     assert "--preflight" in runner.calls[1]
     assert "--delegation-id" not in runner.calls[1]
+    assert "--preflight" not in runner.calls[2]
+
+
+def test_preflight_is_red_when_real_stdio_handshake_fails(tmp_path: Path) -> None:
+    result = preflight_profile(
+        _profiles(),
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        workspace_root=tmp_path,
+        runner=ProbeRunner(handshake_exit_code=2),  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert (
+        result["checks"]["mcp_handshake"]["diagnostic_code"]
+        == DiagnosticCode.MCP_HANDSHAKE_FAILED.value
+    )
+    assert result["consumed_delegation_attempt"] is False
+    assert result["provider_work_process_started"] is False
 
 
 def test_preflight_identifies_a_missing_mcp_executable_before_provider_launch(
@@ -462,6 +509,8 @@ class CodexProbeRunner:
         if "--help" in invocation.argv:
             output = self.exec_help if "exec" in invocation.argv else self.root_help
             return _result(output=output)
+        if invocation.stdin:
+            return _result(output=_mcp_handshake_output(IMPLEMENTATION_WORKER_TOOL_NAMES))
         return _result(output=json.dumps(_mcp_preflight_body()).encode())
 
 
@@ -500,6 +549,7 @@ def test_codex_preflight_accepts_root_only_approval_flag(tmp_path: Path) -> None
     assert runner.calls[:2] == [(executable, "--help"), (executable, "exec", "--help")]
     assert "--preflight" in runner.calls[2]
     assert "--delegation-id" not in runner.calls[2]
+    assert "--preflight" not in runner.calls[3]
 
 
 def test_codex_preflight_fails_closed_when_root_scope_lacks_a_launch_flag(
