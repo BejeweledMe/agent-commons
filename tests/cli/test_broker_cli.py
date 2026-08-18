@@ -4,6 +4,7 @@ import json
 import stat
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -16,6 +17,224 @@ def _executable(path: Path, body: str) -> Path:
     path.write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
     path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return path
+
+
+def _requested_builder_delegation(
+    tmp_path: Path, *, workspace_name: str
+) -> tuple[Path, CommonsManager, dict[str, Any], dict[str, Any]]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name=workspace_name)
+    manager = CommonsManager(repo)
+    parent = manager.start_session(
+        stable_instance_id=f"{workspace_name}-parent-session",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="builder",
+    )
+    manager.session_id = str(parent["session_id"])
+    task = manager.create_task(
+        title="Build a small landing page",
+        description="Exercise broker launch admission before provider work starts.",
+        acceptance_criteria=("The landing page is recorded canonically.",),
+        idempotency_key=f"{workspace_name}-task",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=str(task["revision"]),
+        target_profile="codex-builder",
+        purpose="implementation",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "provider_units", "limit": 1},
+        },
+        idempotency_key=f"{workspace_name}-delegation",
+    )
+    return repo, manager, parent, delegation
+
+
+def test_broker_run_rejects_a_foreign_requester_with_safe_recovery_guidance(
+    tmp_path: Path,
+) -> None:
+    repo, manager, _parent, delegation = _requested_builder_delegation(
+        tmp_path,
+        workspace_name="broker-requester-recovery",
+    )
+    foreign = manager.start_session(
+        stable_instance_id="broker-requester-recovery-foreign",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="builder",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--session-id",
+            str(foreign["session_id"]),
+            "--json",
+            "broker",
+            "run",
+            str(delegation["entity_ref"]["id"]),
+            str(delegation["revision"]),
+            "--idempotency-key",
+            "foreign-requester-launch",
+        ],
+    )
+
+    assert result.exit_code == 1
+    body = json.loads(result.output)
+    error = body["error"]
+    assert error["code"] == "requester_session_required"
+    assert "delegation:recover" in error["message"]
+    assert "manually" in error["message"]
+    actions = " ".join(error["safe_next_actions"])
+    assert "Return to the active canonical requester session" in actions
+    assert "operator-authorized delegation:recover" in actions
+    assert "manually" in actions
+    assert manager.get_delegation(str(delegation["entity_ref"]["id"]))["state"] == "requested"
+    runtime = manager.paths.state_root / "runtime" / "requests"
+    assert not runtime.exists() or list(runtime.glob("*.json")) == []
+
+
+@pytest.mark.parametrize(
+    ("profile_body", "diagnostic_code", "action_fragment"),
+    (
+        (
+            "    executable: /bin/echo\n"
+            "    mcp_executable: /bin/echo\n"
+            "    git_executable: /usr/bin/git\n"
+            "    sandbox: workspace-write\n"
+            "    trusted_workspace: false\n",
+            "trusted_workspace_required",
+            "manual workflow",
+        ),
+        (
+            "    executable: /definitely/missing-codex-for-test\n"
+            "    mcp_executable: /bin/echo\n"
+            "    git_executable: /usr/bin/git\n"
+            "    sandbox: workspace-write\n"
+            "    trusted_workspace: true\n",
+            "provider_start_failed",
+            "manual workflow",
+        ),
+        (
+            "    executable: /bin/echo\n"
+            "    mcp_executable: /bin/echo\n"
+            "    git_executable: git-missing-for-broker-test\n"
+            "    sandbox: workspace-write\n"
+            "    trusted_workspace: true\n",
+            "git_executable_unavailable",
+            "manual workflow",
+        ),
+    ),
+)
+def test_broker_run_reports_prestart_profile_failures_without_consuming_an_attempt(
+    tmp_path: Path,
+    profile_body: str,
+    diagnostic_code: str,
+    action_fragment: str,
+) -> None:
+    repo, manager, parent, delegation = _requested_builder_delegation(
+        tmp_path,
+        workspace_name=f"broker-prestart-{diagnostic_code}",
+    )
+    config = tmp_path / "runtime.yaml"
+    config.write_text(
+        "profiles:\n  codex-builder:\n" + profile_body,
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--session-id",
+            str(parent["session_id"]),
+            "--json",
+            "broker",
+            "run",
+            str(delegation["entity_ref"]["id"]),
+            str(delegation["revision"]),
+            "--idempotency-key",
+            f"{diagnostic_code}-launch",
+            "--profile-config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 1
+    body = json.loads(result.output)
+    error = body["error"]
+    assert error["code"] == diagnostic_code
+    actions = " ".join(error["safe_next_actions"])
+    assert "preflight" in actions
+    assert action_fragment in actions
+    assert manager.get_delegation(str(delegation["entity_ref"]["id"]))["state"] == "requested"
+    runtime = manager.paths.state_root / "runtime" / "requests"
+    assert not runtime.exists() or list(runtime.glob("*.json")) == []
+
+
+def test_broker_run_sanitizes_rejected_operator_values_in_json_and_human_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, manager, parent, delegation = _requested_builder_delegation(
+        tmp_path,
+        workspace_name="broker-sanitized-config",
+    )
+    rejected_value = "git-SUPERSECRET-operator-path-value"
+    config = tmp_path / "runtime-secret.yaml"
+    config.write_text(
+        "profiles:\n"
+        "  codex-builder:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        f"    git_executable: {rejected_value}\n"
+        "    sandbox: workspace-write\n"
+        "    trusted_workspace: true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    base_arguments = [
+        "--repo",
+        str(repo),
+        "--session-id",
+        str(parent["session_id"]),
+    ]
+    run_arguments = [
+        "broker",
+        "run",
+        str(delegation["entity_ref"]["id"]),
+        str(delegation["revision"]),
+        "--idempotency-key",
+        "sanitized-config-launch",
+        "--profile-config",
+        str(config),
+    ]
+
+    json_result = CliRunner().invoke(cli, [*base_arguments, "--json", *run_arguments])
+    human_result = CliRunner().invoke(cli, [*base_arguments, *run_arguments])
+
+    assert json_result.exit_code == 1
+    json_error = json.loads(json_result.output)["error"]
+    assert json_error["code"] == "git_executable_unavailable"
+    assert "configured Git executable is unavailable" in json_error["message"]
+    assert rejected_value not in json_result.output
+    assert human_result.exit_code == 1
+    assert "configured Git executable is unavailable" in human_result.output
+    assert rejected_value not in human_result.output
+    assert manager.get_delegation(str(delegation["entity_ref"]["id"]))["state"] == "requested"
+    runtime = manager.paths.state_root / "runtime" / "requests"
+    assert not runtime.exists() or list(runtime.glob("*.json")) == []
 
 
 def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: Path) -> None:

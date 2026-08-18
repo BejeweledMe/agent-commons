@@ -33,6 +33,7 @@ class DiagnosticCode(StrEnum):
     UNSUPPORTED_PROVIDER_FLAG = "unsupported_provider_flag"
     MCP_CONFIG_INVALID = "mcp_config_invalid"
     MCP_EXECUTABLE_UNAVAILABLE = "mcp_executable_unavailable"
+    GIT_EXECUTABLE_UNAVAILABLE = "git_executable_unavailable"
     MCP_SPAWN_FAILED = "mcp_spawn_failed"
     MCP_HANDSHAKE_FAILED = "mcp_handshake_failed"
     MCP_BINDING_TIMEOUT = "mcp_binding_timeout"
@@ -43,6 +44,7 @@ class DiagnosticCode(StrEnum):
     TERMINAL_TOOL_REJECTED = "terminal_tool_rejected"
     PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
     CANONICAL_FINALIZATION_FAILED = "canonical_finalization_failed"
+    REQUESTER_SESSION_REQUIRED = "requester_session_required"
     REQUESTER_UNAVAILABLE = "requester_unavailable"
     TRUSTED_WORKSPACE_REQUIRED = "trusted_workspace_required"
 
@@ -60,6 +62,7 @@ _HINTS = {
     DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE: (
         "The configured Agent Commons MCP executable is unavailable."
     ),
+    DiagnosticCode.GIT_EXECUTABLE_UNAVAILABLE: ("The configured Git executable is unavailable."),
     DiagnosticCode.MCP_SPAWN_FAILED: "The configured Agent Commons MCP process did not start.",
     DiagnosticCode.MCP_HANDSHAKE_FAILED: (
         "The provider and MCP server did not complete startup negotiation."
@@ -90,6 +93,9 @@ _HINTS = {
     DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
         "Canonical finalization failed after the provider process became terminal."
     ),
+    DiagnosticCode.REQUESTER_SESSION_REQUIRED: (
+        "Provider launch must run as the active canonical delegation requester session."
+    ),
     DiagnosticCode.REQUESTER_UNAVAILABLE: (
         "The attempt owner is unavailable, so this session cannot reconcile it automatically."
     ),
@@ -103,6 +109,8 @@ _SAFE_NEXT_ACTIONS = {
     DiagnosticCode.PROVIDER_START_FAILED: (
         "Run broker preflight for the selected profile.",
         "Verify the operator-owned executable path and installation.",
+        "Until preflight passes, use the manual workflow from an authorized session "
+        "instead of retrying provider launch.",
     ),
     DiagnosticCode.PROVIDER_AUTH_FAILED: (
         "Authenticate with the provider outside Agent Commons, then rerun preflight.",
@@ -112,6 +120,7 @@ _SAFE_NEXT_ACTIONS = {
     ),
     DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG: (
         "Run broker preflight and update the provider CLI or profile compatibility.",
+        "Until preflight passes, use the manual workflow from an authorized session.",
     ),
     DiagnosticCode.MCP_CONFIG_INVALID: (
         "Run broker preflight and inspect only the operator-owned profile configuration.",
@@ -120,6 +129,12 @@ _SAFE_NEXT_ACTIONS = {
         "Add the uv tool executable directory to PATH or configure an absolute "
         "mcp_executable path.",
         "Install the matching agent-commons[mcp] source and rerun broker preflight.",
+    ),
+    DiagnosticCode.GIT_EXECUTABLE_UNAVAILABLE: (
+        "Configure an operator-owned absolute git_executable path.",
+        "Run broker preflight for the selected profile before retrying; preflight does "
+        "not consume a delegation attempt.",
+        "Until preflight passes, use the manual workflow from an authorized session.",
     ),
     DiagnosticCode.MCP_SPAWN_FAILED: ("Install the MCP extra and rerun broker preflight.",),
     DiagnosticCode.MCP_HANDSHAKE_FAILED: (
@@ -154,15 +169,30 @@ _SAFE_NEXT_ACTIONS = {
     DiagnosticCode.CANONICAL_FINALIZATION_FAILED: (
         "Run doctor, inspect the canonical delegation, and reconcile the terminal attempt.",
     ),
+    DiagnosticCode.REQUESTER_SESSION_REQUIRED: (
+        "Return to the active canonical requester session and launch from there.",
+        "Only if that requester is absent, expired, or closed and the delegation is still "
+        "requested, use an operator-authorized delegation:recover session, then create a "
+        "new delegation owned by an active requester.",
+        "Otherwise perform the work manually from an authorized session and record its "
+        "result outside this delegation; do not impersonate the canonical requester.",
+    ),
     DiagnosticCode.REQUESTER_UNAVAILABLE: (
-        "If the canonical delegation is still requested, use an operator-authorized "
-        "delegation:recover session.",
+        "If the canonical delegation is still requested and its requester is absent, "
+        "expired, or closed, use an operator-authorized delegation:recover session, "
+        "then create a new delegation owned by an active requester.",
         "For active or input-needed work, prove provider termination before any canonical "
         "classification; never relaunch blindly.",
+        "Otherwise perform the work manually from an authorized session and record its "
+        "result outside this delegation; do not impersonate the canonical requester.",
     ),
     DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED: (
         "Pass trusted_workspace: true in the writable profile's runtime configuration, "
         "or run the builder inside an externally OS-isolated worktree.",
+        "Run broker preflight for the selected profile before retrying; preflight does "
+        "not consume a delegation attempt.",
+        "If neither trust mode is operator-authorized, use the manual workflow instead "
+        "of launching the provider.",
         "The independent-reviewer profile of the same provider needs no such opt-in.",
     ),
 }
@@ -267,6 +297,38 @@ def diagnostic_safe_next_actions(code: str | DiagnosticCode) -> list[str]:
     """Return fixed, content-free recovery actions for a diagnostic code."""
 
     return list(_SAFE_NEXT_ACTIONS[DiagnosticCode(code)])
+
+
+def configuration_failure_diagnostic(exc: ConfigurationError) -> SafeDiagnostic:
+    """Classify a launch-plan refusal before any provider attempt is reserved.
+
+    Executable resolution errors expose only their fixed component role.  Other
+    profile refusals are classified from maintainer-owned validation messages;
+    no provider output or operator configuration value is persisted here.
+    """
+
+    role = str(getattr(exc, "role", ""))
+    if role == "mcp":
+        code = DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE
+    elif role == "git":
+        code = DiagnosticCode.GIT_EXECUTABLE_UNAVAILABLE
+    elif "trusted_workspace" in str(exc):
+        code = DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED
+    else:
+        code = DiagnosticCode.PROVIDER_START_FAILED
+    return SafeDiagnostic.create(code)
+
+
+def sanitized_configuration_failure(exc: ConfigurationError) -> ConfigurationError:
+    """Return a public pre-start error without rejected configuration content."""
+
+    diagnostic = configuration_failure_diagnostic(exc)
+    error = ConfigurationError(
+        "Provider launch was refused before any delegation attempt was reserved. " + diagnostic.hint
+    )
+    error.code = diagnostic.code.value  # type: ignore[attr-defined]
+    error.safe_next_actions = diagnostic.safe_next_actions  # type: ignore[attr-defined]
+    return error
 
 
 def error_safe_next_actions(exc: Exception) -> list[str]:

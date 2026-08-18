@@ -192,8 +192,44 @@ def test_preflight_identifies_a_missing_mcp_executable_before_provider_launch(
         DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE.value
     )
     assert "PATH" in " ".join(result["checks"]["mcp_executable"]["safe_next_actions"])
+    assert "preflight" in " ".join(result["checks"]["mcp_executable"]["safe_next_actions"])
     assert result["provider_help_process_started"] is False
     assert result["consumed_delegation_attempt"] is False
+    assert runner.calls == []
+
+
+def test_preflight_identifies_a_missing_git_executable_without_echoing_its_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    rejected_value = "git-SUPERSECRET-operator-path-missing"
+    profile_id = BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER
+    profiles = ProfileRegistry(
+        {
+            profile_id: ClaudeRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                git_executable=rejected_value,
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+            )
+        }
+    )
+    runner = ProbeRunner()
+
+    result = preflight_profile(
+        profiles,
+        profile_id,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    check = result["checks"]["git_executable"]
+    assert check["diagnostic_code"] == DiagnosticCode.GIT_EXECUTABLE_UNAVAILABLE.value
+    assert rejected_value not in json.dumps(result)
+    assert result["consumed_delegation_attempt"] is False
+    assert result["provider_work_process_started"] is False
     assert runner.calls == []
 
 
@@ -203,7 +239,7 @@ def test_preflight_names_a_trusted_workspace_refusal_not_a_start_failure(
     """A writable builder in an untrusted workspace refuses to build its launch
     with a trusted_workspace ConfigurationError.  That was flattened into a bare
     provider_start_failed, so preflight blamed the executable on a machine where
-    it runs fine (M8).  The real refusal and its message must survive."""
+    it runs fine (M8).  The real refusal must survive as a maintainer-owned hint."""
 
     profile_id = BuiltinProfileId.CLAUDE_BUILDER
     profiles = ProfileRegistry(
@@ -229,7 +265,10 @@ def test_preflight_names_a_trusted_workspace_refusal_not_a_start_failure(
     assert result["ok"] is False
     check = result["checks"]["profile"]
     assert check["diagnostic_code"] == DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED.value
-    assert "trusted_workspace" in check["detail"]
+    assert "not marked trusted" in check["detail"]
+    actions = " ".join(check["safe_next_actions"])
+    assert "preflight" in actions
+    assert "manual workflow" in actions
     assert result["consumed_delegation_attempt"] is False
 
 
@@ -247,6 +286,9 @@ def test_preflight_returns_closed_code_for_provider_flag_drift(tmp_path: Path) -
         == DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG.value
     )
     assert result["checks"]["provider_help"]["missing_flag_count"] == 2
+    assert "manual workflow" in " ".join(result["checks"]["provider_help"]["safe_next_actions"])
+    assert result["consumed_delegation_attempt"] is False
+    assert result["provider_work_process_started"] is False
 
 
 def test_preflight_checks_generated_session_and_tool_flags(tmp_path: Path) -> None:

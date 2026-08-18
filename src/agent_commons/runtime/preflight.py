@@ -12,7 +12,12 @@ from typing import Any
 
 from agent_commons.errors import ConfigurationError
 
-from .diagnostics import DiagnosticCode, diagnostic_hint, diagnostic_safe_next_actions
+from .diagnostics import (
+    DiagnosticCode,
+    configuration_failure_diagnostic,
+    diagnostic_hint,
+    diagnostic_safe_next_actions,
+)
 from .model import (
     BuiltinProfileId,
     ClaudeRunnerProfile,
@@ -174,20 +179,18 @@ def preflight_profile(
             worker_purpose=effective_purpose,
         )
     except ExecutableResolutionError as exc:
+        diagnostic = configuration_failure_diagnostic(exc)
         if exc.role is ExecutableRole.MCP:
             check_name = "mcp_executable"
-            code = DiagnosticCode.MCP_EXECUTABLE_UNAVAILABLE
         elif exc.role is ExecutableRole.GIT:
             check_name = "git_executable"
-            code = DiagnosticCode.MCP_CONFIG_INVALID
         else:
             check_name = "provider_executable"
-            code = DiagnosticCode.PROVIDER_START_FAILED
         return {
             "profile_id": normalized.value,
             "provider": profile.provider.value,
             "ok": False,
-            "checks": {check_name: _safe_failure(code)},
+            "checks": {check_name: _safe_failure(diagnostic.code)},
             "consumed_delegation_attempt": False,
             "provider_help_process_started": False,
             "provider_work_process_started": False,
@@ -198,18 +201,13 @@ def preflight_profile(
         # trusted_workspace ConfigurationError, which was flattened into a bare
         # provider_start_failed -- so preflight blamed the executable on a
         # machine where the executable runs fine (M8, 2026-08-10 review).  Name
-        # the real refusal, and carry its message as detail.
-        message = str(exc)
-        code = (
-            DiagnosticCode.TRUSTED_WORKSPACE_REQUIRED
-            if "trusted_workspace" in message
-            else DiagnosticCode.PROVIDER_START_FAILED
-        )
+        # the real refusal, but expose only the maintainer-owned safe hint.
+        diagnostic = configuration_failure_diagnostic(exc)
         return {
             "profile_id": normalized.value,
             "provider": profile.provider.value,
             "ok": False,
-            "checks": {"profile": {**_safe_failure(code), "detail": message}},
+            "checks": {"profile": {**_safe_failure(diagnostic.code), "detail": diagnostic.hint}},
             "consumed_delegation_attempt": False,
             "provider_help_process_started": False,
             "provider_work_process_started": False,

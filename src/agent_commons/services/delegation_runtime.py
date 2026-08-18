@@ -50,6 +50,7 @@ from agent_commons.runtime import (
     ProfileRegistry,
     Provider,
     RuntimePolicy,
+    SafeDiagnostic,
     SubprocessRunner,
     TelemetryEvent,
     TelemetryKind,
@@ -60,6 +61,7 @@ from agent_commons.runtime import (
     diagnostic_safe_next_actions,
     terminate_process_group,
 )
+from agent_commons.runtime.diagnostics import sanitized_configuration_failure
 
 from ..domain.agents import effective_grants
 from .manager import CommonsManager
@@ -984,9 +986,17 @@ alone is not task acceptance.
         with _delegation_lock(self.manager.paths.state_root, delegation_id):
             delegation = self.manager.get_delegation(delegation_id)
             if self.manager.session_id != delegation.get("parent_session_id"):
-                raise LifecycleConflictError(
-                    "only the canonical delegation requester may launch its provider"
+                diagnostic = SafeDiagnostic.create(DiagnosticCode.REQUESTER_SESSION_REQUIRED)
+                error = LifecycleConflictError(
+                    "only the active canonical delegation requester session may launch its "
+                    "provider; return to that session, or, only if it is absent, expired, or "
+                    "closed while this delegation remains requested, use an operator-authorized "
+                    "delegation:recover session before creating replacement work; otherwise "
+                    "continue manually without impersonating the requester"
                 )
+                error.code = diagnostic.code.value  # type: ignore[attr-defined]
+                error.safe_next_actions = diagnostic.safe_next_actions  # type: ignore[attr-defined]
+                raise error
             requested_revision = self._requested_revision(delegation_id)
             if expected_revision != requested_revision:
                 raise LifecycleConflictError(
@@ -1052,16 +1062,19 @@ alone is not task acceptance.
             # Validate executable, trust mode, argv, and budget support before
             # allocating a child session or durable operational reservation.
             instruction = self._instruction(delegation, profile_id=profile_id, skills=role_skills)
-            profile.build_invocation(
-                instruction,
-                workspace_root=self.manager.repo_root,
-                state_root=self.manager.paths.state_root,
-                delegation_id=delegation_id,
-                max_budget_microusd=child_policy.max_budget_microusd,
-                worker_purpose=str(delegation["purpose"]),
-                role_tools=role_tools,
-                role_grants=role_grants,
-            )
+            try:
+                profile.build_invocation(
+                    instruction,
+                    workspace_root=self.manager.repo_root,
+                    state_root=self.manager.paths.state_root,
+                    delegation_id=delegation_id,
+                    max_budget_microusd=child_policy.max_budget_microusd,
+                    worker_purpose=str(delegation["purpose"]),
+                    role_tools=role_tools,
+                    role_grants=role_grants,
+                )
+            except ConfigurationError as exc:
+                raise sanitized_configuration_failure(exc) from exc
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
             nonce = str(child["nonce"])
