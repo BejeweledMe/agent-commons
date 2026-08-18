@@ -20,6 +20,33 @@ from agent_commons.errors import ConfigurationError, ValidationError
 
 STATE_OWNER_SCHEMA = "agent_commons.state_owner.v1"
 STATE_OWNER_FILENAME = "workspace-owner.json"
+_STATE_DIAGNOSTIC_ENTRY_LIMIT = 20
+_LEGACY_STATE_ENTRY_NAMES = frozenset(
+    {
+        STATE_OWNER_FILENAME,
+        "canonical-write.lock",
+        "claims",
+        "idempotency",
+        "idempotency-abandonments",
+        "idempotency-v2",
+        "index.sqlite3",
+        "runtime",
+        "sessions",
+    }
+)
+
+
+def _bounded_state_material(root: Path) -> tuple[list[str], bool]:
+    names: list[str] = []
+    truncated = False
+    for item in root.iterdir():
+        if item.name == "workspaces":
+            continue
+        if len(names) == _STATE_DIAGNOSTIC_ENTRY_LIMIT:
+            truncated = True
+            break
+        names.append(item.name)
+    return sorted(names), truncated
 
 
 @lru_cache(maxsize=1)
@@ -255,11 +282,10 @@ class CommonsPaths:
         base_is_unsafe = self.state_base.is_symlink() or (
             self.state_base.exists() and not self.state_base.is_dir()
         )
-        base_has_legacy_material = (
-            self.state_base.is_dir()
-            and not self.state_base.is_symlink()
-            and any(item.name != "workspaces" for item in self.state_base.iterdir())
-        )
+        base_has_legacy_material = False
+        if self.state_base.is_dir() and not self.state_base.is_symlink():
+            material, _truncated = _bounded_state_material(self.state_base)
+            base_has_legacy_material = bool(material)
         if base_is_unsafe or legacy_owner is not None or base_has_legacy_material:
             effective = self.state_base
             mode = "legacy-exact"
@@ -394,9 +420,12 @@ class CommonsPaths:
                 match=bool(expected is not None and legacy_owner == expected),
             )
             return report
-        material = [item for item in self.state_root.iterdir() if item.name != "workspaces"]
+        material, material_truncated = _bounded_state_material(self.state_root)
         report.update(status="empty" if not material else "ambiguous-legacy")
         report["match"] = True if not material and expected is not None else None
+        if material:
+            report["ambiguous_entries"] = material
+            report["ambiguous_entries_truncated"] = material_truncated
         return report
 
     def validate_state_ownership(self, *, read_only: bool = False) -> dict[str, Any]:
@@ -439,14 +468,47 @@ class CommonsPaths:
                     "state automatically.",
                 ),
             )
+        details = {
+            "expected_workspace_id": self.workspace_id,
+            "status": report["status"],
+            "mode": self.state_mode,
+            "source": self.state_source,
+            "resolved_state_root": str(self.state_root),
+        }
+        message = "operational state ownership is missing or invalid"
+        safe_next_actions = (
+            "Inspect support --show-paths and choose an empty exact state root.",
+            "Do not move, delete, or adopt legacy operational state without operator review.",
+        )
+        if (
+            report["status"] == "ambiguous-legacy"
+            and self.state_mode == "legacy-exact"
+            and self.state_base == self.state_root
+        ):
+            entries = list(report.get("ambiguous_entries") or ())
+            truncated = bool(report.get("ambiguous_entries_truncated"))
+            details["legacy_mode_trigger_entries"] = entries
+            details["legacy_mode_trigger_entries_truncated"] = truncated
+            rendered = ", ".join(entries)
+            message = (
+                "AGENT_COMMONS_STATE_BASE contains material that switched it to legacy-exact "
+                f"mode: {rendered}"
+            )
+            non_state_entries = [name for name in entries if name not in _LEGACY_STATE_ENTRY_NAMES]
+            if non_state_entries:
+                details["non_state_entries"] = non_state_entries
+            if non_state_entries == entries and not truncated:
+                safe_next_actions = (
+                    "Move the listed non-state files out of AGENT_COMMONS_STATE_BASE, then rerun "
+                    "doctor or broker preflight.",
+                    "Keep runtime configuration in a separate operator-owned directory outside "
+                    "the state base and delegated workspace.",
+                )
         raise _configuration_error(
-            "operational state ownership is missing or invalid",
+            message,
             code="state_owner_unproven",
-            details={"expected_workspace_id": self.workspace_id, "status": report["status"]},
-            safe_next_actions=(
-                "Inspect support --show-paths and choose an empty exact state root.",
-                "Do not move, delete, or adopt legacy operational state without operator review.",
-            ),
+            details=details,
+            safe_next_actions=safe_next_actions,
         )
 
     def ensure_layout(self, *, read_only: bool = False) -> None:

@@ -41,6 +41,11 @@ only for backward compatibility: pointing a second project at it fails before
 any state is opened, which is correct but surprising if you copied the line from
 a first project.
 
+Reserve the base for its generated `workspaces/` namespace. Operator files such
+as runtime profile YAML belong in a separate directory outside both the base and
+the delegated project; unrelated material makes the base look like ambiguous
+legacy exact state and fails closed.
+
 Expected JSON includes `"canonical_workspace_available":true`,
 `"state_root_explicit":true`, the installed package/Python/platform versions,
 and `agent_commons_source_sha256`. That fingerprint distinguishes installed

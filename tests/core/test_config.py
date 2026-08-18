@@ -392,3 +392,30 @@ def test_base_with_unproven_legacy_material_fails_before_namespacing(tmp_path: P
     assert captured.value.details["status"] == "ambiguous-legacy"
     assert foreign_session.read_text(encoding="utf-8") == "{}\n"
     assert not (base / "workspaces").exists()
+
+
+def test_state_owner_diagnostic_names_the_file_that_switched_a_base_to_legacy(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _initialized_layout(repo)
+    base = tmp_path / "operator-state-base"
+    base.mkdir()
+    runtime_config = base / "first-delegation-runtime.yaml"
+    runtime_config.write_text("profiles: {}\n", encoding="utf-8")
+    paths = CommonsPaths.for_workspace(
+        repo,
+        state_base=base,
+        workspace_id="workspace.00000000000000000000000001",
+    )
+
+    with pytest.raises(ConfigurationError) as captured:
+        paths.ensure_layout()
+
+    assert captured.value.code == "state_owner_unproven"
+    assert captured.value.details["legacy_mode_trigger_entries"] == [
+        "first-delegation-runtime.yaml"
+    ]
+    assert "first-delegation-runtime.yaml" in str(captured.value)
+    assert "Move the listed non-state files" in " ".join(captured.value.safe_next_actions)

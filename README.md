@@ -48,6 +48,11 @@ opened. No state is moved or deleted automatically. The source fingerprint
 distinguishes different checkouts that intentionally share one unreleased
 package version. `init` does not stage or commit anything.
 
+Reserve the base for its generated `workspaces/` namespace. Keep operator files,
+including runtime profile YAML, in a separate operator-owned directory outside
+both the base and the delegated workspace; unrelated material in the base is
+diagnosed as ambiguous legacy state.
+
 Start the author window, keep its rotating `nonce` private, and export only the
 returned session ID:
 

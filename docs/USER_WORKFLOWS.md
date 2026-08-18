@@ -175,6 +175,12 @@ material fails as `state_owner_unproven`; another workspace fails as
 `state_owner_mismatch`. Resolve either by selecting a new empty exact root or a
 base after operator review—never by deleting or rewriting the old state.
 
+The base itself is reserved for the generated `workspaces/` namespace. Store
+runtime profile YAML and other operator files in a separate operator-owned
+directory outside the base and delegated workspace. When an unrelated file is
+the only blocker, the ownership diagnostic names it so it can be moved out and
+the command rerun.
+
 Rollback changes configuration, not data: unset `AGENT_COMMONS_STATE_BASE` and
 select a previously proven exact root if one exists. For read-path diagnosis,
 `orient --fresh --verbose` and `inbox --fresh --verbose` bypass the disposable

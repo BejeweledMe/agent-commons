@@ -59,7 +59,9 @@ sibling of the project rather than a directory inside the delegated workspace.
 ```bash
 export FIRST_DELEGATION_ROOT="$PWD/first-delegation-site"
 export AGENT_COMMONS_STATE_BASE="$PWD/agent-commons-state"
-mkdir -p "$FIRST_DELEGATION_ROOT" "$AGENT_COMMONS_STATE_BASE"
+export FIRST_DELEGATION_OPERATOR_DIR="$PWD/first-delegation-operator"
+mkdir -p "$FIRST_DELEGATION_ROOT" "$AGENT_COMMONS_STATE_BASE" \
+  "$FIRST_DELEGATION_OPERATOR_DIR"
 cd "$FIRST_DELEGATION_ROOT"
 git init
 unset AGENT_COMMONS_STATE_ROOT
@@ -136,15 +138,18 @@ It therefore fails closed unless the operator explicitly sets
 only for a repository whose contents and hooks you trust. Do not use this
 example to run untrusted downloaded work directly on the host.
 
-The runtime config is operator-owned and must be outside the delegated project.
-The commands below configure one Claude builder using executables already on
-`PATH`:
+The runtime config is operator-owned and must be outside both the delegated
+project and `AGENT_COMMONS_STATE_BASE`. The state base may contain only the
+derived `workspaces/` namespace; placing a runtime YAML beside it makes the base
+look like an ambiguous legacy exact root. The commands below use the separate
+operator directory created in step 2 and configure one Claude builder using
+executables already on `PATH`:
 
 ```bash
 export PROVIDER_BIN="$(command -v claude)"
 export COMMONS_MCP_BIN="$AGENT_COMMONS_MCP"
 export GIT_BIN="$(command -v git)"
-export RUNTIME_CONFIG="$AGENT_COMMONS_STATE_BASE/first-delegation-runtime.yaml"
+export RUNTIME_CONFIG="$FIRST_DELEGATION_OPERATOR_DIR/first-delegation-runtime.yaml"
 umask 077
 printf '%s\n' \
   'profiles:' \
@@ -170,10 +175,11 @@ billing modes. Then run the non-billable compatibility checks:
   --profile-config "$RUNTIME_CONFIG"
 ```
 
-Continue only when preflight returns `"ok": true`. It starts provider `--help`
-and the generated MCP contract, but it starts no model work and consumes no
-delegation attempt. It does not prove that provider authentication or a later
-model response will succeed.
+Continue only when preflight returns `"ok": true`. It starts provider `--help`,
+validates the generated MCP contract, and performs a real MCP stdio initialize
+and tool-list handshake. It starts no model work and consumes no delegation
+attempt. It does not prove that provider authentication or a later model
+response will succeed.
 
 If the profile, MCP executable, provider, authentication, or trust decision is
 not ready, stop here and use the
