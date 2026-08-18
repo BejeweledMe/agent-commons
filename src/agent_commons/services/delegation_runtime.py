@@ -776,7 +776,6 @@ class DelegationRuntimeService:
         return f"""You are executing one bounded Agent Commons delegation.
 
 Delegation: {delegation["id"]}
-Delegation revision at launch: {delegation["revision"]}
 Exact target: {target["kind"]}:{target["id"]} @ {delegation["target_revision"]}
 Purpose: {delegation["purpose"]}
 Profile: {delegation["target_profile"]}
@@ -803,6 +802,12 @@ Work only on the exact target and stop if its revision changed. Obey existing
 claims and do not create a child delegation or recursive agent ping-pong. Do not
 commit, push, merge, deploy, publish, contact anyone, expose secrets, or perform
 unrelated work.{required}
+
+The broker changes the delegation revision while binding your child session, so
+the request revision is not valid for an outcome; immediately before every
+delegation outcome call, fetch the delegation again with commons_show_delegation
+and pass its current revision as expected_revision. Never reuse a revision from
+this instruction, an earlier tool result, or a failed outcome call.
 
 For independent_review, do not edit source. Find the existing review request for
 the exact target. After analysis, first call the injected

@@ -463,6 +463,10 @@ def test_independent_review_instruction_requires_both_canonical_terminal_calls(
     succeed = instruction.index("commons_succeed_delegation")
     assert complete < succeed
     assert "review:<id>" in instruction
+    assert "Delegation revision at launch" not in instruction
+    compact_instruction = instruction.replace("\n", " ")
+    assert "immediately before every delegation outcome call" in compact_instruction
+    assert "fetch the delegation again with commons_show_delegation" in compact_instruction
     assert "prose-only answer or successful process exit" in instruction
     assert "commons_delegation_needs_operator" in instruction
     assert "commons_delegation_input_needed" in instruction
