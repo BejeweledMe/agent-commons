@@ -363,6 +363,52 @@ def test_worker_snapshot_never_follows_a_symlinked_parent_component(tmp_path: Pa
         server.tools["commons_repo_read"]("linked/canary.txt", None)
 
 
+def test_worker_snapshot_never_follows_a_final_symlink_component(tmp_path: Path) -> None:
+    """The other half of the guarantee above (finding.5EX9CDCDHXJFBAENGE6ME066WN):
+    the parent-component case was pinned, the FINAL component was only ever
+    probed by hand.  A Git-indexed symlink whose last path component points
+    outside the workspace must fall out of the immutable snapshot — the
+    O_NOFOLLOW open refuses it during enumeration — and reading it by name
+    must fail closed instead of following the link."""
+
+    workspace = _workspace(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "canary.txt").write_text("outside secret\n", encoding="utf-8")
+    (workspace["repo"] / "leak.txt").symlink_to(outside / "canary.txt")
+    blob = (
+        subprocess.run(
+            ("/usr/bin/git", "-C", str(workspace["repo"]), "hash-object", "-w", "--stdin"),
+            input=str(outside / "canary.txt").encode(),
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode("ascii")
+        .strip()
+    )
+    subprocess.run(
+        (
+            "/usr/bin/git",
+            "-C",
+            str(workspace["repo"]),
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "120000",
+            blob,
+            "leak.txt",
+        ),
+        check=True,
+        capture_output=True,
+    )
+
+    server = _worker_server(workspace)
+
+    assert "leak.txt" not in {item["path"] for item in server.tools["commons_repo_files"]("", 500)}
+    with pytest.raises(LifecycleConflictError, match="outside the delegated snapshot"):
+        server.tools["commons_repo_read"]("leak.txt", None)
+
+
 def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     tmp_path: Path,
 ) -> None:
