@@ -108,13 +108,15 @@ class ProbeRunner:
         handshake_exit_code: int = 0,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
+        self.call_kwargs: list[dict] = []
         self.missing_provider_flags = missing_provider_flags
         self.legacy_mcp_contract = legacy_mcp_contract
         self.mcp_body = mcp_body
         self.handshake_exit_code = handshake_exit_code
 
-    def run(self, invocation, **_kwargs) -> ProcessResult:
+    def run(self, invocation, **kwargs) -> ProcessResult:
         self.calls.append(invocation.argv)
+        self.call_kwargs.append(kwargs)
         if "--help" in invocation.argv:
             flags = " ".join(
                 flag for flag in _CLAUDE_HELP_FLAGS if flag not in self.missing_provider_flags
@@ -189,6 +191,16 @@ def test_preflight_validates_provider_flags_and_mcp_without_an_attempt(tmp_path:
     assert "--preflight" in runner.calls[1]
     assert "--delegation-id" not in runner.calls[1]
     assert "--preflight" not in runner.calls[2]
+    # The handshake probe must hold stdin open until the tools/list response
+    # has arrived: the stdio server starts shutdown on stdin EOF, and an
+    # immediate close races the response flush against teardown.
+    assert runner.call_kwargs[0]["close_stdin_when"] is None
+    assert runner.call_kwargs[1]["close_stdin_when"] is None
+    handshake_finished = runner.call_kwargs[2]["close_stdin_when"]
+    complete = _mcp_handshake_output(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
+    assert handshake_finished(b"") is False
+    assert handshake_finished(complete[:-10]) is False
+    assert handshake_finished(complete) is True
 
 
 def test_preflight_is_red_when_real_stdio_handshake_fails(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +72,7 @@ _CODEX_EXEC_HELP_FLAGS = ("--config", "--ignore-user-config", "--strict-config",
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_PREFIX = "mcp_servers.agent-commons."
 _MCP_PROTOCOL_VERSION = "2025-06-18"
+_MCP_HANDSHAKE_FINAL_REQUEST_ID = 2
 
 
 def _mcp_handshake_stdin() -> bytes:
@@ -87,11 +88,37 @@ def _mcp_handshake_stdin() -> bytes:
             },
         },
         {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        {
+            "jsonrpc": "2.0",
+            "id": _MCP_HANDSHAKE_FINAL_REQUEST_ID,
+            "method": "tools/list",
+            "params": {},
+        },
     )
     return b"".join(
         json.dumps(message, separators=(",", ":")).encode("utf-8") + b"\n" for message in messages
     )
+
+
+def _mcp_handshake_finished(stdout: bytes) -> bool:
+    """True once the final handshake response has fully arrived on stdout.
+
+    The stdio server begins shutdown on stdin EOF, so the probe must hold
+    stdin open until this fires; closing earlier races the tools/list flush
+    against EOF-driven teardown and intermittently loses the response on
+    loaded machines.
+    """
+
+    for raw_line in stdout.splitlines():
+        if not raw_line.strip():
+            continue
+        try:
+            message = json.loads(raw_line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(message, Mapping) and message.get("id") == _MCP_HANDSHAKE_FINAL_REQUEST_ID:
+            return True
+    return False
 
 
 def _parse_mcp_handshake(output: bytes) -> set[str]:
@@ -142,6 +169,7 @@ def _run_probe(
     invocation: RunnerInvocation,
     *,
     cwd: Path,
+    close_stdin_when: Callable[[bytes], bool] | None = None,
 ) -> ProcessResult:
     return runner.run(
         invocation,
@@ -149,6 +177,7 @@ def _run_probe(
         child_session_id="session.preflight",
         timeout_seconds=15,
         max_output_bytes=256 * 1024,
+        close_stdin_when=close_stdin_when,
     )
 
 
@@ -410,6 +439,7 @@ def preflight_profile(
                 stdin=_mcp_handshake_stdin(),
             ),
             cwd=root,
+            close_stdin_when=_mcp_handshake_finished,
         )
         handshake_tools: set[str] = set()
         handshake_ok = False

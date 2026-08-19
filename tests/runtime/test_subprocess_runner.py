@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import sys
+import threading
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -257,6 +258,129 @@ def test_runner_aborts_when_post_journal_lifecycle_hook_fails(tmp_path: Path) ->
     assert result.reason is RunReason.CONTROL_ERROR
     assert terminated == [False]
     assert process.stdin.getvalue() == b""
+
+
+class EofDrivenProcess:
+    """A stdio-server-like child: replies slowly, exits only on stdin EOF.
+
+    Models the FastMCP stdio loop precisely enough to reproduce the CI flake:
+    if EOF arrives before the reply has been produced, teardown drops the
+    reply and stdout stays empty; if EOF arrives after, the reply survives.
+    """
+
+    def __init__(self, reply: bytes, clock: Clock) -> None:
+        self.pid = 4321
+        self.reply = reply
+        self.reply_ready = threading.Event()
+        self.stdin_eof = threading.Event()
+        self.stdin_closed_at: float | None = None
+        self.stderr = MemoryStream()
+        process = self
+
+        class _Stdin(io.BytesIO):
+            def close(self) -> None:
+                if process.stdin_closed_at is None:
+                    process.stdin_closed_at = clock.value
+                process.stdin_eof.set()
+
+        class _Stdout:
+            def __init__(self) -> None:
+                self._reply_sent = False
+
+            def read1(self, size: int = -1) -> bytes:
+                del size
+                while True:
+                    if process.reply_ready.is_set() and not self._reply_sent:
+                        self._reply_sent = True
+                        return process.reply
+                    if process.stdin_eof.is_set():
+                        return b""
+                    time.sleep(0.001)
+
+            read = read1
+
+            def close(self) -> None:
+                pass
+
+        self.stdin = _Stdin()
+        self.stdout = _Stdout()
+
+    def poll(self) -> int | None:
+        return 0 if self.stdin_eof.is_set() else None
+
+    def wait(self, timeout: float | None = None) -> int:
+        del timeout
+        return 0
+
+    def terminate(self) -> None:
+        self.stdin_eof.set()
+
+    def kill(self) -> None:
+        self.stdin_eof.set()
+
+
+def test_runner_delivers_eof_only_after_the_probe_reply_arrives(tmp_path: Path) -> None:
+    clock = Clock()
+    reply = b'{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}\n'
+    reply_at = 0.2
+    process = EofDrivenProcess(reply, clock)
+
+    def loaded_machine_sleep(duration: float) -> None:
+        clock.sleep(duration)
+        if clock.value >= reply_at:
+            process.reply_ready.set()
+        # Give the real drain thread time to consume the released reply.
+        time.sleep(0.001)
+
+    runner = SubprocessRunner(
+        environment=SafeEnvironment.from_mapping({"PATH": "/usr/bin"}),
+        process_factory=lambda argv, cwd, env: process,
+        terminator=lambda candidate, *, force: candidate.stdin_eof.set(),
+        monotonic=clock,
+        sleeper=loaded_machine_sleep,
+    )
+    result = runner.run(
+        invocation(),
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=30,
+        max_output_bytes=4096,
+        close_stdin_when=lambda stdout: stdout.endswith(reply),
+    )
+
+    assert result.outcome is RunOutcome.SUCCEEDED
+    assert result.exit_code == 0
+    assert result.stdout == reply
+    assert process.stdin.getvalue() == _EXEC_GATE_FRAME + b"Do bounded work"
+    assert process.stdin_closed_at is not None
+    assert process.stdin_closed_at >= reply_at
+
+
+def test_runner_still_closes_stdin_when_the_child_exits_before_the_reply(
+    tmp_path: Path,
+) -> None:
+    closed: list[bool] = []
+
+    class RecordingStdin(io.BytesIO):
+        def close(self) -> None:
+            closed.append(True)
+
+    process = FakeProcess(exit_code=2)
+    process.stdin = RecordingStdin()
+    runner = SubprocessRunner(process_factory=lambda argv, cwd, env: process)
+
+    result = runner.run(
+        invocation(),
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=10,
+        max_output_bytes=100,
+        close_stdin_when=lambda stdout: False,
+    )
+
+    assert result.outcome is RunOutcome.FAILED
+    assert result.reason is RunReason.NONZERO_EXIT
+    assert closed == [True]
 
 
 def test_real_exec_gate_starts_provider_only_after_durable_hook(tmp_path: Path) -> None:

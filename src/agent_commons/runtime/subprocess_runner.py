@@ -289,9 +289,13 @@ class SubprocessRunner:
     def _drain(stream: BinaryIO | None, output: _BoundedOutput, channel: str) -> None:
         if stream is None:
             return
+        # read1 surfaces bytes as soon as the child flushes them; read(n) on a
+        # buffered pipe blocks until n bytes or EOF, which would starve a
+        # close_stdin_when probe waiting to observe the child's reply.
+        reader = getattr(stream, "read1", stream.read)
         try:
             while True:
-                block = stream.read(64 * 1024)
+                block = reader(64 * 1024)
                 if not block:
                     return
                 output.consume(channel, block)
@@ -302,7 +306,7 @@ class SubprocessRunner:
                 pass
 
     @staticmethod
-    def _write_stdin(stream: BinaryIO | None, value: bytes) -> None:
+    def _write_stdin(stream: BinaryIO | None, value: bytes, *, close: bool = True) -> None:
         if stream is None:
             return
         try:
@@ -311,10 +315,17 @@ class SubprocessRunner:
         except (BrokenPipeError, OSError):
             pass
         finally:
-            try:
-                stream.close()
-            except OSError:
-                pass
+            if close:
+                SubprocessRunner._close_stdin(stream)
+
+    @staticmethod
+    def _close_stdin(stream: BinaryIO | None) -> None:
+        if stream is None:
+            return
+        try:
+            stream.close()
+        except OSError:
+            pass
 
     def _stop(self, process: ProcessHandle) -> None:
         self.terminator(process, force=False)
@@ -356,6 +367,7 @@ class SubprocessRunner:
         max_output_bytes: int,
         cancellation: CancellationToken | None = None,
         on_started: Callable[[int], None] | None = None,
+        close_stdin_when: Callable[[bytes], bool] | None = None,
     ) -> ProcessResult:
         if timeout_seconds < 1 or max_output_bytes < 1:
             raise ValueError("timeout and output limits must be positive")
@@ -413,17 +425,27 @@ class SubprocessRunner:
             outcome = RunOutcome.FAILED
             reason = RunReason.CONTROL_ERROR
         else:
+            # A stdio MCP server begins shutdown on stdin EOF, so a probe that
+            # still needs a response must not close stdin at write time: on a
+            # loaded machine EOF-driven teardown can drop the reply before it
+            # is flushed.  With close_stdin_when, stdin stays open until the
+            # caller has seen the reply it is waiting for on stdout.
             writer = threading.Thread(
                 target=self._write_stdin,
                 args=(process.stdin, gated_stdin(invocation.stdin)),
+                kwargs={"close": close_stdin_when is None},
                 daemon=True,
             )
             writer.start()
+            stdin_held_open = close_stdin_when is not None
             outcome = RunOutcome.FAILED
             reason = RunReason.NONZERO_EXIT
             deadline = started_at + timeout_seconds
             try:
                 while True:
+                    if stdin_held_open and close_stdin_when(output.value("stdout")):
+                        self._close_stdin(process.stdin)
+                        stdin_held_open = False
                     return_code = process.poll()
                     if return_code is not None:
                         if return_code == 0:
@@ -447,10 +469,13 @@ class SubprocessRunner:
                 # the group abandons a writer that keeps editing the checkout
                 # while the ledger is about to call the work finished.
                 self._stop(process)
+                self._close_stdin(process.stdin)
                 raise
 
         if writer is not None:
             writer.join(timeout=1.0)
+        if close_stdin_when is not None:
+            self._close_stdin(process.stdin)
         for reader in readers:
             reader.join(timeout=1.0)
         exit_code = process.poll()
