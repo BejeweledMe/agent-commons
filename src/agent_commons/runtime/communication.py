@@ -14,12 +14,9 @@ import hmac
 import json
 import os
 import stat
-import threading
 import time
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -31,34 +28,24 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
+from agent_commons.storage.opstate import (
+    COMMUNICATION_STORAGE,
+    canonical_state_bytes,
+    ensure_private_directory,
+    exclusive_lock,
+    iso_timestamp,
+    parse_timestamp,
+)
 
 OPERATION_SCHEMA = "agent_commons.runtime_operation.v1"
 _UNAVAILABLE = "communication operation is unavailable"
 _INTEGRITY_KEY_BYTES = 32
 
-_PROCESS_LOCKS_GUARD = threading.Lock()
-_PROCESS_FILE_LOCKS: dict[str, threading.Lock] = {}
-
 
 class CommunicationAuthorizationError(ValidationError):
     """A session outside an operation's fixed participant graph tried to act on it."""
-
-
-def _iso(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat().replace("+00:00", "Z")
-
-
-def _parse_iso(value: str) -> float:
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
-
-
-def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode("utf-8")
 
 
 def _semantic_material(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -70,44 +57,15 @@ def _semantic_material(value: Mapping[str, Any]) -> dict[str, Any]:
 
 def _semantic_sha256(value: Mapping[str, Any]) -> str:
     semantic = _semantic_material(value)
-    return hashlib.sha256(_canonical_bytes(semantic)).hexdigest()
+    return hashlib.sha256(canonical_state_bytes(semantic)).hexdigest()
 
 
 def _integrity_hmac_sha256(value: Mapping[str, Any], key: bytes) -> str:
-    return hmac.new(key, _canonical_bytes(_semantic_material(value)), hashlib.sha256).hexdigest()
-
-
-def _ensure_private_directory(path: Path) -> None:
-    if path.is_symlink():
-        raise IntegrityError(f"communication operational directory must not be a symlink: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if path.is_symlink() or not path.is_dir():
-        raise IntegrityError(f"communication operational path is not a real directory: {path}")
-    try:
-        path.chmod(0o700)
-    except OSError:
-        pass
-
-
-@contextmanager
-def _exclusive_lock(path: Path) -> Iterator[None]:
-    identity = str(path.expanduser().resolve()) if path.parent.exists() else str(path)
-    with _PROCESS_LOCKS_GUARD:
-        process_lock = _PROCESS_FILE_LOCKS.setdefault(identity, threading.Lock())
-    with process_lock:
-        _ensure_private_directory(path.parent)
-        descriptor = os.open(
-            path,
-            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
-        )
-        try:
-            os.fchmod(descriptor, 0o600)
-            lock_exclusive(descriptor)
-            yield
-        finally:
-            unlock(descriptor)
-            os.close(descriptor)
+    return hmac.new(
+        key,
+        canonical_state_bytes(_semantic_material(value)),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _require_typed(name: str, value: str, prefix: str) -> str:
@@ -512,9 +470,9 @@ def _record_from_mapping(value: Mapping[str, Any], integrity_key: bytes) -> Oper
         except ValidationError as exc:
             raise IntegrityError("stored communication continuation is invalid") from exc
     try:
-        created_at = _parse_iso(record.created_at)
-        updated_at = _parse_iso(record.updated_at)
-        deadline_at = _parse_iso(record.deadline_at)
+        created_at = parse_timestamp(record.created_at)
+        updated_at = parse_timestamp(record.updated_at)
+        deadline_at = parse_timestamp(record.deadline_at)
     except ValueError as exc:
         raise IntegrityError("stored communication operation timestamps are invalid") from exc
     if updated_at < created_at or abs(deadline_at - created_at - record.deadline_seconds) > 1e-6:
@@ -557,10 +515,10 @@ class CommunicationStore:
         self.security_policy = security_policy or SecurityPolicy()
         self.read_only = read_only
         if not read_only:
-            _ensure_private_directory(self.state_root)
-            _ensure_private_directory(self.root)
-            _ensure_private_directory(self.operation_root)
-            with _exclusive_lock(self.lock_path):
+            ensure_private_directory(self.state_root, policy=COMMUNICATION_STORAGE)
+            ensure_private_directory(self.root, policy=COMMUNICATION_STORAGE)
+            ensure_private_directory(self.operation_root, policy=COMMUNICATION_STORAGE)
+            with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
                 self._integrity_key = self._load_or_create_integrity_key()
         else:
             self._integrity_key = None
@@ -638,7 +596,7 @@ class CommunicationStore:
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != _canonical_bytes(value):
+        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
             raise IntegrityError("communication operation document is not canonical JSON")
         record = _record_from_mapping(value, self._integrity_key_bytes())
         self.security_policy.assert_safe(value, context="operational communication record")
@@ -647,7 +605,7 @@ class CommunicationStore:
     def _write_document(self, path: Path, record: OperationRecord) -> None:
         value = record.as_dict()
         self.security_policy.assert_safe(value, context="operational communication record")
-        atomic_write_replace(path, _canonical_bytes(value), mode=0o600)
+        atomic_write_replace(path, canonical_state_bytes(value), mode=0o600)
 
     def _documents(self) -> list[OperationRecord]:
         records: list[OperationRecord] = []
@@ -700,7 +658,7 @@ class CommunicationStore:
             )
 
     def _assert_metadata_within_budget(self, metadata: Mapping[str, Any]) -> None:
-        if len(_canonical_bytes(dict(metadata))) > self.limits.max_metadata_bytes:
+        if len(canonical_state_bytes(dict(metadata))) > self.limits.max_metadata_bytes:
             raise ValidationError("communication metadata exceeds the configured size limit")
 
     def _chain_depth(self, parent: OperationRecord) -> int:
@@ -737,7 +695,7 @@ class CommunicationStore:
             <= self.limits.max_deadline_seconds
         ):
             raise ValidationError("communication deadline is out of the configured bounds")
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             existing = self._find(spec.operation_id)
             if existing is not None:
                 unchanged = (
@@ -770,7 +728,7 @@ class CommunicationStore:
                     "communication continuation chain exceeds the configured depth limit"
                 )
 
-            timestamp = _iso(self.clock())
+            timestamp = iso_timestamp(self.clock())
             record = OperationRecord(
                 schema=OPERATION_SCHEMA,
                 operation_id=spec.operation_id,
@@ -788,7 +746,9 @@ class CommunicationStore:
                 deadline_seconds=spec.deadline_seconds,
                 created_at=timestamp,
                 updated_at=timestamp,
-                deadline_at=_iso(self._deadline_after(spec.deadline_seconds, base=timestamp)),
+                deadline_at=iso_timestamp(
+                    self._deadline_after(spec.deadline_seconds, base=timestamp)
+                ),
                 semantic_sha256="0" * 64,
                 integrity_hmac_sha256="0" * 64,
             )
@@ -797,12 +757,12 @@ class CommunicationStore:
             return record
 
     def _deadline_after(self, seconds: int, *, base: str) -> float:
-        return _parse_iso(base) + seconds
+        return parse_timestamp(base) + seconds
 
     def _lazy_expire(self, record: OperationRecord) -> OperationRecord:
         if record.state.terminal:
             return record
-        if self.wall_clock() < _parse_iso(record.deadline_at):
+        if self.wall_clock() < parse_timestamp(record.deadline_at):
             return record
         return self._transition(record, OperationState.EXPIRED, reason="deadline_exceeded")
 
@@ -836,7 +796,7 @@ class CommunicationStore:
                 if ack_idempotency_key is not None
                 else record.ack_idempotency_key
             ),
-            updated_at=_iso(self.clock()),
+            updated_at=iso_timestamp(self.clock()),
         )
         updated = _seal_record(updated, self._integrity_key_bytes())
         self._write_document(self._path(record.operation_id), updated)
@@ -863,7 +823,7 @@ class CommunicationStore:
             self._assert_participant(record, requester_session_id)
             self._assert_current_revision(record, target_revision)
             return record
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
             self._assert_not_foreign(
                 record,
@@ -890,7 +850,7 @@ class CommunicationStore:
             raise ValidationError("communication reply answer must be a mapping")
         self.security_policy.assert_safe(dict(answer), context="operational communication reply")
         self._assert_metadata_within_budget(answer)
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
             self._assert_participant(record, responder_session_id)
             if responder_session_id not in record.scope.allowed_recipient_session_ids:
@@ -926,7 +886,7 @@ class CommunicationStore:
         self._require_writable()
         if not isinstance(idempotency_key, str) or not 0 < len(idempotency_key) <= 256:
             raise ValidationError("communication ack idempotency key is invalid")
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
             self._assert_participant(record, acker_session_id)
             if record.kind.requires_reply:
@@ -962,7 +922,7 @@ class CommunicationStore:
 
     def request_cancel(self, operation_id: str, *, by_session_id: str) -> OperationRecord:
         self._require_writable()
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
             self._assert_participant(record, by_session_id)
             if by_session_id != record.scope.sender_session_id:
@@ -982,7 +942,7 @@ class CommunicationStore:
 
     def confirm_cancel(self, operation_id: str, *, by_session_id: str) -> OperationRecord:
         self._require_writable()
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
             self._assert_participant(record, by_session_id)
             if by_session_id not in record.scope.allowed_recipient_session_ids:
@@ -1001,7 +961,7 @@ class CommunicationStore:
     def reconcile(self) -> tuple[OperationRecord, ...]:
         self._require_writable()
         reconciled: list[OperationRecord] = []
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             for record in self._documents():
                 if record.state.terminal:
                     continue
@@ -1025,7 +985,7 @@ class CommunicationStore:
 
         if self.read_only:
             return visible_records()
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             return visible_records()
 
 

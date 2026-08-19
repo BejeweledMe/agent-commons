@@ -2,37 +2,32 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
-import stat
 import subprocess
-import tempfile
 import time
 import uuid
-from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from agent_commons.errors import IntegrityError, LifecycleConflictError, ValidationError
-from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
+from agent_commons.storage.opstate import (
+    SESSION_STORAGE,
+    ensure_private_directory,
+    exclusive_lock,
+    iso_timestamp,
+    next_audit_event_path,
+    parse_timestamp,
+    publish_audit_event,
+    read_audit_event,
+)
 
 SESSION_SCHEMA = "agent_commons.session.v1"
 SESSION_EVENT_SCHEMA = "agent_commons.session_event.v1"
 _CAPABILITY = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
-_AUDIT_EVENT_FILE = re.compile(r"^[0-9]{20}-[a-f0-9]{32}\.json$")
-
-
-def _iso(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat().replace("+00:00", "Z")
-
-
-def _parse_iso(value: str) -> float:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
 
 
 def _validate_text(name: str, value: str | None, *, required: bool = True) -> str | None:
@@ -72,103 +67,6 @@ def discover_operational_state_root(
     if not common.is_absolute():
         common = (root / common).resolve()
     return common / "agent-commons-state"
-
-
-def _ensure_private_directory(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    try:
-        path.chmod(0o700)
-    except OSError:
-        pass
-
-
-def _fsync_directory(path: Path) -> None:
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-    descriptor = os.open(path, flags)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
-@contextmanager
-def _exclusive_lock(path: Path) -> Iterator[None]:
-    _ensure_private_directory(path.parent)
-    with open(path, "a+b", opener=lambda name, flags: os.open(name, flags, 0o600)) as handle:
-        lock_exclusive(handle.fileno())
-        try:
-            yield
-        finally:
-            unlock(handle.fileno())
-
-
-def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode("utf-8")
-
-
-def _atomic_publish(path: Path, body: Mapping[str, Any]) -> None:
-    """Publish one immutable audit event with no overwrite semantics."""
-
-    _ensure_private_directory(path.parent)
-    data = _canonical_bytes(body)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary = Path(temporary_name)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "wb", closefd=True) as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        descriptor = -1
-        try:
-            os.link(temporary, path)
-        except FileExistsError as exc:
-            raise IntegrityError("operational audit event path collision") from exc
-        _fsync_directory(path.parent)
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        temporary.unlink(missing_ok=True)
-
-
-def _read_audit_event(path: Path, *, schema: str, label: str) -> dict[str, Any]:
-    """Read one canonical regular-file audit event without following symlinks."""
-
-    if _AUDIT_EVENT_FILE.fullmatch(path.name) is None or path.is_symlink():
-        raise IntegrityError(f"{label} audit event has an unsafe path")
-    descriptor = -1
-    try:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-            raise IntegrityError(f"{label} audit event is not a regular file")
-        with os.fdopen(descriptor, "rb", closefd=True) as handle:
-            raw = handle.read()
-        descriptor = -1
-        value = json.loads(raw)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise IntegrityError(f"{label} audit event is unreadable") from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-    if not isinstance(value, dict) or value.get("schema") != schema:
-        raise IntegrityError(f"{label} audit event has an invalid envelope")
-    if raw != _canonical_bytes(value):
-        raise IntegrityError(f"{label} audit event is not canonical JSON")
-    return value
-
-
-def _next_event_path(event_root: Path) -> Path:
-    maximum = 0
-    for path in event_root.glob("*.json"):
-        if _AUDIT_EVENT_FILE.fullmatch(path.name) is None:
-            raise IntegrityError("unexpected operational audit event filename")
-        try:
-            maximum = max(maximum, int(path.name.split("-", 1)[0]))
-        except (ValueError, IndexError):
-            raise IntegrityError("unexpected operational audit event filename") from None
-    return event_root / f"{maximum + 1:020d}-{uuid.uuid4().hex}.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,10 +149,10 @@ class Session:
 
     @property
     def expired(self) -> bool:
-        return _parse_iso(self.expires_at) <= time.time()
+        return parse_timestamp(self.expires_at) <= time.time()
 
     def active_at(self, timestamp: float) -> bool:
-        return self.status == "active" and _parse_iso(self.expires_at) > timestamp
+        return self.status == "active" and parse_timestamp(self.expires_at) > timestamp
 
     def actor_context(self) -> dict[str, Any]:
         """Return trusted writer context without the ownership nonce."""
@@ -298,9 +196,9 @@ class SessionRegistry:
         self.clock = clock
         self.read_only = read_only
         if not read_only:
-            _ensure_private_directory(self.state_root)
-            _ensure_private_directory(self.root)
-            _ensure_private_directory(self.event_root)
+            ensure_private_directory(self.state_root, policy=SESSION_STORAGE)
+            ensure_private_directory(self.root, policy=SESSION_STORAGE)
+            ensure_private_directory(self.event_root, policy=SESSION_STORAGE)
 
     def _require_writable(self) -> None:
         if self.read_only:
@@ -309,7 +207,7 @@ class SessionRegistry:
     def _events(self) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
         for path in sorted(self.event_root.glob("*.json")):
-            value = _read_audit_event(
+            value = read_audit_event(
                 path,
                 schema=SESSION_EVENT_SCHEMA,
                 label="session",
@@ -395,7 +293,11 @@ class SessionRegistry:
 
     def _append(self, body: Mapping[str, Any]) -> None:
         self.policy.assert_safe(body, context="session audit event")
-        _atomic_publish(_next_event_path(self.event_root), body)
+        publish_audit_event(
+            next_audit_event_path(self.event_root),
+            body,
+            policy=SESSION_STORAGE,
+        )
 
     @staticmethod
     def _validate_capabilities(capabilities: Sequence[str]) -> tuple[str, ...]:
@@ -448,7 +350,7 @@ class SessionRegistry:
             },
             context="session registration",
         )
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
             now = self.clock()
             active_for_instance = [
                 item
@@ -475,7 +377,7 @@ class SessionRegistry:
                 raise LifecycleConflictError(
                     "stable instance already has an active session with different identity metadata"
                 )
-            timestamp = _iso(now)
+            timestamp = iso_timestamp(now)
             session = Session(
                 schema=SESSION_SCHEMA,
                 session_id=f"session.{uuid.uuid4().hex}",
@@ -491,7 +393,7 @@ class SessionRegistry:
                 nonce=uuid.uuid4().hex,
                 opened_at=timestamp,
                 last_seen_at=timestamp,
-                expires_at=_iso(now + int(ttl_seconds)),
+                expires_at=iso_timestamp(now + int(ttl_seconds)),
             )
             self._append(
                 {
@@ -557,7 +459,7 @@ class SessionRegistry:
         self.policy.assert_safe(
             {"session_id": session_id, "nonce": nonce}, context="session heartbeat"
         )
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
             current = self.require_active(session_id)
             if current.nonce != nonce:
                 raise LifecycleConflictError("session ownership nonce does not match")
@@ -567,11 +469,11 @@ class SessionRegistry:
                 "schema": SESSION_EVENT_SCHEMA,
                 "event_id": f"session_event.{uuid.uuid4().hex}",
                 "action": "heartbeat",
-                "recorded_at": _iso(now),
+                "recorded_at": iso_timestamp(now),
                 "session_id": session_id,
                 "previous_nonce": current.nonce,
                 "nonce": new_nonce,
-                "expires_at": _iso(now + int(ttl_seconds)),
+                "expires_at": iso_timestamp(now + int(ttl_seconds)),
             }
             self._append(event)
             return replace(
@@ -584,11 +486,11 @@ class SessionRegistry:
     def close(self, session_id: str, *, nonce: str) -> Session:
         self._require_writable()
         self.policy.assert_safe({"session_id": session_id, "nonce": nonce}, context="session close")
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
             current = self.require_active(session_id)
             if current.nonce != nonce:
                 raise LifecycleConflictError("session ownership nonce does not match")
-            timestamp = _iso(self.clock())
+            timestamp = iso_timestamp(self.clock())
             new_nonce = uuid.uuid4().hex
             self._append(
                 {

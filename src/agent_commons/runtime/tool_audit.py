@@ -17,8 +17,13 @@ from typing import Any
 from agent_commons.errors import IntegrityError, LifecycleConflictError, ValidationError
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
+from agent_commons.storage.opstate import (
+    ATTEMPT_STORAGE,
+    canonical_state_bytes,
+    ensure_private_directory,
+    exclusive_lock,
+)
 
-from .attempts import _canonical_bytes, _ensure_private_directory, _exclusive_lock
 from .model import _safe_identifier
 
 TOOL_AUDIT_SCHEMA = "agent_commons.terminal_tool_audit.v2"
@@ -95,7 +100,7 @@ class TerminalToolAuditStore:
         self.clock = clock
         self.read_only = read_only
         if not read_only:
-            _ensure_private_directory(self.root)
+            ensure_private_directory(self.root, policy=ATTEMPT_STORAGE)
 
     @staticmethod
     def _empty(delegation_id: str) -> TerminalToolAudit:
@@ -224,7 +229,7 @@ class TerminalToolAuditStore:
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != _canonical_bytes(value):
+        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
             raise IntegrityError("terminal tool audit is not canonical JSON")
         audit = self._validate(value)
         if audit.delegation_id != delegation_id:
@@ -234,7 +239,7 @@ class TerminalToolAuditStore:
     def get(self, delegation_id: str) -> TerminalToolAudit:
         if self.read_only:
             return self._read(delegation_id)
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             return self._read(delegation_id)
 
     def record(
@@ -258,7 +263,7 @@ class TerminalToolAuditStore:
             _safe_identifier("terminal tool rejection error type", error_type)
         elif error_type is not None or message is not None:
             raise ValidationError("terminal tool audit details are only valid for rejections")
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             current = self._read(delegation_id)
             changes = {
                 "terminal_tool_calls": current.terminal_tool_calls,
@@ -292,5 +297,8 @@ class TerminalToolAuditStore:
                 rejection_details=details,
             )
             self._validate(updated.as_dict())
-            atomic_write_replace(self._path(delegation_id), _canonical_bytes(updated.as_dict()))
+            atomic_write_replace(
+                self._path(delegation_id),
+                canonical_state_bytes(updated.as_dict()),
+            )
             return updated

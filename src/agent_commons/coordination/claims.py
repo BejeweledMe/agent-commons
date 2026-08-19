@@ -19,17 +19,20 @@ from agent_commons.errors import (
     ValidationError,
 )
 from agent_commons.security import SecurityPolicy
+from agent_commons.storage.opstate import (
+    SESSION_STORAGE,
+    canonical_state_bytes,
+    ensure_private_directory,
+    exclusive_lock,
+    iso_timestamp,
+    next_audit_event_path,
+    parse_timestamp,
+    publish_audit_event,
+    read_audit_event,
+)
 
 from .sessions import (
     SessionRegistry,
-    _atomic_publish,
-    _canonical_bytes,
-    _ensure_private_directory,
-    _exclusive_lock,
-    _iso,
-    _next_event_path,
-    _parse_iso,
-    _read_audit_event,
     discover_operational_state_root,
 )
 
@@ -124,7 +127,7 @@ class Claim:
     end_reason: str | None = None
 
     def active_at(self, timestamp: float) -> bool:
-        return self.status == "active" and _parse_iso(self.expires_at) > timestamp
+        return self.status == "active" and parse_timestamp(self.expires_at) > timestamp
 
 
 class ClaimService:
@@ -154,9 +157,9 @@ class ClaimService:
         self.clock = clock
         self.read_only = read_only
         if not read_only:
-            _ensure_private_directory(self.state_root)
-            _ensure_private_directory(self.root)
-            _ensure_private_directory(self.event_root)
+            ensure_private_directory(self.state_root, policy=SESSION_STORAGE)
+            ensure_private_directory(self.root, policy=SESSION_STORAGE)
+            ensure_private_directory(self.event_root, policy=SESSION_STORAGE)
 
     def _require_writable(self) -> None:
         if self.read_only:
@@ -165,7 +168,7 @@ class ClaimService:
     def _events(self) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
         for path in sorted(self.event_root.glob("*.json")):
-            value = _read_audit_event(
+            value = read_audit_event(
                 path,
                 schema=CLAIM_EVENT_SCHEMA,
                 label="claim",
@@ -244,7 +247,11 @@ class ClaimService:
 
     def _append(self, body: Mapping[str, Any]) -> None:
         self.policy.assert_safe(body, context="claim audit event")
-        _atomic_publish(_next_event_path(self.event_root), body)
+        publish_audit_event(
+            next_audit_event_path(self.event_root),
+            body,
+            policy=SESSION_STORAGE,
+        )
 
     def audit_events(self) -> tuple[Mapping[str, Any], ...]:
         return tuple(self._events())
@@ -264,7 +271,7 @@ class ClaimService:
 
     @staticmethod
     def _semantic_digest(request: Mapping[str, Any]) -> str:
-        return hashlib.sha256(_canonical_bytes(request)).hexdigest()
+        return hashlib.sha256(canonical_state_bytes(request)).hexdigest()
 
     def acquire(
         self,
@@ -297,7 +304,7 @@ class ClaimService:
             raise ValidationError("idempotency_key cannot be empty")
         # Session lock is always acquired before the claims lock. This prevents
         # close/expiry transitions from racing the final active-session check.
-        with _exclusive_lock(self.sessions.lock_path):
+        with exclusive_lock(self.sessions.lock_path, policy=SESSION_STORAGE):
             owner = self.sessions.require_active(owner_session_id)
             request = {
                 "resources": list(normalized),
@@ -307,7 +314,7 @@ class ClaimService:
                 "description": description,
             }
             semantic_digest = self._semantic_digest(request)
-            with _exclusive_lock(self.lock_path):
+            with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
                 events = self._events()
                 if idempotency_key is not None:
                     matches = [
@@ -340,7 +347,7 @@ class ClaimService:
                     raise ClaimConflictError(
                         f"resource {requested} overlaps active claim {claim_id} on {held}"
                     )
-                timestamp = _iso(now)
+                timestamp = iso_timestamp(now)
                 claim = Claim(
                     schema=CLAIM_SCHEMA,
                     claim_id=f"claim.{uuid.uuid4().hex}",
@@ -350,7 +357,7 @@ class ClaimService:
                     nonce=uuid.uuid4().hex,
                     acquired_at=timestamp,
                     renewed_at=timestamp,
-                    expires_at=_iso(now + int(ttl_seconds)),
+                    expires_at=iso_timestamp(now + int(ttl_seconds)),
                     description=description,
                 )
                 self._append(
@@ -379,9 +386,9 @@ class ClaimService:
         if ttl_seconds <= 0:
             raise ValidationError("ttl_seconds must be positive")
         self.policy.assert_safe({"claim_id": claim_id, "nonce": nonce}, context="claim renewal")
-        with _exclusive_lock(self.sessions.lock_path):
+        with exclusive_lock(self.sessions.lock_path, policy=SESSION_STORAGE):
             owner = self.sessions.require_active(owner_session_id)
-            with _exclusive_lock(self.lock_path):
+            with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
                 current = self.get(claim_id)
                 if not current.active_at(self.clock()):
                     raise ClaimConflictError("claim is inactive or expired")
@@ -393,12 +400,12 @@ class ClaimService:
                     "schema": CLAIM_EVENT_SCHEMA,
                     "event_id": f"claim_event.{uuid.uuid4().hex}",
                     "action": "renewed",
-                    "recorded_at": _iso(now),
+                    "recorded_at": iso_timestamp(now),
                     "actor_session_id": owner.session_id,
                     "claim_id": claim_id,
                     "previous_nonce": current.nonce,
                     "nonce": new_nonce,
-                    "expires_at": _iso(now + int(ttl_seconds)),
+                    "expires_at": iso_timestamp(now + int(ttl_seconds)),
                 }
                 self._append(event)
                 return replace(
@@ -417,15 +424,15 @@ class ClaimService:
     ) -> Claim:
         self._require_writable()
         self.policy.assert_safe({"claim_id": claim_id, "nonce": nonce}, context="claim release")
-        with _exclusive_lock(self.sessions.lock_path):
+        with exclusive_lock(self.sessions.lock_path, policy=SESSION_STORAGE):
             owner = self.sessions.require_active(owner_session_id)
-            with _exclusive_lock(self.lock_path):
+            with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
                 current = self.get(claim_id)
                 if not current.active_at(self.clock()):
                     raise ClaimConflictError("claim is inactive or expired")
                 if current.owner_session_id != owner.session_id or current.nonce != nonce:
                     raise ClaimConflictError("claim ownership does not match")
-                timestamp = _iso(self.clock())
+                timestamp = iso_timestamp(self.clock())
                 new_nonce = uuid.uuid4().hex
                 self._append(
                     {
@@ -458,13 +465,13 @@ class ClaimService:
         if not reason.strip():
             raise ValidationError("breaking a claim requires a reason")
         self.policy.assert_safe({"claim_id": claim_id, "reason": reason}, context="claim break")
-        with _exclusive_lock(self.sessions.lock_path):
+        with exclusive_lock(self.sessions.lock_path, policy=SESSION_STORAGE):
             actor = self.sessions.require_active(actor_session_id, capability="claim:break")
-            with _exclusive_lock(self.lock_path):
+            with exclusive_lock(self.lock_path, policy=SESSION_STORAGE):
                 current = self.get(claim_id)
                 if not current.active_at(self.clock()):
                     raise ClaimConflictError("claim is inactive or expired")
-                timestamp = _iso(self.clock())
+                timestamp = iso_timestamp(self.clock())
                 new_nonce = uuid.uuid4().hex
                 self._append(
                     {

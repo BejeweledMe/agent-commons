@@ -14,8 +14,13 @@ from typing import Any, Protocol
 
 from agent_commons.errors import ConfigurationError, ValidationError
 from agent_commons.security import SecurityPolicy
+from agent_commons.storage.opstate import (
+    ATTEMPT_STORAGE,
+    canonical_state_bytes,
+    ensure_private_directory,
+    exclusive_lock,
+)
 
-from .attempts import _canonical_bytes, _ensure_private_directory, _exclusive_lock
 from .diagnostics import DiagnosticCode
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 
@@ -245,13 +250,13 @@ class JsonlTelemetrySink:
         self.path = self.root / "events.jsonl"
         self.lock_path = self.root / "events.lock"
         self.security_policy = security_policy or SecurityPolicy()
-        _ensure_private_directory(self.root)
+        ensure_private_directory(self.root, policy=ATTEMPT_STORAGE)
 
     def emit(self, event: TelemetryEvent) -> None:
         body = event.as_dict()
         self.security_policy.assert_safe(body, context="runtime telemetry")
-        data = _canonical_bytes(body)
-        with _exclusive_lock(self.lock_path):
+        data = canonical_state_bytes(body)
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             descriptor = os.open(
                 self.path,
                 os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),

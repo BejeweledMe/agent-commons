@@ -7,12 +7,9 @@ import json
 import os
 import re
 import stat
-import threading
 import time
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -24,9 +21,15 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
+from agent_commons.storage.opstate import (
+    ATTEMPT_STORAGE,
+    canonical_state_bytes,
+    ensure_private_directory,
+    exclusive_lock,
+    iso_timestamp,
+)
 
 from .diagnostics import DiagnosticCode, classify_process_result, sanitize_provider_stderr_tail
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
@@ -55,8 +58,6 @@ _LEGACY_REQUEST_SCHEMA = "agent_commons.runtime_request.v2"
 _LEGACY_ATTEMPT_SCHEMA = "agent_commons.runtime_attempt.v2"
 _REQUEST_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
-_PROCESS_LOCKS_GUARD = threading.Lock()
-_PROCESS_FILE_LOCKS: dict[str, threading.Lock] = {}
 
 
 class AttemptState(StrEnum):
@@ -129,49 +130,6 @@ _TRANSITIONS: dict[AttemptState, frozenset[AttemptState]] = {
 }
 
 
-def _iso(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat().replace("+00:00", "Z")
-
-
-def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode("utf-8")
-
-
-def _ensure_private_directory(path: Path) -> None:
-    if path.is_symlink():
-        raise IntegrityError(f"runtime operational directory must not be a symlink: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if path.is_symlink() or not path.is_dir():
-        raise IntegrityError(f"runtime operational path is not a real directory: {path}")
-    try:
-        path.chmod(0o700)
-    except OSError:
-        pass
-
-
-@contextmanager
-def _exclusive_lock(path: Path) -> Iterator[None]:
-    identity = str(path.expanduser().resolve())
-    with _PROCESS_LOCKS_GUARD:
-        process_lock = _PROCESS_FILE_LOCKS.setdefault(identity, threading.Lock())
-    with process_lock:
-        _ensure_private_directory(path.parent)
-        descriptor = os.open(
-            path,
-            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
-        )
-        try:
-            os.fchmod(descriptor, 0o600)
-            lock_exclusive(descriptor)
-            yield
-        finally:
-            unlock(descriptor)
-            os.close(descriptor)
-
-
 def checkout_fingerprint(cwd: str | Path) -> str:
     return hashlib.sha256(str(Path(cwd).expanduser().resolve()).encode("utf-8")).hexdigest()
 
@@ -223,7 +181,7 @@ class AttemptSpec:
 
     @property
     def semantic_sha256(self) -> str:
-        return hashlib.sha256(_canonical_bytes(self.semantic_body())).hexdigest()
+        return hashlib.sha256(canonical_state_bytes(self.semantic_body())).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,9 +429,9 @@ class AttemptStore:
         self.security_policy = security_policy or SecurityPolicy()
         self.read_only = read_only
         if not read_only:
-            _ensure_private_directory(self.state_root)
-            _ensure_private_directory(self.root)
-            _ensure_private_directory(self.request_root)
+            ensure_private_directory(self.state_root, policy=ATTEMPT_STORAGE)
+            ensure_private_directory(self.root, policy=ATTEMPT_STORAGE)
+            ensure_private_directory(self.request_root, policy=ATTEMPT_STORAGE)
 
     def _require_writable(self) -> None:
         if self.read_only:
@@ -499,7 +457,7 @@ class AttemptStore:
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != _canonical_bytes(value):
+        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
             raise IntegrityError("runtime request document is not canonical JSON")
         self._validate_document(value)
         if value["schema"] == _LEGACY_REQUEST_SCHEMA:
@@ -563,7 +521,7 @@ class AttemptStore:
             parent_policy = RuntimePolicy.from_mapping(dict(spec["parent_policy"]))
         except (TypeError, ValueError, ValidationError) as exc:
             raise IntegrityError("runtime request parent policy is invalid") from exc
-        if hashlib.sha256(_canonical_bytes(spec)).hexdigest() != value["semantic_sha256"]:
+        if hashlib.sha256(canonical_state_bytes(spec)).hexdigest() != value["semantic_sha256"]:
             raise IntegrityError("runtime request semantic digest does not match its body")
         previous = 0
         parsed_attempts: list[Attempt] = []
@@ -633,7 +591,7 @@ class AttemptStore:
 
     def _write_document(self, path: Path, value: Mapping[str, Any]) -> None:
         self._validate_document(value)
-        atomic_write_replace(path, _canonical_bytes(value), mode=0o600)
+        atomic_write_replace(path, canonical_state_bytes(value), mode=0o600)
 
     def _documents(self) -> list[tuple[Path, dict[str, Any]]]:
         documents: list[tuple[Path, dict[str, Any]]] = []
@@ -671,7 +629,7 @@ class AttemptStore:
             or set(value) != {"schema", "entries"}
             or value.get("schema") != QUEUE_SCHEMA
             or not isinstance(value.get("entries"), list)
-            or raw != _canonical_bytes(value)
+            or raw != canonical_state_bytes(value)
         ):
             raise IntegrityError("runtime queue has an invalid shape")
         entries: list[dict[str, Any]] = []
@@ -698,7 +656,7 @@ class AttemptStore:
     def _write_queue(self, entries: list[dict[str, Any]]) -> None:
         body = {"schema": QUEUE_SCHEMA, "entries": entries}
         self.security_policy.assert_safe(body, context="runtime admission queue")
-        atomic_write_replace(self.queue_path, _canonical_bytes(body), mode=0o600)
+        atomic_write_replace(self.queue_path, canonical_state_bytes(body), mode=0o600)
 
     @staticmethod
     def _latest(document: Mapping[str, Any]) -> Attempt:
@@ -881,7 +839,7 @@ class AttemptStore:
         deadline = wait_started + self.operator_limits.queue_wait_seconds
         maximum_queue_depth = 0
         while True:
-            with _exclusive_lock(self.lock_path):
+            with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
                 documents = self._documents()
                 path = self._path(spec.request_id)
                 matching = next(
@@ -965,7 +923,7 @@ class AttemptStore:
                     attempt = self._new_attempt(
                         spec,
                         number=attempts_started + 1,
-                        timestamp=_iso(self.clock()),
+                        timestamp=iso_timestamp(self.clock()),
                     )
                     if matching is not None:
                         updated = {
@@ -991,7 +949,7 @@ class AttemptStore:
 
             remaining = deadline - self.wait_clock()
             if remaining <= 0:
-                with _exclusive_lock(self.lock_path):
+                with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
                     queue = self._read_queue()
                     reduced = [item for item in queue if item["request_id"] != spec.request_id]
                     if reduced != queue:
@@ -1009,7 +967,7 @@ class AttemptStore:
                 for raw_attempt in document["attempts"]
             ]
             return tuple(sorted(attempts, key=lambda item: (item.created_at, item.attempt_id)))
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             attempts = [
                 _attempt_from_mapping(raw_attempt)
                 for _, document in self._documents()
@@ -1066,7 +1024,7 @@ class AttemptStore:
         normalized_diagnostic = (
             DiagnosticCode(diagnostic_code) if diagnostic_code is not None else None
         )
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             for path, document in self._documents():
                 for index, raw_attempt in enumerate(document["attempts"]):
                     current = _attempt_from_mapping(raw_attempt)
@@ -1117,7 +1075,7 @@ class AttemptStore:
                         stderr_diagnostic_tail=stderr_diagnostic_tail,
                         stderr_diagnostic_tail_truncated=stderr_diagnostic_tail_truncated,
                         stderr_diagnostic_tail_redacted=stderr_diagnostic_tail_redacted,
-                        updated_at=_iso(self.clock()),
+                        updated_at=iso_timestamp(self.clock()),
                     )
                     attempts = list(document["attempts"])
                     attempts[index] = updated.as_dict()
@@ -1181,7 +1139,7 @@ class AttemptStore:
 
         self._require_writable()
         reconciled: list[Attempt] = []
-        with _exclusive_lock(self.lock_path):
+        with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             for path, document in self._documents():
                 latest = self._latest(document)
                 if latest.state.terminal:
@@ -1197,7 +1155,7 @@ class AttemptStore:
                     latest,
                     state=AttemptState.NEEDS_OPERATOR,
                     reason=reason.value,
-                    updated_at=_iso(self.clock()),
+                    updated_at=iso_timestamp(self.clock()),
                 )
                 attempts = list(document["attempts"])
                 attempts[-1] = updated.as_dict()
