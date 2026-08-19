@@ -7,6 +7,7 @@ separate behavioural change instead of being hidden inside a mechanical move.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -44,17 +45,16 @@ class OperationalStoragePolicy:
 
 SESSION_STORAGE = OperationalStoragePolicy(
     label="session",
-    reject_directory_symlinks=False,
-    process_lock_namespace=None,
-    lock_identity="literal",
-    nofollow_lock=False,
-    enforce_lock_mode=False,
-    legacy_stream_lock=True,
+    reject_directory_symlinks=True,
+    process_lock_namespace="operational",
+    lock_identity="resolved",
+    nofollow_lock=True,
+    enforce_lock_mode=True,
 )
 ATTEMPT_STORAGE = OperationalStoragePolicy(
     label="runtime",
     reject_directory_symlinks=True,
-    process_lock_namespace="attempts",
+    process_lock_namespace="operational",
     lock_identity="resolved",
     nofollow_lock=True,
     enforce_lock_mode=True,
@@ -62,8 +62,8 @@ ATTEMPT_STORAGE = OperationalStoragePolicy(
 COMMUNICATION_STORAGE = OperationalStoragePolicy(
     label="communication",
     reject_directory_symlinks=True,
-    process_lock_namespace="communication",
-    lock_identity="conditional",
+    process_lock_namespace="operational",
+    lock_identity="resolved",
     nofollow_lock=True,
     enforce_lock_mode=True,
 )
@@ -128,10 +128,19 @@ def exclusive_lock(path: Path, *, policy: OperationalStoragePolicy) -> Iterator[
                     unlock(handle.fileno())
             return
 
+        if path.is_symlink():
+            raise IntegrityError(f"{policy.label} operational lock must not be a symlink: {path}")
         flags = os.O_RDWR | os.O_CREAT
         if policy.nofollow_lock:
             flags |= getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags, 0o600)
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise IntegrityError(
+                    f"{policy.label} operational lock must not be a symlink: {path}"
+                ) from exc
+            raise
         try:
             if policy.enforce_lock_mode:
                 os.fchmod(descriptor, 0o600)

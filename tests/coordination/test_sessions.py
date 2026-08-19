@@ -65,6 +65,18 @@ def test_state_root_is_in_git_common_directory(tmp_path: Path) -> None:
     assert stat.S_IMODE(registry.event_root.stat().st_mode) == 0o700
 
 
+def test_session_registry_rejects_a_symlinked_private_directory(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path / "repo")
+    state_root = tmp_path / "state"
+    state_root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (state_root / "sessions").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(IntegrityError, match="session operational directory"):
+        SessionRegistry(repo, state_root=state_root)
+
+
 def test_worktrees_discover_the_same_operational_state(tmp_path: Path) -> None:
     repo = init_repo(tmp_path / "repo")
     (repo / "README.md").write_text("fixture\n", encoding="utf-8")
