@@ -132,6 +132,23 @@ _RUNTIME_WRITE = {
 
 _SENSITIVE_NAMES = {".env", ".env.local", "credentials", "credentials.json"}
 
+# Only these exact fixed strings may be persisted as terminal-tool rejection
+# details.  Any other exception text is presumed to quote tool arguments —
+# jsonschema embeds the offending value in its message, so a schema-invalid
+# `summary` used to write the summary's own text into the audit store, the
+# exact content THREAT_MODEL promises that store never holds.  The error type
+# is always recorded, so a withheld message still names the refusal class.
+_FIXED_REJECTION_DETAILS = frozenset(
+    {
+        "worker MCP authority ended with its canonical delegation",
+        "worker outcome is outside its delegation scope",
+        "delegated workspace changed after reviewer snapshot creation",
+        "registered review artifact changed after it was inspected",
+        "result_refs must contain at least one reference",
+    }
+)
+_WITHHELD_REJECTION_DETAIL = "details withheld: the refusal text may quote tool arguments"
+
 
 class _OversizedScopedFile(ConfigurationError):
     pass
@@ -648,13 +665,16 @@ def build_server(
                         result = function(*args, **kwargs)
                     except Exception as exc:
                         if terminal and terminal_audit is not None:
+                            rendered = str(exc)
+                            if rendered not in _FIXED_REJECTION_DETAILS:
+                                rendered = _WITHHELD_REJECTION_DETAIL
                             try:
                                 terminal_audit.record(
                                     delegation,
                                     function.__name__,
                                     "rejected",
                                     error_type=type(exc).__name__,
-                                    message=str(exc),
+                                    message=rendered,
                                 )
                             except Exception:
                                 pass

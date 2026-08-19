@@ -74,9 +74,11 @@ tests will teach it to you one failure at a time.
   (`test_a_run_card_says_when_it_ran_and_never_invents_a_spend`)
 - Nothing here stores prompts or transcripts. The Runs surface may show the
   private attempt store's sanitized final 4 KiB stderr tail for an unsuccessful
-  process and bounded sanitized terminal-tool rejection messages. It never
-  receives stdout, successful-run stderr, or tool arguments; truncation and
-  redaction must be visible beside the diagnostic.
+  process and bounded terminal-tool rejection reasons drawn from a fixed
+  allowlist of the backend's own refusal strings (anything else arrives as a
+  fixed withheld-details notice). It never receives stdout, successful-run
+  stderr, or tool arguments; truncation and redaction must be visible beside
+  the diagnostic.
 
 ## Testing the asset
 

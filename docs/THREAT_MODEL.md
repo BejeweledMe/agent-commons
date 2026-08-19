@@ -387,8 +387,11 @@ unsuccessful provider process, ignored local operational state retains only the
 final 4 KiB of stderr after ANSI/control cleanup, absolute-path replacement,
 whole-line secret/PII redaction, and a fail-closed security scan. Stdout and
 successful-run stderr are never persisted; truncation and redaction are explicit.
-Terminal-tool audit stores at most 32 sanitized exception messages (512 bytes
-each), never call arguments, and marks missing earlier details. These files are
+Terminal-tool audit stores at most 32 rejection details (512 bytes each) and
+marks missing earlier ones; each detail is the error type plus either one of
+this repository's own fixed refusal strings or a fixed withheld-details notice
+— free exception text is never persisted, because validation errors quote the
+offending value, so it would carry call arguments. These files are
 private (0700 directories, 0600 files) and never enter canonical events or
 telemetry. OpenTelemetry remains metadata-only. Export endpoints and credentials
 are operator configuration and never ledger data.

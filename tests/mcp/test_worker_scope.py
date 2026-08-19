@@ -767,6 +767,45 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
         )
 
 
+def test_a_rejected_terminal_call_never_persists_argument_content(tmp_path: Path) -> None:
+    """A schema-invalid summary must not leave its text in the rejection audit.
+
+    jsonschema quotes the offending value inside its message, so persisting
+    `str(exc)` verbatim wrote tool-argument content into the audit store —
+    the exact class of content THREAT_MODEL promises it never holds.  The
+    store and the panel may only ever see this repository's own fixed refusal
+    strings; every other message is withheld.
+    """
+
+    workspace = _workspace(tmp_path)
+    server = _worker_server(workspace)
+    delegation_id = workspace["delegation"]["entity_ref"]["id"]
+    marker = "PRIVATETASKCONTENT"
+    oversized = (marker + " ") * 500  # far past the schema's 8192-character cap
+
+    with pytest.raises(ValidationError, match="summary"):
+        server.tools["commons_succeed_delegation"](
+            delegation_id,
+            workspace["started"]["revision"],
+            oversized,
+            [f"task:{workspace['task']['entity_ref']['id']}"],
+            "worker-scope-oversized-summary",
+        )
+
+    store = TerminalToolAuditStore(workspace["parent"].paths.state_root, read_only=True)
+    audit = store.get(delegation_id)
+    assert audit.terminal_tool_calls == 1
+    assert audit.terminal_tool_rejections == 1
+    detail = audit.rejection_details[0]
+    assert detail.tool == "commons_succeed_delegation"
+    assert detail.error_type == "ValidationError"
+    assert marker not in detail.message
+    # The panel reads exactly this store, but check the persisted bytes too:
+    # no fragment of the argument may survive anywhere on disk.
+    raw = b"".join(path.read_bytes() for path in store.root.glob("*.json"))
+    assert marker.encode() not in raw
+
+
 def _repo_reader(tmp_path, body: str):
     """Build a scoped reviewer reader over a one-file committed repository."""
 
