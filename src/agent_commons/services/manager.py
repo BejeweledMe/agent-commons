@@ -20,6 +20,7 @@ from agent_commons.core.canonical import canonical_sha256
 from agent_commons.core.ids import is_typed_id, stable_id
 from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
+from agent_commons.domain.acceptance import select_qualifying_review
 from agent_commons.domain.agents import (
     GRANT_NAMES,
     agent_delegations,
@@ -1459,34 +1460,11 @@ class CommonsManager:
         task = entity(snapshot, "task", task_id)
         if task is None:
             raise LifecycleConflictError(f"task does not exist: {task_id}")
-        target_revision = str(task.get("effective_revision") or task.get("revision"))
-        work_author_sessions = {
-            str(session_id)
-            for session_id in task.get("work_author_session_ids", [])
-            if str(session_id)
-        }
-        qualifying = sorted(
-            (
-                review
-                for review in snapshot.reviews.values()
-                if review.get("state") == "approved"
-                and review.get("independent") is True
-                and review.get("stale") is False
-                and review.get("target_ref") == {"kind": "task", "id": task_id}
-                and review.get("target_revision") == target_revision
-                and str((review.get("actor") or {}).get("session_id", ""))
-                not in work_author_sessions
-            ),
-            key=lambda review: (
-                str(review.get("recorded_at", "")),
-                str(review.get("id", "")),
-            ),
-        )
-        if not qualifying:
+        selected = select_qualifying_review(snapshot, task_id)
+        if selected is None:
             raise LifecycleConflictError(
                 "task acceptance requires a current approved independent review"
             )
-        selected = qualifying[-1]
         selected_ref = {"kind": "review", "id": str(selected["id"])}
         acceptance_review = {
             "ref": selected_ref,
