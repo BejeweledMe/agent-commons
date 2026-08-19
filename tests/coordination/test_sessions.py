@@ -318,3 +318,22 @@ def test_session_audit_rejects_noncanonical_bytes_and_symlinks(tmp_path: Path) -
     event_path.symlink_to(outside)
     with pytest.raises(IntegrityError, match="unsafe path"):
         registry.list_sessions()
+
+
+def test_session_audit_rejects_an_opened_session_without_status(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path / "repo")
+    registry = SessionRegistry(repo)
+    open_session(registry)
+    event_path = next(registry.event_root.glob("*.json"))
+    value = json.loads(event_path.read_bytes())
+    value["session"].pop("status")
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    event_path.write_bytes((canonical + "\n").encode())
+
+    with pytest.raises(IntegrityError, match="invalid session body"):
+        registry.list_sessions()

@@ -340,3 +340,22 @@ def test_claim_audit_rejects_semantically_valid_noncanonical_bytes(
 
     with pytest.raises(IntegrityError, match="canonical JSON"):
         claims.audit_events()
+
+
+def test_claim_audit_rejects_an_acquired_claim_without_status(tmp_path: Path) -> None:
+    _, sessions, claims = harness(tmp_path)
+    owner = open_agent(sessions, "builder")
+    claims.acquire(["task:missing-status"], owner_session_id=owner.session_id)
+    event_path = next(claims.event_root.glob("*.json"))
+    value = json.loads(event_path.read_bytes())
+    value["claim"].pop("status")
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    event_path.write_bytes((canonical + "\n").encode())
+
+    with pytest.raises(IntegrityError, match="invalid claim body"):
+        claims.list_claims()

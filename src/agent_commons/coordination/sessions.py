@@ -243,7 +243,7 @@ class SessionRegistry:
                 opened_at=str(value["opened_at"]),
                 last_seen_at=str(value["last_seen_at"]),
                 expires_at=str(value["expires_at"]),
-                status=str(value.get("status", "active")),
+                status=str(value["status"]),
                 closed_at=(str(value["closed_at"]) if value.get("closed_at") is not None else None),
             )
         except (KeyError, TypeError, ValueError) as exc:

@@ -191,7 +191,7 @@ class ClaimService:
                 renewed_at=str(value["renewed_at"]),
                 expires_at=str(value["expires_at"]),
                 description=str(value.get("description", "")),
-                status=str(value.get("status", "active")),
+                status=str(value["status"]),
                 ended_at=str(value["ended_at"]) if value.get("ended_at") else None,
                 ended_by_session_id=(
                     str(value["ended_by_session_id"]) if value.get("ended_by_session_id") else None
