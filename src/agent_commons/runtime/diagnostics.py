@@ -9,8 +9,10 @@ or persisted.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from agent_commons.errors import (
     ClaimConflictError,
@@ -61,6 +63,50 @@ class DiagnosticCode(StrEnum):
     REQUESTER_SESSION_REQUIRED = "requester_session_required"
     REQUESTER_UNAVAILABLE = "requester_unavailable"
     TRUSTED_WORKSPACE_REQUIRED = "trusted_workspace_required"
+
+
+def workflow_diagnostic_code(value: Mapping[str, Any]) -> DiagnosticCode:
+    """Combine stored process classification with terminal workflow evidence."""
+
+    stored = DiagnosticCode(str(value["diagnostic_code"]))
+    if stored not in {DiagnosticCode.NONE, DiagnosticCode.LEGACY_UNCLASSIFIED}:
+        return stored
+    if value.get("process_canonical_mismatch") is True:
+        if value.get("terminal_tool_audit_available") is True:
+            if int(value.get("terminal_tool_calls", 0)) == 0:
+                return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
+            if (
+                int(value.get("terminal_tool_rejections", 0)) > 0
+                and int(value.get("terminal_tool_completions", 0)) == 0
+            ):
+                return DiagnosticCode.TERMINAL_TOOL_REJECTED
+        return DiagnosticCode.PROCESS_CANONICAL_MISMATCH
+    return stored
+
+
+def canonical_reason_code(canonical: Mapping[str, Any]) -> str:
+    """Return the stable canonical reason label for runtime diagnostics."""
+
+    return str(canonical.get("reason_code") or canonical.get("state") or "unknown")
+
+
+def process_canonical_mismatch(
+    attempt_state: str,
+    canonical: Mapping[str, Any] | None,
+) -> bool | None:
+    """Compare one terminal operational attempt with its canonical delegation."""
+
+    state = str(attempt_state)
+    expected = {
+        "succeeded": "succeeded",
+        "failed": "failed",
+        "cancelled": "cancelled",
+        "timed_out": "timed_out",
+        "needs_operator": "needs_operator",
+    }
+    if canonical is None or state not in expected:
+        return None
+    return expected[state] != canonical.get("state")
 
 
 _HINTS = {

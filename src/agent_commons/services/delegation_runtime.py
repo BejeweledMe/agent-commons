@@ -61,7 +61,12 @@ from agent_commons.runtime import (
     diagnostic_safe_next_actions,
     terminate_process_group,
 )
-from agent_commons.runtime.diagnostics import sanitized_configuration_failure
+from agent_commons.runtime.diagnostics import (
+    canonical_reason_code,
+    process_canonical_mismatch,
+    sanitized_configuration_failure,
+    workflow_diagnostic_code,
+)
 
 from ..domain.agents import effective_grants
 from .manager import CommonsManager
@@ -453,16 +458,16 @@ class DelegationRuntimeService:
                 {
                     "canonical_state": delegation.get("state") if delegation else None,
                     "canonical_reason_code": (
-                        self._canonical_reason_code(delegation) if delegation else None
+                        canonical_reason_code(delegation) if delegation else None
                     ),
-                    "process_canonical_mismatch": self._process_canonical_mismatch(
+                    "process_canonical_mismatch": process_canonical_mismatch(
                         AttemptState(str(value["state"])), delegation
                     ),
                     **audit,
                 }
             )
             if diagnostic:
-                workflow_code = self._workflow_diagnostic_code(value)
+                workflow_code = workflow_diagnostic_code(value)
                 value["workflow_diagnostic_code"] = workflow_code.value
                 value["diagnostic_hint"] = diagnostic_hint(workflow_code)
                 value["safe_next_actions"] = diagnostic_safe_next_actions(workflow_code)
@@ -478,43 +483,6 @@ class DelegationRuntimeService:
             if attempt["correlation"]["delegation_id"] == delegation_id
         ]
         return canonical
-
-    @staticmethod
-    def _workflow_diagnostic_code(value: Mapping[str, Any]) -> DiagnosticCode:
-        stored = DiagnosticCode(str(value["diagnostic_code"]))
-        if stored not in {DiagnosticCode.NONE, DiagnosticCode.LEGACY_UNCLASSIFIED}:
-            return stored
-        if value.get("process_canonical_mismatch") is True:
-            if value.get("terminal_tool_audit_available") is True:
-                if int(value.get("terminal_tool_calls", 0)) == 0:
-                    return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
-                if (
-                    int(value.get("terminal_tool_rejections", 0)) > 0
-                    and int(value.get("terminal_tool_completions", 0)) == 0
-                ):
-                    return DiagnosticCode.TERMINAL_TOOL_REJECTED
-            return DiagnosticCode.PROCESS_CANONICAL_MISMATCH
-        return stored
-
-    @staticmethod
-    def _canonical_reason_code(canonical: Mapping[str, Any]) -> str:
-        return str(canonical.get("reason_code") or canonical.get("state") or "unknown")
-
-    @staticmethod
-    def _process_canonical_mismatch(
-        attempt_state: AttemptState,
-        canonical: Mapping[str, Any] | None,
-    ) -> bool | None:
-        if canonical is None or not attempt_state.terminal:
-            return None
-        expected = {
-            AttemptState.SUCCEEDED: "succeeded",
-            AttemptState.FAILED: "failed",
-            AttemptState.CANCELLED: "cancelled",
-            AttemptState.TIMED_OUT: "timed_out",
-            AttemptState.NEEDS_OPERATOR: "needs_operator",
-        }.get(attempt_state)
-        return expected != canonical.get("state")
 
     def _emit(self, event: TelemetryEvent) -> int:
         try:
@@ -598,11 +566,11 @@ class DelegationRuntimeService:
             stderr_bytes_seen=attempt.stderr_bytes_seen,
             output_truncated=attempt.output_truncated,
             canonical_state=str(canonical.get("state") or "unknown"),
-            canonical_reason_code=self._canonical_reason_code(canonical),
+            canonical_reason_code=canonical_reason_code(canonical),
             process_canonical_mismatch=(
                 None
                 if kind is TelemetryKind.CANONICAL_FINALIZATION_STARTED
-                else self._process_canonical_mismatch(attempt.state, canonical)
+                else process_canonical_mismatch(attempt.state, canonical)
             ),
             **audit,
         )
@@ -984,8 +952,8 @@ alone is not task acceptance.
         attempt.update(
             {
                 "canonical_state": canonical.get("state"),
-                "canonical_reason_code": self._canonical_reason_code(canonical),
-                "process_canonical_mismatch": self._process_canonical_mismatch(
+                "canonical_reason_code": canonical_reason_code(canonical),
+                "process_canonical_mismatch": process_canonical_mismatch(
                     result.attempt.state, canonical
                 ),
                 **self._tool_audit_metadata(
@@ -994,7 +962,7 @@ alone is not task acceptance.
                 ),
             }
         )
-        workflow_code = self._workflow_diagnostic_code(attempt)
+        workflow_code = workflow_diagnostic_code(attempt)
         return {
             "delegation": dict(canonical),
             "attempt": attempt,

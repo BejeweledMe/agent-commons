@@ -19,6 +19,7 @@ from agent_commons.runtime import (
     TelemetryKind,
     default_profile_registry,
 )
+from agent_commons.runtime.diagnostics import workflow_diagnostic_code
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 
@@ -473,7 +474,7 @@ def test_independent_review_instruction_requires_both_canonical_terminal_calls(
 
 
 def test_missing_terminal_audit_does_not_claim_no_tool_was_called() -> None:
-    code = DelegationRuntimeService._workflow_diagnostic_code(
+    code = workflow_diagnostic_code(
         {
             "diagnostic_code": "none",
             "process_canonical_mismatch": True,
