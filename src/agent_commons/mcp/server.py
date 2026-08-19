@@ -24,6 +24,10 @@ from typing import Any, Protocol, TypeVar
 from agent_commons import __version__
 from agent_commons.core.refs import parse_ref
 from agent_commons.domain.agents import effective_grants
+from agent_commons.domain.states import (
+    LIVE_WORKER_DELEGATION_STATES,
+    NON_TERMINAL_DELEGATION_STATES,
+)
 from agent_commons.errors import (
     CommonsError,
     ConfigurationError,
@@ -536,14 +540,13 @@ def build_server(
             candidate = commons.get_delegation(requested_binding)
             state = candidate.get("state")
             child_session_id = candidate.get("child_session_id")
-            if state in {"active", "input_needed"} and child_session_id == active_session_id:
+            if state in LIVE_WORKER_DELEGATION_STATES and child_session_id == active_session_id:
                 worker = candidate
                 break
-            if child_session_id not in {None, active_session_id} or state not in {
-                "requested",
-                "active",
-                "input_needed",
-            }:
+            if (
+                child_session_id not in {None, active_session_id}
+                or state not in NON_TERMINAL_DELEGATION_STATES
+            ):
                 raise ConfigurationError(
                     "delegated MCP binding does not match its live canonical child"
                 )
@@ -558,7 +561,7 @@ def build_server(
             for candidate in commons.list_delegations(state=None)
             if active_session_id is not None
             and candidate.get("child_session_id") == active_session_id
-            and candidate.get("state") in {"active", "input_needed"}
+            and candidate.get("state") in LIVE_WORKER_DELEGATION_STATES
         ]
         if len(worker_matches) > 1:
             raise ConfigurationError("one child session cannot own multiple active delegations")
@@ -600,7 +603,7 @@ def build_server(
             return None
         current = commons.get_delegation(str(worker.get("id")))
         if (
-            current.get("state") not in {"active", "input_needed"}
+            current.get("state") not in LIVE_WORKER_DELEGATION_STATES
             or current.get("child_session_id") != active_session_id
         ):
             raise LifecycleConflictError("worker MCP authority ended with its canonical delegation")

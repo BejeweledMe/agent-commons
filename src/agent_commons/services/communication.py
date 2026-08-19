@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from agent_commons.core.ids import stable_id
+from agent_commons.domain.states import LIVE_WORKER_DELEGATION_STATES
 from agent_commons.errors import LifecycleConflictError, ValidationError
 from agent_commons.runtime import (
     Attempt,
@@ -242,7 +243,7 @@ class CommunicationRuntimeService:
             raise ValidationError("safe_context must be a mapping")
         delegation, scope = self._child_scope(
             delegation_id,
-            allowed_states=frozenset({"active", "input_needed"}),
+            allowed_states=LIVE_WORKER_DELEGATION_STATES,
         )
         metadata = {
             "question": _bounded_text("question", question, max_length=1_000),
@@ -438,7 +439,7 @@ class CommunicationRuntimeService:
         if participant_id not in record.scope.allowed_recipient_session_ids:
             raise LifecycleConflictError("only the canonical parent may answer child input")
         delegation = self._delegation(record.scope.delegation_id)
-        if delegation.get("state") not in {"active", "input_needed"}:
+        if delegation.get("state") not in LIVE_WORKER_DELEGATION_STATES:
             raise LifecycleConflictError("input reply cannot resume a terminal delegation")
         replied = self.store.reply(
             operation_id,

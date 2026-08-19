@@ -22,7 +22,6 @@ from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.domain.agents import (
     GRANT_NAMES,
-    NON_TERMINAL_DELEGATION_STATES,
     agent_delegations,
     descendants,
     effective_grants,
@@ -30,6 +29,7 @@ from agent_commons.domain.agents import (
     retirement_blockers,
     turnover_used,
 )
+from agent_commons.domain.collections import COLLECTIONS, collection_for
 from agent_commons.domain.invalidations import derive_invalidation_state
 from agent_commons.domain.lifecycle import (
     acting_agent_id,
@@ -44,6 +44,7 @@ from agent_commons.domain.projection import (
     project_events,
 )
 from agent_commons.domain.revisions import resolve_revision, structural_correction_changes
+from agent_commons.domain.states import NON_TERMINAL_DELEGATION_STATES
 from agent_commons.domain.validation import validate_payload
 from agent_commons.errors import (
     ConfigurationError,
@@ -74,21 +75,6 @@ PAYLOAD_SCHEMAS = {
     "agent": "commons.payload.agent.v1",
     "event": "commons.payload.maintenance.v1",
     "workspace": "commons.payload.workspace.v1",
-}
-
-_COLLECTIONS = {
-    "objective": "objectives",
-    "task": "tasks",
-    "thread": "threads",
-    "artifact": "artifacts",
-    "review": "reviews",
-    "verification": "verifications",
-    "finding": "findings",
-    "decision": "decisions",
-    "handoff": "handoffs",
-    "delegation": "delegations",
-    "agent": "agents",
-    "agent_link": "agent_links",
 }
 
 
@@ -335,7 +321,7 @@ class CommonsManager:
                 delegation
                 for delegation in self.snapshot().delegations.values()
                 if delegation.get("parent_session_id") == session.session_id
-                and delegation.get("state") in {"requested", "active", "input_needed"}
+                and delegation.get("state") in NON_TERMINAL_DELEGATION_STATES
             ),
             key=lambda item: str(item.get("id", "")),
         )
@@ -743,7 +729,7 @@ class CommonsManager:
                 self.events.get(identifier)
             elif kind == "manifest":
                 self.manifests.get(identifier)
-            elif kind in _COLLECTIONS:
+            elif kind in COLLECTIONS:
                 if entity(current, kind, identifier) is None:
                     raise ValidationError(f"referenced {kind} does not exist: {identifier}")
             else:
@@ -1129,7 +1115,10 @@ class CommonsManager:
 
     def _list(self, kind: str, *, state: str | None = None) -> list[dict[str, Any]]:
         snapshot = self.snapshot()
-        collection = getattr(snapshot, _COLLECTIONS[kind])
+        collection_name = collection_for(kind)
+        if collection_name is None:
+            raise ValidationError(f"unknown entity kind: {kind}")
+        collection = getattr(snapshot, collection_name)
         values = sorted(collection.values(), key=lambda item: str(item.get("id", "")))
         return [dict(item) for item in values if state is None or item.get("state") == state]
 

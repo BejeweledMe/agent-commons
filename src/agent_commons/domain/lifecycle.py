@@ -15,24 +15,14 @@ from agent_commons.domain.agents import (
     session_agent_map,
     turnover_blockers,
 )
+from agent_commons.domain.collections import collection_for
 from agent_commons.domain.projection import ProjectSnapshot
+from agent_commons.domain.states import (
+    LIVE_WORKER_DELEGATION_STATES,
+    NON_TERMINAL_DELEGATION_STATES,
+)
 from agent_commons.domain.validation import EVENT_SPECS
 from agent_commons.errors import LifecycleConflictError, ValidationError
-
-_COLLECTIONS = {
-    "objective": "objectives",
-    "task": "tasks",
-    "thread": "threads",
-    "review": "reviews",
-    "verification": "verifications",
-    "finding": "findings",
-    "decision": "decisions",
-    "artifact": "artifacts",
-    "handoff": "handoffs",
-    "delegation": "delegations",
-    "agent": "agents",
-    "agent_link": "agent_links",
-}
 
 _TASK_ALLOWED = {
     "task.revised": {"ready", "assigned", "active", "blocked", "completed", "review"},
@@ -93,7 +83,7 @@ _DELEGATION_MONOTONIC_LIMITS = (
 
 
 def entity(snapshot: ProjectSnapshot, kind: str, identifier: str) -> dict[str, Any] | None:
-    attribute = _COLLECTIONS.get(kind)
+    attribute = collection_for(kind)
     if attribute is None:
         raise ValidationError(f"unknown entity kind: {kind}")
     collection = getattr(snapshot, attribute)
@@ -510,7 +500,9 @@ def acting_agent_id(snapshot: ProjectSnapshot, actor_session_id: str) -> str | N
     if not bound:
         return None
     live = [
-        delegation for delegation in bound if delegation.get("state") in {"active", "input_needed"}
+        delegation
+        for delegation in bound
+        if delegation.get("state") in LIVE_WORKER_DELEGATION_STATES
     ]
     latest = max(live or bound, key=lambda delegation: str(delegation.get("id", "")))
     return str(latest["agent_id"])
@@ -881,7 +873,7 @@ def _subject_author_sessions(snapshot: ProjectSnapshot, target_ref: Mapping[str,
 
     kind = str(target_ref.get("kind", ""))
     identifier = str(target_ref.get("id", ""))
-    attribute = _COLLECTIONS.get(kind)
+    attribute = collection_for(kind)
     if attribute is None:
         return set()
     record = getattr(snapshot, attribute).get(identifier)
@@ -1145,7 +1137,7 @@ def _validate_delegation_request(
         1
         for delegation in snapshot.delegations.values()
         if delegation.get("parent_delegation_id") == parent_id
-        and delegation.get("state") in {"requested", "active", "input_needed"}
+        and delegation.get("state") in NON_TERMINAL_DELEGATION_STATES
     )
     if nonterminal_children >= int(parent_limits["max_concurrency"]):
         raise LifecycleConflictError(

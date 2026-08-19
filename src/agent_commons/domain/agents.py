@@ -12,6 +12,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from agent_commons.domain.states import NON_TERMINAL_DELEGATION_STATES
+
 #: Ordered because the whole model is "narrower or equal, never wider".
 GRANT_LEVELS: dict[str, int] = {"deny": 0, "ask": 1, "auto": 2}
 
@@ -43,8 +45,6 @@ PROFILE_NARROWING: dict[str, frozenset[str]] = {
 #: Isolation is ordered too: `fresh` is stronger, and moving down it is the only
 #: reconfiguration that needs an explicit operator acknowledgement.
 CONTEXT_MODES: dict[str, int] = {"accumulated": 0, "fresh": 1}
-
-NON_TERMINAL_DELEGATION_STATES = frozenset({"requested", "active", "input_needed"})
 
 #: Guards against a corrupted lineage turning a walk into a hang.  Deeper than
 #: any reachable chain: automatic creation terminates after two generations.

@@ -8,6 +8,7 @@ from typing import Any
 
 from agent_commons.errors import LifecycleConflictError, ValidationError
 
+from .collections import collection_for
 from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
 from .validation import EVENT_SPECS, validate_payload
@@ -139,24 +140,8 @@ class ProjectSnapshot:
     semantics_required: int = 1
 
     def entity_revision(self, kind: str, identifier: str) -> str | None:
-        collection = getattr(
-            self,
-            {
-                "objective": "objectives",
-                "task": "tasks",
-                "thread": "threads",
-                "review": "reviews",
-                "verification": "verifications",
-                "finding": "findings",
-                "decision": "decisions",
-                "artifact": "artifacts",
-                "handoff": "handoffs",
-                "delegation": "delegations",
-                "agent": "agents",
-                "agent_link": "agent_links",
-            }.get(kind, ""),
-            None,
-        )
+        attribute = collection_for(kind)
+        collection = getattr(self, attribute, None) if attribute is not None else None
         if not isinstance(collection, dict) or identifier not in collection:
             return None
         return str(collection[identifier]["revision"])
@@ -721,20 +706,7 @@ def _current_evidence_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]
         return snapshot.effective_event_revisions.get(identifier, identifier)
     if kind == "manifest":
         return identifier if identifier in snapshot.known_manifest_ids else None
-    collection_name = {
-        "objective": "objectives",
-        "task": "tasks",
-        "thread": "threads",
-        "review": "reviews",
-        "verification": "verifications",
-        "finding": "findings",
-        "decision": "decisions",
-        "artifact": "artifacts",
-        "handoff": "handoffs",
-        "delegation": "delegations",
-        "agent": "agents",
-        "agent_link": "agent_links",
-    }.get(kind)
+    collection_name = collection_for(kind)
     if collection_name is None:
         return None
     item = getattr(snapshot, collection_name).get(identifier)

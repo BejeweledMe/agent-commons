@@ -19,6 +19,7 @@ from typing import Any
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
+from agent_commons.domain.collections import collection_for
 from agent_commons.errors import (
     CommonsError,
     ConfigurationError,
@@ -1368,20 +1369,6 @@ class UIContext:
     def entity(self, kind: str, entity_id: str) -> Mapping[str, Any] | None:
         from agent_commons.views import bounded_copy
 
-        collections = {
-            "objective": "objectives",
-            "task": "tasks",
-            "thread": "threads",
-            "review": "reviews",
-            "verification": "verifications",
-            "finding": "findings",
-            "decision": "decisions",
-            "artifact": "artifacts",
-            "handoff": "handoffs",
-            "delegation": "delegations",
-            "agent": "agents",
-            "agent_link": "agent_links",
-        }
         if kind == "session":
             for session in self.manager().sessions.list_sessions():
                 if session.session_id == entity_id:
@@ -1389,7 +1376,7 @@ class UIContext:
                         session.actor_context() | {"state": _session_state(session)}
                     )
             return None
-        attribute = collections.get(kind)
+        attribute = collection_for(kind)
         if attribute is None:
             return None
         manager = self.manager()
