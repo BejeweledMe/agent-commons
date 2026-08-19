@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
-from dataclasses import dataclass, field
 from typing import Any
 
 from agent_commons.errors import LifecycleConflictError, ValidationError
@@ -11,6 +10,7 @@ from agent_commons.errors import LifecycleConflictError, ValidationError
 from .collections import collection_for
 from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
+from .snapshot import ProjectionIssue, ProjectSnapshot
 from .validation import EVENT_SPECS, validate_payload
 
 TASK_STATES = {
@@ -90,85 +90,6 @@ LEDGER_SEMANTICS_VERSION = 2
 #: exactly when a write starts depending on the newer behaviour — never
 #: earlier, so an untouched workspace stays readable by old code.
 SEMANTICS_SENSITIVE_EVENTS = {"task.accepted": 2}
-
-
-@dataclass(frozen=True)
-class ProjectionIssue:
-    """Machine-readable projection failure used by integrity gates."""
-
-    code: str
-    severity: str
-    message: str
-    event_ids: tuple[str, ...] = ()
-    repairable: bool = True
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "code": self.code,
-            "severity": self.severity,
-            "message": self.message,
-            "event_ids": list(self.event_ids),
-            "repairable": self.repairable,
-        }
-
-
-@dataclass
-class ProjectSnapshot:
-    workspace_id: str | None = None
-    objectives: dict[str, dict[str, Any]] = field(default_factory=dict)
-    tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
-    threads: dict[str, dict[str, Any]] = field(default_factory=dict)
-    reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
-    verifications: dict[str, dict[str, Any]] = field(default_factory=dict)
-    findings: dict[str, dict[str, Any]] = field(default_factory=dict)
-    decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
-    artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
-    handoffs: dict[str, dict[str, Any]] = field(default_factory=dict)
-    delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
-    agents: dict[str, dict[str, Any]] = field(default_factory=dict)
-    agent_links: dict[str, dict[str, Any]] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
-    issues: list[ProjectionIssue] = field(default_factory=list)
-    invalid_event_ids: set[str] = field(default_factory=set)
-    stale_refs: set[tuple[str, str]] = field(default_factory=set)
-    effective_event_revisions: dict[str, str] = field(default_factory=dict)
-    known_event_ids: set[str] = field(default_factory=set)
-    known_manifest_ids: set[str] = field(default_factory=set)
-    replay_metrics: dict[str, int] = field(default_factory=dict)
-    # The highest semantics version any effective stamp in this ledger names;
-    # 1 is everything written before stamps existed.
-    semantics_required: int = 1
-
-    def entity_revision(self, kind: str, identifier: str) -> str | None:
-        attribute = collection_for(kind)
-        collection = getattr(self, attribute, None) if attribute is not None else None
-        if not isinstance(collection, dict) or identifier not in collection:
-            return None
-        return str(collection[identifier]["revision"])
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "workspace_id": self.workspace_id,
-            "objectives": list(self.objectives.values()),
-            "tasks": list(self.tasks.values()),
-            "threads": list(self.threads.values()),
-            "reviews": list(self.reviews.values()),
-            "verifications": list(self.verifications.values()),
-            "findings": list(self.findings.values()),
-            "decisions": list(self.decisions.values()),
-            "artifacts": list(self.artifacts.values()),
-            "handoffs": list(self.handoffs.values()),
-            "delegations": list(self.delegations.values()),
-            "agents": list(self.agents.values()),
-            "agent_links": list(self.agent_links.values()),
-            "warnings": sorted(set(self.warnings)),
-            "issues": [issue.as_dict() for issue in self.issues],
-            "invalid_event_ids": sorted(self.invalid_event_ids),
-            "stale_refs": [
-                {"kind": kind, "id": identifier} for kind, identifier in sorted(self.stale_refs)
-            ],
-            "semantics_required": self.semantics_required,
-        }
 
 
 def _record_issue(

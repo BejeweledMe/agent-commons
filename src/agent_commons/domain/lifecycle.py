@@ -16,7 +16,7 @@ from agent_commons.domain.agents import (
     turnover_blockers,
 )
 from agent_commons.domain.collections import collection_for
-from agent_commons.domain.projection import ProjectSnapshot
+from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.states import (
     LIVE_WORKER_DELEGATION_STATES,
     NON_TERMINAL_DELEGATION_STATES,
