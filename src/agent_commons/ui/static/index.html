@@ -828,8 +828,10 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <button type="button" class="gref" data-guide-page="tasks" data-guide-anchor="g-tk-run"
             data-i18n-title="gref_run_states" data-i18n-aria="gref_run_states"></button>
         </div>
-        <p class="note" data-i18n="runs_note">Live and recent provider runs — phase only, never any
-          provider output. No prompts, transcripts, or tool arguments are retained.</p>
+        <p class="note" data-i18n="runs_note">Live and recent provider runs. A failed run may show a
+          private, sanitized final 4 KiB of its stderr and the bounded, fixed refusal reasons of
+          rejected terminal result calls; stdout, prompts, transcripts, and tool arguments are never
+          stored.</p>
         <!-- Where an operator looks for a cost, and finds the truth instead.
              Round 3, designer 16, asked for spend on the run card; nothing in
              this codebase records a consumed provider unit, so there is no
@@ -1815,7 +1817,7 @@ const STRINGS = {
     hire_budget_required: "Anything above deny needs this number: a role allowed to hire or retire other roles is refused without a ceiling on how many.",
     hire_button: "Hire",
     preset_none: "— none —",
-    runs_note: "Live and recent provider runs — phase only, never any provider output. No prompts, transcripts, or tool arguments are retained.",
+    runs_note: "Live and recent provider runs. A failed run may show a private, sanitized final 4 KiB of its stderr and the bounded, fixed refusal reasons of rejected terminal result calls; stdout, prompts, transcripts, and tool arguments are never stored.",
     runs_open_tip: "Open the run's record.",
     runs_no_spend: "No cost appears here because none is recorded: nothing in this system counts tokens, requests or money. The budget on a run is the cap it was launched under, never what it used.",
     runs_filter_status_label: "Show",
@@ -2423,7 +2425,7 @@ const STRINGS = {
     hire_budget_required: "Всё, что выше deny, требует этого числа: роли, которой разрешено нанимать или выводить из работы другие роли, без потолка откажут.",
     hire_button: "Нанять",
     preset_none: "— нет —",
-    runs_note: "Текущие и недавние прогоны провайдера — только фаза, никогда не вывод провайдера. Промпты, транскрипты и аргументы инструментов не сохраняются.",
+    runs_note: "Текущие и недавние прогоны провайдера. Для неуспешного прогона могут показываться приватный очищенный хвост stderr до 4 КиБ и ограниченные фиксированные причины отклонённых вызовов завершения; stdout, промпты, транскрипты и аргументы инструментов никогда не сохраняются.",
     runs_open_tip: "Открыть запись прогона.",
     runs_no_spend: "Стоимости здесь нет, потому что она нигде не записывается: система не считает ни токены, ни обращения, ни деньги. Бюджет у прогона \u2014 это предел, с которым его начали, а не то, что он израсходовал.",
     runs_filter_status_label: "Показывать",
