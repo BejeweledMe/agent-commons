@@ -214,8 +214,19 @@ class RoleCommands:
         *,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        """Record exactly the role that was proposed, crediting its proposer."""
+        """Record exactly the role that was proposed, crediting its proposer.
 
+        The fields come from the proposal rather than from the caller, so
+        confirming cannot quietly become creating something else under the
+        proposer's name.
+        """
+
+        # Create the role and close the proposal as one action.  Approving used
+        # to leave the thread open, so a second click minted a duplicate role,
+        # spent turnover budget again, and left the item glowing in the
+        # attention queue forever -- "approving that proposal" happening twice
+        # (round 2, both product reviewers).  Under one write lock the second
+        # approval finds the thread resolved and is refused.
         with self._canonical_write_lock():
             snapshot = self.snapshot()
             thread = require_entity(snapshot, "thread", thread_id)
@@ -314,13 +325,26 @@ class RoleCommands:
         cascade: bool = False,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        """Take a role out of service, optionally with everything it created."""
+        """Take a role out of service, optionally with everything it created.
+
+        Nothing is deleted; the ledger keeps the whole history.  The whole
+        cascade runs inside one canonical write lock: a half-applied cascade
+        leaves exactly the orphaned authority it exists to remove, and a
+        concurrent writer that gave the root live work between two separate
+        writes used to produce precisely that -- descendants retired, root
+        active.  Members are written leaves-first, so if anything still fails
+        mid-cascade a child is never left active under a retired parent.
+        """
 
         with self._canonical_write_lock():
             snapshot = self.snapshot()
             require_entity(snapshot, "agent", agent_id)
             targets = [*descendants(snapshot.agents, agent_id), agent_id] if cascade else [agent_id]
             targets = [identifier for identifier in targets if identifier in snapshot.agents]
+            # Leaves-first: order by distance from the human root, deepest first,
+            # so a role is always retired before the creator it reports to.
+            # descendants() returns ULID (chronological, ancestors-first) order,
+            # the opposite of what a cascade needs.
             targets.sort(
                 key=lambda identifier: (len(lineage(snapshot.agents, identifier)), identifier),
                 reverse=True,
@@ -344,6 +368,9 @@ class RoleCommands:
                 detail = "; ".join(
                     f"{name}: {', '.join(items)}" for name, items in refusals.items()
                 )
+                # Say what was actually attempted.  Reporting a plain retire as a
+                # refused cascade is a small lie in the record, and this branch
+                # has already paid for one of those.
                 scope = "cascade retire is refused as a whole" if cascade else "retire is refused"
                 raise LifecycleConflictError(f"{scope}: a role owing live work: {detail}")
             base_key = self._idempotency_key("agent.retired", idempotency_key)
@@ -393,9 +420,15 @@ class RoleCommands:
             "link_id": link_id,
             "from_agent_id": from_agent_id,
             "to_agent_id": to_agent_id,
+            # A typed action, never an open/closed flag: adding
+            # `handoff_work` later extends this enum instead of reshaping
+            # the record.
             "allowed_action": allowed_action,
             "reason": reason,
         }
+        # Optional, and recorded only when an operator actually stated one: a
+        # horizon nothing can enforce (replay has no clock) is intent, not a
+        # rule, and a required field nobody reads is a tax on every caller.
         if deadline_seconds is not None:
             payload["deadline_seconds"] = deadline_seconds
         return self.record_event(
