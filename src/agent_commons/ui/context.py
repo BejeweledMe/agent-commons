@@ -19,6 +19,7 @@ from typing import Any
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
 from agent_commons.config import CommonsPaths
 from agent_commons.domain.agents import PROFILE_NARROWING
+from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.collections import collection_for
 from agent_commons.errors import (
     CommonsError,
@@ -569,9 +570,8 @@ class UIContext:
         design reviewers' merged attention queue replaces the two hidden tabs.
         """
 
-        from agent_commons.ui.graph import thread_awaits_human
-
         snapshot = self.manager().snapshot()
+        canonical_attention = awaits_human(snapshot)
         answerable_by_delegation: dict[str, dict[str, Any]] = {}
         for operation in self.pending_operations():
             delegation_id = str(operation.get("delegation_id") or "")
@@ -579,9 +579,11 @@ class UIContext:
                 answerable_by_delegation[delegation_id] = operation
 
         items: list[dict[str, Any]] = []
-        for delegation_id, record in sorted(snapshot.delegations.items()):
-            if record.get("state") != "input_needed":
+        for attention_item in canonical_attention.items:
+            if attention_item.kind != "run_blocked":
                 continue
+            delegation_id = attention_item.identifier
+            record = attention_item.record
             operation = answerable_by_delegation.get(delegation_id)
             items.append(
                 {
@@ -589,6 +591,9 @@ class UIContext:
                     "id": delegation_id,
                     "agent_id": record.get("agent_id"),
                     "target_ref": record.get("target_ref"),
+                    "run_state": record.get("state"),
+                    "reason_code": record.get("reason_code"),
+                    "summary": record.get("summary"),
                     "operation_id": (operation or {}).get("operation_id"),
                     "metadata": (operation or {}).get("metadata"),
                     "answerable_here": bool((operation or {}).get("answerable_here")),
@@ -604,16 +609,15 @@ class UIContext:
         # item per task, not per run: ids sort chronologically, so the last one
         # seen is the run whose result is actually being asked about.
         returned: dict[str, dict[str, Any]] = {}
-        for delegation_id, record in sorted(snapshot.delegations.items()):
-            if record.get("state") != "succeeded":
+        for attention_item in canonical_attention.items:
+            if attention_item.kind != "work_returned":
                 continue
+            delegation_id = attention_item.identifier
+            record = attention_item.record
             target = record.get("target_ref") or {}
-            if target.get("kind") != "task":
-                continue
             task_id = str(target.get("id") or "")
             task = snapshot.tasks.get(task_id)
-            if task is None or task.get("state") in {"accepted", "cancelled"}:
-                continue
+            assert task is not None
             agent_id = record.get("agent_id")
             agent = snapshot.agents.get(str(agent_id)) if agent_id else None
             returned[task_id] = {
@@ -628,9 +632,11 @@ class UIContext:
                 "agent_name": agent.get("name") if agent else None,
             }
         items.extend(returned.values())
-        for thread_id, record in sorted(snapshot.threads.items()):
-            if not thread_awaits_human(record):
+        for attention_item in canonical_attention.items:
+            if attention_item.kind != "thread":
                 continue
+            thread_id = attention_item.identifier
+            record = attention_item.record
             thread_type = str(record.get("thread_type", ""))
             proposal = (record.get("extensions") or {}).get("staff_proposal")
             is_proposal = isinstance(proposal, Mapping) and proposal.get("action") == "create_role"

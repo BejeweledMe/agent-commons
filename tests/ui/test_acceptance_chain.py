@@ -382,6 +382,9 @@ def test_finished_work_waits_in_attention_until_somebody_accepts_it(
     # The footer count and the amber ring read this same list, so the item has
     # to be inside the count, not beside it.
     assert queue["count"] == len(queue["items"])
+    graph = writable_client.get("/api/graph", headers=authorized()).json()
+    waiting = set(graph["awaiting_human"])
+    assert {task["id"], run["delegation_id"], run["agent_id"]} <= waiting
 
     accepted = accept_through_a_real_review(writable_client, workspace, task)
     assert accepted.status_code == 200, accepted.text

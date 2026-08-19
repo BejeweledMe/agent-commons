@@ -163,6 +163,71 @@ def test_a_delegation_waiting_for_input_rings_its_role_and_its_run(
     assert node["awaits_human"] is True
 
 
+@pytest.mark.parametrize(
+    ("transition", "state"),
+    [
+        ("fail_delegation", "failed"),
+        ("mark_delegation_needs_operator", "needs_operator"),
+    ],
+)
+def test_burned_runs_reach_both_attention_queue_and_ring(
+    workspace: dict[str, Any],
+    transition: str,
+    state: str,
+) -> None:
+    manager = _writer(workspace, state)
+    role = manager.create_agent(
+        name=f"{state} role",
+        profile_id="claude-builder",
+        rationale="owns the failed attempt",
+        idempotency_key=f"{state}-role",
+    )
+    task = manager.create_task(
+        title=f"{state} work",
+        description="must remain visible after the run stops",
+        acceptance_criteria=("operator sees it",),
+        idempotency_key=f"{state}-task",
+    )
+    delegation = manager.create_delegation(
+        target_ref={"kind": "task", "id": task["entity_ref"]["id"]},
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits=LIMITS,
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key=f"{state}-delegation",
+    )
+    child = _writer(workspace, f"{state}-child")
+    started = manager.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=str(child.session_id),
+        idempotency_key=f"{state}-start",
+    )
+    getattr(child, transition)(
+        delegation["entity_ref"]["id"],
+        started["revision"],
+        reason_code="runtime_error",
+        summary="the run stopped without a usable result",
+        idempotency_key=f"{state}-terminal",
+    )
+
+    context = UIContext(workspace["repo"], state_root=workspace["state_root"])
+    queue = context.attention()
+    item = next(item for item in queue["items"] if item["id"] == delegation["entity_ref"]["id"])
+    assert item["kind"] == "run_blocked"
+    assert item["run_state"] == state
+    assert queue["count"] == len(queue["items"])
+
+    graph = context.rebuild_graph()
+    waiting = set(graph["awaiting_human"])
+    assert {
+        role["entity_ref"]["id"],
+        task["entity_ref"]["id"],
+        delegation["entity_ref"]["id"],
+    } <= waiting
+
+
 def test_a_run_hangs_under_the_role_it_acts_for(workspace: dict[str, Any]) -> None:
     manager = _writer(workspace, "acts")
     role = manager.create_agent(

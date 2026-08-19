@@ -12,7 +12,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from agent_commons.domain.agents import effective_grants, session_agent_map
+from agent_commons.domain.agents import effective_grants
+from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.ui import GRAPH_SCHEMA
 from agent_commons.views import truncate_utf8
@@ -209,64 +210,10 @@ def _shed(
     return kept, surviving, True
 
 
-#: Thread kinds that are an agent asking a human to decide something, rather
-#: than agents talking among themselves.
-_HUMAN_DECISION_THREADS = frozenset({"decision_request", "question", "help_request", "proposal"})
-
-#: A recipient that means the human is being asked, not a role.
-_HUMAN_RECIPIENTS = frozenset({"operator", "*"})
-
-
-def thread_awaits_human(record: Mapping[str, Any]) -> bool:
-    """Whether an open thread is waiting on a person, not on a role.
-
-    A human-decision thread counts only when it is addressed to the human: a
-    role asking the operator to decide.  A directive the operator sends *to* a
-    role is the same thread kind but waits on the role, and counting it made the
-    operator's own messages inflate their own attention queue and ring their own
-    session (round 2, design).  The ring and the list read this one predicate,
-    so they cannot disagree about which threads are waiting on you.
-    """
-
-    if record.get("state") != "open":
-        return False
-    if str(record.get("thread_type", "")) not in _HUMAN_DECISION_THREADS:
-        return False
-    recipients = {str(item) for item in record.get("to") or ()}
-    return bool(recipients & _HUMAN_RECIPIENTS)
-
-
 def blocked_on_human(snapshot: ProjectSnapshot) -> set[str]:
-    """Node identifiers waiting on a person, derived from real ledger state.
+    """Compatibility view of the domain-owned canonical attention set."""
 
-    Two producers exist today and both are already wired: a delegation enters
-    `input_needed` when a worker asks for input, and an open decision-request
-    thread is a role addressing a human directly.  Nothing here is speculative;
-    a source with no producer would be a yellow ring that never lights.
-    """
-
-    blocked: set[str] = set()
-    for identifier, record in snapshot.delegations.items():
-        if record.get("state") != "input_needed":
-            continue
-        blocked.add(identifier)
-        agent_id = record.get("agent_id")
-        if agent_id:
-            blocked.add(str(agent_id))
-        session_id = record.get("child_session_id")
-        if session_id:
-            blocked.add(str(session_id))
-    for identifier, record in snapshot.threads.items():
-        if not thread_awaits_human(record):
-            continue
-        blocked.add(identifier)
-        session_id = str((record.get("actor") or {}).get("session_id", ""))
-        if session_id:
-            blocked.add(session_id)
-    bindings = session_agent_map(snapshot.delegations)
-    for session_id in list(blocked):
-        blocked.update(bindings.get(session_id, ()))
-    return blocked
+    return set(awaits_human(snapshot).node_ids)
 
 
 def _reporting_ranks(snapshot: ProjectSnapshot, session_ids: set[str]) -> dict[str, int]:
