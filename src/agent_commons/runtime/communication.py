@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import stat
 import time
@@ -21,6 +20,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from agent_commons.core.canonical import loads_json_strict
 from agent_commons.core.ids import is_typed_id, stable_id
 from agent_commons.errors import (
     IdempotencyConflictError,
@@ -591,13 +591,13 @@ class CommunicationStore:
             with os.fdopen(descriptor, "rb", closefd=True) as handle:
                 raw = handle.read()
             descriptor = -1
-            value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            value = loads_json_strict(raw)
+        except (OSError, ValidationError) as exc:
             raise IntegrityError("communication operation document is unreadable") from exc
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
+        if not isinstance(value, dict) or raw != strict_state_bytes(value):
             raise IntegrityError("communication operation document is not canonical JSON")
         record = _record_from_mapping(value, self._integrity_key_bytes())
         self.security_policy.assert_safe(value, context="operational communication record")

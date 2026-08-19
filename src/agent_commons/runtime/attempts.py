@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import stat
@@ -14,6 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from agent_commons.core.canonical import loads_json_strict
 from agent_commons.core.ids import stable_id
 from agent_commons.errors import (
     IdempotencyConflictError,
@@ -452,13 +452,13 @@ class AttemptStore:
             with os.fdopen(descriptor, "rb", closefd=True) as handle:
                 raw = handle.read()
             descriptor = -1
-            value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            value = loads_json_strict(raw)
+        except (OSError, ValidationError) as exc:
             raise IntegrityError("runtime request document is unreadable") from exc
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
+        if not isinstance(value, dict) or raw != strict_state_bytes(value):
             raise IntegrityError("runtime request document is not canonical JSON")
         self._validate_document(value)
         if value["schema"] == _LEGACY_REQUEST_SCHEMA:
@@ -619,8 +619,8 @@ class AttemptStore:
             with os.fdopen(descriptor, "rb", closefd=True) as handle:
                 raw = handle.read()
             descriptor = -1
-            value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            value = loads_json_strict(raw)
+        except (OSError, ValidationError) as exc:
             raise IntegrityError("runtime queue is unreadable") from exc
         finally:
             if descriptor >= 0:
@@ -630,7 +630,7 @@ class AttemptStore:
             or set(value) != {"schema", "entries"}
             or value.get("schema") != QUEUE_SCHEMA
             or not isinstance(value.get("entries"), list)
-            or raw != canonical_state_bytes(value)
+            or raw != strict_state_bytes(value)
         ):
             raise IntegrityError("runtime queue has an invalid shape")
         entries: list[dict[str, Any]] = []

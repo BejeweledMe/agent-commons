@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import stat
@@ -14,12 +13,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agent_commons.core.canonical import loads_json_strict
 from agent_commons.errors import IntegrityError, LifecycleConflictError, ValidationError
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.atomic import atomic_write_replace
 from agent_commons.storage.opstate import (
     ATTEMPT_STORAGE,
-    canonical_state_bytes,
     ensure_private_directory,
     exclusive_lock,
     strict_state_bytes,
@@ -224,13 +223,13 @@ class TerminalToolAuditStore:
             with os.fdopen(descriptor, "rb", closefd=True) as handle:
                 raw = handle.read()
             descriptor = -1
-            value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            value = loads_json_strict(raw)
+        except (OSError, ValidationError) as exc:
             raise IntegrityError("terminal tool audit is unreadable") from exc
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
-        if not isinstance(value, dict) or raw != canonical_state_bytes(value):
+        if not isinstance(value, dict) or raw != strict_state_bytes(value):
             raise IntegrityError("terminal tool audit is not canonical JSON")
         audit = self._validate(value)
         if audit.delegation_id != delegation_id:

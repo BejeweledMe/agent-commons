@@ -16,6 +16,7 @@ from agent_commons.storage.opstate import (
     SESSION_STORAGE,
     ensure_private_directory,
     exclusive_lock,
+    read_audit_event,
     strict_state_bytes,
 )
 
@@ -86,3 +87,11 @@ def test_all_stores_share_one_resolved_process_lock_identity(
 def test_new_operational_state_requires_strict_json(value) -> None:
     with pytest.raises(ValidationError):
         strict_state_bytes(value)
+
+
+def test_operational_audit_reader_rejects_legacy_non_finite_json(tmp_path: Path) -> None:
+    path = tmp_path / "00000000000000000001-deadbeefdeadbeefdeadbeefdeadbeef.json"
+    path.write_bytes(b'{"schema":"test.event.v1","score":NaN}\n')
+
+    with pytest.raises(IntegrityError, match="unreadable"):
+        read_audit_event(path, schema="test.event.v1", label="test")

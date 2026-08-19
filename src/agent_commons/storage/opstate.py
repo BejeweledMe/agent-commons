@@ -22,8 +22,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from agent_commons.core.canonical import canonical_json_file_bytes
-from agent_commons.errors import IntegrityError
+from agent_commons.core.canonical import canonical_json_file_bytes, loads_json_strict
+from agent_commons.errors import IntegrityError, ValidationError
 from agent_commons.platform_support import lock_exclusive, unlock
 
 _AUDIT_EVENT_FILE = re.compile(r"^[0-9]{20}-[a-f0-9]{32}\.json$")
@@ -210,15 +210,15 @@ def read_audit_event(path: Path, *, schema: str, label: str) -> dict[str, Any]:
         with os.fdopen(descriptor, "rb", closefd=True) as handle:
             raw = handle.read()
         descriptor = -1
-        value = json.loads(raw)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = loads_json_strict(raw)
+    except (OSError, ValidationError) as exc:
         raise IntegrityError(f"{label} audit event is unreadable") from exc
     finally:
         if descriptor >= 0:
             os.close(descriptor)
     if not isinstance(value, dict) or value.get("schema") != schema:
         raise IntegrityError(f"{label} audit event has an invalid envelope")
-    if raw != canonical_state_bytes(value):
+    if raw != strict_state_bytes(value):
         raise IntegrityError(f"{label} audit event is not canonical JSON")
     return value
 
