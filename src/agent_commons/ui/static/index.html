@@ -1886,6 +1886,7 @@ const STRINGS = {
     attention_waiting: "Waiting on you. An answer is bounded metadata — never a password, key, or token.",
     attention_empty: "Nothing is waiting on you right now.",
     run_waiting: "run waiting for input",
+    run_stopped: "run stopped",
     role_proposal: "role proposal",
     needs_decision: "needs a decision",
     your_answer: "Your answer",
@@ -2494,6 +2495,7 @@ const STRINGS = {
     attention_waiting: "Ждёт вас. Ответ — это ограниченные метаданные, никогда не пароль, ключ или токен.",
     attention_empty: "Сейчас ничто вас не ждёт.",
     run_waiting: "прогон ждёт ввода",
+    run_stopped: "прогон остановлен",
     role_proposal: "предложение роли",
     needs_decision: "нужно решение",
     your_answer: "Ваш ответ",
@@ -6488,7 +6490,8 @@ function renderAttentionItem(item) {
   card.className = "attn-item " + item.kind;
   const kind = document.createElement("div");
   kind.className = "attn-kind";
-  kind.textContent = item.kind === "run_blocked" ? t("run_waiting")
+  kind.textContent = item.kind === "run_blocked"
+    ? (!item.run_state || item.run_state === "input_needed" ? t("run_waiting") : t("run_stopped"))
     : item.kind === "proposal" ? t("role_proposal")
     : item.kind === "config_broken" ? t("config_broken_kind")
     : item.kind === "work_returned" ? t("work_returned_kind")
@@ -6547,6 +6550,24 @@ function renderAttentionItem(item) {
     head.textContent = item.id + (item.agent_id ? " · " + t("role_word") + " " + item.agent_id : "") +
       (item.deadline ? " · " + t("until") + " " + item.deadline : "");
     card.appendChild(head);
+    // The queue used to caption every blocked run "waiting for input", which
+    // told an operator a failed run was alive and asking a question.  The
+    // payload has carried the real state, the broker's reason code and its
+    // summary since the attention predicate was unified; render them so triage
+    // no longer needs the CLI.  Canonical state leads, gloss after the dash.
+    if (item.run_state) {
+      const state = document.createElement("p");
+      state.className = "note warn";
+      state.textContent = glossed(item.run_state, STATE_GLOSS[item.run_state]) +
+        (item.reason_code ? " · " + item.reason_code : "");
+      card.appendChild(state);
+    }
+    if (item.summary) {
+      const summary = document.createElement("p");
+      summary.className = "note";
+      summary.textContent = item.summary;  // agent prose as text
+      card.appendChild(summary);
+    }
     if (item.metadata != null) {
       const detail = document.createElement("pre");
       detail.textContent = JSON.stringify(item.metadata, null, 2);  // agent prose as text

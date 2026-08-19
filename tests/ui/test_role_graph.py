@@ -228,6 +228,22 @@ def test_burned_runs_reach_both_attention_queue_and_ring(
     } <= waiting
 
 
+def test_the_attention_card_names_the_real_run_state() -> None:
+    """A failed run used to render under "run waiting for input" with the
+    broker's reason code and summary dropped on the floor: the operator saw
+    the dead run in the queue but was told it was alive and asking a
+    question, and triage still needed the CLI."""
+
+    from agent_commons.ui import read_spa
+
+    body = read_spa()
+    renderer = body.split("function renderAttentionItem(item) {", 1)[1].split("\nfunction ", 1)[0]
+    assert 't("run_stopped")' in renderer
+    assert "STATE_GLOSS[item.run_state]" in renderer
+    assert "item.reason_code" in renderer
+    assert "summary.textContent = item.summary;" in renderer
+
+
 def test_a_run_hangs_under_the_role_it_acts_for(workspace: dict[str, Any]) -> None:
     manager = _writer(workspace, "acts")
     role = manager.create_agent(
