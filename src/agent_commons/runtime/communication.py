@@ -37,6 +37,7 @@ from agent_commons.storage.opstate import (
     exclusive_lock,
     iso_timestamp,
     parse_timestamp,
+    strict_state_bytes,
 )
 
 OPERATION_SCHEMA = "agent_commons.runtime_operation.v1"
@@ -605,7 +606,7 @@ class CommunicationStore:
     def _write_document(self, path: Path, record: OperationRecord) -> None:
         value = record.as_dict()
         self.security_policy.assert_safe(value, context="operational communication record")
-        atomic_write_replace(path, canonical_state_bytes(value), mode=0o600)
+        atomic_write_replace(path, strict_state_bytes(value), mode=0o600)
 
     def _documents(self) -> list[OperationRecord]:
         records: list[OperationRecord] = []
@@ -658,7 +659,7 @@ class CommunicationStore:
             )
 
     def _assert_metadata_within_budget(self, metadata: Mapping[str, Any]) -> None:
-        if len(canonical_state_bytes(dict(metadata))) > self.limits.max_metadata_bytes:
+        if len(strict_state_bytes(dict(metadata))) > self.limits.max_metadata_bytes:
             raise ValidationError("communication metadata exceeds the configured size limit")
 
     def _chain_depth(self, parent: OperationRecord) -> int:

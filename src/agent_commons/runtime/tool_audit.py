@@ -22,6 +22,7 @@ from agent_commons.storage.opstate import (
     canonical_state_bytes,
     ensure_private_directory,
     exclusive_lock,
+    strict_state_bytes,
 )
 
 from .model import _safe_identifier
@@ -299,6 +300,6 @@ class TerminalToolAuditStore:
             self._validate(updated.as_dict())
             atomic_write_replace(
                 self._path(delegation_id),
-                canonical_state_bytes(updated.as_dict()),
+                strict_state_bytes(updated.as_dict()),
             )
             return updated

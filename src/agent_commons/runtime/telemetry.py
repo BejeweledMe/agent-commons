@@ -16,9 +16,9 @@ from agent_commons.errors import ConfigurationError, ValidationError
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage.opstate import (
     ATTEMPT_STORAGE,
-    canonical_state_bytes,
     ensure_private_directory,
     exclusive_lock,
+    strict_state_bytes,
 )
 
 from .diagnostics import DiagnosticCode
@@ -255,7 +255,7 @@ class JsonlTelemetrySink:
     def emit(self, event: TelemetryEvent) -> None:
         body = event.as_dict()
         self.security_policy.assert_safe(body, context="runtime telemetry")
-        data = canonical_state_bytes(body)
+        data = strict_state_bytes(body)
         with exclusive_lock(self.lock_path, policy=ATTEMPT_STORAGE):
             descriptor = os.open(
                 self.path,

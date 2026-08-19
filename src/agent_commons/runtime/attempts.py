@@ -29,6 +29,7 @@ from agent_commons.storage.opstate import (
     ensure_private_directory,
     exclusive_lock,
     iso_timestamp,
+    strict_state_bytes,
 )
 
 from .diagnostics import DiagnosticCode, classify_process_result, sanitize_provider_stderr_tail
@@ -591,7 +592,7 @@ class AttemptStore:
 
     def _write_document(self, path: Path, value: Mapping[str, Any]) -> None:
         self._validate_document(value)
-        atomic_write_replace(path, canonical_state_bytes(value), mode=0o600)
+        atomic_write_replace(path, strict_state_bytes(value), mode=0o600)
 
     def _documents(self) -> list[tuple[Path, dict[str, Any]]]:
         documents: list[tuple[Path, dict[str, Any]]] = []
@@ -656,7 +657,7 @@ class AttemptStore:
     def _write_queue(self, entries: list[dict[str, Any]]) -> None:
         body = {"schema": QUEUE_SCHEMA, "entries": entries}
         self.security_policy.assert_safe(body, context="runtime admission queue")
-        atomic_write_replace(self.queue_path, canonical_state_bytes(body), mode=0o600)
+        atomic_write_replace(self.queue_path, strict_state_bytes(body), mode=0o600)
 
     @staticmethod
     def _latest(document: Mapping[str, Any]) -> Attempt:

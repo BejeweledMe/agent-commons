@@ -140,6 +140,15 @@ def test_request_check_reply_ack_lifecycle_is_private_and_atomic(tmp_path: Path)
     assert acked.state.terminal
 
 
+def test_communication_refuses_non_finite_metadata_before_writing(tmp_path: Path) -> None:
+    store = CommunicationStore(tmp_path / "state", clock=FakeClock(), wall_clock=FakeClock())
+
+    with pytest.raises(ValidationError, match="non-finite JSON number"):
+        store.request(make_spec(tmp_path, metadata={"score": float("nan")}))
+
+    assert list(store.operation_root.glob("*.json")) == []
+
+
 def test_reply_is_exactly_once(tmp_path: Path) -> None:
     clock = FakeClock()
     store = CommunicationStore(tmp_path / "state", clock=clock, wall_clock=clock)

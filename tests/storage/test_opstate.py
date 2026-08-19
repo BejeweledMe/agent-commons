@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_commons.errors import IntegrityError
+from agent_commons.errors import IntegrityError, ValidationError
 from agent_commons.storage import opstate
 from agent_commons.storage.opstate import (
     ATTEMPT_STORAGE,
@@ -16,6 +16,7 @@ from agent_commons.storage.opstate import (
     SESSION_STORAGE,
     ensure_private_directory,
     exclusive_lock,
+    strict_state_bytes,
 )
 
 _POLICIES = (SESSION_STORAGE, ATTEMPT_STORAGE, COMMUNICATION_STORAGE)
@@ -79,3 +80,9 @@ def test_all_stores_share_one_resolved_process_lock_identity(
 
     assert peak == 1
     assert stat.S_IMODE(direct.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize("value", [{"score": float("nan")}, {1: "not a string key"}])
+def test_new_operational_state_requires_strict_json(value) -> None:
+    with pytest.raises(ValidationError):
+        strict_state_bytes(value)

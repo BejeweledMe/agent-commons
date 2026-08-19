@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from agent_commons.core.canonical import canonical_json_file_bytes
 from agent_commons.errors import IntegrityError
 from agent_commons.platform_support import lock_exclusive, unlock
 
@@ -81,6 +82,12 @@ def canonical_state_bytes(value: Mapping[str, Any]) -> bytes:
     return (
         json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode("utf-8")
+
+
+def strict_state_bytes(value: Mapping[str, Any]) -> bytes:
+    """Serialize newly written operational state as strict canonical JSON."""
+
+    return canonical_json_file_bytes(value)
 
 
 def ensure_private_directory(path: Path, *, policy: OperationalStoragePolicy) -> None:
@@ -169,7 +176,7 @@ def publish_audit_event(
     """Publish one immutable audit event with no overwrite semantics."""
 
     ensure_private_directory(path.parent, policy=policy)
-    data = canonical_state_bytes(body)
+    data = strict_state_bytes(body)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temporary = Path(temporary_name)
     try:
