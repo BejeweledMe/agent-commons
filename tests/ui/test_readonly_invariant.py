@@ -124,6 +124,49 @@ def test_meta_declares_the_read_only_contract(client) -> None:  # type: ignore[n
     assert "authentication" in meta["trust_note"]
 
 
+def test_read_endpoints_preserve_their_top_level_json_shapes(  # type: ignore[no-untyped-def]
+    client, populated
+) -> None:
+    meta = client.get("/api/meta", headers=authorized()).json()
+    assert set(meta) == {
+        "schema",
+        "agent_commons_version",
+        "workspace_id",
+        "repo",
+        "read_only",
+        "writes_enabled",
+        "writer_session_id",
+        "server_instance_id",
+        "trust_note",
+        "truth_layers",
+    }
+
+    graph = client.get("/api/graph", headers=authorized()).json()
+    assert set(graph) == {
+        "schema",
+        "workspace_id",
+        "generated_at",
+        "ledger_fingerprint",
+        "server_instance_id",
+        "seq",
+        "nodes",
+        "edges",
+        "counts",
+        "awaiting_human",
+        "issues",
+        "warnings",
+        "read_diagnostics",
+        "limits",
+    }
+    first = graph["nodes"][0]
+    entity = client.get(f"/api/entities/{first['kind']}/{first['id']}", headers=authorized()).json()
+    assert set(entity) == {"schema", "kind", "id", "record"}
+
+    attention = client.get("/api/attention", headers=authorized()).json()
+    assert set(attention) == {"items", "count", "writes_enabled"}
+    assert isinstance(client.get("/api/runs", headers=authorized()).json(), list)
+
+
 # -- the writable server -----------------------------------------------------
 
 

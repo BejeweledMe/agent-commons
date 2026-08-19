@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_commons.core.canonical import canonical_json_file_bytes
+from agent_commons.core.canonical import canonical_json_file_bytes, load_json_strict
 from agent_commons.errors import IntegrityError
 from agent_commons.services import CommonsManager
 
@@ -68,6 +68,12 @@ def _create_objective(manager: CommonsManager, *, key: str, title: str) -> dict:
         acceptance_criteria=("canonical writes remain portable",),
         idempotency_key=key,
     )
+
+
+def _replace_receipt_semantic_digest(path: Path) -> None:
+    body = load_json_strict(path)
+    body["semantic_sha256"] = "f" * 64
+    path.write_bytes(canonical_json_file_bytes(body))
 
 
 def test_fresh_clone_rebuilds_receipts_from_canonical_ledger(tmp_path: Path) -> None:
@@ -230,7 +236,52 @@ def test_exact_git_arrival_after_abandonment_is_audited_and_reconciled(
     assert recovered["ok"] is True
     assert recovered["reconciled_tombstones_count"] == 1
     assert len(recovered["reconciled_tombstones"]) == 1
+    assert recovered["warnings"] == ["1 abandonment tombstone(s) are reconciled in scope"]
     assert maintainer.doctor()["ok"] is True
+
+
+def test_status_reports_a_scoped_receipt_that_conflicts_with_its_event(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize(repo)
+    manager = _manager(repo, state_root=tmp_path / "state", suffix="scoped-conflict")
+    _create_objective(manager, key="scoped-conflict", title="Scoped conflict")
+    receipt = manager.events.idempotency.lookup(
+        namespace=manager._namespace(manager._active_session()),
+        key="scoped-conflict",
+    )
+    assert receipt is not None
+
+    _replace_receipt_semantic_digest(receipt.path)
+
+    status = manager.receipt_status()
+    assert status["conflicting_receipts"] == [receipt.key_digest]
+    assert status["issues"][-1] == (
+        f"canonical event has a conflicting idempotency receipt: {receipt.key_digest}"
+    )
+
+
+def test_status_reports_a_legacy_receipt_that_conflicts_with_its_event(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize(repo)
+    state_root = tmp_path / "state"
+    writer = _manager(repo, state_root=state_root, suffix="legacy-conflict")
+    _create_objective(writer, key="legacy-conflict", title="Legacy conflict")
+    receipt = writer.events.idempotency.lookup(
+        namespace=writer._namespace(writer._active_session()),
+        key="legacy-conflict",
+    )
+    assert receipt is not None
+    writer.events.idempotency.prepare_legacy_receipt(receipt)
+    legacy_path = writer.paths.idempotency / receipt.key_digest[:2] / f"{receipt.key_digest}.json"
+    _replace_receipt_semantic_digest(legacy_path)
+    shutil.rmtree(writer.paths.idempotency_v2)
+
+    upgraded = CommonsManager(repo, state_root=state_root, session_id=writer.session_id)
+    status = upgraded.receipt_status()
+    assert status["legacy_conflicting_receipts"] == [receipt.key_digest]
+    assert status["issues"][-1] == (
+        f"legacy idempotency receipt conflicts with canonical event: {receipt.key_digest}"
+    )
 
 
 def test_anchor_rejects_removal_after_first_local_observation(tmp_path: Path) -> None:
