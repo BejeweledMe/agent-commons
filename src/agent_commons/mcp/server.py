@@ -173,6 +173,16 @@ VERIFICATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_record_ve
 INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = VERIFICATION_WORKER_TOOL_NAMES | {"commons_complete_review"}
 
 
+def _is_outside_review_scope(path: Path) -> bool:
+    return (
+        path.is_absolute()
+        or ".." in path.parts
+        or path.name in _SENSITIVE_NAMES
+        or path.name.startswith(".env.")
+        or path.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
+    )
+
+
 class ScopedRepoReader:
     """Immutable, bounded, no-symlink text view for delegated reviewers."""
 
@@ -213,13 +223,7 @@ class ScopedRepoReader:
             raise ConfigurationError("scoped reviewer requires UTF-8 Git paths") from exc
         for relative in names:
             normalized = Path(relative)
-            if (
-                normalized.is_absolute()
-                or ".." in normalized.parts
-                or normalized.name in _SENSITIVE_NAMES
-                or normalized.name.startswith(".env.")
-                or normalized.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
-            ):
+            if _is_outside_review_scope(normalized):
                 continue
             try:
                 digest, size = self._digest(normalized)
@@ -254,13 +258,7 @@ class ScopedRepoReader:
 
     def _safe_candidate(self, relative: str) -> Path:
         normalized = Path(relative)
-        if (
-            normalized.is_absolute()
-            or ".." in normalized.parts
-            or normalized.name in _SENSITIVE_NAMES
-            or normalized.name.startswith(".env.")
-            or normalized.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}
-        ):
+        if _is_outside_review_scope(normalized):
             raise ValidationError("artifact source path is outside the safe review scope")
         return normalized
 
