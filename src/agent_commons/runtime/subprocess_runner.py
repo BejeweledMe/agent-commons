@@ -312,7 +312,12 @@ class SubprocessRunner:
         try:
             stream.write(value)
             stream.flush()
-        except (BrokenPipeError, OSError):
+        # ValueError: with close_stdin_when the main loop may close stdin
+        # between this thread's write and flush, and flushing a closed
+        # BufferedWriter raises it.  close() has flushed the buffer itself,
+        # so the bytes are delivered and the error is as benign as a broken
+        # pipe.
+        except (BrokenPipeError, OSError, ValueError):
             pass
         finally:
             if close:

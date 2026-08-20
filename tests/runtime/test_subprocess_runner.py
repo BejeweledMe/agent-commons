@@ -383,6 +383,18 @@ def test_runner_still_closes_stdin_when_the_child_exits_before_the_reply(
     assert closed == [True]
 
 
+def test_stdin_writer_survives_a_close_racing_its_flush() -> None:
+    # With close_stdin_when the main loop closes stdin as soon as the
+    # predicate fires, which can land between the writer thread's write and
+    # flush.  The flush then raises ValueError, and an escape here would
+    # surface as an unhandled traceback in a daemon thread.
+    class ClosedBetweenWriteAndFlush(io.BytesIO):
+        def flush(self) -> None:
+            raise ValueError("I/O operation on closed file.")
+
+    SubprocessRunner._write_stdin(ClosedBetweenWriteAndFlush(), b"payload", close=False)
+
+
 def test_runner_closes_held_stdin_once_the_output_budget_is_exhausted(tmp_path: Path) -> None:
     clock = Clock()
     # Enough output to exhaust the budget without ever containing the line the
