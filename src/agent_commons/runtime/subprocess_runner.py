@@ -443,7 +443,13 @@ class SubprocessRunner:
             deadline = started_at + timeout_seconds
             try:
                 while True:
-                    if stdin_held_open and close_stdin_when(output.value("stdout")):
+                    # Once the shared output budget is exhausted the retained
+                    # stdout is frozen, so a predicate that has not fired never
+                    # will; holding stdin open past that point only converts a
+                    # parse-visible truncation into a timeout.
+                    if stdin_held_open and (
+                        output.truncated or close_stdin_when(output.value("stdout"))
+                    ):
                         self._close_stdin(process.stdin)
                         stdin_held_open = False
                     return_code = process.poll()

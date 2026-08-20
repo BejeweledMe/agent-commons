@@ -106,6 +106,7 @@ class ProbeRunner:
         legacy_mcp_contract: bool = False,
         mcp_body: object = _DEFAULT_MCP_BODY,
         handshake_exit_code: int = 0,
+        handshake_result: ProcessResult | None = None,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.call_kwargs: list[dict] = []
@@ -113,6 +114,7 @@ class ProbeRunner:
         self.legacy_mcp_contract = legacy_mcp_contract
         self.mcp_body = mcp_body
         self.handshake_exit_code = handshake_exit_code
+        self.handshake_result = handshake_result
 
     def run(self, invocation, **kwargs) -> ProcessResult:
         self.calls.append(invocation.argv)
@@ -123,6 +125,8 @@ class ProbeRunner:
             )
             return _result(output=flags.encode())
         if invocation.stdin:
+            if self.handshake_result is not None:
+                return self.handshake_result
             return _result(
                 output=_mcp_handshake_output(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
                 exit_code=self.handshake_exit_code,
@@ -218,6 +222,60 @@ def test_preflight_is_red_when_real_stdio_handshake_fails(tmp_path: Path) -> Non
     )
     assert result["consumed_delegation_attempt"] is False
     assert result["provider_work_process_started"] is False
+
+
+def test_preflight_keeps_a_truncated_handshake_distinguishable_from_a_timeout(
+    tmp_path: Path,
+) -> None:
+    # A catalog that outgrows the probe's output budget arrives with the final
+    # tools/list line cut off; the runner closes stdin on budget exhaustion, so
+    # the child still exits cleanly and only parsing fails.  A dead-silent
+    # child, by contrast, runs into the probe timeout.  Both used to collapse
+    # into the same mcp_handshake_failed signature as the EOF race bf482fd
+    # fixed; outcome and reason must keep them apart.
+    complete = _mcp_handshake_output(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES)
+    truncated = ProcessResult(
+        outcome=RunOutcome.SUCCEEDED,
+        reason=RunReason.COMPLETED,
+        exit_code=0,
+        pid=123,
+        duration_seconds=0.01,
+        stdout=complete[:-10],
+        stderr=b"",
+        stdout_bytes_seen=len(complete),
+        stderr_bytes_seen=0,
+        output_truncated=True,
+    )
+    timed_out = ProcessResult(
+        outcome=RunOutcome.TIMED_OUT,
+        reason=RunReason.TIMEOUT,
+        exit_code=None,
+        pid=123,
+        duration_seconds=15.0,
+        stdout=b"",
+        stderr=b"",
+        stdout_bytes_seen=0,
+        stderr_bytes_seen=0,
+        output_truncated=False,
+    )
+
+    bodies: dict[str, dict] = {}
+    for label, handshake_result in (("truncated", truncated), ("timed_out", timed_out)):
+        result = preflight_profile(
+            _profiles(),
+            BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+            workspace_root=tmp_path,
+            runner=ProbeRunner(handshake_result=handshake_result),  # type: ignore[arg-type]
+        )
+        assert result["ok"] is False
+        bodies[label] = result["checks"]["mcp_handshake"]
+
+    for body in bodies.values():
+        assert body["diagnostic_code"] == DiagnosticCode.MCP_HANDSHAKE_FAILED.value
+    assert bodies["truncated"]["outcome"] == "succeeded"
+    assert bodies["truncated"]["reason"] == "completed"
+    assert bodies["timed_out"]["outcome"] == "timed_out"
+    assert bodies["timed_out"]["reason"] == "timeout"
 
 
 def test_preflight_identifies_a_missing_mcp_executable_before_provider_launch(

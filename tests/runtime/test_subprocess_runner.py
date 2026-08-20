@@ -383,6 +383,42 @@ def test_runner_still_closes_stdin_when_the_child_exits_before_the_reply(
     assert closed == [True]
 
 
+def test_runner_closes_held_stdin_once_the_output_budget_is_exhausted(tmp_path: Path) -> None:
+    clock = Clock()
+    # Enough output to exhaust the budget without ever containing the line the
+    # predicate waits for: the retained stdout is frozen from that point on, so
+    # a run that kept stdin open could only end in a timeout.
+    noise = b"n" * 8192
+    process = EofDrivenProcess(noise, clock)
+    process.reply_ready.set()
+
+    def draining_sleep(duration: float) -> None:
+        clock.sleep(duration)
+        # Give the real drain thread time to consume the released output.
+        time.sleep(0.001)
+
+    runner = SubprocessRunner(
+        environment=SafeEnvironment.from_mapping({"PATH": "/usr/bin"}),
+        process_factory=lambda argv, cwd, env: process,
+        terminator=lambda candidate, *, force: candidate.stdin_eof.set(),
+        monotonic=clock,
+        sleeper=draining_sleep,
+    )
+    result = runner.run(
+        invocation(),
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=30,
+        max_output_bytes=1024,
+        close_stdin_when=lambda stdout: False,
+    )
+
+    assert result.outcome is RunOutcome.SUCCEEDED
+    assert result.reason is RunReason.COMPLETED
+    assert result.output_truncated is True
+    assert process.stdin_closed_at is not None
+
+
 def test_real_exec_gate_starts_provider_only_after_durable_hook(tmp_path: Path) -> None:
     marker = tmp_path / "provider-started.txt"
     provider_code = (

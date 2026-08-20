@@ -464,6 +464,10 @@ def preflight_profile(
                     else DiagnosticCode.MCP_HANDSHAKE_FAILED
                 ),
                 "missing_tool_count": len(expected_tools - handshake_tools),
+                # The diagnostic code alone cannot separate a probe timeout
+                # from a bad provider exit or an unparseable reply.
+                "outcome": handshake_result.outcome.value,
+                "reason": handshake_result.reason.value,
             }
         )
 
