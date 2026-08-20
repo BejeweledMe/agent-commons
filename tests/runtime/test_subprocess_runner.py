@@ -431,6 +431,82 @@ def test_runner_closes_held_stdin_once_the_output_budget_is_exhausted(tmp_path: 
     assert process.stdin_closed_at is not None
 
 
+def test_runner_closes_held_stdin_on_the_timeout_path(tmp_path: Path) -> None:
+    # A child that never replies and never exits: the predicate cannot fire,
+    # so only the common exit path stands between the timeout and a leaked
+    # open stdin that a stdio server would wait on forever.
+    clock = Clock()
+    closed: list[bool] = []
+
+    class RecordingStdin(io.BytesIO):
+        def close(self) -> None:
+            closed.append(True)
+
+    process = FakeProcess(exit_code=None)
+    process.stdin = RecordingStdin()
+
+    def terminate(candidate: FakeProcess, *, force: bool) -> None:
+        candidate.exit_code = -9 if force else -15
+
+    runner = SubprocessRunner(
+        environment=SafeEnvironment.from_mapping({"PATH": "/usr/bin"}),
+        process_factory=lambda argv, cwd, env: process,
+        terminator=terminate,
+        monotonic=clock,
+        sleeper=clock.sleep,
+        poll_interval_seconds=0.5,
+    )
+    result = runner.run(
+        invocation(),
+        cwd=tmp_path,
+        child_session_id="session.child00000000000000000000000001",
+        timeout_seconds=1,
+        max_output_bytes=100,
+        close_stdin_when=lambda stdout: False,
+    )
+
+    assert result.outcome is RunOutcome.TIMED_OUT
+    assert result.reason is RunReason.TIMEOUT
+    assert closed == [True]
+
+
+def test_runner_closes_held_stdin_when_interrupted(tmp_path: Path) -> None:
+    closed: list[bool] = []
+
+    class RecordingStdin(io.BytesIO):
+        def close(self) -> None:
+            closed.append(True)
+
+    process = FakeProcess(exit_code=None)
+    process.stdin = RecordingStdin()
+
+    def terminate(candidate: FakeProcess, *, force: bool) -> None:
+        candidate.exit_code = -9 if force else -15
+
+    def interrupted_sleep(duration: float) -> None:
+        del duration
+        raise KeyboardInterrupt
+
+    runner = SubprocessRunner(
+        environment=SafeEnvironment.from_mapping({"PATH": "/usr/bin"}),
+        process_factory=lambda argv, cwd, env: process,
+        terminator=terminate,
+        monotonic=Clock(),
+        sleeper=interrupted_sleep,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(
+            invocation(),
+            cwd=tmp_path,
+            child_session_id="session.child00000000000000000000000001",
+            timeout_seconds=10,
+            max_output_bytes=100,
+            close_stdin_when=lambda stdout: False,
+        )
+
+    assert closed == [True]
+
+
 def test_real_exec_gate_starts_provider_only_after_durable_hook(tmp_path: Path) -> None:
     marker = tmp_path / "provider-started.txt"
     provider_code = (
