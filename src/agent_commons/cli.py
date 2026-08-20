@@ -1886,6 +1886,18 @@ def _runtime_service(
     )
 
 
+def _emit_broker_run_result(state: CLIState, result: dict[str, Any]) -> None:
+    """Keep the child-state correction visible without corrupting JSON output."""
+
+    if state.json_output:
+        state.emit(result)
+        return
+    notice = result.get("child_state_resolution")
+    if isinstance(notice, str):
+        click.echo(notice)
+    state.emit({key: value for key, value in result.items() if key != "child_state_resolution"})
+
+
 def _role_catalog_option(function: Any) -> Any:
     return click.option(
         "--role-catalog",
@@ -2075,14 +2087,13 @@ def broker_run(
 ) -> None:
     """Launch one requested delegation; no arbitrary command or prompt is accepted."""
 
-    state.emit(
-        _runtime_service(state, profile_config, telemetry, role_catalog).run(
-            delegation_id,
-            expected_revision,
-            idempotency_key=idempotency_key,
-            retry=retry,
-        )
+    result = _runtime_service(state, profile_config, telemetry, role_catalog).run(
+        delegation_id,
+        expected_revision,
+        idempotency_key=idempotency_key,
+        retry=retry,
     )
+    _emit_broker_run_result(state, result)
 
 
 @broker_group.command("reconcile")

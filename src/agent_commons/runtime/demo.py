@@ -20,7 +20,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from agent_commons.errors import CommonsError
+from agent_commons.errors import CommonsError, ConfigurationError
 from agent_commons.runtime.model import RunnerInvocation
 from agent_commons.runtime.subprocess_runner import ProcessResult, RunOutcome, RunReason
 
@@ -44,12 +44,18 @@ class DemoRunner:
         cwd: str | Path,
         child_session_id: str,
         delegation_id: str | None = None,
+        state_root: str | Path | None = None,
         timeout_seconds: int,
         max_output_bytes: int,
         cancellation: object | None = None,
         on_started: Callable[[int], None] | None = None,
     ) -> ProcessResult:
         del invocation, timeout_seconds, max_output_bytes, cancellation
+        if (
+            state_root is None
+            or Path(state_root).expanduser().resolve() != self._state_root.resolve()
+        ):
+            raise ConfigurationError("demo runner state root does not match its broker binding")
         # Signalling start lets the broker record the canonical delegation.started,
         # exactly as a real provider start would, before the child acts.
         if on_started is not None:

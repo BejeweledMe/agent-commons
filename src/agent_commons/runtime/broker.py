@@ -244,6 +244,7 @@ class LocalBroker:
             cwd=request.cwd,
             child_session_id=request.correlation.child_session_id,
             delegation_id=request.correlation.delegation_id,
+            state_root=request.state_root,
             timeout_seconds=request.child_policy.timeout_seconds,
             max_output_bytes=request.child_policy.max_output_bytes,
             cancellation=cancellation,

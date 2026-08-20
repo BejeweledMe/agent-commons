@@ -105,6 +105,7 @@ def test_runner_uses_explicit_cwd_sanitized_child_identity_and_bounded_output(
         cwd=tmp_path,
         child_session_id="session.child00000000000000000000000001",
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        state_root=tmp_path / "launching-state",
         timeout_seconds=10,
         max_output_bytes=8,
         on_started=after_durable_start,
@@ -123,6 +124,7 @@ def test_runner_uses_explicit_cwd_sanitized_child_identity_and_bounded_output(
         "PATH": "/usr/bin",
         "AGENT_COMMONS_SESSION_ID": "session.child00000000000000000000000001",
         "AGENT_COMMONS_DELEGATION_ID": "delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        "AGENT_COMMONS_STATE_ROOT": str(tmp_path / "launching-state"),
     }
 
 

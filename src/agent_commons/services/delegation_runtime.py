@@ -967,6 +967,11 @@ alone is not task acceptance.
             "delegation": dict(canonical),
             "attempt": attempt,
             "reused": result.reused,
+            "child_state_resolution": (
+                "Child state root: passed the launching workspace's resolved exact root "
+                "explicitly; ignored ambient AGENT_COMMONS_STATE_BASE and "
+                "AGENT_COMMONS_STATE_ROOT for child resolution."
+            ),
             "telemetry_failures": result.telemetry_failures,
             "workflow_diagnostic_code": workflow_code.value,
             "safe_next_actions": diagnostic_safe_next_actions(workflow_code),

@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from agent_commons.errors import LifecycleConflictError, ValidationError
+from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
 from agent_commons.runtime import (
     BuiltinProfileId,
     DiagnosticCode,
@@ -116,6 +116,77 @@ class FakeRunner:
             stderr_bytes_seen=0,
             output_truncated=False,
         )
+
+
+def test_launch_pins_child_state_when_ambient_root_belongs_to_another_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    delegation_id = delegation["entity_ref"]["id"]
+
+    foreign_repo = tmp_path / "foreign-repo"
+    foreign_repo.mkdir()
+    CommonsManager.initialize(foreign_repo, integrations=(), workspace_name="foreign")
+    foreign_state_root = tmp_path / "foreign-state"
+    CommonsManager(foreign_repo, state_root=foreign_state_root)
+    monkeypatch.setenv("AGENT_COMMONS_STATE_ROOT", str(foreign_state_root))
+
+    class StateResolvingRunner(FakeRunner):
+        resolved_state_root: Path | None = None
+        resolution_error: ConfigurationError | None = None
+
+        def run(self, invocation: Any, **values: Any) -> ProcessResult:
+            values["on_started"](7001)
+            try:
+                child = CommonsManager(
+                    manager.repo_root,
+                    session_id=values["child_session_id"],
+                    state_root=values.get("state_root"),
+                )
+            except ConfigurationError as exc:
+                self.resolution_error = exc
+                self.resolved_state_root = foreign_state_root
+            else:
+                child.sessions.require_active(values["child_session_id"])
+                self.resolved_state_root = child.paths.state_root
+            return ProcessResult(
+                outcome=RunOutcome.SUCCEEDED,
+                reason=RunReason.COMPLETED,
+                exit_code=0,
+                pid=7001,
+                duration_seconds=0.25,
+                stdout=b"",
+                stderr=b"",
+                stdout_bytes_seen=0,
+                stderr_bytes_seen=0,
+                output_truncated=False,
+            )
+
+    runner = StateResolvingRunner()
+    service = DelegationRuntimeService(
+        manager,
+        runner=runner,  # type: ignore[arg-type]
+        profiles=default_profile_registry(
+            claude_executable="/bin/echo", mcp_executable="/bin/echo"
+        ),
+    )
+
+    result = service.run(
+        delegation_id,
+        delegation["revision"],
+        idempotency_key="runtime-foreign-ambient-state-launch",
+    )
+
+    assert result["attempt"]["state"] == "succeeded"
+    assert runner.resolution_error is None
+    assert runner.resolved_state_root == manager.paths.state_root
+    notice = result["child_state_resolution"]
+    assert notice.count("\n") == 0
+    assert "launching workspace" in notice
+    assert "AGENT_COMMONS_STATE_ROOT" in notice
+    assert "AGENT_COMMONS_STATE_BASE" in notice
 
 
 class CollectingTelemetry:

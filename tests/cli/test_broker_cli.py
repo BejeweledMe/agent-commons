@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from agent_commons.cli import cli
+from agent_commons.cli import CLIState, _emit_broker_run_result, cli
 from agent_commons.runtime import (
     AttemptSpec,
     AttemptState,
@@ -30,6 +30,27 @@ def _executable(path: Path, body: str) -> Path:
     path.write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
     path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return path
+
+
+def test_human_broker_result_prints_exactly_one_child_state_notice_line(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    notice = (
+        "Child state root: passed the launching workspace root explicitly; ignored ambient "
+        "AGENT_COMMONS_STATE_BASE and AGENT_COMMONS_STATE_ROOT."
+    )
+    state = CLIState(tmp_path, None, False, None, None, "default", False)
+
+    _emit_broker_run_result(
+        state,
+        {"child_state_resolution": notice, "delegation": {"state": "succeeded"}},
+    )
+
+    output = capsys.readouterr().out
+    assert output.splitlines()[0] == notice
+    assert output.count(notice) == 1
+    assert "child_state_resolution" not in output
 
 
 def _requested_builder_delegation(

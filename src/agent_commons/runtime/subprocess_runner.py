@@ -60,7 +60,7 @@ class RunReason(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SafeEnvironment:
-    """A sanitized host environment with one broker-owned session override."""
+    """A sanitized host environment with broker-owned operational bindings."""
 
     _values: tuple[tuple[str, str], ...]
 
@@ -96,7 +96,11 @@ class SafeEnvironment:
         return cls(tuple(values.items()))
 
     def for_child_session(
-        self, child_session_id: str, *, delegation_id: str | None = None
+        self,
+        child_session_id: str,
+        *,
+        delegation_id: str | None = None,
+        state_root: str | Path | None = None,
     ) -> dict[str, str]:
         _safe_identifier("child_session_id", child_session_id)
         if delegation_id is not None:
@@ -107,6 +111,11 @@ class SafeEnvironment:
         result["AGENT_COMMONS_SESSION_ID"] = child_session_id
         if delegation_id is not None:
             result["AGENT_COMMONS_DELEGATION_ID"] = delegation_id
+        if state_root is not None:
+            # Child CLI calls must use the same already-owned exact root as the
+            # broker even if a provider or its login shell reintroduces ambient
+            # state-base/root configuration after host sanitization.
+            result["AGENT_COMMONS_STATE_ROOT"] = str(Path(state_root).expanduser().resolve())
         return result
 
 
@@ -368,6 +377,7 @@ class SubprocessRunner:
         cwd: str | Path,
         child_session_id: str,
         delegation_id: str | None = None,
+        state_root: str | Path | None = None,
         timeout_seconds: int,
         max_output_bytes: int,
         cancellation: CancellationToken | None = None,
@@ -387,7 +397,9 @@ class SubprocessRunner:
                 reason=RunReason.INVALID_WORKING_DIRECTORY,
             )
         environment = self.environment.for_child_session(
-            child_session_id, delegation_id=delegation_id
+            child_session_id,
+            delegation_id=delegation_id,
+            state_root=state_root,
         )
         try:
             # Spawn only the inert gate before canonical delegation.started.
