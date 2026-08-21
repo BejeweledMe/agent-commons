@@ -61,6 +61,7 @@ from agent_commons.runtime import (
     diagnostic_safe_next_actions,
     terminate_process_group,
 )
+from agent_commons.runtime.demo import DemoRunner, demo_tolerant_profiles
 from agent_commons.runtime.diagnostics import (
     canonical_reason_code,
     process_canonical_mismatch,
@@ -371,6 +372,15 @@ class DelegationRuntimeService:
             read_only=manager.read_only,
         )
         self.runner = runner or SubprocessRunner()
+        if isinstance(self.runner, DemoRunner):
+            # Demo mode: the bound runner never launches the invocation it is
+            # handed, so pre-start validation must not veto the run over the
+            # one thing a provider-less machine cannot supply -- a resolvable
+            # executable.  The tolerance keys on the DemoRunner binding alone
+            # (constructed only for `demo: true` operator configs); any other
+            # runner keeps the strict registry, and every non-resolution
+            # refusal still applies inside the wrapped profiles.
+            self.profiles = demo_tolerant_profiles(self.profiles)
         self.telemetry = telemetry or NoopTelemetrySink()
         self.tool_audit = tool_audit or TerminalToolAuditStore(
             manager.paths.state_root,

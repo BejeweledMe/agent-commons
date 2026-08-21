@@ -19,9 +19,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from agent_commons.errors import CommonsError, ConfigurationError
-from agent_commons.runtime.model import RunnerInvocation
+from agent_commons.runtime.model import ProfileRegistry, RunnerInvocation, RunnerProfile
 from agent_commons.runtime.subprocess_runner import ProcessResult, RunOutcome, RunReason
 
 _LOG = logging.getLogger("agent_commons.runtime.demo")
@@ -97,3 +98,53 @@ class DemoRunner:
             stderr_bytes_seen=0,
             output_truncated=False,
         )
+
+
+class _DemoTolerantProfile:
+    """One built-in profile whose unresolvable executables become placeholders.
+
+    Everything except executable resolution is the wrapped profile, untouched:
+    ``trusted_workspace`` opt-ins, the fixed independent-reviewer launch modes,
+    the exact delegation binding, purpose and budget rules, and model
+    validation all run inside the wrapped ``build_invocation`` in their normal
+    order.  Only the ``ExecutableResolutionError`` leg differs -- an executable
+    that fails trusted resolution is recorded as the inert
+    ``DEMO_UNRESOLVED_EXECUTABLE`` stand-in instead of vetoing the run.
+
+    That substitution is safe for exactly one reason: the run's bound runner is
+    the ``DemoRunner``, which discards the invocation and never starts a
+    provider, MCP, or git process.  Wrap profiles only where that runner is
+    bound.
+    """
+
+    __slots__ = ("_profile",)
+
+    def __init__(self, profile: RunnerProfile) -> None:
+        self._profile = profile
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._profile, name)
+
+    def build_invocation(self, instruction: str, **kwargs: Any) -> RunnerInvocation:
+        return self._profile.build_invocation(
+            instruction,
+            demo_unresolved_placeholder=True,
+            **kwargs,
+        )
+
+
+def demo_tolerant_profiles(profiles: ProfileRegistry) -> ProfileRegistry:
+    """Registry for a DemoRunner binding: unresolvable executables do not veto.
+
+    The returned registry answers ``get``/``profile_ids`` and every profile
+    attribute exactly like the original; only ``build_invocation`` gains the
+    placeholder leg described on ``_DemoTolerantProfile``.  Call this solely
+    where a ``DemoRunner`` is the bound runner.
+    """
+
+    return ProfileRegistry(
+        {
+            profile_id: _DemoTolerantProfile(profiles.get(profile_id))
+            for profile_id in profiles.profile_ids
+        }
+    )
