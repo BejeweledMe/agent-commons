@@ -2471,6 +2471,7 @@ const STRINGS = {
     launch_not_configured_note: "Nothing can be run yet: no runtime config is in effect, so this panel has no allowlisted program to start a run with. The config is written from the first-run screen — no restart and no terminal.",
     refusal_uninitialized: "There is no workspace in this directory yet, so there is nothing to record into. Create it from the first-run screen and this write will go through.",
     panel_already_open: "Another panel already owns this project, and only one panel may write to it at a time. Use that window, or stop it and reload this one; its address is in the refusal below.",
+    session_recovered_note: "This panel's session expired while the tab stayed open — the machine asleep, most likely — and the panel opened a replacement under the same identity. Nothing was lost: everything already recorded stays recorded, and the panel writes again as the session named here.",
   },
   ru: {
     tab_attention: "Внимание",
@@ -3108,6 +3109,7 @@ const STRINGS = {
     launch_not_configured_note: "Вести прогоны пока не с чем: файл среды выполнения не действует, поэтому у панели нет разрешённой программы, которой прогон можно поручить. Файл пишется с экрана настройки — без перезагрузки и без терминала.",
     refusal_uninitialized: "Рабочего пространства в этом каталоге ещё нет, записывать некуда. Создайте его на экране настройки, и эта запись пройдёт.",
     panel_already_open: "Этим проектом уже владеет другая панель, а писать в него одновременно может только одна. Пользуйтесь тем окном или остановите его и перезагрузите это; его адрес — в отказе ниже.",
+    session_recovered_note: "Сессия этой панели истекла, пока вкладка была открыта — скорее всего машина уснула, — и панель завела замену под той же личностью. Ничего не потеряно: всё уже записанное записанным и остаётся, а панель снова пишет как названная здесь сессия.",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -3743,8 +3745,16 @@ let showRuntime = localStorage.getItem(RUNTIME_KEY) === "1";
 // writes off there is none, and the projection's own "answers to a human" rank
 // is then the best the board has — every other CLI window opens a session too,
 // and those are machinery like any other.
+// Every session this panel has owned, newest last, as the stream reports it
+// after a TTL replacement.  It is a LINE, not a single id: an expired session
+// is still on the board and was still this operator's own window, and drawing
+// it as somebody else's machinery is the same mistake as treating the dead one
+// as the live one — just the other way round.
+let sessionLineage = [];
+
 function isOperatorSession(node) {
   if (node.kind !== "session") { return false; }
+  if (sessionLineage.indexOf(node.id) >= 0) { return true; }
   const own = metaInfo && metaInfo.writer_session_id;
   return own ? node.id === String(own) : Boolean(node.reports_to_operator);
 }
@@ -7556,9 +7566,56 @@ function handleFrame(frame) {
     loadLaunch();
     return;
   }
+  if (event === "session_expired_recovered" && data) {
+    // Deliberately without touching `lastEventId`: the frame carries no `id:`,
+    // so it takes no part in resumption and must not be able to disturb it.
+    applySessionRecovery(JSON.parse(data));
+    return;
+  }
   if (event === "resume_gap") {
     setStream("gap", "stream_gap_resume");
   }
+}
+
+// The panel's own operator session can expire while the tab stays open — a
+// laptop asleep past the TTL — and be replaced under the same identity.  The
+// tab fetched `/api/meta` exactly once, at boot, and `isOperatorSession`
+// compares node ids against the `writer_session_id` it cached there: a panel
+// that only printed a notice would go on calling the DEAD session the
+// operator's window and hide its own live one as machinery, while the chip in
+// the header showed an id that no longer exists.  So this frame is not a
+// message, it is an instruction to re-read `/api/meta`.
+//
+// It carries no event id and is re-announced on every new connection, so
+// handling it has to be idempotent: the lineage's current id is remembered and
+// a repeat of the same one does nothing at all.
+let recoveredSessionId = null;
+
+async function applySessionRecovery(payload) {
+  const current = payload && payload.writer_session_id
+    ? String(payload.writer_session_id) : "";
+  if (!current || current === recoveredSessionId) { return; }
+  recoveredSessionId = current;
+  sessionLineage = (payload.writer_session_ids || [current]).map(String);
+  try {
+    metaInfo = await api("/api/meta");
+    writesEnabled = Boolean(metaInfo.writes_enabled);
+  } catch (error) {
+    // A refused read leaves the cached id in place, and that stale id is the
+    // whole thing this frame exists to replace — so the panel says it is out
+    // of touch rather than looking recovered while it is not.
+    setStream("gap", "stream_unauthorized");
+    return;
+  }
+  paintStatus();
+  // The board is what the identity decides: which card is the operator's own
+  // window, and which sessions are held behind the runtime toggle.
+  if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
+  // Said where a confirmation is said, with the new session's id beside it
+  // rather than instead of it — an id an operator cannot copy is worse than
+  // none.  Not a green tick: nothing was accepted, a session was replaced.
+  reportResult(document.getElementById("board-result"), "",
+    t("session_recovered_note"), metaInfo.writer_session_id);
 }
 
 // --- first run ------------------------------------------------------------
