@@ -141,10 +141,14 @@ def test_read_endpoints_preserve_their_top_level_json_shapes(  # type: ignore[no
         "read_only",
         "writes_enabled",
         "writer_session_id",
+        "session_refusal",
         "server_instance_id",
         "trust_note",
         "truth_layers",
     }
+    # Present in every state and null in the ordinary one, so the tab tests it
+    # unconditionally rather than probing for a key that may not be there.
+    assert meta["session_refusal"] is None
 
     graph = client.get("/api/graph", headers=authorized()).json()
     assert set(graph) == {

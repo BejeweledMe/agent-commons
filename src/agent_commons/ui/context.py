@@ -55,6 +55,11 @@ SETUP_SUPPORT_BINARY_UNRESOLVED = "setup_support_binary_unresolved"
 #: load -- and the two must not grow into two pieces of advice for one state.
 PANEL_ALREADY_OPEN_ACTIONS = ("use the panel that already serves this project",)
 
+#: The frozen code the wave contract gives that state.  Named here rather than
+#: imported from `ui.session_owner` so this module keeps no import edge to it;
+#: the class that raises it owns the string and this is checked against it.
+PANEL_ALREADY_OPEN = "panel_already_open"
+
 #: What a preflight result means, said once.  `preflight_profile` checks fixed
 #: argv and MCP startup and carries no credential at all, so a signed-out
 #: provider and a working one are indistinguishable to it
@@ -89,6 +94,39 @@ def _elapsed_seconds(started_at: Any, ended_at: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return elapsed if elapsed >= 0 else None
+
+
+def _session_refusal_view(refusal: ConfigurationError | None) -> dict[str, Any] | None:
+    """How `/api/meta` reports a refusal it survived, or None when there is one.
+
+    Only a refusal carrying one of the wave's frozen codes is reported: the
+    frontend draws by code, and a refusal with no code is something it could
+    only render as raw text.  The uncoded ones all mean "this directory is not
+    set up yet", and `GET /api/setup` answers that question properly, so
+    silence here sends the tab to the surface that can actually explain it.
+
+    ``address`` is the one field the operator needs and cannot derive: which
+    window is the live one.  It is host and port and deliberately not a URL --
+    each panel's bearer token lives only in its own tab's fragment, so a link
+    built here would open a page that cannot authorize itself and would look
+    broken rather than occupied.
+    """
+
+    code = getattr(refusal, "code", None)
+    if refusal is None or not code:
+        return None
+    details = getattr(refusal, "details", None)
+    port = details.get("port") if isinstance(details, Mapping) else None
+    return {
+        "code": str(code),
+        "message": str(refusal),
+        "address": (
+            f"127.0.0.1:{port}" if isinstance(port, int) and not isinstance(port, bool) else None
+        ),
+        "safe_next_actions": (
+            list(PANEL_ALREADY_OPEN_ACTIONS) if str(code) == PANEL_ALREADY_OPEN else []
+        ),
+    }
 
 
 def _session_state(session: Any) -> str:
@@ -691,22 +729,57 @@ class UIContext:
     def fingerprint(self) -> str:
         return ledger_fingerprint(self.paths())
 
+    def _workspace_id(self) -> str | None:
+        """This project's workspace id, or None when there is no workspace yet.
+
+        Never raises.  A panel is now expected to serve a directory that is not
+        a workspace at all -- that is the whole first-run screen -- and the tab
+        fetches `/api/meta` before anything else, so an exception here is a tab
+        that never loads and an operator with no way in but the terminal.
+        Which state this actually is remains `GET /api/setup`'s question; the
+        honest answer here is that there is no id to report.
+        """
+
+        try:
+            return str(self.manager().workspace_id)
+        except (CommonsError, OSError) as exc:
+            _LOG.debug("no workspace to report on this panel yet: %s", exc)
+            return None
+
     def meta(self) -> dict[str, Any]:
+        """Boot facts for a tab, answerable in every state the panel can be in.
+
+        This is the first request a tab makes and the tab renders nothing until
+        it returns, so it must not fail for anything the panel is designed to
+        survive.  Two such states used to raise straight out of here into a
+        500: a directory with no workspace yet, and a panel that lost the
+        deferred singleness race, whose session read raises
+        ``PanelAlreadyOpenError``.  The second one is the worse of the two --
+        the operator's second window would go blank with no way to learn that
+        the first window is the live one, or where it is.
+
+        Both are now reported rather than raised.  A refusal that carries a
+        frozen code travels in ``session_refusal``; one that does not is left
+        as an absence, because inventing a verdict here would put a second
+        first-run state machine beside `GET /api/setup`, which owns that
+        question.
+        """
+
         from agent_commons import __version__
         from agent_commons.ui import META_SCHEMA, TRUST_NOTE, TRUTH_LAYERS
 
-        manager = self.manager()
-        # One look at the session, three fields derived from it: read twice and
+        # One look at the session, four fields derived from it: read twice and
         # a panel could be told it is writable and given no id to write as.
-        session_id = self.writer_session_id
+        session_id, refusal = self.session_or_refusal()
         return {
             "schema": META_SCHEMA,
             "agent_commons_version": __version__,
-            "workspace_id": manager.workspace_id,
+            "workspace_id": self._workspace_id(),
             "repo": str(self.repo),
             "read_only": session_id is None,
             "writes_enabled": session_id is not None,
             "writer_session_id": session_id,
+            "session_refusal": _session_refusal_view(refusal),
             "server_instance_id": self.server_instance_id,
             "trust_note": TRUST_NOTE,
             "truth_layers": list(TRUTH_LAYERS),

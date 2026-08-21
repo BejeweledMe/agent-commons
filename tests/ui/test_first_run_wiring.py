@@ -24,7 +24,11 @@ import pytest
 import agent_commons.ui.setup as setup
 from agent_commons.runtime.model import ExecutableResolutionError, ExecutableRole
 from agent_commons.services import CommonsManager
-from agent_commons.ui.context import SETUP_SUPPORT_BINARY_UNRESOLVED, UIContext
+from agent_commons.ui.context import (
+    PANEL_ALREADY_OPEN_ACTIONS,
+    SETUP_SUPPORT_BINARY_UNRESOLVED,
+    UIContext,
+)
 from agent_commons.ui.server import CATALOG_ROUTES, SETUP_ROUTES, create_app
 from tests.ui.conftest import (
     OPERATOR_SURFACE,
@@ -209,6 +213,99 @@ def test_a_panel_that_lost_the_singleness_race_refuses_by_its_own_name(
     finally:
         second.shutdown()
         first.shutdown()
+
+
+def test_the_losing_panel_still_boots_and_meta_says_who_owns_the_project(
+    tmp_path: Path,
+) -> None:
+    """The refusal has to survive a GET, not only a write.
+
+    `/api/meta` is the first request a tab makes and it renders nothing until
+    that returns.  Reading the session directly meant the losing panel's very
+    first request raised `PanelAlreadyOpenError` into a 500: the second window
+    went blank, with no screen able to say that the first window is the live
+    one or where it is -- the terminal was the only way to find out, which is
+    the exact thing this wave removes.
+
+    So it answers 200, reports itself as recording nothing, and names the
+    refusal by its frozen code with the first panel's address beside it.
+    """
+
+    import subprocess
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    state_root = tmp_path / "state"
+    first = ProjectSessionOwner(repo, state_root=state_root)
+    first.acquire_panel_lock(4321)
+    second = ProjectSessionOwner(repo, state_root=state_root)
+    second.acquire_panel_lock(9999)
+    CommonsManager.initialize(repo, integrations=())
+    first.ensure_active()  # resolving the workspace takes the deferred lock
+    context = UIContext(repo, state_root=state_root, session_owner=second)
+    try:
+        with _client(context) as client:
+            response = client.get("/api/meta", headers=authorized())
+        assert response.status_code == 200, response.text
+        meta = response.json()
+        assert meta["writes_enabled"] is False
+        assert meta["read_only"] is True
+        assert meta["writer_session_id"] is None
+        refusal = meta["session_refusal"]
+        assert refusal["code"] == "panel_already_open"
+        assert refusal["address"] == "127.0.0.1:4321"
+        assert "127.0.0.1:4321" in refusal["message"]
+        assert refusal["safe_next_actions"] == list(PANEL_ALREADY_OPEN_ACTIONS)
+        # The workspace exists here, so the losing panel still reports it: this
+        # is an occupied project, not an unconfigured one, and nothing in the
+        # answer may point the operator at the first-run screen.
+        assert meta["workspace_id"]
+        assert "setup_uninitialized" not in str(meta)
+    finally:
+        second.shutdown()
+        first.shutdown()
+
+
+def test_meta_answers_on_a_repository_that_has_no_workspace_yet(tmp_path: Path) -> None:
+    """The same defect, on the wave's headline scenario.
+
+    `agent-commons ui` in a bare git repository is the whole promise, and the
+    tab that opens on it fetched `/api/meta` first.  Building the manager to
+    read a workspace id raised out of the handler, so the panel that was
+    supposed to offer first run served a 500 to its own boot request instead.
+
+    There is no id to report and no frozen code to carry -- which state this
+    is remains `GET /api/setup`'s question, and inventing a verdict here would
+    put a second first-run state machine beside it.  So: 200, a null id, and a
+    null refusal, and the tab goes on to ask the surface that knows.
+    """
+
+    import subprocess
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    owner = ProjectSessionOwner(repo, state_root=tmp_path / "state")
+    context = UIContext(repo, state_root=tmp_path / "state", session_owner=owner)
+    try:
+        with _client(context) as client:
+            response = client.get("/api/meta", headers=authorized())
+            state = client.get("/api/setup", headers=authorized())
+        assert response.status_code == 200, response.text
+        meta = response.json()
+        assert meta["workspace_id"] is None
+        assert meta["session_refusal"] is None
+        assert meta["writes_enabled"] is False
+        assert meta["repo"] == str(repo)
+        # And the surface that owns the question still answers it.
+        assert state.json()["state"] == setup.SETUP_UNINITIALIZED
+    finally:
+        owner.shutdown()
 
 
 def test_the_reading_half_of_setup_is_in_no_tuple_and_answers_read_only(
