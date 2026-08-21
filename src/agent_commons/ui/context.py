@@ -490,6 +490,12 @@ class UIContext:
         state = setup.setup_state(self.repo, profile_config=self._profile_config)
         status: dict[str, Any] = {
             "state": state,
+            # Whether this panel can act on the state at all.  On `--read-only`
+            # none of the setup routes exist, and this route is the only one
+            # the first-run screen is guaranteed to reach -- `/api/meta` says
+            # nothing before a workspace exists -- so without this bit the
+            # screen would offer buttons whose routes answer 404.
+            "operator_panel": self.operator_panel,
             "launch_enabled": self.launch_enabled,
             "catalog_editing_enabled": self.catalog_editing_enabled,
         }

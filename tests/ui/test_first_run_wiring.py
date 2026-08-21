@@ -424,6 +424,10 @@ def test_the_reading_half_of_setup_is_in_no_tuple_and_answers_read_only(
         response = client.get("/api/setup", headers=authorized())
     assert response.status_code == 200
     assert response.json()["state"] == setup.SETUP_UNCONFIGURED
+    # On `--read-only` no setup route is registered, and this is the only
+    # answer the first-run screen gets before a workspace exists -- so it has
+    # to say the panel cannot act, or the screen offers buttons that 404.
+    assert response.json()["operator_panel"] is False
 
 
 # -- the state the screen renders ---------------------------------------------
@@ -437,6 +441,7 @@ def test_an_unconfigured_panel_names_the_state_the_binaries_and_the_target(
         body = client.get("/api/setup", headers=authorized()).json()
 
     assert body["state"] == setup.SETUP_UNCONFIGURED
+    assert body["operator_panel"] is True
     assert body["launch_enabled"] is False
     assert body["blocking_refusal"] is None
     assert body["providers_found"] == ["claude", "codex"]
@@ -732,7 +737,7 @@ def test_a_configured_panel_hands_out_no_path_at_all(
 
     assert body["state"] == setup.SETUP_CONFIGURED
     assert body["launch_enabled"] is True
-    assert set(body) == {"state", "launch_enabled", "catalog_editing_enabled"}
+    assert set(body) == {"state", "operator_panel", "launch_enabled", "catalog_editing_enabled"}
     for payload in (body, written.json()):
         for value in _strings(payload):
             assert os.sep not in value, value
