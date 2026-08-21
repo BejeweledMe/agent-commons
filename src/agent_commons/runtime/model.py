@@ -291,6 +291,26 @@ def _safe_optional_identifier(name: str, value: object) -> str | None:
     return _safe_identifier(name, str(value))
 
 
+def validate_model_name(value: object) -> str | None:
+    """The one check a model name passes, wherever a model is chosen.
+
+    Exported because a model is no longer only an operator-config field: it can
+    now be picked when a role is hired, and a bad pick must be refused *at that
+    form* rather than an hour later from inside a launch, where the operator
+    has neither the field nor the context to fix it.
+
+    It is literally the check both runner profiles run in ``__post_init__``, so
+    a name accepted here is one ``dataclasses.replace(profile, model=...)``
+    will accept too -- there is one rule and no second opinion of it.  What the
+    rule buys is stated plainly: the pattern requires an alphanumeric first
+    character, so a leading ``-`` is not a model name, and nothing chosen on
+    this path can arrive at a provider as a flag.  ``None`` passes through, and
+    means the profile's own model stands.
+    """
+
+    return _safe_optional_identifier("model", value)
+
+
 def _safe_executable(value: object) -> str:
     if not isinstance(value, str) or not value or len(value) > 1024:
         raise ConfigurationError("profile executable must be a non-empty string")

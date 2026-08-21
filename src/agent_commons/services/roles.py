@@ -23,6 +23,29 @@ from agent_commons.errors import LifecycleConflictError
 from ._validation import _optional_list
 
 
+def role_model(record: Mapping[str, Any] | None) -> str | None:
+    """The model a role was hired on, or None when its profile decides.
+
+    One reader beside the one writer below, because the field lives in a
+    free-form object: everything that consumes it -- the launch that puts it in
+    a provider's argv, the catalogue that offers it again, a preset that passes
+    it on -- must agree on where it is and on what a malformed value means.
+
+    A record is replayed from a file this process may not have written, so this
+    never raises and never trusts: anything that is not a plain string under
+    ``extensions.model`` reads as absent, and the profile's own model stands.
+    Callers still validate before use; this only refuses to guess.
+    """
+
+    if not isinstance(record, Mapping):
+        return None
+    extensions = record.get("extensions")
+    if not isinstance(extensions, Mapping):
+        return None
+    model = extensions.get("model")
+    return model if isinstance(model, str) and model else None
+
+
 class RoleCommands:
     """Commands for standing roles and their temporary links."""
 
@@ -78,11 +101,26 @@ class RoleCommands:
         tool_allowlist: Sequence[str] = (),
         turnover_budget: int | None = None,
         template: bool = False,
+        model: str | None = None,
         created_by_agent_id: str | None = None,
         approval: str | None = None,
         proposal_ref: Mapping[str, str] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        """Record a standing role.
+
+        ``model`` is the one thing here that is chosen once and never again: a
+        different model needs the role's whole context recomputed for it, so
+        changing it on a hired role is not offered and `reconfigure_agent` has
+        no field for it.  Absent, the role runs whatever its profile names.
+
+        It is stored under ``payload.extensions`` -- the free-form object the
+        payload schema already carries -- and not as a new top-level field.  A
+        model is operator preference on top of a profile, not a fifth thing the
+        domain reasons about: no rule reads it, no state depends on it, and
+        recorded events keep the shape they have always had.
+        """
+
         key = self._idempotency_key("agent.created", idempotency_key)
         agent_id = self._new_entity_id("agent", "agent.created", key)
         snapshot = self.snapshot()
@@ -116,6 +154,17 @@ class RoleCommands:
             "turnover_budget": turnover_budget,
             "template": bool(template),
         }
+        if model is not None:
+            # Imported where it is used, not at module scope: the canonical
+            # layer owes the optional runtime package no import edge, and a
+            # model name is the one thing here that has anything to do with it.
+            from agent_commons.runtime.model import validate_model_name
+
+            # Validated here as well as at every caller: this is the last point
+            # before the value becomes an immutable canonical event, and an
+            # unsafe name recorded once would be replayed into a provider's
+            # argv on every launch of this role afterwards.
+            payload["extensions"] = {"model": validate_model_name(model)}
         if proposal_ref is not None:
             payload["proposal_ref"] = normalize_ref(proposal_ref)
         for field_name, values in (

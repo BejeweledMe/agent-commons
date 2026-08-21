@@ -504,6 +504,10 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             skills=tuple(body.get("skills") or ()),
             tool_allowlist=tuple(body.get("tool_allowlist") or ()),
             template=bool(body.get("template", False)),
+            # The one moment a model is chosen. Absent, empty, or whitespace
+            # means the profile's model stands; a hired role never changes it,
+            # so `reconfigure` below has no such field and will not get one.
+            model=body.get("model"),
             created_by_agent_id=body.get("created_by_agent_id"),
             from_preset_id=body.get("from_preset_id"),
             idempotency_key=body.get("idempotency_key"),

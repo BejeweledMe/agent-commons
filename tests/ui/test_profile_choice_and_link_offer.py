@@ -241,25 +241,56 @@ def test_the_option_carries_its_gloss_and_the_long_one_keeps_its_surface() -> No
     assert "{model}" in _value(russian, "hire_profile_model")
 
 
-def test_the_panel_offers_no_model_control_and_no_reasoning_control() -> None:
-    """The refusal, pinned.  A reasoning level is not a field of either runner
-    profile, and the model belongs to a config the panel may not write -- so
-    neither gets a control, in the hire form or anywhere else."""
+def test_a_model_is_chosen_only_at_hire_and_no_reasoning_control_exists() -> None:
+    """The refusal, pinned, and narrowed to what is actually refused.
+
+    A reasoning level is not a field of either runner profile, so no control
+    anywhere may claim to set one -- that half is unchanged and unconditional.
+
+    The model half moved.  It is now chosen once, when a role is hired, and
+    never again: the role's accumulated context is built for the model that
+    built it, so a hired role cannot be moved to another one.  The gear panel
+    therefore still has no model field -- it edits skills, the system prompt,
+    the reachable MCP servers, and the role's autonomy -- and neither does any
+    other surface.  The hire form is the single exception, and the ban is
+    narrowed to say exactly that rather than being dropped.
+
+    What is *not* narrowed is the guarantee this test exists for: the panel
+    still names no model of its own.  Every name it can offer arrives from
+    `GET /api/catalog`; the asset-wide ban on model names is pinned next door
+    in `test_an_option_never_names_a_model_the_server_did_not`.
+    """
 
     body = read_spa()
+    modal = _hire_modal(body)
+    hire_controls = set(re.findall(r'<(?:select|input)[^>]*id="([a-z0-9_-]+)"', modal))
     for element in re.findall(r'<(?:select|input)[^>]*id="([a-z0-9_-]+)"', body):
         # `task-reopen-reason` is a person's sentence about a decision, not a
         # setting on a process, so the word itself is not what is forbidden --
         # a control that claims to set how hard a role thinks is.
-        for forbidden in ("model", "reasoning", "effort", "thinking"):
+        for forbidden in ("reasoning", "effort", "thinking"):
             assert forbidden not in element, element
-    assert "ризонинг" not in _hire_modal(body).lower()
+        if "model" in element:
+            assert element in hire_controls, element
+    assert "ризонинг" not in modal.lower()
 
-    # Nothing about a model goes onto the wire either: the hire's payload names
-    # a profile and the profile decides the rest.
+    # And whatever the hire sends, it invents no name: the list comes from the
+    # server, and a model the operator did not pick leaves the field empty so
+    # the profile's own model stands.
     hire = _function(body, "async function hireRole() {")
-    assert "model" not in hire
+    for invented in ("opus", "sonnet", "haiku", "gpt-", "o3", "fable"):
+        assert invented not in hire.lower(), invented
     assert 'body.profile_id = document.getElementById("hire-profile").value;' in hire
+
+    # The gear panel, named rather than merely covered by the sweep above: it
+    # is where an operator would look for this, and it is the surface the
+    # decision explicitly excludes.  A role's model is reported there and not
+    # edited, so `settings-model` may exist -- as text, never as a control.
+    settings = re.findall(r'<(?:select|input)[^>]*id="(settings?-[a-z0-9_-]+)"', body)
+    assert settings, "the settings controls moved; this check would silently pass"
+    for element in settings:
+        assert "model" not in element, element
+    assert '<p class="note" id="settings-model">' in body
 
     # The one line under the picker says where the answer is edited instead, and
     # the mark beside it opens the paragraph that says why there are four.

@@ -59,6 +59,7 @@ from .model import (
     RunnerProfile,
     default_profile_registry,
     resolve_trusted_executable,
+    validate_model_name,
 )
 from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
 from .preflight import preflight_profile
@@ -160,4 +161,5 @@ __all__ = [
     "error_safe_next_actions",
     "preflight_profile",
     "resolve_trusted_executable",
+    "validate_model_name",
 ]

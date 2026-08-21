@@ -27,8 +27,9 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.runtime.model import profile_tool_summary
+from agent_commons.runtime.model import profile_tool_summary, validate_model_name
 from agent_commons.services.manager import CommonsManager
+from agent_commons.services.roles import role_model
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
 
@@ -1277,7 +1278,22 @@ class UIContext:
                     )
 
     def create_agent(self, *, from_preset_id: str | None = None, **fields: Any) -> dict[str, Any]:
+        """Hire a role, once, with the model it will run on for its whole life.
+
+        The model is chosen here and nowhere else.  A role's accumulated
+        context is built for the model that built it, so moving a hired role to
+        another one would need that context recomputed -- the gear panel
+        therefore has no model field and is not going to grow one; it edits
+        skills, the system prompt, the reachable MCP servers, and how much the
+        role decides on its own.
+
+        Empty means the profile's model stands, which is why blank is
+        normalized to absent rather than refused: an untouched free-text box
+        must mean "you choose", not "run a role named ''".
+        """
+
         manager = self.writer()
+        fields["model"] = self._chosen_model(fields.get("model"))
         if from_preset_id:
             preset = manager.get_agent(from_preset_id)
             if not preset.get("template"):
@@ -1288,10 +1304,30 @@ class UIContext:
             for key in ("skills", "tool_allowlist"):
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
+            if fields["model"] is None:
+                # A preset that was saved with a model is a preset whose whole
+                # point includes it; hiring from it and silently getting the
+                # profile's model instead would be the template not applying.
+                fields["model"] = role_model(preset)
         self._check_role_selection(
             fields.get("profile_id"), fields.get("skills"), fields.get("tool_allowlist")
         )
         return manager.create_agent(**fields)
+
+    @staticmethod
+    def _chosen_model(value: Any) -> str | None:
+        """The model this hire names, refused here rather than at launch.
+
+        The runtime validates it again when the profile is replaced, and
+        `create_agent` validates it once more before it becomes an immutable
+        event -- but neither of those refusals reaches the person who typed it.
+        This one lands on the form, while the field is still on screen.
+        """
+
+        if value is None:
+            return None
+        text = str(value).strip()
+        return validate_model_name(text) if text else None
 
     # -- launch (MUST-4) ------------------------------------------------------
 
