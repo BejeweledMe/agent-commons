@@ -11,6 +11,7 @@ not, and outside demo mode nothing changes at all.
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any
 
@@ -309,6 +310,70 @@ def test_demo_relief_sits_below_config_validation(tmp_path: Path) -> None:
                 }
             }
         )
+
+
+def test_model_replacement_keeps_a_demo_profile_demo_tolerant(tmp_path: Path) -> None:
+    """The hire path selects a model with ``dataclasses.replace(profile,
+    model=...)``.  A demo-tolerant profile must be a real dataclass so that
+    call succeeds at all, and the replaced profile must come back still
+    demo-tolerant -- otherwise model selection and demo mode are mutually
+    exclusive, and the strictness returns silently only on the replaced
+    copy."""
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    profiles = demo_tolerant_profiles(_unresolvable_profiles())
+
+    replaced = dataclasses.replace(profiles.get("claude-builder"), model="claude-opus-4")
+    assert replaced.model == "claude-opus-4"
+    invocation = replaced.build_invocation(
+        "do the work",
+        workspace_root=repo,
+        delegation_id="delegation-0001",
+    )
+    assert DEMO_UNRESOLVED_EXECUTABLE in " ".join(invocation.argv)
+
+    # Replacing back to no model keeps working too: reconstruction happens
+    # through the tolerant class, not the strict base.
+    again = dataclasses.replace(replaced, model=None)
+    assert type(again) is type(profiles.get("claude-builder"))
+
+
+def test_every_non_resolution_refusal_survives_a_model_replacement(tmp_path: Path) -> None:
+    """Demo tolerance forgives exactly ``ExecutableResolutionError``; after a
+    ``dataclasses.replace`` the replaced profile still refuses everything else
+    ``build_invocation`` refuses -- the delegation binding, the budget rule,
+    the ``trusted_workspace`` opt-in, and config validation itself."""
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    profiles = demo_tolerant_profiles(_unresolvable_profiles())
+
+    codex = dataclasses.replace(profiles.get("codex-builder"), model="gpt-5-codex")
+    with pytest.raises(ConfigurationError, match="exact delegation binding"):
+        codex.build_invocation("do the work", workspace_root=repo)
+    with pytest.raises(ConfigurationError, match="cannot enforce a monetary launch budget"):
+        codex.build_invocation(
+            "do the work",
+            workspace_root=repo,
+            delegation_id="delegation-0001",
+            max_budget_microusd=1_000,
+        )
+
+    untrusted = dataclasses.replace(
+        profiles.get("claude-builder"), model="claude-opus-4", trusted_workspace=False
+    )
+    with pytest.raises(ConfigurationError, match="trusted_workspace"):
+        untrusted.build_invocation(
+            "do the work",
+            workspace_root=repo,
+            delegation_id="delegation-0001",
+        )
+
+    # __post_init__ re-runs on reconstruction, so an invalid replacement value
+    # is refused at replace time exactly as the strict config parser would.
+    with pytest.raises(ValidationError, match="model"):
+        dataclasses.replace(profiles.get("claude-builder"), model="-not-a-model")
 
 
 def test_placeholder_fills_only_the_unresolvable_leg(tmp_path: Path) -> None:

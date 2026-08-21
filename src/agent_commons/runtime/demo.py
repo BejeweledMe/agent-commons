@@ -16,6 +16,7 @@ letting a demo invent a verdict.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -100,15 +101,31 @@ class DemoRunner:
         )
 
 
-class _DemoTolerantProfile:
-    """One built-in profile whose unresolvable executables become placeholders.
+#: Cache of the demo-tolerant subclass per concrete profile class, so every
+#: registry wrap and every ``dataclasses.replace`` reconstruction reuses one
+#: class identity instead of minting a new type per instance.
+_TOLERANT_TYPES: dict[type, type] = {}
 
-    Everything except executable resolution is the wrapped profile, untouched:
+
+def _demo_tolerant_type(base: type) -> type:
+    """A subclass of ``base`` whose ``build_invocation`` opts into placeholders.
+
+    A subclass -- not a ``__getattr__`` wrapper -- because the profiles must
+    stay real dataclasses: ``dataclasses.replace`` requires
+    ``__dataclass_fields__`` on the *class*, and the hire path swaps a model
+    with ``replace(profile, model=...)``.  A wrapper satisfies every attribute
+    read yet raises ``TypeError`` the moment ``replace`` runs, which would make
+    model selection and demo mode mutually exclusive.  ``replace`` also
+    reconstructs through ``obj.__class__``, so with a subclass the replaced
+    profile comes back demo-tolerant instead of silently strict.
+
+    Everything except executable resolution is the base profile, untouched:
     ``trusted_workspace`` opt-ins, the fixed independent-reviewer launch modes,
     the exact delegation binding, purpose and budget rules, and model
-    validation all run inside the wrapped ``build_invocation`` in their normal
-    order.  Only the ``ExecutableResolutionError`` leg differs -- an executable
-    that fails trusted resolution is recorded as the inert
+    validation all run inside the inherited ``build_invocation`` in their
+    normal order (``__post_init__`` re-validates on every reconstruction).
+    Only the ``ExecutableResolutionError`` leg differs -- an executable that
+    fails trusted resolution is recorded as the inert
     ``DEMO_UNRESOLVED_EXECUTABLE`` stand-in instead of vetoing the run.
 
     That substitution is safe for exactly one reason: the run's bound runner is
@@ -117,34 +134,56 @@ class _DemoTolerantProfile:
     bound.
     """
 
-    __slots__ = ("_profile",)
+    cached = _TOLERANT_TYPES.get(base)
+    if cached is not None:
+        return cached
 
-    def __init__(self, profile: RunnerProfile) -> None:
-        self._profile = profile
+    def build_invocation(self: Any, instruction: str, **kwargs: Any) -> RunnerInvocation:
+        kwargs["demo_unresolved_placeholder"] = True
+        return base.build_invocation(self, instruction, **kwargs)
 
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._profile, name)
+    tolerant = type(
+        f"DemoTolerant{base.__name__}",
+        (base,),
+        {
+            "__slots__": (),
+            "__module__": __name__,
+            "build_invocation": build_invocation,
+            "_demo_tolerant": True,
+        },
+    )
+    _TOLERANT_TYPES[base] = tolerant
+    return tolerant
 
-    def build_invocation(self, instruction: str, **kwargs: Any) -> RunnerInvocation:
-        return self._profile.build_invocation(
-            instruction,
-            demo_unresolved_placeholder=True,
-            **kwargs,
-        )
+
+def _demo_tolerant_profile(profile: RunnerProfile) -> RunnerProfile:
+    if getattr(type(profile), "_demo_tolerant", False):
+        return profile
+    if not dataclasses.is_dataclass(profile) or isinstance(profile, type):
+        raise ConfigurationError("demo mode requires dataclass runner profiles")
+    tolerant = _demo_tolerant_type(type(profile))
+    values = {
+        field.name: getattr(profile, field.name)
+        for field in dataclasses.fields(profile)
+        if field.init
+    }
+    return tolerant(**values)
 
 
 def demo_tolerant_profiles(profiles: ProfileRegistry) -> ProfileRegistry:
     """Registry for a DemoRunner binding: unresolvable executables do not veto.
 
     The returned registry answers ``get``/``profile_ids`` and every profile
-    attribute exactly like the original; only ``build_invocation`` gains the
-    placeholder leg described on ``_DemoTolerantProfile``.  Call this solely
-    where a ``DemoRunner`` is the bound runner.
+    attribute exactly like the original, and its profiles remain dataclasses
+    that survive ``dataclasses.replace`` demo-tolerant; only
+    ``build_invocation`` gains the placeholder leg described on
+    ``_demo_tolerant_type``.  Call this solely where a ``DemoRunner`` is the
+    bound runner.
     """
 
     return ProfileRegistry(
         {
-            profile_id: _DemoTolerantProfile(profiles.get(profile_id))
+            profile_id: _demo_tolerant_profile(profiles.get(profile_id))
             for profile_id in profiles.profile_ids
         }
     )
