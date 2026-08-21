@@ -619,10 +619,27 @@ class UIContext:
         requiring nothing resolvable is this operation's single purpose, and
         the machine it exists for is exactly the one `setup_no_provider_found`
         stops everywhere else.
+
+        A configured environment refuses this write outright.  The route is
+        registered for the panel's whole life while the first-run screen only
+        offers it before setup, so without the refusal a bare authorized POST
+        would silently replace the operator's working `runtime.yaml` -- a file
+        this product did not write and has no business destroying.  The demo
+        config is an exit from the unconfigured states, never an overwrite of
+        a config the loader already accepted.
         """
 
         from agent_commons.ui import setup
 
+        if setup.setup_state(self.repo, profile_config=self._profile_config) == (
+            setup.SETUP_CONFIGURED
+        ):
+            raise setup.SetupError(
+                setup.SETUP_CONFIGURED,
+                "this environment already has a working runtime config; the demo "
+                "write is an exit from the unconfigured states and will not "
+                "replace the operator's own file",
+            )
         written = setup.generate_demo_runtime_config(
             self.repo,
             state_root=self._state_root,

@@ -686,6 +686,35 @@ def test_the_demo_route_closes_the_whole_loop_with_no_resolvable_binary(
     assert (tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml").is_file()
 
 
+def test_the_demo_write_refuses_to_replace_a_working_operator_config(
+    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
+) -> None:
+    """The demo route is registered for the panel's whole life; the button is not.
+
+    The first-run screen hides demo once the environment is configured, but a
+    bare authorized POST reaches the route regardless -- and it used to answer
+    200 and replace the operator's working `runtime.yaml` wholesale, marker
+    gone, no backup.  The refusal has to come from the handler, typed with the
+    state it refuses on, and the file has to still be byte-identical afterwards.
+    """
+
+    context = _writing(workspace, window="first-run-demoguard-w1")
+    with _client(context) as client:
+        written = client.post("/api/setup/runtime-config", headers=authorized())
+        assert written.status_code == 200, written.text
+        config = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
+        # An operator's own touch: still valid YAML, so the loader keeps
+        # accepting the file and the environment stays `setup_configured`.
+        marked = config.read_bytes() + b"# the operator wrote this line by hand\n"
+        config.write_bytes(marked)
+
+        refused = client.post("/api/setup/demo-config", headers=authorized())
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == setup.SETUP_CONFIGURED
+    assert config.read_bytes() == marked
+
+
 def test_adoption_drops_the_profile_summary_cached_before_the_config_existed(
     workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
