@@ -54,6 +54,7 @@ from agent_commons.operator_files import (
     replace_operator_file,
 )
 from agent_commons.runtime.model import (
+    DEMO_UNRESOLVED_EXECUTABLE,
     ClaudePermissionMode,
     CodexApprovalPolicy,
     CodexSandbox,
@@ -375,6 +376,53 @@ def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
     return profiles
 
 
+def _demo_profile_bodies() -> dict[str, dict[str, Any]]:
+    """All four fixed profiles over inert placeholder executables.
+
+    The demo config consults no discovery and records no real path: the
+    DemoRunner never launches the processes these fields would name, and a
+    constant file tells no bearer of the panel token anything about the
+    operator's machine.  The placeholder cannot resolve -- that is its point:
+    a config later hand-edited from ``demo: true`` to ``demo: false`` gains
+    no launchable capability by accident, because outside demo tolerance the
+    same profiles refuse to build.  The launch modes stay exactly the fixed,
+    never-UI-selectable modes of the real generator, so demo mode exercises
+    the same policy surface it demonstrates.
+    """
+
+    shared = {
+        "mcp_executable": DEMO_UNRESOLVED_EXECUTABLE,
+        "git_executable": DEMO_UNRESOLVED_EXECUTABLE,
+    }
+    return {
+        "codex-builder": {
+            "executable": DEMO_UNRESOLVED_EXECUTABLE,
+            **shared,
+            "sandbox": CodexSandbox.WORKSPACE_WRITE.value,
+            "approval_policy": CodexApprovalPolicy.NEVER.value,
+            "trusted_workspace": True,
+        },
+        "codex-independent-reviewer": {
+            "executable": DEMO_UNRESOLVED_EXECUTABLE,
+            **shared,
+            "sandbox": CodexSandbox.READ_ONLY.value,
+            "approval_policy": CodexApprovalPolicy.NEVER.value,
+            "trusted_workspace": True,
+        },
+        "claude-builder": {
+            "executable": DEMO_UNRESOLVED_EXECUTABLE,
+            **shared,
+            "permission_mode": ClaudePermissionMode.ACCEPT_EDITS.value,
+            "trusted_workspace": True,
+        },
+        "claude-independent-reviewer": {
+            "executable": DEMO_UNRESOLVED_EXECUTABLE,
+            **shared,
+            "permission_mode": ClaudePermissionMode.DONT_ASK.value,
+        },
+    }
+
+
 def _assert_safe_placement(
     target: Path,
     directory: Path,
@@ -447,6 +495,73 @@ def generate_runtime_config(
                 + (f" ({reasons})" if reasons else "")
             )
 
+    written = _write_and_prove(
+        root,
+        config_directory=config_directory,
+        profiles=_profile_bodies(found),
+        demo=False,
+        state_root=state_root,
+        state_base=state_base,
+    )
+    return {
+        **written,
+        "providers_found": list(found.providers_found),
+        "providers_missing": list(found.providers_missing),
+    }
+
+
+def generate_demo_runtime_config(
+    repo: str | Path,
+    *,
+    state_root: str | Path | None = None,
+    state_base: str | Path | None = None,
+    config_directory: str | Path | None = None,
+) -> dict[str, Any]:
+    """Write a ``demo: true`` config that requires no resolvable provider.
+
+    This is the named separate operation behind ``POST /api/setup/demo-config``:
+    demo is its own route, never a parameter on the real generator, so the
+    security property "no setup route accepts a parameter" stays true whole.
+    Requiring nothing resolvable is its entire point -- a machine on which
+    ``setup_no_provider_found`` blocks the real generator is exactly the
+    machine this one exists for -- so no discovery is consulted at all, and
+    the written file is a constant modulo the catalogue path.  Placement, the
+    ownership refusals, the private modes, the catalogue seeded beside it,
+    and the loader read-back are the same shared discipline as the real
+    generator; only the profile bodies and the ``demo`` flag differ.
+    """
+
+    root = Path(repo).expanduser().resolve()
+    written = _write_and_prove(
+        root,
+        config_directory=config_directory,
+        profiles=_demo_profile_bodies(),
+        demo=True,
+        state_root=state_root,
+        state_base=state_base,
+    )
+    return {**written, "demo": True}
+
+
+def _write_and_prove(
+    root: Path,
+    *,
+    config_directory: str | Path | None,
+    profiles: dict[str, dict[str, Any]],
+    demo: bool,
+    state_root: str | Path | None,
+    state_base: str | Path | None,
+) -> dict[str, Any]:
+    """The shared write discipline both generators go through, unbranched.
+
+    Placement refusals in their fixed order, the post-mkdir descriptor
+    tightening, the atomic 0600 replace, the seeded catalogue, and the
+    read-back through the guarded launch loader -- with a refused file renamed
+    to ``runtime.yaml.rejected`` rather than left posing as a working config.
+    Kept as one function so the demo generator cannot drift a weaker copy of
+    any of it.
+    """
+
     directory = (
         Path(config_directory).expanduser() if config_directory else default_config_directory()
     )
@@ -467,9 +582,9 @@ def generate_runtime_config(
     _tighten_operator_directory(directory)
 
     body = {
-        "profiles": _profile_bodies(found),
+        "profiles": profiles,
         "catalog": str(catalog_path),
-        "demo": False,
+        "demo": demo,
     }
     encoded = yaml.safe_dump(body, allow_unicode=True, sort_keys=True, width=88).encode("utf-8")
     replace_operator_file(target, encoded, label=_LABEL)
@@ -496,6 +611,4 @@ def generate_runtime_config(
         "path": str(target),
         "catalog_path": str(catalog_path),
         "profiles": [profile_id.value for profile_id in configuration.profiles.profile_ids],
-        "providers_found": list(found.providers_found),
-        "providers_missing": list(found.providers_missing),
     }

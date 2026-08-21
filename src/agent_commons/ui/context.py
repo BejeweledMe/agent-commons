@@ -431,6 +431,12 @@ class UIContext:
             if not discovery.providers_found
             else (SETUP_SUPPORT_BINARY_UNRESOLVED if missing else None)
         )
+        # Demo is one of the exits from every unconfigured state, and the only
+        # one when no provider resolves at all -- without naming it here, the
+        # person `setup_no_provider_found` stops would be left with "write the
+        # YAML by hand", the exact terminal step this panel exists to remove.
+        # Said explicitly so the screen offers it rather than deriving it.
+        status["demo_available"] = True
         return status
 
     def initialize_workspace(self) -> dict[str, Any]:
@@ -505,6 +511,28 @@ class UIContext:
             "providers_missing": written["providers_missing"],
             **adopted,
         }
+
+    def configure_demo_runtime(self) -> dict[str, Any]:
+        """Write the demo runtime config and adopt it; no provider is needed.
+
+        The separate named operation the wave decision froze: demo is its own
+        parameterless route, never a flag on the real write, so "no setup
+        route accepts a parameter" stays true and a bearer of the panel token
+        still cannot choose a mode.  No discovery runs here at all --
+        requiring nothing resolvable is this operation's single purpose, and
+        the machine it exists for is exactly the one `setup_no_provider_found`
+        stops everywhere else.
+        """
+
+        from agent_commons.ui import setup
+
+        written = setup.generate_demo_runtime_config(
+            self.repo,
+            state_root=self._state_root,
+            state_base=self._state_base,
+        )
+        adopted = self.adopt_runtime_config(written["path"])
+        return {"state": setup.SETUP_CONFIGURED, **adopted}
 
     def adopt_runtime_config(self, path: str | Path) -> dict[str, Any]:
         """Take a runtime config into a panel that is already serving.

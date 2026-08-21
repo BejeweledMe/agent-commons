@@ -109,16 +109,20 @@ LAUNCH_ROUTES = (("POST", "/api/delegations"),)
 
 #: First run, declared apart from every other privilege because it is the only
 #: surface that writes outside the ledger: one route creates the workspace
-#: through the same initializer `agent-commons init` calls, the other writes the
-#: operator's own runtime config and adopts it into this running panel.  Both
-#: are registered by any operator panel -- a read-only one registers neither, so
-#: the zero-non-GET invariant is untouched -- and the reading half of the same
-#: surface (`GET /api/setup`, `GET /api/setup/preflight`) is in no tuple at all.
-#: These two are also the only non-GET routes not bound to an existing
-#: workspace: initialization is what makes the workspace exist.
+#: through the same initializer `agent-commons init` calls, one writes the
+#: operator's own runtime config and adopts it into this running panel, and one
+#: writes the provider-free `demo: true` config -- a separate named operation,
+#: never a parameter on the general write, so the property "no setup route
+#: accepts a parameter" stays true whole.  All are registered by any operator
+#: panel -- a read-only one registers none, so the zero-non-GET invariant is
+#: untouched -- and the reading half of the same surface (`GET /api/setup`,
+#: `GET /api/setup/preflight`) is in no tuple at all.  These are also the only
+#: non-GET routes not bound to an existing workspace: initialization is what
+#: makes the workspace exist.
 SETUP_ROUTES = (
     ("POST", "/api/setup/initialize"),
     ("POST", "/api/setup/runtime-config"),
+    ("POST", "/api/setup/demo-config"),
 )
 
 _HEARTBEAT_SECONDS = 15.0
@@ -677,14 +681,15 @@ def _register_catalog_writes(router: _RouteGroup, context: UIContext) -> None:
 
 
 def _register_setup(router: _RouteGroup, context: UIContext) -> None:
-    """Attach the two first-run writes, declared apart in ``SETUP_ROUTES``.
+    """Attach the first-run writes, declared apart in ``SETUP_ROUTES``.
 
-    Neither takes a parameter, and that is the security property of this
-    surface, not an omission: the directory a workspace is created in is the one
-    the panel was opened on, and the operator config always lands on the frozen
-    XDG path.  A bearer token therefore cannot aim either write at a path of its
-    choosing, which is also why no manual "type the binary path here" field
-    exists anywhere on the first-run screen.
+    Not one of them takes a parameter, and that is the security property of
+    this surface, not an omission: the directory a workspace is created in is
+    the one the panel was opened on, the operator config always lands on the
+    frozen XDG path, and demo mode is its own named route rather than a flag
+    on the general write.  A bearer token therefore cannot aim any of these
+    writes at a path or a mode of its choosing, which is also why no manual
+    "type the binary path here" field exists anywhere on the first-run screen.
     """
 
     async def _setup(action: Callable[..., Any]) -> Response:
@@ -708,6 +713,12 @@ def _register_setup(router: _RouteGroup, context: UIContext) -> None:
     @router.post("/api/setup/runtime-config")
     async def write_runtime_config() -> Response:
         return await _setup(context.configure_runtime)
+
+    @router.post("/api/setup/demo-config")
+    async def write_demo_config() -> Response:
+        # The way out of `setup_no_provider_found`: a config that needs no
+        # resolvable provider, because the DemoRunner never launches one.
+        return await _setup(context.configure_demo_runtime)
 
 
 def _register_launch(router: _RouteGroup, context: UIContext) -> None:

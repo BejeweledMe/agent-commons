@@ -286,6 +286,80 @@ def test_regeneration_leaves_no_litter_and_preserves_an_edited_catalogue(
     assert (config_dir / "catalog.yaml").read_text(encoding="utf-8") == edited
 
 
+def test_the_demo_config_needs_no_resolvable_binary_and_reads_back_demo_true(
+    workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The way out of `setup_no_provider_found`: written with nothing on PATH.
+
+    The demo generator consults no discovery -- requiring nothing resolvable
+    is its entire point -- and the file it writes is a constant modulo the
+    catalogue path: all four fixed profiles over the inert demo placeholder,
+    accepted by the same guarded loader with ``demo: true``, under the same
+    private modes and with the same catalogue seeded beside it.
+    """
+
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    config_dir = tmp_path / "operator" / "agent-commons"
+
+    result = setup.generate_demo_runtime_config(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        config_directory=config_dir,
+    )
+
+    target = config_dir / "runtime.yaml"
+    assert result["path"] == str(target)
+    assert result["demo"] is True
+    assert result["profiles"] == [
+        "claude-builder",
+        "claude-independent-reviewer",
+        "codex-builder",
+        "codex-independent-reviewer",
+    ]
+    assert _mode(config_dir) == 0o700
+    assert _mode(target) == 0o600
+    assert _mode(config_dir / "catalog.yaml") == 0o600
+
+    configuration = load_runtime_configuration(target, workspace_root=workspace["repo"])
+    assert configuration.demo is True
+
+    document = yaml.safe_load(target.read_text(encoding="utf-8"))
+    assert document["demo"] is True
+    from agent_commons.runtime.model import DEMO_UNRESOLVED_EXECUTABLE
+
+    for body in document["profiles"].values():
+        # No real path leaves the machine's PATH for this file; the DemoRunner
+        # never launches what these fields name.
+        assert body["executable"] == DEMO_UNRESOLVED_EXECUTABLE
+        assert body["mcp_executable"] == DEMO_UNRESOLVED_EXECUTABLE
+        assert body["git_executable"] == DEMO_UNRESOLVED_EXECUTABLE
+    # The launch modes stay the fixed, never-UI-selectable ones.
+    assert document["profiles"]["codex-builder"]["sandbox"] == "workspace-write"
+    assert document["profiles"]["codex-independent-reviewer"]["sandbox"] == "read-only"
+    assert document["profiles"]["claude-builder"]["permission_mode"] == "acceptEdits"
+    assert document["profiles"]["claude-independent-reviewer"]["permission_mode"] == "dontAsk"
+
+
+def test_the_demo_generator_shares_the_placement_refusals(
+    workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same discipline, not a weaker copy: one refusal from each family."""
+
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    with pytest.raises(setup.SetupError) as inside_workspace:
+        setup.generate_demo_runtime_config(
+            workspace["repo"], config_directory=workspace["repo"] / "config"
+        )
+    assert inside_workspace.value.code == "setup_path_refused_workspace"
+    assert not (workspace["repo"] / "config").exists()
+
+    linked = tmp_path / "linked-config"
+    linked.symlink_to(tmp_path)
+    with pytest.raises(setup.SetupError) as ownership:
+        setup.generate_demo_runtime_config(workspace["repo"], config_directory=linked)
+    assert ownership.value.code == "setup_path_refused_ownership"
+
+
 # -- placement refusals --------------------------------------------------------
 
 

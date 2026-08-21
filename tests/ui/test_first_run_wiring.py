@@ -264,6 +264,10 @@ def test_total_absence_of_a_provider_is_named_before_the_operator_clicks(
         refused = client.post("/api/setup/runtime-config", headers=authorized())
 
     assert body["blocking_refusal"] == setup.SETUP_NO_PROVIDER_FOUND
+    # The refusal is not a dead end: the same answer names demo as a way out,
+    # or the person it stops would be left writing YAML by hand -- the exact
+    # terminal step this panel exists to remove.
+    assert body["demo_available"] is True
     assert refused.status_code == 409
     assert refused.json()["error"]["code"] == setup.SETUP_NO_PROVIDER_FOUND
 
@@ -351,6 +355,83 @@ def test_the_panel_configures_itself_and_launches_without_a_restart(
     # The launch gate is open: the refusal now comes from the domain being asked
     # about a role that does not exist, which is a different refusal entirely.
     assert after.json()["error"]["code"] != "launch_not_configured"
+    assert (tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml").is_file()
+
+
+def test_the_demo_route_closes_the_whole_loop_with_no_resolvable_binary(
+    workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hire, task, Run, `succeeded` -- on a machine where nothing resolves.
+
+    This is the machine `setup_no_provider_found` stops everywhere else, and
+    the demo route is the frozen way out: a separate parameterless operation
+    that writes `demo: true` and adopts it into the serving panel.  Everything
+    below happens through one client against one route table -- the config is
+    written by the route, the role is hired, the task is opened, and the run
+    completes through the DemoRunner the adopted config selects, with PATH
+    empty from the first request to the last.
+    """
+
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    context = _writing(workspace, window="first-run-demo-window01")
+    with _client(context) as client:
+        before = client.get("/api/setup", headers=authorized()).json()
+        assert before["blocking_refusal"] == setup.SETUP_NO_PROVIDER_FOUND
+        assert before["demo_available"] is True
+        # The general write is refused on this machine; the demo one is not.
+        refused = client.post("/api/setup/runtime-config", headers=authorized())
+        assert refused.json()["error"]["code"] == setup.SETUP_NO_PROVIDER_FOUND
+
+        written = client.post("/api/setup/demo-config", headers=authorized())
+        assert written.status_code == 200, written.text
+        body = written.json()
+        assert body["state"] == setup.SETUP_CONFIGURED
+        assert body["demo"] is True
+        assert body["launch_enabled"] is True
+        assert client.get("/api/setup", headers=authorized()).json()["state"] == (
+            setup.SETUP_CONFIGURED
+        )
+
+        hired = client.post(
+            "/api/agents",
+            headers=authorized(),
+            json={
+                "name": "Demo builder",
+                "profile_id": "claude-builder",
+                "rationale": "sees the whole loop close without a provider",
+                "idempotency_key": "demo-route-hire",
+            },
+        )
+        assert hired.status_code == 200, hired.text
+        role_id = hired.json()["entity_ref"]["id"]
+        task = client.post(
+            "/api/tasks",
+            headers=authorized(),
+            json={
+                "title": "Close the demo loop",
+                "description": "the DemoRunner completes this without a provider",
+                "acceptance_criteria": ["the delegation reaches succeeded"],
+                "idempotency_key": "demo-route-task",
+            },
+        )
+        assert task.status_code == 200, task.text
+        task_id = task.json()["entity_ref"]["id"]
+
+        run = client.post(
+            "/api/delegations",
+            headers=authorized(),
+            json={"agent_id": role_id, "task_id": task_id},
+        )
+        assert run.status_code == 200, run.text
+        delegation_id = run.json()["delegation_id"]
+
+    context.await_launches()
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"], read_only=True)
+    delegation = manager.get_delegation(delegation_id)
+    assert delegation["state"] == "succeeded"
+    # Honestly labelled: no provider ran, and the summary says so.
+    assert "demo" in str(delegation.get("summary", "")).lower()
+    assert "no provider" in str(delegation.get("summary", "")).lower()
     assert (tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml").is_file()
 
 
