@@ -1152,6 +1152,9 @@ LANGUAGE_SURFACES = {
     "attention",
     "search",
     "launch",
+    # The first-run screen paints its own state sentence, its binary rows and
+    # the config path from `GET /api/setup`; `chrome` owns only its headings.
+    "setup",
 }
 
 

@@ -604,6 +604,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   background:var(--info); color:#0d1117; border:none; border-radius:6px;
   padding:8px 14px; font-weight:600; align-self:flex-start; cursor:pointer;
 }
+/* First run.  Fixed, not absolute: it stands in for the whole shell rather
+   than sitting inside the board, because on an uninitialized directory there
+   is no board to sit in.  It scrolls on its own — the trust paragraph is long
+   on purpose and must never be the thing that pushes the button off screen. */
+#setup{
+  position:fixed; inset:0; display:grid; place-items:start center;
+  background:var(--bg); z-index:80; overflow-y:auto; padding:32px 16px;
+}
+.setup-card{width:min(560px,100%); display:flex; flex-direction:column; gap:12px}
+.setup-card h2{font-size:16px; margin:0}
+.setup-card .actions{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 0}
+.setup-cmd{
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:9px 11px; margin:0; user-select:all; overflow-wrap:anywhere;
+}
+.setup-row{
+  display:flex; gap:10px; align-items:baseline; padding:8px 11px;
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+}
+.setup-row .setup-name{font-family:ui-monospace,"JetBrains Mono",monospace; flex:none}
+.setup-row .setup-where{color:var(--muted); font-size:12px; overflow-wrap:anywhere; min-width:0}
 .mono{font-family:ui-monospace,"JetBrains Mono",monospace}
 /* Nothing may overflow its frame (operator feedback): long ids and labels
    truncate or wrap inside their own box, never past it. */
@@ -760,6 +781,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
         <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
         <button type="button" id="board-fit" data-i18n="board_fit" data-i18n-title="tip_board_fit">Fit</button>
+        <!-- The way back to first run.  The screen may be set aside on a board
+             that works, and everything it configures is off until it is not, so
+             it has to be reachable again from the surface it was set aside on;
+             it is held back entirely once the project is set up. -->
+        <button type="button" id="board-setup" hidden data-i18n="setup_reopen"></button>
         <!-- The label carries the count of what is being held back, so it is
              painted from JS; only its tooltip is a data-i18n marker. -->
         <button type="button" id="board-runtime" aria-pressed="false" hidden data-i18n-title="tip_runtime_nodes">Runtime nodes</button>
@@ -1428,6 +1454,45 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span id="waiting"></span>
   <span id="truncation"></span>
 </footer>
+<!-- First run.  The panel now opens on whatever directory it was started in,
+     including one git never touched, and `GET /api/setup` is the only route
+     that answers in every one of those states — `/api/meta`, `/api/graph` and
+     the rest all read a workspace and fail without one.  So this screen is not
+     a banner over a working board: it is what the tab shows INSTEAD of booting,
+     until the state it names is left.  It is deliberately not a `.scrim`
+     dialog — there is nothing behind it to trap focus against, and Esc must not
+     dismiss the only thing on screen.
+
+     Everything a person retypes into a terminal has been removed from this
+     panel except one line: `git init`, because a directory that is not a
+     repository cannot be made one from inside a page served out of it. -->
+<div id="setup" hidden>
+  <div class="setup-card">
+    <h2 id="setup-title" data-i18n="setup_title"></h2>
+    <p class="note" data-i18n="setup_intro"></p>
+    <p class="note" id="setup-state-note"></p>
+    <p class="mono setup-cmd" id="setup-command" hidden></p>
+    <div id="setup-found" hidden>
+      <h3 class="subhead" data-i18n="setup_found_title"></h3>
+      <div id="setup-found-rows"></div>
+      <p class="note" id="setup-found-note" hidden></p>
+      <p class="note mono" id="setup-path"></p>
+      <p class="note warn" id="setup-trust" data-i18n="setup_trust_warning"></p>
+    </div>
+    <div class="actions">
+      <button type="button" class="cta" id="setup-init" hidden data-i18n="setup_init_button"></button>
+      <button type="button" class="cta" id="setup-write" hidden data-i18n="setup_write_button"></button>
+      <button type="button" id="setup-demo" hidden data-i18n="setup_demo_button"></button>
+      <button type="button" id="setup-rescan" hidden data-i18n="setup_rescan_button"></button>
+      <button type="button" id="setup-preflight" hidden data-i18n="setup_preflight_button"></button>
+      <button type="button" id="setup-later" hidden data-i18n="setup_later_button"></button>
+    </div>
+    <p class="note" id="setup-demo-offer" hidden data-i18n="setup_demo_offer"></p>
+    <p class="result" id="setup-result"></p>
+    <p class="note" id="setup-preflight-note" hidden data-i18n="setup_preflight_credential_free"></p>
+    <div id="setup-preflight-rows"></div>
+  </div>
+</div>
 <div class="scrim" id="hire-modal" hidden>
   <!-- Every dialog names itself by its own heading and says it is modal: round
        3 found Tab walking straight out of an open form into the page behind it,
@@ -2346,6 +2411,47 @@ const STRINGS = {
     count_verifications: "verifications",
     count_agents: "roles",
     count_templates: "templates",
+    // --- first run ---------------------------------------------------------
+    // There are no capability switches any more, so none of these sentences may
+    // send a person back to a terminal: every state on this screen ends in a
+    // button, and the one command that survives here — `git init` — survives
+    // only because a directory that is not a repository cannot be made one from
+    // a page served out of it.
+    setup_title: "Set this project up",
+    setup_intro: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This screen writes the last two; nothing here needs a terminal.",
+    setup_repo_missing: "This directory is not a git repository, so there is nothing for a workspace to attach to and nothing to record work against. Make it one and press “Look again”:",
+    setup_init_offer: "A git repository with no workspace yet. Creating one writes .agent-commons/ here — the shared history that every role, every task and every run is recorded into. Nothing outside this directory is touched.",
+    setup_init_button: "Create the workspace here",
+    setup_unconfigured_lead: "The workspace exists. What is missing is the runtime config: the operator-owned file, kept outside this repository, that says which local programs a run may start and under which limits. Until it exists nothing can be put to work.",
+    setup_all_set: "This project is set up. Roles can be hired and runs can be started; there is nothing left to do here.",
+    setup_found_title: "What was found on this machine",
+    setup_binary_missing: "not found",
+    setup_found_none: "Neither claude nor codex resolved to a program this panel is allowed to start, so no provider config can be written. Demo mode is the way on, and it is not a preview: a role is hired, a task is created, Run starts a run and it finishes with a recorded result, exactly as a real one would.",
+    setup_found_partial: "Only {found} resolved. Profiles are written for it and for nothing else — the roles offered when you hire will be its roles, and {missing} will simply not appear until it is installed and you look again.",
+    setup_support_missing: "A provider was found, but a program every written profile names did not resolve:",
+    setup_support_missing_after: "Nothing can be written until it does: a profile naming a program this panel cannot resolve would fail at the first run instead of failing here. Install it and press “Look again”. Demo mode needs none of them.",
+    setup_path_label: "Will be written to",
+    setup_trust_warning: "Read this before pressing. The profiles written here let a run start those programs on your behalf with this working tree writable: a builder role's process can create, change and delete files anywhere under this repository, and it does so without asking per action. Nothing outside the repository is granted, no credential is written, and reviewer profiles get read-only access — but the working tree itself is genuinely exposed, so do this on a project whose git history you are willing to fall back on.",
+    setup_write_button: "Write the config and set this panel up",
+    setup_written: "Set up. The panel adopted the config as it stands — no restart — and the profiles are offered from now on.",
+    setup_initialized: "Workspace created. The panel opened its own session in it and is now recording.",
+    setup_demo_written: "Demo mode set up. The whole loop works and no provider is ever started.",
+    setup_rejected_existing: "There is already an operator runtime config at the path below, and this panel's own launch loader will not accept it. Your file is untouched: the panel did not write it and will not rename or overwrite anything it did not write. Nothing will run until it is repaired or replaced.",
+    setup_manual_yaml: "Replacing it from here overwrites it with a freshly generated config. Repairing it means editing it yourself — this panel will not edit a file it did not write. It cannot say which line is wrong either, because the state it is told carries the verdict and not the reason.",
+    setup_rejected: "The config this panel generated was refused by its own launch loader, so it was never adopted, and it was moved aside to runtime.yaml.rejected rather than left posing as a working config. The loader's reason:",
+    setup_rescan_button: "Look again",
+    setup_demo_offer: "Demo mode writes a config with demo: true. No provider process is ever started and nothing leaves this machine, but the whole loop closes — hire, task, Run, a recorded result. Use it to learn the panel, or to keep working while a provider is missing.",
+    setup_demo_button: "Set up demo mode instead",
+    setup_later_button: "Not now — go to the board",
+    setup_reopen: "Set the runtime up…",
+    setup_working: "working…",
+    setup_preflight_button: "Check the configured profiles",
+    setup_preflight_credential_free: "The check starts each provider with --help and shakes hands with the MCP server. It consumes no run and no subscription quota — and for exactly that reason it cannot tell an authorized provider from an unauthorized one: it proves the programs exist and answer, and nothing about your account.",
+    setup_preflight_ok: "answered",
+    setup_preflight_bad: "did not answer",
+    setup_preflight_all_ok: "Every configured profile answered.",
+    setup_preflight_some_bad: "Something did not answer; the profiles are listed below.",
+    stream_setup_pending: "not set up yet — the screen says what is missing",
   },
   ru: {
     tab_attention: "Внимание",
@@ -2944,6 +3050,42 @@ const STRINGS = {
     count_verifications: "проверок",
     count_agents: "ролей",
     count_templates: "шаблонов",
+    // --- первая настройка --------------------------------------------------
+    setup_title: "Настройте этот проект",
+    setup_intro: "Роль сможет работать, когда есть три вещи: git-репозиторий, рабочее пространство внутри него и файл среды выполнения вне него — тот, что перечисляет программы, которые прогон вправе стартовать. Этот экран пишет последние две; терминал здесь не нужен.",
+    setup_repo_missing: "Этот каталог — не git-репозиторий, значит рабочему пространству не к чему прикрепиться и работу некуда записывать. Сделайте его репозиторием и нажмите «Посмотреть снова»:",
+    setup_init_offer: "Это git-репозиторий, рабочего пространства в нём пока нет. Создание запишет сюда .agent-commons/ — общую историю, в которую попадают все роли, все задачи и все прогоны. Ничего за пределами этого каталога не затрагивается.",
+    setup_init_button: "Создать рабочее пространство здесь",
+    setup_unconfigured_lead: "Рабочее пространство есть. Не хватает файла среды выполнения: операторского файла вне этого репозитория, который говорит, какие локальные программы прогон вправе стартовать и с какими ограничениями. Пока его нет, поручить работу некому.",
+    setup_all_set: "Проект настроен. Роли можно нанимать, прогоны — вести; здесь больше нечего делать.",
+    setup_found_title: "Что нашлось на этой машине",
+    setup_binary_missing: "не найдена",
+    setup_found_none: "Ни claude, ни codex не разрешились в программу, которую панели позволено стартовать, поэтому файл с профилями провайдера написать не из чего. Выход — демонстрационный режим, и это не витрина: роль нанимается, задача создаётся, «Прогон» ведёт прогон до конца, и результат записывается ровно так же, как настоящий.",
+    setup_found_partial: "Разрешилась только {found}. Профили пишутся для неё и больше ни для кого — при найме будут предложены её роли, а {missing} просто не появится, пока вы её не установите и не посмотрите снова.",
+    setup_support_missing: "Провайдер нашёлся, но программа, которую называет каждый записываемый профиль, не разрешилась:",
+    setup_support_missing_after: "Пока это не исправлено, писать нечего: профиль с программой, которую панель не может разрешить, упал бы на первом прогоне вместо того, чтобы отказать здесь. Установите её и нажмите «Посмотреть снова». Демонстрационному режиму ни одна из них не нужна.",
+    setup_path_label: "Будет записан в",
+    setup_trust_warning: "Прочитайте до того, как нажмёте. Профили, которые здесь пишутся, позволяют прогону стартовать эти программы от вашего имени с правом записи в это рабочее дерево: процесс роли-исполнителя может создавать, менять и удалять файлы в любом месте под этим репозиторием и делает это, не спрашивая на каждом действии. Ничего за пределами репозитория не выдаётся, никакие учётные данные не пишутся, роли-ревьюеры получают доступ только на чтение — но само рабочее дерево открыто по-настоящему, поэтому делайте это на проекте, на историю git которого вы готовы опереться.",
+    setup_write_button: "Записать файл и настроить эту панель",
+    setup_written: "Настроено. Панель приняла файл как есть, перезагружать ничего не нужно, и профили предлагаются начиная с этого момента.",
+    setup_initialized: "Рабочее пространство создано. Панель открыла в нём собственную сессию и ведёт запись.",
+    setup_demo_written: "Демонстрационный режим настроен. Весь круг работает, ни один провайдер не стартует.",
+    setup_rejected_existing: "По пути ниже уже лежит операторский файл среды выполнения, и собственный загрузчик этой панели его не принимает. Ваш файл не тронут: панель его не писала и не переименовывает и не перезаписывает то, чего не писала. Пока он не починен или не заменён, работать ничего не будет.",
+    setup_manual_yaml: "Замена отсюда перезапишет его свежесгенерированным файлом. Починка означает править его самому — файл, который панель не писала, она не редактирует. Сказать, какая именно строка неверна, она тоже не может: состояние, которое ей сообщают, несёт вердикт, но не причину.",
+    setup_rejected: "Файл, который панель сгенерировала, её собственный загрузчик не принял, поэтому файл не был принят в работу и убран в сторону под именем runtime.yaml.rejected, а не оставлен изображать рабочий. Причина от загрузчика:",
+    setup_rescan_button: "Посмотреть снова",
+    setup_demo_offer: "Демонстрационный режим пишет файл с demo: true. Ни один процесс провайдера не стартует и ничего не покидает эту машину, но круг замыкается целиком — наём, задача, «Прогон», записанный результат. Годится, чтобы освоить панель или продолжать работу, пока провайдера нет.",
+    setup_demo_button: "Настроить демонстрационный режим",
+    setup_later_button: "Не сейчас — на доску",
+    setup_reopen: "Настроить среду выполнения…",
+    setup_working: "выполняется…",
+    setup_preflight_button: "Проверить настроенные профили",
+    setup_preflight_credential_free: "Проверка стартует каждого провайдера с --help и здоровается с MCP-сервером. Она не тратит ни одного прогона и ни одной квоты подписки — и именно поэтому не отличает авторизованного провайдера от неавторизованного: она доказывает, что программы существуют и отвечают, и ничего о вашей учётной записи.",
+    setup_preflight_ok: "ответил",
+    setup_preflight_bad: "не ответил",
+    setup_preflight_all_ok: "Все настроенные профили ответили.",
+    setup_preflight_some_bad: "Что-то не ответило; профили перечислены ниже.",
+    stream_setup_pending: "ещё не настроено — экран говорит, чего не хватает",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -3010,8 +3152,16 @@ async function post(path, body) {
   if (!response.ok) {
     // Refusals name the guard they tripped; that string is the useful part.
     // The backend message is canonical and stays verbatim in any language.
-    throw new Error((payload.error && payload.error.message) ||
+    const failure = new Error((payload.error && payload.error.message) ||
       (t("request_failed") + " " + response.status));
+    // The refusal's CODE travels beside its sentence rather than being thrown
+    // away.  Some refusals are states the panel can act on rather than text to
+    // print — `launch_not_configured` has a screen, `panel_already_open` has an
+    // address — and matching those on their English message would break the
+    // moment the message is reworded.
+    failure.code = (payload.error && payload.error.code) || "";
+    failure.actions = (payload.error && payload.error.safe_next_actions) || [];
+    throw failure;
   }
   return payload;
 }
@@ -7357,6 +7507,282 @@ function handleFrame(frame) {
   }
 }
 
+// --- first run ------------------------------------------------------------
+// The panel used to assume a configured project: `boot()` asked `/api/meta`
+// first, and on a directory with no workspace that route raises — so the tab
+// showed "unauthorized" and a person whose only mistake was opening the panel
+// one directory too early had nothing to click.  `GET /api/setup` is the one
+// route that answers in every state, so it is asked FIRST and decides whether
+// there is a panel to boot at all.
+//
+// Two of the states have no board behind them at all (no repository, no
+// workspace): there the screen is the whole tab and cannot be put aside.  The
+// other two — no runtime config, or a config the launch loader will not accept
+// — sit over a board that works, so they can be set aside like the onboarding
+// card, and reopened from the places that need them.
+const SETUP_WITHOUT_A_BOARD = ["setup_not_a_repository", "setup_uninitialized"];
+// The frozen refusal codes this screen renders as a state rather than as text.
+//
+// "configured" is spelled two ways: the wave contract froze `setup_configured`
+// alongside every other code, and `ui/setup.py` emits the bare `configured`.
+// Both are accepted here rather than one being guessed at, because the panel
+// getting this wrong is a panel that offers first run forever on a project that
+// is already set up.  The disagreement is the backend's to settle; when it is,
+// this list loses whichever spelling stopped being sent.
+const SETUP_CONFIGURED = ["configured", "setup_configured"];
+const SETUP_REJECTED = "setup_config_rejected_by_loader";
+const SETUP_NO_PROVIDER = "setup_no_provider_found";
+const SETUP_SUPPORT_MISSING = "setup_support_binary_unresolved";
+// Every executable the generated profiles name, in the order the screen lists
+// them: the two providers first, because choosing to trust them is the decision
+// being asked, then the two this project needs beside them.
+const SETUP_BINARIES = ["claude", "codex", "agent-commons-mcp", "git"];
+
+let setupInfo = null;
+let setupSetAside = false;
+let setupOpenedByHand = false;
+
+async function loadSetup() {
+  try { setupInfo = await api("/api/setup"); }
+  catch (error) { setupInfo = null; }
+  return setupInfo;
+}
+
+function setupIsConfigured(state) {
+  return SETUP_CONFIGURED.indexOf(state) >= 0;
+}
+
+function setupNeedsAttention() {
+  return Boolean(setupInfo) && !setupIsConfigured(setupInfo.state);
+}
+
+function setupHasNoBoard() {
+  return Boolean(setupInfo) && SETUP_WITHOUT_A_BOARD.indexOf(setupInfo.state) >= 0;
+}
+
+// The state note, in one place: which sentence the screen leads with is the
+// whole content of this screen, and spreading it across the button handlers is
+// how two states end up saying the same thing.
+function setupLead(state) {
+  if (state === "setup_not_a_repository") { return ["setup_repo_missing"]; }
+  if (state === "setup_uninitialized") { return ["setup_init_offer"]; }
+  // Two operationally different things wear this one frozen code, and the
+  // difference is what happened to the file.  Here the file is the operator's
+  // own and is UNTOUCHED — the panel did not write it and will not rename it —
+  // so the sentence must not read like the one for a generated config, which
+  // this panel wrote, refused, and moved aside itself (`setup_rejected`).
+  if (state === SETUP_REJECTED) { return ["setup_rejected_existing", "setup_manual_yaml"]; }
+  if (setupIsConfigured(state)) { return ["setup_all_set"]; }
+  return ["setup_unconfigured_lead"];
+}
+
+// What would refuse a write attempted right now, said before the click rather
+// than only after it — the server answers this in `blocking_refusal`, and the
+// screen's job is to turn it into a sentence and a disabled button.
+function setupBlockingNote(info) {
+  if (info.blocking_refusal === SETUP_NO_PROVIDER) { return t("setup_found_none"); }
+  if (info.blocking_refusal === SETUP_SUPPORT_MISSING) {
+    return t("setup_support_missing") + " " +
+      (info.support_missing || []).join(", ") + ". " + t("setup_support_missing_after");
+  }
+  if ((info.providers_missing || []).length && (info.providers_found || []).length) {
+    return said("setup_found_partial", {
+      found: (info.providers_found || []).join(", "),
+      missing: (info.providers_missing || []).join(", "),
+    });
+  }
+  return "";
+}
+
+function paintSetupBinaries(info) {
+  const host = document.getElementById("setup-found-rows");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const probes = info.providers || {};
+  for (const name of SETUP_BINARIES) {
+    const probe = probes[name];
+    if (!probe) { continue; }
+    const row = document.createElement("div");
+    row.className = "setup-row";
+    const label = document.createElement("span");
+    label.className = "setup-name";
+    // A program's name is a proper name and is never translated, in either
+    // language; so is the absolute path beside it.
+    label.textContent = name;
+    row.appendChild(label);
+    const where = document.createElement("span");
+    where.className = "setup-where";
+    where.textContent = probe.found ? probe.path : t("setup_binary_missing");
+    row.appendChild(where);
+    host.appendChild(row);
+  }
+}
+
+function paintSetup() {
+  const screen = document.getElementById("setup");
+  // Held back once the project is set up, and offered the moment it is not:
+  // the screen can be set aside over a board that works, and everything it
+  // configures stays off until it is not.
+  document.getElementById("board-setup").hidden = !setupNeedsAttention();
+  if (!setupInfo) { screen.hidden = true; return; }
+  const info = setupInfo;
+  const state = info.state;
+  const boardless = setupHasNoBoard();
+  screen.hidden = !(boardless || setupOpenedByHand ||
+    (setupNeedsAttention() && !setupSetAside));
+  if (screen.hidden) { return; }
+
+  const configurable = state === "setup_unconfigured" || state === SETUP_REJECTED;
+  const blocked = Boolean(info.blocking_refusal);
+
+  const lead = document.getElementById("setup-state-note");
+  lead.textContent = setupLead(state).map(t).join(" ");
+  // The one line in this panel a person is asked to retype, and only because a
+  // directory that is not a repository cannot be made one from a page served
+  // out of it.  It is a command, so it is not translated.
+  const command = document.getElementById("setup-command");
+  command.hidden = state !== "setup_not_a_repository";
+  command.textContent = "git init";
+
+  document.getElementById("setup-found").hidden = !configurable;
+  if (configurable) {
+    paintSetupBinaries(info);
+    const note = document.getElementById("setup-found-note");
+    note.textContent = setupBlockingNote(info);
+    note.hidden = !note.textContent;
+    // The narrow, deliberate exception to "this panel hands out no path": while
+    // the runtime is unconfigured the target IS the decision being asked.  The
+    // route stops sending it the moment the state is configured, and this stops
+    // showing it at the same moment.
+    document.getElementById("setup-path").textContent =
+      t("setup_path_label") + " " + (info.config_path || "");
+  }
+
+  const init = document.getElementById("setup-init");
+  init.hidden = state !== "setup_uninitialized";
+  const write = document.getElementById("setup-write");
+  write.hidden = !configurable;
+  // Refused before the click rather than after it: the sentence above says
+  // which program is missing, and the button says the same thing by being dead.
+  write.disabled = blocked;
+  write.title = blocked ? setupBlockingNote(info) : "";
+  const demo = document.getElementById("setup-demo");
+  demo.hidden = !configurable;
+  const offer = document.getElementById("setup-demo-offer");
+  // Demo is named on every unconfigured state, and it is the LEAD when nothing
+  // else can be written: `setup_no_provider_found` without it is a dead end,
+  // which is the one thing this screen may not be.
+  offer.hidden = !(configurable && info.demo_available);
+  document.getElementById("setup-rescan").hidden = false;
+  document.getElementById("setup-preflight").hidden = !setupIsConfigured(state);
+  document.getElementById("setup-preflight-note").hidden = !setupIsConfigured(state);
+  // Boardless states have nothing to go back to; every other opening does.
+  document.getElementById("setup-later").hidden = boardless;
+}
+
+function openSetup() {
+  setupOpenedByHand = true;
+  setupSetAside = false;
+  document.getElementById("setup-result").textContent = "";
+  paintSetup();
+  loadSetup().then(paintSetup);
+}
+
+function closeSetup() {
+  setupOpenedByHand = false;
+  setupSetAside = true;
+  paintSetup();
+}
+
+// A refusal from a setup write, said as this screen's own sentence where the
+// code has one and verbatim where it does not.  The generated-config case is
+// the only one of the two rejections that arrives with a reason attached, and
+// the reason is the whole value of the message — so it is kept.
+function setupRefusalText(error) {
+  const code = error && error.code;
+  const message = String((error && error.message) || error);
+  if (code === SETUP_REJECTED) { return t("setup_rejected") + " " + message; }
+  if (code === SETUP_NO_PROVIDER) { return t("setup_found_none"); }
+  if (code === "panel_already_open") { return t("panel_already_open") + " " + message; }
+  return message;
+}
+
+async function setupWrite(path, doneKey) {
+  const result = document.getElementById("setup-result");
+  const buttons = document.querySelectorAll("#setup .actions button");
+  for (const button of buttons) { button.disabled = true; }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let failure = null;
+  try { await post(path, {}); }
+  catch (error) { failure = error; }
+  for (const button of buttons) { button.disabled = false; }
+  await loadSetup();
+  if (failure) {
+    result.className = "result bad";
+    result.textContent = setupRefusalText(failure);
+    paintSetup();
+    return;
+  }
+  result.className = "result ok";
+  result.textContent = t(doneKey);
+  setupOpenedByHand = false;
+  paintSetup();
+  // Everything downstream of the write changes at once — a workspace appears,
+  // or profiles and a catalogue do — and the panel adopts them without a
+  // restart, so the tab has to catch up with itself rather than tell the
+  // operator to reload.
+  await boot();
+}
+
+document.getElementById("setup-init").addEventListener("click", () => {
+  setupWrite("/api/setup/initialize", "setup_initialized");
+});
+document.getElementById("setup-write").addEventListener("click", () => {
+  setupWrite("/api/setup/runtime-config", "setup_written");
+});
+document.getElementById("setup-demo").addEventListener("click", () => {
+  setupWrite("/api/setup/demo-config", "setup_demo_written");
+});
+document.getElementById("setup-rescan").addEventListener("click", () => {
+  document.getElementById("setup-result").textContent = "";
+  loadSetup().then(paintSetup);
+});
+document.getElementById("setup-later").addEventListener("click", closeSetup);
+document.getElementById("board-setup").addEventListener("click", openSetup);
+
+async function runSetupPreflight() {
+  const result = document.getElementById("setup-result");
+  const host = document.getElementById("setup-preflight-rows");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let report = null;
+  try { report = await api("/api/setup/preflight"); }
+  catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+    return;
+  }
+  result.className = "result " + (report.ok ? "ok" : "bad");
+  result.textContent = report.ok ? t("setup_preflight_all_ok") : t("setup_preflight_some_bad");
+  for (const entry of report.profiles || []) {
+    const row = document.createElement("div");
+    row.className = "setup-row";
+    const label = document.createElement("span");
+    label.className = "setup-name";
+    // The profile id is canonical and keeps the ledger's spelling; the verdict
+    // beside it is the panel's own word and is translated.
+    label.textContent = entry.profile_id;
+    row.appendChild(label);
+    const verdict = document.createElement("span");
+    verdict.className = "setup-where";
+    verdict.textContent = entry.ok ? t("setup_preflight_ok") : t("setup_preflight_bad");
+    row.appendChild(verdict);
+    host.appendChild(row);
+  }
+}
+document.getElementById("setup-preflight").addEventListener("click", runSetupPreflight);
+
 let metaInfo = null;
 
 // The title was hardcoded "read-only" and stayed wrong with writes on (L8);
@@ -7480,6 +7906,10 @@ const LANGUAGE_SURFACES = [
   ["attention", () => loadAttention()],
   ["search", () => repaintSearch()],
   ["launch", () => { if (launchEnabled) { loadLaunch(); } }],
+  // The first-run screen is half `data-i18n` chrome and half painted from the
+  // one answer that describes the state, so `chrome` alone would translate its
+  // headings and leave the sentence that matters in the previous language.
+  ["setup", () => paintSetup()],
 ];
 
 // Repaint everything the current language touches, without a reload.  Chrome
@@ -7492,7 +7922,25 @@ function applyLanguage() {
   }
 }
 
+// `connect()` never returns — it is a reconnect loop — so a second boot after
+// first run must not start a second one beside the first.
+let streamStarted = false;
+
 async function boot() {
+  // The first question, and the only one that has an answer in every state:
+  // whether there is a project here to boot at all.  It is asked before
+  // `/api/meta` because `/api/meta` reads a workspace and raises without one,
+  // and that raise is what used to leave a first-time operator looking at a
+  // panel that said "no access" about a directory they had every access to.
+  await loadSetup();
+  paintSetup();
+  if (setupHasNoBoard()) {
+    // No repository, or no workspace: every other route reads state that does
+    // not exist yet, and there is nothing behind the screen to paint.  The
+    // stream stays shut until first run has made one.
+    setStream("gap", "stream_setup_pending");
+    return;
+  }
   try {
     const meta = await api("/api/meta");
     metaInfo = meta;
@@ -7516,7 +7964,7 @@ async function boot() {
   const graph = await api("/api/graph");
   paintChrome(graph);
   render(graph);
-  connect();
+  if (!streamStarted) { streamStarted = true; connect(); }
 }
 
 applyI18n();
