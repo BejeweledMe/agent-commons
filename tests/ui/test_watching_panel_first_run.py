@@ -23,7 +23,12 @@ import subprocess
 import pytest
 
 from agent_commons.ui import read_spa
-from agent_commons.ui.setup import SETUP_CONFIGURED, SETUP_UNCONFIGURED, SETUP_UNINITIALIZED
+from agent_commons.ui.setup import (
+    CONFIG_REJECTED_BY_LOADER,
+    SETUP_CONFIGURED,
+    SETUP_UNCONFIGURED,
+    SETUP_UNINITIALIZED,
+)
 
 needs_node = pytest.mark.skipif(
     shutil.which("node") is None, reason="no node to run the first-run screen in"
@@ -116,6 +121,8 @@ def _paint(lang: str, info: dict[str, object]) -> dict[str, object]:
             "  readonlyHidden: at('setup-readonly').hidden,",
             "  hidden: Object.fromEntries("
             "    Object.keys(nodes).map((id) => [id, Boolean(nodes[id].hidden)])),",
+            "  rejectedWhy: at('setup-rejected-why').textContent,",
+            "  rejectedPath: at('setup-rejected-path').textContent,",
             "}));",
         ]
     )
@@ -248,3 +255,71 @@ def test_configured_is_spelled_one_way_and_it_is_the_backend_s() -> None:
     # And a configured project is left alone by every state the screen keeps.
     answer = _paint("en", {"state": SETUP_CONFIGURED, "operator_panel": True})
     assert answer["screenHidden"] is True
+
+
+# --- the reason a rejected config was rejected ------------------------------
+
+
+def _rejected(**extra: object) -> dict[str, object]:
+    return {
+        "state": CONFIG_REJECTED_BY_LOADER,
+        "operator_panel": True,
+        "providers": {},
+        "providers_found": [],
+        "providers_missing": [],
+        "support_missing": [],
+        "demo_available": True,
+        **extra,
+    }
+
+
+@needs_node
+def test_the_rejected_config_screen_carries_the_loader_s_own_words() -> None:
+    """The reason arrives beside the state now.  It is canonical text out of the
+    launch loader -- the same sentence `POST /api/setup/runtime-config` reports
+    -- so it is printed exactly as it came, with only the label in front of it
+    belonging to the panel.  The path is named where the file STANDS: this is
+    the operator's own config, and the panel has not moved it."""
+
+    reason = "commons.runtime.profile 'claude-builder': executable is not an allowed program"
+    path = "/home/x/.config/agent-commons/runtime.yaml"
+    answer = _paint("en", _rejected(config_path=path, rejected_reason=reason, rejected_path=path))
+    assert answer["hidden"]["setup-rejected"] is False
+    english, _ = _language_tables()
+    assert answer["rejectedWhy"] == _value(english, "setup_rejected_why") + " " + reason
+    assert answer["rejectedPath"] == _value(english, "setup_rejected_where") + " " + path
+    # The reason survives whole: a screen that truncated or reworded it would
+    # send the reader back to the terminal it exists to replace.
+    assert reason in str(answer["rejectedWhy"])
+
+    # The lead still says the file is untouched, which is the half of this code
+    # that distinguishes it from a generated config the panel wrote and moved.
+    assert "untouched" in _value(english, "setup_rejected_existing")
+
+    # A state carrying no reason -- an older server -- says so rather than
+    # showing an empty label with nothing after it.
+    blind = _paint("en", _rejected(config_path=path))
+    assert blind["rejectedWhy"] == _value(english, "setup_rejected_no_reason")
+    assert blind["hidden"]["setup-rejected-path"] is True
+
+
+@needs_node
+def test_the_reason_reaches_a_watching_panel_too() -> None:
+    """It arrives on a GET, so the panel that cannot repair the file can still
+    say what is wrong with it -- which is the more useful half for whoever is
+    going to be told about it."""
+
+    answer = _paint(
+        "ru",
+        _rejected(
+            operator_panel=False,
+            config_path="/x/runtime.yaml",
+            rejected_reason="loader said no",
+            rejected_path="/x/runtime.yaml",
+        ),
+    )
+    assert answer["hidden"]["setup-rejected"] is False
+    assert "loader said no" in str(answer["rejectedWhy"])
+    assert answer["readonlyHidden"] is False
+    for control in SETUP_WRITE_CONTROLS:
+        assert answer["hidden"][control] is True, control

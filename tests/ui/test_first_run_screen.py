@@ -302,17 +302,51 @@ def test_the_two_rejections_wearing_one_code_never_say_the_same_thing() -> None:
     assert said.endswith(reason)
 
 
-def test_the_screen_says_out_loud_that_it_cannot_name_the_broken_line() -> None:
-    """The known gap, stated to the reader rather than left as a shrug: the
-    state a panel is handed for an existing rejected config is a bare code with
-    no reason in it, so the screen can say the file is refused and not why.
-    Saying so is the honest floor until the reason is carried out."""
+def test_the_screen_names_what_the_loader_objected_to() -> None:
+    """The gap this test used to state as an honest floor is closed.
 
-    for block in _language_tables():
-        manual = _value(block, "setup_manual_yaml")
-        assert manual
-    english, _ = _language_tables()
-    assert "reason" in _value(english, "setup_manual_yaml")
+    `setup_state` swallowed the loader's `CommonsError` and handed the screen a
+    bare code, so the panel could say the file was refused and not one word
+    about why -- and the only way to learn more was the terminal, which is the
+    regress the whole wave exists to remove.  `rejected_reason` and
+    `rejected_path` now travel beside the code, and the reason is the loader's
+    own text, the same one `POST /api/setup/runtime-config` puts in its error
+    message, so one failure reads one way whichever half of the screen met it.
+
+    What the panel must NOT do is paraphrase it: the reason is canonical text
+    out of the launch loader and is printed exactly as it arrived.
+    """
+
+    body = read_spa()
+    markup = body.split('<div id="setup" hidden>', 1)[1].split("\n</div>", 1)[0]
+    assert '<div id="setup-rejected" hidden>' in markup
+    assert '<p class="note" id="setup-rejected-why">' in markup
+    assert '<p class="note mono" id="setup-rejected-path">' in markup
+
+    paint = _function(body, "function paintSetup() {")
+    assert "const rejected = state === SETUP_REJECTED;" in paint
+    assert 'document.getElementById("setup-rejected").hidden = !rejected;' in paint
+    # Label plus the reason verbatim -- concatenated, never rewritten, and never
+    # passed through `t()`, which would be the panel translating the loader.
+    assert 't("setup_rejected_why") + " " + info.rejected_reason' in paint
+    assert 't("setup_rejected_where") + " " + info.rejected_path' in paint
+
+    english, russian = _language_tables()
+    for block in (english, russian):
+        for key in ("setup_rejected_why", "setup_rejected_where", "setup_rejected_no_reason"):
+            assert _value(block, key), key
+    # And the paragraph that used to end "it cannot say which line is wrong"
+    # now points at the reason instead, in both languages: a sentence that
+    # apologises for an absence outlives the absence and becomes a lie.
+    assert "below, in its own words" in _value(english, "setup_manual_yaml")
+    assert "ниже его же словами" in _value(russian, "setup_manual_yaml")
+    for block in (english, russian):
+        assert "carries the verdict and not the reason" not in _value(block, "setup_manual_yaml")
+
+    # A rejected state that arrives with no reason -- an older server -- is
+    # still said out loud rather than shown as an empty label.
+    assert 't("setup_rejected_no_reason")' in paint
+    assert "was not told" in _value(english, "setup_rejected_no_reason")
 
 
 # -- the paths, and the consent asked for them --------------------------------

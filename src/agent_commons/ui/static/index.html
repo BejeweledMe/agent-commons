@@ -1599,6 +1599,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <p class="note mono" id="setup-path"></p>
       <p class="note warn" id="setup-trust" data-i18n="setup_trust_warning"></p>
     </div>
+    <!-- Why the existing config was refused, in the loader's own words. Until
+         the state carried a reason this screen could only say "your file does
+         not work", and the only way to learn more was the terminal — the exact
+         regress this panel exists to remove. The reason is canonical text from
+         the loader and is printed verbatim, never translated; the label before
+         it and the path beside it are the panel's. -->
+    <div id="setup-rejected" hidden>
+      <p class="note" id="setup-rejected-why"></p>
+      <p class="note mono" id="setup-rejected-path"></p>
+    </div>
     <div class="actions">
       <button type="button" class="cta" id="setup-init" hidden data-i18n="setup_init_button"></button>
       <button type="button" class="cta" id="setup-write" hidden data-i18n="setup_write_button"></button>
@@ -2629,7 +2639,13 @@ const STRINGS = {
     setup_initialized: "Workspace created. The panel opened its own session in it and is now recording.",
     setup_demo_written: "Demo mode set up. The whole loop works and no provider is ever started.",
     setup_rejected_existing: "There is already an operator runtime config at the path below, and this panel's own launch loader will not accept it. Your file is untouched: the panel did not write it and will not rename or overwrite anything it did not write. Nothing will run until it is repaired or replaced.",
-    setup_manual_yaml: "Replacing it from here overwrites it with a freshly generated config. Repairing it means editing it yourself — this panel will not edit a file it did not write. It cannot say which line is wrong either, because the state it is told carries the verdict and not the reason.",
+    setup_manual_yaml: "Replacing it from here overwrites it with a freshly generated config. Repairing it means editing it yourself — this panel will not edit a file it did not write. What the loader objected to is below, in its own words.",
+    // The loader's refusal, and the file it refused. Both arrive beside the
+    // state now; before they did, this screen could only say "your file does
+    // not work" and the terminal was the only way to learn more.
+    setup_rejected_why: "The loader's reason:",
+    setup_rejected_where: "The file it refused:",
+    setup_rejected_no_reason: "This panel was not told what the loader objected to, only that it refused. Running a launch from the terminal in this directory will print the reason.",
     setup_rejected: "The config this panel generated was refused by its own launch loader, so it was never adopted, and it was moved aside to runtime.yaml.rejected rather than left posing as a working config. The loader's reason:",
     setup_rescan_button: "Look again",
     setup_demo_offer: "Demo mode writes a config with demo: true. No provider process is ever started and nothing leaves this machine, but the whole loop closes — hire, task, Run, a recorded result. Use it to learn the panel, or to keep working while a provider is missing.",
@@ -3312,7 +3328,10 @@ const STRINGS = {
     setup_initialized: "Рабочее пространство создано. Панель открыла в нём собственную сессию и ведёт запись.",
     setup_demo_written: "Демонстрационный режим настроен. Весь круг работает, ни один провайдер не стартует.",
     setup_rejected_existing: "По пути ниже уже лежит операторский файл среды выполнения, и собственный загрузчик этой панели его не принимает. Ваш файл не тронут: панель его не писала и не переименовывает и не перезаписывает то, чего не писала. Пока он не починен или не заменён, работать ничего не будет.",
-    setup_manual_yaml: "Замена отсюда перезапишет его свежесгенерированным файлом. Починка означает править его самому — файл, который панель не писала, она не редактирует. Сказать, какая именно строка неверна, она тоже не может: состояние, которое ей сообщают, несёт вердикт, но не причину.",
+    setup_manual_yaml: "Замена отсюда перезапишет его свежесгенерированным файлом. Починка означает править его самому — файл, который панель не писала, она не редактирует. Что именно не устроило загрузчик, сказано ниже его же словами.",
+    setup_rejected_why: "Причина от загрузчика:",
+    setup_rejected_where: "Файл, который он не принял:",
+    setup_rejected_no_reason: "Этой панели не сообщили, что именно не устроило загрузчик, — только то, что он отказал. Причину напечатает попытка начать прогон из терминала в этом каталоге.",
     setup_rejected: "Файл, который панель сгенерировала, её собственный загрузчик не принял, поэтому файл не был принят в работу и убран в сторону под именем runtime.yaml.rejected, а не оставлен изображать рабочий. Причина от загрузчика:",
     setup_rescan_button: "Посмотреть снова",
     setup_demo_offer: "Демонстрационный режим пишет файл с demo: true. Ни один процесс провайдера не стартует и ничего не покидает эту машину, но круг замыкается целиком — наём, задача, «Прогон», записанный результат. Годится, чтобы освоить панель или продолжать работу, пока провайдера нет.",
@@ -8112,6 +8131,29 @@ function paintSetup() {
     // showing it at the same moment.
     document.getElementById("setup-path").textContent =
       t("setup_path_label") + " " + (info.config_path || "");
+  }
+
+  // Why the loader refused the operator's own file, in the loader's own words.
+  // The same text `POST /api/setup/runtime-config` puts in its error message,
+  // so one failure reads one way whichever half of the screen met it.  A
+  // rejected state that arrives without one — an older server — is still said
+  // out loud, as an absence, because "your file does not work" and silence
+  // about why is the dead end this reason was added to close.
+  const rejected = state === SETUP_REJECTED;
+  document.getElementById("setup-rejected").hidden = !rejected;
+  if (rejected) {
+    const why = document.getElementById("setup-rejected-why");
+    // The reason is canonical text out of the launch loader and is printed
+    // exactly as it arrived; only the label in front of it is the panel's.
+    why.textContent = info.rejected_reason
+      ? t("setup_rejected_why") + " " + info.rejected_reason
+      : t("setup_rejected_no_reason");
+    const where = document.getElementById("setup-rejected-path");
+    // The file the loader refused, named where it stands — the panel did not
+    // write it, has not moved it, and says so above.
+    where.textContent = info.rejected_path
+      ? t("setup_rejected_where") + " " + info.rejected_path : "";
+    where.hidden = !info.rejected_path;
   }
 
   // Every button below writes, and on an observing panel none of their routes
