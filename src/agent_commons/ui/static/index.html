@@ -1581,8 +1581,16 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
 <div id="setup" hidden>
   <div class="setup-card">
     <h2 id="setup-title" data-i18n="setup_title"></h2>
-    <p class="note" data-i18n="setup_intro"></p>
+    <!-- The intro says this screen writes the two missing things, which is only
+         true of a panel that can write. On `--read-only` none of the setup
+         routes is even registered, so the key is switched rather than the text:
+         an element is owned by `data-i18n` or by a JS write, never both. -->
+    <p class="note" id="setup-intro" data-i18n="setup_intro"></p>
     <p class="note" id="setup-state-note"></p>
+    <!-- An observing panel still describes the state — that is a GET and it is
+         the whole use of this screen there — and says plainly that it has no
+         way to act on it, instead of offering buttons whose routes answer 404. -->
+    <p class="note warn" id="setup-readonly" hidden data-i18n="setup_readonly_note"></p>
     <p class="mono setup-cmd" id="setup-command" hidden></p>
     <div id="setup-found" hidden>
       <h3 class="subhead" data-i18n="setup_found_title"></h3>
@@ -2599,6 +2607,10 @@ const STRINGS = {
     // a page served out of it.
     setup_title: "Set this project up",
     setup_intro: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This screen writes the last two; nothing here needs a terminal.",
+    // The same three things, said by a panel that can write none of them: this
+    // one was started to watch, so its whole use here is to name the state.
+    setup_intro_readonly: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This panel is watching only, so it can say which of them is missing and nothing more.",
+    setup_readonly_note: "This panel cannot set anything up. It was started to observe, so the routes that would write a workspace or a runtime config do not exist on it at all — there is nothing here to press. To do what the state above needs, open a panel on this directory without the read-only switch, and this one will describe the result on the next look.",
     setup_repo_missing: "This directory is not a git repository, so there is nothing for a workspace to attach to and nothing to record work against. Make it one and press “Look again”:",
     setup_init_offer: "A git repository with no workspace yet. Creating one writes .agent-commons/ here — the shared history that every role, every task and every run is recorded into. Nothing outside this directory is touched.",
     setup_init_button: "Create the workspace here",
@@ -3280,6 +3292,8 @@ const STRINGS = {
     // --- первая настройка --------------------------------------------------
     setup_title: "Настройте этот проект",
     setup_intro: "Роль сможет работать, когда есть три вещи: git-репозиторий, рабочее пространство внутри него и файл среды выполнения вне него — тот, что перечисляет программы, которые прогон вправе стартовать. Этот экран пишет последние две; терминал здесь не нужен.",
+    setup_intro_readonly: "Роль сможет работать, когда есть три вещи: git-репозиторий, рабочее пространство внутри него и файл среды выполнения вне него — тот, что перечисляет программы, которые прогон вправе стартовать. Эта панель только наблюдает, поэтому может сказать, чего из этого не хватает, и больше ничего.",
+    setup_readonly_note: "Эта панель ничего настроить не может. Она открыта для наблюдения, поэтому маршрутов, которые записали бы рабочее пространство или файл среды выполнения, на ней нет вовсе — нажимать здесь нечего. Чтобы сделать то, чего требует состояние выше, откройте панель на этом каталоге без переключателя «только чтение», а эта опишет результат при следующем взгляде.",
     setup_repo_missing: "Этот каталог — не git-репозиторий, значит рабочему пространству не к чему прикрепиться и работу некуда записывать. Сделайте его репозиторием и нажмите «Посмотреть снова»:",
     setup_init_offer: "Это git-репозиторий, рабочего пространства в нём пока нет. Создание запишет сюда .agent-commons/ — общую историю, в которую попадают все роли, все задачи и все прогоны. Ничего за пределами этого каталога не затрагивается.",
     setup_init_button: "Создать рабочее пространство здесь",
@@ -8055,6 +8069,17 @@ function paintSetup() {
   const reopen = document.getElementById("board-setup");
   reopen.hidden = !setupInfo;
   reopen.dataset.i18n = setupNeedsAttention() ? "setup_reopen" : "setup_preflight_button";
+  // Whether this panel can act on what the screen is about to describe.  The
+  // setup routes are registered from the same structural property the answer
+  // reports, so the screen and the router cannot disagree about what exists.
+  // An answer that omits the field is an older server: assume it can act, which
+  // is what the panel did before the field existed, rather than hiding the only
+  // way forward on a panel that has one.
+  const observing = Boolean(setupInfo) && setupInfo.operator_panel === false;
+  // The intro promises that this screen writes the two missing things. On an
+  // observing panel it writes nothing, so it says what it does instead.
+  document.getElementById("setup-intro").dataset.i18n =
+    observing ? "setup_intro_readonly" : "setup_intro";
   applyI18n();
   if (!setupInfo) { screen.hidden = true; return; }
   const info = setupInfo;
@@ -8090,21 +8115,29 @@ function paintSetup() {
       t("setup_path_label") + " " + (info.config_path || "");
   }
 
+  // Every button below writes, and on an observing panel none of their routes
+  // is registered — pressing one would answer 404, which reads as a broken
+  // product rather than as a panel that was never given the power. The screen
+  // says so once, in words, and offers only what it can actually do: describe
+  // the state, look again, and run the credential-free check, all of them GETs.
+  document.getElementById("setup-readonly").hidden = !observing;
+
   const init = document.getElementById("setup-init");
-  init.hidden = state !== "setup_uninitialized";
+  init.hidden = observing || state !== "setup_uninitialized";
   const write = document.getElementById("setup-write");
-  write.hidden = !configurable;
+  write.hidden = observing || !configurable;
   // Refused before the click rather than after it: the sentence above says
   // which program is missing, and the button says the same thing by being dead.
   write.disabled = blocked;
   write.title = blocked ? setupBlockingNote(info) : "";
   const demo = document.getElementById("setup-demo");
-  demo.hidden = !configurable;
+  demo.hidden = observing || !configurable;
   const offer = document.getElementById("setup-demo-offer");
   // Demo is named on every unconfigured state, and it is the LEAD when nothing
   // else can be written: `setup_no_provider_found` without it is a dead end,
-  // which is the one thing this screen may not be.
-  offer.hidden = !(configurable && info.demo_available);
+  // which is the one thing this screen may not be.  The sentence names the
+  // button, so it goes wherever the button goes.
+  offer.hidden = observing || !(configurable && info.demo_available);
   document.getElementById("setup-rescan").hidden = false;
   document.getElementById("setup-preflight").hidden = !setupIsConfigured(state);
   document.getElementById("setup-preflight-note").hidden = !setupIsConfigured(state);

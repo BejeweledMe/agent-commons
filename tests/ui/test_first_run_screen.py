@@ -195,7 +195,9 @@ def test_no_provider_at_all_is_offered_demo_as_a_way_on_not_as_a_consolation() -
     body = read_spa()
     # The offer is shown off `demo_available`, which the route sends precisely
     # so the screen does not have to derive it.
-    assert "offer.hidden = !(configurable && info.demo_available);" in body
+    # `observing` is the other half: the sentence names a button, so on a panel
+    # that has no such route it goes with the button rather than advertising it.
+    assert "offer.hidden = observing || !(configurable && info.demo_available);" in body
     assert 'setupWrite("/api/setup/demo-config", "setup_demo_written");' in body
     for block in _language_tables():
         # Demo mode's config value is canonical and is not translated.
