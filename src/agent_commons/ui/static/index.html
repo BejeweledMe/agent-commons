@@ -1084,9 +1084,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-lm-panel" data-i18n="guide_lm_panel_h"></h3>
           <p data-i18n="guide_lm_panel_p"></p>
           <p class="mono dim" data-i18n="guide_lm_panel_ex"></p>
-          <h3 id="g-lm-gates" data-i18n="guide_lm_gates_h"></h3>
-          <p data-i18n="guide_lm_gates_p"></p>
-          <p class="mono dim" data-i18n="guide_lm_gates_ex"></p>
+          <!-- Was "Three gates", and it described all three capability switches
+               in full long after the CLI stopped having any.  The heading kept
+               its place because the subject did not go away with them —
+               loopback, one bearer token, nothing stored — only the sentence
+               about how a capability is turned on did.  What decides now is
+               what is CONFIGURED, and the panel says which of those it is
+               missing rather than which switch to add.  No switch this product
+               no longer has may be spelled anywhere in this file, comments
+               included; a test asserts it. -->
+          <h3 id="g-lm-access" data-i18n="guide_lm_access_h"></h3>
+          <p data-i18n="guide_lm_access_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_access_ex"></p>
         </div>
         <div id="gpage-catalog" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
@@ -1360,6 +1369,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <label class="field"><span data-i18n="run_wall_label">Stop the run after this many seconds (blank = default)</span>
         <input type="number" id="run-wall" min="1" max="86400"></label>
       <button type="button" id="run-go" data-i18n="run_go">Run this role on the task</button>
+      <!-- The way out of `launch_not_configured`, inside the panel.  The tab
+           used to be hidden outright when nothing was configured, so a person
+           looking for Run found no tab, no refusal and no next step; the note
+           above switches to the reason and this leads to the screen that
+           removes it. -->
+      <button type="button" id="run-setup" hidden data-i18n="setup_reopen"></button>
       <p class="result" id="run-result"></p>
     </section>
 
@@ -1409,7 +1424,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <!-- An empty operator catalogue rendered this control as an empty box and
            read as broken (round 3, designer).  The box gives way to a line that
            says what a skill is and where skills come from — written from JS
-           because the second half depends on the catalogue-editing gate. -->
+           because the second half depends on whether the catalogue is editable. -->
       <p class="note" id="settings-skills-empty" hidden></p>
       <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions on
         every run. Changes apply from the next run, never retroactively.</p>
@@ -1578,7 +1593,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
             data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
           <select id="hire-skills" multiple size="4"></select></label>
         <!-- Written from JS for the same reason the settings one is: the second
-             half of the sentence depends on the catalogue-editing gate. -->
+             half of the sentence depends on whether the catalogue is editable. -->
         <p class="note" id="hire-skills-empty" hidden></p>
         <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions
           on every run. Changes apply from the next run, never retroactively.</p>
@@ -1851,7 +1866,7 @@ const STRINGS = {
     start_work: "Open the chat",
     recorded: "recorded",
     chat_empty_writable: "No main chat yet. Write here and every role that answers to you is addressed at once — this is the conversation, not the work. Work with a done-when of its own goes through “+ Task”.",
-    chat_empty_readonly: "No main chat yet. Start the UI with --enable-writes to open one.",
+    chat_empty_readonly: "No main chat yet. This panel holds no operator session, so it can neither open one nor write into it.",
     addressed_roles: "addressed roles",
     unaddressed_prefix: ". Roles created since this chat opened are not addressed in it: ",
     unaddressed_suffix: ". Open a new chat to include them.",
@@ -1956,14 +1971,14 @@ const STRINGS = {
     needs_decision: "needs a decision",
     your_answer: "Your answer",
     answer_button: "Answer",
-    readonly_answer: "Read-only. Start the UI with --enable-writes as the owning session to answer.",
+    readonly_answer: "Read-only. This panel holds no operator session, so it has nothing to answer as — it was opened as a view that records nothing, or another panel on this project holds the session.",
     answer_owner: "Answer from the session that owns this run: ",
     blocked_no_channel: "This run is blocked in the canonical ledger; no live answer channel is open here.",
     confirm_role_button: "Confirm this role",
-    readonly_confirm: "Read-only. Start the UI with --enable-writes to confirm.",
+    readonly_confirm: "Read-only. This panel holds no operator session, so there is nothing here to confirm with.",
     your_reply: "Your reply",
     reply_button: "Reply",
-    readonly_reply: "Read-only. Start the UI with --enable-writes to reply.",
+    readonly_reply: "Read-only. This panel holds no operator session, so there is nothing here to reply as.",
     reply_needs_body: "a reply needs a body",
     replied: "replied",
     answered: "answered",
@@ -1983,7 +1998,7 @@ const STRINGS = {
     not_on_graph: "that subject is not on the current graph",
     catalog_editing_note: "Entries here change what delegated runs are told to do. They are stored in",
     catalog_default_store: "the operator catalogue",
-    catalog_readonly: "Read-only. Start the UI with --role-catalog and --enable-catalog-editing to change it.",
+    catalog_readonly: "Read-only. Changing the catalogue needs two things at once: a catalogue file of this panel's own, and an operator session to record the change under. Setting the runtime up writes a catalogue beside it — the first-run screen is on the board bar.",
     none_yet: "none yet",
     remove_button: "Remove",
     catalog_add_heading: "Add or replace an entry",
@@ -2158,11 +2173,11 @@ const STRINGS = {
     guide_lm_panel_h: "What this panel actually launches",
     guide_lm_panel_p: "A UI run is one bounded leaf: max_depth 0, one attempt, 600 seconds of wall time, budget 1 provider_units — no children, no fan-out. It goes through the same DelegationRuntimeService the CLI broker uses, under the role's operator-allowlisted profile; the panel may change the wall time and nothing else.",
     guide_lm_panel_ex: "Run on the board → delegation.requested at depth 0, then the provider process; state changes reach the panel over the event stream",
-    guide_lm_gates_h: "Three gates, loopback, no transcripts",
-    guide_lm_gates_p: "The server listens on loopback behind a bearer token held in memory and printed once. Read-only by default: only GET routes exist. --enable-writes opens the enumerated write routes; --enable-catalog-editing (plus --role-catalog) additionally lets the panel edit the catalogue; --enable-launch (plus --profile-config) additionally starts provider runs. Profiles are never editable from the UI at any gate. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
-    guide_lm_gates_ex: "read-only start → the app registers GET routes only; the stream without the token → 401",
+    guide_lm_access_h: "Loopback, one token, nothing stored",
+    guide_lm_access_p: "The server listens on loopback behind a bearer token held in memory and printed once. There are no capability switches: what the panel can do follows from what exists — an operator session of its own makes it record at all, a catalogue file makes that catalogue editable, a runtime config makes runs startable — and each of the three is written from the panel's own first-run screen. A view opened to record nothing registers no route that is not a GET. Profiles are never editable from here in any state. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
+    guide_lm_access_ex: "a run before the runtime config exists → launch_not_configured, and the first-run screen rather than a restart",
     guide_ct_file_h: "The catalogue is an operator file",
-    guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue (second gate), never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
+    guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue when it has one, never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
     guide_ct_file_ex: "a builder runs with write access to the workspace — a catalogue inside it would be a catalogue the role can rewrite",
     guide_ct_skill_h: "A skill is operator-authored instruction",
     guide_ct_skill_p: "A skill entry carries up to 4000 characters of instruction text; a tool entry carries only an identity, because the tool it names is already fixed by the profile. At launch skill_instructions resolves each id fail-closed: an id the catalogue lacks refuses the launch, rather than silently running a different role than the operator described. The resolved text joins the bounded instruction fed to the provider process over stdin — a role cannot write its own skill.",
@@ -2452,6 +2467,10 @@ const STRINGS = {
     setup_preflight_all_ok: "Every configured profile answered.",
     setup_preflight_some_bad: "Something did not answer; the profiles are listed below.",
     stream_setup_pending: "not set up yet — the screen says what is missing",
+    // --- the three refusals that are states of this panel --------------------
+    launch_not_configured_note: "Nothing can be run yet: no runtime config is in effect, so this panel has no allowlisted program to start a run with. The config is written from the first-run screen — no restart and no terminal.",
+    refusal_uninitialized: "There is no workspace in this directory yet, so there is nothing to record into. Create it from the first-run screen and this write will go through.",
+    panel_already_open: "Another panel already owns this project, and only one panel may write to it at a time. Use that window, or stop it and reload this one; its address is in the refusal below.",
   },
   ru: {
     tab_attention: "Внимание",
@@ -2504,7 +2523,7 @@ const STRINGS = {
     start_work: "Открыть чат",
     recorded: "записано",
     chat_empty_writable: "Общего чата пока нет. Напишите здесь — и обращение уйдёт сразу каждой роли, которая вам подчиняется. Это разговор, а не работа: работу со своим критерием готовности заводят кнопкой «+ Задача».",
-    chat_empty_readonly: "Общего чата пока нет. Запустите интерфейс с --enable-writes, чтобы открыть его.",
+    chat_empty_readonly: "Общего чата пока нет. У этой панели нет операторской сессии, поэтому она не может ни открыть чат, ни писать в него.",
     addressed_roles: "адресовано ролям",
     unaddressed_prefix: ". Роли, созданные после открытия этого чата, в нём не адресованы: ",
     unaddressed_suffix: ". Откройте новый чат, чтобы включить их.",
@@ -2606,14 +2625,14 @@ const STRINGS = {
     needs_decision: "нужно решение",
     your_answer: "Ваш ответ",
     answer_button: "Ответить",
-    readonly_answer: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes из сессии-владельца.",
+    readonly_answer: "Только чтение. У этой панели нет операторской сессии, отвечать ей не от чьего имени — она открыта как вид, который ничего не записывает, либо сессией этого проекта владеет другая панель.",
     answer_owner: "Ответить может сессия — владелец этого прогона: ",
     blocked_no_channel: "Этот прогон заблокирован в каноническом реестре; живого канала для ответа здесь нет.",
     confirm_role_button: "Подтвердить эту роль",
-    readonly_confirm: "Только чтение. Чтобы подтвердить, запустите интерфейс с --enable-writes.",
+    readonly_confirm: "Только чтение. У этой панели нет операторской сессии, подтверждать ей не от чьего имени.",
     your_reply: "Ваш ответ",
     reply_button: "Ответить",
-    readonly_reply: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes.",
+    readonly_reply: "Только чтение. У этой панели нет операторской сессии, отвечать ей не от чьего имени.",
     reply_needs_body: "ответу нужен текст",
     replied: "ответ отправлен",
     answered: "ответ записан",
@@ -2633,7 +2652,7 @@ const STRINGS = {
     not_on_graph: "этого объекта нет на текущем графе",
     catalog_editing_note: "Записи здесь меняют то, что поручается делать делегированным прогонам. Они хранятся в",
     catalog_default_store: "каталоге оператора",
-    catalog_readonly: "Только чтение. Чтобы изменять, запустите интерфейс с --role-catalog и --enable-catalog-editing.",
+    catalog_readonly: "Только чтение. Для правки каталога нужны сразу две вещи: собственный файл каталога у этой панели и операторская сессия, под которой запишется изменение. Настройка среды выполнения кладёт каталог рядом — экран настройки на панели доски.",
     none_yet: "пока пусто",
     remove_button: "Удалить",
     catalog_add_heading: "Добавить или заменить запись",
@@ -2799,11 +2818,11 @@ const STRINGS = {
     guide_lm_panel_h: "Что реально запускает панель",
     guide_lm_panel_p: "Прогон из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
     guide_lm_panel_ex: "Run на доске → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
-    guide_lm_gates_h: "Три гейта, loopback, без транскриптов",
-    guide_lm_gates_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. По умолчанию только чтение: существуют только GET-маршруты. --enable-writes открывает перечисленные маршруты записи; --enable-catalog-editing (плюс --role-catalog) дополнительно даёт панели править каталог; --enable-launch (плюс --profile-config) дополнительно разрешает прогоны провайдера. Профили из UI не редактируются ни при каком гейте. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
-    guide_lm_gates_ex: "старт только на чтение → приложение регистрирует только GET-маршруты; стрим без токена → 401",
+    guide_lm_access_h: "Loopback, один токен, ничего не хранится",
+    guide_lm_access_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. Переключателей возможностей нет: панель может ровно то, для чего есть основание — собственная операторская сессия делает её пишущей вообще, файл каталога делает каталог правимым, файл среды выполнения делает прогоны возможными, — и все три пишутся с её же экрана настройки. Вид, открытый чтобы ничего не записывать, не регистрирует ни одного маршрута кроме GET. Профили отсюда не редактируются ни в каком состоянии. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
+    guide_lm_access_ex: "прогон до того, как есть файл среды выполнения → launch_not_configured и экран настройки, а не перезагрузка",
     guide_ct_file_h: "Каталог — файл оператора",
-    guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог (второй гейт), но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
+    guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог, когда он у неё есть, но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
     guide_ct_file_ex: "билдер работает с правом записи в workspace — каталог внутри него был бы каталогом, который роль может переписать",
     guide_ct_skill_h: "Навык — инструкция от оператора",
     guide_ct_skill_p: "Запись навыка несёт до 4000 знаков инструкции; запись инструмента — только идентификатор, потому что сам инструмент уже зафиксирован профилем. На старте прогона skill_instructions разрешает каждый id fail-closed: id, которого нет в каталоге, отменяет прогон — вместо того чтобы молча запустить другую роль, чем описал оператор. Разрешённый текст входит в ограниченную инструкцию, подаваемую процессу провайдера через stdin, — роль не может написать себе навык сама.",
@@ -3086,6 +3105,9 @@ const STRINGS = {
     setup_preflight_all_ok: "Все настроенные профили ответили.",
     setup_preflight_some_bad: "Что-то не ответило; профили перечислены ниже.",
     stream_setup_pending: "ещё не настроено — экран говорит, чего не хватает",
+    launch_not_configured_note: "Вести прогоны пока не с чем: файл среды выполнения не действует, поэтому у панели нет разрешённой программы, которой прогон можно поручить. Файл пишется с экрана настройки — без перезагрузки и без терминала.",
+    refusal_uninitialized: "Рабочего пространства в этом каталоге ещё нет, записывать некуда. Создайте его на экране настройки, и эта запись пройдёт.",
+    panel_already_open: "Этим проектом уже владеет другая панель, а писать в него одновременно может только одна. Пользуйтесь тем окном или остановите его и перезагрузите это; его адрес — в отказе ниже.",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -3222,8 +3244,24 @@ const REFUSAL_HINTS = [
   ["is not allowed from task state", "err_task_state_illegal"],
 ];
 
+// Three refusals are states of this panel rather than complaints about a
+// request, and every form in the panel can meet all three: the workspace does
+// not exist yet, the runtime is not configured, or another panel already owns
+// this project.  They are matched on the CODE the server sends, not on the
+// English of the message — the message is the canonical text and may be
+// reworded, while the code is frozen by the wave contract.  The canonical
+// sentence still follows in brackets, and for `panel_already_open` it is the
+// half that carries the first panel's address.
+const REFUSAL_CODES = {
+  setup_uninitialized: "refusal_uninitialized",
+  launch_not_configured: "launch_not_configured_note",
+  panel_already_open: "panel_already_open",
+};
+
 function humanizeError(error, fieldLabels) {
   const message = String(error.message || error);
+  const coded = REFUSAL_CODES[error && error.code];
+  if (coded) { return t(coded) + " (" + message + ")"; }
   const field = refusedField(message);
   if (field && fieldLabels && fieldLabels[field]) {
     // No canonical text in brackets here, and only here: the sentence already
@@ -4681,7 +4719,7 @@ document.getElementById("task-create-go").addEventListener("click", async () => 
     document.getElementById("task-desc").value = "";
     document.getElementById("task-criteria").value = "";
     await refreshGraph();
-    if (launchEnabled) { loadLaunch(); }
+    loadLaunch();
   } catch (error) {
     showFormError(error, TASK_FIELDS, result);
   }
@@ -5245,9 +5283,11 @@ async function loadCatalog() {
   catalogEditing = Boolean(catalog && catalog.catalog_editing_enabled);
 }
 
-// Launching a role's run from the panel (MUST-4). The Run tab appears on a role
-// only when the operator started the UI with the launch gate; it records a
-// delegation under the role's profile and runs it through the broker.
+// Launching a role's run from the panel (MUST-4). It records a delegation under
+// the role's profile and runs it through the broker.  There is no launch switch
+// any more: whether a run can start follows from whether a runtime config is in
+// effect, and that config is written from this panel's own first-run screen —
+// so the tab is shown either way and says which of the two it is.
 let launchEnabled = false;
 let launchTasks = [];
 
@@ -5256,6 +5296,16 @@ async function loadLaunch() {
   try { options = (await api("/api/launch")) || options; } catch (error) { /* read-only */ }
   launchEnabled = Boolean(options.launch_enabled);
   launchTasks = options.tasks || [];
+  // An unconfigured runtime is a state with a name and a way out, not a missing
+  // control: the note switches to the reason and the button beside it leads to
+  // the screen that writes the config.  The note switches its `data-i18n` key
+  // rather than its text, because `applyI18n` runs on every stream frame and
+  // would put the other sentence back two seconds later.
+  document.getElementById("run-note").dataset.i18n =
+    launchEnabled ? "run_note" : "launch_not_configured_note";
+  document.getElementById("run-go").disabled = !launchEnabled;
+  document.getElementById("run-setup").hidden = launchEnabled;
+  applyI18n();
   const picker = document.getElementById("run-task");
   // The same clobber as the hire pickers, and this one fires on every stream
   // snapshot: `loadLaunch` runs about every two seconds while a run moves, and
@@ -5310,6 +5360,7 @@ async function runRole() {
 }
 
 document.getElementById("run-go").addEventListener("click", runRole);
+document.getElementById("run-setup").addEventListener("click", () => openSetup());
 
 // Live run phases (MUST-5). The Runs tab appears when there is a run to show and
 // updates on the same stream as the graph, so a launched run visibly moves
@@ -6017,7 +6068,7 @@ function paintHire() {
   // catalogue renders this control as an empty box that reads as broken, so the
   // box gives way to the line that says what a skill is and where skills come
   // from.  The line is written here rather than carried as `data-i18n` because
-  // its second half depends on the catalogue-editing gate — and because being
+  // its second half depends on whether the catalogue is editable — and because being
   // written here is what repaints it on a language switch.
   const skills = catalog.skills || [];
   fillSelect(document.getElementById("hire-skills"), skills, held("hire-skills", []), true);
@@ -6448,9 +6499,12 @@ async function inspect(node) {
   settingsTab.hidden = !(isRole && writesEnabled);
   // The pencil is a pointer to the Settings tab, so it comes and goes with it.
   document.getElementById("drawer-rename").hidden = settingsTab.hidden;
-  // Run appears on a role only when the launch gate is on, and only for an
-  // active (non-preset) role that can actually be staffed.
-  runTab.hidden = !(isRole && launchEnabled && node.state === "active" &&
+  // Run appears on every active (non-preset) role a writing panel can staff,
+  // configured runtime or not.  Hiding it while nothing was configured meant a
+  // person looking for Run found no tab, no refusal and no next step — the
+  // panel's own missing capability rendered as an absence.  It shows, it says
+  // why it cannot start anything, and it leads to the screen that fixes it.
+  runTab.hidden = !(isRole && writesEnabled && node.state === "active" &&
     !(node.attrs && node.attrs.template));
   const linksTab = document.querySelector('#drawer-tabs button[data-panel="links"]');
   linksTab.hidden = !isRole;
@@ -7499,7 +7553,7 @@ function handleFrame(frame) {
     loadAttention();
     loadChat();
     loadRuns();
-    if (launchEnabled) { loadLaunch(); }
+    loadLaunch();
     return;
   }
   if (event === "resume_gap") {
@@ -7905,7 +7959,7 @@ const LANGUAGE_SURFACES = [
   ["chat", () => loadChat()],
   ["attention", () => loadAttention()],
   ["search", () => repaintSearch()],
-  ["launch", () => { if (launchEnabled) { loadLaunch(); } }],
+  ["launch", () => loadLaunch()],
   // The first-run screen is half `data-i18n` chrome and half painted from the
   // one answer that describes the state, so `chrome` alone would translate its
   // headings and leave the sentence that matters in the previous language.
