@@ -48,9 +48,11 @@ def _serve_spy(captured: dict[str, Any]) -> Any:
     return serve
 
 
-def test_the_ui_command_defaults_to_a_context_that_cannot_write(
+def test_the_ui_command_opens_and_owns_its_own_session_by_default(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Nobody runs `session start` for the panel: it is the session's owner."""
+
     captured: dict[str, Any] = {}
     monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
     result = CliRunner().invoke(
@@ -58,18 +60,36 @@ def test_the_ui_command_defaults_to_a_context_that_cannot_write(
     )
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["read_only"] is True
+    payload = json.loads(result.output)
+    assert payload["read_only"] is False
+    assert str(payload["writer_session_id"]).startswith("session.")
+    assert captured["context"].writes_enabled is True
+    # Ctrl-C (serve returning) closed the panel's session behind itself.
+    shown = CommonsManager(repo, read_only=True).show_session(payload["writer_session_id"])
+    assert shown["status"] == "closed"
+
+
+def test_read_only_serves_a_context_that_cannot_write(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(
+        cli, ["--repo", str(repo), "--json", "ui", "--port", "0", "--no-browser", "--read-only"]
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["read_only"] is True
+    assert payload["writer_session_id"] is None
     assert captured["context"].writes_enabled is False
 
 
-def test_enable_writes_binds_the_operator_session_the_cli_resolves(
+def test_an_externally_selected_session_is_not_adopted(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The flag has to exist *and* carry a real session into the context.
-
-    A writable server bound to no session would record canonical events under a
-    nameless actor, which the ledger has no way to represent honestly.
-    """
+    """The panel holds no nonce for a borrowed session, so it cannot renew or
+    close it; it warns and opens its own instead."""
 
     session_id = _session(repo)
     captured: dict[str, Any] = {}
@@ -86,30 +106,18 @@ def test_enable_writes_binds_the_operator_session_the_cli_resolves(
             "--port",
             "0",
             "--no-browser",
-            "--enable-writes",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["read_only"] is False
-    assert payload["writer_session_id"] == session_id
-    assert captured["context"].writes_enabled is True
-    assert captured["context"].writer_session_id == session_id
-
-
-def test_enable_writes_without_a_session_is_refused_before_binding_a_socket(
-    repo: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    captured: dict[str, Any] = {}
-    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
-    result = CliRunner().invoke(
-        cli, ["--repo", str(repo), "--json", "ui", "--no-browser", "--enable-writes"]
-    )
-
-    assert result.exit_code != 0
-    assert "session" in result.output
-    assert "context" not in captured
+    # The warning goes to stderr; the started document is the last stdout line.
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["writer_session_id"] != session_id
+    assert session_id in result.output
+    assert "cannot renew" in result.output
+    # The borrowed session was left strictly alone.
+    shown = CommonsManager(repo, read_only=True).show_session(session_id)
+    assert shown["status"] == "active"
 
 
 def test_catalogue_editing_requires_naming_the_file_it_edits(
@@ -141,12 +149,9 @@ def test_catalogue_editing_is_a_separate_switch_from_role_writes(
         [
             "--repo",
             str(repo),
-            "--session-id",
-            _session(repo),
             "--json",
             "ui",
             "--no-browser",
-            "--enable-writes",
             "--role-catalog",
             str(catalogue),
         ],

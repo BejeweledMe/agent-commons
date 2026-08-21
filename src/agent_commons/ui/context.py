@@ -123,6 +123,7 @@ class UIContext:
         state_source: str = "default",
         writer_session_id: str | None = None,
         session_provider: Callable[[], str] | None = None,
+        session_owner: Any | None = None,
         catalog_path: Path | None = None,
         catalog_editing: bool = False,
         profile_config: Path | None = None,
@@ -150,18 +151,27 @@ class UIContext:
         # same identity the CLI writes under.  Absent one, this stays the
         # read-only server it has always been.
         #
-        # Two ways in, and exactly one may be used.  A caller that already holds
-        # a resolved session id passes it and it never changes; a caller that
-        # owns the session's whole lifetime passes a provider instead, because
-        # the id is then not a constant -- a session that outlives its TTL is
-        # replaced by a fresh one under the same identity, and every reader has
-        # to see the replacement without anybody remembering to re-assign a
-        # field.  Passing both is a programmer error, not an operator one:
-        # there would be no honest rule for which of the two wins.
-        if writer_session_id is not None and session_provider is not None:
-            raise TypeError("pass writer_session_id or session_provider, not both")
+        # Three ways in, and exactly one may be used.  A caller that already
+        # holds a resolved session id passes it and it never changes; a caller
+        # that owns the session's whole lifetime passes a provider or the owner
+        # object itself, because the id is then not a constant -- a session that
+        # outlives its TTL is replaced by a fresh one under the same identity,
+        # and every reader has to see the replacement without anybody
+        # remembering to re-assign a field.  The owner additionally carries the
+        # whole session lineage (for blocker answers scoped to a previous
+        # session) and the pre-launch TTL guarantee.  Passing more than one is a
+        # programmer error, not an operator one: there would be no honest rule
+        # for which wins.
+        given = [
+            item
+            for item in (writer_session_id, session_provider, session_owner)
+            if item is not None
+        ]
+        if len(given) > 1:
+            raise TypeError("pass writer_session_id, session_provider, or session_owner, not two")
         self._writer_session_id = writer_session_id
         self._session_provider = session_provider
+        self._session_owner = session_owner
         self.server_instance_id = uuid.uuid4().hex
         # One poller runs per SSE connection, so sequence and graph are shared
         # mutable state across worker threads.
@@ -200,9 +210,33 @@ class UIContext:
         between two calls.
         """
 
+        if self._session_owner is not None:
+            # `ensure_active` is a cheap in-memory liveness check that only
+            # touches the registry -- and repairs, replacing an expired session
+            # with a fresh one under the same identity -- when expiry is near.
+            # Routing every read through it is what moved "is the session
+            # alive" from once at startup to before every write.
+            return str(self._session_owner.ensure_active())
         if self._session_provider is not None:
             return self._session_provider()
         return self._writer_session_id
+
+    @property
+    def writer_session_ids(self) -> tuple[str, ...]:
+        """Every session id this panel has written under, the current one last.
+
+        Blocker answers are scoped to the session that asked the question, and
+        those scopes are immutable.  A panel whose session expired and was
+        recovered must still recognise requests addressed to its previous
+        sessions, so filters compare against this whole set rather than the
+        single current id.
+        """
+
+        if self._session_owner is not None:
+            self._session_owner.ensure_active()
+            return tuple(str(item) for item in self._session_owner.session_ids())
+        session_id = self.writer_session_id
+        return (session_id,) if session_id is not None else ()
 
     @property
     def writes_enabled(self) -> bool:
@@ -242,17 +276,25 @@ class UIContext:
         session_id = self.writer_session_id
         if session_id is None:
             raise ConfigurationError(
-                "this UI was started read-only; restart with --enable-writes to record events"
+                "this UI was started read-only; restart without --read-only to record events"
             )
-        manager = CommonsManager(
+        return self._writer_bound(session_id)
+
+    def _writer_bound(self, session_id: str) -> CommonsManager:
+        """A writer manager over one already-resolved session id.
+
+        Split from :meth:`writer` so a caller that needs the id *and* the
+        manager reads the (possibly rotating) session exactly once and binds
+        both to the same value.
+        """
+
+        return CommonsManager(
             self.repo,
             session_id=session_id,
             state_root=self._state_root,
             state_base=self._state_base,
             state_source=self._state_source,
         )
-        # Invalidate the cached graph so the next poll reflects the write.
-        return manager
 
     def invalidate(self) -> None:
         with self._guard:
@@ -549,7 +591,11 @@ class UIContext:
             _participant_id,
         )
 
-        manager = self.writer() if self.writes_enabled else self.manager()
+        # One read of the (possibly rotating) session lineage binds both the
+        # manager and the answerability filter to the same value; a second read
+        # through the provider could observe a different session between them.
+        session_ids = self.writer_session_ids
+        manager = self._writer_bound(session_ids[-1]) if session_ids else self.manager()
         try:
             operations = CommunicationRuntimeService(manager).inbox()
         except (CommonsError, OSError) as exc:
@@ -563,9 +609,11 @@ class UIContext:
             _LOG.warning("communication inbox unavailable, live answers disabled: %s", exc)
             operations = ()
         # Scopes store a deterministic pseudonym, not the registry session id,
-        # so the comparison has to be made in the same space.
-        session_id = self.writer_session_id
-        answerable = _participant_id(str(session_id)) if session_id else ""
+        # so the comparison has to be made in the same space.  The whole owned
+        # lineage participates: a scope recorded against a session this panel
+        # has since replaced still belongs to this panel, and hiding its answer
+        # form would orphan the blocker forever.
+        answerable = {_participant_id(str(item)) for item in session_ids}
         found = []
         for record in operations:
             if record.get("state") not in {"open", "replied"}:
@@ -581,7 +629,7 @@ class UIContext:
                     "task_id": scope.get("task_id"),
                     "metadata": record.get("metadata"),
                     "deadline": record.get("deadline"),
-                    "answerable_here": bool(answerable) and answerable in recipients,
+                    "answerable_here": bool(answerable & recipients),
                     "answer_from_session": sorted(recipients),
                 }
             )
@@ -988,9 +1036,20 @@ class UIContext:
 
         if not self.launch_enabled:
             raise ConfigurationError(
-                "launching is off; restart with --enable-writes --profile-config and "
-                "--enable-launch"
+                "launching is off; restart with --profile-config and --enable-launch"
             )
+        limits = dict(self._DEFAULT_RUN_LIMITS)
+        if wall_time_seconds:
+            limits["wall_time_seconds"] = int(wall_time_seconds)
+        if self._session_owner is not None:
+            # A forced heartbeat *before* `create_delegation`, not merely before
+            # the child starts: the runtime refuses a child unless the parent
+            # session TTL covers the wall time plus a finalization margin, and
+            # by launch time that refusal would arrive raw from the broker in a
+            # background thread.  Renewing here also pins the session for the
+            # whole launch window, so the requester recorded on the delegation
+            # is the session the background thread launches under.
+            self._session_owner.ensure_run_ttl(int(limits["wall_time_seconds"]))
         writer = self.writer()
         role = writer.get_agent(agent_id)
         if role.get("state") != "active":
@@ -1010,9 +1069,6 @@ class UIContext:
             if profile_id.endswith("independent-reviewer")
             else "implementation"
         )
-        limits = dict(self._DEFAULT_RUN_LIMITS)
-        if wall_time_seconds:
-            limits["wall_time_seconds"] = int(wall_time_seconds)
         delegation = writer.create_delegation(
             target_ref={"kind": "task", "id": task_id},
             target_revision=str(task.get("effective_revision") or task["revision"]),

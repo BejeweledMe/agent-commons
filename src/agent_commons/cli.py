@@ -328,9 +328,10 @@ def init_command(
 )
 @click.option("--no-browser", is_flag=True, help="Do not open a browser automatically.")
 @click.option(
-    "--enable-writes",
+    "--read-only",
+    "ui_read_only",
     is_flag=True,
-    help="Allow the role panel to record canonical events under the active session.",
+    help="Serve a view that records nothing; the panel opens no session of its own.",
 )
 @click.option(
     "--role-catalog",
@@ -360,22 +361,25 @@ def ui_command(
     state: CLIState,
     port: int,
     no_browser: bool,
-    enable_writes: bool,
+    ui_read_only: bool,
     role_catalog: Path | None,
     enable_catalog_editing: bool,
     profile_config: Path | None,
     enable_launch: bool,
 ) -> None:
-    """Serve a local view of this workspace on loopback; read-only by default.
+    """Serve the role panel on loopback; the panel owns its own session.
 
-    With --enable-writes the role panel records through the same
+    The panel opens, renews, and finally closes an operator session of its own
+    -- nobody runs ``session start`` for it -- and records through the same
     ``CommonsManager`` the CLI and MCP adapter use.  There is no second write
-    path.  It binds 127.0.0.1 only; there is deliberately no --host flag.
+    path.  With --read-only it opens no session and records nothing.  It binds
+    127.0.0.1 only; there is deliberately no --host flag.
     """
 
     try:
         from agent_commons.ui.context import UIContext
         from agent_commons.ui.server import serve
+        from agent_commons.ui.session_owner import ProjectSessionOwner
     except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
         raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
 
@@ -383,18 +387,28 @@ def ui_command(
         raise ConfigurationError(
             "--enable-catalog-editing requires --role-catalog naming the file to edit"
         )
-    writer_session_id = None
-    if enable_writes:
-        # Writes need the operator's own session, resolved and checked exactly
-        # as the CLI resolves it, so the UI cannot record under a nameless actor.
-        # Refuse here rather than at the first POST: the failure belongs where
-        # the operator is still watching, not in a browser tab an hour later.
-        if state.session_id is None:
-            error = ValidationError("--enable-writes requires an explicitly selected session")
-            error.code = "session_not_selected"  # type: ignore[attr-defined]
-            error.details = {"selection": "AGENT_COMMONS_SESSION_ID or --session-id"}  # type: ignore[attr-defined]
-            raise error
-        writer_session_id = str(state.manager().show_session(state.session_id)["session_id"])
+    read_only = ui_read_only or state.read_only
+    owner = None
+    if not read_only:
+        if state.session_id is not None:
+            # An externally selected session comes without its ownership nonce,
+            # so the panel could never renew or close it.  Refusing to adopt it
+            # is what keeps every panel session owned end to end.
+            click.echo(
+                "note: ignoring the selected session "
+                f"{state.session_id} (AGENT_COMMONS_SESSION_ID or --session-id): "
+                "the panel cannot renew a session it does not own, so it opens "
+                "and owns its own session instead",
+                err=True,
+            )
+        # Constructing the owner settles the workspace and fails here, at the
+        # terminal, if the project is unusable -- not in a browser tab later.
+        owner = ProjectSessionOwner(
+            state.repo,
+            state_root=state.state_root,
+            state_base=state.state_base,
+            state_source=state.state_source,
+        )
 
     if role_catalog is not None:
         # Load the catalogue once at startup so an invalid file fails here, while
@@ -405,8 +419,8 @@ def ui_command(
         load_role_catalog(role_catalog, workspace_root=state.repo)
 
     if enable_launch:
-        if not enable_writes:
-            raise ConfigurationError("--enable-launch requires --enable-writes")
+        if read_only:
+            raise ConfigurationError("--enable-launch cannot be combined with --read-only")
         if profile_config is None:
             raise ConfigurationError(
                 "--enable-launch requires --profile-config naming the runtime profile config"
@@ -422,7 +436,7 @@ def ui_command(
         state_root=state.state_root,
         state_base=state.state_base,
         state_source=state.state_source,
-        writer_session_id=writer_session_id,
+        session_owner=owner,
         catalog_path=role_catalog,
         catalog_editing=enable_catalog_editing,
         profile_config=profile_config,
@@ -430,6 +444,15 @@ def ui_command(
     )
 
     def emit(bound_port: int, token: str) -> None:
+        writer_session_id = None
+        if owner is not None:
+            # Become the one panel for this project before renewing anything:
+            # a second panel would share the first one's session and nonce, and
+            # its heartbeats and shutdown would sabotage the first.  The lock
+            # names the bound port so a refused second panel can say where the
+            # existing one already is.
+            owner.acquire_panel_lock(bound_port)
+            writer_session_id = owner.start()
         url = f"http://127.0.0.1:{bound_port}/#t={token}"
         if state.json_output:
             state.emit(
@@ -439,19 +462,18 @@ def ui_command(
                     "port": bound_port,
                     "token": token,
                     "repo": str(state.repo),
-                    "read_only": not enable_writes,
+                    "read_only": read_only,
                     "writer_session_id": writer_session_id,
                     "catalog_editing": enable_catalog_editing,
                 }
             )
             return
-        click.echo(
-            "Agent Commons UI — read-only" if not enable_writes else "Agent Commons UI — writable"
-        )
+        click.echo("Agent Commons UI — read-only" if read_only else "Agent Commons UI — writable")
         click.echo(f"  url     {url}")
         click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
-        if enable_writes:
+        if not read_only:
             click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
+            click.echo("          the panel opened this session itself and renews it;")
             click.echo("          anyone holding this token writes as that session")
         else:
             click.echo("  writes  disabled — this server records no canonical event")
@@ -461,9 +483,19 @@ def ui_command(
         click.echo("  trust   loopback reachability alone is not authentication")
         click.echo("  note    the token is not stored on disk; opening a browser exposes")
         click.echo("          the URL to other processes of this user via the process list")
-        click.echo("  stop    Ctrl-C")
+        click.echo("  stop    Ctrl-C closes the panel session unless a run is still live")
 
-    serve(context, port=port, open_browser=not no_browser, emit=emit)
+    try:
+        serve(context, port=port, open_browser=not no_browser, emit=emit)
+    finally:
+        if owner is not None:
+            outcome = owner.shutdown()
+            if outcome["session_id"] is not None and not outcome["closed"]:
+                # Deliberate: closing under live work would orphan the run.
+                click.echo(
+                    f"panel session {outcome['session_id']} left open: {outcome['reason']}",
+                    err=True,
+                )
 
 
 @cli.group("chat")
