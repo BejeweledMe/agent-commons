@@ -7730,10 +7730,16 @@ function paintSetupBinaries(info) {
 
 function paintSetup() {
   const screen = document.getElementById("setup");
-  // Held back once the project is set up, and offered the moment it is not:
-  // the screen can be set aside over a board that works, and everything it
-  // configures stays off until it is not.
-  document.getElementById("board-setup").hidden = !setupNeedsAttention();
+  // The way back in, under whichever of its two names applies: while something
+  // is still missing it offers to set it up, and once nothing is it offers the
+  // credential-free check over the profiles that were written — which is the
+  // screen's only remaining use and would otherwise be unreachable.  The label
+  // switches its key rather than its text, because `applyI18n` runs on every
+  // stream frame and would put the other one back.
+  const reopen = document.getElementById("board-setup");
+  reopen.hidden = !setupInfo;
+  reopen.dataset.i18n = setupNeedsAttention() ? "setup_reopen" : "setup_preflight_button";
+  applyI18n();
   if (!setupInfo) { screen.hidden = true; return; }
   const info = setupInfo;
   const state = info.state;

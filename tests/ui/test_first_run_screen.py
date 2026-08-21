@@ -360,3 +360,26 @@ def test_every_string_the_screen_needs_is_in_both_tables() -> None:
     for block in _language_tables():
         for key in frozen:
             assert re.search(rf'^\s*{key}: "', block, re.MULTILINE), key
+
+
+def test_the_way_back_into_the_screen_survives_being_set_aside() -> None:
+    """The screen can be set aside over a board that works, and everything it
+    configures stays off until it is not -- so it has to be reachable again from
+    the surface it was set aside on.  Once nothing is missing the same control
+    becomes the credential-free check, which is the screen's only remaining use
+    and would otherwise have no door at all."""
+
+    body = read_spa()
+    assert 'id="board-setup"' in body
+    assert 'document.getElementById("board-setup").addEventListener("click", openSetup);' in body
+    paint = body.split("function paintSetup() {", 1)[1].split("\n}\n", 1)[0]
+    assert (
+        'reopen.dataset.i18n = setupNeedsAttention() ? "setup_reopen" : "setup_preflight_button";'
+        in paint
+    )
+    # The label switches its KEY, so `applyI18n` -- which runs on every stream
+    # frame -- repaints it instead of overwriting it two seconds later.
+    assert "applyI18n();" in paint
+    # And the Run tab's own way in, for the state that sends a person looking
+    # for Run in the first place.
+    assert 'id="run-setup"' in body
