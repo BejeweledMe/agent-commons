@@ -522,7 +522,7 @@ def test_setup_states_are_named_with_the_frozen_codes(
     setup.generate_runtime_config(
         workspace["repo"], config_directory=setup.default_config_directory()
     )
-    assert setup.setup_state(workspace["repo"]) == "configured"
+    assert setup.setup_state(workspace["repo"]) == "setup_configured"
 
     # A named config earns `configured` the same way the default path does:
     # by being accepted by the loader, not by existing.
@@ -531,7 +531,7 @@ def test_setup_states_are_named_with_the_frozen_codes(
     generated = setup.default_runtime_config_path().read_text(encoding="utf-8")
     named.write_text(generated, encoding="utf-8")
     named.chmod(0o600)
-    assert setup.setup_state(workspace["repo"], profile_config=named) == "configured"
+    assert setup.setup_state(workspace["repo"], profile_config=named) == "setup_configured"
 
 
 def test_configured_means_the_loader_accepted_the_file_not_that_it_exists(
@@ -558,7 +558,7 @@ def test_configured_means_the_loader_accepted_the_file_not_that_it_exists(
         workspace["repo"], config_directory=setup.default_config_directory()
     )
     target = setup.default_runtime_config_path()
-    assert setup.setup_state(workspace["repo"]) == "configured"
+    assert setup.setup_state(workspace["repo"]) == "setup_configured"
     target.write_text(target.read_text(encoding="utf-8") + "bogus_field: true\n", encoding="utf-8")
     assert setup.setup_state(workspace["repo"]) == "setup_config_rejected_by_loader"
 
@@ -568,7 +568,7 @@ def test_configured_means_the_loader_accepted_the_file_not_that_it_exists(
         target.read_text(encoding="utf-8").replace("bogus_field: true\n", ""),
         encoding="utf-8",
     )
-    assert setup.setup_state(workspace["repo"]) == "configured"
+    assert setup.setup_state(workspace["repo"]) == "setup_configured"
     target.chmod(0o666)
     assert setup.setup_state(workspace["repo"]) == "setup_config_rejected_by_loader"
 
@@ -591,6 +591,11 @@ def test_the_refusal_codes_are_the_frozen_contract_strings() -> None:
     assert setup.SETUP_NOT_A_REPOSITORY == "setup_not_a_repository"
     assert setup.SETUP_UNINITIALIZED == "setup_uninitialized"
     assert setup.SETUP_UNCONFIGURED == "setup_unconfigured"
+    # The one state this table once left unpinned, and the one that drifted:
+    # the contract froze `setup_configured` while the code said "configured",
+    # and the frontend had to accept both spellings blind.  Prefixed like its
+    # three sibling states, and pinned so it cannot drift again.
+    assert setup.SETUP_CONFIGURED == "setup_configured"
     assert setup.SETUP_NO_PROVIDER_FOUND == "setup_no_provider_found"
     assert setup.PATH_REFUSED_WORKSPACE == "setup_path_refused_workspace"
     assert setup.PATH_REFUSED_STATE == "setup_path_refused_state_base"

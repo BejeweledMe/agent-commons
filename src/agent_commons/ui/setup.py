@@ -7,7 +7,7 @@ answers three questions and does nothing else -- no routes, no context, no CLI:
   that is not a git repository, a repository without an initialized workspace,
   an initialized workspace without an operator runtime config, a config the
   launch loader refuses, and a configured one, naming each with the refusal
-  codes frozen by the wave contract.  ``configured`` is earned through
+  codes frozen by the wave contract.  ``setup_configured`` is earned through
   ``load_runtime_configuration`` on every call, never inferred from the file's
   existence.
 - *Which executables exist here?*  ``discover_providers`` probes ``claude``,
@@ -71,7 +71,7 @@ _LABEL = "runtime profile config"
 SETUP_NOT_A_REPOSITORY = "setup_not_a_repository"
 SETUP_UNINITIALIZED = "setup_uninitialized"
 SETUP_UNCONFIGURED = "setup_unconfigured"
-SETUP_CONFIGURED = "configured"
+SETUP_CONFIGURED = "setup_configured"
 SETUP_NO_PROVIDER_FOUND = "setup_no_provider_found"
 PATH_REFUSED_WORKSPACE = "setup_path_refused_workspace"
 PATH_REFUSED_STATE = STATE_REFUSAL_CODE
@@ -116,8 +116,8 @@ def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -
     default registry is deliberately unlaunchable, so the panel must route the
     operator to setup instead of pretending the environment is configured.
 
-    ``configured`` means the guarded launch loader accepted the file, not that
-    a file happens to sit at the path.  Generation proves acceptance once, at
+    ``setup_configured`` means the guarded launch loader accepted the file,
+    not that a file happens to sit at the path.  Generation proves acceptance once, at
     write time; this is the only place that proves it on every later start, so
     a config broken after the fact (an edit, a permission change, a foreign
     owner) names itself ``setup_config_rejected_by_loader`` instead of posing

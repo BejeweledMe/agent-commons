@@ -381,7 +381,7 @@ def test_launching_needs_no_flag_and_no_second_first_run(
     result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
     assert result.exit_code == 0, result.output
     assert captured["context"].launch_enabled is True
-    assert captured["context"].setup_status()["state"] == "configured"
+    assert captured["context"].setup_status()["state"] == "setup_configured"
 
     # And the flag still overrides where the file is read from.
     elsewhere = _runtime_config(tmp_path / "elsewhere" / "runtime.yaml")
