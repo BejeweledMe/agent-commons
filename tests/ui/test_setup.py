@@ -401,10 +401,53 @@ def test_setup_states_are_named_with_the_frozen_codes(
     )
     assert setup.setup_state(workspace["repo"]) == "configured"
 
+    # A named config earns `configured` the same way the default path does:
+    # by being accepted by the loader, not by existing.
     named = tmp_path / "named.yaml"
     assert setup.setup_state(workspace["repo"], profile_config=named) == "setup_unconfigured"
-    named.write_text("profiles: {}\n", encoding="utf-8")
+    generated = setup.default_runtime_config_path().read_text(encoding="utf-8")
+    named.write_text(generated, encoding="utf-8")
+    named.chmod(0o600)
     assert setup.setup_state(workspace["repo"], profile_config=named) == "configured"
+
+
+def test_configured_means_the_loader_accepted_the_file_not_that_it_exists(
+    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
+) -> None:
+    """A present-but-refused config must never pose as a configured
+    environment: every later panel start re-earns `configured` through the
+    same guarded loader the launch path uses.  A file the loader refuses --
+    an empty registry, an unknown field, loose permissions -- names itself
+    `setup_config_rejected_by_loader` instead."""
+
+    named = tmp_path / "named.yaml"
+    named.write_text("profiles: {}\n", encoding="utf-8")
+    named.chmod(0o600)
+    assert (
+        setup.setup_state(workspace["repo"], profile_config=named)
+        == "setup_config_rejected_by_loader"
+    )
+
+    # The same dishonesty on the default path: a generated config that later
+    # grows a field the loader does not know stops being `configured` on the
+    # very next look, without anyone regenerating anything.
+    setup.generate_runtime_config(
+        workspace["repo"], config_directory=setup.default_config_directory()
+    )
+    target = setup.default_runtime_config_path()
+    assert setup.setup_state(workspace["repo"]) == "configured"
+    target.write_text(target.read_text(encoding="utf-8") + "bogus_field: true\n", encoding="utf-8")
+    assert setup.setup_state(workspace["repo"]) == "setup_config_rejected_by_loader"
+
+    # A permissions regression is the same state: the loader would refuse this
+    # file at launch, so setup must not call the environment configured.
+    target.write_text(
+        target.read_text(encoding="utf-8").replace("bogus_field: true\n", ""),
+        encoding="utf-8",
+    )
+    assert setup.setup_state(workspace["repo"]) == "configured"
+    target.chmod(0o666)
+    assert setup.setup_state(workspace["repo"]) == "setup_config_rejected_by_loader"
 
 
 def test_default_config_directory_honours_absolute_xdg_and_falls_back_to_home(

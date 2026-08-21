@@ -5,8 +5,11 @@ answers three questions and does nothing else -- no routes, no context, no CLI:
 
 - *What state is this directory in?*  ``setup_state`` distinguishes a directory
   that is not a git repository, a repository without an initialized workspace,
-  an initialized workspace without an operator runtime config, and a configured
-  one, naming each with the refusal codes frozen by the wave contract.
+  an initialized workspace without an operator runtime config, a config the
+  launch loader refuses, and a configured one, naming each with the refusal
+  codes frozen by the wave contract.  ``configured`` is earned through
+  ``load_runtime_configuration`` on every call, never inferred from the file's
+  existence.
 - *Which executables exist here?*  ``discover_providers`` probes ``claude``,
   ``codex``, ``agent-commons-mcp``, and ``git``.  It performs **no checks of
   its own**: the single call per candidate is ``resolve_trusted_executable``,
@@ -111,6 +114,13 @@ def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -
     The absence of a config is a *state*, never "defaults": the loader's
     default registry is deliberately unlaunchable, so the panel must route the
     operator to setup instead of pretending the environment is configured.
+
+    ``configured`` means the guarded launch loader accepted the file, not that
+    a file happens to sit at the path.  Generation proves acceptance once, at
+    write time; this is the only place that proves it on every later start, so
+    a config broken after the fact (an edit, a permission change, a foreign
+    owner) names itself ``setup_config_rejected_by_loader`` instead of posing
+    as a configured environment that cannot launch anything.
     """
 
     root = Path(repo).expanduser()
@@ -122,6 +132,10 @@ def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -
     config = Path(profile_config).expanduser() if profile_config else default_runtime_config_path()
     if config.is_symlink() or not config.is_file():
         return SETUP_UNCONFIGURED
+    try:
+        load_runtime_configuration(config, workspace_root=root)
+    except CommonsError:
+        return CONFIG_REJECTED_BY_LOADER
     return SETUP_CONFIGURED
 
 
