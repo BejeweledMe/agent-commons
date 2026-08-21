@@ -166,6 +166,58 @@ def test_demo_implementation_run_succeeds_when_no_executable_resolves(
     assert "no provider" in summary
 
 
+def test_a_role_hired_on_a_model_still_runs_in_demo_mode(tmp_path: Path) -> None:
+    """Model selection and demo mode must not be mutually exclusive.
+
+    The launch path substitutes the role's model with
+    ``dataclasses.replace(profile, model=...)``, and in demo mode the profile
+    it replaces is a demo-tolerant one.  ``replace`` reconstructs through the
+    object's own class, so the copy has to come back tolerant -- a strict copy
+    would veto this run over an unresolvable executable and the newcomer who
+    picked a model in the hire form would be the one person the demo does not
+    work for.  Whole run, not the profile object: this goes through the same
+    registry the broker is built with.
+    """
+
+    manager, task = _workspace(tmp_path)
+    role = manager.create_agent(
+        name="Demo builder",
+        profile_id="claude-builder",
+        rationale="hired on a chosen model, on a machine with no provider",
+        model="claude-opus-4-6",
+        idempotency_key="demo-model-role",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-builder",
+        purpose="implementation",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "provider_units", "limit": 1},
+        },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="demo-model-delegation",
+    )
+    service = DelegationRuntimeService(
+        manager,
+        profiles=_unresolvable_profiles(),
+        runner=DemoRunner(manager.paths.state_root),  # type: ignore[arg-type]
+    )
+
+    result = service.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="demo-model-launch",
+    )
+
+    assert result["delegation"]["state"] == "succeeded"
+    assert "no provider" in str(result["delegation"].get("summary", "")).lower()
+
+
 def test_demo_codex_run_succeeds_when_no_executable_resolves(tmp_path: Path) -> None:
     """The Codex build order resolves MCP and git before the provider; the
     demo tolerance covers that path too."""

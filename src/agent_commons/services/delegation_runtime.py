@@ -49,6 +49,7 @@ from agent_commons.runtime import (
     OperatorLimits,
     ProfileRegistry,
     Provider,
+    RunnerProfile,
     RuntimePolicy,
     SafeDiagnostic,
     SubprocessRunner,
@@ -60,6 +61,7 @@ from agent_commons.runtime import (
     diagnostic_hint,
     diagnostic_safe_next_actions,
     terminate_process_group,
+    validate_model_name,
 )
 from agent_commons.runtime.demo import DemoRunner, demo_tolerant_profiles
 from agent_commons.runtime.diagnostics import (
@@ -71,6 +73,7 @@ from agent_commons.runtime.diagnostics import (
 
 from ..domain.agents import effective_grants
 from .manager import CommonsManager
+from .roles import role_model
 
 _TERMINAL_DELEGATION_STATES = {
     "succeeded",
@@ -125,6 +128,22 @@ def _delegation_lock(state_root: Path, delegation_id: str) -> Iterator[None]:
         finally:
             unlock(descriptor)
             os.close(descriptor)
+
+
+@dataclass(frozen=True, slots=True)
+class _RoleScope:
+    """What the standing role behind a delegation contributes to its launch.
+
+    A record rather than a tuple because the members answer different
+    questions and three of them were already easy to transpose at the call
+    site; a fourth made that a matter of luck.
+    """
+
+    tools: tuple[str, ...] = ()
+    grants: Mapping[str, str] = field(default_factory=dict)
+    skills: tuple[tuple[str, str], ...] = ()
+    #: The model this role was hired on, or None to keep the profile's own.
+    model: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,31 +723,76 @@ class DelegationRuntimeService:
             ttl_seconds=min(int(limits["wall_time_seconds"]) + 300, 86_400),
         )
 
-    def _role_scope(
-        self, delegation: Mapping[str, Any]
-    ) -> tuple[tuple[str, ...], dict[str, str], tuple[tuple[str, str], ...]]:
-        """Tool narrowing and standing grants of the role this run acts for.
+    def _role_scope(self, delegation: Mapping[str, Any]) -> _RoleScope:
+        """Everything the role this run acts for contributes to the launch.
 
         Read at launch, not carried in the request document: a role narrowed or
         downgraded a moment ago binds the next run rather than the one after
         somebody remembers to restart something.  Grants come back *effective*,
         so a level lowered on an ancestor removes the staff-changing tool from
         this launch's argv.
+
+        The model is the one member that cannot have changed since the role was
+        hired -- it is fixed for a role's whole life -- but it is read here all
+        the same, because this is already the one place that turns a role
+        record into launch inputs and a second reader would be a second answer.
         """
 
         agent_id = str(delegation.get("agent_id") or "")
         if not agent_id:
-            return (), {}, ()
+            return _RoleScope()
         snapshot = self.manager.snapshot()
         role = snapshot.agents.get(agent_id)
         if role is None:
             raise LifecycleConflictError(f"delegation names a role that does not exist: {agent_id}")
         if role.get("state") != "active":
             raise LifecycleConflictError(f"a retired role cannot start new work: {agent_id}")
-        return (
-            tuple(str(name) for name in role.get("tool_allowlist") or ()),
-            effective_grants(snapshot.agents, agent_id),
-            skill_instructions(self.catalog, tuple(str(name) for name in role.get("skills") or ())),
+        return _RoleScope(
+            tools=tuple(str(name) for name in role.get("tool_allowlist") or ()),
+            grants=effective_grants(snapshot.agents, agent_id),
+            skills=skill_instructions(
+                self.catalog, tuple(str(name) for name in role.get("skills") or ())
+            ),
+            model=role_model(role),
+        )
+
+    def _profile_for(self, profile_id: BuiltinProfileId, model: str | None) -> RunnerProfile:
+        """The operator's profile, with the role's model standing in for its own.
+
+        ``dataclasses.replace`` rather than an override threaded through
+        ``RunnerProfile.build_invocation``: the profiles are frozen dataclasses
+        whose ``__post_init__`` validates every field, so the replacement is
+        re-validated on the way in -- the model against the identifier rule
+        that keeps a leading dash from becoming a flag, and the independent
+        reviewer's fixed sandbox and permission mode against the same checks
+        that made them fixed.  A widened protocol would have moved that
+        validation into each implementation and left the reviewer rules
+        depending on nobody forgetting to re-run them.
+
+        The replaced profile is what the whole launch uses, the broker
+        included: the broker resolves the profile from the registry it is built
+        with, so handing it the original registry would put the chosen model in
+        the ledger and the profile's model in the argv -- the one failure this
+        is for.
+        """
+
+        profile = self.profiles.get(profile_id)
+        if model is None:
+            return profile
+        return replace(profile, model=validate_model_name(model))
+
+    def _profiles_with(
+        self, profile_id: BuiltinProfileId, profile: RunnerProfile
+    ) -> ProfileRegistry:
+        """The registry the broker gets: this launch's profile, others untouched."""
+
+        if self.profiles.get(profile_id) is profile:
+            return self.profiles
+        return ProfileRegistry(
+            {
+                candidate: (profile if candidate is profile_id else self.profiles.get(candidate))
+                for candidate in self.profiles.profile_ids
+            }
         )
 
     @staticmethod
@@ -822,9 +886,11 @@ alone is not task acceptance.
     def _broker(
         self,
         hook: BrokerLifecycleHook,
+        *,
+        profiles: ProfileRegistry | None = None,
     ) -> LocalBroker:
         return LocalBroker(
-            profiles=self.profiles,
+            profiles=self.profiles if profiles is None else profiles,
             attempts=self.attempts,
             runner=self.runner,
             telemetry=self.telemetry,
@@ -1085,21 +1151,27 @@ alone is not task acceptance.
                 raise LifecycleConflictError("operational retry requires an earlier failed attempt")
 
             profile_id = BuiltinProfileId(str(delegation["target_profile"]))
-            profile = self.profiles.get(profile_id)
+            # A standing role narrows the profile's tools, decides which
+            # staff-changing tools exist, supplies its required skills, and
+            # names the model it was hired on.  Resolved here, at launch,
+            # against the role's current record: a narrowing recorded a minute
+            # ago applies to this run.  It comes first because the profile this
+            # launch uses is derived from it.
+            scope = self._role_scope(delegation)
+            try:
+                profile = self._profile_for(profile_id, scope.model)
+            except (ConfigurationError, ValidationError) as exc:
+                raise sanitized_configuration_failure(exc) from exc
             budget_unit = str(delegation["limits"]["budget"]["unit"])
             if budget_unit == "micro_usd" and not profile.supports_budget:
                 raise ConfigurationError(
                     f"profile {profile_id.value} cannot enforce the delegation's micro_usd budget"
                 )
             parent_policy, child_policy = self._policies(delegation)
-            # A standing role narrows the profile's tools, decides which
-            # staff-changing tools exist, and supplies its required skills.
-            # Resolved here, at launch, against the role's current record: a
-            # narrowing recorded a minute ago applies to this run.
-            role_tools, role_grants, role_skills = self._role_scope(delegation)
+            role_tools, role_grants = scope.tools, scope.grants
             # Validate executable, trust mode, argv, and budget support before
             # allocating a child session or durable operational reservation.
-            instruction = self._instruction(delegation, profile_id=profile_id, skills=role_skills)
+            instruction = self._instruction(delegation, profile_id=profile_id, skills=scope.skills)
             try:
                 profile.build_invocation(
                     instruction,
@@ -1148,7 +1220,11 @@ alone is not task acceptance.
                 child_session_id=child_session_id,
                 idempotency_key=_request_key(delegation_id),
             )
-            broker = self._broker(hook)
+            # The broker resolves the profile from the registry it is built
+            # with, so it gets one holding this launch's profile: with the
+            # original the chosen model would reach the ledger and the
+            # profile's model would reach the argv.
+            broker = self._broker(hook, profiles=self._profiles_with(profile_id, profile))
             canonical: dict[str, Any] | None = None
             result: BrokerResult | None = None
             try:

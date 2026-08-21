@@ -11,8 +11,11 @@ import pytest
 from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
 from agent_commons.runtime import (
     BuiltinProfileId,
+    ClaudePermissionMode,
+    ClaudeRunnerProfile,
     DiagnosticCode,
     ProcessResult,
+    ProfileRegistry,
     RunOutcome,
     RunReason,
     TelemetryEvent,
@@ -462,6 +465,200 @@ def test_a_required_skill_reaches_the_instruction_the_provider_receives(
     instruction = seen[-1].decode("utf-8")
     assert "Check error handling before style." in instruction
     assert "house-checklist" in instruction
+
+
+def test_the_model_a_role_was_hired_on_reaches_the_launched_process(tmp_path: Path) -> None:
+    """From the hire form to argv, through the path a broker run really takes.
+
+    The same failure mode as the tool narrowing above, and a worse one to miss:
+    a model verified only against the delegation event, or only against the
+    profile object the service holds, would leave the operator's choice in the
+    ledger while the provider ran the profile's model -- the panel reporting
+    one thing and the subscription billing another.
+
+    The broker resolves the profile from the registry it is *built* with, so
+    the substitution has to reach that registry and not merely the object the
+    service checked. That is exactly what this asserts, from the argv the
+    runner was handed.
+    """
+
+    manager, task = _workspace(tmp_path)
+    role = manager.create_agent(
+        name="Chosen-model reviewer",
+        profile_id="claude-independent-reviewer",
+        rationale="hired to run on a model the operator picked",
+        model="claude-opus-4-6",
+        idempotency_key="runtime-model-role",
+    )
+    review = manager.request_review(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        criteria=("Inspect exact target",),
+        independent=True,
+        idempotency_key="runtime-model-review",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "micro_usd", "limit": 50_000},
+        },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="runtime-model-delegation",
+    )
+    delegation_id = delegation["entity_ref"]["id"]
+    seen: list[tuple[str, ...]] = []
+
+    class CapturingRunner(FakeRunner):
+        def run(self, invocation: Any, **values: Any) -> ProcessResult:
+            seen.append(tuple(invocation.argv))
+            return super().run(invocation, **values)
+
+    def complete_as_child(child_session_id: str) -> None:
+        child = CommonsManager(
+            manager.repo_root,
+            session_id=child_session_id,
+            state_root=manager.paths.state_root,
+        )
+        child.complete_review(
+            review["entity_ref"]["id"],
+            review["revision"],
+            target_revision=task["revision"],
+            verdict="approved",
+            summary="The exact target satisfies the requested criterion.",
+            idempotency_key="runtime-model-child-review",
+        )
+        current = child.get_delegation(delegation_id)
+        child.succeed_delegation(
+            delegation_id,
+            current["revision"],
+            summary="Independent expert review recorded.",
+            result_refs=({"kind": "review", "id": review["entity_ref"]["id"]},),
+            idempotency_key="runtime-model-child-succeed",
+        )
+
+    # The operator config names no model at all, so the only place this one can
+    # have come from is the role record.
+    profiles = default_profile_registry(claude_executable="/bin/echo", mcp_executable="/bin/echo")
+    assert profiles.get("claude-independent-reviewer").model is None
+
+    service = DelegationRuntimeService(
+        manager,
+        runner=CapturingRunner(after_start=complete_as_child),  # type: ignore[arg-type]
+        profiles=profiles,
+        telemetry=CollectingTelemetry(),
+    )
+    result = service.run(
+        delegation_id,
+        delegation["revision"],
+        idempotency_key="runtime-model-launch",
+    )
+
+    assert result["delegation"]["state"] == "succeeded"
+    argv = seen[0]
+    assert argv[argv.index("--model") + 1] == "claude-opus-4-6"
+    # The service's own registry is untouched: the substitution is per launch,
+    # never a mutation of operator configuration held for the process's life.
+    assert profiles.get("claude-independent-reviewer").model is None
+    # And the independent reviewer is still an independent reviewer. Replacing
+    # a field re-runs __post_init__, so the fixed permission mode and the fixed
+    # tool set are re-validated rather than inherited from an object that was
+    # checked once, long ago.
+    assert argv[argv.index("--permission-mode") + 1] == "dontAsk"
+
+
+def test_a_role_hired_on_no_model_still_runs_the_profiles_own(tmp_path: Path) -> None:
+    """The other half, and the one a bug would make silent: a role that named
+    no model must be launched exactly as before, with the operator config's
+    model reaching argv untouched.  Nothing may substitute an empty choice."""
+
+    manager, task = _workspace(tmp_path)
+    role = manager.create_agent(
+        name="Profile-model reviewer",
+        profile_id="claude-independent-reviewer",
+        rationale="hired without naming a model",
+        idempotency_key="runtime-nomodel-role",
+    )
+    review = manager.request_review(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        criteria=("Inspect exact target",),
+        independent=True,
+        idempotency_key="runtime-nomodel-review",
+    )
+    delegation = manager.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 60,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "micro_usd", "limit": 50_000},
+        },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
+        idempotency_key="runtime-nomodel-delegation",
+    )
+    delegation_id = delegation["entity_ref"]["id"]
+    seen: list[tuple[str, ...]] = []
+
+    class CapturingRunner(FakeRunner):
+        def run(self, invocation: Any, **values: Any) -> ProcessResult:
+            seen.append(tuple(invocation.argv))
+            return super().run(invocation, **values)
+
+    def complete_as_child(child_session_id: str) -> None:
+        child = CommonsManager(
+            manager.repo_root,
+            session_id=child_session_id,
+            state_root=manager.paths.state_root,
+        )
+        child.complete_review(
+            review["entity_ref"]["id"],
+            review["revision"],
+            target_revision=task["revision"],
+            verdict="approved",
+            summary="The exact target satisfies the requested criterion.",
+            idempotency_key="runtime-nomodel-child-review",
+        )
+        current = child.get_delegation(delegation_id)
+        child.succeed_delegation(
+            delegation_id,
+            current["revision"],
+            summary="Independent expert review recorded.",
+            result_refs=({"kind": "review", "id": review["entity_ref"]["id"]},),
+            idempotency_key="runtime-nomodel-child-succeed",
+        )
+
+    configured = ProfileRegistry(
+        {
+            BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER: ClaudeRunnerProfile(
+                profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+                executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                model="claude-sonnet-4-5",
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+            )
+        }
+    )
+    result = DelegationRuntimeService(
+        manager,
+        runner=CapturingRunner(after_start=complete_as_child),  # type: ignore[arg-type]
+        profiles=configured,
+        telemetry=CollectingTelemetry(),
+    ).run(delegation_id, delegation["revision"], idempotency_key="runtime-nomodel-launch")
+
+    assert result["delegation"]["state"] == "succeeded"
+    argv = seen[0]
+    assert argv[argv.index("--model") + 1] == "claude-sonnet-4-5"
 
 
 def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> None:
