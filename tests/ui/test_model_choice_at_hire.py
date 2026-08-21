@@ -60,6 +60,10 @@ def test_a_chosen_model_is_recorded_under_the_payload_extensions(
     record = _record(writable, agent_id)
     assert record["extensions"] == {"model": "claude-opus-4-6"}
     assert role_model(record) == "claude-opus-4-6"
+    graph_response = writable_client.get("/api/graph", headers=authorized())
+    assert graph_response.status_code == 200, graph_response.text
+    role_node = next(node for node in graph_response.json()["nodes"] if node["id"] == agent_id)
+    assert role_node["attrs"]["model"] == "claude-opus-4-6"
     # And it is in the event itself, not only in the projection: a role hired
     # today has to still name its model after a replay tomorrow.
     hired = [

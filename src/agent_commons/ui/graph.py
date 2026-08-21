@@ -15,6 +15,7 @@ from typing import Any
 from agent_commons.domain.agents import effective_grants
 from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.projection import ProjectSnapshot
+from agent_commons.services.roles import role_model
 from agent_commons.ui import GRAPH_SCHEMA
 from agent_commons.views import truncate_utf8
 
@@ -139,6 +140,9 @@ def _node(
         # The ledger has no objective->task link; say so instead of drawing one.
         attrs["attached"] = False
     if kind == "agent":
+        model = role_model(record)
+        if model is not None:
+            attrs["model"] = _clean(model)
         grants = record.get("effective_grants")
         if isinstance(grants, Mapping):
             attrs["effective_grants"] = {
