@@ -388,8 +388,10 @@ def ui_command(
                 "and owns its own session instead",
                 err=True,
             )
-        # Constructing the owner settles the workspace and fails here, at the
-        # terminal, if the project is unusable -- not in a browser tab later.
+        # The owner resolves its workspace lazily.  It deliberately does not
+        # fail here when there is none: a directory with no workspace is the
+        # state the panel's own first-run screen exists to leave, and refusing
+        # at the terminal is precisely the refusal this panel removes.
         owner = ProjectSessionOwner(
             state.repo,
             state_root=state.state_root,
@@ -429,7 +431,9 @@ def ui_command(
             # a second panel would share the first one's session and nonce, and
             # its heartbeats and shutdown would sabotage the first.  The lock
             # names the bound port so a refused second panel can say where the
-            # existing one already is.
+            # existing one already is.  On a directory with no workspace both
+            # calls defer instead of failing: there is nothing to lock and
+            # nothing to open a session in until first run has been through.
             owner.acquire_panel_lock(bound_port)
             writer_session_id = owner.start()
         url = f"http://127.0.0.1:{bound_port}/#t={token}"
@@ -454,10 +458,14 @@ def ui_command(
         click.echo("Agent Commons UI — read-only" if read_only else "Agent Commons UI — writable")
         click.echo(f"  url     {url}")
         click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
-        if not read_only:
+        if not read_only and writer_session_id is not None:
             click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
             click.echo("          the panel opened this session itself and renews it;")
             click.echo("          anyone holding this token writes as that session")
+        elif not read_only:
+            click.echo("  writes  pending — this directory has no workspace yet, so there is")
+            click.echo("          nothing to record into; the panel offers first run, and it")
+            click.echo("          opens its own session as soon as the workspace exists")
         else:
             click.echo("  writes  disabled — this server records no canonical event")
         if context.catalog_editing_enabled:

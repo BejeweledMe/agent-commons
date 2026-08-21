@@ -8,6 +8,7 @@ every panel restart into a `LifecycleConflictError`.
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -338,6 +339,46 @@ def test_start_launches_a_renewal_thread_and_shutdown_stops_it(
 
     assert outcome["closed"] is True
     assert not thread.is_alive()
+
+
+def test_an_owner_built_before_the_workspace_exists_defers_instead_of_refusing(
+    tmp_path: Any, clock: Clock
+) -> None:
+    """Constructing the owner must not settle the workspace.
+
+    It used to, and that is what made `agent-commons ui` refuse in a directory
+    with no workspace -- the one directory the panel's first-run screen exists
+    for.  Everything the owner needs is resolved at first use instead, and the
+    panel lock asked for at startup is taken as part of that resolution, still
+    before any session is opened.
+    """
+
+    import subprocess
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    owner = ProjectSessionOwner(repo, state_root=tmp_path / "state", clock=clock)
+
+    assert owner.workspace_ready() is False
+    # Both deferred rather than raised: the panel is up and serving first run.
+    owner.acquire_panel_lock(4321)
+    assert owner.start() is None
+
+    CommonsManager.initialize(repo, integrations=())
+
+    session_id = owner.ensure_active()
+    assert session_id.startswith("session.")
+    assert owner.workspace_ready() is True
+    # The lock asked for before there was anywhere to put it is held now, at
+    # the port the panel actually bound.
+    assert '"port":4321' in owner.panel_lock_path.read_text(encoding="utf-8")
+    # And the renewal that could not start at the terminal is running.
+    assert any(
+        thread.name == f"agent-commons-ui-heartbeat-{owner.workspace_id}"
+        for thread in threading.enumerate()
+    )
+    owner.shutdown()
 
 
 def test_the_panel_lock_records_the_port_with_private_permissions(

@@ -8,6 +8,7 @@ context entirely and those tests stay green.  These enter through the command.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,20 @@ def _session(repo: Path) -> str:
     return str(session["session_id"])
 
 
+@pytest.fixture(autouse=True)
+def _isolated_operator_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The operator's own runtime config must not take part in these tests.
+
+    The panel now finds `$XDG_CONFIG_HOME/agent-commons/runtime.yaml` by itself,
+    which is the point -- and which would otherwise make every assertion here
+    depend on whether the developer running the suite happens to have one.
+    """
+
+    monkeypatch.delenv("AGENT_COMMONS_STATE_ROOT", raising=False)
+    monkeypatch.delenv("AGENT_COMMONS_STATE_BASE", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+
+
 def _serve_spy(captured: dict[str, Any]) -> Any:
     def serve(context: Any, *, port: int, open_browser: bool, emit: Any) -> None:
         captured["context"] = context
@@ -66,6 +81,87 @@ def test_the_ui_command_opens_and_owns_its_own_session_by_default(
     assert captured["context"].writes_enabled is True
     # Ctrl-C (serve returning) closed the panel's session behind itself.
     shown = CommonsManager(repo, read_only=True).show_session(payload["writer_session_id"])
+    assert shown["status"] == "closed"
+
+
+def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_first_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The head scenario of this whole wave, driven through the real command.
+
+    `agent-commons ui` used to refuse here: building `ProjectSessionOwner`
+    built a `CommonsManager`, which refuses a directory with no workspace, so
+    the one command meant to remove "go back to the terminal and run init"
+    ended at the terminal telling you to run init.  Every UI test that thought
+    it covered this handed `UIContext` a fabricated `writer_session_id`, which
+    is exactly the piece that was broken.
+
+    Everything below happens inside one `serve` call -- one process, one route
+    table -- because that is the property under test: the panel is not restarted
+    between being unusable and being usable.
+    """
+
+    from fastapi.testclient import TestClient
+
+    from agent_commons.ui.server import create_app
+
+    repo = tmp_path / "fresh"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    seen: dict[str, Any] = {}
+
+    def serve(context: Any, *, port: int, open_browser: bool, emit: Any) -> None:
+        emit(port or 49999, "test-token")
+        app = create_app(context, token="test-token", port=49999)
+        headers = {"Authorization": "Bearer test-token"}
+        with TestClient(app, base_url="http://127.0.0.1:49999") as client:
+            seen["before"] = client.get("/api/setup", headers=headers).json()
+            seen["refused"] = client.post(
+                "/api/tasks",
+                headers=headers,
+                json={"title": "Too early", "description": "before the workspace exists"},
+            ).json()
+            seen["initialized"] = client.post("/api/setup/initialize", headers=headers)
+            seen["after"] = client.get("/api/setup", headers=headers).json()
+            seen["recorded"] = client.post(
+                "/api/tasks",
+                headers=headers,
+                json={
+                    "title": "Now it works",
+                    "description": "recorded after first run",
+                    "acceptance_criteria": ["the panel recorded it without a restart"],
+                },
+            )
+            seen["meta"] = client.get("/api/meta", headers=headers).json()
+
+    monkeypatch.setattr("agent_commons.ui.server.serve", serve)
+    result = CliRunner().invoke(
+        cli, ["--repo", str(repo), "--json", "ui", "--port", "0", "--no-browser"]
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    # The panel came up writable in intent and sessionless in fact: there was
+    # nowhere to open a session, and that is a state rather than a failure.
+    assert payload["read_only"] is False
+    assert payload["writer_session_id"] is None
+
+    assert seen["before"]["state"] == "setup_uninitialized"
+    # Refused by name, from the route that exists -- not a 404, and not a raw
+    # ConfigurationError from somewhere inside the manager.
+    assert seen["refused"]["error"]["code"] == "setup_uninitialized"
+    assert seen["initialized"].status_code == 200, seen["initialized"].text
+    assert seen["after"]["state"] != "setup_uninitialized"
+    assert (repo / ".agent-commons" / "workspace.yaml").is_file()
+
+    # The same process, the same route table, and now a real operator session
+    # the panel opened for itself.
+    assert seen["recorded"].status_code == 200, seen["recorded"].text
+    assert str(seen["recorded"].json()["entity_ref"]["id"]).startswith("task.")
+    session_id = seen["meta"]["writer_session_id"]
+    assert str(session_id).startswith("session.")
+    assert seen["meta"]["writes_enabled"] is True
+    shown = CommonsManager(repo, read_only=True).show_session(session_id)
     assert shown["status"] == "closed"
 
 

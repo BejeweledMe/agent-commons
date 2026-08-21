@@ -9,6 +9,12 @@ opens the session itself, keeps the nonce in process memory, renews it from a
 daemon thread, and replaces an expired session with a fresh one under the same
 identity.
 
+The workspace is resolved at first use rather than at construction, and that is
+load-bearing rather than tidy: a panel opened on a directory that has no
+workspace yet must still start, because creating the workspace is one of the
+things the panel now does.  Constructing a manager here refused at the terminal
+in exactly the case the first-run screen exists for.
+
 One instance exists per *open project*, not per process: the future project
 sidebar holds a ``dict[workspace_id, ProjectSessionOwner]`` and nothing here is
 module-global.  The pattern -- a process opens a session, holds the nonce, and
@@ -136,21 +142,21 @@ class ProjectSessionOwner:
         self._clock = clock
         self._heartbeat_interval = float(heartbeat_interval_seconds)
         self._session_ttl = int(session_ttl_seconds)
-        # One manager up front settles the workspace identity and the effective
-        # state root, and fails at the terminal if the project is not usable.
-        manager = self._manager()
-        self.workspace_id = manager.workspace_id
-        self._state_root = manager.paths.state_root
-        # The registry is held directly rather than through the manager so the
-        # clock is injectable: every expiry decision in this object and in the
-        # store is then made against the same notion of now.
-        self._registry = SessionRegistry(
-            repo,
-            state_root=self._state_root,
-            policy=manager.policy,
-            clock=clock,
-        )
         self._guard = threading.RLock()
+        # The workspace is settled at first use, not here.  Building a manager
+        # in the constructor made `agent-commons ui` refuse to start in a
+        # directory that has no workspace yet -- which is precisely the
+        # directory the first-run screen exists for, and precisely the terminal
+        # error this panel is meant to remove.  Everything below is filled in by
+        # `_resolve`, once, when something actually needs a session.
+        self._workspace_id: str | None = None
+        self._state_root: Path | None = None
+        self._registry_store: SessionRegistry | None = None
+        # A panel lock asked for before the workspace exists: there is no state
+        # root to put it in yet, so the port is remembered and the lock is taken
+        # the moment there is (see `_resolve`).
+        self._pending_lock_port: int | None = None
+        self._start_requested = False
         self._session_id: str | None = None
         self._nonce: str | None = None
         self._expires_at = 0.0
@@ -175,22 +181,96 @@ class ProjectSessionOwner:
             state_source=self._configured_state_source,
         )
 
+    # -- the workspace, settled at first use -------------------------------
+
+    def _resolve(self) -> None:
+        """Settle the workspace identity and the state root, once.
+
+        Raises the manager's own ``ConfigurationError`` while the directory is
+        not a workspace.  That refusal is an answer, not a failure: callers that
+        can wait ask through :meth:`workspace_ready`, and the panel keeps
+        serving its first-run screen until the workspace exists.
+        """
+
+        with self._guard:
+            if self._registry_store is not None:
+                return
+            manager = self._manager()
+            state_root = manager.paths.state_root
+            if self._pending_lock_port is not None:
+                # Before anything else, exactly as at a normal start: a second
+                # panel must be refused before it can share the first one's
+                # session and nonce.  Nothing is committed to this object until
+                # the lock is held, so a refusal here leaves the owner
+                # unresolved and the port still pending rather than half armed.
+                self._acquire_panel_lock_locked(
+                    self._pending_lock_port, path=state_root / "ui" / "panel.lock"
+                )
+                self._pending_lock_port = None
+            self._workspace_id = manager.workspace_id
+            self._state_root = state_root
+            # The registry is held directly rather than through the manager so
+            # the clock is injectable: every expiry decision in this object and
+            # in the store is then made against the same notion of now.
+            self._registry_store = SessionRegistry(
+                self.repo,
+                state_root=state_root,
+                policy=manager.policy,
+                clock=self._clock,
+            )
+
+    def workspace_ready(self) -> bool:
+        """Whether a workspace exists to hold a session. Never raises."""
+
+        try:
+            self._resolve()
+        except CommonsError as exc:
+            _LOG.debug("the panel has no workspace to open a session in: %s", exc)
+            return False
+        return True
+
+    @property
+    def workspace_id(self) -> str:
+        self._resolve()
+        assert self._workspace_id is not None
+        return self._workspace_id
+
+    @property
+    def _registry(self) -> SessionRegistry:
+        self._resolve()
+        assert self._registry_store is not None
+        return self._registry_store
+
     # -- session lifecycle -------------------------------------------------
 
-    def start(self) -> str:
-        """Open (or re-adopt) the session and start the renewal thread."""
+    def start(self) -> str | None:
+        """Open (or re-adopt) the session and start the renewal thread.
 
+        ``None`` when there is no workspace yet.  The panel still serves -- its
+        first-run screen is the way out of that state -- and this owner opens
+        its session, takes the panel lock and starts renewing at the first
+        request that needs a session after the workspace appears.
+        """
+
+        with self._guard:
+            self._start_requested = True
+            self._stop.clear()
+            if not self.workspace_ready():
+                return None
         session_id = self.ensure_active()
         with self._guard:
-            if self._thread is None or not self._thread.is_alive():
-                self._stop.clear()
-                self._thread = threading.Thread(
-                    target=self._heartbeat_loop,
-                    name=f"agent-commons-ui-heartbeat-{self.workspace_id}",
-                    daemon=True,
-                )
-                self._thread.start()
+            self._start_renewal_locked()
         return session_id
+
+    def _start_renewal_locked(self) -> None:
+        if self._stop.is_set() or (self._thread is not None and self._thread.is_alive()):
+            return
+        self._thread = threading.Thread(
+            target=self._heartbeat_loop,
+            name=f"agent-commons-ui-heartbeat-{self.workspace_id}",
+            daemon=True,
+        )
+        self._thread.start()
 
     def ensure_active(self) -> str:
         """The current session id, opening or repairing first when needed.
@@ -279,6 +359,10 @@ class ProjectSessionOwner:
         """
 
         previous = self._session_id
+        # Resolving here rather than in the constructor is what lets the panel
+        # start on a directory that is not a workspace yet; it also takes the
+        # panel lock the moment there is somewhere to put it.
+        self._resolve()
         session = self._registry.open_session(
             **panel_session_identity(self.workspace_id),
             ttl_seconds=self._session_ttl,
@@ -294,6 +378,11 @@ class ProjectSessionOwner:
                 previous,
                 session.session_id,
             )
+        if self._start_requested:
+            # A start that could not run at the terminal because there was no
+            # workspace yet: renewal begins here instead, at the first session
+            # this owner opens.  Idempotent, so the ordinary path is unaffected.
+            self._start_renewal_locked()
 
     def _renew_locked(self, ttl_seconds: int) -> None:
         """Heartbeat under the lock, repairing an expired session first."""
@@ -330,6 +419,8 @@ class ProjectSessionOwner:
 
     @property
     def panel_lock_path(self) -> Path:
+        self._resolve()
+        assert self._state_root is not None
         return self._state_root / "ui" / "panel.lock"
 
     def acquire_panel_lock(self, port: int) -> None:
@@ -341,31 +432,44 @@ class ProjectSessionOwner:
         exclusive lock file per project prevents the second panel from ever
         reaching that point, and the recorded port lets the refusal say where
         the existing panel already is.
+
+        A project with no workspace has no state root to hold the lock and
+        nothing yet to conflict over, so the port is remembered instead and the
+        lock is taken as part of resolving the workspace -- still before any
+        session is opened, which is the ordering the guarantee rests on.
         """
 
         require_supported_platform()
-        assert _fcntl is not None
         with self._guard:
-            path = self.panel_lock_path
-            ensure_private_directory(path.parent, policy=SESSION_STORAGE)
-            if path.is_symlink():
-                raise ConfigurationError(f"panel lock must not be a symlink: {path}")
-            if self._panel_lock_fd is not None:
-                self._write_panel_lock_locked(port)
+            if not self.workspace_ready():
+                self._pending_lock_port = int(port)
                 return
-            flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-            descriptor = os.open(path, flags, 0o600)
-            try:
-                _fcntl.flock(descriptor, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
-            except OSError:
-                holder_port = self._read_panel_lock_port(descriptor)
-                os.close(descriptor)
-                self._lock_refused = True
-                raise PanelAlreadyOpenError(holder_port) from None
-            os.fchmod(descriptor, 0o600)
-            self._panel_lock_fd = descriptor
-            self._lock_refused = False
+            self._acquire_panel_lock_locked(port)
+
+    def _acquire_panel_lock_locked(self, port: int, *, path: Path | None = None) -> None:
+        # The path is passed explicitly by the deferred path in `_resolve`,
+        # which runs before this object knows its own state root.
+        assert _fcntl is not None
+        path = path if path is not None else self.panel_lock_path
+        ensure_private_directory(path.parent, policy=SESSION_STORAGE)
+        if path.is_symlink():
+            raise ConfigurationError(f"panel lock must not be a symlink: {path}")
+        if self._panel_lock_fd is not None:
             self._write_panel_lock_locked(port)
+            return
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            _fcntl.flock(descriptor, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        except OSError:
+            holder_port = self._read_panel_lock_port(descriptor)
+            os.close(descriptor)
+            self._lock_refused = True
+            raise PanelAlreadyOpenError(holder_port) from None
+        os.fchmod(descriptor, 0o600)
+        self._panel_lock_fd = descriptor
+        self._lock_refused = False
+        self._write_panel_lock_locked(port)
 
     def _write_panel_lock_locked(self, port: int) -> None:
         assert self._panel_lock_fd is not None
