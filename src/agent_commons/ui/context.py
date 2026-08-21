@@ -27,7 +27,11 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.runtime.model import profile_tool_summary, validate_model_name
+from agent_commons.runtime.model import (
+    BuiltinProfileId,
+    profile_tool_summary,
+    validate_model_name,
+)
 from agent_commons.services.manager import CommonsManager
 from agent_commons.services.roles import role_model
 from agent_commons.ui.graph import build_graph
@@ -914,6 +918,64 @@ class UIContext:
             self._profile_info = summary
         return summary
 
+    def model_options(self, snapshot: Any) -> dict[str, list[str]]:
+        """Models the hire form may offer, per provider, from honest sources only.
+
+        The panel may not invent a model name -- a name it made up would be a
+        name that is not the one that runs, and the frontend asset is pinned
+        against carrying any.  So every string here comes from somewhere this
+        project can actually point at:
+
+        - the model each configured profile names, which is what a launch would
+          use anyway;
+        - the model each active role was already hired on, so the second role
+          on a project is a pick from a list rather than retyping.
+
+        Neither source is a claim that a name is valid *now*: a model can be
+        retired by its provider between the config being written and this
+        request, and this surface has no way to ask.  It is a list of what this
+        machine and this project have already chosen, which is why the field
+        stays free text with this offered beside it rather than a closed
+        select.  Every candidate is re-validated on the way out: these arrive
+        from an operator file and from replayed events, and a name that could
+        not survive a launch has no business being offered for one.
+
+        A key per provider, always present and possibly empty, so the form can
+        look one up by the selected profile's provider without knowing which
+        providers exist.
+        """
+
+        options: dict[str, set[str]] = {
+            profile_id.provider.value: set() for profile_id in BuiltinProfileId
+        }
+
+        def offer(provider: str | None, model: Any) -> None:
+            if provider not in options or not isinstance(model, str):
+                return
+            try:
+                validated = validate_model_name(model)
+            except ValidationError:
+                # An operator file or a replayed event named something no
+                # launch would accept.  Dropping it silently is right: the
+                # catalogue is a list of offers, and this is not one.
+                _LOG.debug("a recorded model name is not offerable: %r", model[:64])
+                return
+            if validated is not None:
+                options[provider].add(validated)
+
+        for info in self.profile_info().values():
+            offer(str(info.get("provider")), info.get("model"))
+        for record in snapshot.agents.values():
+            if record.get("state") != "active":
+                continue
+            try:
+                provider = BuiltinProfileId(str(record.get("profile_id"))).provider.value
+            except ValueError:
+                # A role recorded against a profile this build does not know.
+                continue
+            offer(provider, role_model(record))
+        return {provider: sorted(models) for provider, models in sorted(options.items())}
+
     def catalog(self) -> dict[str, Any]:
         """What the gear panel may offer, and who owns each half of it.
 
@@ -951,6 +1013,11 @@ class UIContext:
             # choice actually starts.  Empty when the operator config could not
             # be read: the panel falls back to "fixed in the profile".
             "profile_info": self.profile_info(),
+            # Models to offer beside the hire form's free-text field, keyed by
+            # provider.  The panel names no model of its own, so this is the
+            # only place the form's suggestions can come from; empty lists are
+            # normal and mean the field is simply typed into.
+            "model_options": self.model_options(snapshot),
             # Read-only reference: the same composition a launch receives, so
             # the Tools view can never drift from what actually runs.
             "profile_tools": profile_tool_summary(),
