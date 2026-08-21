@@ -549,6 +549,21 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   border-left:2px solid var(--edge); border-radius:0 6px 6px 0;
   padding:7px 10px; margin:0 0 12px; font-size:12px; overflow-x:auto;
 }
+/* "How to build a product" walks a path the product is still assembling, so the
+   page says which of it is drafted instead of letting a placeholder be read as
+   an instruction.  The notice leads the page; a screenshot leaves a marked gap
+   rather than a drawing, because a picture of this panel is taken off a working
+   panel and cannot honestly be invented ahead of one. */
+.doc p.draftnote{
+  font-size:12px; color:var(--warn); background:var(--surface-2);
+  border-left:2px solid var(--warn); border-radius:0 6px 6px 0;
+  padding:7px 10px; margin:0 0 14px;
+}
+.doc p.shot{
+  font-size:11px; color:var(--faint); text-align:center;
+  border:1px dashed var(--edge); border-radius:6px;
+  padding:14px 10px; margin:0 0 12px;
+}
 /* A deep link lands on a heading, and every heading on a long page looks like
    every other one.  The mark says which paragraph the question was about and
    fades on its own; `scroll-margin` keeps the heading off the very top edge. */
@@ -928,6 +943,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              is recorded but not yet consumed by the runtime. -->
         <div class="dock-tabs" id="guide-tabs">
           <button type="button" data-gpage="brief" aria-selected="true" data-i18n="guide_tab_brief">In short</button>
+          <!-- The onboarding side of the split, which had one page on it and a
+               confession beside it: the reference pages taught nobody, and
+               "In short" says what the system IS without walking anybody
+               through building anything with it.  This is that walk — one
+               worked example, from a directory the panel has never seen to work
+               a person accepted — so it belongs here and not past the rule. -->
+          <button type="button" data-gpage="build" aria-selected="false" data-i18n="guide_tab_build">How to build a product</button>
           <!-- The strip's own confession (round 3, designer): what follows this
                rule is reference, scored 8/10 as reference and 3/10 as
                onboarding.  Saying so costs nothing and stops the five pages
@@ -1011,6 +1033,48 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <p data-i18n="guide_next_p"></p>
           <h3 data-i18n="guide_never_h">What this panel never does</h3>
           <p data-i18n="guide_never_p"></p>
+        </div>
+        <!-- The walk the guide admitted it did not have.  One worked example,
+             followed end to end: a directory the panel has never seen, one role,
+             one task, one run, one independent review, one acceptance.
+             Its headings carry stable ids like every other page's, so a "?" in
+             the panel can point at a STEP and not only at a definition.
+
+             The page is scaffolded and its prose is a draft, and it says so at
+             the top rather than reading as finished.  That is deliberate: the
+             path it describes is being assembled by this same wave, and a
+             walkthrough written ahead of the walk would describe a product that
+             does not exist yet — the exact failure the reference pages were
+             scored down for.  The pictures are marked gaps for the same reason:
+             a screenshot of this panel is taken off a working panel, and one
+             drawn in advance would be a drawing of a guess. -->
+        <div id="gpage-build" hidden>
+          <h1 data-i18n="guide_bd_h">From an empty directory to work you accepted</h1>
+          <p class="draftnote" data-i18n="guide_bd_draft"></p>
+          <p data-i18n="guide_bd_example"></p>
+          <h3 id="g-bd-setup" data-i18n="guide_bd_setup_h"></h3>
+          <p data-i18n="guide_bd_setup_p"></p>
+          <p class="shot" data-i18n="guide_bd_setup_shot"></p>
+          <h3 id="g-bd-hire" data-i18n="guide_bd_hire_h"></h3>
+          <p data-i18n="guide_bd_hire_p"></p>
+          <p class="shot" data-i18n="guide_bd_hire_shot"></p>
+          <h3 id="g-bd-task" data-i18n="guide_bd_task_h"></h3>
+          <p data-i18n="guide_bd_task_p"></p>
+          <p class="shot" data-i18n="guide_bd_task_shot"></p>
+          <h3 id="g-bd-run" data-i18n="guide_bd_run_h"></h3>
+          <p data-i18n="guide_bd_run_p"></p>
+          <p class="shot" data-i18n="guide_bd_run_shot"></p>
+          <h3 id="g-bd-answer" data-i18n="guide_bd_answer_h"></h3>
+          <p data-i18n="guide_bd_answer_p"></p>
+          <p class="shot" data-i18n="guide_bd_answer_shot"></p>
+          <h3 id="g-bd-review" data-i18n="guide_bd_review_h"></h3>
+          <p data-i18n="guide_bd_review_p"></p>
+          <p class="shot" data-i18n="guide_bd_review_shot"></p>
+          <h3 id="g-bd-accept" data-i18n="guide_bd_accept_h"></h3>
+          <p data-i18n="guide_bd_accept_p"></p>
+          <p class="shot" data-i18n="guide_bd_accept_shot"></p>
+          <h3 id="g-bd-next" data-i18n="guide_bd_next_h"></h3>
+          <p data-i18n="guide_bd_next_p"></p>
         </div>
         <!-- Every heading below carries a stable id, and that is the whole
              deep-link mechanism: a "?" in the panel names a page and one of
@@ -2130,6 +2194,7 @@ const STRINGS = {
     guide_never_h: "What this panel never does",
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. For an unsuccessful provider process it keeps only a private, sanitized final 4 KiB of stderr: secrets, PII and absolute paths are redacted; stdout is never stored. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     guide_tab_brief: "In short",
+    guide_tab_build: "How to build a product",
     guide_tab_units: "The system’s units",
     guide_tab_agents: "Roles and memory",
     guide_tab_tasks: "Tasks and runs",
@@ -2138,6 +2203,38 @@ const STRINGS = {
     guide_tab_catalog: "Skills and tools",
     guide_ref_label: "Reference",
     guide_ref_lead: "This page is reference: it explains how the mechanism works, rather than teaching a first route. The first route is in “In short”.",
+    // The walkthrough. Its scaffolding is settled — these eight steps are the
+    // path and their order is the order — and its prose is a draft that says so
+    // out loud, because the path is still being assembled and a walkthrough
+    // written ahead of the walk would describe a product that does not exist.
+    // The pictures are marked gaps for the same reason: a screenshot of this
+    // panel comes off a working panel and cannot be drawn in advance.
+    guide_bd_h: "From an empty directory to work you accepted",
+    guide_bd_draft: "Draft. The steps below and their order are settled; the words under them are a sketch and will be rewritten from a real walk once this whole path runs end to end. The marked gaps are where screenshots go — they are taken off a working panel, so none has been invented here.",
+    guide_bd_example: "One example is followed all the way through: a project that has an Agent Commons workspace and nothing else — no roles, no tasks, no history — and one small, checkable piece of work in it. Every step names what you press, what is recorded, and what would refuse you.",
+    guide_bd_setup_h: "1. Point the panel at the project",
+    guide_bd_setup_p: "Sketch: open the panel in the project directory. If there is no workspace, or no operator configuration, the first screen says which of the two is missing and writes what it can — the workspace here, the runtime file in your own config directory — without a terminal. This step ends when the panel says the project is set up.",
+    guide_bd_setup_shot: "Picture: the first-run screen, on a directory that has a repository and no workspace yet.",
+    guide_bd_hire_h: "2. Hire the first role",
+    guide_bd_hire_p: "Sketch: the + on the board. A name, a profile — which provider and which fixed permissions — a model, and one sentence about why the role exists. The model is chosen here and nowhere else. Nothing runs yet: hiring records who may be asked to work, not any work.",
+    guide_bd_hire_shot: "Picture: the hire form, filled in, before it is submitted.",
+    guide_bd_task_h: "3. Say what has to be done",
+    guide_bd_task_p: "Sketch: + Task. The text of the task is what the role is actually told, so this is the field that decides the work — not the sentence about why the role exists. Say what has to be true when it is done, because that is what the review will check.",
+    guide_bd_task_shot: "Picture: the new-task form, with a task written the way step 6 can be judged against.",
+    guide_bd_run_h: "4. Start a run and watch it",
+    guide_bd_run_p: "Sketch: a run is one bounded attempt by one role at one task. It is started from the task, it has a ceiling on how long and how much it may produce, and it appears on the board as it goes. A run that ends well has not finished the task — that is step 6.",
+    guide_bd_run_shot: "Picture: the board with a run in progress, and the Runs list beside it.",
+    guide_bd_answer_h: "5. Answer what the run asks",
+    guide_bd_answer_p: "Sketch: a run that needs a decision stops and asks, and the question waits for you on the board and in the footer count. Answering is a recorded act, like everything else here; nothing is decided on your behalf while you are away.",
+    guide_bd_answer_shot: "Picture: a blocked run with its question and the field that answers it.",
+    guide_bd_review_h: "6. Have it judged by someone who did not do it",
+    guide_bd_review_p: "Sketch: hire a reviewer profile and open an independent review of the work. Independent means the reviewer is not the author: the same role cannot approve what it produced, and acceptance in step 7 will refuse without a current approved review from someone else.",
+    guide_bd_review_shot: "Picture: the review request and the verdict it came back with.",
+    guide_bd_accept_h: "7. Accept it, or send it back",
+    guide_bd_accept_p: "Sketch: acceptance is yours and is the only thing that closes a task. Sending work back is an ordinary outcome, not a failure — it returns to the same role with what was wrong recorded beside it. Only acceptance shows as a green tick anywhere in this panel.",
+    guide_bd_accept_shot: "Picture: the acceptance step, and the same task afterwards.",
+    guide_bd_next_h: "8. The second time round",
+    guide_bd_next_p: "Sketch: what changes once the first piece is through — saving the role you hired as a template, giving a role memory that carries between runs, letting one role hire another under a ceiling you set, and where each of those is described in full on the reference pages.",
     guide_map_aria: "The work loop: a role takes a task, a run works it, a review judges it, and only acceptance closes it — a finished run sends the work to review, never straight to accepted.",
     guide_map_caption: "A run that ends succeeded has not finished the task: it hands the work to review. You accept it — or send it back.",
     guide_map_role: "Role",
@@ -2800,6 +2897,7 @@ const STRINGS = {
     guide_never_h: "Чего панель никогда не делает",
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Для неуспешного процесса провайдера хранится только приватный очищенный хвост stderr до 4 КиБ: секреты, персональные данные и абсолютные пути скрываются; stdout не сохраняется. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     guide_tab_brief: "Коротко",
+    guide_tab_build: "Как собрать продукт",
     guide_tab_units: "Единицы системы",
     guide_tab_agents: "Роли и память",
     guide_tab_tasks: "Задачи и прогоны",
@@ -2808,6 +2906,32 @@ const STRINGS = {
     guide_tab_catalog: "Навыки и инструменты",
     guide_ref_label: "Справочник",
     guide_ref_lead: "Эта страница — справочник: она объясняет, как устроен механизм, а не ведёт по первому маршруту. Первый маршрут — в разделе «Коротко».",
+    guide_bd_h: "От пустого каталога до принятой работы",
+    guide_bd_draft: "Черновик. Шаги ниже и их порядок уже определены; текст под ними — набросок, его перепишут по настоящему проходу, когда весь маршрут заработает целиком. Отмеченные пропуски — места для снимков экрана: их снимают с работающей панели, поэтому здесь не выдумано ни одного.",
+    guide_bd_example: "Один пример проходится до конца: проект, в котором есть workspace Agent Commons и больше ничего — ни ролей, ни задач, ни истории, — и одна небольшая проверяемая работа в нём. На каждом шаге сказано, что вы нажимаете, что записывается и что вам откажет.",
+    guide_bd_setup_h: "1. Указать панели проект",
+    guide_bd_setup_p: "Набросок: откройте панель в каталоге проекта. Если workspace нет или нет конфига оператора, первый экран говорит, чего именно не хватает, и пишет то, что может: workspace — здесь, файл среды выполнения — в вашем каталоге конфигурации, без терминала. Шаг закончен, когда панель говорит, что проект настроен.",
+    guide_bd_setup_shot: "Снимок: экран первого открытия на каталоге, где репозиторий есть, а workspace ещё нет.",
+    guide_bd_hire_h: "2. Нанять первую роль",
+    guide_bd_hire_p: "Набросок: кнопка + на доске. Имя, профиль — какой провайдер и какие закреплённые права, — модель и одна фраза о том, зачем эта роль. Модель выбирается здесь и больше нигде. Пока ничего не работает: наём записывает, кого можно просить о работе, а не саму работу.",
+    guide_bd_hire_shot: "Снимок: форма найма, заполненная, до отправки.",
+    guide_bd_task_h: "3. Сказать, что нужно сделать",
+    guide_bd_task_p: "Набросок: кнопка «+ Задача». Текст задачи — это то, что роли действительно говорят, поэтому именно это поле решает, какой будет работа, а не фраза о том, зачем роль нужна. Напишите, что должно быть верно по завершении: именно это и будет проверять обзор.",
+    guide_bd_task_shot: "Снимок: форма новой задачи с текстом, по которому шаг 6 сможет судить.",
+    guide_bd_run_h: "4. Начать прогон и посмотреть на него",
+    guide_bd_run_p: "Набросок: прогон — одна ограниченная попытка одной роли решить одну задачу. Он начинается от задачи, у него есть потолок по времени и объёму, и он виден на доске по ходу дела. Хорошо завершившийся прогон не закрывает задачу — это шаг 6.",
+    guide_bd_run_shot: "Снимок: доска с идущим прогоном и список прогонов рядом.",
+    guide_bd_answer_h: "5. Ответить на то, о чём прогон спрашивает",
+    guide_bd_answer_p: "Набросок: прогон, которому нужно решение, останавливается и спрашивает, а вопрос ждёт вас на доске и в счётчике внизу. Ответ — такое же записываемое действие, как и всё здесь; за вас, пока вас нет, ничего не решают.",
+    guide_bd_answer_shot: "Снимок: остановленный прогон со своим вопросом и полем ответа.",
+    guide_bd_review_h: "6. Отдать на суд тому, кто это не делал",
+    guide_bd_review_p: "Набросок: наймите роль-обозревателя и откройте независимый обзор работы. Независимый значит, что обозреватель — не автор: одна и та же роль не может утвердить то, что сама произвела, и приёмка на шаге 7 откажет без действующего утверждённого обзора от другого.",
+    guide_bd_review_shot: "Снимок: запрос обзора и вернувшийся вердикт.",
+    guide_bd_accept_h: "7. Принять или вернуть",
+    guide_bd_accept_p: "Набросок: приёмка — ваша, и только она закрывает задачу. Вернуть работу — обычный исход, а не провал: она возвращается к той же роли, а рядом записано, что было не так. Зелёной галочкой в этой панели отмечается только приёмка.",
+    guide_bd_accept_shot: "Снимок: шаг приёмки и та же задача после него.",
+    guide_bd_next_h: "8. Во второй раз",
+    guide_bd_next_p: "Набросок: что меняется, когда первый кусок пройден, — сохранить нанятую роль как шаблон, дать роли память, переходящую между прогонами, разрешить одной роли нанимать другую в пределах заданного вами потолка; и где каждое из этого расписано целиком на страницах справочника.",
     guide_map_aria: "Круг работы: роль берёт задачу, прогон её делает, ревью выносит вердикт, и закрывает задачу только приёмка — закончившийся прогон отправляет работу на ревью, а не сразу в приёмку.",
     guide_map_caption: "Прогон, закончившийся succeeded, задачу не завершает: он передаёт работу на ревью. Принимаете её вы — или отправляете назад.",
     guide_map_role: "Роль",
