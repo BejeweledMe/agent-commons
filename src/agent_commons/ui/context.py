@@ -260,8 +260,47 @@ class UIContext:
         return (session_id,) if session_id is not None else ()
 
     @property
+    def operator_panel(self) -> bool:
+        """Whether this panel acts at all, rather than only shows.
+
+        Structural and settled at construction: a panel either was handed the
+        means to hold an operator session -- an owner, a provider, or an
+        already-resolved id -- or it was not, and nothing that happens while it
+        serves can change the answer.  This is the *only* thing the route table
+        is built from, because FastAPI builds that table once while every other
+        piece of state the panel has (a workspace, an operator config, a
+        catalogue) can now appear while it is already serving.
+
+        Deliberately not "a session can be obtained": obtaining one needs a
+        workspace, and creating the workspace is itself one of the routes.
+        """
+
+        return (
+            self._session_owner is not None
+            or self._session_provider is not None
+            or self._writer_session_id is not None
+        )
+
+    @property
     def writes_enabled(self) -> bool:
-        return self.writer_session_id is not None
+        """Whether a session can be obtained *right now*. Never raises.
+
+        This is the executable half of the pair: handlers read it, the route
+        table does not.  A panel opened on a directory that is not a workspace
+        yet is an operator panel whose writes are not enabled -- the owner
+        cannot resolve a workspace that does not exist -- and it becomes one
+        whose writes are enabled the moment `POST /api/setup/initialize`
+        returns, in the same process.  A refusal from the session machinery is
+        therefore an answer here rather than something to propagate: raising out
+        of a property that handlers consult as a precondition would turn "not
+        set up yet" into a 500.
+        """
+
+        try:
+            return self.writer_session_id is not None
+        except ConfigurationError as exc:
+            _LOG.debug("this panel cannot hold a session yet: %s", exc)
+            return False
 
     @property
     def catalog_editing_enabled(self) -> bool:
@@ -270,8 +309,14 @@ class UIContext:
         Two conditions, and both are states rather than switches: there has to
         be a catalogue file to edit, and the panel has to be one that acts at
         all.  A panel without a session shows the catalogue and changes nothing
-        -- that is what read-only means -- so the catalogue path alone must not
-        open a POST route.
+        -- that is what read-only means.
+
+        Like `launch_enabled`, this decides whether an edit is *permitted*, not
+        whether the route exists.  The generated runtime config names a
+        catalogue beside itself and the panel adopts both while it is already
+        serving, so a route table built from this would answer 404 to the very
+        editing the first-run screen had just switched on.  `POST` is refused by
+        `_require_catalog_editing`, which says which half is missing.
         """
 
         return self._catalog_path is not None and self.writes_enabled
@@ -280,10 +325,10 @@ class UIContext:
     def launch_enabled(self) -> bool:
         # Launch needs writes (a real operator session records the delegation)
         # and either a profile config to build the runtime from or an injected
-        # runtime factory (tests).  Unlike the surfaces above this one does not
-        # decide whether a route exists: the operator config can appear while
-        # the panel is already serving, so the route is always there for a
-        # writing panel and refuses by `launch_not_configured` until this is
+        # runtime factory (tests).  Like every other capability here this one
+        # does not decide whether a route exists: the operator config can appear
+        # while the panel is already serving, so the route is always there for
+        # an operator panel and refuses by `launch_not_configured` until this is
         # true.
         return self.writes_enabled and (
             self._profile_config is not None or self._runtime_factory is not None

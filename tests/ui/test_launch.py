@@ -28,7 +28,13 @@ from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import LAUNCH_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 #: Every field the run surface publishes, exactly.  Asserted as an equality so a
 #: later change cannot quietly add one -- in particular a "spend"/"cost"/"used"
@@ -193,7 +199,7 @@ def test_the_launch_route_is_declared_apart_from_the_write_surface(
     assert context.launch_enabled is False
     with _client(context) as client:
         found = mutating_surface(client.app)
-    assert found == expected_surface(context)
+    assert found == expected_surface(context) == OPERATOR_SURFACE
     # Present, because the runtime config can be written into a panel that is
     # already serving and the route table is built once.
     assert set(LAUNCH_ROUTES) <= found

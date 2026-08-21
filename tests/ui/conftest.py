@@ -128,22 +128,14 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
         yield test_client
 
 
-#: Every declared route tuple beside the context property that gates it.  The
-#: tuples in `ui.server` are a declaration checked by test rather than a runtime
-#: allowlist, so the check has to live here -- and it has to live here *once*:
-#: a new tuple joins the writing surface by being added to this table and
-#: nowhere else, instead of by editing every test that pins the surface.
-_SURFACE_GATES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
-    ("writes_enabled", MUTATING_ROUTES),
-    ("catalog_editing_enabled", CATALOG_ROUTES),
-    # Registered by every writing panel, configured or not: the runtime config
-    # can be written into an already-serving panel, and the route table is built
-    # once.  `launch_enabled` still exists and still means "a run would start" --
-    # it is just no longer what decides whether the route is there.
-    ("writes_enabled", LAUNCH_ROUTES),
-    # Same reason, one step earlier: first run is what makes a panel configured,
-    # so it cannot be gated on the panel being configured.
-    ("writes_enabled", SETUP_ROUTES),
+#: The whole non-GET surface of an operator panel, named once.  There is no
+#: table of gates any more and that is the point: every capability the panel can
+#: gain -- a workspace, a runtime config, a catalogue -- now appears while it is
+#: already serving, and FastAPI builds its route table once, so the table cannot
+#: depend on any of them.  A new tuple joins the surface by being added here and
+#: nowhere else.
+OPERATOR_SURFACE: frozenset[tuple[str, str]] = frozenset(
+    set(MUTATING_ROUTES) | set(LAUNCH_ROUTES) | set(SETUP_ROUTES) | set(CATALOG_ROUTES)
 )
 
 
@@ -165,16 +157,15 @@ def mutating_surface(app: FastAPI) -> set[tuple[str, str]]:
 def expected_surface(context: UIContext) -> set[tuple[str, str]]:
     """The non-GET surface a panel in this state is supposed to register.
 
-    Derived from the context's own gate properties and the declared tuples, so
-    a read-only panel expects the empty set and every other panel expects the
-    union of the tuples its gates open.
+    Two answers and no formula: a read-only panel registers nothing, and an
+    operator panel registers the whole declared union, whatever else is or is
+    not configured about it.  Because `operator_panel` is also the one property
+    `create_app` reads, callers that want a check independent of the
+    implementation compare against `OPERATOR_SURFACE` literally instead -- and
+    the tests that pin the invariant do both.
     """
 
-    surface: set[tuple[str, str]] = set()
-    for gate, routes in _SURFACE_GATES:
-        if getattr(context, gate):
-            surface |= set(routes)
-    return surface
+    return set(OPERATOR_SURFACE) if context.operator_panel else set()
 
 
 def authorized() -> dict[str, str]:

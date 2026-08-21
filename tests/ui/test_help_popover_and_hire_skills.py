@@ -17,7 +17,13 @@ from agent_commons.services import CommonsManager
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import create_app
-from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 def _language_tables() -> tuple[str, str]:
@@ -263,7 +269,7 @@ def test_a_hire_carrying_a_skill_records_it_through_the_route_that_existed(
     app = create_app(context, token="test-token", port=PORT)
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
         # No route was added for the field.
-        assert mutating_surface(app) == expected_surface(context)
+        assert mutating_surface(app) == expected_surface(context) == OPERATOR_SURFACE
 
         # The picker offers what the catalogue holds, which is what the panel
         # fills `#hire-skills` from.

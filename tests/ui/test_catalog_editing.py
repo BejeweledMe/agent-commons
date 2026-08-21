@@ -1,8 +1,9 @@
 """The operator catalogue, edited from the panel and read by the broker.
 
 Two properties matter and neither is provable from the context object alone:
-the routes exist only behind their own gate, and what the panel writes is a
-file the next launch can actually load.
+the routes exist on every operator panel and refuse by name until a catalogue
+is configured, and what the panel writes is a file the next launch can actually
+load.
 """
 
 from __future__ import annotations
@@ -17,7 +18,13 @@ from agent_commons.errors import ConfigurationError
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import CATALOG_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
@@ -63,31 +70,46 @@ def _writing_context(workspace: dict[str, Any], **extra: Any) -> UIContext:
     )
 
 
-def test_catalogue_routes_appear_only_once_a_catalogue_is_configured(
+def test_the_catalogue_routes_exist_before_a_catalogue_does_and_refuse_until_then(
     workspace: dict[str, Any], tmp_path: Path
 ) -> None:
-    """Editing presets and changing what a run is told to do are not one thing.
+    """Editing presets and changing what a run is told to do are not one thing,
+    but the difference is a refusal and no longer a missing route.
 
-    Both panels here are writing panels bound to a real operator session, which
-    is the whole point: the difference between them is the operator catalogue
-    and nothing else, so the catalogue surface is shown to follow the catalogue
-    rather than the session.
+    The catalogue path used to gate registration, and that quietly broke the
+    promise this wave is about: the first-run screen writes a runtime config
+    that names a `catalog.yaml` beside itself, the panel adopts both while it is
+    serving, and `POST /api/catalog/entries` still answered 404 because the
+    route table had been decided at startup.  Both panels here carry the routes;
+    only one of them may use them.
     """
 
     without = _writing_context(workspace)
     with _client(without) as client:
         found = mutating_surface(client.app)
-    assert found == expected_surface(without)
-    # A writing panel with no catalogue records roles and edits no catalogue.
-    assert set(MUTATING_ROUTES) <= found
-    assert not found & set(CATALOG_ROUTES)
+        refused = client.post(
+            "/api/catalog/entries",
+            headers=authorized(),
+            json={"section": "skills", "id": "x", "title": "X"},
+        )
+    assert found == expected_surface(without) == OPERATOR_SURFACE
+    assert set(MUTATING_ROUTES) | set(CATALOG_ROUTES) <= found
+    assert without.catalog_editing_enabled is False
+    # Refused, not absent, and the refusal names which half of the state is
+    # missing rather than pretending the surface does not exist.
+    assert refused.status_code == 409, refused.text
+    assert "no operator catalogue" in refused.json()["error"]["message"]
 
     editing = _writing_context(workspace, catalog_path=tmp_path / "catalog.yaml")
     with _client(editing) as client:
         found = mutating_surface(client.app)
-    assert found == expected_surface(editing)
-    assert set(CATALOG_ROUTES) <= found
-    assert found - set(CATALOG_ROUTES) == expected_surface(without)
+        accepted = client.post(
+            "/api/catalog/entries",
+            headers=authorized(),
+            json={"section": "skills", "id": "x", "title": "X", "instruction": "do it"},
+        )
+    assert found == expected_surface(editing) == OPERATOR_SURFACE
+    assert accepted.status_code == 200, accepted.text
 
 
 def test_a_panel_without_a_session_edits_no_catalogue_however_configured(

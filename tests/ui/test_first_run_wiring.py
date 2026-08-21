@@ -25,8 +25,14 @@ import agent_commons.ui.setup as setup
 from agent_commons.runtime.model import ExecutableResolutionError, ExecutableRole
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import SETUP_SUPPORT_BINARY_UNRESOLVED, UIContext
-from agent_commons.ui.server import SETUP_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
+from agent_commons.ui.server import CATALOG_ROUTES, SETUP_ROUTES, create_app
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -112,11 +118,51 @@ def test_setup_writes_are_declared_apart_and_absent_from_a_read_only_panel(
     writing = _writing(workspace, window="first-run-surface-window")
     with _client(writing) as client:
         found = mutating_surface(client.app)
-    assert found == expected_surface(writing)
+    assert found == expected_surface(writing) == OPERATOR_SURFACE
     # Registered by a panel that is not configured yet -- being unconfigured is
     # the state these two routes exist to leave.
     assert writing.launch_enabled is False
     assert set(SETUP_ROUTES) <= found
+
+
+def test_a_panel_on_a_repository_with_no_workspace_carries_the_surface_and_refuses_by_name(
+    tmp_path: Path,
+) -> None:
+    """The whole surface is registered before the workspace exists, and every
+    route that records refuses with the frozen code until it does.
+
+    This is what makes first run reachable at all: the routes cannot wait for a
+    workspace, because creating the workspace is one of them.  The refusal is
+    raised from a dependency, so it lands before the request body is read --
+    nothing in a body can make an absent workspace recordable.
+    """
+
+    import subprocess
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    context = UIContext(
+        repo,
+        state_root=tmp_path / "state",
+        writer_session_id="session.00000000000000000000000003",
+    )
+    with _client(context) as client:
+        assert mutating_surface(client.app) == expected_surface(context) == OPERATOR_SURFACE
+        # Deliberately malformed: a body that could not be parsed proves the
+        # refusal happened before anything looked at it.
+        refused = client.post(
+            "/api/tasks", headers=authorized(), content=b"{not json", timeout=None
+        )
+        catalogue = client.post("/api/catalog/entries", headers=authorized(), json={})
+        launch = client.post("/api/delegations", headers=authorized(), json={})
+        allowed = client.get("/api/setup", headers=authorized())
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == setup.SETUP_UNINITIALIZED
+    assert catalogue.json()["error"]["code"] == setup.SETUP_UNINITIALIZED
+    assert launch.json()["error"]["code"] == setup.SETUP_UNINITIALIZED
+    assert allowed.json()["state"] == setup.SETUP_UNINITIALIZED
 
 
 def test_the_reading_half_of_setup_is_in_no_tuple_and_answers_read_only(
@@ -302,12 +348,12 @@ def test_an_adopted_config_hands_the_panel_the_catalogue_path_beside_it(
     carry that file's *contents* and not its name, so the panel had no way to
     learn which file to read back.
 
-    The second half of this test is a caveat, pinned rather than papered over: a
-    panel that adopts a catalogue at runtime can read it, but its catalogue
-    POST routes were decided when the app was built and are not there.  Turning
-    that into working editing means gating `CATALOG_ROUTES` on `writes_enabled`
-    the way `LAUNCH_ROUTES` already is, which is a change to a frozen invariant
-    and not this seam's to make.
+    The second half is the rest of the promise, and it used to be a pinned
+    caveat: the panel adopted the catalogue, said editing was enabled, and
+    `POST /api/catalog/entries` answered 404 because the route table had been
+    decided when the app was built.  The catalogue routes are now registered by
+    every operator panel, so adopting a catalogue mid-flight really does turn
+    editing on -- in this process, without a restart.
     """
 
     context = _writing(workspace, window="first-run-catalog-window")
@@ -315,12 +361,24 @@ def test_an_adopted_config_hands_the_panel_the_catalogue_path_beside_it(
         registered = mutating_surface(client.app)
         client.post("/api/setup/runtime-config", headers=authorized())
         catalogue = client.get("/api/catalog", headers=authorized()).json()
+        saved = client.post(
+            "/api/catalog/entries",
+            headers=authorized(),
+            json={
+                "section": "skills",
+                "id": "house-style",
+                "title": "House style",
+                "instruction": "Follow the house style.",
+            },
+        )
 
     seeded = tmp_path / "xdg-config" / "agent-commons" / "catalog.yaml"
     assert seeded.is_file()
     assert catalogue["catalog_path"] == str(seeded)
     assert context.catalog_editing_enabled is True
-    assert not registered & {("POST", "/api/catalog/entries")}
+    assert set(CATALOG_ROUTES) <= registered
+    assert saved.status_code == 200, saved.text
+    assert "house-style" in seeded.read_text(encoding="utf-8")
 
 
 # -- paths stop at the moment they stop being needed ---------------------------

@@ -20,7 +20,12 @@ from typing import Any
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import MUTATING_ROUTES
-from tests.ui.conftest import authorized, expected_surface, mutating_surface
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 def _language_tables() -> tuple[str, str]:
@@ -352,4 +357,4 @@ def test_the_pair_the_two_selects_produce_still_fits_the_route_that_existed(
     # the same permission twice.  A UI that refused would be inventing a rule.
     assert open_link(a_id, b_id).status_code == 200
 
-    assert mutating_surface(writable_client.app) == expected_surface(writable)
+    assert mutating_surface(writable_client.app) == expected_surface(writable) == OPERATOR_SURFACE

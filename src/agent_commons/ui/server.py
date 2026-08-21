@@ -1,8 +1,13 @@
-"""FastAPI application for the local read-only workspace view.
+"""FastAPI application for the local workspace panel.
 
-Only ``GET`` routes are registered.  The absence of a mutating route is a
-structural property of this module, verified by test, rather than a rule some
-middleware is trusted to enforce.
+One structural property, verified by test rather than trusted to middleware: a
+read-only panel registers no route of any method but ``GET``, and an operator
+panel registers exactly the union of the four declared tuples -- unconditionally,
+whatever else is or is not configured about it.  There is no gate formula left
+in the route table, because everything a panel can gain (a workspace, an
+operator runtime config, a catalogue beside it) can now appear while it is
+already serving, and the table is built once.  What is not yet true is refused
+by the handler with a named code the first-run screen draws by.
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ import webbrowser
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from agent_commons.errors import CommonsError
@@ -31,7 +36,12 @@ from agent_commons.ui.security import (
     new_token,
     token_matches,
 )
-from agent_commons.ui.setup import SetupError
+from agent_commons.ui.setup import (
+    SETUP_NOT_A_REPOSITORY,
+    SETUP_UNINITIALIZED,
+    SetupError,
+    setup_state,
+)
 
 _ENTITY_KINDS = frozenset(
     {
@@ -74,9 +84,12 @@ MUTATING_ROUTES = (
     ("POST", "/api/tasks/{task_id}/reopen"),
 )
 
-#: Catalogue editing appears only once an operator catalogue is configured, so
-#: it has its own allowlist. Adding a skill and adding a role are different
-#: privileges and the test that pins the mutating surface should say so.
+#: Catalogue editing keeps its own allowlist: adding a skill and adding a role
+#: are different privileges and the test that pins the mutating surface should
+#: say so. It is no longer its own registration gate -- the generated runtime
+#: config seeds a catalogue beside itself and the panel adopts both while it is
+#: already serving, so a gated table answered 404 to editing the first-run
+#: screen had just switched on. `_require_catalog_editing` refuses instead.
 CATALOG_ROUTES = (
     ("POST", "/api/catalog/entries"),
     ("POST", "/api/catalog/entries/remove"),
@@ -84,7 +97,7 @@ CATALOG_ROUTES = (
 
 #: Launching a provider is a larger privilege than recording a role: bounded
 #: metadata against a billable subscription process. It is registered by every
-#: writing panel all the same, because the operator config that makes a launch
+#: operator panel all the same, because the operator config that makes a launch
 #: possible can be written from the panel's own first-run screen while the
 #: server is already up, and FastAPI does not rebuild its route table. The
 #: handler refuses with `launch_not_configured` until the environment exists.
@@ -97,9 +110,11 @@ LAUNCH_ROUTES = (("POST", "/api/delegations"),)
 #: surface that writes outside the ledger: one route creates the workspace
 #: through the same initializer `agent-commons init` calls, the other writes the
 #: operator's own runtime config and adopts it into this running panel.  Both
-#: are registered by any writing panel -- a read-only one registers neither, so
+#: are registered by any operator panel -- a read-only one registers neither, so
 #: the zero-non-GET invariant is untouched -- and the reading half of the same
 #: surface (`GET /api/setup`, `GET /api/setup/preflight`) is in no tuple at all.
+#: These two are also the only non-GET routes not bound to an existing
+#: workspace: initialization is what makes the workspace exist.
 SETUP_ROUTES = (
     ("POST", "/api/setup/initialize"),
     ("POST", "/api/setup/runtime-config"),
@@ -107,6 +122,78 @@ SETUP_ROUTES = (
 
 _HEARTBEAT_SECONDS = 15.0
 _POLL_SECONDS = 2.0
+
+#: What the operator can do about a panel opened on a directory that is not a
+#: workspace yet. The panel serves the first-run screen; the routes that record
+#: canonical events are there, and they say this until it exists.
+_NOT_INITIALIZED_ACTIONS = ["run first run from this panel", "or run `agent-commons init` here"]
+
+
+class _NotInitialized(Exception):
+    """No workspace yet, so nothing can be recorded. Rendered by ``create_app``.
+
+    Raised from a route dependency rather than from a handler on purpose: a
+    dependency runs *before* the request body is read, which is the same
+    discipline `launch_not_configured` already follows. Nothing in a body can
+    make an absent workspace recordable, so nothing in it is worth parsing.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class _RouteGroup:
+    """Where one group of routes attaches, and what must hold before any runs.
+
+    The routes stay flat on the application -- an included ``APIRouter`` is one
+    nested object in ``app.routes``, and the invariant test reads that list to
+    check what was registered against what was declared, so nesting would hide
+    the surface from the only check that guards it.  What the group carries is
+    the precondition shared by every route in it, as a FastAPI dependency:
+    dependencies resolve *before* the handler runs and therefore before the
+    request body is read.
+    """
+
+    def __init__(self, app: FastAPI, *, requires: list[Any] | None = None) -> None:
+        self._app = app
+        self._requires = list(requires or ())
+
+    def post(self, path: str) -> Callable[[Any], Any]:
+        return self._app.post(path, dependencies=self._requires)
+
+
+def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
+    """The route group that needs a workspace existing right now.
+
+    The panel's non-GET surface is registered structurally -- see ``create_app``
+    -- so this is where "registered" stops meaning "usable".  It reads
+    ``writes_enabled``, which is deliberately a question answered per request:
+    the same panel answers no before `POST /api/setup/initialize` and yes after
+    it, in the same process and without the route table changing.
+    """
+
+    async def _require_workspace() -> None:
+        # Two questions, and the state is asked first: there is nothing to
+        # record into before the workspace exists, so a panel that believes it
+        # holds a session there is wrong rather than lucky.
+        state = await asyncio.to_thread(setup_state, context.repo)
+        if state != SETUP_UNINITIALIZED and await asyncio.to_thread(lambda: context.writes_enabled):
+            return
+        if state == SETUP_NOT_A_REPOSITORY:
+            raise _NotInitialized(
+                SETUP_NOT_A_REPOSITORY,
+                "this directory is not a git repository, so there is nothing for a "
+                "workspace to attach to and nothing to record against",
+            )
+        raise _NotInitialized(
+            SETUP_UNINITIALIZED,
+            "this directory has no workspace yet, so this panel holds no operator "
+            "session and records no canonical event",
+        )
+
+    return _RouteGroup(app, requires=[Depends(_require_workspace)])
 
 
 def _error(status: int, code: str, message: str, actions: list[str] | None = None) -> JSONResponse:
@@ -164,6 +251,14 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     def _authorized(request: Request) -> bool:
         presented = bearer_token(request.headers.get("authorization"))
         return presented is not None and token_matches(presented, token)
+
+    async def _not_initialized(_: Request, exc: Exception) -> Response:
+        # The frozen refusal table travels as a code, exactly as the first-run
+        # screen's other refusals do; the class name would say nothing.
+        assert isinstance(exc, _NotInitialized)
+        return _error(409, exc.code, exc.message, _NOT_INITIALIZED_ACTIONS)
+
+    app.add_exception_handler(_NotInitialized, _not_initialized)
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> Response:
@@ -273,13 +368,23 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         except CommonsError as exc:
             return _error(422, type(exc).__name__, str(exc))
 
-    if context.writes_enabled:
-        _register_writes(app, context)
-        # Not gated on `launch_enabled`: see LAUNCH_ROUTES.
-        _register_launch(app, context)
-        _register_setup(app, context)
-    if context.catalog_editing_enabled:
-        _register_catalog_writes(app, context)
+    if context.operator_panel:
+        # One condition for the whole non-GET surface, and it is the only
+        # structural one left.  Every capability this panel might gain -- a
+        # workspace, an operator runtime config, a catalogue beside it -- can
+        # now appear while the server is already running, and FastAPI builds its
+        # route table exactly once; a table built from those states would answer
+        # 404 to the very surface the first-run screen had just switched on.
+        # What is still false at request time is refused by the handler, with a
+        # code the panel can draw: `setup_uninitialized`, `launch_not_configured`,
+        # or the catalogue's own named refusal.
+        recording = _workspace_bound(app, context)
+        _register_writes(recording, context)
+        _register_launch(recording, context)
+        _register_catalog_writes(recording, context)
+        # First run is the one surface that must answer before the workspace
+        # exists -- it is what makes it exist -- so it is bound to nothing.
+        _register_setup(_RouteGroup(app), context)
 
     @app.get("/api/stream")
     async def stream(request: Request) -> Response:
@@ -316,7 +421,7 @@ async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any
     return JSONResponse(result)
 
 
-def _register_writes(app: FastAPI, context: UIContext) -> None:
+def _register_writes(router: _RouteGroup, context: UIContext) -> None:
     """Attach the mutating surface. Every handler ends in ``CommonsManager``."""
 
     async def _record(action: Callable[..., Any], **kwargs: Any) -> Response:
@@ -325,7 +430,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
     async def _body(request: Request) -> dict[str, Any]:
         return await _json_body(request)
 
-    @app.post("/api/operations/{operation_id}/answer")
+    @router.post("/api/operations/{operation_id}/answer")
     async def answer_operation(operation_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -335,7 +440,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/chat")
+    @router.post("/api/chat")
     async def open_chat(request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -346,7 +451,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/chat/{thread_id}/messages")
+    @router.post("/api/chat/{thread_id}/messages")
     async def say_in_chat(thread_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -357,7 +462,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents")
+    @router.post("/api/agents")
     async def create_agent(request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -377,7 +482,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents/proposals/{thread_id}/approve")
+    @router.post("/api/agents/proposals/{thread_id}/approve")
     async def approve_proposal(thread_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -386,7 +491,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents/proposals/{thread_id}/decline")
+    @router.post("/api/agents/proposals/{thread_id}/decline")
     async def decline_proposal(thread_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -396,7 +501,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents/{agent_id}/reconfigure")
+    @router.post("/api/agents/{agent_id}/reconfigure")
     async def reconfigure_agent(agent_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -409,7 +514,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/tasks")
+    @router.post("/api/tasks")
     async def create_task(request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -422,7 +527,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/tasks/{task_id}/revise")
+    @router.post("/api/tasks/{task_id}/revise")
     async def revise_task(task_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -437,7 +542,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
     # independent review, then accept the verdict or send the work back.  Each
     # is a thin adapter over the manager; the refusal when no qualifying review
     # exists is the domain's, and reaches the panel as the guard that fired.
-    @app.post("/api/tasks/{task_id}/review-request")
+    @router.post("/api/tasks/{task_id}/review-request")
     async def request_task_review(task_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -448,7 +553,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/tasks/{task_id}/accept")
+    @router.post("/api/tasks/{task_id}/accept")
     async def accept_task(task_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -459,7 +564,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/tasks/{task_id}/reopen")
+    @router.post("/api/tasks/{task_id}/reopen")
     async def reopen_task(task_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -470,7 +575,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agent-links")
+    @router.post("/api/agent-links")
     async def open_agent_link(request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -483,7 +588,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agent-links/{link_id}/close")
+    @router.post("/api/agent-links/{link_id}/close")
     async def close_agent_link(link_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -496,7 +601,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents/{agent_id}/retire")
+    @router.post("/api/agents/{agent_id}/retire")
     async def retire_agent(agent_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -508,7 +613,7 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
         )
 
-    @app.post("/api/agents/{agent_id}/messages")
+    @router.post("/api/agents/{agent_id}/messages")
     async def message_agent(agent_id: str, request: Request) -> Response:
         body = await _body(request)
         return await _record(
@@ -522,10 +627,15 @@ def _register_writes(app: FastAPI, context: UIContext) -> None:
         )
 
 
-def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
-    """Attach the operator-catalogue surface, gated separately from role writes."""
+def _register_catalog_writes(router: _RouteGroup, context: UIContext) -> None:
+    """Attach the operator-catalogue surface, declared apart from role writes.
 
-    @app.post("/api/catalog/entries")
+    Declared apart, not gated apart: every operator panel carries these two
+    routes and `_require_catalog_editing` names which half of the state is
+    missing -- no catalogue, or no session -- when one is called without them.
+    """
+
+    @router.post("/api/catalog/entries")
     async def save_catalog_entry(request: Request) -> Response:
         body = await _json_body(request)
         return await _guarded(
@@ -538,7 +648,7 @@ def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
             instruction=body.get("instruction"),
         )
 
-    @app.post("/api/catalog/entries/remove")
+    @router.post("/api/catalog/entries/remove")
     async def remove_catalog_entry(request: Request) -> Response:
         body = await _json_body(request)
         return await _guarded(
@@ -549,7 +659,7 @@ def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
         )
 
 
-def _register_setup(app: FastAPI, context: UIContext) -> None:
+def _register_setup(router: _RouteGroup, context: UIContext) -> None:
     """Attach the two first-run writes, declared apart in ``SETUP_ROUTES``.
 
     Neither takes a parameter, and that is the security property of this
@@ -574,23 +684,23 @@ def _register_setup(app: FastAPI, context: UIContext) -> None:
         context.invalidate()
         return JSONResponse(result)
 
-    @app.post("/api/setup/initialize")
+    @router.post("/api/setup/initialize")
     async def initialize_workspace() -> Response:
         return await _setup(context.initialize_workspace)
 
-    @app.post("/api/setup/runtime-config")
+    @router.post("/api/setup/runtime-config")
     async def write_runtime_config() -> Response:
         return await _setup(context.configure_runtime)
 
 
-def _register_launch(app: FastAPI, context: UIContext) -> None:
+def _register_launch(router: _RouteGroup, context: UIContext) -> None:
     """Attach the launch surface, declared separately from role writes.
 
     One route: put a role to work on a task. It records a delegation through the
     same manager as every other write, then runs it through the same broker the
     CLI uses — one launch path, not a second one.
 
-    Every writing panel gets this route, configured or not, and the refusal for
+    Every operator panel gets this route, configured or not, and the refusal for
     "not configured" is typed rather than structural: `launch_not_configured`.
     That is a deliberate weakening — the guarantee moves from "the route does
     not exist" to "the route refuses" — bought by the fact that the operator
@@ -598,7 +708,7 @@ def _register_launch(app: FastAPI, context: UIContext) -> None:
     route table has been built and can no longer change.
     """
 
-    @app.post("/api/delegations")
+    @router.post("/api/delegations")
     async def run_role_on_task(request: Request) -> Response:
         if not context.launch_enabled:
             # Named ahead of the body read: nothing about the request can make
