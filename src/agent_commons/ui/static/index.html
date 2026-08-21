@@ -3771,6 +3771,14 @@ function roleModel(record) {
   return typeof model === "string" && model.trim() ? model : "";
 }
 
+// Board cards do not have the full record the drawer fetches later: they read
+// the public graph node, whose backend projection deliberately exposes only
+// the validated model rather than the role's free-form extensions object.
+function boardRoleModel(node) {
+  const model = node && node.kind === "agent" && node.attrs && node.attrs.model;
+  return typeof model === "string" && model.trim() ? model : "";
+}
+
 function profileOptions(profiles, info) {
   // The four ids are the domain's whole menu; which of them can actually START
   // is the operator's runtime.yaml, and that is what `profile_info` reports.
@@ -4272,8 +4280,10 @@ function render(graph) {
     const line = node.kind + " · " + stateLabel(node) +
       (node.awaits_human ? "  ⏳ " + t("waiting_on_you") : "");
     content.appendChild(text(10, 34, line, "meta"));
-    content.appendChild(text(10, 50,
-      node.stale ? node.id + "  ▨ " + t("stale") : node.id, "meta"));
+    const model = boardRoleModel(node);
+    const detail = model ? t("sum_model") + ": " + model
+      : (node.stale ? node.id + "  ▨ " + t("stale") : node.id);
+    content.appendChild(text(10, 50, detail, "meta"));
     // The tooltip is where the state's gloss goes, and only here: a card is 180
     // by 62 units and already carries a kind, a state, a label and a ULID, so a
     // sentence beside the state would push one of those off the card.  The
@@ -4290,6 +4300,7 @@ function render(graph) {
     const tooltip = document.createElementNS(SVGNS, "title");
     tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id +
       "\n" + node.kind + " · " + stateWithGloss(node);
+    if (model) { tooltip.textContent += "\n" + t("sum_model") + ": " + model; }
     // The operator's own window is the one card a newcomer cannot map to
     // anything they did; say plainly that it is them (round 2, PM findings).
     if (isOperatorSession(node)) {

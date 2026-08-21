@@ -360,6 +360,45 @@ def test_the_board_drawer_names_the_model_without_inventing_one_for_a_role_that_
     assert "if (!text.trim()) { return; }" in row
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="no node to run boardRoleModel() in")
+def test_the_board_card_draws_only_the_model_projected_on_its_role_node() -> None:
+    """The board paints from `/api/graph`, not from the later drawer fetch.
+
+    A role with no projected model keeps its ordinary id line; a model is
+    shown only when the server put a non-empty string on that agent node.
+    """
+
+    body = read_spa()
+    assert "function boardRoleModel(node) {" in body
+    harness = "\n".join(
+        [
+            _function(body, "function boardRoleModel(node) {"),
+            "for (const node of JSON.parse(process.argv[2])) {",
+            "  console.log(JSON.stringify(boardRoleModel(node)));",
+            "}",
+        ]
+    )
+    nodes = [
+        {"kind": "agent", "attrs": {"model": "server-value"}},
+        {"kind": "agent", "attrs": {"model": ""}},
+        {"kind": "agent", "attrs": {"model": ["not-a-string"]}},
+        {"kind": "task", "attrs": {"model": "not-a-role"}},
+        {"kind": "agent", "attrs": {}},
+    ]
+    done = subprocess.run(
+        ["node", "-", json.dumps(nodes)],
+        input=harness,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert done.stdout.split() == ['"server-value"', '""', '""', '""', '""']
+
+    renderer = body.split("function render(graph) {", 1)[1].split("\nfunction ", 1)[0]
+    assert "const model = boardRoleModel(node);" in renderer
+    assert 'model ? t("sum_model") + ": " + model' in renderer
+
+
 # --- the ban, with the control that makes a "no matches" answer mean anything -
 
 
