@@ -297,6 +297,25 @@ def test_the_spa_carries_the_whole_acceptance_chain() -> None:
     assert "async function repaintAfterAcceptanceWrite" in body
 
 
+def test_the_drawer_reopens_on_the_fresh_node_after_an_acceptance_write() -> None:
+    """The drawer's state line is painted from the graph node, and the node the
+    acceptance handlers capture before the write describes exactly the
+    projection the write makes stale: accepting repainted the panel's headline
+    to "accepted" while the same task's card still said `State: review`.  The
+    repaint helper must look the id up in the graph it just re-read, and fall
+    back to the stale object only for a node the new graph no longer carries."""
+
+    body = read_spa()
+    helper = body.split("async function repaintAfterAcceptanceWrite(node) {", 1)[1].split(
+        "\n}\n", 1
+    )[0]
+    refind = helper.index("((lastGraph && lastGraph.nodes) || []).find((n) => n.id === node.id)")
+    # Re-found strictly after the re-read, or it would find the stale graph.
+    assert helper.index("await refreshGraph();") < refind
+    assert "await inspect(fresh || node);" in helper
+    assert "await inspect(node);" not in helper
+
+
 def test_the_panel_never_records_an_acceptance_without_a_summary() -> None:
     """Acceptance is the human decision the whole design protects; the line
     saying what was accepted stays in the ledger forever, so the panel refuses

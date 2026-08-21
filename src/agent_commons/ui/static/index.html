@@ -6237,7 +6237,15 @@ document.getElementById("task-edit-save").addEventListener("click", async () => 
 async function repaintAfterAcceptanceWrite(node) {
   await refreshGraph();
   await loadAttention();
-  if (node) { await inspect(node); }
+  if (!node) { return; }
+  // `refreshGraph` just replaced `lastGraph`, so the node captured before the
+  // write describes exactly the projection the write made stale -- and the
+  // drawer's state line is painted from the node, so reopening on it said
+  // "State: review" under a headline that said accepted.  The same id is
+  // looked up in the fresh snapshot; the stale object is only the fallback
+  // for a node the new graph no longer carries at all.
+  const fresh = ((lastGraph && lastGraph.nodes) || []).find((n) => n.id === node.id);
+  await inspect(fresh || node);
 }
 
 async function requestTaskReview() {
