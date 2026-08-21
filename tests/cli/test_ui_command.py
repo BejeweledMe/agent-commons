@@ -169,6 +169,40 @@ def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_fir
     assert shown["status"] == "closed"
 
 
+def test_a_second_panel_is_refused_at_the_terminal_before_anything_else_happens(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The singleness lock is taken in the command body, before `serve`.
+
+    Taken inside `emit` -- after the socket bound and after `create_app` -- a
+    second panel whose predecessor's session had expired would open a fresh
+    session first, hit the lock only afterwards, and abandon that session for
+    its whole TTL while claiming it shared the first panel's.  Refusing before
+    the server exists makes the abandonment structurally impossible, and the
+    refusal keeps its frozen text and the first panel's address.
+    """
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    first = ProjectSessionOwner(repo)
+    first.acquire_panel_lock(4321)
+    try:
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+        result = CliRunner().invoke(cli, ["--repo", str(repo), "ui", "--port", "0", "--no-browser"])
+
+        assert result.exit_code != 0
+        assert "another panel already serves this project" in result.output
+        assert "127.0.0.1:4321" in result.output
+        # The refusal came before the server was ever constructed...
+        assert "context" not in captured
+        # ...and before the refused panel could open (and then abandon) any
+        # session: the workspace holds none at all.
+        assert list(CommonsManager(repo, read_only=True).sessions.list_sessions()) == []
+    finally:
+        first.shutdown()
+
+
 def test_read_only_serves_a_context_that_cannot_write(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

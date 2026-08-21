@@ -437,6 +437,18 @@ def ui_command(
             state_base=state.state_base,
             state_source=state.state_source,
         )
+        # Become the one panel for this project before the server binds and
+        # before anything at all can open a session.  Taken any later, a
+        # second panel whose predecessor's session had expired would open a
+        # brand-new session first, hit the lock only afterwards, and abandon
+        # that session for its whole TTL -- while telling the operator it was
+        # sharing the first panel's.  The refusal therefore happens here, at
+        # the terminal, and names the first panel's port.  On a directory with
+        # no workspace there is nowhere to put the lock yet, so the owner
+        # remembers the request and takes it the moment the workspace exists,
+        # still before any session.  `emit` rewrites the held lock with the
+        # port that was actually bound.
+        owner.acquire_panel_lock(port)
 
     if role_catalog is not None:
         # Load the catalogue once at startup so an invalid file fails here, while
@@ -477,13 +489,11 @@ def ui_command(
     def emit(bound_port: int, token: str) -> None:
         writer_session_id = None
         if owner is not None:
-            # Become the one panel for this project before renewing anything:
-            # a second panel would share the first one's session and nonce, and
-            # its heartbeats and shutdown would sabotage the first.  The lock
-            # names the bound port so a refused second panel can say where the
-            # existing one already is.  On a directory with no workspace both
-            # calls defer instead of failing: there is nothing to lock and
-            # nothing to open a session in until first run has been through.
+            # The lock was taken in the command body, before the server bound
+            # a socket and before any session existed; this call only rewrites
+            # the already-held lock with the port that was actually bound (or,
+            # on a directory with no workspace, updates the port the deferred
+            # lock will record once there is a state root to hold it).
             owner.acquire_panel_lock(bound_port)
             writer_session_id = owner.start()
         url = f"http://127.0.0.1:{bound_port}/#t={token}"
