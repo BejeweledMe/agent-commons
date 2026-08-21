@@ -55,6 +55,70 @@ def test_a_caught_up_client_receives_no_gap(context: UIContext) -> None:
     assert not any(b"resume_gap" in frame for frame in frames)
 
 
+def test_a_recovered_session_is_announced_on_the_stream(workspace: dict[str, Any]) -> None:
+    """The frozen informational code `session_expired_recovered`, observably.
+
+    The tab fetches `/api/meta` exactly once, at boot, and compares nodes
+    against that cached `writer_session_id` forever.  When the owner replaces
+    an expired session under the same identity, the stream -- the one channel
+    an open tab keeps reading -- must say so: an open connection within one
+    poll, and a connection opened after the recovery immediately, so a tab
+    that reconnected after the laptop woke cannot keep trusting a dead id.
+    """
+
+    import json as _json
+    import time as _time
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    class ManualClock:
+        def __init__(self) -> None:
+            self.value = float(int(_time.time()))
+
+        def __call__(self) -> float:
+            return self.value
+
+    clock = ManualClock()
+    owner = ProjectSessionOwner(workspace["repo"], state_root=workspace["state_root"], clock=clock)
+    first = owner.ensure_active()
+    context = UIContext(workspace["repo"], state_root=workspace["state_root"], session_owner=owner)
+    try:
+        # While the session is alive the stream says nothing about it.
+        quiet = drive(context, None, 2)
+        assert not any(b"session_expired_recovered" in frame for frame in quiet)
+
+        # A connection that stays open across the expiry hears the recovery
+        # from its own poll loop -- nobody wrote anything.
+        async def open_across_the_sleep() -> list[bytes]:
+            generator = _events(context, None)
+            frames: list[bytes] = []
+            try:
+                frames.append(await anext(generator))  # hello
+                frames.append(await anext(generator))  # snapshot
+                clock.value += 9 * 3600  # the laptop slept past the TTL
+                frames.append(await anext(generator))
+            finally:
+                await generator.aclose()
+            return frames
+
+        frames = asyncio.run(open_across_the_sleep())
+        recovery = frames[2]
+        assert recovery.startswith(b"event: session_expired_recovered")
+        # No event id: an informational frame may never disturb Last-Event-ID.
+        assert b"id:" not in recovery
+        payload = _json.loads(recovery.split(b"data: ", 1)[1])
+        assert payload["code"] == "session_expired_recovered"
+        assert payload["previous_session_id"] == first
+        assert payload["writer_session_id"] == owner.session_id != first
+        assert payload["writer_session_ids"] == [first, owner.session_id]
+
+        # A tab reconnecting after the recovery is told before its first poll.
+        reconnect = drive(context, None, 3)
+        assert reconnect[2].startswith(b"event: session_expired_recovered")
+    finally:
+        owner.shutdown()
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

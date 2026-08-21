@@ -301,6 +301,28 @@ class ProjectSessionOwner:
                 return
             self._renew_locked(self._session_ttl)
 
+    def refresh_liveness(self) -> None:
+        """Notice an expired session now rather than at the next write.
+
+        Never raises, and never opens a *first* session: an owner that has not
+        opened one yet has nothing to recover, and probing would drag a panel
+        with no workspace into a refusal it does not deserve.  When a session
+        exists, this runs the same in-memory expiry check every write runs --
+        the check a sleeping laptop's clock jumps past -- so an expired
+        session is replaced under the same identity and the lineage grows
+        while the panel is merely being watched, not written through.  The
+        stream polls this; without it a recovery would only ever be noticed
+        by the next write or the next quarter-hourly heartbeat.
+        """
+
+        with self._guard:
+            if self._session_id is None:
+                return
+        try:
+            self.ensure_active()
+        except CommonsError as exc:
+            _LOG.debug("panel session liveness probe failed: %s", exc)
+
     def session_ids(self) -> tuple[str, ...]:
         """Every session id this owner has written under, current one last."""
 

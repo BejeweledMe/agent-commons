@@ -145,6 +145,46 @@ def test_an_expired_session_is_replaced_under_the_same_identity(
     assert _registry_session(workspace, clock, second).active_at(clock.value)
 
 
+def test_refresh_liveness_repairs_an_expired_session_without_a_write(
+    workspace: dict[str, Any], clock: Clock
+) -> None:
+    """The stream's probe: expiry is noticed by watching, not only by writing."""
+
+    owner = _owner(workspace, clock)
+    first = owner.ensure_active()
+
+    clock.value += 9 * 3600  # the laptop slept past the eight-hour TTL
+
+    owner.refresh_liveness()
+
+    second = owner.session_id
+    assert second is not None and second != first
+    assert owner.session_ids() == (first, second)
+    owner.shutdown()
+
+
+def test_refresh_liveness_never_opens_a_first_session(tmp_path: Any, clock: Clock) -> None:
+    """The probe watches; it must not drag a sessionless panel into opening.
+
+    In particular a panel on a directory with no workspace serves its stream
+    long before a session can exist, and the probe must neither raise there
+    nor create the session as a side effect of being watched.
+    """
+
+    import subprocess
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    owner = ProjectSessionOwner(repo, state_root=tmp_path / "state", clock=clock)
+
+    owner.refresh_liveness()  # no workspace: must be silent
+
+    assert owner.session_id is None
+    assert owner.session_ids() == ()
+    owner.shutdown()
+
+
 def test_shutdown_closes_the_session_when_no_run_is_live(
     workspace: dict[str, Any], clock: Clock
 ) -> None:

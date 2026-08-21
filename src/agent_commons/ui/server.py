@@ -784,6 +784,38 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
                 instance=context.server_instance_id,
             )
 
+    # The panel's operator session can be replaced under the same identity when
+    # its TTL expired -- a laptop asleep past eight hours -- and the tab cached
+    # `writer_session_id` exactly once, at boot.  The stream is the only channel
+    # an open tab keeps reading, so the replacement is announced here, as the
+    # frozen informational code `session_expired_recovered`.  A connection
+    # announces the current id of any lineage that has grown past its first
+    # session and it has not announced yet: an open connection reports the
+    # recovery within one poll, and a tab reconnecting after one is told
+    # immediately instead of trusting its stale cache.  The frame carries no
+    # event id, so it can never disturb Last-Event-ID resumption.
+    announced_session: str | None = None
+
+    def _recovery_frame() -> bytes | None:
+        nonlocal announced_session
+        lineage = context.session_lineage()
+        if len(lineage) < 2 or lineage[-1] == announced_session:
+            return None
+        announced_session = lineage[-1]
+        return _sse(
+            "session_expired_recovered",
+            {
+                "code": "session_expired_recovered",
+                "writer_session_id": lineage[-1],
+                "previous_session_id": lineage[-2],
+                "writer_session_ids": list(lineage),
+            },
+        )
+
+    recovered = await asyncio.to_thread(_recovery_frame)
+    if recovered is not None:
+        yield recovered
+
     # Each connection tracks the last sequence it sent.  refresh_if_changed is a
     # one-shot consumer of a shared fingerprint, so whichever connection polls
     # first after a write triggers the rebuild and the others saw `changed ==
@@ -796,6 +828,10 @@ async def _events(context: UIContext, last_event_id: str | None) -> AsyncIterato
     while True:
         await asyncio.sleep(_POLL_SECONDS)
         since_heartbeat += _POLL_SECONDS
+        recovered = await asyncio.to_thread(_recovery_frame)
+        if recovered is not None:
+            yield recovered
+            since_heartbeat = 0.0
         await asyncio.to_thread(context.refresh_if_changed)
         if context.seq > last_sent:
             seq, graph = await asyncio.to_thread(context.snapshot_frame)

@@ -264,6 +264,26 @@ class UIContext:
         session_id = self.writer_session_id
         return (session_id,) if session_id is not None else ()
 
+    def session_lineage(self) -> tuple[str, ...]:
+        """The lineage the stream watches for a replaced session, kept fresh.
+
+        The already-open tab fetched ``/api/meta`` exactly once, at boot, and
+        compares nodes against that cached ``writer_session_id`` forever; the
+        stream is the only channel it keeps reading.  This is what the stream
+        polls: for an owner the liveness is refreshed first, so an expiry the
+        laptop slept through is noticed within one poll interval instead of at
+        the next write or the next quarter-hourly heartbeat.  A context bound
+        to a fixed id has a lineage of one that can never grow, and a
+        read-only panel has none: neither ever reports a recovery.
+        """
+
+        if self._session_owner is not None:
+            self._session_owner.refresh_liveness()
+            return tuple(str(item) for item in self._session_owner.session_ids())
+        if self._writer_session_id is not None:
+            return (str(self._writer_session_id),)
+        return ()
+
     @property
     def operator_panel(self) -> bool:
         """Whether this panel acts at all, rather than only shows.
