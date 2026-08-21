@@ -1551,13 +1551,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           data-i18n-title="gref_profile" data-i18n-aria="gref_profile"></button>
         <select id="hire-profile"></select></label>
       <!-- Round 4, finding 4: the operator wanted to pick a model and a
-           reasoning level here.  The model is not the panel's to pick — it is
-           fixed by the profile, in a file the panel may not write — and there
-           is no reasoning field anywhere in a runner profile to pick from.  So
-           the form says which of the two questions has an answer and where that
-           answer lives, instead of offering a control that would either lie or
-           be refused.  The options themselves name the model when the server
-           knows it; this line says why that is all there is. -->
+           reasoning level here.  Half of that now has an answer.  A reasoning
+           level still does not — there is no such field anywhere in a runner
+           profile — but the model IS chosen here, once, at the only moment it
+           can be: a role's accumulated context is built for the model that
+           built it, so a hired role cannot be moved to another one afterwards.
+           The line under the picker says where the profile's own default is
+           fixed, because that is what an empty model field falls back to. -->
       <p class="note" id="hire-profile-help" data-i18n="hire_profile_help">The profile decides which process and which
         model a run of this role uses. That is set by the operator in runtime.yaml, a file outside
         the workspace, and never from here.</p>
@@ -1566,6 +1566,25 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
            screen later — refused. The warning belongs where the choice is. -->
       <p class="note warn" id="hire-profile-missing" hidden data-i18n="hire_profile_missing">This
         profile is not in the operator's config, so a run of this role cannot start yet.</p>
+      <!-- Free text with suggestions beside it, never a closed select.  The
+           panel may not name a model of its own — an invented name is a name
+           that is not the one that runs, and the asset is pinned against
+           carrying any — so every suggestion arrives from `/api/catalog`, out
+           of the profiles this machine configured and the roles this project
+           already hired.  That list is honest but not exhaustive: a provider
+           ships models nobody here has named yet, so the field takes anything
+           and the server judges it.  `list=` offers the same names as the
+           browser's own completion; the line under the field shows them
+           outright, because a datalist a person never opens is a list nobody
+           saw. -->
+      <label class="field" id="hire-model-field"><span data-i18n="hire_model_label">Model</span>
+        <input type="text" id="hire-model" autocomplete="off" spellcheck="false"
+          list="hire-model-offers" data-i18n-placeholder="hire_model_placeholder"></label>
+      <datalist id="hire-model-offers"></datalist>
+      <!-- Written from JS: it names the models the server offered, and those
+           are canonical strings from another machine's config that no table
+           here could hold. -->
+      <p class="note" id="hire-model-hint"></p>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
       <!-- Round 4, finding 8: the operator read this field as a system prompt
@@ -1883,6 +1902,15 @@ const STRINGS = {
     hire_profile_model_fixed: "fixed in the profile",
     hire_profile_unconfigured: "not in the operator's config (runtime.yaml)",
     hire_profile_missing: "This profile is not in the operator's config, so a run of this role cannot start yet. Profiles are added by the operator in runtime.yaml; hiring the role is still recorded.",
+    // The model is chosen once, here, and never again: a role's accumulated
+    // context is built for the model that built it. The field is free text —
+    // the offers beside it are what this machine and this project have already
+    // named, which is a list of the honest ones, not a list of all of them.
+    hire_model_label: "Model for this role — chosen now, and only now",
+    hire_model_placeholder: "empty — the profile's model",
+    hire_model_hint: "The model cannot be changed after the hire: everything this role remembers is built for the model that built it, so moving it would mean rebuilding that memory. Leave the field empty to run whatever the profile names.",
+    hire_model_offered: "Already named here",
+    hire_model_none: "Nothing has been named here yet, so there is nothing to offer. Type the name your provider knows, or leave the field empty.",
     hire_chain_note: "A role hired here answers to you — there is no team-lead control, on purpose. One role comes to answer to another only through a proposal that role makes and a person approves; this form creates no such rank.",
     gref_chain: "Why the team starts flat, and how a rank between roles is really built. The full account is in the Overview.",
     hire_rationale_label: "Why this role exists (kept forever)",
@@ -1954,7 +1982,13 @@ const STRINGS = {
     confirm_retire: "Retire this role? Nothing is deleted; it stops taking work.",
     confirm_retire_cascade: "Retire this role and every role it created? Nothing is deleted; they stop taking work.",
     profile_word: "profile",
-    profile_note: "the profile fixes the executable, model, sandbox, and tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
+    profile_note: "the profile fixes the executable, the default model, the sandbox, and the tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
+    // Reported here, never edited here. The hire form is the one place a model
+    // is chosen, and the reason is a property of the role rather than a missing
+    // feature: its memory was accumulated by the model that accumulated it.
+    settings_model_chosen: "Hired on {model}.",
+    settings_model_fixed: "That cannot be changed: everything this role remembers was built for that model, so moving it would mean rebuilding that memory. Hire another role to run another model.",
+    settings_model_profile: "No model was chosen at the hire, so runs use whatever the profile names.",
     stored_word: "stored",
     in_effect: "in effect",
     cannot_retire: "cannot be retired yet — ",
@@ -2353,6 +2387,7 @@ const STRINGS = {
     sum_independent_no: "not independent",
     sum_from_to: "Between",
     sum_action: "May",
+    sum_model: "Model",
     sum_skills: "Required skills",
     sum_tools: "Allowed tools",
     sum_origin: "Hired by",
@@ -2538,6 +2573,11 @@ const STRINGS = {
     hire_profile_model_fixed: "закреплена в профиле",
     hire_profile_unconfigured: "нет в конфиге оператора (runtime.yaml)",
     hire_profile_missing: "Этого профиля нет в конфиге оператора, поэтому прогон такой роли пока не запустится. Профили оператор добавляет в runtime.yaml; нанять роль всё равно можно.",
+    hire_model_label: "Модель этой роли — выбирается сейчас и только сейчас",
+    hire_model_placeholder: "пусто — модель профиля",
+    hire_model_hint: "После найма модель не поменять: всё, что роль помнит, собрано под ту модель, которая это накопила, и перенос означал бы пересборку этой памяти. Оставьте поле пустым, чтобы работала модель профиля.",
+    hire_model_offered: "Здесь уже названы",
+    hire_model_none: "Здесь пока ничего не названо, поэтому и предлагать нечего. Впишите имя, которое знает ваш провайдер, или оставьте поле пустым.",
     hire_chain_note: "Роль, нанятая здесь, подчиняется оператору — поля «тимлид» нет намеренно. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком; эта форма такого ранга не создаёт.",
     gref_chain: "Почему команда начинается плоской и откуда берётся ранг между ролями. Полный разбор — в «Обзоре».",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
@@ -2609,7 +2649,10 @@ const STRINGS = {
     confirm_retire: "Отправить эту роль в отставку? Ничего не удаляется; она перестаёт брать работу.",
     confirm_retire_cascade: "Отправить в отставку эту роль и все созданные ею роли? Ничего не удаляется; они перестают брать работу.",
     profile_word: "профиль",
-    profile_note: "профиль фиксирует исполняемый файл, модель, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
+    profile_note: "профиль фиксирует исполняемый файл, модель по умолчанию, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
+    settings_model_chosen: "Нанята на модели {model}.",
+    settings_model_fixed: "Поменять это нельзя: всё, что роль помнит, собрано под ту модель, и перенос означал бы пересборку этой памяти. Для другой модели наймите другую роль.",
+    settings_model_profile: "При найме модель не выбирали, поэтому прогоны идут на той, которую называет профиль.",
     stored_word: "сохранено",
     in_effect: "действует",
     cannot_retire: "пока нельзя отправить в отставку — ",
@@ -2997,6 +3040,7 @@ const STRINGS = {
     sum_independent_no: "не независимое",
     sum_from_to: "Между",
     sum_action: "Может",
+    sum_model: "Модель",
     sum_skills: "Обязательных навыков",
     sum_tools: "Разрешённых инструментов",
     sum_origin: "Кто нанял",
@@ -3221,6 +3265,11 @@ function refusedField(message) {
 // buttons, which is where a refusal about a control was worth nothing (round 3).
 const REFUSED_CONTROLS = [
   [/^these skills are not in the operator catalogue: /, "skills"],
+  // The model name rule, refused at the form rather than from inside a run an
+  // hour later.  The server's sentence already names what a model name may
+  // contain AND says that empty is a legitimate answer, so there is nothing to
+  // rewrite — only somewhere better to put it than under the buttons.
+  [/^that is not a usable model name: /, "model"],
 ];
 
 function refusedControl(message) {
@@ -3507,6 +3556,20 @@ const PROFILE_PROVIDER = {
   "claude-builder": "claude", "claude-independent-reviewer": "claude",
   "codex-builder": "codex", "codex-independent-reviewer": "codex",
 };
+
+// The model a role was hired with, or nothing.  It lives under
+// `payload.extensions` — the free-form object the agent payload schema already
+// carried — so recording a choice moved no schema and changed no already
+// written event.  The same reading as the backend's `role_model`, and the same
+// distrust: this record is replayed from a file this tab did not write, so
+// anything that is not a plain non-empty string reads as absent rather than
+// being printed as if it were a name.
+function roleModel(record) {
+  const extensions = record && record.extensions;
+  if (!extensions || typeof extensions !== "object") { return ""; }
+  const model = extensions.model;
+  return typeof model === "string" && model.trim() ? model : "";
+}
 
 function profileOptions(profiles, info) {
   // The four ids are the domain's whole menu; which of them can actually START
@@ -4183,6 +4246,36 @@ function paintProfileAvailability() {
   document.getElementById("hire-profile-missing").hidden = !missing;
 }
 
+// The models the hire form may offer for the profile currently chosen.
+//
+// `model_options` is keyed by PROVIDER, always present and often empty: the
+// backend builds it out of the configured profiles' own models and the models
+// this project's active roles were hired with, and offers nothing else.  The
+// panel adds nothing to it — an invented name would be a name that is not the
+// one that runs — so an empty list is rendered as an empty list and says so,
+// rather than being padded with something plausible.
+//
+// Two surfaces, one source: the `<datalist>` the browser completes from, and a
+// line under the field that shows the same names outright, because a completion
+// popup nobody opens is a list nobody saw.
+function paintModelOffers() {
+  const chosen = document.getElementById("hire-profile").value;
+  const info = (catalog && catalog.profile_info && catalog.profile_info[chosen]) || {};
+  const provider = info.provider || PROFILE_PROVIDER[chosen] || "";
+  const offers = ((catalog && catalog.model_options) || {})[provider] || [];
+  const list = document.getElementById("hire-model-offers");
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  for (const name of offers) {
+    const option = document.createElement("option");
+    option.value = name;
+    list.appendChild(option);
+  }
+  // The names are canonical strings out of an operator file and out of replayed
+  // events; they are printed as they were sent and are never translated.
+  document.getElementById("hire-model-hint").textContent = t("hire_model_hint") + " " +
+    (offers.length ? t("hire_model_offered") + ": " + offers.join(", ") : t("hire_model_none"));
+}
+
 function applyHireMode() {
   const wantsPreset =
     document.getElementById("hire-mode").value === "preset" && !hireTemplate;
@@ -4200,8 +4293,16 @@ function applyHireMode() {
   // goes: a template already decided the profile, and a sentence about which
   // process a choice starts would be a sentence about a control not on screen.
   document.getElementById("hire-profile-help").hidden = fromPreset;
+  // The model travels with the picker, for the same reason and one more: a
+  // template is a saved role SHAPE and the model is part of the shape it saved,
+  // so the backend hands the hire the template's model.  A field offered here
+  // would silently override it — and the offers are keyed by the provider of a
+  // profile that is no longer on screen, so there would be nothing honest to
+  // put in the list beside it either.
+  document.getElementById("hire-model-field").hidden = fromPreset;
+  document.getElementById("hire-model-hint").hidden = fromPreset;
   if (fromPreset) { document.getElementById("hire-profile-missing").hidden = true; }
-  else { paintProfileAvailability(); }
+  else { paintProfileAvailability(); paintModelOffers(); }
   // Saving a template hires nobody, so the sentence about who a hired role
   // answers to has nothing to be about on that path.
   document.getElementById("hire-chain-note").hidden = hireTemplate;
@@ -4673,7 +4774,15 @@ for (const [pickerId, noteId] of [
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
-document.getElementById("hire-profile").addEventListener("change", paintProfileAvailability);
+// Both surfaces under the picker depend on which profile is chosen: whether the
+// operator's config carries it at all, and which provider's models may be
+// offered beside the model field.  The operator's typed model is deliberately
+// NOT cleared by a provider change — the field is theirs, and a form that empties
+// a field under the hand is the class of bug round 3 found three times here.
+document.getElementById("hire-profile").addEventListener("change", () => {
+  paintProfileAvailability();
+  paintModelOffers();
+});
 for (const id of ["hire-create_roles", "hire-retire_roles"]) {
   document.getElementById(id).addEventListener("change", paintTurnoverRequirement);
 }
@@ -5246,11 +5355,20 @@ function paintSettingsLabels(record) {
       option.textContent = glossed(option.value, PICKER_GLOSS[option.value]);
     }
   }
-  // The model is a property of the operator-owned profile, not of the role: a
-  // role that could name a model would be editing argv.
+  // The profile, and then the model — reported, never edited.  This panel is
+  // where an operator would look for a model control, and it is exactly the
+  // surface the decision excludes: a role's accumulated context is built for the
+  // model that built it, so moving a hired role to another model would mean
+  // rebuilding that context, and `reconfigure_agent` refuses the change
+  // outright.  Saying nothing here would read as an oversight; saying it is
+  // fixed, and why, is the honest shape of the same absence.
   document.getElementById("settings-model").textContent =
     t("profile_word") + " " + (record.profile_id || "—") + " — " + t("profile_note") +
-    (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
+    (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".") + " " +
+    (roleModel(record)
+      ? said("settings_model_chosen", { model: roleModel(record) }) + " " +
+        t("settings_model_fixed")
+      : t("settings_model_profile"));
   const note = document.getElementById("settings-note");
   const blockers = record.retirement_blockers || [];
   // What is stored against what is in effect.  Both are canonical grant levels
@@ -6062,6 +6180,11 @@ function paintHire() {
     profileOptions(catalog.profiles || [], catalog.profile_info || {}),
     held("hire-profile", null), false);
   paintProfileAvailability();
+  // The offers and the sentence beside them are repainted from the catalogue
+  // every time, and a language switch is a repaint — but the operator's typed
+  // model is never touched: `paintModelOffers` writes the datalist and the note,
+  // and the input is not one of them.
+  paintModelOffers();
   fillSelect(document.getElementById("hire-context_mode"),
     glossedOptions(catalog.context_modes || ["fresh", "accumulated"], PICKER_GLOSS),
     held("hire-context_mode", "fresh"), false);
@@ -6142,6 +6265,14 @@ async function hireRole() {
     // loaded per role, and a hire has no role yet.
     const skills = selectedValues(document.getElementById("hire-skills"));
     if (skills.length) { body.skills = skills; }
+    // An untouched field means "you choose", so the key is left off the wire
+    // entirely rather than sent as an empty string — the same discipline the
+    // skills picker keeps two lines above.  The backend normalizes blank to
+    // absent as well, and the placeholder says what absent gets you; sending
+    // nothing is simply the honest spelling of the same answer.  Whatever is
+    // typed goes as typed: this panel names no model of its own.
+    const model = document.getElementById("hire-model").value.trim();
+    if (model) { body.model = model; }
   }
   // A catalogue hire with no template chosen trips profile_id on the wire, but
   // the field the operator left empty is "Template" (round 2, PM findings).
@@ -6151,6 +6282,10 @@ async function hireRole() {
     // A refusal about the skills selection belongs under the picker, by the
     // label the operator is reading, exactly like the other three.
     skills: ["setting_skills_label", "hire-skills"],
+    // A refused model name is refused about ONE field, and it is a field the
+    // operator can fix in place — so it lands under it, like the skills refusal
+    // and unlike a banner about the request as a whole.
+    model: ["hire_model_label", "hire-model"],
   }, fromPreset
     ? { profile_id: ["hire_preset_label", "hire-preset"] }
     : { profile_id: ["hire_profile_label", "hire-profile"] });
@@ -6372,6 +6507,13 @@ const AGENT_GRANTS = [
 function summarizeAgent(host, node, record) {
   summaryRow(host, "hire_name_label", record.name);
   summaryRow(host, "hire_profile_label", valueWithGloss(record.profile_id));
+  // Beside the profile, because it qualifies the profile: the model the role was
+  // hired with overrides the profile's own.  The row is absent when the role
+  // named none — that is the profile's model standing, and an invented "default"
+  // in this slot would be the panel naming a model.  Here rather than only in
+  // Settings, because Settings is a writable panel's surface and a read-only tab
+  // may still need to know what this role runs on.
+  summaryRow(host, "sum_model", roleModel(record));
   // What the role MAY DO is the question its card is opened with, so this is the
   // effective grant — what an ancestor's downgrade actually leaves it — and not
   // the stored one the settings form edits.
