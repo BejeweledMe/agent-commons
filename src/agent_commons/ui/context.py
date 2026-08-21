@@ -65,6 +65,16 @@ PANEL_ALREADY_OPEN_ACTIONS = ("use the panel that already serves this project",)
 #: the class that raises it owns the string and this is checked against it.
 PANEL_ALREADY_OPEN = "panel_already_open"
 
+#: Why a model name typed into the hire form was refused, in terms the person
+#: looking at the field can act on.  The rule itself lives in `runtime.model`
+#: and is not restated here; what is restated is the way out, because a
+#: refusal that names no satisfiable rule is a dead end on a form.
+MODEL_NAME_REFUSED = (
+    "that is not a usable model name: it must start with a letter or digit and may "
+    "then contain letters, digits, and . _ : / - up to 256 characters. Leave the "
+    "field empty to run the model the profile already names"
+)
+
 #: What a preflight result means, said once.  `preflight_profile` checks fixed
 #: argv and MCP startup and carries no credential at all, so a signed-out
 #: provider and a working one are indistinguishable to it
@@ -1389,12 +1399,24 @@ class UIContext:
         `create_agent` validates it once more before it becomes an immutable
         event -- but neither of those refusals reaches the person who typed it.
         This one lands on the form, while the field is still on screen.
+
+        Which is also why the message is rewritten rather than passed through.
+        The rule is one rule and its inner refusal -- "model is not a safe
+        identifier" -- is right for a log and useless on a form: it names no
+        rule the operator can satisfy and no way out of the field.  This one
+        says what a model name may contain and that leaving it empty is a
+        legitimate answer, which is the whole point of refusing here.
         """
 
         if value is None:
             return None
         text = str(value).strip()
-        return validate_model_name(text) if text else None
+        if not text:
+            return None
+        try:
+            return validate_model_name(text)
+        except ValidationError as exc:
+            raise ValidationError(MODEL_NAME_REFUSED) from exc
 
     # -- launch (MUST-4) ------------------------------------------------------
 

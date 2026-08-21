@@ -10,8 +10,9 @@ Three properties, and none of them follows from the code reading right:
   is what an untouched field has to mean.
 
 Delivery -- that the chosen name actually reaches the provider's argv rather
-than only the ledger -- is pinned in `tests/services/test_delegation_manager.py`
-beside the launch path it travels through.
+than only the ledger -- is pinned in `tests/runtime/test_orchestration.py`,
+beside the launch path it travels through, and asserted from the argv a real
+broker run hands the runner.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import pytest
 from agent_commons.errors import ValidationError
 from agent_commons.services import CommonsManager
 from agent_commons.services.roles import role_model
-from agent_commons.ui.context import UIContext
+from agent_commons.ui.context import MODEL_NAME_REFUSED, UIContext
 from tests.ui.conftest import authorized
 
 
@@ -121,7 +122,11 @@ def test_an_unsafe_model_name_is_refused_at_the_form(
     response = writable_client.post("/api/agents", json=_body(model=hostile), headers=authorized())
     assert response.status_code == 409, response.text
     assert response.json()["error"]["code"] == ValidationError.__name__
-    assert "model" in response.json()["error"]["message"]
+    # And the message is one a person at the form can act on: it names what a
+    # model name may contain and says that empty is a legitimate answer. The
+    # inner refusal ("model is not a safe identifier") is right for a log and a
+    # dead end on a form, so it is rewritten rather than passed through.
+    assert response.json()["error"]["message"] == MODEL_NAME_REFUSED
 
     manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
     assert not manager.snapshot().agents
