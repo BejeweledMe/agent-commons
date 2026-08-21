@@ -11,7 +11,7 @@ import hashlib
 import logging
 import threading
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -122,6 +122,7 @@ class UIContext:
         state_base: Path | None = None,
         state_source: str = "default",
         writer_session_id: str | None = None,
+        session_provider: Callable[[], str] | None = None,
         catalog_path: Path | None = None,
         catalog_editing: bool = False,
         profile_config: Path | None = None,
@@ -148,7 +149,19 @@ class UIContext:
         # A writable context is opt-in and needs a real operator session, the
         # same identity the CLI writes under.  Absent one, this stays the
         # read-only server it has always been.
-        self.writer_session_id = writer_session_id
+        #
+        # Two ways in, and exactly one may be used.  A caller that already holds
+        # a resolved session id passes it and it never changes; a caller that
+        # owns the session's whole lifetime passes a provider instead, because
+        # the id is then not a constant -- a session that outlives its TTL is
+        # replaced by a fresh one under the same identity, and every reader has
+        # to see the replacement without anybody remembering to re-assign a
+        # field.  Passing both is a programmer error, not an operator one:
+        # there would be no honest rule for which of the two wins.
+        if writer_session_id is not None and session_provider is not None:
+            raise TypeError("pass writer_session_id or session_provider, not both")
+        self._writer_session_id = writer_session_id
+        self._session_provider = session_provider
         self.server_instance_id = uuid.uuid4().hex
         # One poller runs per SSE connection, so sequence and graph are shared
         # mutable state across worker threads.
@@ -174,6 +187,22 @@ class UIContext:
 
         for thread in list(self._launch_threads):
             thread.join(timeout=timeout)
+
+    @property
+    def writer_session_id(self) -> str | None:
+        """The session this panel records under, or None when it is read-only.
+
+        Computed rather than stored, so that an owner able to replace the
+        session behind it is not obliged to reach into this object.  Every read
+        goes through here; nothing caches the answer.  A caller that needs two
+        consistent looks at it -- a check and then a use -- must read it once
+        into a local, because a provider is free to hand back a different id
+        between two calls.
+        """
+
+        if self._session_provider is not None:
+            return self._session_provider()
+        return self._writer_session_id
 
     @property
     def writes_enabled(self) -> bool:
@@ -210,13 +239,14 @@ class UIContext:
         CLI and the MCP adapter use, opened under an explicit operator session.
         """
 
-        if self.writer_session_id is None:
+        session_id = self.writer_session_id
+        if session_id is None:
             raise ConfigurationError(
                 "this UI was started read-only; restart with --enable-writes to record events"
             )
         manager = CommonsManager(
             self.repo,
-            session_id=self.writer_session_id,
+            session_id=session_id,
             state_root=self._state_root,
             state_base=self._state_base,
             state_source=self._state_source,
@@ -243,14 +273,17 @@ class UIContext:
         from agent_commons.ui import META_SCHEMA, TRUST_NOTE, TRUTH_LAYERS
 
         manager = self.manager()
+        # One look at the session, three fields derived from it: read twice and
+        # a panel could be told it is writable and given no id to write as.
+        session_id = self.writer_session_id
         return {
             "schema": META_SCHEMA,
             "agent_commons_version": __version__,
             "workspace_id": manager.workspace_id,
             "repo": str(self.repo),
-            "read_only": not self.writes_enabled,
-            "writes_enabled": self.writes_enabled,
-            "writer_session_id": self.writer_session_id,
+            "read_only": session_id is None,
+            "writes_enabled": session_id is not None,
+            "writer_session_id": session_id,
             "server_instance_id": self.server_instance_id,
             "trust_note": TRUST_NOTE,
             "truth_layers": list(TRUTH_LAYERS),
@@ -531,7 +564,8 @@ class UIContext:
             operations = ()
         # Scopes store a deterministic pseudonym, not the registry session id,
         # so the comparison has to be made in the same space.
-        answerable = _participant_id(str(self.writer_session_id)) if self.writer_session_id else ""
+        session_id = self.writer_session_id
+        answerable = _participant_id(str(session_id)) if session_id else ""
         found = []
         for record in operations:
             if record.get("state") not in {"open", "replied"}:
