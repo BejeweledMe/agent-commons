@@ -23,6 +23,10 @@ from agent_commons.services import CommonsManager
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
+    # A git repository, because the panel's first-run state begins by asking
+    # whether there is one: without it every state here would read
+    # `setup_not_a_repository` regardless of the workspace.
+    subprocess.run(["git", "init", "--quiet"], cwd=root, check=True, capture_output=True)
     CommonsManager.initialize(root, integrations=(), workspace_name="ui-command")
     return root
 
@@ -296,43 +300,122 @@ def test_a_read_only_panel_edits_no_catalogue_even_when_given_one(
     assert json.loads(result.output)["catalog_editing"] is False
 
 
-def test_launching_needs_no_flag_only_a_runtime_profile_config(
-    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A writing panel is launch-capable exactly when a profile config is in
-    effect; without one it serves and refuses runs rather than failing to start."""
-
-    captured: dict[str, Any] = {}
-    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
-    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
-    assert result.exit_code == 0, result.output
-    assert captured["context"].launch_enabled is False
-
-    config = tmp_path / "runtime.yaml"
-    config.write_text(
+def _runtime_config(path: Path, *, catalog: Path | None = None) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         "profiles:\n"
         "  claude-builder:\n"
         "    executable: /bin/echo\n"
         "    mcp_executable: /bin/echo\n"
         "    git_executable: /usr/bin/git\n"
         "    permission_mode: acceptEdits\n"
-        "    trusted_workspace: true\n",
+        "    trusted_workspace: true\n" + (f"catalog: {catalog}\n" if catalog else ""),
         encoding="utf-8",
     )
+    return path
+
+
+def test_launching_needs_no_flag_and_no_second_first_run(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A start finds the operator config the panel itself wrote last time.
+
+    This used to pin the opposite -- `launch_enabled is False` without the flag
+    was recorded as the desired behaviour -- and that made the whole first-run
+    story work exactly once per project.  `setup_state` answers off
+    `$XDG_CONFIG_HOME/agent-commons/runtime.yaml` whether or not a flag was
+    given, so the second `agent-commons ui` served a panel that reported
+    `configured` while `launch_enabled` read the flag and stayed false: set up,
+    and unable to launch or edit anything.
+
+    The flag is now only an override.  What it overrides is where the file is
+    read from, not whether one is read.
+    """
+
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+    assert result.exit_code == 0, result.output
+    # Nothing written yet: unconfigured is a state, and the panel says so
+    # instead of refusing to start.
+    assert captured["context"].launch_enabled is False
+    assert captured["context"].setup_status()["state"] == "setup_unconfigured"
+
+    # What first run leaves behind, at the path first run writes it to.
+    _runtime_config(tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml")
+
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+    assert result.exit_code == 0, result.output
+    assert captured["context"].launch_enabled is True
+    assert captured["context"].setup_status()["state"] == "configured"
+
+    # And the flag still overrides where the file is read from.
+    elsewhere = _runtime_config(tmp_path / "elsewhere" / "runtime.yaml")
     result = CliRunner().invoke(
         cli,
-        [
-            "--repo",
-            str(repo),
-            "--json",
-            "ui",
-            "--no-browser",
-            "--profile-config",
-            str(config),
-        ],
+        ["--repo", str(repo), "--json", "ui", "--no-browser", "--profile-config", str(elsewhere)],
     )
     assert result.exit_code == 0, result.output
     assert captured["context"].launch_enabled is True
+
+
+def test_a_config_the_loader_refuses_leaves_the_panel_unconfigured(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Adopting whatever happens to sit at the default path would be worse than
+    not looking: the loader decides, and a file it refuses is not adopted.
+
+    The panel then serves its first-run screen -- which is where this file gets
+    rewritten -- instead of failing at the operator's first Run with a parse
+    error from inside the broker.
+    """
+
+    broken = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
+    broken.parent.mkdir(parents=True)
+    broken.write_text("profiles: [this is not a mapping]\n", encoding="utf-8")
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["context"].launch_enabled is False
+    assert "ignoring the operator runtime config" in result.output
+
+
+def test_the_catalogue_the_operator_config_names_is_read_without_a_flag(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The generated config seeds a `catalog.yaml` beside itself and names it.
+
+    That name was only ever read by `adopt_runtime_config`, on the request that
+    wrote the config -- so the catalogue the panel had just created went unread
+    from the next start on, and `--role-catalog` was the only way back to it.
+    """
+
+    catalogue = tmp_path / "xdg-config" / "agent-commons" / "catalog.yaml"
+    catalogue.parent.mkdir(parents=True)
+    catalogue.write_text("skills: []\ntools: []\n", encoding="utf-8")
+    _runtime_config(catalogue.with_name("runtime.yaml"), catalog=catalogue)
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["context"].catalog()["catalog_path"] == str(catalogue)
+    assert captured["context"].catalog_editing_enabled is True
+    assert json.loads(result.output)["catalog_editing"] is True
+
+    # An explicit path still wins: the flag says where to read the catalogue.
+    override = tmp_path / "override.yaml"
+    override.write_text("skills: []\ntools: []\n", encoding="utf-8")
+    result = CliRunner().invoke(
+        cli,
+        ["--repo", str(repo), "--json", "ui", "--no-browser", "--role-catalog", str(override)],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["context"].catalog()["catalog_path"] == str(override)
 
 
 def test_a_role_catalogue_path_reaches_the_context(

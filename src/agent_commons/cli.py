@@ -318,6 +318,45 @@ def init_command(
     )
 
 
+def _operator_runtime_config(
+    state: CLIState, role_catalog: Path | None
+) -> tuple[Path | None, Path | None]:
+    """The operator runtime config already on disk, and the catalogue it names.
+
+    Only called when no `--profile-config` was given.  The panel writes this
+    file itself, at a path fixed in `ui.setup`, and then has to find it again on
+    the next start -- otherwise first run succeeds exactly once per project and
+    every start after it serves a panel that reports "configured" and can do
+    nothing, because the state and the capability were reading different things.
+
+    Two rules keep this honest.  The loader decides: a file it refuses is not
+    adopted at all, so the panel stays unconfigured and the first-run screen
+    says so, rather than a launch failing later with a parse error.  And an
+    explicit `--role-catalog` outranks the catalogue the config names, because
+    the flag is the operator saying where to read it from.
+    """
+
+    from agent_commons.services.delegation_runtime import load_runtime_configuration
+    from agent_commons.ui.setup import default_runtime_config_path
+
+    candidate = default_runtime_config_path()
+    if candidate.is_symlink() or not candidate.is_file():
+        return None, role_catalog
+    try:
+        configuration = load_runtime_configuration(candidate, workspace_root=state.repo)
+    except CommonsError as exc:
+        # Said once, at the terminal, and then not repeated: the panel's setup
+        # screen is where the operator fixes or rewrites this file.
+        click.echo(
+            f"note: ignoring the operator runtime config at {candidate}: {exc}",
+            err=True,
+        )
+        return None, role_catalog
+    if role_catalog is None and configuration.catalog_path is not None:
+        role_catalog = configuration.catalog_path
+    return candidate, role_catalog
+
+
 @cli.command("ui")
 @click.option(
     "--port",
@@ -413,6 +452,17 @@ def ui_command(
         from agent_commons.services.delegation_runtime import load_runtime_configuration
 
         load_runtime_configuration(profile_config, workspace_root=state.repo)
+    else:
+        # No flag: find the operator config the panel's own first-run screen
+        # wrote last time.  Without this the first run of a project worked and
+        # every run after it did not -- `setup_state` already answers off this
+        # same default path, so the panel reported a configured runtime while
+        # `launch_enabled` (which reads the flag) stayed false, and the operator
+        # got a panel that said "set up" and could neither launch nor edit the
+        # catalogue.  The loader decides: a file it will not accept leaves the
+        # panel unconfigured rather than half configured, and the first-run
+        # screen is what the operator sees.
+        profile_config, role_catalog = _operator_runtime_config(state, role_catalog)
 
     context = UIContext(
         state.repo,
