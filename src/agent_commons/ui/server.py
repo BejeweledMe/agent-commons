@@ -25,7 +25,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 
 from agent_commons.errors import CommonsError
 from agent_commons.ui import ENTITY_SCHEMA, read_spa
-from agent_commons.ui.context import LAUNCH_NOT_CONFIGURED, UIContext
+from agent_commons.ui.context import (
+    LAUNCH_NOT_CONFIGURED,
+    PANEL_ALREADY_OPEN_ACTIONS,
+    UIContext,
+)
 from agent_commons.ui.security import (
     PUBLIC_PATHS,
     SECURITY_HEADERS,
@@ -188,9 +192,11 @@ def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
         # record into before the workspace exists, so a panel that believes it
         # holds a session there is wrong rather than lucky.
         state = await asyncio.to_thread(setup_state, context.repo)
-        if state != SETUP_UNINITIALIZED and await asyncio.to_thread(lambda: context.writes_enabled):
+        # One look at the session and its refusal: two reads could pair "no
+        # session" with a reason a concurrent request had already cleared.
+        session_id, refusal = await asyncio.to_thread(context.session_or_refusal)
+        if state != SETUP_UNINITIALIZED and session_id is not None:
             return
-        refusal = context.session_refusal
         if isinstance(refusal, PanelAlreadyOpenError):
             # A panel whose deferred lock lost the singleness race: the
             # workspace exists, another panel owns it, and calling that
@@ -200,7 +206,7 @@ def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
             raise _NotInitialized(
                 str(refusal.code),
                 str(refusal),
-                actions=["use the panel that already serves this project"],
+                actions=list(PANEL_ALREADY_OPEN_ACTIONS),
             )
         if state == SETUP_NOT_A_REPOSITORY:
             raise _NotInitialized(

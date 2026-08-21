@@ -49,6 +49,12 @@ LAUNCH_NOT_CONFIGURED = (
 #: its answer into an HTTP refusal the first-run screen can draw.
 SETUP_SUPPORT_BINARY_UNRESOLVED = "setup_support_binary_unresolved"
 
+#: What the operator can do about a panel that lost the singleness race, said
+#: once.  The refusal reaches the frontend from two directions -- a non-GET
+#: route refused before its body is read, and `/api/meta` on the very first
+#: load -- and the two must not grow into two pieces of advice for one state.
+PANEL_ALREADY_OPEN_ACTIONS = ("use the panel that already serves this project",)
+
 #: What a preflight result means, said once.  `preflight_profile` checks fixed
 #: argv and MCP startup and carries no credential at all, so a signed-out
 #: provider and a working one are indistinguishable to it
@@ -306,29 +312,46 @@ class UIContext:
             or self._writer_session_id is not None
         )
 
+    def session_or_refusal(self) -> tuple[str | None, ConfigurationError | None]:
+        """The session this panel can write under *right now*, and why not.
+
+        One answer, not two reads.  Whether writes are possible and the typed
+        reason they are not are the same fact seen from two sides, and every
+        caller needs both: asking `writes_enabled` and then `session_refusal`
+        is two looks at a value a session owner is free to change between them,
+        so a concurrent caller could pair "no session" with somebody else's
+        reason -- or with none at all.  Callers that need the pair consistent
+        take it from here; the two properties below remain for callers that
+        genuinely want only one half.
+
+        Never raises.  A panel opened on a directory that is not a workspace
+        yet is an operator panel that cannot obtain a session -- the owner
+        cannot resolve a workspace that does not exist -- and it becomes one
+        that can the moment `POST /api/setup/initialize` returns, in the same
+        process.  A refusal from the session machinery is therefore an answer
+        here rather than something to propagate: raising out of something
+        handlers consult as a precondition would turn "not set up yet", or
+        "another panel owns this project", into a 500.
+        """
+
+        try:
+            session_id = self.writer_session_id
+        except ConfigurationError as exc:
+            _LOG.debug("this panel cannot hold a session yet: %s", exc)
+            self._session_refusal = exc
+            return None, exc
+        self._session_refusal = None
+        return session_id, None
+
     @property
     def writes_enabled(self) -> bool:
         """Whether a session can be obtained *right now*. Never raises.
 
-        This is the executable half of the pair: handlers read it, the route
-        table does not.  A panel opened on a directory that is not a workspace
-        yet is an operator panel whose writes are not enabled -- the owner
-        cannot resolve a workspace that does not exist -- and it becomes one
-        whose writes are enabled the moment `POST /api/setup/initialize`
-        returns, in the same process.  A refusal from the session machinery is
-        therefore an answer here rather than something to propagate: raising out
-        of a property that handlers consult as a precondition would turn "not
-        set up yet" into a 500.
+        This is the executable half of the pair whose structural half is
+        `operator_panel`: handlers read it, the route table does not.
         """
 
-        try:
-            enabled = self.writer_session_id is not None
-        except ConfigurationError as exc:
-            _LOG.debug("this panel cannot hold a session yet: %s", exc)
-            self._session_refusal = exc
-            return False
-        self._session_refusal = None
-        return enabled
+        return self.session_or_refusal()[0] is not None
 
     @property
     def session_refusal(self) -> ConfigurationError | None:
@@ -340,6 +363,10 @@ class UIContext:
         refusal is ``PanelAlreadyOpenError``, and reporting that panel as
         "not set up yet" sends the operator to a first-run screen that cannot
         help.  Handlers read this to keep that refusal under its own name.
+
+        A caller that also needs the session id must use `session_or_refusal`
+        instead: these two properties are separate reads and nothing keeps
+        them describing the same instant.
         """
 
         return self._session_refusal
