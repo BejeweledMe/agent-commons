@@ -7964,13 +7964,12 @@ async function applySessionRecovery(payload) {
 const SETUP_WITHOUT_A_BOARD = ["setup_not_a_repository", "setup_uninitialized"];
 // The frozen refusal codes this screen renders as a state rather than as text.
 //
-// "configured" is spelled two ways: the wave contract froze `setup_configured`
-// alongside every other code, and `ui/setup.py` emits the bare `configured`.
-// Both are accepted here rather than one being guessed at, because the panel
-// getting this wrong is a panel that offers first run forever on a project that
-// is already set up.  The disagreement is the backend's to settle; when it is,
-// this list loses whichever spelling stopped being sent.
-const SETUP_CONFIGURED = ["configured", "setup_configured"];
+// One spelling, and it is the contract's: `setup_configured`, prefixed like the
+// three states beside it.  This was the only code in the table with no test
+// pinning it, which is exactly why the backend and the contract had drifted
+// apart and the panel had to accept both spellings blind.  The pin is there
+// now, so a second spelling here would be a second thing that can go wrong.
+const SETUP_CONFIGURED = "setup_configured";
 const SETUP_REJECTED = "setup_config_rejected_by_loader";
 const SETUP_NO_PROVIDER = "setup_no_provider_found";
 const SETUP_SUPPORT_MISSING = "setup_support_binary_unresolved";
@@ -7990,7 +7989,7 @@ async function loadSetup() {
 }
 
 function setupIsConfigured(state) {
-  return SETUP_CONFIGURED.indexOf(state) >= 0;
+  return state === SETUP_CONFIGURED;
 }
 
 function setupNeedsAttention() {

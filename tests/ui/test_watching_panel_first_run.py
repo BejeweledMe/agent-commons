@@ -23,7 +23,7 @@ import subprocess
 import pytest
 
 from agent_commons.ui import read_spa
-from agent_commons.ui.setup import SETUP_UNCONFIGURED, SETUP_UNINITIALIZED
+from agent_commons.ui.setup import SETUP_CONFIGURED, SETUP_UNCONFIGURED, SETUP_UNINITIALIZED
 
 needs_node = pytest.mark.skipif(
     shutil.which("node") is None, reason="no node to run the first-run screen in"
@@ -226,3 +226,25 @@ def test_the_note_says_where_the_power_is_instead_of_only_that_it_is_missing() -
     # And it names the way on in both languages.
     assert "read-only" in note_en
     assert "только чтение" in note_ru
+
+
+# --- one spelling of configured ---------------------------------------------
+
+
+@needs_node
+def test_configured_is_spelled_one_way_and_it_is_the_backend_s() -> None:
+    """This was the only code in the frozen table with no test pinning it, which
+    is how the backend and the contract came to disagree and why the panel had
+    to accept both spellings blind.  The backend is pinned now, so the panel
+    reads the canonical constant here -- imported, not retyped -- and carries
+    exactly one spelling."""
+
+    body = read_spa()
+    assert 'const SETUP_CONFIGURED = "setup_configured";' in body
+    assert SETUP_CONFIGURED == "setup_configured"
+    assert '"configured", "setup_configured"' not in body
+    assert "spelled two ways" not in body
+
+    # And a configured project is left alone by every state the screen keeps.
+    answer = _paint("en", {"state": SETUP_CONFIGURED, "operator_panel": True})
+    assert answer["screenHidden"] is True
