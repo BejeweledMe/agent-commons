@@ -193,6 +193,11 @@ class UIContext:
         self._writer_session_id = writer_session_id
         self._session_provider = session_provider
         self._session_owner = session_owner
+        # The typed reason `writes_enabled` last answered False, when there was
+        # one.  Kept so the request path can tell "no workspace yet" apart from
+        # "another panel owns this project" instead of collapsing both into the
+        # first-run refusal.
+        self._session_refusal: ConfigurationError | None = None
         self.server_instance_id = uuid.uuid4().hex
         # One poller runs per SSE connection, so sequence and graph are shared
         # mutable state across worker threads.
@@ -297,10 +302,27 @@ class UIContext:
         """
 
         try:
-            return self.writer_session_id is not None
+            enabled = self.writer_session_id is not None
         except ConfigurationError as exc:
             _LOG.debug("this panel cannot hold a session yet: %s", exc)
+            self._session_refusal = exc
             return False
+        self._session_refusal = None
+        return enabled
+
+    @property
+    def session_refusal(self) -> ConfigurationError | None:
+        """The typed refusal behind the last False from ``writes_enabled``.
+
+        Most of the time the reason is the obvious one -- no workspace yet --
+        and the caller's own state check already names it.  The exception is a
+        panel that lost the singleness race while its lock was deferred: its
+        refusal is ``PanelAlreadyOpenError``, and reporting that panel as
+        "not set up yet" sends the operator to a first-run screen that cannot
+        help.  Handlers read this to keep that refusal under its own name.
+        """
+
+        return self._session_refusal
 
     @property
     def catalog_editing_enabled(self) -> bool:

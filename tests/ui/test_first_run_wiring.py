@@ -165,6 +165,52 @@ def test_a_panel_on_a_repository_with_no_workspace_carries_the_surface_and_refus
     assert allowed.json()["state"] == setup.SETUP_UNINITIALIZED
 
 
+def test_a_panel_that_lost_the_singleness_race_refuses_by_its_own_name(
+    tmp_path: Path,
+) -> None:
+    """A deferred lock that loses the race must not masquerade as first run.
+
+    Two panels opened on a directory with no workspace both defer their
+    singleness lock; whichever resolves the workspace first takes it, and the
+    other one's `writes_enabled` honestly answers False from then on.  But
+    reporting that as `setup_uninitialized` told the operator the workspace
+    was missing when it exists and is simply owned by another window.  The
+    refusal keeps its frozen `panel_already_open` code, its text, and the
+    first panel's address.
+    """
+
+    import subprocess
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    state_root = tmp_path / "state"
+    first = ProjectSessionOwner(repo, state_root=state_root)
+    first.acquire_panel_lock(4321)
+    second = ProjectSessionOwner(repo, state_root=state_root)
+    second.acquire_panel_lock(9999)
+    CommonsManager.initialize(repo, integrations=())
+    first.ensure_active()  # resolving the workspace takes the deferred lock
+    context = UIContext(repo, state_root=state_root, session_owner=second)
+    try:
+        with _client(context) as client:
+            refused = client.post(
+                "/api/tasks",
+                json={"title": "Too many panels", "description": "the race is lost"},
+                headers=authorized(),
+            )
+        assert refused.status_code == 409
+        error = refused.json()["error"]
+        assert error["code"] == "panel_already_open"
+        assert "127.0.0.1:4321" in error["message"]
+        assert "setup_uninitialized" not in str(refused.json())
+    finally:
+        second.shutdown()
+        first.shutdown()
+
+
 def test_the_reading_half_of_setup_is_in_no_tuple_and_answers_read_only(
     workspace: dict[str, Any],
 ) -> None:

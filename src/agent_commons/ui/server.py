@@ -36,6 +36,7 @@ from agent_commons.ui.security import (
     new_token,
     token_matches,
 )
+from agent_commons.ui.session_owner import PanelAlreadyOpenError
 from agent_commons.ui.setup import (
     SETUP_NOT_A_REPOSITORY,
     SETUP_UNINITIALIZED,
@@ -130,18 +131,22 @@ _NOT_INITIALIZED_ACTIONS = ["run first run from this panel", "or run `agent-comm
 
 
 class _NotInitialized(Exception):
-    """No workspace yet, so nothing can be recorded. Rendered by ``create_app``.
+    """Nothing can be recorded here yet. Rendered by ``create_app``.
 
     Raised from a route dependency rather than from a handler on purpose: a
     dependency runs *before* the request body is read, which is the same
     discipline `launch_not_configured` already follows. Nothing in a body can
     make an absent workspace recordable, so nothing in it is worth parsing.
+    Mostly this carries the first-run codes; a panel that lost the singleness
+    race carries ``panel_already_open`` with its own actions instead, because
+    sending that operator to first run would not help.
     """
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, actions: list[str] | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
+        self.actions = list(actions) if actions is not None else list(_NOT_INITIALIZED_ACTIONS)
 
 
 class _RouteGroup:
@@ -181,6 +186,18 @@ def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
         state = await asyncio.to_thread(setup_state, context.repo)
         if state != SETUP_UNINITIALIZED and await asyncio.to_thread(lambda: context.writes_enabled):
             return
+        refusal = context.session_refusal
+        if isinstance(refusal, PanelAlreadyOpenError):
+            # A panel whose deferred lock lost the singleness race: the
+            # workspace exists, another panel owns it, and calling that
+            # "not set up yet" would send the operator to a first-run screen
+            # that cannot help.  The refusal keeps its own frozen code, its
+            # text, and the first panel's address.
+            raise _NotInitialized(
+                str(refusal.code),
+                str(refusal),
+                actions=["use the panel that already serves this project"],
+            )
         if state == SETUP_NOT_A_REPOSITORY:
             raise _NotInitialized(
                 SETUP_NOT_A_REPOSITORY,
@@ -256,7 +273,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         # The frozen refusal table travels as a code, exactly as the first-run
         # screen's other refusals do; the class name would say nothing.
         assert isinstance(exc, _NotInitialized)
-        return _error(409, exc.code, exc.message, _NOT_INITIALIZED_ACTIONS)
+        return _error(409, exc.code, exc.message, exc.actions)
 
     app.add_exception_handler(_NotInitialized, _not_initialized)
 
