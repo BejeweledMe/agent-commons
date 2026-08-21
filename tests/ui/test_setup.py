@@ -373,6 +373,27 @@ def test_a_world_writable_directory_is_refused_as_an_ownership_violation(
     assert not (config_dir / "runtime.yaml").exists()
 
 
+def test_the_post_mkdir_tightening_refuses_a_symlinked_directory(tmp_path: Path) -> None:
+    """Placement is checked before ``mkdir``, so the tightening that follows
+    creation must bind to the real inode: opened ``O_NOFOLLOW``, a symlink
+    planted where the config directory should be is refused as an ownership
+    violation instead of being chmodded through."""
+
+    real = tmp_path / "elsewhere"
+    real.mkdir(mode=0o755)
+    link = tmp_path / "agent-commons"
+    link.symlink_to(real)
+
+    with pytest.raises(setup.SetupError) as captured:
+        setup._tighten_operator_directory(link)
+    assert captured.value.code == "setup_path_refused_ownership"
+    assert _mode(real) == 0o755  # the target was never touched
+
+    real.chmod(0o750)
+    setup._tighten_operator_directory(real)
+    assert _mode(real) == 0o700
+
+
 # -- loader rejection ----------------------------------------------------------
 
 

@@ -298,6 +298,38 @@ def _assert_operator_owned(path: Path, *, expect_directory: bool) -> None:
         )
 
 
+def _tighten_operator_directory(directory: Path) -> None:
+    """Re-verify the just-created config directory by descriptor, then 0700 it.
+
+    ``_assert_safe_placement`` checked this path *before* ``mkdir``, which
+    leaves the classic gap: a symlink planted between the check and the
+    creation would let ``mkdir(exist_ok=True)`` succeed through it and a
+    path-based ``chmod`` follow it into someone else's directory.  Opening
+    with ``O_NOFOLLOW | O_DIRECTORY`` binds the ownership check and the
+    ``fchmod`` to the one inode that actually exists after ``mkdir``, so the
+    directory that gets tightened is provably a non-symlink directory owned by
+    the operator.  (Exploiting the original gap already required write access
+    to the operator's own config parent, but the descriptor costs nothing.)
+    """
+
+    try:
+        descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | os.O_DIRECTORY)
+    except OSError as exc:
+        raise _refuse_ownership(
+            f"{_LABEL} directory cannot be opened safely: {directory}", target=directory
+        ) from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if hasattr(os, "getuid") and metadata.st_uid not in {0, os.getuid()}:
+            raise _refuse_ownership(
+                f"{_LABEL} path must be owned by the operator or root: {directory}",
+                target=directory,
+            )
+        os.fchmod(descriptor, 0o700)
+    finally:
+        os.close(descriptor)
+
+
 def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
     """Fixed launch modes per profile; only found providers are written at all.
 
@@ -432,7 +464,7 @@ def generate_runtime_config(
     _assert_operator_owned(catalog_path, expect_directory=False)
 
     directory.mkdir(parents=True, exist_ok=True)
-    os.chmod(directory, 0o700)
+    _tighten_operator_directory(directory)
 
     body = {
         "profiles": _profile_bodies(found),
