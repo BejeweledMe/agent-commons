@@ -18,7 +18,7 @@ import pytest
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import MUTATING_ROUTES
-from tests.ui.conftest import authorized, tree_digest
+from tests.ui.conftest import authorized, expected_surface, mutating_surface, tree_digest
 
 # The acceptance chain's setup lives beside the acceptance tests rather than
 # being copied here: one recipe for "a task with a qualifying review", so a
@@ -181,14 +181,9 @@ def _agent_body(**overrides: Any) -> dict[str, Any]:
 
 def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
     writable_client,  # type: ignore[no-untyped-def]
+    writable: UIContext,
 ) -> None:
-    found = {
-        (method, route.path)
-        for route in writable_client.app.routes
-        for method in (getattr(route, "methods", set()) or set())
-        if method not in {"GET", "HEAD"}
-    }
-    assert found == set(MUTATING_ROUTES)
+    assert mutating_surface(writable_client.app) == expected_surface(writable)
 
 
 def create_agent(client, *, name: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]

@@ -11,7 +11,7 @@ import pytest
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext, ledger_fingerprint
 from agent_commons.ui.server import _events, _parse_last_event_id, create_app
-from tests.ui.conftest import PORT
+from tests.ui.conftest import PORT, expected_surface, mutating_surface
 
 
 def drive(context: UIContext, last_event_id: str | None, count: int) -> list[bytes]:
@@ -89,8 +89,9 @@ def test_the_app_registers_only_read_routes(context: UIContext) -> None:
     app = create_app(context, token="t", port=PORT)
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/api/graph" in paths
-    for route in app.routes:
-        assert (getattr(route, "methods", set()) or set()) <= {"GET", "HEAD"}
+    # A read-only panel opens no gate, so the surface it is entitled to and the
+    # surface it registers are both empty.
+    assert mutating_surface(app) == expected_surface(context) == set()
 
 
 def test_the_spa_is_readable_as_a_package_resource() -> None:

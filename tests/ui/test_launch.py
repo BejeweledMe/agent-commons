@@ -28,7 +28,7 @@ from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import LAUNCH_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized
+from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
 
 #: Every field the run surface publishes, exactly.  Asserted as an equality so a
 #: later change cannot quietly add one -- in particular a "spend"/"cost"/"used"
@@ -185,13 +185,8 @@ def test_launching_only_appears_behind_its_own_gate(
         writer_session_id=str(session["session_id"]),
     )
     with _client(writable_only) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
-    assert found == set(MUTATING_ROUTES)  # no launch route
+        found = mutating_surface(client.app)
+    assert found == expected_surface(writable_only)  # no launch route
     assert ("POST", "/api/delegations") not in found
 
 

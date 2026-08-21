@@ -17,7 +17,7 @@ from agent_commons.errors import ConfigurationError
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import CATALOG_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized
+from tests.ui.conftest import PORT, authorized, expected_surface, mutating_surface
 
 
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
@@ -59,13 +59,9 @@ def test_catalogue_routes_exist_only_behind_their_own_gate(
         catalog_path=tmp_path / "catalog.yaml",
     )
     with _client(writable_only) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
-    assert found == set()
+        found = mutating_surface(client.app)
+    # A catalogue path with the gate shut opens nothing at all.
+    assert found == expected_surface(writable_only) == set()
 
     editing = UIContext(
         workspace["repo"],
@@ -74,14 +70,9 @@ def test_catalogue_routes_exist_only_behind_their_own_gate(
         catalog_editing=True,
     )
     with _client(editing) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
+        found = mutating_surface(client.app)
     # Catalogue editing brings its own routes and none of the role-write ones.
-    assert found == set(CATALOG_ROUTES)
+    assert found == expected_surface(editing) == set(CATALOG_ROUTES)
     assert not found & set(MUTATING_ROUTES)
 
 

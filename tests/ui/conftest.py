@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.server import CATALOG_ROUTES, LAUNCH_ROUTES, MUTATING_ROUTES
 
 PORT = 51234
 
@@ -119,6 +121,48 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
     app = create_app(writable, token="test-token", port=PORT)
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client
+
+
+#: Every declared route tuple beside the context property that gates it.  The
+#: tuples in `ui.server` are a declaration checked by test rather than a runtime
+#: allowlist, so the check has to live here -- and it has to live here *once*:
+#: a new tuple joins the writing surface by being added to this table and
+#: nowhere else, instead of by editing every test that pins the surface.
+_SURFACE_GATES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    ("writes_enabled", MUTATING_ROUTES),
+    ("catalog_editing_enabled", CATALOG_ROUTES),
+    ("launch_enabled", LAUNCH_ROUTES),
+)
+
+
+def mutating_surface(app: FastAPI) -> set[tuple[str, str]]:
+    """The non-GET (method, path) pairs an assembled app actually registers.
+
+    Read from the built router, not from the declaration, so the two can
+    disagree and be caught disagreeing.
+    """
+
+    return {
+        (method, route.path)
+        for route in app.routes
+        for method in (getattr(route, "methods", set()) or set())
+        if method not in {"GET", "HEAD"}
+    }
+
+
+def expected_surface(context: UIContext) -> set[tuple[str, str]]:
+    """The non-GET surface a panel in this state is supposed to register.
+
+    Derived from the context's own gate properties and the declared tuples, so
+    a read-only panel expects the empty set and every other panel expects the
+    union of the tuples its gates open.
+    """
+
+    surface: set[tuple[str, str]] = set()
+    for gate, routes in _SURFACE_GATES:
+        if getattr(context, gate):
+            surface |= set(routes)
+    return surface
 
 
 def authorized() -> dict[str, str]:
