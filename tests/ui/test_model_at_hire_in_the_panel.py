@@ -243,6 +243,21 @@ def test_an_untouched_field_sends_no_model_at_all() -> None:
     assert 'document.getElementById("hire-model-hint").hidden = fromPreset;' in mode
 
 
+def test_the_reused_modal_does_not_leak_one_hire_s_model_into_the_next() -> None:
+    """The modal is one element opened again and again, and round 2 found three
+    fields carrying the previous opening's values into the next.  A free-text
+    model is the worst of that class to leave out of the reset: the second role
+    would be hired on the first one's model with nothing having asked, and the
+    choice cannot be corrected afterwards."""
+
+    body = read_spa()
+    opening = _function(body, "function showHire(open, options) {")
+    assert 'document.getElementById("hire-model").value = "";' in opening
+    # And the reset happens before the mode is applied, so the offers and the
+    # sentence beside the blank field are the ones for the profile on screen.
+    assert opening.index('"hire-model"') < opening.index("applyHireMode();")
+
+
 def test_the_refused_name_lands_under_the_field_and_matches_the_sentence_sent() -> None:
     """The seam, checked from both sides.  The panel places this refusal by
     matching the backend's own sentence, so the two are compared here rather

@@ -4528,6 +4528,10 @@ function showHire(open, options) {
   // first; what THIS opening asks for is applied below.
   document.getElementById("hire-name").value = "";
   document.getElementById("hire-rationale").value = "";
+  // The model is a free-text field and would otherwise leak the last hire's
+  // choice into the next one, silently — the second role would be hired on the
+  // first one's model with nothing on screen having asked for it.
+  document.getElementById("hire-model").value = "";
   document.getElementById("hire-turnover_budget").value = "";
   document.getElementById("hire-create_roles").value = "deny";
   document.getElementById("hire-retire_roles").value = "deny";
