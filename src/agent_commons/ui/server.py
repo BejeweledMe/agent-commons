@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import secrets
 import socket
 import webbrowser
@@ -47,6 +48,24 @@ from agent_commons.ui.setup import (
     SetupError,
     missing_workspace_state,
 )
+
+
+class _ExpectedShutdownCancellationFilter(logging.Filter):
+    """Hide only uvicorn's traceback for tasks it cancelled during shutdown."""
+
+    def __init__(self, shutting_down: Callable[[], bool]) -> None:
+        super().__init__()
+        self._shutting_down = shutting_down
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        error = record.exc_info[1] if record.exc_info is not None else None
+        expected = (
+            self._shutting_down()
+            and record.getMessage().startswith("Exception in ASGI application")
+            and isinstance(error, asyncio.CancelledError)
+        )
+        return not expected
+
 
 _ENTITY_KINDS = frozenset(
     {
@@ -949,4 +968,11 @@ def serve(
         # block actually close the session.
         timeout_graceful_shutdown=1,
     )
-    uvicorn.Server(config).run(sockets=[listener])
+    server = uvicorn.Server(config)
+    cancellation_filter = _ExpectedShutdownCancellationFilter(lambda: server.should_exit)
+    error_logger = logging.getLogger("uvicorn.error")
+    error_logger.addFilter(cancellation_filter)
+    try:
+        server.run(sockets=[listener])
+    finally:
+        error_logger.removeFilter(cancellation_filter)

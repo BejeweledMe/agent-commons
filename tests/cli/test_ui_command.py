@@ -126,6 +126,7 @@ def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) ->
         text=True,
     )
     conn = None
+    stderr = ""
     try:
         assert proc.stdout is not None
         started = json.loads(proc.stdout.readline())
@@ -146,6 +147,8 @@ def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) ->
 
         proc.send_signal(signal.SIGINT)
         proc.wait(timeout=15)
+        assert proc.stderr is not None
+        stderr = proc.stderr.read()
     finally:
         if conn is not None:
             conn.close()
@@ -156,6 +159,7 @@ def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) ->
 
     shown = CommonsManager(repo, read_only=True).show_session(started["writer_session_id"])
     assert shown["status"] == "closed"
+    assert "Traceback" not in stderr, stderr
 
 
 def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_first_run(
