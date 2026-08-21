@@ -82,7 +82,7 @@ def test_discovery_calls_only_the_trusted_resolver_and_believes_its_answers(
     assert resolver.calls == [
         ("claude", ExecutableRole.PROVIDER),
         ("codex", ExecutableRole.PROVIDER),
-        ("agent-commons-mcp", ExecutableRole.MCP),
+        (str(Path(sys.executable).parent / "agent-commons-mcp"), ExecutableRole.MCP),
         ("/usr/bin/git", ExecutableRole.GIT),
     ]
     assert discovery.claude.path == "/nowhere/resolved/claude"
@@ -93,16 +93,20 @@ def test_discovery_calls_only_the_trusted_resolver_and_believes_its_answers(
     assert discovery.providers_found == ("claude", "codex")
 
 
-def test_mcp_falls_back_to_the_interpreter_directory_with_an_absolute_path(
+def test_mcp_prefers_the_interpreter_sibling_and_falls_back_to_path(
     workspace: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``agent-commons-mcp`` is a console script invisible on PATH under
-    ``uv run``; the second candidate is the running interpreter's directory."""
+    """``agent-commons-mcp`` is this project's own support binary: the only
+    version guaranteed to match the code writing the ledger is the running
+    interpreter's sibling, so that absolute path is the *first* candidate.
+    PATH is the fallback for installs without a sibling console script --
+    never the way a foreign checkout's older install gets picked over the
+    matching one."""
 
     sibling = str(Path(sys.executable).parent / "agent-commons-mcp")
 
     def outcome(value: str, role: ExecutableRole) -> Any:
-        if value == "agent-commons-mcp":
+        if value == sibling:
             return ExecutableResolutionError(role, "profile executable is unavailable: mcp")
         return f"/resolved/{Path(value).name}"
 
@@ -113,15 +117,39 @@ def test_mcp_falls_back_to_the_interpreter_directory_with_an_absolute_path(
 
     mcp_calls = [call for call in resolver.calls if call[1] is ExecutableRole.MCP]
     assert mcp_calls == [
-        ("agent-commons-mcp", ExecutableRole.MCP),
         (sibling, ExecutableRole.MCP),
+        ("agent-commons-mcp", ExecutableRole.MCP),
     ]
     assert discovery.mcp.path == "/resolved/agent-commons-mcp"
     assert Path(sibling).is_absolute()
-    # The PATH refusal is decomposed but its exact reason survives.
+    # The sibling refusal is decomposed but its exact reason survives.
     assert [refusal.reason for refusal in discovery.mcp.refusals] == [
         "profile executable is unavailable: mcp"
     ]
+
+
+def test_a_path_shadowing_foreign_mcp_never_wins_over_the_sibling(
+    workspace: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The live incident: a second checkout's ``.venv/bin`` on PATH offered an
+    ``agent-commons-mcp`` that resolution would happily accept, and PATH-first
+    ordering wrote it into every generated profile.  With the sibling first,
+    the foreign install is never even asked for while the sibling resolves."""
+
+    sibling = str(Path(sys.executable).parent / "agent-commons-mcp")
+
+    def outcome(value: str, role: ExecutableRole) -> Any:
+        return f"/resolved/{Path(value).name}" if Path(value).is_absolute() else f"/other/{value}"
+
+    resolver = RecordingResolver(outcome)
+    monkeypatch.setattr(setup, "resolve_trusted_executable", resolver)
+
+    discovery = setup.discover_providers(workspace["repo"])
+
+    mcp_calls = [call for call in resolver.calls if call[1] is ExecutableRole.MCP]
+    assert mcp_calls == [(sibling, ExecutableRole.MCP)]
+    assert discovery.mcp.path == "/resolved/agent-commons-mcp"
+    assert discovery.mcp.refusals == ()
 
 
 def test_git_tries_the_well_known_path_then_falls_back_to_path_lookup(

@@ -229,10 +229,16 @@ def discover_providers(workspace_root: str | Path) -> ProviderDiscovery:
 
     Candidate order encodes three traps this wave already met:
 
-    - ``agent-commons-mcp`` is a console script; under ``uv run`` it lives in
-      ``.venv/bin`` and is *not* on PATH.  PATH is tried first, then the
-      directory of the running interpreter, and whichever wins is recorded as
-      an absolute path.
+    - ``agent-commons-mcp`` is not an operator-chosen tool like the providers;
+      it is this project's own support binary, and the only correct version is
+      the one matching the code that writes the ledger -- the sibling of the
+      running interpreter, by construction the same installed distribution as
+      this very module.  The sibling is therefore tried *first*; PATH is only
+      the fallback for installs where the console script does not sit next to
+      the interpreter.  PATH-first was tried and picked another checkout's
+      ``.venv/bin/agent-commons-mcp`` on a machine with two checkouts -- the
+      exact skew AGENTS.md warns about, where an older install misreads a
+      newer ledger as corrupted instead of failing to launch.
     - ``git`` tries the well-known ``/usr/bin/git`` first and falls back to
       PATH; either way the recorded value is the resolved absolute path.
     - The process PATH is the operator's own, which is why this wave's panel
@@ -246,7 +252,7 @@ def discover_providers(workspace_root: str | Path) -> ProviderDiscovery:
         codex=_probe("codex", ("codex",), workspace_root=root, role=ExecutableRole.PROVIDER),
         mcp=_probe(
             "agent-commons-mcp",
-            ("agent-commons-mcp", interpreter_sibling),
+            (interpreter_sibling, "agent-commons-mcp"),
             workspace_root=root,
             role=ExecutableRole.MCP,
         ),
