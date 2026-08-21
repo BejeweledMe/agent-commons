@@ -142,6 +142,13 @@ class RuntimeConfiguration:
     #: workspace without a subscription or any billable process.  It is opt-in
     #: through the operator config and never the default.
     demo: bool = False
+    #: Where ``catalog`` was read from, when it was named at all.  The contents
+    #: above are everything a launch needs; a panel additionally needs the path,
+    #: because editing the catalogue means writing that same file back.  Kept
+    #: beside the contents rather than re-parsed by every reader, so the file a
+    #: panel edits and the file a broker resolves skills from can never be two
+    #: different files.
+    catalog_path: Path | None = None
 
 
 def load_runtime_configuration(
@@ -216,6 +223,9 @@ def load_runtime_configuration(
         limits,
         load_role_catalog(raw_catalog, workspace_root=workspace_root),
         demo=raw_demo,
+        # Expanded exactly as the loader above expanded it, so a `~` in the
+        # operator file names one file to both readers.
+        catalog_path=Path(raw_catalog).expanduser() if raw_catalog else None,
     )
 
 

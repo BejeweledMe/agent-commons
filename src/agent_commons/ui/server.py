@@ -31,6 +31,7 @@ from agent_commons.ui.security import (
     new_token,
     token_matches,
 )
+from agent_commons.ui.setup import SetupError
 
 _ENTITY_KINDS = frozenset(
     {
@@ -91,6 +92,18 @@ CATALOG_ROUTES = (
 #: mutating-surface test still names launching as its own privilege rather than
 #: folding it into the write allowlist.
 LAUNCH_ROUTES = (("POST", "/api/delegations"),)
+
+#: First run, declared apart from every other privilege because it is the only
+#: surface that writes outside the ledger: one route creates the workspace
+#: through the same initializer `agent-commons init` calls, the other writes the
+#: operator's own runtime config and adopts it into this running panel.  Both
+#: are registered by any writing panel -- a read-only one registers neither, so
+#: the zero-non-GET invariant is untouched -- and the reading half of the same
+#: surface (`GET /api/setup`, `GET /api/setup/preflight`) is in no tuple at all.
+SETUP_ROUTES = (
+    ("POST", "/api/setup/initialize"),
+    ("POST", "/api/setup/runtime-config"),
+)
 
 _HEARTBEAT_SECONDS = 15.0
 _POLL_SECONDS = 2.0
@@ -244,10 +257,27 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         # Live and recent run phases, metadata only. Readable in any mode.
         return JSONResponse(await asyncio.to_thread(context.runs))
 
+    @app.get("/api/setup")
+    async def setup_status() -> Response:
+        # Readable in any mode; acting on it needs a writing panel. This is the
+        # one route that names operator paths, and only until the runtime is
+        # configured -- see `UIContext.setup_status`.
+        return JSONResponse(await asyncio.to_thread(context.setup_status))
+
+    @app.get("/api/setup/preflight")
+    async def setup_preflight() -> Response:
+        try:
+            return JSONResponse(await asyncio.to_thread(context.setup_preflight))
+        except SetupError as exc:
+            return _error(409, exc.code, str(exc))
+        except CommonsError as exc:
+            return _error(422, type(exc).__name__, str(exc))
+
     if context.writes_enabled:
         _register_writes(app, context)
         # Not gated on `launch_enabled`: see LAUNCH_ROUTES.
         _register_launch(app, context)
+        _register_setup(app, context)
     if context.catalog_editing_enabled:
         _register_catalog_writes(app, context)
 
@@ -517,6 +547,40 @@ def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
             section=str(body.get("section", "")),
             entry_id=str(body.get("id", "")),
         )
+
+
+def _register_setup(app: FastAPI, context: UIContext) -> None:
+    """Attach the two first-run writes, declared apart in ``SETUP_ROUTES``.
+
+    Neither takes a parameter, and that is the security property of this
+    surface, not an omission: the directory a workspace is created in is the one
+    the panel was opened on, and the operator config always lands on the frozen
+    XDG path.  A bearer token therefore cannot aim either write at a path of its
+    choosing, which is also why no manual "type the binary path here" field
+    exists anywhere on the first-run screen.
+    """
+
+    async def _setup(action: Callable[..., Any]) -> Response:
+        # Setup refusals are the frozen table the first-run screen draws by, so
+        # the code travels typed rather than as the exception's class name.
+        try:
+            result = await asyncio.to_thread(action)
+        except SetupError as exc:
+            return _error(409, exc.code, str(exc))
+        except CommonsError as exc:
+            return _error(409, type(exc).__name__, str(exc))
+        except (OSError, TypeError, ValueError) as exc:
+            return _error(400, "invalid_request", str(exc))
+        context.invalidate()
+        return JSONResponse(result)
+
+    @app.post("/api/setup/initialize")
+    async def initialize_workspace() -> Response:
+        return await _setup(context.initialize_workspace)
+
+    @app.post("/api/setup/runtime-config")
+    async def write_runtime_config() -> Response:
+        return await _setup(context.configure_runtime)
 
 
 def _register_launch(app: FastAPI, context: UIContext) -> None:

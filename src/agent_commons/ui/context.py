@@ -42,6 +42,24 @@ LAUNCH_NOT_CONFIGURED = (
     "needs an operator session and an operator profile config"
 )
 
+#: A provider was resolved but one of the executables every profile needs beside
+#: it was not.  The wave contract froze this code after `ui.setup` found the
+#: state reachable and refused to invent a code for it: that module may not
+#: extend the frozen table, so the binding lives here, on the wiring that turns
+#: its answer into an HTTP refusal the first-run screen can draw.
+SETUP_SUPPORT_BINARY_UNRESOLVED = "setup_support_binary_unresolved"
+
+#: What a preflight result means, said once.  `preflight_profile` checks fixed
+#: argv and MCP startup and carries no credential at all, so a signed-out
+#: provider and a working one are indistinguishable to it
+#: (decision.5QPR0HQYNAG3XKBMMKBJCAG1RB).  A green preflight is therefore a
+#: statement about structure, never about authorization.
+PREFLIGHT_CREDENTIAL_FREE = (
+    "this check is structural: it verifies the fixed launch flags and the MCP "
+    "handshake without any credential, so it cannot tell a signed-out provider "
+    "from an authorized one -- a green result does not mean you are logged in"
+)
+
 
 def _iso_now() -> str:
     return datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
@@ -270,6 +288,213 @@ class UIContext:
         return self.writes_enabled and (
             self._profile_config is not None or self._runtime_factory is not None
         )
+
+    # -- first run ------------------------------------------------------------
+    #
+    # Everything below is the wiring between `ui.setup` and the panel's HTTP
+    # surface.  It sequences that module and names its refusals; it repeats none
+    # of its checks, because a second copy of "is this executable safe to run"
+    # is exactly how the two answers start to disagree.
+
+    @staticmethod
+    def _unresolved_support_binaries(discovery: Any) -> tuple[str, ...]:
+        """Support executables every generated profile needs, that did not resolve.
+
+        Named off the discovery the module already produced rather than probed
+        again: this is a classification of its answer, not a second opinion.
+        """
+
+        return tuple(probe.name for probe in (discovery.mcp, discovery.git) if not probe.found)
+
+    def setup_status(self) -> dict[str, Any]:
+        """What the first-run screen needs, and the one place paths leave here.
+
+        The panel hands out no filesystem path anywhere else, and this is the
+        narrow, deliberate exception: while the runtime is still unconfigured
+        the operator has to see which binaries were found and where the config
+        is about to be written, because that is the decision being asked of
+        them.  The moment the state is `configured` the exception closes and the
+        same route answers with the state and nothing else -- the paths are not
+        redacted, they are not gathered at all.
+        """
+
+        from agent_commons.ui import setup
+
+        state = setup.setup_state(self.repo, profile_config=self._profile_config)
+        status: dict[str, Any] = {
+            "state": state,
+            "launch_enabled": self.launch_enabled,
+            "catalog_editing_enabled": self.catalog_editing_enabled,
+        }
+        if state == setup.SETUP_CONFIGURED:
+            return status
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        status["providers"] = discovery.describe()
+        status["providers_found"] = list(discovery.providers_found)
+        status["providers_missing"] = list(discovery.providers_missing)
+        status["support_missing"] = list(missing)
+        status["config_path"] = str(self._profile_config or setup.default_runtime_config_path())
+        # What would refuse a write attempted right now, said before the
+        # operator clicks rather than only after: no provider at all is the
+        # frozen `setup_no_provider_found`, and a provider without the
+        # executables every profile needs beside it is the code this wave added.
+        status["blocking_refusal"] = (
+            setup.SETUP_NO_PROVIDER_FOUND
+            if not discovery.providers_found
+            else (SETUP_SUPPORT_BINARY_UNRESOLVED if missing else None)
+        )
+        return status
+
+    def initialize_workspace(self) -> dict[str, Any]:
+        """Create the workspace in this directory, through the code `init` runs.
+
+        `CommonsManager.initialize` is the same entry point the CLI command
+        calls; there is no second initializer.  The report is trimmed to what
+        the screen can use, because the full one lists every file written and
+        this surface does not publish paths.
+        """
+
+        from agent_commons.ui import setup
+
+        if setup.setup_state(self.repo) == setup.SETUP_NOT_A_REPOSITORY:
+            raise setup.SetupError(
+                setup.SETUP_NOT_A_REPOSITORY,
+                "this directory is not a git repository, so there is nothing for "
+                "a workspace to attach to",
+            )
+        report = CommonsManager.initialize(self.repo, integrations=("codex", "claude"))
+        self.invalidate()
+        return {
+            "workspace_id": report["workspace_id"],
+            "integrations": list(report["integrations"]),
+            "changed": bool(report["changed"]),
+            "state": setup.setup_state(self.repo, profile_config=self._profile_config),
+        }
+
+    def configure_runtime(self) -> dict[str, Any]:
+        """Generate the operator runtime config and adopt it without a restart.
+
+        Discovery runs once and is handed to the generator, so the profiles that
+        get written are the ones the operator was just shown rather than the
+        result of a second probe that could answer differently.
+        """
+
+        from agent_commons.ui import setup
+
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        if discovery.providers_found and missing:
+            # `ui.setup` raises an uncoded ConfigurationError here on purpose --
+            # it may not extend the frozen refusal table by itself -- and keeps
+            # every resolver reason in the message.  This is where the frozen
+            # code gets attached, with those reasons carried through.
+            reasons = "; ".join(
+                f"{probe.name} [{refusal.candidate}]: {refusal.reason}"
+                for probe in (discovery.mcp, discovery.git)
+                if not probe.found
+                for refusal in probe.refusals
+            )
+            raise setup.SetupError(
+                SETUP_SUPPORT_BINARY_UNRESOLVED,
+                "a provider was found but "
+                + " and ".join(missing)
+                + " could not be resolved, and every generated profile names both"
+                + (f": {reasons}" if reasons else ""),
+                details={"missing": list(missing), "discovery": discovery.describe()},
+            )
+        written = setup.generate_runtime_config(
+            self.repo,
+            state_root=self._state_root,
+            state_base=self._state_base,
+            discovery=discovery,
+        )
+        adopted = self.adopt_runtime_config(written["path"])
+        # The written path is deliberately not echoed: this panel is configured
+        # from here on, and `setup_status` stops naming paths at the same moment.
+        return {
+            "state": setup.SETUP_CONFIGURED,
+            "providers_found": written["providers_found"],
+            "providers_missing": written["providers_missing"],
+            **adopted,
+        }
+
+    def adopt_runtime_config(self, path: str | Path) -> dict[str, Any]:
+        """Take a runtime config into a panel that is already serving.
+
+        This is the whole point of writing the config from the panel: a first
+        run that ends in "now restart me" is not a first run that worked.  Three
+        pieces of state have to move together, and each was a trap on its own:
+
+        - `_profile_config`, which is what `launch_enabled` and the runtime
+          service read;
+        - `_profile_info`, which is cached for the life of the process by
+          design.  A panel that adopted a config without dropping it would keep
+          answering "the model is fixed in the profile" forever, because the
+          cache was filled from the *unconfigured* read;
+        - `_catalog_path`, which the generated config names beside itself.
+
+        Loaded through the same guarded loader the launch path uses, so a config
+        this panel adopts is exactly one a launch would accept, and a refusal
+        arrives here instead of at the operator's first Run.
+        """
+
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+        target = Path(path).expanduser()
+        configuration = load_runtime_configuration(target, workspace_root=self.repo)
+        with self._guard:
+            self._profile_config = target
+            self._profile_info = None
+            if configuration.catalog_path is not None:
+                self._catalog_path = configuration.catalog_path
+        # The graph is unchanged, but everything derived beside it -- the
+        # catalogue, the launch options -- is not, and the panel polls for that
+        # through the same fingerprint.
+        self.invalidate()
+        return {
+            "profiles": [str(profile_id) for profile_id in configuration.profiles.profile_ids],
+            "demo": configuration.demo,
+            "launch_enabled": self.launch_enabled,
+            "catalog_editing_enabled": self.catalog_editing_enabled,
+        }
+
+    def setup_preflight(self) -> dict[str, Any]:
+        """Run the credential-free compatibility check over configured profiles.
+
+        `preflight_profile` debuts in the panel here.  It starts provider `--help`
+        and MCP handshake processes and consumes no delegation attempt; what it
+        cannot do is tell an unauthorized provider from an authorized one, and
+        the answer says so in every response rather than only in a tooltip.
+        """
+
+        from agent_commons.runtime.preflight import preflight_profile
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+        from agent_commons.ui import setup
+
+        if self._profile_config is None:
+            raise setup.SetupError(
+                setup.SETUP_UNCONFIGURED,
+                "there is no operator runtime config to check yet; the check runs "
+                "against the profiles the first-run screen writes",
+            )
+        configuration = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        state_root = self.paths().state_root
+        results = [
+            preflight_profile(
+                configuration.profiles,
+                profile_id,
+                workspace_root=self.repo,
+                state_root=state_root,
+            )
+            for profile_id in configuration.profiles.profile_ids
+        ]
+        return {
+            "credential_free": True,
+            "note": PREFLIGHT_CREDENTIAL_FREE,
+            "ok": all(bool(result["ok"]) for result in results),
+            "profiles": results,
+        }
 
     def manager(self) -> CommonsManager:
         return CommonsManager(

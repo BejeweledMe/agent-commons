@@ -10,7 +10,12 @@ from fastapi import FastAPI
 
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
-from agent_commons.ui.server import CATALOG_ROUTES, LAUNCH_ROUTES, MUTATING_ROUTES
+from agent_commons.ui.server import (
+    CATALOG_ROUTES,
+    LAUNCH_ROUTES,
+    MUTATING_ROUTES,
+    SETUP_ROUTES,
+)
 
 PORT = 51234
 
@@ -136,6 +141,9 @@ _SURFACE_GATES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     # once.  `launch_enabled` still exists and still means "a run would start" --
     # it is just no longer what decides whether the route is there.
     ("writes_enabled", LAUNCH_ROUTES),
+    # Same reason, one step earlier: first run is what makes a panel configured,
+    # so it cannot be gated on the panel being configured.
+    ("writes_enabled", SETUP_ROUTES),
 )
 
 
