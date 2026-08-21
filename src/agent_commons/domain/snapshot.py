@@ -50,6 +50,10 @@ class ProjectSnapshot:
     effective_event_revisions: dict[str, str] = field(default_factory=dict)
     known_event_ids: set[str] = field(default_factory=set)
     known_manifest_ids: set[str] = field(default_factory=set)
+    # Replay-only identity facts from immutable event actors.  Session ids may
+    # rotate while the identity stays byte-for-byte stable; keeping this out of
+    # ``to_dict`` avoids turning an implementation guard into project data.
+    session_identities: dict[str, dict[str, Any]] = field(default_factory=dict)
     replay_metrics: dict[str, int] = field(default_factory=dict)
     # The highest semantics version any effective stamp in this ledger names;
     # 1 is everything written before stamps existed.

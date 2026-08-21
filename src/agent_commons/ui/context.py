@@ -1166,7 +1166,7 @@ class UIContext:
         session_ids = self.writer_session_ids
         manager = self._writer_bound(session_ids[-1]) if session_ids else self.manager()
         try:
-            operations = CommunicationRuntimeService(manager).inbox()
+            operations = CommunicationRuntimeService(manager, session_lineage=session_ids).inbox()
         except (CommonsError, OSError) as exc:
             # A corrupt or unreadable communication store is not "no blockers":
             # swallowing it silently made a real failure indistinguishable from
@@ -1754,7 +1754,9 @@ class UIContext:
 
         if not isinstance(answer, Mapping) or not answer:
             raise ValidationError("an answer needs at least one field")
-        service = CommunicationRuntimeService(self.writer())
+        session_ids = self.writer_session_ids
+        manager = self._writer_bound(session_ids[-1]) if session_ids else self.writer()
+        service = CommunicationRuntimeService(manager, session_lineage=session_ids)
         return service.reply_to_input(
             operation_id,
             idempotency_key=idempotency_key or f"ui-reply-{operation_id}",

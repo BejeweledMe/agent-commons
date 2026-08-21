@@ -113,6 +113,10 @@ def _record_issue(
     snapshot.warnings.append(message)
 
 
+def _actor_identity(actor: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): deepcopy(value) for key, value in actor.items() if str(key) != "session_id"}
+
+
 def _apply(
     collection: dict[str, dict[str, Any]], identifier: str, event: Mapping[str, Any], state: str
 ) -> None:
@@ -884,6 +888,14 @@ def _project_events_once(
         try:
             if not isinstance(payload, Mapping):
                 raise ValidationError("event payload must be an object")
+            actor = event.get("actor")
+            if not isinstance(actor, Mapping):
+                raise ValidationError("event actor must be an object")
+            actor_session_id = str(actor.get("session_id", ""))
+            actor_identity = _actor_identity(actor)
+            known_identity = snapshot.session_identities.get(actor_session_id)
+            if known_identity is not None and known_identity != actor_identity:
+                raise LifecycleConflictError("session actor identity changed during replay")
             validate_payload(event_type, payload)
             workspace_id = event.get("workspace_id")
             if snapshot.workspace_id is not None and workspace_id != snapshot.workspace_id:
@@ -894,7 +906,8 @@ def _project_events_once(
                 snapshot,
                 event_type,
                 payload,
-                actor_session_id=str((event.get("actor") or {}).get("session_id", "")),
+                actor_session_id=actor_session_id,
+                actor=actor,
                 # Relations carry the run/role binding on `delegation.requested`,
                 # so replay revalidates who was allowed to staff that role there
                 # rather than trusting that the write path checked it once.  The
@@ -904,6 +917,7 @@ def _project_events_once(
                 relations=event.get("relations") or (),
             )
             _apply_effective_event(snapshot, event)
+            snapshot.session_identities.setdefault(actor_session_id, actor_identity)
             snapshot.effective_event_revisions[event_id] = str(
                 event.get("_effective_correction_id") or event_id
             )

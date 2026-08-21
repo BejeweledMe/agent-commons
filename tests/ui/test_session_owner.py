@@ -16,7 +16,19 @@ import pytest
 
 from agent_commons.coordination.sessions import Session, SessionRegistry
 from agent_commons.errors import ConfigurationError, LifecycleConflictError
+from agent_commons.runtime import (
+    AttemptSpec,
+    AttemptState,
+    AttemptStore,
+    BuiltinProfileId,
+    CommunicationAuthorizationError,
+    CommunicationStore,
+    CorrelationIds,
+    RuntimePolicy,
+    checkout_fingerprint,
+)
 from agent_commons.services import CommonsManager
+from agent_commons.services.communication import CommunicationRuntimeService, _participant_id
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.session_owner import (
     ProjectSessionOwner,
@@ -314,43 +326,144 @@ def test_the_context_writer_repairs_a_stale_session_before_the_first_write(
 def test_pending_operations_stay_answerable_across_a_session_recovery(
     workspace: dict[str, Any], clock: Clock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A blocker scoped to a replaced session must not lose its answer form."""
-
-    from agent_commons.services.communication import _participant_id
+    """A successor answers its predecessor's blocker, but a stranger cannot."""
 
     owner = _owner(workspace, clock)
     first = owner.ensure_active()
     context = UIContext(workspace["repo"], state_root=workspace["state_root"], session_owner=owner)
+
+    parent = CommonsManager(workspace["repo"], state_root=workspace["state_root"], session_id=first)
+    child = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    child_session = child.start_session(
+        stable_instance_id="panel-lineage-child-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="builder",
+    )
+    child.session_id = child_session["session_id"]
+    task = parent.create_task(
+        title="Answer after panel recovery",
+        description="Keep one private question answerable across the panel TTL.",
+        acceptance_criteria=("The recovered panel answers without impersonating its predecessor",),
+        idempotency_key="panel-lineage-task",
+    )
+    requested = parent.create_delegation(
+        target_ref=task["entity_ref"],
+        target_revision=task["revision"],
+        target_profile="codex-builder",
+        purpose="implementation",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 900,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "tokens", "limit": 10_000},
+        },
+        idempotency_key="panel-lineage-delegation",
+    )
+    delegation_id = requested["entity_ref"]["id"]
+    parent.start_delegation(
+        delegation_id,
+        requested["revision"],
+        child_session_id=child_session["session_id"],
+        idempotency_key="panel-lineage-delegation-start",
+    )
+
+    parent_policy = RuntimePolicy(
+        remaining_depth=1,
+        max_fanout=1,
+        max_attempts=1,
+        max_concurrency=1,
+        timeout_seconds=900,
+    )
+    attempts = AttemptStore(workspace["state_root"])
+    attempt = attempts.reserve(
+        AttemptSpec(
+            idempotency_key="panel-lineage-attempt",
+            profile_id=BuiltinProfileId.CODEX_BUILDER,
+            provider=BuiltinProfileId.CODEX_BUILDER.provider,
+            correlation=CorrelationIds(
+                delegation_id=delegation_id,
+                target_kind="task",
+                target_id=task["entity_ref"]["id"],
+                target_revision=task["revision"],
+                parent_session_id=first,
+                child_session_id=child_session["session_id"],
+            ),
+            parent_policy=parent_policy,
+            child_policy=parent_policy.derive_child(),
+            checkout_fingerprint=checkout_fingerprint(workspace["repo"]),
+        ),
+        parent_policy=parent_policy,
+    ).attempt
+    attempts.transition(attempt.attempt_id, AttemptState.LAUNCHING, reason="process_starting")
+    attempts.transition(
+        attempt.attempt_id,
+        AttemptState.RUNNING,
+        reason="process_started",
+        pid=4242,
+    )
+    opened = CommunicationRuntimeService(child, attempts=attempts).request_input(
+        delegation_id,
+        idempotency_key="panel-lineage-question",
+        question="Which bounded branch should the worker take?",
+        why_needed="Both branches satisfy the task.",
+        safe_context={"choices": ["small", "large"]},
+        desired_outcome="Choose one listed branch.",
+        deadline_seconds=300,
+    )
+    operation_id = opened["operation"]["operation_id"]
+
     clock.value += 9 * 3600
     second = owner.ensure_active()
     assert second != first
-
-    class FakeService:
-        def __init__(self, _manager: Any) -> None:
-            pass
-
-        def inbox(self) -> tuple[dict[str, Any], ...]:
-            return (
-                {
-                    "operation_id": "op-1",
-                    "kind": "input",
-                    "state": "open",
-                    "scope": {
-                        "delegation_id": "delegation.d1",
-                        "task_id": "task.t1",
-                        "allowed_recipient_session_ids": (_participant_id(first),),
-                    },
-                    "metadata": {},
-                    "deadline": None,
-                },
-            )
-
-    monkeypatch.setattr(
-        "agent_commons.services.communication.CommunicationRuntimeService", FakeService
-    )
     operations = context.pending_operations()
-    assert [item["operation_id"] for item in operations] == ["op-1"]
+    assert [item["operation_id"] for item in operations] == [operation_id]
     assert operations[0]["answerable_here"] is True
+
+    stranger = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    stranger_session = stranger.start_session(
+        stable_instance_id="panel-lineage-stranger-12345678",
+        principal="operator",
+        client="codex",
+        software="codex-cli",
+        role="observer",
+    )
+    stranger.session_id = stranger_session["session_id"]
+    with pytest.raises(LifecycleConflictError, match="only replacements"):
+        CommunicationRuntimeService(
+            stranger,
+            session_lineage=(first, stranger_session["session_id"]),
+        ).inbox()
+    foreign_context = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=stranger_session["session_id"],
+    )
+    with pytest.raises(CommunicationAuthorizationError):
+        foreign_context.answer_operation(
+            operation_id=operation_id,
+            answer={"selection": "large"},
+            idempotency_key="foreign-lineage-answer",
+        )
+
+    observed: dict[str, Any] = {}
+    original_reply = CommunicationStore.reply
+
+    def observe_reply(self: CommunicationStore, *args: Any, **kwargs: Any) -> Any:
+        observed["responder_session_id"] = kwargs.get("responder_session_id")
+        return original_reply(self, *args, **kwargs)
+
+    monkeypatch.setattr(CommunicationStore, "reply", observe_reply)
+    replied = context.answer_operation(
+        operation_id=operation_id,
+        answer={"selection": "small"},
+        idempotency_key="successor-lineage-answer",
+    )
+    assert replied["operation"]["state"] == "replied"
+    assert replied["delegation"]["state"] == "active"
+    assert observed["responder_session_id"] == _participant_id(second)
 
 
 def test_the_owner_exposes_its_whole_session_lineage(

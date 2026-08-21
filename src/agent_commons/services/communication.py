@@ -9,7 +9,7 @@ runtime attempt, so callers cannot select arbitrary recipients or widen scope.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from agent_commons.core.ids import stable_id
@@ -19,6 +19,7 @@ from agent_commons.runtime import (
     Attempt,
     AttemptState,
     AttemptStore,
+    CommunicationAuthorizationError,
     CommunicationScope,
     CommunicationStore,
     OperationKind,
@@ -65,8 +66,12 @@ class CommunicationRuntimeService:
         *,
         attempts: AttemptStore | None = None,
         store: CommunicationStore | None = None,
+        session_lineage: Collection[str] | None = None,
     ) -> None:
         self.manager = manager
+        if isinstance(session_lineage, (str, bytes)):
+            raise ValidationError("session_lineage must be a collection of session ids")
+        self._session_lineage = tuple(dict.fromkeys(session_lineage or ()))
         self.attempts = attempts or AttemptStore(
             manager.paths.state_root,
             security_policy=manager.policy,
@@ -81,6 +86,36 @@ class CommunicationRuntimeService:
     def _active_session_id(self) -> str:
         session = self.manager.sessions.require_active(self.manager.session_id)
         return session.session_id
+
+    @staticmethod
+    def _session_identity(session: Any) -> tuple[Any, ...]:
+        return (
+            session.stable_instance_id,
+            session.principal,
+            session.client,
+            session.software,
+            session.model_family,
+            session.model,
+            session.role,
+            session.capabilities,
+            session.source_producer,
+        )
+
+    def _lineage_participant_ids(self) -> tuple[str, ...]:
+        """Validate one replacement lineage and return its private participant ids."""
+
+        current = self.manager.sessions.require_active(self.manager.session_id)
+        raw_ids = tuple(dict.fromkeys((*self._session_lineage, current.session_id)))
+        sessions = {item.session_id: item for item in self.manager.sessions.list_sessions()}
+        identity = self._session_identity(current)
+        for session_id in raw_ids:
+            candidate = sessions.get(session_id)
+            if candidate is None or self._session_identity(candidate) != identity:
+                raise LifecycleConflictError(
+                    "communication session lineage must contain only replacements "
+                    "of the current session identity"
+                )
+        return tuple(_participant_id(session_id) for session_id in raw_ids)
 
     def _delegation(self, delegation_id: str) -> dict[str, Any]:
         delegation = self.manager.get_delegation(delegation_id)
@@ -199,12 +234,28 @@ class CommunicationRuntimeService:
             allowed_recipient_session_ids=(_participant_id(str(delegation["child_session_id"])),),
         )
 
-    def _operation_for_current_session(self, operation_id: str) -> OperationRecord:
-        session_id = self._active_session_id()
-        record = self.store.check(
-            operation_id,
-            requester_session_id=_participant_id(session_id),
+    def _operation_for_current_session(
+        self,
+        operation_id: str,
+        *,
+        requester_session_ids: Collection[str] | None = None,
+    ) -> OperationRecord:
+        participant_ids = tuple(
+            requester_session_ids or (_participant_id(self._active_session_id()),)
         )
+        unavailable: CommunicationAuthorizationError | None = None
+        for participant_id in participant_ids:
+            try:
+                record = self.store.check(
+                    operation_id,
+                    requester_session_id=participant_id,
+                )
+                break
+            except CommunicationAuthorizationError as exc:
+                unavailable = exc
+        else:
+            assert unavailable is not None
+            raise unavailable
         delegation = self._delegation(record.scope.delegation_id)
         self._assert_target_current(
             delegation,
@@ -433,10 +484,16 @@ class CommunicationRuntimeService:
     ) -> dict[str, Any]:
         if not isinstance(answer, Mapping):
             raise ValidationError("answer must be a mapping")
-        record = self._operation_for_current_session(operation_id)
+        authorized_participants = self._lineage_participant_ids()
+        record = self._operation_for_current_session(
+            operation_id,
+            requester_session_ids=authorized_participants,
+        )
         session_id = self._active_session_id()
         participant_id = _participant_id(session_id)
-        if participant_id not in record.scope.allowed_recipient_session_ids:
+        if not set(authorized_participants).intersection(
+            record.scope.allowed_recipient_session_ids
+        ):
             raise LifecycleConflictError("only the canonical parent may answer child input")
         delegation = self._delegation(record.scope.delegation_id)
         if delegation.get("state") not in LIVE_WORKER_DELEGATION_STATES:
@@ -446,6 +503,7 @@ class CommunicationRuntimeService:
             responder_session_id=participant_id,
             idempotency_key=_operation_key("reply", record.scope.delegation_id, idempotency_key),
             answer=dict(answer),
+            authorized_recipient_session_ids=authorized_participants,
         )
         current = delegation
         if current.get("state") == "input_needed":
@@ -485,10 +543,8 @@ class CommunicationRuntimeService:
         ).as_dict()
 
     def inbox(self) -> tuple[dict[str, Any], ...]:
-        session_id = self._active_session_id()
-        return tuple(
-            record.as_dict()
-            for record in self.store.list_operations(
-                requester_session_id=_participant_id(session_id)
-            )
-        )
+        records: dict[str, OperationRecord] = {}
+        for participant_id in self._lineage_participant_ids():
+            for record in self.store.list_operations(requester_session_id=participant_id):
+                records[record.operation_id] = record
+        return tuple(records[key].as_dict() for key in sorted(records))
