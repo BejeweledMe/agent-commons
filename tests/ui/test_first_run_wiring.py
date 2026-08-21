@@ -169,6 +169,114 @@ def test_a_panel_on_a_repository_with_no_workspace_carries_the_surface_and_refus
     assert allowed.json()["state"] == setup.SETUP_UNINITIALIZED
 
 
+def _reading_paths(app: Any) -> list[str]:
+    """Every GET path the built application registers, read from the router.
+
+    The coordinator's manual probe of four routes is exactly the kind of list
+    kept in a head that misses the fifth; the router is the only complete
+    account of the reading surface, so the walk reads it.
+    """
+
+    return sorted(
+        route.path for route in app.routes if "GET" in (getattr(route, "methods", set()) or set())
+    )
+
+
+#: Fillers for parameterized paths.  The refusal under test is raised from a
+#: dependency, before any handler looks at a parameter, so any syntactically
+#: plausible value proves the point.
+_PATH_FILLERS = {"{kind}": "task", "{entity_id}": "task.00000000000000000000000001"}
+
+#: The reading routes that must answer before a workspace exists: the SPA and
+#: its icon, `/api/meta` (the tab renders nothing until it returns), and
+#: `GET /api/setup` -- the one entry point that names the state.
+_ANSWERS_IN_EVERY_STATE = {"/", "/favicon.ico", "/api/meta", "/api/setup"}
+
+
+def _walk_reading_surface(client: Any) -> dict[str, Any]:
+    """GET every registered route; refuse-or-answer responses keyed by path."""
+
+    responses = {}
+    for path in _reading_paths(client.app):
+        target = path
+        for placeholder, value in _PATH_FILLERS.items():
+            target = target.replace(placeholder, value)
+        responses[path] = client.get(target, headers=authorized())
+    return responses
+
+
+def test_every_reading_route_on_a_bare_repository_refuses_by_name_or_answers(
+    tmp_path: Path,
+) -> None:
+    """No reading route may 500 on the wave's headline directory.
+
+    The writing half of the panel refused `setup_uninitialized` while the
+    reading half let the manager's ConfigurationError escape -- as a 500 on
+    the graph and runs, and as a 422 named after the exception class on the
+    catalogue -- so the tab on a bare repository could not load against a
+    fully working backend.  Every reading route now either answers (the four
+    routes first run itself depends on) or refuses 409 with the frozen code in
+    the exact shape the writing routes use, and `ConfigurationError` reaches
+    no response in any form.
+    """
+
+    import subprocess
+
+    repo = tmp_path / "bare"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
+    context = UIContext(
+        repo,
+        state_root=tmp_path / "state",
+        writer_session_id="session.00000000000000000000000004",
+    )
+    with _client(context) as client:
+        responses = _walk_reading_surface(client)
+
+    # The walk must actually cover the surface: a shrunken route table would
+    # pass every per-route assertion while checking nothing.
+    assert {"/api/graph", "/api/runs", "/api/catalog", "/api/stream"} <= set(responses)
+    for path, response in responses.items():
+        assert "ConfigurationError" not in response.text, (path, response.text)
+        if path in _ANSWERS_IN_EVERY_STATE:
+            assert response.status_code in {200, 204}, (path, response.text)
+            continue
+        assert response.status_code == 409, (path, response.status_code, response.text)
+        error = response.json()["error"]
+        assert error["code"] == setup.SETUP_UNINITIALIZED, (path, error)
+        assert error["message"], path
+        assert error["safe_next_actions"], path
+    assert responses["/api/setup"].json()["state"] == setup.SETUP_UNINITIALIZED
+
+
+def test_every_reading_route_names_a_directory_that_is_not_a_repository(
+    tmp_path: Path,
+) -> None:
+    """The same walk, one state earlier -- and on a read-only panel.
+
+    The reading refusal is not a privilege of an operator panel: a read-only
+    panel pointed at a directory that is not a repository has exactly as
+    little to read, and its routes name that state rather than leaking the
+    manager's failure.
+    """
+
+    loose = tmp_path / "loose"
+    loose.mkdir()
+    context = UIContext(loose, state_root=tmp_path / "state")
+    with _client(context) as client:
+        responses = _walk_reading_surface(client)
+
+    assert {"/api/graph", "/api/runs", "/api/catalog", "/api/stream"} <= set(responses)
+    for path, response in responses.items():
+        assert "ConfigurationError" not in response.text, (path, response.text)
+        if path in _ANSWERS_IN_EVERY_STATE:
+            assert response.status_code in {200, 204}, (path, response.text)
+            continue
+        assert response.status_code == 409, (path, response.status_code, response.text)
+        assert response.json()["error"]["code"] == setup.SETUP_NOT_A_REPOSITORY, path
+    assert responses["/api/setup"].json()["state"] == setup.SETUP_NOT_A_REPOSITORY
+
+
 def test_a_panel_that_lost_the_singleness_race_refuses_by_its_own_name(
     tmp_path: Path,
 ) -> None:

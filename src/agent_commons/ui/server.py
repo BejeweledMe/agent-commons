@@ -45,7 +45,7 @@ from agent_commons.ui.setup import (
     SETUP_NOT_A_REPOSITORY,
     SETUP_UNINITIALIZED,
     SetupError,
-    setup_state,
+    missing_workspace_state,
 )
 
 _ENTITY_KINDS = frozenset(
@@ -157,6 +157,31 @@ class _NotInitialized(Exception):
         self.actions = list(actions) if actions is not None else list(_NOT_INITIALIZED_ACTIONS)
 
 
+def _missing_workspace_refusal(missing: str | None) -> _NotInitialized:
+    """The one refusal both halves of the surface raise before a workspace.
+
+    Reading routes and writing routes refuse the same two states with the same
+    code, the same sentence, and the same safe next actions, because the tab
+    draws them by the code and a second shape would be a second contract.  A
+    ``None`` still lands on ``setup_uninitialized``: the caller that reaches
+    here with a workspace present is a writing route whose panel could not
+    obtain a session, and "not set up for that yet" remains the honest name
+    the first-run screen can act on.
+    """
+
+    if missing == SETUP_NOT_A_REPOSITORY:
+        return _NotInitialized(
+            SETUP_NOT_A_REPOSITORY,
+            "this directory is not a git repository, so there is nothing for a "
+            "workspace to attach to and nothing to read or record here",
+        )
+    return _NotInitialized(
+        SETUP_UNINITIALIZED,
+        "this directory has no workspace yet, so this panel has nothing to read "
+        "and records no canonical event until first run creates one",
+    )
+
+
 class _RouteGroup:
     """Where one group of routes attaches, and what must hold before any runs.
 
@@ -191,11 +216,11 @@ def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
         # Two questions, and the state is asked first: there is nothing to
         # record into before the workspace exists, so a panel that believes it
         # holds a session there is wrong rather than lucky.
-        state = await asyncio.to_thread(setup_state, context.repo)
+        missing = await asyncio.to_thread(missing_workspace_state, context.repo)
         # One look at the session and its refusal: two reads could pair "no
         # session" with a reason a concurrent request had already cleared.
         session_id, refusal = await asyncio.to_thread(context.session_or_refusal)
-        if state != SETUP_UNINITIALIZED and session_id is not None:
+        if missing is None and session_id is not None:
             return
         if isinstance(refusal, PanelAlreadyOpenError):
             # A panel whose deferred lock lost the singleness race: the
@@ -208,17 +233,7 @@ def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
                 str(refusal),
                 actions=list(PANEL_ALREADY_OPEN_ACTIONS),
             )
-        if state == SETUP_NOT_A_REPOSITORY:
-            raise _NotInitialized(
-                SETUP_NOT_A_REPOSITORY,
-                "this directory is not a git repository, so there is nothing for a "
-                "workspace to attach to and nothing to record against",
-            )
-        raise _NotInitialized(
-            SETUP_UNINITIALIZED,
-            "this directory has no workspace yet, so this panel holds no operator "
-            "session and records no canonical event",
-        )
+        raise _missing_workspace_refusal(missing)
 
     return _RouteGroup(app, requires=[Depends(_require_workspace)])
 
@@ -279,6 +294,25 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         presented = bearer_token(request.headers.get("authorization"))
         return presented is not None and token_matches(presented, token)
 
+    async def _require_workspace_to_read() -> None:
+        # The reading half of the precondition the writing routes already
+        # carry, minus the session question a read never asks.  Before this
+        # guard, a reading route on a directory with no workspace built the
+        # manager and let its ConfigurationError escape as a 500 -- or, on the
+        # catalogue route, as a 422 named after the exception class -- while
+        # the writing half refused with a frozen code.  The tab that opened on
+        # a bare repository therefore could not load at all.  Every reading
+        # route that touches the ledger now refuses with the same code, the
+        # same sentence, and the same safe next actions as the writes; the
+        # routes that must answer in every state -- the SPA itself, `/api/meta`
+        # (the tab's boot request), and `GET /api/setup` (the one entry point
+        # that names the state) -- deliberately do not carry it.
+        missing = await asyncio.to_thread(missing_workspace_state, context.repo)
+        if missing is not None:
+            raise _missing_workspace_refusal(missing)
+
+    reads_workspace = [Depends(_require_workspace_to_read)]
+
     async def _not_initialized(_: Request, exc: Exception) -> Response:
         # The frozen refusal table travels as a code, exactly as the first-run
         # screen's other refusals do; the class name would say nothing.
@@ -303,12 +337,12 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     async def meta() -> Response:
         return JSONResponse(await asyncio.to_thread(context.meta))
 
-    @app.get("/api/graph")
+    @app.get("/api/graph", dependencies=reads_workspace)
     async def graph() -> Response:
         await asyncio.to_thread(context.refresh_if_changed)
         return JSONResponse(await asyncio.to_thread(context.graph))
 
-    @app.get("/api/entities/{kind}/{entity_id}")
+    @app.get("/api/entities/{kind}/{entity_id}", dependencies=reads_workspace)
     async def entity(kind: str, entity_id: str) -> Response:
         if kind not in _ENTITY_KINDS:
             return _error(400, "unknown_kind", "unsupported entity kind")
@@ -326,7 +360,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             }
         )
 
-    @app.get("/api/search")
+    @app.get("/api/search", dependencies=reads_workspace)
     async def search(request: Request) -> Response:
         query = request.query_params.get("q", "")
         kind = request.query_params.get("kind") or None
@@ -340,26 +374,26 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             await asyncio.to_thread(context.search, query=query, limit=limit, subject_kind=kind)
         )
 
-    @app.get("/api/operations")
+    @app.get("/api/operations", dependencies=reads_workspace)
     async def operations() -> Response:
         return JSONResponse(await asyncio.to_thread(context.pending_operations))
 
-    @app.get("/api/chat")
+    @app.get("/api/chat", dependencies=reads_workspace)
     async def chat() -> Response:
         return JSONResponse(await asyncio.to_thread(context.engagements))
 
-    @app.get("/api/proposals")
+    @app.get("/api/proposals", dependencies=reads_workspace)
     async def proposals() -> Response:
         return JSONResponse(await asyncio.to_thread(context.agent_proposals))
 
-    @app.get("/api/attention")
+    @app.get("/api/attention", dependencies=reads_workspace)
     async def attention() -> Response:
         # One canonical queue: the same source as the amber ring and the footer
         # count, so the list can never be empty while the graph says N are
         # waiting on you.
         return JSONResponse(await asyncio.to_thread(context.attention))
 
-    @app.get("/api/catalog")
+    @app.get("/api/catalog", dependencies=reads_workspace)
     async def catalog() -> Response:
         try:
             return JSONResponse(await asyncio.to_thread(context.catalog))
@@ -368,13 +402,13 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             # fault: name it rather than returning an opaque 500 (round 2).
             return _error(422, type(exc).__name__, str(exc))
 
-    @app.get("/api/launch")
+    @app.get("/api/launch", dependencies=reads_workspace)
     async def launch_options() -> Response:
         # The roles and tasks the panel needs to offer a run, plus whether
         # launching is enabled at all. Readable in any mode; acting on it is not.
         return JSONResponse(await asyncio.to_thread(context.launch_options))
 
-    @app.get("/api/runs")
+    @app.get("/api/runs", dependencies=reads_workspace)
     async def runs() -> Response:
         # Live and recent run phases, metadata only. Readable in any mode.
         return JSONResponse(await asyncio.to_thread(context.runs))
@@ -386,7 +420,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         # configured -- see `UIContext.setup_status`.
         return JSONResponse(await asyncio.to_thread(context.setup_status))
 
-    @app.get("/api/setup/preflight")
+    @app.get("/api/setup/preflight", dependencies=reads_workspace)
     async def setup_preflight() -> Response:
         try:
             return JSONResponse(await asyncio.to_thread(context.setup_preflight))
@@ -413,7 +447,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         # exists -- it is what makes it exist -- so it is bound to nothing.
         _register_setup(_RouteGroup(app), context)
 
-    @app.get("/api/stream")
+    @app.get("/api/stream", dependencies=reads_workspace)
     async def stream(request: Request) -> Response:
         last_event_id = request.headers.get("last-event-id")
         return StreamingResponse(

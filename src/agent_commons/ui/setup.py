@@ -109,6 +109,27 @@ def default_runtime_config_path() -> Path:
     return default_config_directory() / "runtime.yaml"
 
 
+def missing_workspace_state(repo: str | Path) -> str | None:
+    """The first-run state that precedes any workspace here, or None past it.
+
+    The two states in which the panel has no ledger to read and nothing to
+    record into: a directory that is not a git repository, and a repository
+    whose workspace was never initialized.  Split from :func:`setup_state`
+    because this is the per-request precondition every API route -- reading
+    or writing -- refuses by, and it must stay a pair of stats; the config
+    and loader questions ``setup_state`` goes on to ask cost a YAML parse and
+    change nothing about whether a workspace exists.
+    """
+
+    root = Path(repo).expanduser()
+    if not (root / ".git").exists():
+        return SETUP_NOT_A_REPOSITORY
+    workspace_config = root / ".agent-commons" / "workspace.yaml"
+    if workspace_config.is_symlink() or not workspace_config.is_file():
+        return SETUP_UNINITIALIZED
+    return None
+
+
 def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -> str:
     """Name the first-run state of ``repo`` with one frozen code.
 
@@ -125,11 +146,9 @@ def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -
     """
 
     root = Path(repo).expanduser()
-    if not (root / ".git").exists():
-        return SETUP_NOT_A_REPOSITORY
-    workspace_config = root / ".agent-commons" / "workspace.yaml"
-    if workspace_config.is_symlink() or not workspace_config.is_file():
-        return SETUP_UNINITIALIZED
+    missing = missing_workspace_state(root)
+    if missing is not None:
+        return missing
     config = Path(profile_config).expanduser() if profile_config else default_runtime_config_path()
     if config.is_symlink() or not config.is_file():
         return SETUP_UNCONFIGURED
