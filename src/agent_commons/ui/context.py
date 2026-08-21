@@ -487,7 +487,8 @@ class UIContext:
 
         from agent_commons.ui import setup
 
-        state = setup.setup_state(self.repo, profile_config=self._profile_config)
+        report = setup.setup_state_report(self.repo, profile_config=self._profile_config)
+        state = report["state"]
         status: dict[str, Any] = {
             "state": state,
             # Whether this panel can act on the state at all.  On `--read-only`
@@ -501,6 +502,16 @@ class UIContext:
         }
         if state == setup.SETUP_CONFIGURED:
             return status
+        if state == setup.CONFIG_REJECTED_BY_LOADER:
+            # The loader's own refusal text and the file it refused, exactly
+            # as `POST /api/setup/runtime-config` reports the same failure --
+            # a bare state code here left the operator with "your file does
+            # not work" and the terminal as the only place to learn why.  The
+            # file itself is the operator's own and stays untouched where it
+            # stands; only a just-generated config the read-back refuses is
+            # ever renamed aside, and that happens in the generator.
+            status["rejected_reason"] = report["rejected_reason"]
+            status["rejected_path"] = report["rejected_path"]
         discovery = setup.discover_providers(self.repo)
         missing = self._unresolved_support_binaries(discovery)
         status["providers"] = discovery.describe()

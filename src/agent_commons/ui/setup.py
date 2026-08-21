@@ -145,18 +145,44 @@ def setup_state(repo: str | Path, *, profile_config: str | Path | None = None) -
     as a configured environment that cannot launch anything.
     """
 
+    return str(setup_state_report(repo, profile_config=profile_config)["state"])
+
+
+def setup_state_report(
+    repo: str | Path, *, profile_config: str | Path | None = None
+) -> dict[str, Any]:
+    """:func:`setup_state`, keeping the loader's refusal instead of eating it.
+
+    ``setup_config_rejected_by_loader`` alone tells the operator "your file
+    does not work" and not one word about why -- and the only way to learn
+    more was the terminal, the exact regress this panel exists to remove.  So
+    the rejected state carries ``rejected_reason``, the loader's own refusal
+    text exactly as ``POST /api/setup/runtime-config`` already reports it, and
+    ``rejected_path``, the file it refused.
+
+    ``rejected_path`` names the operator's file *where it stands*: unlike a
+    just-generated config, which the generator proves and renames to
+    ``runtime.yaml.rejected`` when its own loader read-back refuses it, a
+    pre-existing config is the operator's own -- this product did not write it
+    and has no business moving it.  Naming a state never touches the disk.
+    """
+
     root = Path(repo).expanduser()
     missing = missing_workspace_state(root)
     if missing is not None:
-        return missing
+        return {"state": missing}
     config = Path(profile_config).expanduser() if profile_config else default_runtime_config_path()
     if config.is_symlink() or not config.is_file():
-        return SETUP_UNCONFIGURED
+        return {"state": SETUP_UNCONFIGURED}
     try:
         load_runtime_configuration(config, workspace_root=root)
-    except CommonsError:
-        return CONFIG_REJECTED_BY_LOADER
-    return SETUP_CONFIGURED
+    except CommonsError as exc:
+        return {
+            "state": CONFIG_REJECTED_BY_LOADER,
+            "rejected_reason": str(exc),
+            "rejected_path": str(config),
+        }
+    return {"state": SETUP_CONFIGURED}
 
 
 @dataclass(frozen=True, slots=True)

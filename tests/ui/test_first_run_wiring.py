@@ -452,6 +452,47 @@ def test_an_unconfigured_panel_names_the_state_the_binaries_and_the_target(
     assert body["config_path"] == str(tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml")
 
 
+def test_a_rejected_config_names_the_loaders_reason_and_leaves_the_file_alone(
+    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
+) -> None:
+    """`setup_config_rejected_by_loader` must say why, and must not touch disk.
+
+    The state branch used to eat the loader's CommonsError and answer with the
+    bare code: the operator read "your file does not work" with no word about
+    what is wrong, and the terminal was the only place to learn more -- the
+    exact regress this wave closes.  The answer now carries the loader's own
+    refusal text, in the same form `POST /api/setup/runtime-config` already
+    reports it, and the path of the refused file.
+
+    And because this file is the operator's own -- the product did not write
+    it -- naming the state leaves it byte-for-byte where it stands.  Only a
+    just-generated config the read-back refuses is renamed to `.rejected`,
+    and that happens in the generator, never here.
+    """
+
+    from agent_commons.errors import CommonsError
+    from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+    context = _writing(workspace, window="first-run-rejected-win1")
+    with _client(context) as client:
+        written = client.post("/api/setup/runtime-config", headers=authorized())
+        assert written.status_code == 200, written.text
+        target = setup.default_runtime_config_path()
+        target.write_text(
+            target.read_text(encoding="utf-8") + "bogus_field: true\n", encoding="utf-8"
+        )
+        before = target.read_bytes()
+        body = client.get("/api/setup", headers=authorized()).json()
+
+    assert body["state"] == setup.CONFIG_REJECTED_BY_LOADER
+    with pytest.raises(CommonsError) as refusal:
+        load_runtime_configuration(target, workspace_root=workspace["repo"])
+    assert body["rejected_reason"] == str(refusal.value)
+    assert body["rejected_path"] == str(target)
+    assert target.read_bytes() == before
+    assert not target.with_name(target.name + ".rejected").exists()
+
+
 def test_a_directory_that_is_not_a_repository_is_named_not_refused(
     tmp_path: Path,
 ) -> None:
