@@ -61,7 +61,7 @@ retirement. `agent retire --cascade` takes a role and everything it created out
 of service in one command, and refuses as a whole if any of them still owes a
 live delegation or an unfinished review. Nothing is ever deleted.
 
-`agent-commons ui --enable-writes` opens the same operations in a panel built
+`agent-commons ui` opens the same operations in a panel built
 around one home per kind of thing: a library sidebar (the board, runs, a
 two-minute Overview, Skills and Tools over the operator catalogue, the agent
 catalogue of role templates), the board in the centre, and the conversation —

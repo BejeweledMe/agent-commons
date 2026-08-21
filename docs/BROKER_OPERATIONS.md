@@ -159,12 +159,14 @@ Note the current limitation plainly: no producer writes to this store yet. The
 broker does not emit run events, so these commands operate on an empty
 projection until the streaming runner exists.
 
-## Local read-only UI
+## Local UI
 
-`agent-commons ui` serves a read-only view of the workspace. It binds
-`127.0.0.1` only — there is deliberately no `--host` flag — requires a bearer
-token printed at startup, pins the `Host` header to loopback, and registers only
-`GET` routes. It records no canonical event.
+`agent-commons ui` binds `127.0.0.1` only — there is deliberately no `--host`
+flag — requires a bearer token printed at startup, and pins the `Host` header
+to loopback. By default it opens its own operator session and records
+canonical events under it, the same way the CLI and MCP adapters do; pass
+`--read-only` for a view that opens no session, records nothing, and registers
+only `GET` routes.
 
 Opening a browser automatically puts the token in the URL, which is visible to
 other processes of the same user through the process list. Use `--no-browser`

@@ -337,7 +337,8 @@ runs as. Its reply is how feedback returns; it is not a way into every
 conversation in the workspace.
 
 Role settings, messages to a role, and retirement may be recorded from the local
-UI when it is started with `--enable-writes`. That surface is an adapter over
+UI whenever it is not `--read-only` — `agent-commons ui` opens a writing panel
+by default, no capability flag required. That surface is an adapter over
 `CommonsManager` exactly as the CLI and MCP adapters are; it does not create a
 second write path, and the capability-granting half of the catalogue is not
 editable from it.

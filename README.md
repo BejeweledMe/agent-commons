@@ -13,6 +13,27 @@ issue tracker, generic shell, remote agent host, permission broker, or autonomou
 swarm. The immutable file ledger is authoritative; SQLite, Markdown views,
 runtime journals, and telemetry are rebuildable or operational projections.
 
+## Fastest path: the panel
+
+```bash
+git clone https://github.com/BejeweledMe/agent-commons.git && cd agent-commons
+make sync
+uv run agent-commons ui
+```
+
+(`uv run` finds the checkout's own CLI without a manual `PATH` export; once
+`.venv/bin` is on `PATH` — see the manual cycle below — plain `agent-commons
+ui` is the same command.) Nothing past `make sync` is a terminal step.
+`agent-commons ui` opens with no
+capability flags and no prior `init` or `session start`: on an empty directory
+it offers to create the project, find or configure a runtime (or a
+provider-free demo), hire a role with a chosen model, and put it to work — the
+panel owns its own operator session and records through the same
+`CommonsManager` the CLI uses. See
+[Build the product](https://github.com/BejeweledMe/agent-commons/blob/main/docs/tutorials/BUILD_THE_PRODUCT.md)
+for the walkthrough, or `--read-only` for a view that opens no session and
+records nothing.
+
 ## First value: one manual author/reviewer cycle
 
 The supported first path needs no MCP server, provider API key, or paid model
@@ -204,8 +225,26 @@ metadata and rejects excess work with backpressure.
 ### See the whole loop without a provider (demo mode)
 
 To watch a role take a task from Hire to a finished result in a scratch
-workspace — without a subscription and without launching any billable process —
-add `demo: true` to the top level of the same operator config:
+workspace — without a subscription, without launching any billable process, and
+without installing `claude` or `codex` at all — run the panel and choose demo
+from its own first-run screen:
+
+```bash
+agent-commons ui
+```
+
+`agent-commons ui` opens with no capability flags: what it can do follows from
+what is configured, not from what was passed on the command line. On a
+directory with no operator runtime config yet, the panel's first-run screen
+offers hiring a real provider it found on `PATH`, or — when it found none, or
+just because you asked — a demo config it writes for you at the frozen path
+(`POST /api/setup/demo-config`). That demo config never names an executable and
+is accepted with zero providers installed, which is the one thing a
+provider-backed config cannot be.
+
+To reach the same state from a script, or to point the panel at an
+already-written file, add `demo: true` to the top level of an operator config
+by hand and pass it with `--profile-config`, which remains a path override:
 
 ```yaml
 demo: true
@@ -218,11 +257,8 @@ profiles:
     trusted_workspace: true
 ```
 
-Then launch the panel with the same gate the real broker uses:
-
 ```bash
-agent-commons ui --state-root /absolute/path/to/state \
-  --enable-launch --profile-config /absolute/path/to/demo-runtime.yaml
+agent-commons ui --profile-config /absolute/path/to/demo-runtime.yaml
 ```
 
 Demo mode stands in for the provider CLI at the exact runner seam — it is still
@@ -230,6 +266,15 @@ the one launch path, not a second one. A demo implementation run records an
 honest `delegation.succeeded` whose summary says plainly that no provider ran;
 it never fabricates a review or a verification, so those purposes fall to
 `needs_operator` instead. Remove `demo: true` to run the real provider.
+
+The panel launches a run the moment you ask it to, with no separate
+confirmation step for spending your provider subscription. That is a
+deliberate product decision, not an oversight: coming to Codex or Claude Code
+directly, nobody confirms per-window that the session may cost money, and the
+panel holds itself to the same standard rather than asking once per run. Read
+this paragraph as that confirmation — launching a role from the panel runs a
+real, billable provider process against your own subscription, exactly as
+running that provider yourself would.
 
 Preflight checks static flags, source/catalog compatibility, and starts no model
 work. A missing MCP helper is reported as
