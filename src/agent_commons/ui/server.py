@@ -936,5 +936,17 @@ def serve(
         emit(bound_port, token)
     if open_browser:
         webbrowser.open(f"http://127.0.0.1:{bound_port}/#t={token}")
-    config = uvicorn.Config(app, log_level="warning", access_log=False)
+    config = uvicorn.Config(
+        app,
+        log_level="warning",
+        access_log=False,
+        # An SSE connection never finishes on its own, so a graceful shutdown
+        # that waits for open responses waits for the browser tab instead of
+        # the person at the keyboard: Ctrl-C left this call blocked, the
+        # session and the panel lock alive, and the next panel refused.  One
+        # second lets an in-flight ordinary request land; then the streams are
+        # cancelled and this returns, which is what lets the caller's finally
+        # block actually close the session.
+        timeout_graceful_shutdown=1,
+    )
     uvicorn.Server(config).run(sockets=[listener])

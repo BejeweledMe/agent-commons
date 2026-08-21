@@ -7,8 +7,11 @@ context entirely and those tests stay green.  These enter through the command.
 
 from __future__ import annotations
 
+import http.client
 import json
+import signal
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -83,8 +86,75 @@ def test_the_ui_command_opens_and_owns_its_own_session_by_default(
     assert payload["read_only"] is False
     assert str(payload["writer_session_id"]).startswith("session.")
     assert captured["context"].writes_enabled is True
-    # Ctrl-C (serve returning) closed the panel's session behind itself.
+    # `serve` returning closed the panel's session behind itself.  This spy
+    # returns immediately, so it proves the cleanup wiring and nothing about
+    # signals; whether Ctrl-C actually makes the real server return is the
+    # subject of `test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected`.
     shown = CommonsManager(repo, read_only=True).show_session(payload["writer_session_id"])
+    assert shown["status"] == "closed"
+
+
+def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) -> None:
+    """A held-open `GET /api/stream` must not make Ctrl-C wait forever.
+
+    The SSE generator never finishes on its own, so a graceful shutdown that
+    waits for open responses waits for the browser tab instead of the person
+    at the keyboard: `serve()` did not return, `owner.shutdown()` never ran,
+    and the session and the panel lock survived to refuse the next panel.  The
+    test that used to carry the Ctrl-C claim replaced the server with a
+    function that returned immediately -- no signal, no socket, no server --
+    which is how the defect stayed green.  This one runs the real command,
+    holds a real stream open, and sends the real signal.
+    """
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-u",
+            "-m",
+            "agent_commons",
+            "--repo",
+            str(repo),
+            "--json",
+            "ui",
+            "--port",
+            "0",
+            "--no-browser",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    conn = None
+    try:
+        assert proc.stdout is not None
+        started = json.loads(proc.stdout.readline())
+        conn = http.client.HTTPConnection("127.0.0.1", int(started["port"]), timeout=30)
+        conn.request(
+            "GET",
+            "/api/stream",
+            headers={
+                "Authorization": f"Bearer {started['token']}",
+                "Accept": "text/event-stream",
+            },
+        )
+        response = conn.getresponse()
+        assert response.status == 200
+        # One real frame off the wire, so the stream is live -- not merely
+        # accepted -- when the signal lands.
+        assert response.read(5)
+
+        proc.send_signal(signal.SIGINT)
+        proc.wait(timeout=15)
+    finally:
+        if conn is not None:
+            conn.close()
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=15)
+            pytest.fail("Ctrl-C did not stop the panel while the stream was open")
+
+    shown = CommonsManager(repo, read_only=True).show_session(started["writer_session_id"])
     assert shown["status"] == "closed"
 
 
