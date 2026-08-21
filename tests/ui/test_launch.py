@@ -154,7 +154,6 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
-        launch_enabled=True,
         runtime_factory=runtime_factory,
     )
     return {
@@ -166,10 +165,8 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_launching_only_appears_behind_its_own_gate(
-    workspace: dict[str, Any],
-) -> None:
-    """A writable panel without the launch gate exposes no launch route."""
+def _unconfigured(workspace: dict[str, Any]) -> UIContext:
+    """A writing panel with no runtime environment behind it."""
 
     manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
     session = manager.start_session(
@@ -179,15 +176,51 @@ def test_launching_only_appears_behind_its_own_gate(
         software="claude-code",
         role="operator",
     )
-    writable_only = UIContext(
+    return UIContext(
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
     )
-    with _client(writable_only) as client:
+
+
+def test_the_launch_route_is_declared_apart_from_the_write_surface(
+    workspace: dict[str, Any],
+) -> None:
+    """Launching is its own declared privilege even though every writing panel
+    registers it: the tuple, not the route table, is what says so."""
+
+    context = _unconfigured(workspace)
+    assert context.launch_enabled is False
+    with _client(context) as client:
         found = mutating_surface(client.app)
-    assert found == expected_surface(writable_only)  # no launch route
-    assert ("POST", "/api/delegations") not in found
+    assert found == expected_surface(context)
+    # Present, because the runtime config can be written into a panel that is
+    # already serving and the route table is built once.
+    assert set(LAUNCH_ROUTES) <= found
+
+
+def test_the_launch_handler_refuses_without_a_configured_runtime(
+    workspace: dict[str, Any],
+) -> None:
+    """The compensation for registering the route unconditionally.
+
+    The guarantee moved from "there is no route" to "the route refuses", so the
+    refusal has to be typed rather than a generic conflict: the panel reads
+    `launch_not_configured` to offer setup instead of a retry.
+    """
+
+    context = _unconfigured(workspace)
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={"agent_id": "agent.whatever", "task_id": "task.whatever"},
+            headers=authorized(),
+        )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "launch_not_configured"
+    # Nothing was recorded on the way to the refusal: it fires before the body
+    # is even read, so an unconfigured panel cannot half-start a run.
+    assert context.runs() == []
 
 
 def test_the_panel_launches_a_role_on_a_task_end_to_end(
@@ -476,7 +509,6 @@ def _demo_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
-        launch_enabled=True,
         profile_config=config,
     )
     return {

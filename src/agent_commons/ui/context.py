@@ -34,6 +34,14 @@ from agent_commons.views import bounded_copy, truncate_utf8
 
 _LOG = logging.getLogger("agent_commons.ui")
 
+#: The one wording for "this panel cannot launch yet", shared by the direct-call
+#: refusal here and the typed ``launch_not_configured`` HTTP refusal in
+#: `ui.server`, so the two can never drift into two explanations of one state.
+LAUNCH_NOT_CONFIGURED = (
+    "no runtime environment is configured for this panel: launching a provider "
+    "needs an operator session and an operator profile config"
+)
+
 
 def _iso_now() -> str:
     return datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
@@ -125,25 +133,20 @@ class UIContext:
         session_provider: Callable[[], str] | None = None,
         session_owner: Any | None = None,
         catalog_path: Path | None = None,
-        catalog_editing: bool = False,
         profile_config: Path | None = None,
-        launch_enabled: bool = False,
         runtime_factory: Any | None = None,
     ) -> None:
         self.repo = repo
         self._state_root = state_root
         self._state_base = state_base
         self._state_source = state_source
+        # The operator catalogue is read in any mode -- a read-only panel still
+        # shows what the roles were built from -- and edited only by a panel
+        # that has a session, which is what `catalog_editing_enabled` answers.
         self._catalog_path = catalog_path
-        # A separate gate from --enable-writes on purpose.  Editing presets and
-        # editing the set of things a child process may run are different
-        # magnitudes of privilege, and one checkbox for both would hide that.
-        self._catalog_editing = bool(catalog_editing)
-        # Launching a provider is a third, larger privilege still: it spawns a
-        # billable subscription process.  It has its own gate and needs the
-        # operator profile config, exactly like the CLI broker.
+        # Launching a provider spawns a billable subscription process, and it
+        # needs the operator profile config, exactly like the CLI broker.
         self._profile_config = profile_config
-        self._launch_enabled = bool(launch_enabled)
         # Tests inject a runtime service built over a fake runner here; in
         # production it is None and the service is built from the profile config.
         self._runtime_factory = runtime_factory
@@ -244,17 +247,28 @@ class UIContext:
 
     @property
     def catalog_editing_enabled(self) -> bool:
-        return self._catalog_editing and self._catalog_path is not None
+        """Whether this panel may write the operator catalogue back to disk.
+
+        Two conditions, and both are states rather than switches: there has to
+        be a catalogue file to edit, and the panel has to be one that acts at
+        all.  A panel without a session shows the catalogue and changes nothing
+        -- that is what read-only means -- so the catalogue path alone must not
+        open a POST route.
+        """
+
+        return self._catalog_path is not None and self.writes_enabled
 
     @property
     def launch_enabled(self) -> bool:
-        # Launch needs writes (a real operator session records the delegation),
-        # its own gate, and either a profile config to build the runtime from or
-        # an injected runtime factory (tests).
-        return (
-            self._launch_enabled
-            and self.writes_enabled
-            and (self._profile_config is not None or self._runtime_factory is not None)
+        # Launch needs writes (a real operator session records the delegation)
+        # and either a profile config to build the runtime from or an injected
+        # runtime factory (tests).  Unlike the surfaces above this one does not
+        # decide whether a route exists: the operator config can appear while
+        # the panel is already serving, so the route is always there for a
+        # writing panel and refuses by `launch_not_configured` until this is
+        # true.
+        return self.writes_enabled and (
+            self._profile_config is not None or self._runtime_factory is not None
         )
 
     def manager(self) -> CommonsManager:
@@ -276,7 +290,7 @@ class UIContext:
         session_id = self.writer_session_id
         if session_id is None:
             raise ConfigurationError(
-                "this UI was started read-only; restart without --read-only to record events"
+                "this panel holds no operator session, so it records no canonical event"
             )
         return self._writer_bound(session_id)
 
@@ -413,11 +427,10 @@ class UIContext:
         panel asks; the rest stays where it is configured.
 
         Read through the same guarded loader the launch path uses, so a config
-        this surface would accept is exactly one a launch would accept.  The
-        `--enable-launch` gate is deliberately not consulted: permission to
-        spawn a billable process and permission to say which model a profile
-        names are different privileges, and the config is operator-owned either
-        way.
+        this surface would accept is exactly one a launch would accept.
+        `launch_enabled` is deliberately not consulted: permission to spawn a
+        billable process and permission to say which model a profile names are
+        different privileges, and the config is operator-owned either way.
 
         Never raises.  A missing, unreadable, or malformed config makes this
         empty, and the panel then says the model is fixed in the profile rather
@@ -513,16 +526,20 @@ class UIContext:
     # -- catalogue editing ----------------------------------------------------
 
     def _require_catalog_editing(self) -> Path:
-        if not self.catalog_editing_enabled:
+        # Named states, not missing switches: each branch says which half of
+        # `catalog_editing_enabled` is false, so the refusal is actionable.  The
+        # path check comes first and is not an assert -- `python -O` strips
+        # assertions, and a stripped guard would let None reach
+        # write_role_catalog and raise an opaque TypeError instead of a refusal
+        # (O2, 2026-08-10 review).
+        if self._catalog_path is None:
             raise ConfigurationError(
-                "catalogue editing is off; restart with --role-catalog and --enable-catalog-editing"
+                "this panel has no operator catalogue configured, so there is nothing to edit"
             )
-        # Not an assert: catalog_editing_enabled already guarantees a path, but
-        # `python -O` strips assertions, and a stripped guard here would let
-        # None reach write_role_catalog and raise an opaque TypeError instead of
-        # this refusal (O2, 2026-08-10 review).
-        if self._catalog_path is None:  # pragma: no cover - defended, not reachable
-            raise ConfigurationError("catalogue editing is on but no catalogue path is configured")
+        if not self.writes_enabled:
+            raise ConfigurationError(
+                "this panel holds no operator session; it shows the catalogue and changes nothing"
+            )
         return self._catalog_path
 
     def _catalog_users(self, section: str, entry_id: str) -> list[str]:
@@ -1035,9 +1052,7 @@ class UIContext:
         """
 
         if not self.launch_enabled:
-            raise ConfigurationError(
-                "launching is off; restart with --profile-config and --enable-launch"
-            )
+            raise ConfigurationError(LAUNCH_NOT_CONFIGURED)
         limits = dict(self._DEFAULT_RUN_LIMITS)
         if wall_time_seconds:
             limits["wall_time_seconds"] = int(wall_time_seconds)

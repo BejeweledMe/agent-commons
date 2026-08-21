@@ -1,8 +1,8 @@
 """`agent-commons ui` is the seam a user crosses to reach the role panel.
 
 Every other test of the writable UI builds `UIContext` directly, which is one
-layer beside the real path: the command can lose its flag entirely and those
-tests stay green.  These enter through the command.
+layer beside the real path: the command can stop wiring a path through to the
+context entirely and those tests stay green.  These enter through the command.
 """
 
 from __future__ import annotations
@@ -120,30 +120,40 @@ def test_an_externally_selected_session_is_not_adopted(
     assert shown["status"] == "active"
 
 
-def test_catalogue_editing_requires_naming_the_file_it_edits(
+def test_the_command_carries_no_capability_flags(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Refuse at the command, not by silently editing nothing."""
+    """What the panel may do follows from what is configured, not from a switch.
+
+    The flags that used to gate writes, catalogue editing and launching are
+    gone; the two paths that remain only say where a file is read from.
+    """
 
     captured: dict[str, Any] = {}
     monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
-    result = CliRunner().invoke(
-        cli, ["--repo", str(repo), "--json", "ui", "--no-browser", "--enable-catalog-editing"]
-    )
-
-    assert result.exit_code != 0
-    assert "--role-catalog" in result.output
+    help_text = CliRunner().invoke(cli, ["--repo", str(repo), "ui", "--help"]).output
+    for gone in ("--enable-writes", "--enable-catalog-editing", "--enable-launch"):
+        assert gone not in help_text
+    for kept in ("--read-only", "--role-catalog", "--profile-config"):
+        assert kept in help_text
     assert "context" not in captured
 
 
-def test_catalogue_editing_is_a_separate_switch_from_role_writes(
+def test_a_catalogue_path_is_what_makes_the_panel_able_to_edit_one(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Editing presets and changing what a run is told to do are not one flag."""
+    """Editing presets and changing what a run is told to do are still separate:
+    a panel that records roles edits no catalogue until one is configured."""
 
     catalogue = tmp_path / "catalog.yaml"
     captured: dict[str, Any] = {}
     monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+    assert result.exit_code == 0, result.output
+    assert captured["context"].writes_enabled is True
+    assert captured["context"].catalog_editing_enabled is False
+    assert json.loads(result.output)["catalog_editing"] is False
+
     result = CliRunner().invoke(
         cli,
         [
@@ -158,8 +168,75 @@ def test_catalogue_editing_is_a_separate_switch_from_role_writes(
     )
 
     assert result.exit_code == 0, result.output
-    assert captured["context"].writes_enabled is True
+    assert captured["context"].catalog_editing_enabled is True
+    assert json.loads(result.output)["catalog_editing"] is True
+
+
+def test_a_read_only_panel_edits_no_catalogue_even_when_given_one(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--role-catalog says where the catalogue is read from, not that it may be
+    written: a read-only panel shows it and registers no route to change it."""
+
+    catalogue = tmp_path / "catalog.yaml"
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "ui",
+            "--no-browser",
+            "--read-only",
+            "--role-catalog",
+            str(catalogue),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
     assert captured["context"].catalog_editing_enabled is False
+    assert json.loads(result.output)["catalog_editing"] is False
+
+
+def test_launching_needs_no_flag_only_a_runtime_profile_config(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A writing panel is launch-capable exactly when a profile config is in
+    effect; without one it serves and refuses runs rather than failing to start."""
+
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "--json", "ui", "--no-browser"])
+    assert result.exit_code == 0, result.output
+    assert captured["context"].launch_enabled is False
+
+    config = tmp_path / "runtime.yaml"
+    config.write_text(
+        "profiles:\n"
+        "  claude-builder:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: acceptEdits\n"
+        "    trusted_workspace: true\n",
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "ui",
+            "--no-browser",
+            "--profile-config",
+            str(config),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["context"].launch_enabled is True
 
 
 def test_a_role_catalogue_path_reaches_the_context(

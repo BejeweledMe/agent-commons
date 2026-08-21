@@ -336,25 +336,13 @@ def init_command(
 @click.option(
     "--role-catalog",
     type=click.Path(dir_okay=False, path_type=Path),
-    help="Operator-owned catalogue of selectable skills and tools.",
-)
-@click.option(
-    "--enable-catalog-editing",
-    is_flag=True,
-    help="Also allow editing that catalogue from the panel. Separate from "
-    "--enable-writes: this changes what child processes may run.",
+    help="Override the operator-owned catalogue of selectable skills and tools.",
 )
 @click.option(
     "--profile-config",
     "profile_config",
     type=click.Path(dir_okay=False, path_type=Path),
-    help="Operator-owned runtime profile config; required to launch runs from the panel.",
-)
-@click.option(
-    "--enable-launch",
-    is_flag=True,
-    help="Allow the panel to launch a delegation (spawn a provider run). Separate "
-    "from --enable-writes: this starts a billable subscription process.",
+    help="Override the operator-owned runtime profile config runs are launched from.",
 )
 @click.pass_obj
 def ui_command(
@@ -363,9 +351,7 @@ def ui_command(
     no_browser: bool,
     ui_read_only: bool,
     role_catalog: Path | None,
-    enable_catalog_editing: bool,
     profile_config: Path | None,
-    enable_launch: bool,
 ) -> None:
     """Serve the role panel on loopback; the panel owns its own session.
 
@@ -374,6 +360,11 @@ def ui_command(
     ``CommonsManager`` the CLI and MCP adapter use.  There is no second write
     path.  With --read-only it opens no session and records nothing.  It binds
     127.0.0.1 only; there is deliberately no --host flag.
+
+    There are no capability flags: what the panel can do follows from what is
+    configured -- a session it owns, an operator catalogue, a runtime profile
+    config -- and the panel says which of those are missing.  --role-catalog and
+    --profile-config only override where those two files are read from.
     """
 
     try:
@@ -383,10 +374,6 @@ def ui_command(
     except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
         raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
 
-    if enable_catalog_editing and role_catalog is None:
-        raise ConfigurationError(
-            "--enable-catalog-editing requires --role-catalog naming the file to edit"
-        )
     read_only = ui_read_only or state.read_only
     owner = None
     if not read_only:
@@ -418,13 +405,7 @@ def ui_command(
 
         load_role_catalog(role_catalog, workspace_root=state.repo)
 
-    if enable_launch:
-        if read_only:
-            raise ConfigurationError("--enable-launch cannot be combined with --read-only")
-        if profile_config is None:
-            raise ConfigurationError(
-                "--enable-launch requires --profile-config naming the runtime profile config"
-            )
+    if profile_config is not None:
         # Fail here, at the terminal, if the profile config is invalid — not at
         # the first launch from a browser tab.
         from agent_commons.services.delegation_runtime import load_runtime_configuration
@@ -438,9 +419,7 @@ def ui_command(
         state_source=state.state_source,
         session_owner=owner,
         catalog_path=role_catalog,
-        catalog_editing=enable_catalog_editing,
         profile_config=profile_config,
-        launch_enabled=enable_launch,
     )
 
     def emit(bound_port: int, token: str) -> None:
@@ -464,7 +443,11 @@ def ui_command(
                     "repo": str(state.repo),
                     "read_only": read_only,
                     "writer_session_id": writer_session_id,
-                    "catalog_editing": enable_catalog_editing,
+                    # Same key as ever, now a state rather than a flag: the
+                    # panel edits the catalogue when it has one and has a
+                    # session to act under.  Read after `owner.start()`, so the
+                    # session it reports on is the one that exists.
+                    "catalog_editing": context.catalog_editing_enabled,
                 }
             )
             return
@@ -477,9 +460,12 @@ def ui_command(
             click.echo("          anyone holding this token writes as that session")
         else:
             click.echo("  writes  disabled — this server records no canonical event")
-        if enable_catalog_editing:
+        if context.catalog_editing_enabled:
             click.echo(f"  catalog editable at {role_catalog}")
             click.echo("          adding a skill changes what delegated runs are told to do")
+        if not read_only and not context.launch_enabled:
+            click.echo("  launch  not configured — no runtime profile config is in effect,")
+            click.echo("          so a run is refused in the panel rather than started")
         click.echo("  trust   loopback reachability alone is not authentication")
         click.echo("  note    the token is not stored on disk; opening a browser exposes")
         click.echo("          the URL to other processes of this user via the process list")
@@ -610,7 +596,7 @@ def support_command(state: CLIState, show_paths: bool) -> None:
         "supported_platform": True,
         "supported_operating_systems": ["darwin", "linux"],
         "core_release_stage": "alpha",
-        "broker_release_stage": "experimental_manual_opt_in",
+        "broker_release_stage": "experimental",
         "canonical_workspace_available": paths.commons_root.is_dir(),
         "state_root_explicit": paths.state_mode == "exact",
         "state_config_source": paths.state_source,

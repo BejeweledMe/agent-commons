@@ -43,37 +43,75 @@ def editable(workspace: dict[str, Any], tmp_path: Path) -> UIContext:
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
         catalog_path=tmp_path / "catalog.yaml",
-        catalog_editing=True,
     )
 
 
-def test_catalogue_routes_exist_only_behind_their_own_gate(
+def _writing_context(workspace: dict[str, Any], **extra: Any) -> UIContext:
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id=f"catalog-surface-{len(extra)}-window",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    return UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(session["session_id"]),
+        **extra,
+    )
+
+
+def test_catalogue_routes_appear_only_once_a_catalogue_is_configured(
     workspace: dict[str, Any], tmp_path: Path
 ) -> None:
-    """Editing presets and changing what a run is told to do are not one switch."""
+    """Editing presets and changing what a run is told to do are not one thing.
 
-    writable_only = UIContext(
-        workspace["repo"],
-        state_root=workspace["state_root"],
-        writer_session_id=None,
-        catalog_path=tmp_path / "catalog.yaml",
-    )
-    with _client(writable_only) as client:
+    Both panels here are writing panels bound to a real operator session, which
+    is the whole point: the difference between them is the operator catalogue
+    and nothing else, so the catalogue surface is shown to follow the catalogue
+    rather than the session.
+    """
+
+    without = _writing_context(workspace)
+    with _client(without) as client:
         found = mutating_surface(client.app)
-    # A catalogue path with the gate shut opens nothing at all.
-    assert found == expected_surface(writable_only) == set()
+    assert found == expected_surface(without)
+    # A writing panel with no catalogue records roles and edits no catalogue.
+    assert set(MUTATING_ROUTES) <= found
+    assert not found & set(CATALOG_ROUTES)
 
-    editing = UIContext(
-        workspace["repo"],
-        state_root=workspace["state_root"],
-        catalog_path=tmp_path / "catalog.yaml",
-        catalog_editing=True,
-    )
+    editing = _writing_context(workspace, catalog_path=tmp_path / "catalog.yaml")
     with _client(editing) as client:
         found = mutating_surface(client.app)
-    # Catalogue editing brings its own routes and none of the role-write ones.
-    assert found == expected_surface(editing) == set(CATALOG_ROUTES)
-    assert not found & set(MUTATING_ROUTES)
+    assert found == expected_surface(editing)
+    assert set(CATALOG_ROUTES) <= found
+    assert found - set(CATALOG_ROUTES) == expected_surface(without)
+
+
+def test_a_panel_without_a_session_edits_no_catalogue_however_configured(
+    workspace: dict[str, Any], tmp_path: Path
+) -> None:
+    """The read-only invariant outranks a configured catalogue path.
+
+    A read-only panel still *reads* the catalogue -- that is why the path is
+    accepted at all -- but it registers no route of any method but GET, and the
+    refusal for a direct call says which half of the state is missing.
+    """
+
+    reading_only = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        catalog_path=tmp_path / "catalog.yaml",
+    )
+    assert reading_only.catalog_editing_enabled is False
+    with _client(reading_only) as client:
+        assert mutating_surface(client.app) == expected_surface(reading_only) == set()
+    with pytest.raises(ConfigurationError, match="no operator session"):
+        reading_only.save_catalog_entry(
+            section="skills", entry_id="anything", title="Anything", instruction="do it"
+        )
 
 
 def test_a_saved_skill_is_a_file_the_next_launch_can_load(

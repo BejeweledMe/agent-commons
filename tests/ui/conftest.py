@@ -131,7 +131,11 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
 _SURFACE_GATES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("writes_enabled", MUTATING_ROUTES),
     ("catalog_editing_enabled", CATALOG_ROUTES),
-    ("launch_enabled", LAUNCH_ROUTES),
+    # Registered by every writing panel, configured or not: the runtime config
+    # can be written into an already-serving panel, and the route table is built
+    # once.  `launch_enabled` still exists and still means "a run would start" --
+    # it is just no longer what decides whether the route is there.
+    ("writes_enabled", LAUNCH_ROUTES),
 )
 
 

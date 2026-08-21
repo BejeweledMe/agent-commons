@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 
 from agent_commons.errors import CommonsError
 from agent_commons.ui import ENTITY_SCHEMA, read_spa
-from agent_commons.ui.context import UIContext
+from agent_commons.ui.context import LAUNCH_NOT_CONFIGURED, UIContext
 from agent_commons.ui.security import (
     PUBLIC_PATHS,
     SECURITY_HEADERS,
@@ -73,17 +73,23 @@ MUTATING_ROUTES = (
     ("POST", "/api/tasks/{task_id}/reopen"),
 )
 
-#: Catalogue editing is behind its own gate, so it has its own allowlist.
-#: Adding a skill and adding a role are different privileges and the test that
-#: pins the mutating surface should say so.
+#: Catalogue editing appears only once an operator catalogue is configured, so
+#: it has its own allowlist. Adding a skill and adding a role are different
+#: privileges and the test that pins the mutating surface should say so.
 CATALOG_ROUTES = (
     ("POST", "/api/catalog/entries"),
     ("POST", "/api/catalog/entries/remove"),
 )
 
-#: Launching a provider is a third, larger privilege behind its own gate:
-#: recording a role is bounded metadata, spawning a billable subscription
-#: process is not. Its own allowlist keeps the mutating-surface test honest.
+#: Launching a provider is a larger privilege than recording a role: bounded
+#: metadata against a billable subscription process. It is registered by every
+#: writing panel all the same, because the operator config that makes a launch
+#: possible can be written from the panel's own first-run screen while the
+#: server is already up, and FastAPI does not rebuild its route table. The
+#: handler refuses with `launch_not_configured` until the environment exists.
+#: Keeping it a separately declared tuple is the compensation for that: the
+#: mutating-surface test still names launching as its own privilege rather than
+#: folding it into the write allowlist.
 LAUNCH_ROUTES = (("POST", "/api/delegations"),)
 
 _HEARTBEAT_SECONDS = 15.0
@@ -240,10 +246,10 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
 
     if context.writes_enabled:
         _register_writes(app, context)
+        # Not gated on `launch_enabled`: see LAUNCH_ROUTES.
+        _register_launch(app, context)
     if context.catalog_editing_enabled:
         _register_catalog_writes(app, context)
-    if context.launch_enabled:
-        _register_launch(app, context)
 
     @app.get("/api/stream")
     async def stream(request: Request) -> Response:
@@ -514,15 +520,27 @@ def _register_catalog_writes(app: FastAPI, context: UIContext) -> None:
 
 
 def _register_launch(app: FastAPI, context: UIContext) -> None:
-    """Attach the launch surface, gated separately from role writes.
+    """Attach the launch surface, declared separately from role writes.
 
     One route: put a role to work on a task. It records a delegation through the
     same manager as every other write, then runs it through the same broker the
     CLI uses — one launch path, not a second one.
+
+    Every writing panel gets this route, configured or not, and the refusal for
+    "not configured" is typed rather than structural: `launch_not_configured`.
+    That is a deliberate weakening — the guarantee moves from "the route does
+    not exist" to "the route refuses" — bought by the fact that the operator
+    profile config is written from the panel's own first-run screen, after the
+    route table has been built and can no longer change.
     """
 
     @app.post("/api/delegations")
     async def run_role_on_task(request: Request) -> Response:
+        if not context.launch_enabled:
+            # Named ahead of the body read: nothing about the request can make
+            # an unconfigured runtime launchable, and the panel needs the code,
+            # not a generic conflict, to offer setup instead of a retry.
+            return _error(409, "launch_not_configured", LAUNCH_NOT_CONFIGURED)
         body = await _json_body(request)
         return await _guarded(
             context.run_role_on_task,
