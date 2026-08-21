@@ -74,6 +74,17 @@ button.pill[aria-expanded="true"]{border-color:var(--info); color:var(--fg)}
 .pill.reconnecting{color:var(--warn); border-color:var(--warn)}
 .pill.gap{color:var(--bad); border-color:var(--bad)}
 .trust{font-size:11px; color:var(--muted)}
+/* A state of THIS WINDOW, not a complaint about a request: `/api/meta` reports
+   a refusal the panel survived — most of all "another panel already owns this
+   project" — and there is no form for it to land in, because the operator did
+   nothing to provoke it.  A full-width row under the header, above everything
+   the refusal explains, and only there when there is something to explain. */
+#panel-refusal{
+  padding:8px 12px; display:flex; flex-direction:column; gap:4px;
+  background:var(--surface-2); border-bottom:1px solid var(--warn);
+}
+#panel-refusal ul{margin:0; padding-left:18px}
+#panel-refusal li{font-size:11px; color:var(--muted)}
 /* Three-zone shell: library on the left, the board in the centre, the
    conversation on the right — one home per kind of thing (redesign, item 6). */
 /* `position:relative` because below the narrow breakpoint the two side columns
@@ -748,6 +759,28 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <span class="note" data-i18n="ws_ids_note"></span>
   </div>
 </header>
+<!-- What `/api/meta` reported about this window rather than about a request:
+     `session_refusal` is null in the ordinary case and a coded refusal the
+     panel SURVIVED when it is not.  Every line here is written from JS — the
+     sentence depends on the code, and the address and the safe next actions are
+     canonical strings from the server that no table here could hold. -->
+<div id="panel-refusal" hidden>
+  <p class="note warn" id="panel-refusal-note"></p>
+  <!-- The address is an ADDRESS and deliberately not a link.  Each panel's
+       bearer token lives only in its own tab's URL fragment, so a link built
+       here would open a page that cannot authorize itself: the operator would
+       read the busy panel as a broken one.  It rides as the same id chip every
+       confirmation uses, because what they need to do with it is copy it. -->
+  <p class="note" id="panel-refusal-where" hidden>
+    <span class="idlbl" id="panel-refusal-where-label"></span>
+    <code class="idchip" id="panel-refusal-address"></code>
+  </p>
+  <!-- And the case where there is no address: the lock file holding the first
+       panel's port may be unreadable, and the server sends null rather than a
+       guess.  Saying so beats printing "null" or leaving a blank chip. -->
+  <p class="note" id="panel-refusal-nowhere" hidden></p>
+  <ul id="panel-refusal-actions"></ul>
+</div>
 <main>
   <nav id="sidebar">
     <div class="navgroup">
@@ -2506,6 +2539,12 @@ const STRINGS = {
     launch_not_configured_note: "Nothing can be run yet: no runtime config is in effect, so this panel has no allowlisted program to start a run with. The config is written from the first-run screen — no restart and no terminal.",
     refusal_uninitialized: "There is no workspace in this directory yet, so there is nothing to record into. Create it from the first-run screen and this write will go through.",
     panel_already_open: "Another panel already owns this project, and only one panel may write to it at a time. Use that window, or stop it and reload this one; its address is in the refusal below.",
+    // The address is shown, never linked: each panel's access token lives only
+    // in its own tab's address fragment, so a link built here would open a page
+    // that could not authorize itself.
+    panel_refusal_where: "the panel that owns this project:",
+    panel_refusal_not_a_link: "Type this address into a window yourself, or find the tab that is already on it. The panel deliberately does not make it a link: a panel's access token lives only in its own tab's address, so a link built here would open a page that could not let you in — and a busy panel would look like a broken one.",
+    panel_refusal_nowhere: "Which address that panel is on could not be read: the file recording its port is missing or unreadable. The window is still there — look for it among your open tabs, or stop it and reload this one.",
     session_recovered_note: "This panel's session expired while the tab stayed open — the machine asleep, most likely — and the panel opened a replacement under the same identity. Nothing was lost: everything already recorded stays recorded, and the panel writes again as the session named here.",
   },
   ru: {
@@ -3153,6 +3192,9 @@ const STRINGS = {
     launch_not_configured_note: "Вести прогоны пока не с чем: файл среды выполнения не действует, поэтому у панели нет разрешённой программы, которой прогон можно поручить. Файл пишется с экрана настройки — без перезагрузки и без терминала.",
     refusal_uninitialized: "Рабочего пространства в этом каталоге ещё нет, записывать некуда. Создайте его на экране настройки, и эта запись пройдёт.",
     panel_already_open: "Этим проектом уже владеет другая панель, а писать в него одновременно может только одна. Пользуйтесь тем окном или остановите его и перезагрузите это; его адрес — в отказе ниже.",
+    panel_refusal_where: "панель, владеющая проектом:",
+    panel_refusal_not_a_link: "Наберите этот адрес в окне сами или найдите вкладку, которая уже на нём. Панель намеренно не делает его ссылкой: ключ доступа панели живёт только в адресе её собственной вкладки, поэтому собранная здесь ссылка открыла бы страницу, которая не смогла бы вас впустить, — и занятая панель выглядела бы сломанной.",
+    panel_refusal_nowhere: "Прочитать, на каком адресе та панель, не удалось: файл с её портом отсутствует или нечитаем. Окно всё равно существует — поищите его среди открытых вкладок или остановите его и перезагрузите это.",
     session_recovered_note: "Сессия этой панели истекла, пока вкладка была открыта — скорее всего машина уснула, — и панель завела замену под той же личностью. Ничего не потеряно: всё уже записанное записанным и остаётся, а панель снова пишет как названная здесь сессия.",
   },
 };
@@ -7750,6 +7792,10 @@ async function applySessionRecovery(payload) {
     return;
   }
   paintStatus();
+  // The re-read carries a fresh `session_refusal` too, and it can have changed
+  // in either direction — a panel that lost the singleness race and one that
+  // has just won it back are both this frame.
+  paintPanelRefusal();
   // The board is what the identity decides: which card is the operator's own
   // window, and which sessions are held behind the runtime toggle.
   if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
@@ -8083,6 +8129,54 @@ function paintWorkspaceIdentity() {
   }
 }
 
+// The refusal `/api/meta` survived, drawn as the state of this window.
+//
+// It is not an error of any request: the operator opened a second panel on a
+// project the first one already owns, and every write in this tab will now be
+// refused with nothing on screen saying why.  `session_refusal` is null in the
+// ordinary case, so an absent banner is the ordinary case and not a bug.
+//
+// Two things are honest to say and one is not.  The sentence and the safe next
+// actions come from the frozen code and from the server; the ADDRESS is shown
+// as an address and never as a link, because each panel's bearer token lives
+// only in its own tab's URL fragment — a link assembled here would open a page
+// with no way to authorize itself, and the operator would read the panel that
+// is merely busy as one that is broken.  `address` may also be null, when the
+// lock file that holds the first panel's port cannot be read; then the panel
+// says it does not know rather than printing an empty chip.
+function paintPanelRefusal() {
+  const refusal = (metaInfo && metaInfo.session_refusal) || null;
+  const host = document.getElementById("panel-refusal");
+  host.hidden = !refusal;
+  if (!refusal) { return; }
+  // Said as this panel's own sentence where the code has one, and verbatim
+  // where it does not: an unfamiliar code is still worth more on screen than a
+  // silent banner, and the canonical text is what the operator can search for.
+  const key = REFUSAL_CODES[refusal.code];
+  const message = String(refusal.message || "");
+  document.getElementById("panel-refusal-note").textContent =
+    key ? t(key) + " (" + message + ")" : message;
+
+  const address = refusal.address ? String(refusal.address) : "";
+  document.getElementById("panel-refusal-where").hidden = !address;
+  document.getElementById("panel-refusal-nowhere").hidden = Boolean(address);
+  document.getElementById("panel-refusal-where-label").textContent = t("panel_refusal_where");
+  const chip = document.getElementById("panel-refusal-address");
+  chip.textContent = address;
+  chip.title = t("panel_refusal_not_a_link");
+  document.getElementById("panel-refusal-nowhere").textContent = t("panel_refusal_nowhere");
+
+  // The server's own safe next actions, verbatim: they are the canonical text
+  // of the refusal and the panel has nothing truer to put in their place.
+  const list = document.getElementById("panel-refusal-actions");
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  for (const action of refusal.safe_next_actions || []) {
+    const item = document.createElement("li");
+    item.textContent = String(action);
+    list.appendChild(item);
+  }
+}
+
 document.getElementById("workspace").addEventListener("click", () => {
   const pill = document.getElementById("workspace");
   const open = pill.getAttribute("aria-expanded") !== "true";
@@ -8144,6 +8238,9 @@ const LANGUAGE_SURFACES = [
   // The workspace's name is its directory and is never translated; the sentence
   // that says so, and the tooltip on every id chip beside it, are (item 29).
   ["workspace", () => paintWorkspaceIdentity()],
+  // The banner is half this panel's sentence and half the server's canonical
+  // text; `chrome` owns neither, because both are written from JS.
+  ["panel_refusal", () => paintPanelRefusal()],
   ["stream", () => setStream(lastStream.state, lastStream.key)],
   ["board", () => { if (lastGraph) { paintChrome(lastGraph); render(lastGraph); } }],
   ["legend", () => paintGlyphLegend()],
@@ -8205,6 +8302,10 @@ async function boot() {
     metaInfo = meta;
     writesEnabled = Boolean(meta.writes_enabled);
     paintStatus();
+    // Before anything else is painted: with a refusal standing, everything
+    // below it is a read-only view of somebody else's project, and the operator
+    // is owed the reason at the top rather than after the first refused write.
+    paintPanelRefusal();
     await loadCatalog();
     catalogInstructionVisibility();
     paintCatalog();

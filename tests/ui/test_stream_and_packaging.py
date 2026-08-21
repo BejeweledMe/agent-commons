@@ -1133,6 +1133,10 @@ LANGUAGE_SURFACES = {
     "chrome",
     "status",
     "workspace",
+    # The banner `/api/meta` fills in when this panel survived a refusal --
+    # another panel owning the project -- is written from JS on both halves:
+    # this panel's sentence and the server's canonical address and actions.
+    "panel_refusal",
     "stream",
     "board",
     "legend",

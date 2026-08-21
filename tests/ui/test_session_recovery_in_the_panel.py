@@ -70,6 +70,10 @@ def _recover(lang: str, frames: list[dict[str, object]]) -> dict[str, object]:
             '  return { writer_session_id: "session.NEW", writes_enabled: true };',
             "}",
             'function paintStatus() { calls.push("paintStatus"); }',
+            # The refusal banner is repainted off the SAME re-read: a panel that
+            # lost the singleness race can win it back when the first window
+            # closes, and a banner drawn only at boot would outlive its cause.
+            'function paintPanelRefusal() { calls.push("paintPanelRefusal"); }',
             "function paintChrome() {}",
             "function render() {}",
             "function setStream(state, key) { calls.push(key); }",
@@ -129,6 +133,9 @@ def test_the_frame_re_reads_meta_rather_than_only_printing_a_notice() -> None:
     assert answer["calls"].count("/api/meta") == 1
     assert answer["meta"] == "session.NEW"
     assert "paintStatus" in answer["calls"]
+    # And everything else that answer decides is repainted off it, including the
+    # refusal banner: `session_refusal` travels in the same payload.
+    assert "paintPanelRefusal" in answer["calls"]
 
 
 @needs_node
