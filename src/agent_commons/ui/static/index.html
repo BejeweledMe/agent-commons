@@ -7844,6 +7844,29 @@ document.getElementById("board-fit").addEventListener("click", fitView);
 // manually from a fetch body instead.
 let lastEventId = null;
 
+// A refusal is not a dropped connection, and the reconnect loop cannot tell
+// them apart on its own: every non-OK response was thrown and retried, forever,
+// with the backoff capped at fifteen seconds.  `GET /api/stream` on a directory
+// with no workspace used to be a 500 and now answers `409 setup_uninitialized`
+// like every other reading route — a state, not a hiccup, and one no amount of
+// waiting will change.  Retrying it is a panel that says "reconnecting…" about
+// a project that simply is not set up.
+//
+// Matched on the CODE, not on the status: 409 is also how ordinary conflicts
+// arrive, and only these two say the ground under the panel is gone.
+const STREAM_HALTED_BY = ["setup_uninitialized", "setup_not_a_repository"];
+
+async function streamRefusalCode(response) {
+  // A refusal body that will not parse is not a refusal this can act on; the
+  // ordinary reconnect is the right answer then, so it says nothing.
+  try {
+    const payload = await response.json();
+    return (payload && payload.error && payload.error.code) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
 async function connect() {
   if (!self.ReadableStream || !("body" in Response.prototype)) {
     setStream("gap", "stream_unavailable");
@@ -7856,6 +7879,19 @@ async function connect() {
       const headers = authHeaders({ "Accept": "text/event-stream" });
       if (lastEventId) { headers["Last-Event-ID"] = lastEventId; }
       const response = await fetch("/api/stream", { headers: headers });
+      if (!response.ok && STREAM_HALTED_BY.indexOf(await streamRefusalCode(response)) >= 0) {
+        // The loop ends rather than backing off: this project has no history to
+        // stream and will not grow one until somebody sets it up.  The first-run
+        // screen owns that explanation, so it is re-read and repainted here, and
+        // `streamStarted` is released so the `boot()` that follows a successful
+        // first run can start the stream again instead of leaving a live panel
+        // permanently deaf.
+        streamStarted = false;
+        setStream("gap", "stream_setup_pending");
+        await loadSetup();
+        paintSetup();
+        return;
+      }
       if (!response.ok || !response.body) { throw new Error("stream " + response.status); }
       setStream("live", "stream_live");
       backoff = 1000;

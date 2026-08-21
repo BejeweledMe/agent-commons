@@ -11,6 +11,10 @@ table itself is built from, present in every state, so the screen and the
 router cannot disagree about what exists.  What the screen must do with it is
 the subject here: keep describing the state, which is a GET and is the whole
 use of this screen on a watching panel, and stop offering what it cannot do.
+
+The stream half of the same story is pinned at the bottom: `GET /api/stream` on
+a bare directory answers `409 setup_uninitialized` now instead of a 500, and a
+refusal is not a dropped connection.
 """
 
 from __future__ import annotations
@@ -323,3 +327,43 @@ def test_the_reason_reaches_a_watching_panel_too() -> None:
     assert answer["readonlyHidden"] is False
     for control in SETUP_WRITE_CONTROLS:
         assert answer["hidden"][control] is True, control
+
+
+# --- the stream, which is not a dropped connection --------------------------
+
+
+def test_the_stream_stops_on_a_refusal_instead_of_reconnecting_forever() -> None:
+    """`GET /api/stream` on a directory with no workspace was a 500 and is now
+    `409 setup_uninitialized`, like every other reading route.  The reconnect
+    loop threw every non-OK response and retried it forever, so the panel would
+    have said "reconnecting…" about a project that is simply not set up and no
+    amount of waiting would have changed it."""
+
+    body = read_spa()
+    halting = body.split("const STREAM_HALTED_BY = [", 1)[1].split("]", 1)[0]
+    assert "setup_uninitialized" in halting
+    assert "setup_not_a_repository" in halting
+
+    connect = _function(body, "async function connect() {")
+    assert "STREAM_HALTED_BY.indexOf(await streamRefusalCode(response)) >= 0" in connect
+    # Matched on the CODE and not on the status: 409 is also how an ordinary
+    # conflict arrives, and retrying one of those is right.
+    assert "response.status === 409" not in connect
+
+    # It ends the loop rather than backing off, and hands the explanation to the
+    # screen that owns it.
+    halt = connect.split("STREAM_HALTED_BY.indexOf", 1)[1].split("}", 1)[0]
+    assert "streamStarted = false;" in halt
+    assert 'setStream("gap", "stream_setup_pending");' in halt
+    assert "loadSetup()" in halt and "paintSetup();" in halt
+
+    # And releasing the flag is what lets a first run started from that screen
+    # bring the stream back without a reload: `boot()` guards on it.
+    boot = _function(body, "async function boot() {")
+    assert "if (!streamStarted) { streamStarted = true; connect(); }" in boot
+
+    # A refusal body that will not parse is not one the panel can act on, so it
+    # falls back to the ordinary reconnect rather than halting on a guess.
+    reader = _function(body, "async function streamRefusalCode(response) {")
+    assert "catch (error) {" in reader
+    assert 'return "";' in reader
