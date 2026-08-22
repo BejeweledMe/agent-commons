@@ -26,6 +26,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from agent_commons.errors import CommonsError
+from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
 from agent_commons.ui.context import (
     LAUNCH_NOT_CONFIGURED,
@@ -386,6 +387,21 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             "gallery_data_unavailable",
             "published design packages are not available in this build",
         )
+
+    @app.get("/api/artifacts/{artifact_id}/preview", dependencies=reads_workspace)
+    async def artifact_preview(artifact_id: str) -> Response:
+        # The response contains raw workspace bytes, so it goes through the
+        # same bearer middleware as every data route. The reader deliberately
+        # receives only an artifact id: manifest resolution owns the source
+        # path and rejects a replaced or unsafe file before bytes reach HTTP.
+        def _read_preview():
+            return ArtifactPreviewReader(context.manager()).read(artifact_id)
+
+        try:
+            preview = await asyncio.to_thread(_read_preview)
+        except ArtifactPreviewRefusal as exc:
+            return _error(exc.status_code, exc.code, str(exc))
+        return Response(content=preview.content, media_type=preview.media_type)
 
     @app.get("/api/graph", dependencies=reads_workspace)
     async def graph() -> Response:
