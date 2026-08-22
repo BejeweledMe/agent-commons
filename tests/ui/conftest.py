@@ -42,7 +42,7 @@ def workspace(tmp_path: Path) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "--quiet")
-    (repo / "README.md").write_text("demo\n", encoding="utf-8")
+    (repo / "README.md").write_text("example\n", encoding="utf-8")
     state_root = tmp_path / "state"
     CommonsManager.initialize(repo, integrations=())
     return {"repo": repo, "state_root": state_root, "commons_root": repo / ".agent-commons"}

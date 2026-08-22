@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 import agent_commons.ui.setup as setup
 from agent_commons.runtime.model import ExecutableResolutionError, ExecutableRole
@@ -123,6 +124,11 @@ def test_setup_writes_are_declared_apart_and_absent_from_a_read_only_panel(
     with _client(writing) as client:
         found = mutating_surface(client.app)
     assert found == expected_surface(writing) == OPERATOR_SURFACE
+    assert SETUP_ROUTES == (
+        ("POST", "/api/setup/initialize"),
+        ("POST", "/api/setup/runtime-config"),
+        ("POST", "/api/setup/add-discovered-providers"),
+    )
     # Registered by a panel that is not configured yet -- being unconfigured is
     # the state these two routes exist to leave.
     assert writing.launch_enabled is False
@@ -505,7 +511,7 @@ def test_a_directory_that_is_not_a_repository_is_named_not_refused(
     assert response.json()["state"] == setup.SETUP_NOT_A_REPOSITORY
 
 
-def test_total_absence_of_a_provider_is_named_before_the_operator_clicks(
+def test_total_absence_of_a_provider_is_an_honest_refusal_not_a_demo_offer(
     workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
@@ -515,12 +521,104 @@ def test_total_absence_of_a_provider_is_named_before_the_operator_clicks(
         refused = client.post("/api/setup/runtime-config", headers=authorized())
 
     assert body["blocking_refusal"] == setup.SETUP_NO_PROVIDER_FOUND
-    # The refusal is not a dead end: the same answer names demo as a way out,
-    # or the person it stops would be left writing YAML by hand -- the exact
-    # terminal step this panel exists to remove.
-    assert body["demo_available"] is True
+    assert "demo_available" not in body
     assert refused.status_code == 409
     assert refused.json()["error"]["code"] == setup.SETUP_NO_PROVIDER_FOUND
+    # It is absent, not a typed refusal: the product no longer owns a demo
+    # operation on this surface.
+    with _client(context) as client:
+        removed = client.post("/api/setup/demo-config", headers=authorized())
+    assert removed.status_code == 404
+
+
+def test_runtime_config_never_replaces_a_working_operator_file(
+    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
+) -> None:
+    """The ordinary generator is a first-write operation, never an editor."""
+
+    context = _writing(workspace, window="first-run-runtime-guard-window")
+    with _client(context) as client:
+        created = client.post("/api/setup/runtime-config", headers=authorized())
+        assert created.status_code == 200, created.text
+        target = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
+        marked = target.read_bytes() + b"# the operator wrote this line by hand\n"
+        target.write_bytes(marked)
+
+        refused = client.post("/api/setup/runtime-config", headers=authorized())
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == setup.SETUP_CONFIGURED
+    assert target.read_bytes() == marked
+
+
+def test_a_second_provider_is_added_without_restarting_the_panel(
+    workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A generated claude-only file gains codex profiles through one POST."""
+
+    bindir = tmp_path / "bin"
+    for name in ("claude", "agent-commons-mcp", "git"):
+        _install(bindir, name)
+    monkeypatch.setenv("PATH", str(bindir))
+    context = _writing(workspace, window="first-run-add-provider-window")
+    with _client(context) as client:
+        initial = client.post("/api/setup/runtime-config", headers=authorized())
+        assert initial.status_code == 200, initial.text
+        target = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
+        before = yaml.safe_load(target.read_text(encoding="utf-8"))
+
+        _install(bindir, "codex")
+        added = client.post("/api/setup/add-discovered-providers", headers=authorized())
+
+    assert added.status_code == 200, added.text
+    body = added.json()
+    assert body["added_providers"] == ["codex"]
+    assert body["changed"] is True
+    assert body["launch_enabled"] is True
+    after = yaml.safe_load(target.read_text(encoding="utf-8"))
+    assert after["profiles"]["claude-builder"] == before["profiles"]["claude-builder"]
+    assert (
+        after["profiles"]["claude-independent-reviewer"]
+        == before["profiles"]["claude-independent-reviewer"]
+    )
+    assert {"codex-builder", "codex-independent-reviewer"} <= set(after["profiles"])
+
+
+def test_add_provider_profiles_refuses_manual_edits_and_skips_noop_writes(
+    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
+) -> None:
+    context = _writing(workspace, window="first-run-add-provider-guard-window")
+    with _client(context) as client:
+        created = client.post("/api/setup/runtime-config", headers=authorized())
+        assert created.status_code == 200, created.text
+        target = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
+        before = target.read_bytes()
+
+        unchanged = client.post("/api/setup/add-discovered-providers", headers=authorized())
+        assert unchanged.status_code == 200, unchanged.text
+        assert unchanged.json()["added_providers"] == []
+        assert unchanged.json()["changed"] is False
+        assert target.read_bytes() == before
+
+        marked = before + b"# operator-owned marker\n"
+        target.write_bytes(marked)
+        refused = client.post("/api/setup/add-discovered-providers", headers=authorized())
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == setup.SETUP_CONFIGURED
+    assert "edited manually" in refused.json()["error"]["message"]
+    assert target.read_bytes() == marked
+
+
+def test_add_provider_profiles_refuses_before_a_runtime_exists(
+    workspace: dict[str, Any], provider_bin: Path
+) -> None:
+    context = _writing(workspace, window="first-run-add-provider-unconfigured-window")
+    with _client(context) as client:
+        refused = client.post("/api/setup/add-discovered-providers", headers=authorized())
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == setup.SETUP_UNCONFIGURED
 
 
 def test_a_found_provider_without_its_support_binaries_carries_the_new_code(
@@ -607,112 +705,6 @@ def test_the_panel_configures_itself_and_launches_without_a_restart(
     # about a role that does not exist, which is a different refusal entirely.
     assert after.json()["error"]["code"] != "launch_not_configured"
     assert (tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml").is_file()
-
-
-def test_the_demo_route_closes_the_whole_loop_with_no_resolvable_binary(
-    workspace: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Hire, task, Run, `succeeded` -- on a machine where nothing resolves.
-
-    This is the machine `setup_no_provider_found` stops everywhere else, and
-    the demo route is the frozen way out: a separate parameterless operation
-    that writes `demo: true` and adopts it into the serving panel.  Everything
-    below happens through one client against one route table -- the config is
-    written by the route, the role is hired, the task is opened, and the run
-    completes through the DemoRunner the adopted config selects, with PATH
-    empty from the first request to the last.
-    """
-
-    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
-    context = _writing(workspace, window="first-run-demo-window01")
-    with _client(context) as client:
-        before = client.get("/api/setup", headers=authorized()).json()
-        assert before["blocking_refusal"] == setup.SETUP_NO_PROVIDER_FOUND
-        assert before["demo_available"] is True
-        # The general write is refused on this machine; the demo one is not.
-        refused = client.post("/api/setup/runtime-config", headers=authorized())
-        assert refused.json()["error"]["code"] == setup.SETUP_NO_PROVIDER_FOUND
-
-        written = client.post("/api/setup/demo-config", headers=authorized())
-        assert written.status_code == 200, written.text
-        body = written.json()
-        assert body["state"] == setup.SETUP_CONFIGURED
-        assert body["demo"] is True
-        assert body["launch_enabled"] is True
-        assert client.get("/api/setup", headers=authorized()).json()["state"] == (
-            setup.SETUP_CONFIGURED
-        )
-
-        hired = client.post(
-            "/api/agents",
-            headers=authorized(),
-            json={
-                "name": "Demo builder",
-                "profile_id": "claude-builder",
-                "rationale": "sees the whole loop close without a provider",
-                "idempotency_key": "demo-route-hire",
-            },
-        )
-        assert hired.status_code == 200, hired.text
-        role_id = hired.json()["entity_ref"]["id"]
-        task = client.post(
-            "/api/tasks",
-            headers=authorized(),
-            json={
-                "title": "Close the demo loop",
-                "description": "the DemoRunner completes this without a provider",
-                "acceptance_criteria": ["the delegation reaches succeeded"],
-                "idempotency_key": "demo-route-task",
-            },
-        )
-        assert task.status_code == 200, task.text
-        task_id = task.json()["entity_ref"]["id"]
-
-        run = client.post(
-            "/api/delegations",
-            headers=authorized(),
-            json={"agent_id": role_id, "task_id": task_id},
-        )
-        assert run.status_code == 200, run.text
-        delegation_id = run.json()["delegation_id"]
-
-    context.await_launches()
-    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"], read_only=True)
-    delegation = manager.get_delegation(delegation_id)
-    assert delegation["state"] == "succeeded"
-    # Honestly labelled: no provider ran, and the summary says so.
-    assert "demo" in str(delegation.get("summary", "")).lower()
-    assert "no provider" in str(delegation.get("summary", "")).lower()
-    assert (tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml").is_file()
-
-
-def test_the_demo_write_refuses_to_replace_a_working_operator_config(
-    workspace: dict[str, Any], provider_bin: Path, tmp_path: Path
-) -> None:
-    """The demo route is registered for the panel's whole life; the button is not.
-
-    The first-run screen hides demo once the environment is configured, but a
-    bare authorized POST reaches the route regardless -- and it used to answer
-    200 and replace the operator's working `runtime.yaml` wholesale, marker
-    gone, no backup.  The refusal has to come from the handler, typed with the
-    state it refuses on, and the file has to still be byte-identical afterwards.
-    """
-
-    context = _writing(workspace, window="first-run-demoguard-w1")
-    with _client(context) as client:
-        written = client.post("/api/setup/runtime-config", headers=authorized())
-        assert written.status_code == 200, written.text
-        config = tmp_path / "xdg-config" / "agent-commons" / "runtime.yaml"
-        # An operator's own touch: still valid YAML, so the loader keeps
-        # accepting the file and the environment stays `setup_configured`.
-        marked = config.read_bytes() + b"# the operator wrote this line by hand\n"
-        config.write_bytes(marked)
-
-        refused = client.post("/api/setup/demo-config", headers=authorized())
-
-    assert refused.status_code == 409, refused.text
-    assert refused.json()["error"]["code"] == setup.SETUP_CONFIGURED
-    assert config.read_bytes() == marked
 
 
 def test_adoption_drops_the_profile_summary_cached_before_the_config_existed(

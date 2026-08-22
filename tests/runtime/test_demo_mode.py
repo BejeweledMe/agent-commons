@@ -1,12 +1,11 @@
-"""Demo mode must not require a resolvable provider on the machine.
+"""Internal DemoRunner mechanics tolerate unresolved provider executables.
 
-The product promise behind these tests: a newcomer without any provider
-subscription or installed CLI still sees the whole Hire -> Task -> Run ->
-result loop close through the DemoRunner.  Pre-start validation therefore
-tolerates exactly ``ExecutableResolutionError`` -- and only when the run's
-bound runner is the DemoRunner, which never launches a provider, MCP, or git
-process.  Everything else ``build_invocation`` refuses stays refused, demo or
-not, and outside demo mode nothing changes at all.
+The runner remains a development seam for simulating implementation behavior;
+it is not a product route, first-run offer, or promise to complete an operator
+workflow. Pre-start validation tolerates exactly ``ExecutableResolutionError``
+only for this runner, which never launches a provider, MCP, or git process.
+Everything else ``build_invocation`` refuses stays refused, demo or not, and
+outside demo mode nothing changes at all.
 """
 
 from __future__ import annotations
@@ -126,10 +125,7 @@ class _MustNotRun:
 def test_demo_implementation_run_succeeds_when_no_executable_resolves(
     tmp_path: Path,
 ) -> None:
-    """The blocker this seam removes: with ``demo: true`` and neither claude
-    nor codex resolvable anywhere, an implementation delegation still reaches
-    ``succeeded`` through the DemoRunner, wired exactly the way the CLI and the
-    panel build the service from an operator config."""
+    """An internal config still binds the runner seam without executables."""
 
     manager, task = _workspace(tmp_path)
     delegation = _implementation_delegation(manager, task, target_profile="claude-builder")
@@ -167,16 +163,15 @@ def test_demo_implementation_run_succeeds_when_no_executable_resolves(
 
 
 def test_a_role_hired_on_a_model_still_runs_in_demo_mode(tmp_path: Path) -> None:
-    """Model selection and demo mode must not be mutually exclusive.
+    """Model selection and the internal demo seam must not be mutually exclusive.
 
     The launch path substitutes the role's model with
     ``dataclasses.replace(profile, model=...)``, and in demo mode the profile
     it replaces is a demo-tolerant one.  ``replace`` reconstructs through the
     object's own class, so the copy has to come back tolerant -- a strict copy
-    would veto this run over an unresolvable executable and the newcomer who
-    picked a model in the hire form would be the one person the demo does not
-    work for.  Whole run, not the profile object: this goes through the same
-    registry the broker is built with.
+    would veto this run over an unresolvable executable. Whole run, not the
+    profile object: this goes through the same registry the broker is built
+    with.
     """
 
     manager, task = _workspace(tmp_path)

@@ -365,7 +365,6 @@ def test_the_reference_pages_explain_their_terms_instead_of_assuming_them() -> N
     # The phrases quoted back verbatim as not-understood are gone.
     for gone in ("compare-and-swap", "write lock", "runner seam", "on every replay"):
         assert gone not in _value(english, "guide_tk_ledger_p"), gone
-        assert gone not in _value(english, "guide_tk_demo_p"), gone
         assert gone not in _value(english, "guide_tk_run_p"), gone
     for gone in ("replay-ем", "compare-and-swap", "локом записи", "воркер", "шов"):
         offenders = [line.strip() for line in russian.split("\n") if gone in line.lower()]

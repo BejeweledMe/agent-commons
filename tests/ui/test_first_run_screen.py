@@ -174,10 +174,8 @@ def test_a_repository_with_no_workspace_is_offered_the_workspace_not_a_command()
 
 
 @needs_node
-def test_no_provider_at_all_is_offered_demo_as_a_way_on_not_as_a_consolation() -> None:
-    """`setup_no_provider_found` is the state with nothing to write, and the one
-    state the screen could most easily leave as a dead end.  Demo is named as
-    the way on, and named as the whole loop rather than as a preview."""
+def test_no_provider_at_all_is_an_honest_refusal_with_the_guide_and_rescan() -> None:
+    """The product does not invent a runnable path when neither CLI exists."""
 
     absent = {
         "state": SETUP_UNCONFIGURED,
@@ -185,7 +183,7 @@ def test_no_provider_at_all_is_offered_demo_as_a_way_on_not_as_a_consolation() -
         "providers_found": [],
         "providers_missing": ["claude", "codex"],
         "support_missing": [],
-        "demo_available": True,
+        "operator_panel": True,
     }
     for lang, table in (("en", 0), ("ru", 1)):
         note = _decide(lang, "setupBlockingNote(argument)", absent)
@@ -193,15 +191,16 @@ def test_no_provider_at_all_is_offered_demo_as_a_way_on_not_as_a_consolation() -
         assert "claude" in note and "codex" in note
 
     body = read_spa()
-    # The offer is shown off `demo_available`, which the route sends precisely
-    # so the screen does not have to derive it.
-    # `observing` is the other half: the sentence names a button, so on a panel
-    # that has no such route it goes with the button rather than advertising it.
-    assert "offer.hidden = observing || !(configurable && info.demo_available);" in body
-    assert 'setupWrite("/api/setup/demo-config", "setup_demo_written");' in body
+    assert "demo_available" not in body
+    assert "setup-demo" not in body
+    assert 'id="setup-guide"' in body
+    assert "info.blocking_refusal !== SETUP_NO_PROVIDER" in body
+    assert "const noProvider = info.blocking_refusal === SETUP_NO_PROVIDER;" in body
+    assert "write.hidden = observing || !configurable || noProvider;" in body
     for block in _language_tables():
-        # Demo mode's config value is canonical and is not translated.
-        assert "demo: true" in _value(block, "setup_demo_offer")
+        sentence = _value(block, "setup_found_none")
+        assert "claude" in sentence and "codex" in sentence
+        assert _value(block, "setup_no_provider_guide")
 
 
 @needs_node
@@ -212,7 +211,6 @@ def test_one_provider_of_two_names_the_missing_one_and_what_its_absence_costs() 
         "providers_found": ["claude"],
         "providers_missing": ["codex"],
         "support_missing": [],
-        "demo_available": True,
     }
     for lang in ("en", "ru"):
         note = _decide(lang, "setupBlockingNote(argument)", partial)
@@ -223,7 +221,8 @@ def test_one_provider_of_two_names_the_missing_one_and_what_its_absence_costs() 
         assert "{found}" not in note and "{missing}" not in note
     # And nothing is blocked by it: a half-found machine still writes a config.
     body = read_spa()
-    assert "write.disabled = blocked;" in body
+    assert "write.hidden = observing || !configurable || noProvider;" in body
+    assert "write.disabled = blocked && !noProvider;" in body
 
 
 @needs_node
@@ -238,7 +237,6 @@ def test_a_provider_without_its_support_binaries_names_the_program_before_the_cl
         "providers_found": ["claude", "codex"],
         "providers_missing": [],
         "support_missing": ["agent-commons-mcp"],
-        "demo_available": True,
     }
     for lang in ("en", "ru"):
         note = _decide(lang, "setupBlockingNote(argument)", unresolved)
@@ -388,9 +386,11 @@ def test_every_string_the_screen_needs_is_in_both_tables() -> None:
         "setup_rejected",
         "setup_rescan_button",
         "setup_manual_yaml",
-        "setup_demo_offer",
-        "setup_demo_button",
+        "setup_no_provider_guide",
         "setup_preflight_button",
+        "setup_add_discovered_providers_button",
+        "setup_providers_added",
+        "setup_no_new_providers",
         "setup_preflight_credential_free",
     )
     for block in _language_tables():

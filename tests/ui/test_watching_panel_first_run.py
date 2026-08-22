@@ -60,7 +60,7 @@ def _function(body: str, header: str) -> str:
 
 def _setup_module(body: str) -> str:
     head = "const SETUP_WITHOUT_A_BOARD = ["
-    tail = "let setupOpenedByHand = false;"
+    tail = "let setupGuideOpened = false;"
     assert head in body and tail in body
     return head + body.split(head, 1)[1].split(tail, 1)[0] + tail
 
@@ -68,8 +68,8 @@ def _setup_module(body: str) -> str:
 # The controls the screen offers, and which of them write.  Named here rather
 # than derived, so a button added to this screen has to be classified by hand
 # before this test will pass -- an unclassified write is exactly the 404.
-SETUP_WRITE_CONTROLS = ("setup-init", "setup-write", "setup-demo")
-SETUP_READ_CONTROLS = ("setup-rescan", "setup-preflight")
+SETUP_WRITE_CONTROLS = ("setup-init", "setup-write", "setup-add-providers")
+SETUP_READ_CONTROLS = ("setup-rescan", "setup-preflight", "setup-guide")
 
 
 def _paint(lang: str, info: dict[str, object]) -> dict[str, object]:
@@ -183,8 +183,7 @@ def test_a_watching_panel_describes_the_state_and_offers_nothing_it_cannot_do() 
     for control in SETUP_READ_CONTROLS:
         assert control in answer["hidden"], control
     assert answer["hidden"]["setup-rescan"] is False
-    # The sentence that names the demo button goes with the button.
-    assert answer["hidden"]["setup-demo-offer"] is True
+    assert answer["hidden"]["setup-guide"] is True
 
     # The intro promises this screen writes the two missing things, which is
     # not true here -- so the KEY is switched, not the text, because an element
@@ -196,10 +195,8 @@ def test_a_watching_panel_describes_the_state_and_offers_nothing_it_cannot_do() 
 
 
 @needs_node
-def test_the_unconfigured_state_on_a_watching_panel_loses_all_three_buttons() -> None:
-    """The state with the most to offer is the one with the most to withdraw:
-    write, demo, and the demo sentence are all reachable here and none of their
-    routes exists on a panel started to observe."""
+def test_the_unconfigured_state_on_a_watching_panel_loses_every_write_control() -> None:
+    """No write is offered when this panel has no route for it."""
 
     unconfigured = {
         "state": SETUP_UNCONFIGURED,
@@ -208,16 +205,39 @@ def test_the_unconfigured_state_on_a_watching_panel_loses_all_three_buttons() ->
         "providers_found": ["claude"],
         "providers_missing": ["codex"],
         "support_missing": [],
-        "demo_available": True,
         "config_path": "/home/x/.config/agent-commons/runtime.yaml",
     }
     answer = _paint("en", unconfigured)
-    for control in SETUP_WRITE_CONTROLS + ("setup-demo-offer",):
+    for control in SETUP_WRITE_CONTROLS:
         assert answer["hidden"][control] is True, control
     assert answer["readonlyHidden"] is False
     # What was found is still listed: it is a fact about this machine and it is
     # exactly what the person who CAN act will need to be told.
     assert answer["hidden"]["setup-found"] is False
+
+
+@needs_node
+def test_no_provider_screen_keeps_rescan_and_guide_but_offers_no_write() -> None:
+    """A missing subscription CLI is an honest stopped state, not a simulated run."""
+
+    answer = _paint(
+        "en",
+        {
+            "state": SETUP_UNCONFIGURED,
+            "operator_panel": True,
+            "providers": {},
+            "providers_found": [],
+            "providers_missing": ["claude", "codex"],
+            "support_missing": [],
+            "blocking_refusal": "setup_no_provider_found",
+            "config_path": "/home/x/.config/agent-commons/runtime.yaml",
+        },
+    )
+
+    assert answer["hidden"]["setup-rescan"] is False
+    assert answer["hidden"]["setup-guide"] is False
+    for control in SETUP_WRITE_CONTROLS:
+        assert answer["hidden"][control] is True, control
 
 
 def test_the_note_says_where_the_power_is_instead_of_only_that_it_is_missing() -> None:
@@ -272,7 +292,6 @@ def _rejected(**extra: object) -> dict[str, object]:
         "providers_found": [],
         "providers_missing": [],
         "support_missing": [],
-        "demo_available": True,
         **extra,
     }
 
