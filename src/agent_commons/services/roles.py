@@ -6,7 +6,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from agent_commons.core.refs import normalize_ref
-from agent_commons.domain.agents import (
+from agent_commons.domain.lifecycle import acting_agent_id, require_entity
+from agent_commons.domain.roles import (
     GRANT_NAMES,
     agent_delegations,
     descendants,
@@ -15,7 +16,6 @@ from agent_commons.domain.agents import (
     retirement_blockers,
     turnover_used,
 )
-from agent_commons.domain.lifecycle import acting_agent_id, require_entity
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.states import NON_TERMINAL_DELEGATION_STATES
 from agent_commons.errors import LifecycleConflictError
