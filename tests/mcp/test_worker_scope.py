@@ -811,8 +811,11 @@ def _repo_reader(tmp_path, body: str):
 
     import subprocess
 
+    from agent_commons.mcp.scoped_repo import ScopedRepoReader as ExtractedScopedRepoReader
     from agent_commons.mcp.server import ScopedRepoReader
     from agent_commons.services import CommonsManager
+
+    assert ScopedRepoReader is ExtractedScopedRepoReader
 
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
