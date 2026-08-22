@@ -18,8 +18,14 @@ import re
 from typing import Any
 
 from agent_commons.ui import read_spa
+from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import MUTATING_ROUTES
-from tests.ui.conftest import authorized
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 def _language_tables() -> tuple[str, str]:
@@ -303,6 +309,7 @@ def test_the_asset_still_carries_no_literal_nul_byte() -> None:
 
 def test_the_pair_the_two_selects_produce_still_fits_the_route_that_existed(
     writable_client,  # type: ignore[no-untyped-def]
+    writable: UIContext,
 ) -> None:
     """Both sides being editable changes what the operator can say, not what the
     panel may call: the body is the one `POST /api/agent-links` already took,
@@ -350,10 +357,4 @@ def test_the_pair_the_two_selects_produce_still_fits_the_route_that_existed(
     # the same permission twice.  A UI that refused would be inventing a rule.
     assert open_link(a_id, b_id).status_code == 200
 
-    routes = {
-        (method, route.path)
-        for route in writable_client.app.routes
-        for method in (getattr(route, "methods", set()) or set())
-        if method not in {"GET", "HEAD"}
-    }
-    assert routes == set(MUTATING_ROUTES)
+    assert mutating_surface(writable_client.app) == expected_surface(writable) == OPERATOR_SURFACE

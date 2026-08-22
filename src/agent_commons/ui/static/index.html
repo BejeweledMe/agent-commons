@@ -74,6 +74,17 @@ button.pill[aria-expanded="true"]{border-color:var(--info); color:var(--fg)}
 .pill.reconnecting{color:var(--warn); border-color:var(--warn)}
 .pill.gap{color:var(--bad); border-color:var(--bad)}
 .trust{font-size:11px; color:var(--muted)}
+/* A state of THIS WINDOW, not a complaint about a request: `/api/meta` reports
+   a refusal the panel survived — most of all "another panel already owns this
+   project" — and there is no form for it to land in, because the operator did
+   nothing to provoke it.  A full-width row under the header, above everything
+   the refusal explains, and only there when there is something to explain. */
+#panel-refusal{
+  padding:8px 12px; display:flex; flex-direction:column; gap:4px;
+  background:var(--surface-2); border-bottom:1px solid var(--warn);
+}
+#panel-refusal ul{margin:0; padding-left:18px}
+#panel-refusal li{font-size:11px; color:var(--muted)}
 /* Three-zone shell: library on the left, the board in the centre, the
    conversation on the right — one home per kind of thing (redesign, item 6). */
 /* `position:relative` because below the narrow breakpoint the two side columns
@@ -538,6 +549,21 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   border-left:2px solid var(--edge); border-radius:0 6px 6px 0;
   padding:7px 10px; margin:0 0 12px; font-size:12px; overflow-x:auto;
 }
+/* "How to build a product" walks a path the product is still assembling, so the
+   page says which of it is drafted instead of letting a placeholder be read as
+   an instruction.  The notice leads the page; a screenshot leaves a marked gap
+   rather than a drawing, because a picture of this panel is taken off a working
+   panel and cannot honestly be invented ahead of one. */
+.doc p.draftnote{
+  font-size:12px; color:var(--warn); background:var(--surface-2);
+  border-left:2px solid var(--warn); border-radius:0 6px 6px 0;
+  padding:7px 10px; margin:0 0 14px;
+}
+.doc p.shot{
+  font-size:11px; color:var(--faint); text-align:center;
+  border:1px dashed var(--edge); border-radius:6px;
+  padding:14px 10px; margin:0 0 12px;
+}
 /* A deep link lands on a heading, and every heading on a long page looks like
    every other one.  The mark says which paragraph the question was about and
    fades on its own; `scroll-margin` keeps the heading off the very top edge. */
@@ -604,6 +630,27 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   background:var(--info); color:#0d1117; border:none; border-radius:6px;
   padding:8px 14px; font-weight:600; align-self:flex-start; cursor:pointer;
 }
+/* First run.  Fixed, not absolute: it stands in for the whole shell rather
+   than sitting inside the board, because on an uninitialized directory there
+   is no board to sit in.  It scrolls on its own — the trust paragraph is long
+   on purpose and must never be the thing that pushes the button off screen. */
+#setup{
+  position:fixed; inset:0; display:grid; place-items:start center;
+  background:var(--bg); z-index:80; overflow-y:auto; padding:32px 16px;
+}
+.setup-card{width:min(560px,100%); display:flex; flex-direction:column; gap:12px}
+.setup-card h2{font-size:16px; margin:0}
+.setup-card .actions{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 0}
+.setup-cmd{
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:9px 11px; margin:0; user-select:all; overflow-wrap:anywhere;
+}
+.setup-row{
+  display:flex; gap:10px; align-items:baseline; padding:8px 11px;
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+}
+.setup-row .setup-name{font-family:ui-monospace,"JetBrains Mono",monospace; flex:none}
+.setup-row .setup-where{color:var(--muted); font-size:12px; overflow-wrap:anywhere; min-width:0}
 .mono{font-family:ui-monospace,"JetBrains Mono",monospace}
 /* Nothing may overflow its frame (operator feedback): long ids and labels
    truncate or wrap inside their own box, never past it. */
@@ -727,6 +774,28 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <span class="note" data-i18n="ws_ids_note"></span>
   </div>
 </header>
+<!-- What `/api/meta` reported about this window rather than about a request:
+     `session_refusal` is null in the ordinary case and a coded refusal the
+     panel SURVIVED when it is not.  Every line here is written from JS — the
+     sentence depends on the code, and the address and the safe next actions are
+     canonical strings from the server that no table here could hold. -->
+<div id="panel-refusal" hidden>
+  <p class="note warn" id="panel-refusal-note"></p>
+  <!-- The address is an ADDRESS and deliberately not a link.  Each panel's
+       bearer token lives only in its own tab's URL fragment, so a link built
+       here would open a page that cannot authorize itself: the operator would
+       read the busy panel as a broken one.  It rides as the same id chip every
+       confirmation uses, because what they need to do with it is copy it. -->
+  <p class="note" id="panel-refusal-where" hidden>
+    <span class="idlbl" id="panel-refusal-where-label"></span>
+    <code class="idchip" id="panel-refusal-address"></code>
+  </p>
+  <!-- And the case where there is no address: the lock file holding the first
+       panel's port may be unreadable, and the server sends null rather than a
+       guess.  Saying so beats printing "null" or leaving a blank chip. -->
+  <p class="note" id="panel-refusal-nowhere" hidden></p>
+  <ul id="panel-refusal-actions"></ul>
+</div>
 <main>
   <nav id="sidebar">
     <div class="navgroup">
@@ -760,6 +829,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
         <button type="button" id="fab" hidden data-i18n-title="fab_hire">+</button>
         <button type="button" id="task-fab" hidden data-i18n="task_fab" data-i18n-title="tip_task_fab">+ Task</button>
         <button type="button" id="board-fit" data-i18n="board_fit" data-i18n-title="tip_board_fit">Fit</button>
+        <!-- The way back to first run.  The screen may be set aside on a board
+             that works, and everything it configures is off until it is not, so
+             it has to be reachable again from the surface it was set aside on;
+             it is held back entirely once the project is set up. -->
+        <button type="button" id="board-setup" hidden data-i18n="setup_reopen"></button>
         <!-- The label carries the count of what is being held back, so it is
              painted from JS; only its tooltip is a data-i18n marker. -->
         <button type="button" id="board-runtime" aria-pressed="false" hidden data-i18n-title="tip_runtime_nodes">Runtime nodes</button>
@@ -869,6 +943,13 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
              is recorded but not yet consumed by the runtime. -->
         <div class="dock-tabs" id="guide-tabs">
           <button type="button" data-gpage="brief" aria-selected="true" data-i18n="guide_tab_brief">In short</button>
+          <!-- The onboarding side of the split, which had one page on it and a
+               confession beside it: the reference pages taught nobody, and
+               "In short" says what the system IS without walking anybody
+               through building anything with it.  This is that walk — one
+               worked example, from a directory the panel has never seen to work
+               a person accepted — so it belongs here and not past the rule. -->
+          <button type="button" data-gpage="build" aria-selected="false" data-i18n="guide_tab_build">How to build a product</button>
           <!-- The strip's own confession (round 3, designer): what follows this
                rule is reference, scored 8/10 as reference and 3/10 as
                onboarding.  Saying so costs nothing and stops the five pages
@@ -953,6 +1034,48 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 data-i18n="guide_never_h">What this panel never does</h3>
           <p data-i18n="guide_never_p"></p>
         </div>
+        <!-- The walk the guide admitted it did not have.  One worked example,
+             followed end to end: a directory the panel has never seen, one role,
+             one task, one run, one independent review, one acceptance.
+             Its headings carry stable ids like every other page's, so a "?" in
+             the panel can point at a STEP and not only at a definition.
+
+             The page is scaffolded and its prose is a draft, and it says so at
+             the top rather than reading as finished.  That is deliberate: the
+             path it describes is being assembled by this same wave, and a
+             walkthrough written ahead of the walk would describe a product that
+             does not exist yet — the exact failure the reference pages were
+             scored down for.  The pictures are marked gaps for the same reason:
+             a screenshot of this panel is taken off a working panel, and one
+             drawn in advance would be a drawing of a guess. -->
+        <div id="gpage-build" hidden>
+          <h1 data-i18n="guide_bd_h">From an empty directory to work you accepted</h1>
+          <p class="draftnote" data-i18n="guide_bd_draft"></p>
+          <p data-i18n="guide_bd_example"></p>
+          <h3 id="g-bd-setup" data-i18n="guide_bd_setup_h"></h3>
+          <p data-i18n="guide_bd_setup_p"></p>
+          <p class="shot" data-i18n="guide_bd_setup_shot"></p>
+          <h3 id="g-bd-hire" data-i18n="guide_bd_hire_h"></h3>
+          <p data-i18n="guide_bd_hire_p"></p>
+          <p class="shot" data-i18n="guide_bd_hire_shot"></p>
+          <h3 id="g-bd-task" data-i18n="guide_bd_task_h"></h3>
+          <p data-i18n="guide_bd_task_p"></p>
+          <p class="shot" data-i18n="guide_bd_task_shot"></p>
+          <h3 id="g-bd-run" data-i18n="guide_bd_run_h"></h3>
+          <p data-i18n="guide_bd_run_p"></p>
+          <p class="shot" data-i18n="guide_bd_run_shot"></p>
+          <h3 id="g-bd-answer" data-i18n="guide_bd_answer_h"></h3>
+          <p data-i18n="guide_bd_answer_p"></p>
+          <p class="shot" data-i18n="guide_bd_answer_shot"></p>
+          <h3 id="g-bd-review" data-i18n="guide_bd_review_h"></h3>
+          <p data-i18n="guide_bd_review_p"></p>
+          <p class="shot" data-i18n="guide_bd_review_shot"></p>
+          <h3 id="g-bd-accept" data-i18n="guide_bd_accept_h"></h3>
+          <p data-i18n="guide_bd_accept_p"></p>
+          <p class="shot" data-i18n="guide_bd_accept_shot"></p>
+          <h3 id="g-bd-next" data-i18n="guide_bd_next_h"></h3>
+          <p data-i18n="guide_bd_next_p"></p>
+        </div>
         <!-- Every heading below carries a stable id, and that is the whole
              deep-link mechanism: a "?" in the panel names a page and one of
              these ids, and `openGuide` does the rest.  An id here is a promise —
@@ -1029,9 +1152,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-tk-accept" data-i18n="guide_tk_accept_h"></h3>
           <p data-i18n="guide_tk_accept_p"></p>
           <p class="mono dim" data-i18n="guide_tk_accept_ex"></p>
-          <h3 id="g-tk-demo" data-i18n="guide_tk_demo_h"></h3>
-          <p data-i18n="guide_tk_demo_p"></p>
-          <p class="mono dim" data-i18n="guide_tk_demo_ex"></p>
         </div>
         <div id="gpage-links" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
@@ -1058,9 +1178,18 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-lm-panel" data-i18n="guide_lm_panel_h"></h3>
           <p data-i18n="guide_lm_panel_p"></p>
           <p class="mono dim" data-i18n="guide_lm_panel_ex"></p>
-          <h3 id="g-lm-gates" data-i18n="guide_lm_gates_h"></h3>
-          <p data-i18n="guide_lm_gates_p"></p>
-          <p class="mono dim" data-i18n="guide_lm_gates_ex"></p>
+          <!-- Was "Three gates", and it described all three capability switches
+               in full long after the CLI stopped having any.  The heading kept
+               its place because the subject did not go away with them —
+               loopback, one bearer token, nothing stored — only the sentence
+               about how a capability is turned on did.  What decides now is
+               what is CONFIGURED, and the panel says which of those it is
+               missing rather than which switch to add.  No switch this product
+               no longer has may be spelled anywhere in this file, comments
+               included; a test asserts it. -->
+          <h3 id="g-lm-access" data-i18n="guide_lm_access_h"></h3>
+          <p data-i18n="guide_lm_access_p"></p>
+          <p class="mono dim" data-i18n="guide_lm_access_ex"></p>
         </div>
         <div id="gpage-catalog" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
@@ -1334,6 +1463,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <label class="field"><span data-i18n="run_wall_label">Stop the run after this many seconds (blank = default)</span>
         <input type="number" id="run-wall" min="1" max="86400"></label>
       <button type="button" id="run-go" data-i18n="run_go">Run this role on the task</button>
+      <!-- The way out of `launch_not_configured`, inside the panel.  The tab
+           used to be hidden outright when nothing was configured, so a person
+           looking for Run found no tab, no refusal and no next step; the note
+           above switches to the reason and this leads to the screen that
+           removes it. -->
+      <button type="button" id="run-setup" hidden data-i18n="setup_reopen"></button>
       <p class="result" id="run-result"></p>
     </section>
 
@@ -1383,7 +1518,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
       <!-- An empty operator catalogue rendered this control as an empty box and
            read as broken (round 3, designer).  The box gives way to a line that
            says what a skill is and where skills come from — written from JS
-           because the second half depends on the catalogue-editing gate. -->
+           because the second half depends on whether the catalogue is editable. -->
       <p class="note" id="settings-skills-empty" hidden></p>
       <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions on
         every run. Changes apply from the next run, never retroactively.</p>
@@ -1428,6 +1563,63 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
   <span id="waiting"></span>
   <span id="truncation"></span>
 </footer>
+<!-- First run.  The panel now opens on whatever directory it was started in,
+     including one git never touched, and `GET /api/setup` is the only route
+     that answers in every one of those states — `/api/meta`, `/api/graph` and
+     the rest all read a workspace and fail without one.  So this screen is not
+     a banner over a working board: it is what the tab shows INSTEAD of booting,
+     until the state it names is left.  It is deliberately not a `.scrim`
+     dialog — there is nothing behind it to trap focus against, and Esc must not
+     dismiss the only thing on screen.
+
+     Everything a person retypes into a terminal has been removed from this
+     panel except one line: `git init`, because a directory that is not a
+     repository cannot be made one from inside a page served out of it. -->
+<div id="setup" hidden>
+  <div class="setup-card">
+    <h2 id="setup-title" data-i18n="setup_title"></h2>
+    <!-- The intro says this screen writes the two missing things, which is only
+         true of a panel that can write. On `--read-only` none of the setup
+         routes is even registered, so the key is switched rather than the text:
+         an element is owned by `data-i18n` or by a JS write, never both. -->
+    <p class="note" id="setup-intro" data-i18n="setup_intro"></p>
+    <p class="note" id="setup-state-note"></p>
+    <!-- An observing panel still describes the state — that is a GET and it is
+         the whole use of this screen there — and says plainly that it has no
+         way to act on it, instead of offering buttons whose routes answer 404. -->
+    <p class="note warn" id="setup-readonly" hidden data-i18n="setup_readonly_note"></p>
+    <p class="mono setup-cmd" id="setup-command" hidden></p>
+    <div id="setup-found" hidden>
+      <h3 class="subhead" data-i18n="setup_found_title"></h3>
+      <div id="setup-found-rows"></div>
+      <p class="note" id="setup-found-note" hidden></p>
+      <p class="note mono" id="setup-path"></p>
+      <p class="note warn" id="setup-trust" data-i18n="setup_trust_warning"></p>
+    </div>
+    <!-- Why the existing config was refused, in the loader's own words. Until
+         the state carried a reason this screen could only say "your file does
+         not work", and the only way to learn more was the terminal — the exact
+         regress this panel exists to remove. The reason is canonical text from
+         the loader and is printed verbatim, never translated; the label before
+         it and the path beside it are the panel's. -->
+    <div id="setup-rejected" hidden>
+      <p class="note" id="setup-rejected-why"></p>
+      <p class="note mono" id="setup-rejected-path"></p>
+    </div>
+    <div class="actions">
+      <button type="button" class="cta" id="setup-init" hidden data-i18n="setup_init_button"></button>
+      <button type="button" class="cta" id="setup-write" hidden data-i18n="setup_write_button"></button>
+      <button type="button" id="setup-rescan" hidden data-i18n="setup_rescan_button"></button>
+      <button type="button" id="setup-guide" hidden data-i18n="setup_no_provider_guide">Open the guide</button>
+      <button type="button" id="setup-preflight" hidden data-i18n="setup_preflight_button"></button>
+      <button type="button" id="setup-add-providers" hidden data-i18n="setup_add_discovered_providers_button">Add profiles for a newly found provider</button>
+      <button type="button" id="setup-later" hidden data-i18n="setup_later_button"></button>
+    </div>
+    <p class="result" id="setup-result"></p>
+    <p class="note" id="setup-preflight-note" hidden data-i18n="setup_preflight_credential_free"></p>
+    <div id="setup-preflight-rows"></div>
+  </div>
+</div>
 <div class="scrim" id="hire-modal" hidden>
   <!-- Every dialog names itself by its own heading and says it is modal: round
        3 found Tab walking straight out of an open form into the page behind it,
@@ -1471,21 +1663,41 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           data-i18n-title="gref_profile" data-i18n-aria="gref_profile"></button>
         <select id="hire-profile"></select></label>
       <!-- Round 4, finding 4: the operator wanted to pick a model and a
-           reasoning level here.  The model is not the panel's to pick — it is
-           fixed by the profile, in a file the panel may not write — and there
-           is no reasoning field anywhere in a runner profile to pick from.  So
-           the form says which of the two questions has an answer and where that
-           answer lives, instead of offering a control that would either lie or
-           be refused.  The options themselves name the model when the server
-           knows it; this line says why that is all there is. -->
-      <p class="note" id="hire-profile-help" data-i18n="hire_profile_help">The profile decides which process and which
-        model a run of this role uses. That is set by the operator in runtime.yaml, a file outside
-        the workspace, and never from here.</p>
+           reasoning level here.  Half of that now has an answer.  A reasoning
+           level still does not — there is no such field anywhere in a runner
+           profile — but the model IS chosen here, once, at the only moment it
+           can be: a role's accumulated context is built for the model that
+           built it, so a hired role cannot be moved to another one afterwards.
+           The line under the picker says where the profile's own default is
+           fixed, because that is what an empty model field falls back to. -->
+      <p class="note" id="hire-profile-help" data-i18n="hire_profile_help">The profile decides which process a run of
+        this role uses and the model an empty model field below falls back to. The profile itself
+        is set by the operator in runtime.yaml, a file outside the workspace, and never from
+        here.</p>
       <!-- Said only when the chosen profile is absent from the operator's own
            config: the live tester hired a reviewer, and only the launch — a
            screen later — refused. The warning belongs where the choice is. -->
       <p class="note warn" id="hire-profile-missing" hidden data-i18n="hire_profile_missing">This
         profile is not in the operator's config, so a run of this role cannot start yet.</p>
+      <!-- Free text with suggestions beside it, never a closed select.  The
+           panel may not name a model of its own — an invented name is a name
+           that is not the one that runs, and the asset is pinned against
+           carrying any — so every suggestion arrives from `/api/catalog`, out
+           of the profiles this machine configured and the roles this project
+           already hired.  That list is honest but not exhaustive: a provider
+           ships models nobody here has named yet, so the field takes anything
+           and the server judges it.  `list=` offers the same names as the
+           browser's own completion; the line under the field shows them
+           outright, because a datalist a person never opens is a list nobody
+           saw. -->
+      <label class="field" id="hire-model-field"><span data-i18n="hire_model_label">Model</span>
+        <input type="text" id="hire-model" autocomplete="off" spellcheck="false"
+          list="hire-model-offers" data-i18n-placeholder="hire_model_placeholder"></label>
+      <datalist id="hire-model-offers"></datalist>
+      <!-- Written from JS: it names the models the server offered, and those
+           are canonical strings from another machine's config that no table
+           here could hold. -->
+      <p class="note" id="hire-model-hint"></p>
       <label class="field"><span class="req" data-i18n="hire_rationale_label">Why this role exists (kept forever)</span>
         <input type="text" id="hire-rationale" autocomplete="off"></label>
       <!-- Round 4, finding 8: the operator read this field as a system prompt
@@ -1513,7 +1725,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
             data-i18n-title="gref_skills" data-i18n-aria="gref_skills"></button>
           <select id="hire-skills" multiple size="4"></select></label>
         <!-- Written from JS for the same reason the settings one is: the second
-             half of the sentence depends on the catalogue-editing gate. -->
+             half of the sentence depends on whether the catalogue is editable. -->
         <p class="note" id="hire-skills-empty" hidden></p>
         <p class="note" data-i18n="skill_contract_line">Skills are glued into the role's instructions
           on every run. Changes apply from the next run, never retroactively.</p>
@@ -1786,7 +1998,7 @@ const STRINGS = {
     start_work: "Open the chat",
     recorded: "recorded",
     chat_empty_writable: "No main chat yet. Write here and every role that answers to you is addressed at once — this is the conversation, not the work. Work with a done-when of its own goes through “+ Task”.",
-    chat_empty_readonly: "No main chat yet. Start the UI with --enable-writes to open one.",
+    chat_empty_readonly: "No main chat yet. This panel holds no operator session, so it can neither open one nor write into it.",
     addressed_roles: "addressed roles",
     unaddressed_prefix: ". Roles created since this chat opened are not addressed in it: ",
     unaddressed_suffix: ". Open a new chat to include them.",
@@ -1795,7 +2007,7 @@ const STRINGS = {
     hire_preset_label: "Template",
     hire_name_label: "Name",
     hire_profile_label: "Profile",
-    hire_profile_help: "The profile decides which process and which model a run of this role uses. That is set by the operator in runtime.yaml, a file outside the workspace, and never from here.",
+    hire_profile_help: "The profile decides which process a run of this role uses and the model an empty model field below falls back to. The profile itself is set by the operator in runtime.yaml, a file outside the workspace, and never from here.",
     // Two halves of one option line, kept apart so the second can be the honest
     // answer: the panel prints the model the server named, or says where the
     // model is fixed — it never puts a name of its own in that slot.
@@ -1803,6 +2015,15 @@ const STRINGS = {
     hire_profile_model_fixed: "fixed in the profile",
     hire_profile_unconfigured: "not in the operator's config (runtime.yaml)",
     hire_profile_missing: "This profile is not in the operator's config, so a run of this role cannot start yet. Profiles are added by the operator in runtime.yaml; hiring the role is still recorded.",
+    // The model is chosen once, here, and never again: a role's accumulated
+    // context is built for the model that built it. The field is free text —
+    // the offers beside it are what this machine and this project have already
+    // named, which is a list of the honest ones, not a list of all of them.
+    hire_model_label: "Model for this role — chosen now, and only now",
+    hire_model_placeholder: "empty — the profile's model",
+    hire_model_hint: "The model cannot be changed after the hire: everything this role remembers is built for the model that built it, so moving it would mean rebuilding that memory. Leave the field empty to run whatever the profile names.",
+    hire_model_offered: "Already named here",
+    hire_model_none: "Nothing has been named here yet, so there is nothing to offer. Type the name your provider knows, or leave the field empty.",
     hire_chain_note: "A role hired here answers to you — there is no team-lead control, on purpose. One role comes to answer to another only through a proposal that role makes and a person approves; this form creates no such rank.",
     gref_chain: "Why the team starts flat, and how a rank between roles is really built. The full account is in the Overview.",
     hire_rationale_label: "Why this role exists (kept forever)",
@@ -1874,7 +2095,13 @@ const STRINGS = {
     confirm_retire: "Retire this role? Nothing is deleted; it stops taking work.",
     confirm_retire_cascade: "Retire this role and every role it created? Nothing is deleted; they stop taking work.",
     profile_word: "profile",
-    profile_note: "the profile fixes the executable, model, sandbox, and tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
+    profile_note: "the profile fixes the executable, the default model, the sandbox, and the tool set. Selections here can only narrow it. Catalogue entries are added by the operator outside this UI",
+    // Reported here, never edited here. The hire form is the one place a model
+    // is chosen, and the reason is a property of the role rather than a missing
+    // feature: its memory was accumulated by the model that accumulated it.
+    settings_model_chosen: "Hired on {model}.",
+    settings_model_fixed: "That cannot be changed: everything this role remembers was built for that model, so moving it would mean rebuilding that memory. Hire another role to run another model.",
+    settings_model_profile: "No model was chosen at the hire, so runs use whatever the profile names.",
     stored_word: "stored",
     in_effect: "in effect",
     cannot_retire: "cannot be retired yet — ",
@@ -1891,14 +2118,14 @@ const STRINGS = {
     needs_decision: "needs a decision",
     your_answer: "Your answer",
     answer_button: "Answer",
-    readonly_answer: "Read-only. Start the UI with --enable-writes as the owning session to answer.",
+    readonly_answer: "Read-only. This panel holds no operator session, so it has nothing to answer as — it was opened as a view that records nothing, or another panel on this project holds the session.",
     answer_owner: "Answer from the session that owns this run: ",
     blocked_no_channel: "This run is blocked in the canonical ledger; no live answer channel is open here.",
     confirm_role_button: "Confirm this role",
-    readonly_confirm: "Read-only. Start the UI with --enable-writes to confirm.",
+    readonly_confirm: "Read-only. This panel holds no operator session, so there is nothing here to confirm with.",
     your_reply: "Your reply",
     reply_button: "Reply",
-    readonly_reply: "Read-only. Start the UI with --enable-writes to reply.",
+    readonly_reply: "Read-only. This panel holds no operator session, so there is nothing here to reply as.",
     reply_needs_body: "a reply needs a body",
     replied: "replied",
     answered: "answered",
@@ -1918,7 +2145,7 @@ const STRINGS = {
     not_on_graph: "that subject is not on the current graph",
     catalog_editing_note: "Entries here change what delegated runs are told to do. They are stored in",
     catalog_default_store: "the operator catalogue",
-    catalog_readonly: "Read-only. Start the UI with --role-catalog and --enable-catalog-editing to change it.",
+    catalog_readonly: "Read-only. Changing the catalogue needs two things at once: a catalogue file of this panel's own, and an operator session to record the change under. Setting the runtime up writes a catalogue beside it — the first-run screen is on the board bar.",
     none_yet: "none yet",
     remove_button: "Remove",
     catalog_add_heading: "Add or replace an entry",
@@ -1983,6 +2210,7 @@ const STRINGS = {
     guide_never_h: "What this panel never does",
     guide_never_p: "It never leaves your machine. It keeps no prompts or transcripts. For an unsuccessful provider process it keeps only a private, sanitized final 4 KiB of stderr: secrets, PII and absolute paths are redacted; stdout is never stored. It starts no paid process without its own explicit flag. It never rewrites history — only appends.",
     guide_tab_brief: "In short",
+    guide_tab_build: "How to build a product",
     guide_tab_units: "The system’s units",
     guide_tab_agents: "Roles and memory",
     guide_tab_tasks: "Tasks and runs",
@@ -1991,6 +2219,38 @@ const STRINGS = {
     guide_tab_catalog: "Skills and tools",
     guide_ref_label: "Reference",
     guide_ref_lead: "This page is reference: it explains how the mechanism works, rather than teaching a first route. The first route is in “In short”.",
+    // The walkthrough. Its scaffolding is settled — these eight steps are the
+    // path and their order is the order — and its prose is a draft that says so
+    // out loud, because the path is still being assembled and a walkthrough
+    // written ahead of the walk would describe a product that does not exist.
+    // The pictures are marked gaps for the same reason: a screenshot of this
+    // panel comes off a working panel and cannot be drawn in advance.
+    guide_bd_h: "From an empty directory to work you accepted",
+    guide_bd_draft: "Draft. The steps below and their order are settled; the words under them are a sketch and will be rewritten from a real walk once this whole path runs end to end. The marked gaps are where screenshots go — they are taken off a working panel, so none has been invented here.",
+    guide_bd_example: "One example is followed all the way through: a project that has an Agent Commons workspace and nothing else — no roles, no tasks, no history — and one small, checkable piece of work in it. Every step names what you press, what is recorded, and what would refuse you.",
+    guide_bd_setup_h: "1. Point the panel at the project",
+    guide_bd_setup_p: "Sketch: open the panel in the project directory. If there is no workspace, or no operator configuration, the first screen says which of the two is missing and writes what it can — the workspace here, the runtime file in your own config directory — without a terminal. This step ends when the panel says the project is set up.",
+    guide_bd_setup_shot: "Picture: the first-run screen, on a directory that has a repository and no workspace yet.",
+    guide_bd_hire_h: "2. Hire the first role",
+    guide_bd_hire_p: "Sketch: the + on the board. A name, a profile — which provider and which fixed permissions — a model, and one sentence about why the role exists. The model is chosen here and nowhere else. Nothing runs yet: hiring records who may be asked to work, not any work.",
+    guide_bd_hire_shot: "Picture: the hire form, filled in, before it is submitted.",
+    guide_bd_task_h: "3. Say what has to be done",
+    guide_bd_task_p: "Sketch: + Task. The text of the task is what the role is actually told, so this is the field that decides the work — not the sentence about why the role exists. Say what has to be true when it is done, because that is what the review will check.",
+    guide_bd_task_shot: "Picture: the new-task form, with a task written the way step 6 can be judged against.",
+    guide_bd_run_h: "4. Start a run and watch it",
+    guide_bd_run_p: "Sketch: a run is one bounded attempt by one role at one task. It is started from the task, it has a ceiling on how long and how much it may produce, and it appears on the board as it goes. A run that ends well has not finished the task — that is step 6.",
+    guide_bd_run_shot: "Picture: the board with a run in progress, and the Runs list beside it.",
+    guide_bd_answer_h: "5. Answer what the run asks",
+    guide_bd_answer_p: "Sketch: a run that needs a decision stops and asks, and the question waits for you on the board and in the footer count. Answering is a recorded act, like everything else here; nothing is decided on your behalf while you are away.",
+    guide_bd_answer_shot: "Picture: a blocked run with its question and the field that answers it.",
+    guide_bd_review_h: "6. Have it judged by someone who did not do it",
+    guide_bd_review_p: "Sketch: hire a reviewer profile and open an independent review of the work. Independent means the reviewer is not the author: the same role cannot approve what it produced, and acceptance in step 7 will refuse without a current approved review from someone else.",
+    guide_bd_review_shot: "Picture: the review request and the verdict it came back with.",
+    guide_bd_accept_h: "7. Accept it, or send it back",
+    guide_bd_accept_p: "Sketch: acceptance is yours and is the only thing that closes a task. Sending work back is an ordinary outcome, not a failure — it returns to the same role with what was wrong recorded beside it. Only acceptance shows as a green tick anywhere in this panel.",
+    guide_bd_accept_shot: "Picture: the acceptance step, and the same task afterwards.",
+    guide_bd_next_h: "8. The second time round",
+    guide_bd_next_p: "Sketch: what changes once the first piece is through — saving the role you hired as a template, giving a role memory that carries between runs, letting one role hire another under a ceiling you set, and where each of those is described in full on the reference pages.",
     guide_map_aria: "The work loop: a role takes a task, a run works it, a review judges it, and only acceptance closes it — a finished run sends the work to review, never straight to accepted.",
     guide_map_caption: "A run that ends succeeded has not finished the task: it hands the work to review. You accept it — or send it back.",
     guide_map_role: "Role",
@@ -2003,7 +2263,7 @@ const STRINGS = {
     guide_map_back: "sent back",
     gref_grants: "deny, ask, auto — what the three permission levels actually do. The full account is in the Overview.",
     gref_context: "context_mode — what a role’s memory really is. The full account is in the Overview.",
-    gref_profile: "profile_id — what the four profiles decide, and why neither the model nor a reasoning level is chosen here. The full account is in the Overview.",
+    gref_profile: "profile_id — what the four profiles decide, why the model is chosen once at hire in the field below, and why a reasoning level is not chosen at all. The full account is in the Overview.",
     gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. The full account is in the Overview.",
     gref_accept: "Why a finished run has not finished the task. The full account is in the Overview.",
     gref_link_type: "ask and handoff_work — what a link actually records. The full account is in the Overview.",
@@ -2050,7 +2310,7 @@ const STRINGS = {
     guide_ag_role_p: "Hiring writes one agent.created event into the ledger — the shared history every page here reads from: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no staff list stored beside that history — the current team is rebuilt by re-reading it, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
     guide_ag_profile_h: "A variant is a profile",
-    guide_ag_profile_p: "There is no separate choice of model, sandbox or spend: one profile_id fixes all of them at once, and the picker names the model beside each id when the operator’s config is readable. Today the set is fixed at four — two providers × builder or independent reviewer — because the narrowing rule that lets a role create only a narrower role is keyed by exactly those ids; new variants are described by the operator in runtime.yaml, and widening the set is a change to that rule rather than to this panel. A reasoning level is not offered because no runner profile carries such a field: a control for it would set nothing.",
+    guide_ag_profile_p: "There is no separate choice of sandbox or spend: one profile_id fixes them at once, and the picker names the profile’s default model beside each id when the operator’s config is readable. The model is the one choice made apart, in the hire form’s model field — once, at hire, never afterwards, because everything the role remembers is built for the model that built it; an empty field runs the profile’s own. Today the set is fixed at four — two providers × builder or independent reviewer — because the narrowing rule that lets a role create only a narrower role is keyed by exactly those ids; new variants are described by the operator in runtime.yaml, and widening the set is a change to that rule rather than to this panel. A reasoning level is not offered because no runner profile carries such a field: a control for it would set nothing.",
     guide_ag_profile_ex: "hire → profile_id: claude-builder; the model shown beside it is what runtime.yaml names — with no such config the picker says the model is fixed in the profile rather than naming one",
     guide_ag_grants_h: "Permissions are derived, never propagated",
     guide_ag_grants_p: "Three grants — create_roles, retire_roles, open_links — each deny, ask or auto, deny by default. What a role may actually do is effective_grants: the minimum across the role and every creator above it, recomputed on every call, so a downgrade binds work already running; a retired ancestor collapses the whole line to deny. The auto level is deliberately withheld: it is stored as written but takes effect as ask, so every automatic action still asks a person.",
@@ -2070,9 +2330,6 @@ const STRINGS = {
     guide_tk_accept_h: "Success is not acceptance",
     guide_tk_accept_p: "delegation.succeeded closes the run, not the task: the task stays exactly where it was, because acceptance is a human act. task.accepted demands a current, approved, independent review of the exact task revision — independent meaning its author is none of the sessions that did the work (the record lists those as work_author_session_ids), so nobody accepts their own result. Without such a review the write is refused. If the bound review later goes stale, the acceptance is stripped the next time the picture is rebuilt.",
     guide_tk_accept_ex: "a green tick in the graph means accepted or approved only; succeeded stays informational blue",
-    guide_tk_demo_h: "Demo mode",
-    guide_tk_demo_p: "With demo: true in the operator config no provider is launched. The launch path stays the same one — request, limits, states — but at the final step, where the real provider process would start, a stand-in named DemoRunner answers instead. It self-completes only implementation runs, with an honest summary saying no provider ran; it never fabricates a review or verification — those runs end needs_operator instead. Opt-in, never the default.",
-    guide_tk_demo_ex: "demo run of a reviewer role → no verdict is invented; the delegation ends needs_operator",
     guide_ln_record_h: "What a link records",
     guide_ln_record_p: "agent.link_opened writes from_agent_id, to_agent_id, allowed_action, deadline_seconds and a reason; agent.link_closed must name the revision it closes, so a blind close is refused. The domain validates the whole record: both roles active, no self-link, and the opener holds open_links. allowed_action is a typed enum — ask or handoff_work — never an open flag.",
     guide_ln_record_ex: "close without expected_revision → refused; a link stays open until an explicit agent.link_closed",
@@ -2093,11 +2350,11 @@ const STRINGS = {
     guide_lm_panel_h: "What this panel actually launches",
     guide_lm_panel_p: "A UI run is one bounded leaf: max_depth 0, one attempt, 600 seconds of wall time, budget 1 provider_units — no children, no fan-out. It goes through the same DelegationRuntimeService the CLI broker uses, under the role's operator-allowlisted profile; the panel may change the wall time and nothing else.",
     guide_lm_panel_ex: "Run on the board → delegation.requested at depth 0, then the provider process; state changes reach the panel over the event stream",
-    guide_lm_gates_h: "Three gates, loopback, no transcripts",
-    guide_lm_gates_p: "The server listens on loopback behind a bearer token held in memory and printed once. Read-only by default: only GET routes exist. --enable-writes opens the enumerated write routes; --enable-catalog-editing (plus --role-catalog) additionally lets the panel edit the catalogue; --enable-launch (plus --profile-config) additionally starts provider runs. Profiles are never editable from the UI at any gate. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
-    guide_lm_gates_ex: "read-only start → the app registers GET routes only; the stream without the token → 401",
+    guide_lm_access_h: "Loopback, one token, nothing stored",
+    guide_lm_access_p: "The server listens on loopback behind a bearer token held in memory and printed once. There are no capability switches: what the panel can do follows from what exists — an operator session of its own makes it record at all, a catalogue file makes that catalogue editable, a runtime config makes runs startable — and each of the three is written from the panel's own first-run screen. A view opened to record nothing registers no route that is not a GET. Profiles are never editable from here in any state. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
+    guide_lm_access_ex: "a run before the runtime config exists → launch_not_configured, and the first-run screen rather than a restart",
     guide_ct_file_h: "The catalogue is an operator file",
-    guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue (second gate), never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
+    guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue when it has one, never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
     guide_ct_file_ex: "a builder runs with write access to the workspace — a catalogue inside it would be a catalogue the role can rewrite",
     guide_ct_skill_h: "A skill is operator-authored instruction",
     guide_ct_skill_p: "A skill entry carries up to 4000 characters of instruction text; a tool entry carries only an identity, because the tool it names is already fixed by the profile. At launch skill_instructions resolves each id fail-closed: an id the catalogue lacks refuses the launch, rather than silently running a different role than the operator described. The resolved text joins the bounded instruction fed to the provider process over stdin — a role cannot write its own skill.",
@@ -2273,6 +2530,7 @@ const STRINGS = {
     sum_independent_no: "not independent",
     sum_from_to: "Between",
     sum_action: "May",
+    sum_model: "Model",
     sum_skills: "Required skills",
     sum_tools: "Allowed tools",
     sum_origin: "Hired by",
@@ -2346,6 +2604,67 @@ const STRINGS = {
     count_verifications: "verifications",
     count_agents: "roles",
     count_templates: "templates",
+    // --- first run ---------------------------------------------------------
+    // There are no capability switches any more. The one exception is an
+    // unavailable provider: the panel says so honestly, offers the guide and
+    // a rescan, and does not simulate a run it cannot make.
+    setup_title: "Set this project up",
+    setup_intro: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This screen writes the last two; nothing here needs a terminal.",
+    // The same three things, said by a panel that can write none of them: this
+    // one was started to watch, so its whole use here is to name the state.
+    setup_intro_readonly: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This panel is watching only, so it can say which of them is missing and nothing more.",
+    setup_readonly_note: "This panel cannot set anything up. It was started to observe, so the routes that would write a workspace or a runtime config do not exist on it at all — there is nothing here to press. To do what the state above needs, open a panel on this directory without the read-only switch, and this one will describe the result on the next look.",
+    setup_repo_missing: "This directory is not a git repository, so there is nothing for a workspace to attach to and nothing to record work against. Make it one and press “Look again”:",
+    setup_init_offer: "A git repository with no workspace yet. Creating one writes .agent-commons/ here — the shared history that every role, every task and every run is recorded into. Nothing outside this directory is touched.",
+    setup_init_button: "Create the workspace here",
+    setup_unconfigured_lead: "The workspace exists. What is missing is the runtime config: the operator-owned file, kept outside this repository, that says which local programs a run may start and under which limits. Until it exists nothing can be put to work.",
+    setup_all_set: "This project is set up. Roles can be hired and runs can be started; there is nothing left to do here.",
+    setup_found_title: "What was found on this machine",
+    setup_binary_missing: "not found",
+    setup_found_none: "Run functionality is unavailable: neither claude nor codex was found. Install the CLI for one of them with your subscription, then press “Look again”.",
+    setup_found_partial: "Only {found} resolved. Profiles are written for it and for nothing else — the roles offered when you hire will be its roles, and {missing} will simply not appear until it is installed and you look again.",
+    setup_support_missing: "A provider was found, but a program every written profile names did not resolve:",
+    setup_support_missing_after: "Nothing can be written until it does: a profile naming a program this panel cannot resolve would fail at the first run instead of failing here. Install it and press “Look again”.",
+    setup_path_label: "Will be written to",
+    setup_trust_warning: "Read this before pressing. The profiles written here let a run start those programs on your behalf with this working tree writable: a builder role's process can create, change and delete files anywhere under this repository, and it does so without asking per action. Nothing outside the repository is granted, no credential is written, and reviewer profiles get read-only access — but the working tree itself is genuinely exposed, so do this on a project whose git history you are willing to fall back on.",
+    setup_write_button: "Write the config and set this panel up",
+    setup_written: "Set up. The panel adopted the config as it stands — no restart — and the profiles are offered from now on.",
+    setup_initialized: "Workspace created. The panel opened its own session in it and is now recording.",
+    setup_rejected_existing: "There is already an operator runtime config at the path below, and this panel's own launch loader will not accept it. Your file is untouched: the panel did not write it and will not rename or overwrite anything it did not write. Nothing will run until it is repaired or replaced.",
+    setup_manual_yaml: "Replacing it from here overwrites it with a freshly generated config. Repairing it means editing it yourself — this panel will not edit a file it did not write. What the loader objected to is below, in its own words.",
+    // The loader's refusal, and the file it refused. Both arrive beside the
+    // state now; before they did, this screen could only say "your file does
+    // not work" and the terminal was the only way to learn more.
+    setup_rejected_why: "The loader's reason:",
+    setup_rejected_where: "The file it refused:",
+    setup_rejected_no_reason: "This panel was not told what the loader objected to, only that it refused. Running a launch from the terminal in this directory will print the reason.",
+    setup_rejected: "The config this panel generated was refused by its own launch loader, so it was never adopted, and it was moved aside to runtime.yaml.rejected rather than left posing as a working config. The loader's reason:",
+    setup_rescan_button: "Look again",
+    setup_no_provider_guide: "Open the guide",
+    setup_later_button: "Not now — go to the board",
+    setup_reopen: "Set the runtime up…",
+    setup_working: "working…",
+    setup_preflight_button: "Check the configured profiles",
+    setup_add_discovered_providers_button: "Add profiles for a newly found provider",
+    setup_providers_added: "Added profiles for: {providers}.",
+    setup_no_new_providers: "No newly discovered providers to add.",
+    setup_preflight_credential_free: "The check starts each provider with --help and shakes hands with the MCP server. It consumes no run and no subscription quota — and for exactly that reason it cannot tell an authorized provider from an unauthorized one: it proves the programs exist and answer, and nothing about your account.",
+    setup_preflight_ok: "answered",
+    setup_preflight_bad: "did not answer",
+    setup_preflight_all_ok: "Every configured profile answered.",
+    setup_preflight_some_bad: "Something did not answer; the profiles are listed below.",
+    stream_setup_pending: "not set up yet — the screen says what is missing",
+    // --- the three refusals that are states of this panel --------------------
+    launch_not_configured_note: "Nothing can be run yet: no runtime config is in effect, so this panel has no allowlisted program to start a run with. The config is written from the first-run screen — no restart and no terminal.",
+    refusal_uninitialized: "There is no workspace in this directory yet, so there is nothing to record into. Create it from the first-run screen and this write will go through.",
+    panel_already_open: "Another panel already owns this project, and only one panel may write to it at a time. Use that window, or stop it and reload this one; its address is in the refusal below.",
+    // The address is shown, never linked: each panel's access token lives only
+    // in its own tab's address fragment, so a link built here would open a page
+    // that could not authorize itself.
+    panel_refusal_where: "the panel that owns this project:",
+    panel_refusal_not_a_link: "Type this address into a window yourself, or find the tab that is already on it. The panel deliberately does not make it a link: a panel's access token lives only in its own tab's address, so a link built here would open a page that could not let you in — and a busy panel would look like a broken one.",
+    panel_refusal_nowhere: "Which address that panel is on could not be read: the file recording its port is missing or unreadable. The window is still there — look for it among your open tabs, or stop it and reload this one.",
+    session_recovered_note: "This panel's session expired while the tab stayed open — the machine asleep, most likely — and the panel opened a replacement under the same identity. Nothing was lost: everything already recorded stays recorded, and the panel writes again as the session named here.",
   },
   ru: {
     tab_attention: "Внимание",
@@ -2398,7 +2717,7 @@ const STRINGS = {
     start_work: "Открыть чат",
     recorded: "записано",
     chat_empty_writable: "Общего чата пока нет. Напишите здесь — и обращение уйдёт сразу каждой роли, которая вам подчиняется. Это разговор, а не работа: работу со своим критерием готовности заводят кнопкой «+ Задача».",
-    chat_empty_readonly: "Общего чата пока нет. Запустите интерфейс с --enable-writes, чтобы открыть его.",
+    chat_empty_readonly: "Общего чата пока нет. У этой панели нет операторской сессии, поэтому она не может ни открыть чат, ни писать в него.",
     addressed_roles: "адресовано ролям",
     unaddressed_prefix: ". Роли, созданные после открытия этого чата, в нём не адресованы: ",
     unaddressed_suffix: ". Откройте новый чат, чтобы включить их.",
@@ -2407,11 +2726,16 @@ const STRINGS = {
     hire_preset_label: "Шаблон",
     hire_name_label: "Имя",
     hire_profile_label: "Профиль",
-    hire_profile_help: "Профиль решает, какой процесс и какая модель работают в прогоне этой роли. Это задаёт оператор в runtime.yaml — файле вне workspace — и никогда не отсюда.",
+    hire_profile_help: "Профиль решает, какой процесс работает в прогоне этой роли и какая модель подставится, если поле модели ниже оставить пустым. Сам профиль задаёт оператор в runtime.yaml — файле вне workspace — и никогда не отсюда.",
     hire_profile_model: "модель: {model}",
     hire_profile_model_fixed: "закреплена в профиле",
     hire_profile_unconfigured: "нет в конфиге оператора (runtime.yaml)",
     hire_profile_missing: "Этого профиля нет в конфиге оператора, поэтому прогон такой роли пока не запустится. Профили оператор добавляет в runtime.yaml; нанять роль всё равно можно.",
+    hire_model_label: "Модель этой роли — выбирается сейчас и только сейчас",
+    hire_model_placeholder: "пусто — модель профиля",
+    hire_model_hint: "После найма модель не поменять: всё, что роль помнит, собрано под ту модель, которая это накопила, и перенос означал бы пересборку этой памяти. Оставьте поле пустым, чтобы работала модель профиля.",
+    hire_model_offered: "Здесь уже названы",
+    hire_model_none: "Здесь пока ничего не названо, поэтому и предлагать нечего. Впишите имя, которое знает ваш провайдер, или оставьте поле пустым.",
     hire_chain_note: "Роль, нанятая здесь, подчиняется оператору — поля «тимлид» нет намеренно. Подчинение одной роли другой рождается только из предложения роли, утверждённого человеком; эта форма такого ранга не создаёт.",
     gref_chain: "Почему команда начинается плоской и откуда берётся ранг между ролями. Полный разбор — в «Обзоре».",
     hire_rationale_label: "Зачем нужна эта роль (хранится навсегда)",
@@ -2483,7 +2807,10 @@ const STRINGS = {
     confirm_retire: "Отправить эту роль в отставку? Ничего не удаляется; она перестаёт брать работу.",
     confirm_retire_cascade: "Отправить в отставку эту роль и все созданные ею роли? Ничего не удаляется; они перестают брать работу.",
     profile_word: "профиль",
-    profile_note: "профиль фиксирует исполняемый файл, модель, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
+    profile_note: "профиль фиксирует исполняемый файл, модель по умолчанию, песочницу и набор инструментов. Выбор здесь может только сузить его. Записи каталога добавляет оператор вне этого интерфейса",
+    settings_model_chosen: "Нанята на модели {model}.",
+    settings_model_fixed: "Поменять это нельзя: всё, что роль помнит, собрано под ту модель, и перенос означал бы пересборку этой памяти. Для другой модели наймите другую роль.",
+    settings_model_profile: "При найме модель не выбирали, поэтому прогоны идут на той, которую называет профиль.",
     stored_word: "сохранено",
     in_effect: "действует",
     cannot_retire: "пока нельзя отправить в отставку — ",
@@ -2500,14 +2827,14 @@ const STRINGS = {
     needs_decision: "нужно решение",
     your_answer: "Ваш ответ",
     answer_button: "Ответить",
-    readonly_answer: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes из сессии-владельца.",
+    readonly_answer: "Только чтение. У этой панели нет операторской сессии, отвечать ей не от чьего имени — она открыта как вид, который ничего не записывает, либо сессией этого проекта владеет другая панель.",
     answer_owner: "Ответить может сессия — владелец этого прогона: ",
     blocked_no_channel: "Этот прогон заблокирован в каноническом реестре; живого канала для ответа здесь нет.",
     confirm_role_button: "Подтвердить эту роль",
-    readonly_confirm: "Только чтение. Чтобы подтвердить, запустите интерфейс с --enable-writes.",
+    readonly_confirm: "Только чтение. У этой панели нет операторской сессии, подтверждать ей не от чьего имени.",
     your_reply: "Ваш ответ",
     reply_button: "Ответить",
-    readonly_reply: "Только чтение. Чтобы ответить, запустите интерфейс с --enable-writes.",
+    readonly_reply: "Только чтение. У этой панели нет операторской сессии, отвечать ей не от чьего имени.",
     reply_needs_body: "ответу нужен текст",
     replied: "ответ отправлен",
     answered: "ответ записан",
@@ -2527,7 +2854,7 @@ const STRINGS = {
     not_on_graph: "этого объекта нет на текущем графе",
     catalog_editing_note: "Записи здесь меняют то, что поручается делать делегированным прогонам. Они хранятся в",
     catalog_default_store: "каталоге оператора",
-    catalog_readonly: "Только чтение. Чтобы изменять, запустите интерфейс с --role-catalog и --enable-catalog-editing.",
+    catalog_readonly: "Только чтение. Для правки каталога нужны сразу две вещи: собственный файл каталога у этой панели и операторская сессия, под которой запишется изменение. Настройка среды выполнения кладёт каталог рядом — экран настройки на панели доски.",
     none_yet: "пока пусто",
     remove_button: "Удалить",
     catalog_add_heading: "Добавить или заменить запись",
@@ -2592,6 +2919,7 @@ const STRINGS = {
     guide_never_h: "Чего панель никогда не делает",
     guide_never_p: "Не выходит за пределы вашего компьютера. Не хранит промпты и транскрипты. Для неуспешного процесса провайдера хранится только приватный очищенный хвост stderr до 4 КиБ: секреты, персональные данные и абсолютные пути скрываются; stdout не сохраняется. Не запускает платные процессы без отдельного явного флага. Не переписывает историю — только дописывает.",
     guide_tab_brief: "Коротко",
+    guide_tab_build: "Как собрать продукт",
     guide_tab_units: "Единицы системы",
     guide_tab_agents: "Роли и память",
     guide_tab_tasks: "Задачи и прогоны",
@@ -2600,6 +2928,32 @@ const STRINGS = {
     guide_tab_catalog: "Навыки и инструменты",
     guide_ref_label: "Справочник",
     guide_ref_lead: "Эта страница — справочник: она объясняет, как устроен механизм, а не ведёт по первому маршруту. Первый маршрут — в разделе «Коротко».",
+    guide_bd_h: "От пустого каталога до принятой работы",
+    guide_bd_draft: "Черновик. Шаги ниже и их порядок уже определены; текст под ними — набросок, его перепишут по настоящему проходу, когда весь маршрут заработает целиком. Отмеченные пропуски — места для снимков экрана: их снимают с работающей панели, поэтому здесь не выдумано ни одного.",
+    guide_bd_example: "Один пример проходится до конца: проект, в котором есть workspace Agent Commons и больше ничего — ни ролей, ни задач, ни истории, — и одна небольшая проверяемая работа в нём. На каждом шаге сказано, что вы нажимаете, что записывается и что вам откажет.",
+    guide_bd_setup_h: "1. Указать панели проект",
+    guide_bd_setup_p: "Набросок: откройте панель в каталоге проекта. Если workspace нет или нет конфига оператора, первый экран говорит, чего именно не хватает, и пишет то, что может: workspace — здесь, файл среды выполнения — в вашем каталоге конфигурации, без терминала. Шаг закончен, когда панель говорит, что проект настроен.",
+    guide_bd_setup_shot: "Снимок: экран первого открытия на каталоге, где репозиторий есть, а workspace ещё нет.",
+    guide_bd_hire_h: "2. Нанять первую роль",
+    guide_bd_hire_p: "Набросок: кнопка + на доске. Имя, профиль — какой провайдер и какие закреплённые права, — модель и одна фраза о том, зачем эта роль. Модель выбирается здесь и больше нигде. Пока ничего не работает: наём записывает, кого можно просить о работе, а не саму работу.",
+    guide_bd_hire_shot: "Снимок: форма найма, заполненная, до отправки.",
+    guide_bd_task_h: "3. Сказать, что нужно сделать",
+    guide_bd_task_p: "Набросок: кнопка «+ Задача». Текст задачи — это то, что роли действительно говорят, поэтому именно это поле решает, какой будет работа, а не фраза о том, зачем роль нужна. Напишите, что должно быть верно по завершении: именно это и будет проверять обзор.",
+    guide_bd_task_shot: "Снимок: форма новой задачи с текстом, по которому шаг 6 сможет судить.",
+    guide_bd_run_h: "4. Начать прогон и посмотреть на него",
+    guide_bd_run_p: "Набросок: прогон — одна ограниченная попытка одной роли решить одну задачу. Он начинается от задачи, у него есть потолок по времени и объёму, и он виден на доске по ходу дела. Хорошо завершившийся прогон не закрывает задачу — это шаг 6.",
+    guide_bd_run_shot: "Снимок: доска с идущим прогоном и список прогонов рядом.",
+    guide_bd_answer_h: "5. Ответить на то, о чём прогон спрашивает",
+    guide_bd_answer_p: "Набросок: прогон, которому нужно решение, останавливается и спрашивает, а вопрос ждёт вас на доске и в счётчике внизу. Ответ — такое же записываемое действие, как и всё здесь; за вас, пока вас нет, ничего не решают.",
+    guide_bd_answer_shot: "Снимок: остановленный прогон со своим вопросом и полем ответа.",
+    guide_bd_review_h: "6. Отдать на суд тому, кто это не делал",
+    guide_bd_review_p: "Набросок: наймите роль-обозревателя и откройте независимый обзор работы. Независимый значит, что обозреватель — не автор: одна и та же роль не может утвердить то, что сама произвела, и приёмка на шаге 7 откажет без действующего утверждённого обзора от другого.",
+    guide_bd_review_shot: "Снимок: запрос обзора и вернувшийся вердикт.",
+    guide_bd_accept_h: "7. Принять или вернуть",
+    guide_bd_accept_p: "Набросок: приёмка — ваша, и только она закрывает задачу. Вернуть работу — обычный исход, а не провал: она возвращается к той же роли, а рядом записано, что было не так. Зелёной галочкой в этой панели отмечается только приёмка.",
+    guide_bd_accept_shot: "Снимок: шаг приёмки и та же задача после него.",
+    guide_bd_next_h: "8. Во второй раз",
+    guide_bd_next_p: "Набросок: что меняется, когда первый кусок пройден, — сохранить нанятую роль как шаблон, дать роли память, переходящую между прогонами, разрешить одной роли нанимать другую в пределах заданного вами потолка; и где каждое из этого расписано целиком на страницах справочника.",
     guide_map_aria: "Круг работы: роль берёт задачу, прогон её делает, ревью выносит вердикт, и закрывает задачу только приёмка — закончившийся прогон отправляет работу на ревью, а не сразу в приёмку.",
     guide_map_caption: "Прогон, закончившийся succeeded, задачу не завершает: он передаёт работу на ревью. Принимаете её вы — или отправляете назад.",
     guide_map_role: "Роль",
@@ -2612,7 +2966,7 @@ const STRINGS = {
     guide_map_back: "назад в работу",
     gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Полный разбор — в «Обзоре».",
     gref_context: "context_mode — что такое «память» роли на самом деле. Полный разбор — в «Обзоре».",
-    gref_profile: "profile_id — что решают четыре профиля и почему ни модель, ни уровень ризонинга не выбираются здесь. Полный разбор — в «Обзоре».",
+    gref_profile: "profile_id — что решают четыре профиля, почему модель выбирается один раз при найме в поле ниже и почему уровень ризонинга не выбирается вовсе. Полный разбор — в «Обзоре».",
     gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Полный разбор — в «Обзоре».",
     gref_accept: "Почему закончившийся прогон не завершает задачу. Полный разбор — в «Обзоре».",
     gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Полный разбор — в «Обзоре».",
@@ -2650,7 +3004,7 @@ const STRINGS = {
     guide_ag_role_p: "Найм записывает в леджер — общую историю, из которой читает каждая страница здесь, — одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного списка штата рядом с этой историей нет — текущая команда собирается её перечитыванием, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
     guide_ag_profile_h: "Вариант — это профиль",
-    guide_ag_profile_p: "Отдельного выбора модели, песочницы или потолка трат нет: один profile_id закрепляет всё сразу, а рядом с каждым id в списке стоит модель — если операторский конфиг читается. Сегодня набор фиксирован четырьмя — два провайдера × исполнитель или независимый проверяющий, — потому что правило сужения (роль может создать только более узкую роль) устроено именно по этим id; новые варианты описывает оператор в runtime.yaml, и расширение набора — правка того правила, а не панели. Уровень ризонинга не предлагается, потому что такого поля нет ни в одном профиле процесса: он бы ничего не задавал.",
+    guide_ag_profile_p: "Отдельного выбора песочницы или потолка трат нет: один profile_id закрепляет их сразу, а рядом с каждым id в списке стоит модель профиля — если операторский конфиг читается. Модель — единственный выбор в стороне: поле модели формы найма, один раз, при найме и никогда после, потому что всё, что роль помнит, собрано под ту модель, которая это накопила; пустое поле оставляет модель профиля. Сегодня набор фиксирован четырьмя — два провайдера × исполнитель или независимый проверяющий, — потому что правило сужения (роль может создать только более узкую роль) устроено именно по этим id; новые варианты описывает оператор в runtime.yaml, и расширение набора — правка того правила, а не панели. Уровень ризонинга не предлагается, потому что такого поля нет ни в одном профиле процесса: он бы ничего не задавал.",
     guide_ag_profile_ex: "найм → profile_id: claude-builder; модель рядом — та, что названа в runtime.yaml, а без такого конфига список говорит, что модель закреплена в профиле, и не называет её",
     guide_ag_grants_h: "Права выводятся, а не хранятся",
     guide_ag_grants_p: "Три гранта — create_roles, retire_roles, open_links — каждый deny, ask или auto, по умолчанию deny. Реальные права — effective_grants: минимум по роли и всем её создателям вверх по цепочке, пересчитывается на каждом вызове, поэтому понижение действует и на уже идущую работу; уволенный предок схлопывает всю линию до deny. Уровень auto сознательно удержан: он записывается как есть, но действует как ask — каждое автоматическое действие всё равно спрашивает человека.",
@@ -2670,9 +3024,6 @@ const STRINGS = {
     guide_tk_accept_h: "Успех — не приёмка",
     guide_tk_accept_p: "delegation.succeeded закрывает прогон, но не задачу: задача остаётся ровно там, где была, потому что приёмка — действие человека. task.accepted требует актуального одобренного независимого ревью точной ревизии задачи — независимое значит написанное не теми сессиями, что делали работу (их список в записи называется work_author_session_ids): никто не принимает собственный результат. Без такого ревью запись отклоняется. Если привязанное ревью потом устареет, приёмка снимется при следующей пересборке картины.",
     guide_tk_accept_ex: "зелёная галка в графе — только accepted или approved; succeeded остаётся информационным синим",
-    guide_tk_demo_h: "Demo-режим",
-    guide_tk_demo_p: "С demo: true в конфиге оператора провайдер не запускается. Путь прогона остаётся тем же одним — запрос, лимиты, состояния, — но на последнем шаге, где стартовал бы настоящий процесс провайдера, вместо него отвечает заглушка DemoRunner. Она сама завершает только implementation-прогоны, с честным summary о том, что провайдер не работал; ревью и верификации она не выдумывает — такие прогоны уходят в needs_operator. Включается явно и никогда не по умолчанию.",
-    guide_tk_demo_ex: "demo-прогон роли ревьюера → вердикт не выдумывается; делегирование уходит в needs_operator",
     guide_ln_record_h: "Что записывает связь",
     guide_ln_record_p: "agent.link_opened записывает from_agent_id, to_agent_id, allowed_action, deadline_seconds и причину; agent.link_closed обязан назвать ревизию, которую закрывает, — слепое закрытие отклоняется. Домен проверяет запись целиком: обе роли активны, связь не сама на себя, у открывающего есть open_links. allowed_action — типизированный enum (ask или handoff_work), а не флаг «открыто».",
     guide_ln_record_ex: "закрытие без expected_revision → отказ; связь открыта до явного agent.link_closed",
@@ -2693,11 +3044,11 @@ const STRINGS = {
     guide_lm_panel_h: "Что реально запускает панель",
     guide_lm_panel_p: "Прогон из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
     guide_lm_panel_ex: "Run на доске → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
-    guide_lm_gates_h: "Три гейта, loopback, без транскриптов",
-    guide_lm_gates_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. По умолчанию только чтение: существуют только GET-маршруты. --enable-writes открывает перечисленные маршруты записи; --enable-catalog-editing (плюс --role-catalog) дополнительно даёт панели править каталог; --enable-launch (плюс --profile-config) дополнительно разрешает прогоны провайдера. Профили из UI не редактируются ни при каком гейте. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
-    guide_lm_gates_ex: "старт только на чтение → приложение регистрирует только GET-маршруты; стрим без токена → 401",
+    guide_lm_access_h: "Loopback, один токен, ничего не хранится",
+    guide_lm_access_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. Переключателей возможностей нет: панель может ровно то, для чего есть основание — собственная операторская сессия делает её пишущей вообще, файл каталога делает каталог правимым, файл среды выполнения делает прогоны возможными, — и все три пишутся с её же экрана настройки. Вид, открытый чтобы ничего не записывать, не регистрирует ни одного маршрута кроме GET. Профили отсюда не редактируются ни в каком состоянии. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
+    guide_lm_access_ex: "прогон до того, как есть файл среды выполнения → launch_not_configured и экран настройки, а не перезагрузка",
     guide_ct_file_h: "Каталог — файл оператора",
-    guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог (второй гейт), но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
+    guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог, когда он у неё есть, но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
     guide_ct_file_ex: "билдер работает с правом записи в workspace — каталог внутри него был бы каталогом, который роль может переписать",
     guide_ct_skill_h: "Навык — инструкция от оператора",
     guide_ct_skill_p: "Запись навыка несёт до 4000 знаков инструкции; запись инструмента — только идентификатор, потому что сам инструмент уже зафиксирован профилем. На старте прогона skill_instructions разрешает каждый id fail-closed: id, которого нет в каталоге, отменяет прогон — вместо того чтобы молча запустить другую роль, чем описал оператор. Разрешённый текст входит в ограниченную инструкцию, подаваемую процессу провайдера через stdin, — роль не может написать себе навык сама.",
@@ -2871,6 +3222,7 @@ const STRINGS = {
     sum_independent_no: "не независимое",
     sum_from_to: "Между",
     sum_action: "Может",
+    sum_model: "Модель",
     sum_skills: "Обязательных навыков",
     sum_tools: "Разрешённых инструментов",
     sum_origin: "Кто нанял",
@@ -2944,6 +3296,55 @@ const STRINGS = {
     count_verifications: "проверок",
     count_agents: "ролей",
     count_templates: "шаблонов",
+    // --- первая настройка --------------------------------------------------
+    setup_title: "Настройте этот проект",
+    setup_intro: "Роль сможет работать, когда есть три вещи: git-репозиторий, рабочее пространство внутри него и файл среды выполнения вне него — тот, что перечисляет программы, которые прогон вправе стартовать. Этот экран пишет последние две; терминал здесь не нужен.",
+    setup_intro_readonly: "Роль сможет работать, когда есть три вещи: git-репозиторий, рабочее пространство внутри него и файл среды выполнения вне него — тот, что перечисляет программы, которые прогон вправе стартовать. Эта панель только наблюдает, поэтому может сказать, чего из этого не хватает, и больше ничего.",
+    setup_readonly_note: "Эта панель ничего настроить не может. Она открыта для наблюдения, поэтому маршрутов, которые записали бы рабочее пространство или файл среды выполнения, на ней нет вовсе — нажимать здесь нечего. Чтобы сделать то, чего требует состояние выше, откройте панель на этом каталоге без переключателя «только чтение», а эта опишет результат при следующем взгляде.",
+    setup_repo_missing: "Этот каталог — не git-репозиторий, значит рабочему пространству не к чему прикрепиться и работу некуда записывать. Сделайте его репозиторием и нажмите «Посмотреть снова»:",
+    setup_init_offer: "Это git-репозиторий, рабочего пространства в нём пока нет. Создание запишет сюда .agent-commons/ — общую историю, в которую попадают все роли, все задачи и все прогоны. Ничего за пределами этого каталога не затрагивается.",
+    setup_init_button: "Создать рабочее пространство здесь",
+    setup_unconfigured_lead: "Рабочее пространство есть. Не хватает файла среды выполнения: операторского файла вне этого репозитория, который говорит, какие локальные программы прогон вправе стартовать и с какими ограничениями. Пока его нет, поручить работу некому.",
+    setup_all_set: "Проект настроен. Роли можно нанимать, прогоны — вести; здесь больше нечего делать.",
+    setup_found_title: "Что нашлось на этой машине",
+    setup_binary_missing: "не найдена",
+    setup_found_none: "Функционал недоступен: не найдены ни claude, ни codex. Установите CLI одного из них с вашей подпиской и нажмите «Посмотреть снова».",
+    setup_found_partial: "Разрешилась только {found}. Профили пишутся для неё и больше ни для кого — при найме будут предложены её роли, а {missing} просто не появится, пока вы её не установите и не посмотрите снова.",
+    setup_support_missing: "Провайдер нашёлся, но программа, которую называет каждый записываемый профиль, не разрешилась:",
+    setup_support_missing_after: "Пока это не исправлено, писать нечего: профиль с программой, которую панель не может разрешить, упал бы на первом прогоне вместо того, чтобы отказать здесь. Установите её и нажмите «Посмотреть снова».",
+    setup_path_label: "Будет записан в",
+    setup_trust_warning: "Прочитайте до того, как нажмёте. Профили, которые здесь пишутся, позволяют прогону стартовать эти программы от вашего имени с правом записи в это рабочее дерево: процесс роли-исполнителя может создавать, менять и удалять файлы в любом месте под этим репозиторием и делает это, не спрашивая на каждом действии. Ничего за пределами репозитория не выдаётся, никакие учётные данные не пишутся, роли-ревьюеры получают доступ только на чтение — но само рабочее дерево открыто по-настоящему, поэтому делайте это на проекте, на историю git которого вы готовы опереться.",
+    setup_write_button: "Записать файл и настроить эту панель",
+    setup_written: "Настроено. Панель приняла файл как есть, перезагружать ничего не нужно, и профили предлагаются начиная с этого момента.",
+    setup_initialized: "Рабочее пространство создано. Панель открыла в нём собственную сессию и ведёт запись.",
+    setup_rejected_existing: "По пути ниже уже лежит операторский файл среды выполнения, и собственный загрузчик этой панели его не принимает. Ваш файл не тронут: панель его не писала и не переименовывает и не перезаписывает то, чего не писала. Пока он не починен или не заменён, работать ничего не будет.",
+    setup_manual_yaml: "Замена отсюда перезапишет его свежесгенерированным файлом. Починка означает править его самому — файл, который панель не писала, она не редактирует. Что именно не устроило загрузчик, сказано ниже его же словами.",
+    setup_rejected_why: "Причина от загрузчика:",
+    setup_rejected_where: "Файл, который он не принял:",
+    setup_rejected_no_reason: "Этой панели не сообщили, что именно не устроило загрузчик, — только то, что он отказал. Причину напечатает попытка начать прогон из терминала в этом каталоге.",
+    setup_rejected: "Файл, который панель сгенерировала, её собственный загрузчик не принял, поэтому файл не был принят в работу и убран в сторону под именем runtime.yaml.rejected, а не оставлен изображать рабочий. Причина от загрузчика:",
+    setup_rescan_button: "Посмотреть снова",
+    setup_no_provider_guide: "Открыть справочник",
+    setup_later_button: "Не сейчас — на доску",
+    setup_reopen: "Настроить среду выполнения…",
+    setup_working: "выполняется…",
+    setup_preflight_button: "Проверить настроенные профили",
+    setup_add_discovered_providers_button: "Добавить профили нового провайдера",
+    setup_providers_added: "Добавлены профили: {providers}.",
+    setup_no_new_providers: "Новых найденных провайдеров нет.",
+    setup_preflight_credential_free: "Проверка стартует каждого провайдера с --help и здоровается с MCP-сервером. Она не тратит ни одного прогона и ни одной квоты подписки — и именно поэтому не отличает авторизованного провайдера от неавторизованного: она доказывает, что программы существуют и отвечают, и ничего о вашей учётной записи.",
+    setup_preflight_ok: "ответил",
+    setup_preflight_bad: "не ответил",
+    setup_preflight_all_ok: "Все настроенные профили ответили.",
+    setup_preflight_some_bad: "Что-то не ответило; профили перечислены ниже.",
+    stream_setup_pending: "ещё не настроено — экран говорит, чего не хватает",
+    launch_not_configured_note: "Вести прогоны пока не с чем: файл среды выполнения не действует, поэтому у панели нет разрешённой программы, которой прогон можно поручить. Файл пишется с экрана настройки — без перезагрузки и без терминала.",
+    refusal_uninitialized: "Рабочего пространства в этом каталоге ещё нет, записывать некуда. Создайте его на экране настройки, и эта запись пройдёт.",
+    panel_already_open: "Этим проектом уже владеет другая панель, а писать в него одновременно может только одна. Пользуйтесь тем окном или остановите его и перезагрузите это; его адрес — в отказе ниже.",
+    panel_refusal_where: "панель, владеющая проектом:",
+    panel_refusal_not_a_link: "Наберите этот адрес в окне сами или найдите вкладку, которая уже на нём. Панель намеренно не делает его ссылкой: ключ доступа панели живёт только в адресе её собственной вкладки, поэтому собранная здесь ссылка открыла бы страницу, которая не смогла бы вас впустить, — и занятая панель выглядела бы сломанной.",
+    panel_refusal_nowhere: "Прочитать, на каком адресе та панель, не удалось: файл с её портом отсутствует или нечитаем. Окно всё равно существует — поищите его среди открытых вкладок или остановите его и перезагрузите это.",
+    session_recovered_note: "Сессия этой панели истекла, пока вкладка была открыта — скорее всего машина уснула, — и панель завела замену под той же личностью. Ничего не потеряно: всё уже записанное записанным и остаётся, а панель снова пишет как названная здесь сессия.",
   },
 };
 const LANG_KEY = "ac_ui_lang";
@@ -3010,8 +3411,16 @@ async function post(path, body) {
   if (!response.ok) {
     // Refusals name the guard they tripped; that string is the useful part.
     // The backend message is canonical and stays verbatim in any language.
-    throw new Error((payload.error && payload.error.message) ||
+    const failure = new Error((payload.error && payload.error.message) ||
       (t("request_failed") + " " + response.status));
+    // The refusal's CODE travels beside its sentence rather than being thrown
+    // away.  Some refusals are states the panel can act on rather than text to
+    // print — `launch_not_configured` has a screen, `panel_already_open` has an
+    // address — and matching those on their English message would break the
+    // moment the message is reworded.
+    failure.code = (payload.error && payload.error.code) || "";
+    failure.actions = (payload.error && payload.error.safe_next_actions) || [];
+    throw failure;
   }
   return payload;
 }
@@ -3047,6 +3456,11 @@ function refusedField(message) {
 // buttons, which is where a refusal about a control was worth nothing (round 3).
 const REFUSED_CONTROLS = [
   [/^these skills are not in the operator catalogue: /, "skills"],
+  // The model name rule, refused at the form rather than from inside a run an
+  // hour later.  The server's sentence already names what a model name may
+  // contain AND says that empty is a legitimate answer, so there is nothing to
+  // rewrite — only somewhere better to put it than under the buttons.
+  [/^that is not a usable model name: /, "model"],
 ];
 
 function refusedControl(message) {
@@ -3072,8 +3486,24 @@ const REFUSAL_HINTS = [
   ["is not allowed from task state", "err_task_state_illegal"],
 ];
 
+// Three refusals are states of this panel rather than complaints about a
+// request, and every form in the panel can meet all three: the workspace does
+// not exist yet, the runtime is not configured, or another panel already owns
+// this project.  They are matched on the CODE the server sends, not on the
+// English of the message — the message is the canonical text and may be
+// reworded, while the code is frozen by the wave contract.  The canonical
+// sentence still follows in brackets, and for `panel_already_open` it is the
+// half that carries the first panel's address.
+const REFUSAL_CODES = {
+  setup_uninitialized: "refusal_uninitialized",
+  launch_not_configured: "launch_not_configured_note",
+  panel_already_open: "panel_already_open",
+};
+
 function humanizeError(error, fieldLabels) {
   const message = String(error.message || error);
+  const coded = REFUSAL_CODES[error && error.code];
+  if (coded) { return t(coded) + " (" + message + ")"; }
   const field = refusedField(message);
   if (field && fieldLabels && fieldLabels[field]) {
     // No canonical text in brackets here, and only here: the sentence already
@@ -3318,6 +3748,28 @@ const PROFILE_PROVIDER = {
   "codex-builder": "codex", "codex-independent-reviewer": "codex",
 };
 
+// The model a role was hired with, or nothing.  It lives under
+// `payload.extensions` — the free-form object the agent payload schema already
+// carried — so recording a choice moved no schema and changed no already
+// written event.  The same reading as the backend's `role_model`, and the same
+// distrust: this record is replayed from a file this tab did not write, so
+// anything that is not a plain non-empty string reads as absent rather than
+// being printed as if it were a name.
+function roleModel(record) {
+  const extensions = record && record.extensions;
+  if (!extensions || typeof extensions !== "object") { return ""; }
+  const model = extensions.model;
+  return typeof model === "string" && model.trim() ? model : "";
+}
+
+// Board cards do not have the full record the drawer fetches later: they read
+// the public graph node, whose backend projection deliberately exposes only
+// the validated model rather than the role's free-form extensions object.
+function boardRoleModel(node) {
+  const model = node && node.kind === "agent" && node.attrs && node.attrs.model;
+  return typeof model === "string" && model.trim() ? model : "";
+}
+
 function profileOptions(profiles, info) {
   // The four ids are the domain's whole menu; which of them can actually START
   // is the operator's runtime.yaml, and that is what `profile_info` reports.
@@ -3555,8 +4007,16 @@ let showRuntime = localStorage.getItem(RUNTIME_KEY) === "1";
 // writes off there is none, and the projection's own "answers to a human" rank
 // is then the best the board has — every other CLI window opens a session too,
 // and those are machinery like any other.
+// Every session this panel has owned, newest last, as the stream reports it
+// after a TTL replacement.  It is a LINE, not a single id: an expired session
+// is still on the board and was still this operator's own window, and drawing
+// it as somebody else's machinery is the same mistake as treating the dead one
+// as the live one — just the other way round.
+let sessionLineage = [];
+
 function isOperatorSession(node) {
   if (node.kind !== "session") { return false; }
+  if (sessionLineage.indexOf(node.id) >= 0) { return true; }
   const own = metaInfo && metaInfo.writer_session_id;
   return own ? node.id === String(own) : Boolean(node.reports_to_operator);
 }
@@ -3811,8 +4271,10 @@ function render(graph) {
     const line = node.kind + " · " + stateLabel(node) +
       (node.awaits_human ? "  ⏳ " + t("waiting_on_you") : "");
     content.appendChild(text(10, 34, line, "meta"));
-    content.appendChild(text(10, 50,
-      node.stale ? node.id + "  ▨ " + t("stale") : node.id, "meta"));
+    const model = boardRoleModel(node);
+    const detail = model ? t("sum_model") + ": " + model
+      : (node.stale ? node.id + "  ▨ " + t("stale") : node.id);
+    content.appendChild(text(10, 50, detail, "meta"));
     // The tooltip is where the state's gloss goes, and only here: a card is 180
     // by 62 units and already carries a kind, a state, a label and a ULID, so a
     // sentence beside the state would push one of those off the card.  The
@@ -3829,6 +4291,7 @@ function render(graph) {
     const tooltip = document.createElementNS(SVGNS, "title");
     tooltip.textContent = (node.label ? node.label + "\n" : "") + node.id +
       "\n" + node.kind + " · " + stateWithGloss(node);
+    if (model) { tooltip.textContent += "\n" + t("sum_model") + ": " + model; }
     // The operator's own window is the one card a newcomer cannot map to
     // anything they did; say plainly that it is them (round 2, PM findings).
     if (isOperatorSession(node)) {
@@ -3985,6 +4448,36 @@ function paintProfileAvailability() {
   document.getElementById("hire-profile-missing").hidden = !missing;
 }
 
+// The models the hire form may offer for the profile currently chosen.
+//
+// `model_options` is keyed by PROVIDER, always present and often empty: the
+// backend builds it out of the configured profiles' own models and the models
+// this project's active roles were hired with, and offers nothing else.  The
+// panel adds nothing to it — an invented name would be a name that is not the
+// one that runs — so an empty list is rendered as an empty list and says so,
+// rather than being padded with something plausible.
+//
+// Two surfaces, one source: the `<datalist>` the browser completes from, and a
+// line under the field that shows the same names outright, because a completion
+// popup nobody opens is a list nobody saw.
+function paintModelOffers() {
+  const chosen = document.getElementById("hire-profile").value;
+  const info = (catalog && catalog.profile_info && catalog.profile_info[chosen]) || {};
+  const provider = info.provider || PROFILE_PROVIDER[chosen] || "";
+  const offers = ((catalog && catalog.model_options) || {})[provider] || [];
+  const list = document.getElementById("hire-model-offers");
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  for (const name of offers) {
+    const option = document.createElement("option");
+    option.value = name;
+    list.appendChild(option);
+  }
+  // The names are canonical strings out of an operator file and out of replayed
+  // events; they are printed as they were sent and are never translated.
+  document.getElementById("hire-model-hint").textContent = t("hire_model_hint") + " " +
+    (offers.length ? t("hire_model_offered") + ": " + offers.join(", ") : t("hire_model_none"));
+}
+
 function applyHireMode() {
   const wantsPreset =
     document.getElementById("hire-mode").value === "preset" && !hireTemplate;
@@ -4002,8 +4495,16 @@ function applyHireMode() {
   // goes: a template already decided the profile, and a sentence about which
   // process a choice starts would be a sentence about a control not on screen.
   document.getElementById("hire-profile-help").hidden = fromPreset;
+  // The model travels with the picker, for the same reason and one more: a
+  // template is a saved role SHAPE and the model is part of the shape it saved,
+  // so the backend hands the hire the template's model.  A field offered here
+  // would silently override it — and the offers are keyed by the provider of a
+  // profile that is no longer on screen, so there would be nothing honest to
+  // put in the list beside it either.
+  document.getElementById("hire-model-field").hidden = fromPreset;
+  document.getElementById("hire-model-hint").hidden = fromPreset;
   if (fromPreset) { document.getElementById("hire-profile-missing").hidden = true; }
-  else { paintProfileAvailability(); }
+  else { paintProfileAvailability(); paintModelOffers(); }
   // Saving a template hires nobody, so the sentence about who a hired role
   // answers to has nothing to be about on that path.
   document.getElementById("hire-chain-note").hidden = hireTemplate;
@@ -4063,6 +4564,10 @@ function showHire(open, options) {
   // first; what THIS opening asks for is applied below.
   document.getElementById("hire-name").value = "";
   document.getElementById("hire-rationale").value = "";
+  // The model is a free-text field and would otherwise leak the last hire's
+  // choice into the next one, silently — the second role would be hired on the
+  // first one's model with nothing on screen having asked for it.
+  document.getElementById("hire-model").value = "";
   document.getElementById("hire-turnover_budget").value = "";
   document.getElementById("hire-create_roles").value = "deny";
   document.getElementById("hire-retire_roles").value = "deny";
@@ -4475,7 +4980,15 @@ for (const [pickerId, noteId] of [
 document.getElementById("sgr-to-runs").addEventListener("click", () => viewShow("runs"));
 document.getElementById("hire-mode").addEventListener("change", applyHireMode);
 document.getElementById("hire-preset").addEventListener("change", prefillPresetRationale);
-document.getElementById("hire-profile").addEventListener("change", paintProfileAvailability);
+// Both surfaces under the picker depend on which profile is chosen: whether the
+// operator's config carries it at all, and which provider's models may be
+// offered beside the model field.  The operator's typed model is deliberately
+// NOT cleared by a provider change — the field is theirs, and a form that empties
+// a field under the hand is the class of bug round 3 found three times here.
+document.getElementById("hire-profile").addEventListener("change", () => {
+  paintProfileAvailability();
+  paintModelOffers();
+});
 for (const id of ["hire-create_roles", "hire-retire_roles"]) {
   document.getElementById(id).addEventListener("change", paintTurnoverRequirement);
 }
@@ -4531,7 +5044,7 @@ document.getElementById("task-create-go").addEventListener("click", async () => 
     document.getElementById("task-desc").value = "";
     document.getElementById("task-criteria").value = "";
     await refreshGraph();
-    if (launchEnabled) { loadLaunch(); }
+    loadLaunch();
   } catch (error) {
     showFormError(error, TASK_FIELDS, result);
   }
@@ -5048,11 +5561,20 @@ function paintSettingsLabels(record) {
       option.textContent = glossed(option.value, PICKER_GLOSS[option.value]);
     }
   }
-  // The model is a property of the operator-owned profile, not of the role: a
-  // role that could name a model would be editing argv.
+  // The profile, and then the model — reported, never edited.  This panel is
+  // where an operator would look for a model control, and it is exactly the
+  // surface the decision excludes: a role's accumulated context is built for the
+  // model that built it, so moving a hired role to another model would mean
+  // rebuilding that context, and `reconfigure_agent` refuses the change
+  // outright.  Saying nothing here would read as an oversight; saying it is
+  // fixed, and why, is the honest shape of the same absence.
   document.getElementById("settings-model").textContent =
     t("profile_word") + " " + (record.profile_id || "—") + " — " + t("profile_note") +
-    (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".");
+    (catalog && catalog.catalog_path ? " (" + catalog.catalog_path + ")." : ".") + " " +
+    (roleModel(record)
+      ? said("settings_model_chosen", { model: roleModel(record) }) + " " +
+        t("settings_model_fixed")
+      : t("settings_model_profile"));
   const note = document.getElementById("settings-note");
   const blockers = record.retirement_blockers || [];
   // What is stored against what is in effect.  Both are canonical grant levels
@@ -5095,9 +5617,11 @@ async function loadCatalog() {
   catalogEditing = Boolean(catalog && catalog.catalog_editing_enabled);
 }
 
-// Launching a role's run from the panel (MUST-4). The Run tab appears on a role
-// only when the operator started the UI with the launch gate; it records a
-// delegation under the role's profile and runs it through the broker.
+// Launching a role's run from the panel (MUST-4). It records a delegation under
+// the role's profile and runs it through the broker.  There is no launch switch
+// any more: whether a run can start follows from whether a runtime config is in
+// effect, and that config is written from this panel's own first-run screen —
+// so the tab is shown either way and says which of the two it is.
 let launchEnabled = false;
 let launchTasks = [];
 
@@ -5106,6 +5630,16 @@ async function loadLaunch() {
   try { options = (await api("/api/launch")) || options; } catch (error) { /* read-only */ }
   launchEnabled = Boolean(options.launch_enabled);
   launchTasks = options.tasks || [];
+  // An unconfigured runtime is a state with a name and a way out, not a missing
+  // control: the note switches to the reason and the button beside it leads to
+  // the screen that writes the config.  The note switches its `data-i18n` key
+  // rather than its text, because `applyI18n` runs on every stream frame and
+  // would put the other sentence back two seconds later.
+  document.getElementById("run-note").dataset.i18n =
+    launchEnabled ? "run_note" : "launch_not_configured_note";
+  document.getElementById("run-go").disabled = !launchEnabled;
+  document.getElementById("run-setup").hidden = launchEnabled;
+  applyI18n();
   const picker = document.getElementById("run-task");
   // The same clobber as the hire pickers, and this one fires on every stream
   // snapshot: `loadLaunch` runs about every two seconds while a run moves, and
@@ -5160,6 +5694,7 @@ async function runRole() {
 }
 
 document.getElementById("run-go").addEventListener("click", runRole);
+document.getElementById("run-setup").addEventListener("click", () => openSetup());
 
 // Live run phases (MUST-5). The Runs tab appears when there is a run to show and
 // updates on the same stream as the graph, so a launched run visibly moves
@@ -5704,7 +6239,15 @@ document.getElementById("task-edit-save").addEventListener("click", async () => 
 async function repaintAfterAcceptanceWrite(node) {
   await refreshGraph();
   await loadAttention();
-  if (node) { await inspect(node); }
+  if (!node) { return; }
+  // `refreshGraph` just replaced `lastGraph`, so the node captured before the
+  // write describes exactly the projection the write made stale -- and the
+  // drawer's state line is painted from the node, so reopening on it said
+  // "State: review" under a headline that said accepted.  The same id is
+  // looked up in the fresh snapshot; the stale object is only the fallback
+  // for a node the new graph no longer carries at all.
+  const fresh = ((lastGraph && lastGraph.nodes) || []).find((n) => n.id === node.id);
+  await inspect(fresh || node);
 }
 
 async function requestTaskReview() {
@@ -5851,6 +6394,11 @@ function paintHire() {
     profileOptions(catalog.profiles || [], catalog.profile_info || {}),
     held("hire-profile", null), false);
   paintProfileAvailability();
+  // The offers and the sentence beside them are repainted from the catalogue
+  // every time, and a language switch is a repaint — but the operator's typed
+  // model is never touched: `paintModelOffers` writes the datalist and the note,
+  // and the input is not one of them.
+  paintModelOffers();
   fillSelect(document.getElementById("hire-context_mode"),
     glossedOptions(catalog.context_modes || ["fresh", "accumulated"], PICKER_GLOSS),
     held("hire-context_mode", "fresh"), false);
@@ -5867,7 +6415,7 @@ function paintHire() {
   // catalogue renders this control as an empty box that reads as broken, so the
   // box gives way to the line that says what a skill is and where skills come
   // from.  The line is written here rather than carried as `data-i18n` because
-  // its second half depends on the catalogue-editing gate — and because being
+  // its second half depends on whether the catalogue is editable — and because being
   // written here is what repaints it on a language switch.
   const skills = catalog.skills || [];
   fillSelect(document.getElementById("hire-skills"), skills, held("hire-skills", []), true);
@@ -5931,6 +6479,14 @@ async function hireRole() {
     // loaded per role, and a hire has no role yet.
     const skills = selectedValues(document.getElementById("hire-skills"));
     if (skills.length) { body.skills = skills; }
+    // An untouched field means "you choose", so the key is left off the wire
+    // entirely rather than sent as an empty string — the same discipline the
+    // skills picker keeps two lines above.  The backend normalizes blank to
+    // absent as well, and the placeholder says what absent gets you; sending
+    // nothing is simply the honest spelling of the same answer.  Whatever is
+    // typed goes as typed: this panel names no model of its own.
+    const model = document.getElementById("hire-model").value.trim();
+    if (model) { body.model = model; }
   }
   // A catalogue hire with no template chosen trips profile_id on the wire, but
   // the field the operator left empty is "Template" (round 2, PM findings).
@@ -5940,6 +6496,10 @@ async function hireRole() {
     // A refusal about the skills selection belongs under the picker, by the
     // label the operator is reading, exactly like the other three.
     skills: ["setting_skills_label", "hire-skills"],
+    // A refused model name is refused about ONE field, and it is a field the
+    // operator can fix in place — so it lands under it, like the skills refusal
+    // and unlike a banner about the request as a whole.
+    model: ["hire_model_label", "hire-model"],
   }, fromPreset
     ? { profile_id: ["hire_preset_label", "hire-preset"] }
     : { profile_id: ["hire_profile_label", "hire-profile"] });
@@ -6161,6 +6721,13 @@ const AGENT_GRANTS = [
 function summarizeAgent(host, node, record) {
   summaryRow(host, "hire_name_label", record.name);
   summaryRow(host, "hire_profile_label", valueWithGloss(record.profile_id));
+  // Beside the profile, because it qualifies the profile: the model the role was
+  // hired with overrides the profile's own.  The row is absent when the role
+  // named none — that is the profile's model standing, and an invented "default"
+  // in this slot would be the panel naming a model.  Here rather than only in
+  // Settings, because Settings is a writable panel's surface and a read-only tab
+  // may still need to know what this role runs on.
+  summaryRow(host, "sum_model", roleModel(record));
   // What the role MAY DO is the question its card is opened with, so this is the
   // effective grant — what an ancestor's downgrade actually leaves it — and not
   // the stored one the settings form edits.
@@ -6298,9 +6865,12 @@ async function inspect(node) {
   settingsTab.hidden = !(isRole && writesEnabled);
   // The pencil is a pointer to the Settings tab, so it comes and goes with it.
   document.getElementById("drawer-rename").hidden = settingsTab.hidden;
-  // Run appears on a role only when the launch gate is on, and only for an
-  // active (non-preset) role that can actually be staffed.
-  runTab.hidden = !(isRole && launchEnabled && node.state === "active" &&
+  // Run appears on every active (non-preset) role a writing panel can staff,
+  // configured runtime or not.  Hiding it while nothing was configured meant a
+  // person looking for Run found no tab, no refusal and no next step — the
+  // panel's own missing capability rendered as an absence.  It shows, it says
+  // why it cannot start anything, and it leads to the screen that fixes it.
+  runTab.hidden = !(isRole && writesEnabled && node.state === "active" &&
     !(node.attrs && node.attrs.template));
   const linksTab = document.querySelector('#drawer-tabs button[data-panel="links"]');
   linksTab.hidden = !isRole;
@@ -7285,6 +7855,29 @@ document.getElementById("board-fit").addEventListener("click", fitView);
 // manually from a fetch body instead.
 let lastEventId = null;
 
+// A refusal is not a dropped connection, and the reconnect loop cannot tell
+// them apart on its own: every non-OK response was thrown and retried, forever,
+// with the backoff capped at fifteen seconds.  `GET /api/stream` on a directory
+// with no workspace used to be a 500 and now answers `409 setup_uninitialized`
+// like every other reading route — a state, not a hiccup, and one no amount of
+// waiting will change.  Retrying it is a panel that says "reconnecting…" about
+// a project that simply is not set up.
+//
+// Matched on the CODE, not on the status: 409 is also how ordinary conflicts
+// arrive, and only these two say the ground under the panel is gone.
+const STREAM_HALTED_BY = ["setup_uninitialized", "setup_not_a_repository"];
+
+async function streamRefusalCode(response) {
+  // A refusal body that will not parse is not a refusal this can act on; the
+  // ordinary reconnect is the right answer then, so it says nothing.
+  try {
+    const payload = await response.json();
+    return (payload && payload.error && payload.error.code) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
 async function connect() {
   if (!self.ReadableStream || !("body" in Response.prototype)) {
     setStream("gap", "stream_unavailable");
@@ -7297,6 +7890,19 @@ async function connect() {
       const headers = authHeaders({ "Accept": "text/event-stream" });
       if (lastEventId) { headers["Last-Event-ID"] = lastEventId; }
       const response = await fetch("/api/stream", { headers: headers });
+      if (!response.ok && STREAM_HALTED_BY.indexOf(await streamRefusalCode(response)) >= 0) {
+        // The loop ends rather than backing off: this project has no history to
+        // stream and will not grow one until somebody sets it up.  The first-run
+        // screen owns that explanation, so it is re-read and repainted here, and
+        // `streamStarted` is released so the `boot()` that follows a successful
+        // first run can start the stream again instead of leaving a live panel
+        // permanently deaf.
+        streamStarted = false;
+        setStream("gap", "stream_setup_pending");
+        await loadSetup();
+        paintSetup();
+        return;
+      }
       if (!response.ok || !response.body) { throw new Error("stream " + response.status); }
       setStream("live", "stream_live");
       backoff = 1000;
@@ -7349,13 +7955,419 @@ function handleFrame(frame) {
     loadAttention();
     loadChat();
     loadRuns();
-    if (launchEnabled) { loadLaunch(); }
+    loadLaunch();
+    return;
+  }
+  if (event === "session_expired_recovered" && data) {
+    // Deliberately without touching `lastEventId`: the frame carries no `id:`,
+    // so it takes no part in resumption and must not be able to disturb it.
+    applySessionRecovery(JSON.parse(data));
     return;
   }
   if (event === "resume_gap") {
     setStream("gap", "stream_gap_resume");
   }
 }
+
+// The panel's own operator session can expire while the tab stays open — a
+// laptop asleep past the TTL — and be replaced under the same identity.  The
+// tab fetched `/api/meta` exactly once, at boot, and `isOperatorSession`
+// compares node ids against the `writer_session_id` it cached there: a panel
+// that only printed a notice would go on calling the DEAD session the
+// operator's window and hide its own live one as machinery, while the chip in
+// the header showed an id that no longer exists.  So this frame is not a
+// message, it is an instruction to re-read `/api/meta`.
+//
+// It carries no event id and is re-announced on every new connection, so
+// handling it has to be idempotent: the lineage's current id is remembered and
+// a repeat of the same one does nothing at all.
+let recoveredSessionId = null;
+
+async function applySessionRecovery(payload) {
+  const current = payload && payload.writer_session_id
+    ? String(payload.writer_session_id) : "";
+  if (!current || current === recoveredSessionId) { return; }
+  recoveredSessionId = current;
+  sessionLineage = (payload.writer_session_ids || [current]).map(String);
+  try {
+    metaInfo = await api("/api/meta");
+    writesEnabled = Boolean(metaInfo.writes_enabled);
+  } catch (error) {
+    // A refused read leaves the cached id in place, and that stale id is the
+    // whole thing this frame exists to replace — so the panel says it is out
+    // of touch rather than looking recovered while it is not.
+    setStream("gap", "stream_unauthorized");
+    return;
+  }
+  paintStatus();
+  // The re-read carries a fresh `session_refusal` too, and it can have changed
+  // in either direction — a panel that lost the singleness race and one that
+  // has just won it back are both this frame.
+  paintPanelRefusal();
+  // The board is what the identity decides: which card is the operator's own
+  // window, and which sessions are held behind the runtime toggle.
+  if (lastGraph) { paintChrome(lastGraph); render(lastGraph); }
+  // Said where a confirmation is said, with the new session's id beside it
+  // rather than instead of it — an id an operator cannot copy is worse than
+  // none.  Not a green tick: nothing was accepted, a session was replaced.
+  reportResult(document.getElementById("board-result"), "",
+    t("session_recovered_note"), metaInfo.writer_session_id);
+}
+
+// --- first run ------------------------------------------------------------
+// The panel used to assume a configured project: `boot()` asked `/api/meta`
+// first, and on a directory with no workspace that route raises — so the tab
+// showed "unauthorized" and a person whose only mistake was opening the panel
+// one directory too early had nothing to click.  `GET /api/setup` is the one
+// route that answers in every state, so it is asked FIRST and decides whether
+// there is a panel to boot at all.
+//
+// Two of the states have no board behind them at all (no repository, no
+// workspace): there the screen is the whole tab and cannot be put aside.  The
+// other two — no runtime config, or a config the launch loader will not accept
+// — sit over a board that works, so they can be set aside like the onboarding
+// card, and reopened from the places that need them.
+const SETUP_WITHOUT_A_BOARD = ["setup_not_a_repository", "setup_uninitialized"];
+// The frozen refusal codes this screen renders as a state rather than as text.
+//
+// One spelling, and it is the contract's: `setup_configured`, prefixed like the
+// three states beside it.  This was the only code in the table with no test
+// pinning it, which is exactly why the backend and the contract had drifted
+// apart and the panel had to accept both spellings blind.  The pin is there
+// now, so a second spelling here would be a second thing that can go wrong.
+const SETUP_CONFIGURED = "setup_configured";
+const SETUP_REJECTED = "setup_config_rejected_by_loader";
+const SETUP_NO_PROVIDER = "setup_no_provider_found";
+const SETUP_SUPPORT_MISSING = "setup_support_binary_unresolved";
+// Every executable the generated profiles name, in the order the screen lists
+// them: the two providers first, because choosing to trust them is the decision
+// being asked, then the two this project needs beside them.
+const SETUP_BINARIES = ["claude", "codex", "agent-commons-mcp", "git"];
+
+let setupInfo = null;
+let setupSetAside = false;
+let setupOpenedByHand = false;
+let setupGuideOpened = false;
+
+async function loadSetup() {
+  try { setupInfo = await api("/api/setup"); }
+  catch (error) { setupInfo = null; }
+  return setupInfo;
+}
+
+function setupIsConfigured(state) {
+  return state === SETUP_CONFIGURED;
+}
+
+function setupNeedsAttention() {
+  return Boolean(setupInfo) && !setupIsConfigured(setupInfo.state);
+}
+
+function setupHasNoBoard() {
+  return Boolean(setupInfo) && SETUP_WITHOUT_A_BOARD.indexOf(setupInfo.state) >= 0;
+}
+
+// The state note, in one place: which sentence the screen leads with is the
+// whole content of this screen, and spreading it across the button handlers is
+// how two states end up saying the same thing.
+function setupLead(state) {
+  if (state === "setup_not_a_repository") { return ["setup_repo_missing"]; }
+  if (state === "setup_uninitialized") { return ["setup_init_offer"]; }
+  // Two operationally different things wear this one frozen code, and the
+  // difference is what happened to the file.  Here the file is the operator's
+  // own and is UNTOUCHED — the panel did not write it and will not rename it —
+  // so the sentence must not read like the one for a generated config, which
+  // this panel wrote, refused, and moved aside itself (`setup_rejected`).
+  if (state === SETUP_REJECTED) { return ["setup_rejected_existing", "setup_manual_yaml"]; }
+  if (setupIsConfigured(state)) { return ["setup_all_set"]; }
+  return ["setup_unconfigured_lead"];
+}
+
+  // What would refuse a write attempted right now, said before the click rather
+  // than only after it — the server answers this in `blocking_refusal`, and the
+  // screen's job is to turn it into a sentence and offer only a real next step.
+function setupBlockingNote(info) {
+  if (info.blocking_refusal === SETUP_NO_PROVIDER) { return t("setup_found_none"); }
+  if (info.blocking_refusal === SETUP_SUPPORT_MISSING) {
+    return t("setup_support_missing") + " " +
+      (info.support_missing || []).join(", ") + ". " + t("setup_support_missing_after");
+  }
+  if ((info.providers_missing || []).length && (info.providers_found || []).length) {
+    return said("setup_found_partial", {
+      found: (info.providers_found || []).join(", "),
+      missing: (info.providers_missing || []).join(", "),
+    });
+  }
+  return "";
+}
+
+function paintSetupBinaries(info) {
+  const host = document.getElementById("setup-found-rows");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  const probes = info.providers || {};
+  for (const name of SETUP_BINARIES) {
+    const probe = probes[name];
+    if (!probe) { continue; }
+    const row = document.createElement("div");
+    row.className = "setup-row";
+    const label = document.createElement("span");
+    label.className = "setup-name";
+    // A program's name is a proper name and is never translated, in either
+    // language; so is the absolute path beside it.
+    label.textContent = name;
+    row.appendChild(label);
+    const where = document.createElement("span");
+    where.className = "setup-where";
+    where.textContent = probe.found ? probe.path : t("setup_binary_missing");
+    row.appendChild(where);
+    host.appendChild(row);
+  }
+}
+
+function paintSetup() {
+  const screen = document.getElementById("setup");
+  // The way back in, under whichever of its two names applies: while something
+  // is still missing it offers to set it up, and once nothing is it offers the
+  // credential-free check over the profiles that were written — which is the
+  // screen's only remaining use and would otherwise be unreachable.  The label
+  // switches its key rather than its text, because `applyI18n` runs on every
+  // stream frame and would put the other one back.
+  const reopen = document.getElementById("board-setup");
+  reopen.hidden = !setupInfo;
+  reopen.dataset.i18n = setupNeedsAttention() ? "setup_reopen" : "setup_preflight_button";
+  // Whether this panel can act on what the screen is about to describe.  The
+  // setup routes are registered from the same structural property the answer
+  // reports, so the screen and the router cannot disagree about what exists.
+  // An answer that omits the field is an older server: assume it can act, which
+  // is what the panel did before the field existed, rather than hiding the only
+  // way forward on a panel that has one.
+  const observing = Boolean(setupInfo) && setupInfo.operator_panel === false;
+  // The intro promises that this screen writes the two missing things. On an
+  // observing panel it writes nothing, so it says what it does instead.
+  document.getElementById("setup-intro").dataset.i18n =
+    observing ? "setup_intro_readonly" : "setup_intro";
+  applyI18n();
+  if (!setupInfo) { screen.hidden = true; return; }
+  const info = setupInfo;
+  const state = info.state;
+  const boardless = setupHasNoBoard();
+  screen.hidden = setupGuideOpened || !(boardless || setupOpenedByHand ||
+    (setupNeedsAttention() && !setupSetAside));
+  if (screen.hidden) { return; }
+
+  const configurable = state === "setup_unconfigured" || state === SETUP_REJECTED;
+  const blocked = Boolean(info.blocking_refusal);
+
+  const lead = document.getElementById("setup-state-note");
+  lead.textContent = setupLead(state).map(t).join(" ");
+  // The one line in this panel a person is asked to retype, and only because a
+  // directory that is not a repository cannot be made one from a page served
+  // out of it.  It is a command, so it is not translated.
+  const command = document.getElementById("setup-command");
+  command.hidden = state !== "setup_not_a_repository";
+  command.textContent = "git init";
+
+  document.getElementById("setup-found").hidden = !configurable;
+  if (configurable) {
+    paintSetupBinaries(info);
+    const note = document.getElementById("setup-found-note");
+    note.textContent = setupBlockingNote(info);
+    note.hidden = !note.textContent;
+    // The narrow, deliberate exception to "this panel hands out no path": while
+    // the runtime is unconfigured the target IS the decision being asked.  The
+    // route stops sending it the moment the state is configured, and this stops
+    // showing it at the same moment.
+    document.getElementById("setup-path").textContent =
+      t("setup_path_label") + " " + (info.config_path || "");
+  }
+
+  // Why the loader refused the operator's own file, in the loader's own words.
+  // The same text `POST /api/setup/runtime-config` puts in its error message,
+  // so one failure reads one way whichever half of the screen met it.  A
+  // rejected state that arrives without one — an older server — is still said
+  // out loud, as an absence, because "your file does not work" and silence
+  // about why is the dead end this reason was added to close.
+  const rejected = state === SETUP_REJECTED;
+  document.getElementById("setup-rejected").hidden = !rejected;
+  if (rejected) {
+    const why = document.getElementById("setup-rejected-why");
+    // The reason is canonical text out of the launch loader and is printed
+    // exactly as it arrived; only the label in front of it is the panel's.
+    why.textContent = info.rejected_reason
+      ? t("setup_rejected_why") + " " + info.rejected_reason
+      : t("setup_rejected_no_reason");
+    const where = document.getElementById("setup-rejected-path");
+    // The file the loader refused, named where it stands — the panel did not
+    // write it, has not moved it, and says so above.
+    where.textContent = info.rejected_path
+      ? t("setup_rejected_where") + " " + info.rejected_path : "";
+    where.hidden = !info.rejected_path;
+  }
+
+  // Every button below writes, and on an observing panel none of their routes
+  // is registered — pressing one would answer 404, which reads as a broken
+  // product rather than as a panel that was never given the power. The screen
+  // says so once, in words, and offers only what it can actually do: describe
+  // the state, look again, and run the credential-free check, all of them GETs.
+  document.getElementById("setup-readonly").hidden = !observing;
+
+  const init = document.getElementById("setup-init");
+  init.hidden = observing || state !== "setup_uninitialized";
+  const write = document.getElementById("setup-write");
+  // With no provider the only actions are documentation and another scan. A
+  // found provider missing a required support binary remains visible but
+  // disabled with its exact reason, because installing that helper is the
+  // concrete fix and it is already named on this screen.
+  const noProvider = info.blocking_refusal === SETUP_NO_PROVIDER;
+  write.hidden = observing || !configurable || noProvider;
+  write.disabled = blocked && !noProvider;
+  write.title = blocked ? setupBlockingNote(info) : "";
+  document.getElementById("setup-rescan").hidden = false;
+  document.getElementById("setup-guide").hidden =
+    observing || info.blocking_refusal !== SETUP_NO_PROVIDER;
+  document.getElementById("setup-preflight").hidden = observing || !setupIsConfigured(state);
+  document.getElementById("setup-add-providers").hidden =
+    observing || !setupIsConfigured(state);
+  document.getElementById("setup-preflight-note").hidden =
+    observing || !setupIsConfigured(state);
+  // Boardless states have nothing to go back to; every other opening does.
+  document.getElementById("setup-later").hidden = boardless;
+}
+
+function openSetup() {
+  setupOpenedByHand = true;
+  setupSetAside = false;
+  setupGuideOpened = false;
+  document.getElementById("setup-result").textContent = "";
+  paintSetup();
+  loadSetup().then(paintSetup);
+}
+
+function closeSetup() {
+  setupOpenedByHand = false;
+  setupSetAside = true;
+  paintSetup();
+}
+
+// A refusal from a setup write, said as this screen's own sentence where the
+// code has one and verbatim where it does not.  The generated-config case is
+// the only one of the two rejections that arrives with a reason attached, and
+// the reason is the whole value of the message — so it is kept.
+function setupRefusalText(error) {
+  const code = error && error.code;
+  const message = String((error && error.message) || error);
+  if (code === SETUP_REJECTED) { return t("setup_rejected") + " " + message; }
+  if (code === SETUP_NO_PROVIDER) { return t("setup_found_none"); }
+  if (code === "panel_already_open") { return t("panel_already_open") + " " + message; }
+  return message;
+}
+
+async function setupWrite(path, doneKey) {
+  const result = document.getElementById("setup-result");
+  const buttons = document.querySelectorAll("#setup .actions button");
+  for (const button of buttons) { button.disabled = true; }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let failure = null;
+  try { await post(path, {}); }
+  catch (error) { failure = error; }
+  for (const button of buttons) { button.disabled = false; }
+  await loadSetup();
+  if (failure) {
+    result.className = "result bad";
+    result.textContent = setupRefusalText(failure);
+    paintSetup();
+    return;
+  }
+  result.className = "result ok";
+  result.textContent = t(doneKey);
+  setupOpenedByHand = false;
+  paintSetup();
+  // Everything downstream of the write changes at once — a workspace appears,
+  // or profiles and a catalogue do — and the panel adopts them without a
+  // restart, so the tab has to catch up with itself rather than tell the
+  // operator to reload.
+  await boot();
+}
+
+document.getElementById("setup-init").addEventListener("click", () => {
+  setupWrite("/api/setup/initialize", "setup_initialized");
+});
+document.getElementById("setup-write").addEventListener("click", () => {
+  setupWrite("/api/setup/runtime-config", "setup_written");
+});
+document.getElementById("setup-rescan").addEventListener("click", () => {
+  document.getElementById("setup-result").textContent = "";
+  loadSetup().then(paintSetup);
+});
+document.getElementById("setup-guide").addEventListener("click", () => {
+  setupGuideOpened = true;
+  paintSetup();
+  viewShow("guide");
+});
+document.getElementById("setup-later").addEventListener("click", closeSetup);
+document.getElementById("board-setup").addEventListener("click", openSetup);
+
+async function addDiscoveredProviders() {
+  const result = document.getElementById("setup-result");
+  const buttons = document.querySelectorAll("#setup .actions button");
+  for (const button of buttons) { button.disabled = true; }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let report = null;
+  let failure = null;
+  try { report = await post("/api/setup/add-discovered-providers", {}); }
+  catch (error) { failure = error; }
+  for (const button of buttons) { button.disabled = false; }
+  await loadSetup();
+  if (failure) {
+    result.className = "result bad";
+    result.textContent = setupRefusalText(failure);
+    paintSetup();
+    return;
+  }
+  const added = (report && report.added_providers) || [];
+  result.className = "result ok";
+  result.textContent = added.length
+    ? said("setup_providers_added", { providers: added.join(", ") })
+    : t("setup_no_new_providers");
+  paintSetup();
+  await boot();
+}
+document.getElementById("setup-add-providers").addEventListener("click", addDiscoveredProviders);
+
+async function runSetupPreflight() {
+  const result = document.getElementById("setup-result");
+  const host = document.getElementById("setup-preflight-rows");
+  while (host.firstChild) { host.removeChild(host.firstChild); }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let report = null;
+  try { report = await api("/api/setup/preflight"); }
+  catch (error) {
+    result.className = "result bad";
+    result.textContent = String(error.message || error);
+    return;
+  }
+  result.className = "result " + (report.ok ? "ok" : "bad");
+  result.textContent = report.ok ? t("setup_preflight_all_ok") : t("setup_preflight_some_bad");
+  for (const entry of report.profiles || []) {
+    const row = document.createElement("div");
+    row.className = "setup-row";
+    const label = document.createElement("span");
+    label.className = "setup-name";
+    // The profile id is canonical and keeps the ledger's spelling; the verdict
+    // beside it is the panel's own word and is translated.
+    label.textContent = entry.profile_id;
+    row.appendChild(label);
+    const verdict = document.createElement("span");
+    verdict.className = "setup-where";
+    verdict.textContent = entry.ok ? t("setup_preflight_ok") : t("setup_preflight_bad");
+    row.appendChild(verdict);
+    host.appendChild(row);
+  }
+}
+document.getElementById("setup-preflight").addEventListener("click", runSetupPreflight);
 
 let metaInfo = null;
 
@@ -7395,6 +8407,54 @@ function paintWorkspaceIdentity() {
     const chip = document.getElementById(id);
     chip.textContent = value || "—";
     chip.title = t("id_chip_tip");
+  }
+}
+
+// The refusal `/api/meta` survived, drawn as the state of this window.
+//
+// It is not an error of any request: the operator opened a second panel on a
+// project the first one already owns, and every write in this tab will now be
+// refused with nothing on screen saying why.  `session_refusal` is null in the
+// ordinary case, so an absent banner is the ordinary case and not a bug.
+//
+// Two things are honest to say and one is not.  The sentence and the safe next
+// actions come from the frozen code and from the server; the ADDRESS is shown
+// as an address and never as a link, because each panel's bearer token lives
+// only in its own tab's URL fragment — a link assembled here would open a page
+// with no way to authorize itself, and the operator would read the panel that
+// is merely busy as one that is broken.  `address` may also be null, when the
+// lock file that holds the first panel's port cannot be read; then the panel
+// says it does not know rather than printing an empty chip.
+function paintPanelRefusal() {
+  const refusal = (metaInfo && metaInfo.session_refusal) || null;
+  const host = document.getElementById("panel-refusal");
+  host.hidden = !refusal;
+  if (!refusal) { return; }
+  // Said as this panel's own sentence where the code has one, and verbatim
+  // where it does not: an unfamiliar code is still worth more on screen than a
+  // silent banner, and the canonical text is what the operator can search for.
+  const key = REFUSAL_CODES[refusal.code];
+  const message = String(refusal.message || "");
+  document.getElementById("panel-refusal-note").textContent =
+    key ? t(key) + " (" + message + ")" : message;
+
+  const address = refusal.address ? String(refusal.address) : "";
+  document.getElementById("panel-refusal-where").hidden = !address;
+  document.getElementById("panel-refusal-nowhere").hidden = Boolean(address);
+  document.getElementById("panel-refusal-where-label").textContent = t("panel_refusal_where");
+  const chip = document.getElementById("panel-refusal-address");
+  chip.textContent = address;
+  chip.title = t("panel_refusal_not_a_link");
+  document.getElementById("panel-refusal-nowhere").textContent = t("panel_refusal_nowhere");
+
+  // The server's own safe next actions, verbatim: they are the canonical text
+  // of the refusal and the panel has nothing truer to put in their place.
+  const list = document.getElementById("panel-refusal-actions");
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  for (const action of refusal.safe_next_actions || []) {
+    const item = document.createElement("li");
+    item.textContent = String(action);
+    list.appendChild(item);
   }
 }
 
@@ -7459,6 +8519,9 @@ const LANGUAGE_SURFACES = [
   // The workspace's name is its directory and is never translated; the sentence
   // that says so, and the tooltip on every id chip beside it, are (item 29).
   ["workspace", () => paintWorkspaceIdentity()],
+  // The banner is half this panel's sentence and half the server's canonical
+  // text; `chrome` owns neither, because both are written from JS.
+  ["panel_refusal", () => paintPanelRefusal()],
   ["stream", () => setStream(lastStream.state, lastStream.key)],
   ["board", () => { if (lastGraph) { paintChrome(lastGraph); render(lastGraph); } }],
   ["legend", () => paintGlyphLegend()],
@@ -7479,7 +8542,11 @@ const LANGUAGE_SURFACES = [
   ["chat", () => loadChat()],
   ["attention", () => loadAttention()],
   ["search", () => repaintSearch()],
-  ["launch", () => { if (launchEnabled) { loadLaunch(); } }],
+  ["launch", () => loadLaunch()],
+  // The first-run screen is half `data-i18n` chrome and half painted from the
+  // one answer that describes the state, so `chrome` alone would translate its
+  // headings and leave the sentence that matters in the previous language.
+  ["setup", () => paintSetup()],
 ];
 
 // Repaint everything the current language touches, without a reload.  Chrome
@@ -7492,12 +8559,34 @@ function applyLanguage() {
   }
 }
 
+// `connect()` never returns — it is a reconnect loop — so a second boot after
+// first run must not start a second one beside the first.
+let streamStarted = false;
+
 async function boot() {
+  // The first question, and the only one that has an answer in every state:
+  // whether there is a project here to boot at all.  It is asked before
+  // `/api/meta` because `/api/meta` reads a workspace and raises without one,
+  // and that raise is what used to leave a first-time operator looking at a
+  // panel that said "no access" about a directory they had every access to.
+  await loadSetup();
+  paintSetup();
+  if (setupHasNoBoard()) {
+    // No repository, or no workspace: every other route reads state that does
+    // not exist yet, and there is nothing behind the screen to paint.  The
+    // stream stays shut until first run has made one.
+    setStream("gap", "stream_setup_pending");
+    return;
+  }
   try {
     const meta = await api("/api/meta");
     metaInfo = meta;
     writesEnabled = Boolean(meta.writes_enabled);
     paintStatus();
+    // Before anything else is painted: with a refusal standing, everything
+    // below it is a read-only view of somebody else's project, and the operator
+    // is owed the reason at the top rather than after the first refused write.
+    paintPanelRefusal();
     await loadCatalog();
     catalogInstructionVisibility();
     paintCatalog();
@@ -7516,7 +8605,7 @@ async function boot() {
   const graph = await api("/api/graph");
   paintChrome(graph);
   render(graph);
-  connect();
+  if (!streamStarted) { streamStarted = true; connect(); }
 }
 
 applyI18n();

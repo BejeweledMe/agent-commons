@@ -64,6 +64,29 @@ tests will teach it to you one failure at a time.
   link set are diffed by test.
   (`test_every_guide_deep_link_lands_on_a_heading_that_actually_exists`)
 
+## A registered route is not a usable route
+
+A writing panel registers its whole non-`GET` surface unconditionally — the
+union of `MUTATING_ROUTES`, `CATALOG_ROUTES`, `LAUNCH_ROUTES`, and
+`SETUP_ROUTES` in `src/agent_commons/ui/server.py` — the instant it can hold a
+session at all, before the workspace, the operator runtime config, or the
+catalogue exist. A read-only panel registers none of it; that half of the
+invariant is unconditional too. What changes over the panel's lifetime is
+never the route table, only whether a given call succeeds: an unconfigured
+environment answers a real POST with a typed 409 (`setup_uninitialized`,
+`launch_not_configured`, a catalogue refusal), not a 404. Never treat a 404 as
+"this panel can't do that yet" and never treat reaching a route without an
+error as proof of capability — read the response body's `error.code`, the same
+way `setup_state`/`launch_enabled`/`catalog_editing_enabled` on `GET
+/api/setup` and `GET /api/catalog` do, and drive first-run and blocked-action
+UI off those typed codes rather than off which requests happen to fail.
+
+The current setup tuple is exactly `POST /api/setup/initialize`,
+`POST /api/setup/runtime-config`, and
+`POST /api/setup/add-discovered-providers`. The last route derives its only
+input from trusted discovery and a byte-for-byte proof of the currently
+generated config; it never receives a YAML fragment or a path from the browser.
+
 ## Honesty rules
 
 - The panel never advances state client-side: every repaint after a write

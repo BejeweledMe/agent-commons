@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import re
 import stat
-import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -27,6 +26,9 @@ from typing import Any
 import yaml
 
 from agent_commons.errors import ConfigurationError, ValidationError
+from agent_commons.operator_files import assert_outside_workspace, replace_operator_file
+
+_LABEL = "role catalog"
 
 #: A skill carries operator-authored instruction text; a tool carries only an
 #: identity, because the tool it names is already fixed by the profile.
@@ -93,18 +95,6 @@ def _validated(value: Any) -> dict[str, list[dict[str, str]]]:
     return catalogue
 
 
-def _assert_outside_workspace(source: Path, workspace_root: str | Path | None) -> None:
-    if workspace_root is None:
-        return
-    try:
-        resolved_source = source.resolve()
-        resolved_workspace = Path(workspace_root).expanduser().resolve(strict=True)
-    except OSError as exc:
-        raise ConfigurationError("role catalog cannot be resolved safely") from exc
-    if resolved_source == resolved_workspace or resolved_workspace in resolved_source.parents:
-        raise ConfigurationError("role catalog must be outside the delegated workspace")
-
-
 def load_role_catalog(
     path: str | Path | None, *, workspace_root: str | Path | None = None
 ) -> dict[str, list[dict[str, str]]]:
@@ -113,7 +103,7 @@ def load_role_catalog(
     if path is None:
         return empty_catalog()
     source = Path(path).expanduser()
-    _assert_outside_workspace(source, workspace_root)
+    assert_outside_workspace(source, workspace_root, label=_LABEL)
     if not source.exists():
         # An operator may name the file before creating it; an absent catalogue
         # is empty, while an unreadable one is an error.
@@ -162,30 +152,13 @@ def write_role_catalog(
     """
 
     target = Path(path).expanduser()
-    _assert_outside_workspace(target, workspace_root)
+    assert_outside_workspace(target, workspace_root, label=_LABEL)
     validated = _validated(catalogue)
     body = yaml.safe_dump(validated, allow_unicode=True, sort_keys=True, width=88)
     encoded = body.encode("utf-8")
     if len(encoded) > _MAX_BYTES:
         raise ConfigurationError("role catalog exceeds 64 KiB")
-    if target.is_symlink():
-        raise ConfigurationError("role catalog must not be a symlink")
-    parent = target.parent
-    if not parent.is_dir():
-        raise ConfigurationError(f"role catalog directory does not exist: {parent}")
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=parent)
-    temporary = Path(temporary_name)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "wb", closefd=True) as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, target)
-        temporary = None  # type: ignore[assignment]
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    replace_operator_file(target, encoded, label=_LABEL)
     return validated
 
 

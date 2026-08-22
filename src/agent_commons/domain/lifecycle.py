@@ -111,6 +111,7 @@ def validate_transition(
     payload: Mapping[str, Any],
     *,
     actor_session_id: str,
+    actor: Mapping[str, Any] | None = None,
     relations: Sequence[Mapping[str, Any]] = (),
 ) -> None:
     if event_type == "workspace.semantics_required":
@@ -215,7 +216,22 @@ def validate_transition(
             raise LifecycleConflictError(
                 "only the delegation's bound child session may report this outcome"
             )
-    if event_type in {"delegation.resumed", "delegation.cancelled", "delegation.timed_out"}:
+    if event_type == "delegation.resumed":
+        parent_session_id = str(current.get("parent_session_id", ""))
+        actor_identity = (
+            {str(key): value for key, value in actor.items() if str(key) != "session_id"}
+            if isinstance(actor, Mapping)
+            else None
+        )
+        same_identity_replacement = (
+            actor_identity is not None
+            and snapshot.session_identities.get(parent_session_id) == actor_identity
+        )
+        if actor_session_id != parent_session_id and not same_identity_replacement:
+            raise LifecycleConflictError(
+                "only the delegation requester session may control this transition"
+            )
+    if event_type in {"delegation.cancelled", "delegation.timed_out"}:
         if actor_session_id != str(current.get("parent_session_id", "")):
             raise LifecycleConflictError(
                 "only the delegation requester session may control this transition"

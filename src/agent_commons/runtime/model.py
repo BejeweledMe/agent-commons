@@ -241,16 +241,19 @@ def _resolved_worker_mcp(
     child_session_id: str | None,
     mcp_executable: str,
     git_executable: str,
+    demo_unresolved_placeholder: bool = False,
 ) -> tuple[str, tuple[str, ...]]:
-    resolved_mcp = resolve_trusted_executable(
+    resolved_mcp = _resolve_or_demo_placeholder(
         mcp_executable,
         workspace_root=workspace_root,
         role=ExecutableRole.MCP,
+        demo_unresolved_placeholder=demo_unresolved_placeholder,
     )
-    resolved_git = resolve_trusted_executable(
+    resolved_git = _resolve_or_demo_placeholder(
         git_executable,
         workspace_root=workspace_root,
         role=ExecutableRole.GIT,
+        demo_unresolved_placeholder=demo_unresolved_placeholder,
     )
     effective_state_root = (
         Path(state_root if state_root is not None else workspace_root / ".agent-commons")
@@ -286,6 +289,26 @@ def _safe_optional_identifier(name: str, value: object) -> str | None:
     if value is None:
         return None
     return _safe_identifier(name, str(value))
+
+
+def validate_model_name(value: object) -> str | None:
+    """The one check a model name passes, wherever a model is chosen.
+
+    Exported because a model is no longer only an operator-config field: it can
+    now be picked when a role is hired, and a bad pick must be refused *at that
+    form* rather than an hour later from inside a launch, where the operator
+    has neither the field nor the context to fix it.
+
+    It is literally the check both runner profiles run in ``__post_init__``, so
+    a name accepted here is one ``dataclasses.replace(profile, model=...)``
+    will accept too -- there is one rule and no second opinion of it.  What the
+    rule buys is stated plainly: the pattern requires an alphanumeric first
+    character, so a leading ``-`` is not a model name, and nothing chosen on
+    this path can arrive at a provider as a flag.  ``None`` passes through, and
+    means the profile's own model stands.
+    """
+
+    return _safe_optional_identifier("model", value)
 
 
 def _safe_executable(value: object) -> str:
@@ -353,6 +376,36 @@ def resolve_trusted_executable(
             "profile executable must be owned by the operator or root",
         )
     return str(resolved)
+
+
+#: Argv stand-in a demo build records for an executable that failed trusted
+#: resolution.  Nothing can exist below ``/dev/null``, so even if such an
+#: invocation ever leaked to a real runner the launch would fail instantly
+#: instead of executing something unintended.
+DEMO_UNRESOLVED_EXECUTABLE = "/dev/null/agent-commons-demo-unresolved"
+
+
+def _resolve_or_demo_placeholder(
+    value: str,
+    *,
+    workspace_root: Path,
+    role: ExecutableRole,
+    demo_unresolved_placeholder: bool,
+) -> str:
+    """Resolve strictly; a demo build alone substitutes an inert placeholder.
+
+    Exactly ``ExecutableResolutionError`` is absorbed, and only when the caller
+    explicitly opted in for a run whose bound runner never starts a process.
+    Every other refusal keeps its exact exception, and the default leg is a
+    plain re-raise, byte-identical to calling ``resolve_trusted_executable``.
+    """
+
+    try:
+        return resolve_trusted_executable(value, workspace_root=workspace_root, role=role)
+    except ExecutableResolutionError:
+        if not demo_unresolved_placeholder:
+            raise
+        return DEMO_UNRESOLVED_EXECUTABLE
 
 
 def _instruction_bytes(instruction: str) -> bytes:
@@ -509,6 +562,7 @@ class CodexRunnerProfile:
         worker_purpose: str | None = None,
         role_tools: Sequence[str] | None = None,
         role_grants: Mapping[str, str] | None = None,
+        demo_unresolved_placeholder: bool = False,
     ) -> RunnerInvocation:
         if not self.trusted_workspace:
             raise ConfigurationError(
@@ -527,6 +581,7 @@ class CodexRunnerProfile:
             child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
             git_executable=self.git_executable,
+            demo_unresolved_placeholder=demo_unresolved_placeholder,
         )
         enabled_tools = tuple(
             tool.removeprefix(_MCP_TOOL_PREFIX)
@@ -534,7 +589,12 @@ class CodexRunnerProfile:
         )
         config_prefix = f"mcp_servers.{_CODEX_MCP_SERVER}"
         argv = [
-            resolve_trusted_executable(self.executable, workspace_root=workspace_root),
+            _resolve_or_demo_placeholder(
+                self.executable,
+                workspace_root=workspace_root,
+                role=ExecutableRole.PROVIDER,
+                demo_unresolved_placeholder=demo_unresolved_placeholder,
+            ),
             "--ask-for-approval",
             self.approval_policy.value,
             "--sandbox",
@@ -623,6 +683,7 @@ class ClaudeRunnerProfile:
         worker_purpose: str | None = None,
         role_tools: Sequence[str] | None = None,
         role_grants: Mapping[str, str] | None = None,
+        demo_unresolved_placeholder: bool = False,
     ) -> RunnerInvocation:
         if delegation_id is None:
             raise ConfigurationError("Claude runtime requires an exact delegation binding")
@@ -640,10 +701,11 @@ class ClaudeRunnerProfile:
                 if effective_budget is None
                 else min(effective_budget, max_budget_microusd)
             )
-        provider_executable = resolve_trusted_executable(
+        provider_executable = _resolve_or_demo_placeholder(
             self.executable,
             workspace_root=workspace_root,
             role=ExecutableRole.PROVIDER,
+            demo_unresolved_placeholder=demo_unresolved_placeholder,
         )
         mcp_executable, mcp_args = _resolved_worker_mcp(
             workspace_root=workspace_root,
@@ -652,6 +714,7 @@ class ClaudeRunnerProfile:
             child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
             git_executable=self.git_executable,
+            demo_unresolved_placeholder=demo_unresolved_placeholder,
         )
         # Pass the sole MCP server as immutable argv material.  Strict mode
         # excludes ambient user/project MCP configuration.  The broker-selected

@@ -17,8 +17,13 @@ import pytest
 
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.context import UIContext
-from agent_commons.ui.server import MUTATING_ROUTES
-from tests.ui.conftest import authorized, tree_digest
+from agent_commons.ui.server import (
+    CATALOG_ROUTES,
+    LAUNCH_ROUTES,
+    MUTATING_ROUTES,
+    SETUP_ROUTES,
+)
+from tests.ui.conftest import authorized, expected_surface, mutating_surface, tree_digest
 
 # The acceptance chain's setup lives beside the acceptance tests rather than
 # being copied here: one recipe for "a task with a qualifying review", so a
@@ -136,10 +141,14 @@ def test_read_endpoints_preserve_their_top_level_json_shapes(  # type: ignore[no
         "read_only",
         "writes_enabled",
         "writer_session_id",
+        "session_refusal",
         "server_instance_id",
         "trust_note",
         "truth_layers",
     }
+    # Present in every state and null in the ordinary one, so the tab tests it
+    # unconditionally rather than probing for a key that may not be there.
+    assert meta["session_refusal"] is None
 
     graph = client.get("/api/graph", headers=authorized()).json()
     assert set(graph) == {
@@ -181,14 +190,17 @@ def _agent_body(**overrides: Any) -> dict[str, Any]:
 
 def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
     writable_client,  # type: ignore[no-untyped-def]
+    writable: UIContext,
 ) -> None:
-    found = {
-        (method, route.path)
-        for route in writable_client.app.routes
-        for method in (getattr(route, "methods", set()) or set())
-        if method not in {"GET", "HEAD"}
-    }
-    assert found == set(MUTATING_ROUTES)
+    # Both halves on purpose: the derived expectation reads the same property
+    # `create_app` reads, so on its own it could only ever agree with itself.
+    # The literal union of the four declared tuples is what actually pins the
+    # surface -- a route silently dropped from registration *and* from the
+    # declaration would pass the first comparison and fail this one.
+    assert mutating_surface(writable_client.app) == expected_surface(writable)
+    assert mutating_surface(writable_client.app) == (
+        set(MUTATING_ROUTES) | set(LAUNCH_ROUTES) | set(SETUP_ROUTES) | set(CATALOG_ROUTES)
+    )
 
 
 def create_agent(client, *, name: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]

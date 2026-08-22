@@ -247,43 +247,126 @@ anyway.
 
 ### The local UI as a write surface
 
-With `--enable-writes` the loopback server records canonical events. The
-mutating surface is a fixed enumerated list of routes, each a thin adapter over
-an existing `CommonsManager` method — the same manager the CLI and MCP adapters
-use. That list now includes opening and closing agent links (`/api/agent-links`
-and `/api/agent-links/{link_id}/close`): governance-magnitude writes validated
+`agent-commons ui` opens a writing panel by default — there is no capability
+flag to pass, only `--read-only` to opt out of writing at all. The panel opens,
+renews, and closes an operator session of its own; nobody runs `session start`
+for it. Its non-`GET` surface is registered structurally and unconditionally
+the moment the panel can hold a session at all: the union of four declared
+route tuples (mutating writes, catalogue writes, launch, and first-run setup),
+each a thin adapter over an existing `CommonsManager` method — the same
+manager the CLI and MCP adapters use. A route being registered is not the same
+claim as a route being usable: what a request can actually do is decided per
+call, by the handler, with a typed refusal (`setup_uninitialized`,
+`launch_not_configured`, and the catalogue's own refusal) standing in for the
+capability flags this surface used to gate registration on. The mutating list
+includes opening and closing agent links (`/api/agent-links` and
+`/api/agent-links/{link_id}/close`): governance-magnitude writes validated
 entirely by the domain — enum, self-link, deadline bounds, both roles active —
 and a close must name the revision it closes, so a blind close is refused. A
 link is a recorded permission, not a communication channel; the runtime does
 not consume it, and the panel says so. Anyone holding the bearer token writes
-as the operator session the server was started with, and the startup banner
-says so. Writes stay off by default.
+as the operator session the panel opened for itself, and the startup banner
+says so.
 
-`--enable-catalog-editing` is a **second, separate** gate and additionally
-requires `--role-catalog`. It lets the panel add and remove skills and tools,
-which changes what delegated runs are told to do — a different magnitude of
-privilege from recording a role, and one flag for both would hide that. The
-catalogue is written atomically at mode 0600 after full validation, so a
-rejected edit leaves the previous file byte-identical and a partial write cannot
-break the next launch. Removing an entry an active role requires is refused and
-names the roles.
+Catalogue editing is a **second, separate** privilege from recording a role: it
+lets the panel add and remove skills and tools, which changes what delegated
+runs are told to do — a different magnitude than recording a role, and folding
+the two together would hide that. It is permitted only when a catalogue path
+exists *and* the panel holds a session; a route table gated the old way would
+answer 404 to the very editing the first-run screen had just enabled by
+writing a catalogue beside a fresh runtime config, so the handler refuses
+instead of the route being absent. The catalogue is written atomically at mode
+0600 after full validation, so a rejected edit leaves the previous file
+byte-identical and a partial write cannot break the next launch. Removing an
+entry an active role requires is refused and names the roles.
 
-`--enable-launch` is a **third, separate** gate and additionally requires
-`--profile-config`. It lets the panel start a provider run: record a delegation
-on a role's behalf and spawn the subscription process through the same
-`DelegationRuntimeService` the CLI broker uses. This is a larger privilege still
-— spawning a billable process, not recording bounded metadata — so it has its
-own gate and its own route allowlist, and it launches only under the role's
-operator-allowlisted profile (which fixes the executable, model, and sandbox).
-It cannot name an executable or a model: the profile does, and profiles are never
-editable from the UI at any gate, because they name executables and no loopback
-surface should decide what process starts.
+Launch is a **third, separate** privilege. It lets the panel start a provider
+run: record a delegation on a role's behalf and spawn the subscription process
+through the same `DelegationRuntimeService` the CLI broker uses. This is a
+larger privilege still — spawning a billable process, not recording bounded
+metadata — so it keeps its own declared route tuple even though it is
+registered by every operator panel unconditionally; `launch_not_configured` is
+the handler's refusal until an operator runtime config exists, reachable from
+the panel's own first-run screen with no terminal step. It launches only under
+the role's operator-allowlisted profile (which fixes the executable, model,
+and sandbox). It cannot name an executable: the profile does, and profiles are
+never editable from the UI, because they name executables and no loopback
+surface should decide what process starts. The model is the one field of a
+profile the UI can choose, and only once, at hire time — see "Model choice at
+hire" below.
 
-Residual: with all three gates open, the bearer token is the only thing between
-another local process and the ledger, the instruction text of every subsequent
-run, and the ability to spend provider capacity by launching a run. The launch
-inherits the operator's own provider authentication and the `provider_units`
-ceiling; Commons neither selects the account nor changes its billing.
+There is deliberately no confirmation dialog before a launch spends the
+operator's own provider subscription. That is a stated product decision, not a
+gap: arriving at Codex or Claude Code directly does not ask per window whether
+spending is authorized, and the panel holds itself to the same standard rather
+than interposing a click the underlying tool does not have. The fact that this
+product starts billable provider processes on the operator's own subscription
+is said here, in documentation, instead — read this paragraph as that
+disclosure.
+
+Residual: the bearer token is the only thing between another local process and
+the ledger, the instruction text of every subsequent run, and the ability to
+spend provider capacity by launching a run, exactly as before — the three
+former flags added no isolation beyond the token, since a caller that already
+holds the token could pass any of them itself. The launch inherits the
+operator's own provider authentication and the `provider_units` ceiling;
+Commons neither selects the account nor changes its billing.
+
+### Model choice at hire
+
+Hiring a role may include a model, delivered in `payload.extensions.model` —
+additive to the existing agent schema, no migration. The list offered is
+assembled server-side from the models named by configured profiles and the
+models already running on the project's roles, plus a free-text field; the
+panel asserts by test that it never hardcodes a model name of its own, so the
+set the operator sees can never claim to be complete. The model is validated
+against the same flag-injection guard every profile field uses before it
+reaches process construction. It is fixed at hire time and cannot be changed
+from a role's settings afterward — a deliberate limit, not a missing control:
+changing a role's model would mean rebuilding its context for a different
+model, which this version does not do.
+
+### First-run setup as a write surface
+
+`GET /api/setup` names the directory's state with one of a small frozen set of
+codes — not a git repository, no workspace yet, no operator config yet, an
+existing config the launch loader refuses, or configured — readable in any
+panel mode. Acting on it needs a writing panel: `POST /api/setup/initialize`
+creates the workspace through the same initializer `agent-commons init` runs;
+`POST /api/setup/runtime-config` discovers `claude`/`codex` on `PATH` (through
+the same `resolve_trusted_executable` every profile launch already used — no
+new check), writes the generated config once to the frozen path
+(`$XDG_CONFIG_HOME/agent-commons/runtime.yaml`, directory `0700`, file `0600`),
+and reads it back through the same loader the launch path uses before calling
+it accepted. A later parameterless
+`POST /api/setup/add-discovered-providers` may add profiles only when it can
+reconstruct the exact bytes of the existing generated configuration: a manually
+edited file, a custom configuration, or a provider that is no longer
+discoverable is refused without mutation. No route accepts a path, mode, or
+YAML fragment, so a bearer token cannot aim a write or ask the server to merge
+operator-authored YAML; there is deliberately no executable-path field on the
+first-run screen.
+
+`decision.2ZTHNGPQVMHZ5RF614HQPWCKYV` removes demo from the product surface:
+with no supported provider, execution is unavailable rather than simulated.
+`decision.1A08MD6B8TXRWVNX00DJZD98DY` fixes the one-write and byte-ownership
+proof for later additive generation.
+
+### Panel session ownership and singleness
+
+A writing panel opens its own operator session rather than adopting one from
+the environment: `AGENT_COMMONS_SESSION_ID` (or `--session-id`) is explicitly
+not adopted, because the panel would hold no ownership nonce for a session it
+did not open and so could never renew or close it. The session's identity is
+fixed — `stable_instance_id` derived from the workspace id, a constant
+principal, client, software, and role, and no version, port, or pid in it —
+because the dedup this identity gets on restart compares bytes exactly, and
+any field that changes between runs would turn every panel restart into a
+lifecycle conflict instead of a resumed session. An exclusive lock file under
+the state root (`ui/panel.lock`, holding the bound port) is what keeps two
+panels off the same project: the second refuses to start and names the first
+panel's address, rather than the two panels silently sharing one session's
+renewal window and one shutdown tearing down the other's writes.
 
 ### Recursive delegation and resource exhaustion
 
@@ -435,14 +518,15 @@ routine logs and private reasoning are excluded.
   while the Claude builder has no OS-enforced boundary and retains shell and
   file-write tools. For the Claude builder, external isolation is the only
   boundary, not a recommendation.
-- The local UI (`agent-commons ui`) opens a loopback listening socket. By
-  default it is read-only, registers only `GET` routes, requires a bearer token,
-  pins the `Host` header, and emits no CORS headers, but it is still a new
-  network surface on the host. With `--enable-writes` it also records canonical
-  events as the operator session it was started with, and the bearer token is
-  then the only thing between another local process and those writes. Its token is held in memory and printed once; launching a
-  browser automatically exposes that URL to other processes of the same user
-  through the process list.
+- The local UI (`agent-commons ui`) opens a loopback listening socket. It
+  requires a bearer token, pins the `Host` header, and emits no CORS headers,
+  but it is still a new network surface on the host. By default it also opens
+  its own operator session and records canonical events under it; the bearer
+  token is then the only thing between another local process and those writes.
+  `--read-only` opts out of a session and registers only `GET` routes instead.
+  Its token is held in memory and printed once; launching a browser
+  automatically exposes that URL to other processes of the same user through
+  the process list.
 - The UI renders agent-written text — task titles, delegation purposes,
   self-declared session roles — as ordinary graph nodes. It is injection-safe
   (rendered as text, never markup), but a node label is still attacker-chosen

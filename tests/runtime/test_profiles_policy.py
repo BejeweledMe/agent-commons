@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_commons.errors import ConfigurationError
+from agent_commons.errors import ConfigurationError, ValidationError
 from agent_commons.mcp.server import (
     IMPLEMENTATION_WORKER_TOOL_NAMES,
     INDEPENDENT_REVIEW_WORKER_TOOL_NAMES,
@@ -27,6 +27,7 @@ from agent_commons.runtime import (
     RuntimePolicy,
     RuntimeUsage,
     default_profile_registry,
+    validate_model_name,
 )
 
 
@@ -157,6 +158,67 @@ def test_profile_config_rejects_arbitrary_command_environment_and_unsafe_reviewe
         )
     with pytest.raises(ConfigurationError, match="basename or an absolute path"):
         ProfileRegistry.from_mapping({"profiles": {"codex-builder": {"executable": "tools/codex"}}})
+
+
+def test_replacing_a_profiles_model_re_runs_every_rule_that_made_it_safe() -> None:
+    """The hire path swaps a model with ``dataclasses.replace(profile,
+    model=...)``, and everything that makes a profile safe has to survive it.
+
+    That is the reason the delivery is a ``replace`` on a frozen dataclass and
+    not an override threaded through ``RunnerProfile.build_invocation``:
+    ``__post_init__`` runs on every reconstruction, so the independent
+    reviewer's fixed sandbox and permission mode are re-checked rather than
+    inherited from an object validated once, long ago -- and so is the model
+    itself, which is the value that becomes an element of a provider's argv.
+    """
+
+    reviewer = ProfileRegistry.from_mapping(
+        {"profiles": {"codex-independent-reviewer": {"sandbox": CodexSandbox.READ_ONLY.value}}}
+    ).get(BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER)
+
+    swapped = dataclasses.replace(reviewer, model="gpt-5.2-codex")
+    assert swapped.model == "gpt-5.2-codex"
+    assert swapped.sandbox is CodexSandbox.READ_ONLY
+
+    # The reviewer rules are re-run on the replacement, not carried over.
+    with pytest.raises(ConfigurationError, match="read-only"):
+        dataclasses.replace(reviewer, sandbox=CodexSandbox.WORKSPACE_WRITE)
+    claude_reviewer = ClaudeRunnerProfile(
+        profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+    assert dataclasses.replace(claude_reviewer, model="claude-opus-4-6").permission_mode is (
+        ClaudePermissionMode.DONT_ASK
+    )
+    with pytest.raises(ConfigurationError, match="dontAsk"):
+        dataclasses.replace(claude_reviewer, permission_mode=ClaudePermissionMode.PLAN)
+
+    # And the model is validated by the replacement itself, so a name that
+    # slipped past every earlier gate still cannot reach argv as a flag.
+    for hostile in ("--dangerously-skip-permissions", "-m", "two words", ""):
+        with pytest.raises(ValidationError, match="model"):
+            dataclasses.replace(reviewer, model=hostile)
+
+
+def test_validate_model_name_is_the_same_rule_the_profiles_run() -> None:
+    """One rule with one implementation.  The hire form refuses a model before
+    it is recorded and the profile refuses it again at launch; if those were
+    two rules, a name could be accepted by the form and rejected by the run --
+    or, far worse, the other way round."""
+
+    for accepted in ("claude-opus-4-6", "gpt-5.2-codex", "a", "x" * 256, "vendor/model:v1"):
+        assert validate_model_name(accepted) == accepted
+        assert (
+            dataclasses.replace(
+                ClaudeRunnerProfile(profile_id=BuiltinProfileId.CLAUDE_BUILDER), model=accepted
+            ).model
+            == accepted
+        )
+    assert validate_model_name(None) is None
+
+    for refused in ("-m", "--model", "", " ", "a b", "a\nb", "x" * 257, ";id", "$(id)"):
+        with pytest.raises(ValidationError, match="model"):
+            validate_model_name(refused)
 
 
 def test_profile_executables_reject_workspace_path_hijack_and_writable_targets(

@@ -296,12 +296,30 @@ second non-trivial domain validates the boundary. Existing specialist workflows
 remain independent and may later become optional domain packs.
 
 The local UI is a third adapter over `CommonsManager`, beside the CLI and the
-MCP server. It is read-only by default; `agent-commons ui --enable-writes`
-registers a fixed, enumerated set of mutating routes bound to an explicit
-operator session. Each is a thin call into an existing manager method, so
-"there is no second write path" remains a property of the code rather than a
-convention: removing `CommonsManager.record_event` breaks every one of them,
-which is asserted by test.
+MCP server. `agent-commons ui` opens no capability flags: what it registers is
+structural, not conditional. A read-only panel (`agent-commons ui
+--read-only`) registers zero non-`GET` routes. An operator panel — one with the
+means to hold a session of its own — registers the full non-`GET` surface
+unconditionally, as the union of four declared tuples
+(`MUTATING_ROUTES`, `CATALOG_ROUTES`, `LAUNCH_ROUTES`, `SETUP_ROUTES`), because
+FastAPI builds its route table once while the panel's own first-run screen can
+create the workspace, write the operator runtime config, and adopt a catalogue
+beside it — all while already serving. Whether a registered route can actually
+do anything is answered per request, by the handler, with a typed refusal
+(`setup_uninitialized`, `launch_not_configured`, the catalogue's own refusal)
+rather than by the route being absent. Each route is a thin call into an
+existing manager method, so "there is no second write path" remains a property
+of the code rather than a convention: removing `CommonsManager.record_event`
+breaks every one of them, which is asserted by test, alongside a literal
+assertion that the registered surface equals that union — not a value derived
+from the same conditions the registration itself used.
+
+The setup member of that union is deliberately fixed to
+`POST /api/setup/initialize`, `POST /api/setup/runtime-config`, and
+`POST /api/setup/add-discovered-providers`. The first config write is guarded
+against replacing a working file. The additive route accepts no input, proves
+the current generated file byte-for-byte, and refuses rather than merging any
+operator edit.
 
 Provider runners, OpenTelemetry exporters, and an eventual AHP adapter are
 replaceable optional edges. None defines canonical entities or bypasses the

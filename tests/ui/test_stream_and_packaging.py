@@ -11,7 +11,7 @@ import pytest
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext, ledger_fingerprint
 from agent_commons.ui.server import _events, _parse_last_event_id, create_app
-from tests.ui.conftest import PORT
+from tests.ui.conftest import PORT, expected_surface, mutating_surface
 
 
 def drive(context: UIContext, last_event_id: str | None, count: int) -> list[bytes]:
@@ -55,6 +55,70 @@ def test_a_caught_up_client_receives_no_gap(context: UIContext) -> None:
     assert not any(b"resume_gap" in frame for frame in frames)
 
 
+def test_a_recovered_session_is_announced_on_the_stream(workspace: dict[str, Any]) -> None:
+    """The frozen informational code `session_expired_recovered`, observably.
+
+    The tab fetches `/api/meta` exactly once, at boot, and compares nodes
+    against that cached `writer_session_id` forever.  When the owner replaces
+    an expired session under the same identity, the stream -- the one channel
+    an open tab keeps reading -- must say so: an open connection within one
+    poll, and a connection opened after the recovery immediately, so a tab
+    that reconnected after the laptop woke cannot keep trusting a dead id.
+    """
+
+    import json as _json
+    import time as _time
+
+    from agent_commons.ui.session_owner import ProjectSessionOwner
+
+    class ManualClock:
+        def __init__(self) -> None:
+            self.value = float(int(_time.time()))
+
+        def __call__(self) -> float:
+            return self.value
+
+    clock = ManualClock()
+    owner = ProjectSessionOwner(workspace["repo"], state_root=workspace["state_root"], clock=clock)
+    first = owner.ensure_active()
+    context = UIContext(workspace["repo"], state_root=workspace["state_root"], session_owner=owner)
+    try:
+        # While the session is alive the stream says nothing about it.
+        quiet = drive(context, None, 2)
+        assert not any(b"session_expired_recovered" in frame for frame in quiet)
+
+        # A connection that stays open across the expiry hears the recovery
+        # from its own poll loop -- nobody wrote anything.
+        async def open_across_the_sleep() -> list[bytes]:
+            generator = _events(context, None)
+            frames: list[bytes] = []
+            try:
+                frames.append(await anext(generator))  # hello
+                frames.append(await anext(generator))  # snapshot
+                clock.value += 9 * 3600  # the laptop slept past the TTL
+                frames.append(await anext(generator))
+            finally:
+                await generator.aclose()
+            return frames
+
+        frames = asyncio.run(open_across_the_sleep())
+        recovery = frames[2]
+        assert recovery.startswith(b"event: session_expired_recovered")
+        # No event id: an informational frame may never disturb Last-Event-ID.
+        assert b"id:" not in recovery
+        payload = _json.loads(recovery.split(b"data: ", 1)[1])
+        assert payload["code"] == "session_expired_recovered"
+        assert payload["previous_session_id"] == first
+        assert payload["writer_session_id"] == owner.session_id != first
+        assert payload["writer_session_ids"] == [first, owner.session_id]
+
+        # A tab reconnecting after the recovery is told before its first poll.
+        reconnect = drive(context, None, 3)
+        assert reconnect[2].startswith(b"event: session_expired_recovered")
+    finally:
+        owner.shutdown()
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -89,8 +153,9 @@ def test_the_app_registers_only_read_routes(context: UIContext) -> None:
     app = create_app(context, token="t", port=PORT)
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/api/graph" in paths
-    for route in app.routes:
-        assert (getattr(route, "methods", set()) or set()) <= {"GET", "HEAD"}
+    # A read-only panel opens no gate, so the surface it is entitled to and the
+    # surface it registers are both empty.
+    assert mutating_surface(app) == expected_surface(context) == set()
 
 
 def test_the_spa_is_readable_as_a_package_resource() -> None:
@@ -230,6 +295,25 @@ def test_the_spa_carries_the_whole_acceptance_chain() -> None:
     # The state drives what is offered; nothing is advanced client-side.
     assert 'state === "review" ? "accept_state_review"' in body
     assert "async function repaintAfterAcceptanceWrite" in body
+
+
+def test_the_drawer_reopens_on_the_fresh_node_after_an_acceptance_write() -> None:
+    """The drawer's state line is painted from the graph node, and the node the
+    acceptance handlers capture before the write describes exactly the
+    projection the write makes stale: accepting repainted the panel's headline
+    to "accepted" while the same task's card still said `State: review`.  The
+    repaint helper must look the id up in the graph it just re-read, and fall
+    back to the stale object only for a node the new graph no longer carries."""
+
+    body = read_spa()
+    helper = body.split("async function repaintAfterAcceptanceWrite(node) {", 1)[1].split(
+        "\n}\n", 1
+    )[0]
+    refind = helper.index("((lastGraph && lastGraph.nodes) || []).find((n) => n.id === node.id)")
+    # Re-found strictly after the re-read, or it would find the stale graph.
+    assert helper.index("await refreshGraph();") < refind
+    assert "await inspect(fresh || node);" in helper
+    assert "await inspect(node);" not in helper
 
 
 def test_the_panel_never_records_an_acceptance_without_a_summary() -> None:
@@ -1068,6 +1152,10 @@ LANGUAGE_SURFACES = {
     "chrome",
     "status",
     "workspace",
+    # The banner `/api/meta` fills in when this panel survived a refusal --
+    # another panel owning the project -- is written from JS on both halves:
+    # this panel's sentence and the server's canonical address and actions.
+    "panel_refusal",
     "stream",
     "board",
     "legend",
@@ -1087,6 +1175,9 @@ LANGUAGE_SURFACES = {
     "attention",
     "search",
     "launch",
+    # The first-run screen paints its own state sentence, its binary rows and
+    # the config path from `GET /api/setup`; `chrome` owns only its headings.
+    "setup",
 }
 
 

@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from agent_commons.domain.agents import PROFILE_NARROWING
+from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
 from tests.ui.conftest import PORT, authorized
 
@@ -175,3 +176,167 @@ def test_the_operator_config_is_read_once_and_not_once_per_request(
     first = context.catalog()["profile_info"]
     config.unlink()
     assert context.catalog()["profile_info"] == first
+
+
+# --- the models the hire form may offer -------------------------------------
+
+
+def _hire(
+    workspace: dict[str, Any], *, name: str, profile_id: str, model: str | None = None
+) -> str:
+    """Record one standing role the way the panel's hire route does."""
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id=f"model-options-{name}",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    bound = CommonsManager(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        session_id=str(session["session_id"]),
+    )
+    created = bound.create_agent(
+        name=name,
+        profile_id=profile_id,
+        rationale="staffed to populate the offer list",
+        model=model,
+    )
+    return str(created["entity_ref"]["id"])
+
+
+def test_the_offer_list_comes_from_the_two_honest_sources_and_no_others(
+    workspace: dict[str, Any],
+) -> None:
+    """The panel may name no model of its own -- the frontend asset is pinned
+    against carrying one -- so the hire form's suggestions can only come from
+    the server, and only from somewhere this project can point at: the models
+    the operator's own profiles name, and the models roles here already run on.
+
+    A key per provider, always present, so the form looks one up by the
+    selected profile's provider without knowing which providers exist.
+    """
+
+    _hire(
+        workspace,
+        name="Reviewer",
+        profile_id="codex-independent-reviewer",
+        model="gpt-5.2-codex",
+    )
+    _hire(workspace, name="Plain", profile_id="claude-builder")
+
+    options = _context(workspace, _configured(workspace, CONFIG)).catalog()["model_options"]
+
+    assert sorted(options) == ["claude", "codex"]
+    # claude-sonnet-4-5 is the configured profile's; gpt-5.2-codex is a role's.
+    assert options["claude"] == ["claude-sonnet-4-5"]
+    assert options["codex"] == ["gpt-5.2-codex"]
+
+
+def test_a_provider_with_nothing_to_offer_still_gets_its_key(
+    workspace: dict[str, Any],
+) -> None:
+    """Empty is a normal answer, not a missing one: on a fresh project the
+    field is simply typed into, and the form must not have to tell an absent
+    key apart from an empty list."""
+
+    options = _context(workspace, None).catalog()["model_options"]
+
+    assert options == {"claude": [], "codex": []}
+
+
+def test_a_retired_role_stops_offering_its_model(workspace: dict[str, Any]) -> None:
+    """The list says what this project runs *now*.  A model that only a retired
+    role ever used is not something the project is running, and offering it
+    would make the list grow forever with every experiment."""
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="model-options-retire",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    bound = CommonsManager(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        session_id=str(session["session_id"]),
+    )
+    created = bound.create_agent(
+        name="Experiment",
+        profile_id="claude-builder",
+        rationale="tried once",
+        model="claude-opus-4-6",
+    )
+    context = _context(workspace, None)
+    assert context.catalog()["model_options"]["claude"] == ["claude-opus-4-6"]
+
+    bound.retire_agent(
+        created["entity_ref"]["id"],
+        created["revision"],
+        reason="the experiment is over",
+    )
+    assert context.catalog()["model_options"]["claude"] == []
+
+
+def test_a_name_no_launch_would_accept_is_never_offered(
+    workspace: dict[str, Any],
+) -> None:
+    """The list is re-validated on the way out.
+
+    Both sources are files this process may not have written -- an operator
+    config and replayed canonical events -- so a name that could not survive a
+    launch has no business being offered for one.  A leading dash is the case
+    that matters: offered and picked, it would arrive at a provider as a flag.
+    """
+
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id="model-options-hostile",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    bound = CommonsManager(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        session_id=str(session["session_id"]),
+    )
+    good = bound.create_agent(
+        name="Good",
+        profile_id="claude-builder",
+        rationale="a name a launch accepts",
+        model="claude-opus-4-6",
+    )
+    # Reach past the write guard the way a foreign writer or an older build
+    # could have: the record exists, and this surface still refuses to offer it.
+    snapshot = bound.snapshot()
+    snapshot.agents[str(good["entity_ref"]["id"])]["extensions"] = {
+        "model": "--dangerously-skip-permissions"
+    }
+    options = _context(workspace, None).model_options(snapshot)
+
+    assert options == {"claude": [], "codex": []}
+
+
+def test_the_offer_list_survives_an_unreadable_operator_config(
+    workspace: dict[str, Any],
+) -> None:
+    """The config half is optional exactly like `profile_info` is: an operator
+    file the loader refuses costs the offer list its first source and nothing
+    else -- the roles this project already runs are still offered."""
+
+    _hire(workspace, name="Builder", profile_id="claude-builder", model="claude-opus-4-6")
+    missing = workspace["repo"].parent / "no-such-runtime.yaml"
+
+    with _client(_context(workspace, missing)) as client:
+        response = client.get("/api/catalog", headers=authorized())
+
+    assert response.status_code == 200
+    assert response.json()["profile_info"] == {}
+    assert response.json()["model_options"] == {"claude": ["claude-opus-4-6"], "codex": []}

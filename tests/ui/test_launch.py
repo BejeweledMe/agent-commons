@@ -28,7 +28,13 @@ from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import LAUNCH_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 #: Every field the run surface publishes, exactly.  Asserted as an equality so a
 #: later change cannot quietly add one -- in particular a "spend"/"cost"/"used"
@@ -154,7 +160,6 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
-        launch_enabled=True,
         runtime_factory=runtime_factory,
     )
     return {
@@ -166,10 +171,8 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_launching_only_appears_behind_its_own_gate(
-    workspace: dict[str, Any],
-) -> None:
-    """A writable panel without the launch gate exposes no launch route."""
+def _unconfigured(workspace: dict[str, Any]) -> UIContext:
+    """A writing panel with no runtime environment behind it."""
 
     manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
     session = manager.start_session(
@@ -179,20 +182,51 @@ def test_launching_only_appears_behind_its_own_gate(
         software="claude-code",
         role="operator",
     )
-    writable_only = UIContext(
+    return UIContext(
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
     )
-    with _client(writable_only) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
-    assert found == set(MUTATING_ROUTES)  # no launch route
-    assert ("POST", "/api/delegations") not in found
+
+
+def test_the_launch_route_is_declared_apart_from_the_write_surface(
+    workspace: dict[str, Any],
+) -> None:
+    """Launching is its own declared privilege even though every writing panel
+    registers it: the tuple, not the route table, is what says so."""
+
+    context = _unconfigured(workspace)
+    assert context.launch_enabled is False
+    with _client(context) as client:
+        found = mutating_surface(client.app)
+    assert found == expected_surface(context) == OPERATOR_SURFACE
+    # Present, because the runtime config can be written into a panel that is
+    # already serving and the route table is built once.
+    assert set(LAUNCH_ROUTES) <= found
+
+
+def test_the_launch_handler_refuses_without_a_configured_runtime(
+    workspace: dict[str, Any],
+) -> None:
+    """The compensation for registering the route unconditionally.
+
+    The guarantee moved from "there is no route" to "the route refuses", so the
+    refusal has to be typed rather than a generic conflict: the panel reads
+    `launch_not_configured` to offer setup instead of a retry.
+    """
+
+    context = _unconfigured(workspace)
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={"agent_id": "agent.whatever", "task_id": "task.whatever"},
+            headers=authorized(),
+        )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "launch_not_configured"
+    # Nothing was recorded on the way to the refusal: it fires before the body
+    # is even read, so an unconfigured panel cannot half-start a run.
+    assert context.runs() == []
 
 
 def test_the_panel_launches_a_role_on_a_task_end_to_end(
@@ -429,95 +463,6 @@ def test_the_run_surface_claims_no_spend_it_never_recorded(
         if any(word in key for word in ("spend", "cost", "usd", "used", "consumed", "price"))
     ]
     assert run["limits"]["budget"] == {"unit": "provider_units", "limit": 1}
-
-
-def _demo_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
-    """A launchable panel wired through a real demo runtime config.
-
-    Unlike ``_launch_workspace``, this injects no fake runner: the panel builds
-    its runtime service from an operator profile config that carries
-    ``demo: true``, so the production ``_runtime_service`` path selects the
-    DemoRunner.  This is the seam a newcomer's scratch workspace uses to close
-    the Hire -> Task -> Run loop without a subscription.
-    """
-
-    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
-    session = manager.start_session(
-        stable_instance_id="ui-demo-window-000001",
-        principal="operator",
-        client="claude",
-        software="claude-code",
-        role="operator",
-    )
-    manager.session_id = session["session_id"]
-    role = manager.create_agent(
-        name="Backend owner",
-        profile_id="claude-builder",
-        rationale="owns the surface and does the work",
-        idempotency_key="demo-role",
-    )
-    task = manager.create_task(
-        title="Wire the endpoint",
-        description="the role will implement this",
-        acceptance_criteria=("done",),
-        idempotency_key="demo-task",
-    )
-    # The profile config must live outside the delegated workspace; the repo is
-    # tmp_path/repo, so a sibling file satisfies the guard.  The executable is
-    # never invoked -- the DemoRunner stands in for it -- so /bin/echo is fine.
-    config = workspace["repo"].parent / "demo-runtime.yaml"
-    config.write_text(
-        "demo: true\n"
-        "profiles:\n"
-        "  claude-builder:\n"
-        "    executable: /bin/echo\n"
-        "    mcp_executable: /bin/echo\n"
-        "    git_executable: /usr/bin/git\n"
-        "    permission_mode: acceptEdits\n"
-        "    trusted_workspace: true\n",
-        encoding="utf-8",
-    )
-    context = UIContext(
-        workspace["repo"],
-        state_root=workspace["state_root"],
-        writer_session_id=str(session["session_id"]),
-        launch_enabled=True,
-        profile_config=config,
-    )
-    return {
-        "context": context,
-        "manager": manager,
-        "role_id": role["entity_ref"]["id"],
-        "task_id": task["entity_ref"]["id"],
-    }
-
-
-def test_demo_profile_closes_the_loop_without_a_provider(
-    workspace: dict[str, Any],
-) -> None:
-    """A demo-mode config lets the panel's Run reach `succeeded` with no
-    provider launched, and labels the result honestly as a demo."""
-
-    fixture = _demo_workspace(workspace)
-    context: UIContext = fixture["context"]
-
-    with _client(context) as client:
-        assert client.get("/api/launch", headers=authorized()).json()["launch_enabled"] is True
-        response = client.post(
-            "/api/delegations",
-            json={"agent_id": fixture["role_id"], "task_id": fixture["task_id"]},
-            headers=authorized(),
-        )
-    assert response.status_code == 200, response.text
-    delegation_id = response.json()["delegation_id"]
-
-    context.await_launches()
-    delegation = fixture["manager"].get_delegation(delegation_id)
-    assert delegation["state"] == "succeeded"
-    assert delegation["agent_id"] == fixture["role_id"]
-    # The summary tells the truth: no provider ran.
-    assert "demo" in str(delegation.get("summary", "")).lower()
-    assert "no provider" in str(delegation.get("summary", "")).lower()
 
 
 def test_a_launch_that_never_starts_says_so_instead_of_looking_pending(

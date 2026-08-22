@@ -6,9 +6,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.server import (
+    CATALOG_ROUTES,
+    LAUNCH_ROUTES,
+    MUTATING_ROUTES,
+    SETUP_ROUTES,
+)
 
 PORT = 51234
 
@@ -35,7 +42,7 @@ def workspace(tmp_path: Path) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "--quiet")
-    (repo / "README.md").write_text("demo\n", encoding="utf-8")
+    (repo / "README.md").write_text("example\n", encoding="utf-8")
     state_root = tmp_path / "state"
     CommonsManager.initialize(repo, integrations=())
     return {"repo": repo, "state_root": state_root, "commons_root": repo / ".agent-commons"}
@@ -119,6 +126,46 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
     app = create_app(writable, token="test-token", port=PORT)
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client
+
+
+#: The whole non-GET surface of an operator panel, named once.  There is no
+#: table of gates any more and that is the point: every capability the panel can
+#: gain -- a workspace, a runtime config, a catalogue -- now appears while it is
+#: already serving, and FastAPI builds its route table once, so the table cannot
+#: depend on any of them.  A new tuple joins the surface by being added here and
+#: nowhere else.
+OPERATOR_SURFACE: frozenset[tuple[str, str]] = frozenset(
+    set(MUTATING_ROUTES) | set(LAUNCH_ROUTES) | set(SETUP_ROUTES) | set(CATALOG_ROUTES)
+)
+
+
+def mutating_surface(app: FastAPI) -> set[tuple[str, str]]:
+    """The non-GET (method, path) pairs an assembled app actually registers.
+
+    Read from the built router, not from the declaration, so the two can
+    disagree and be caught disagreeing.
+    """
+
+    return {
+        (method, route.path)
+        for route in app.routes
+        for method in (getattr(route, "methods", set()) or set())
+        if method not in {"GET", "HEAD"}
+    }
+
+
+def expected_surface(context: UIContext) -> set[tuple[str, str]]:
+    """The non-GET surface a panel in this state is supposed to register.
+
+    Two answers and no formula: a read-only panel registers nothing, and an
+    operator panel registers the whole declared union, whatever else is or is
+    not configured about it.  Because `operator_panel` is also the one property
+    `create_app` reads, callers that want a check independent of the
+    implementation compare against `OPERATOR_SURFACE` literally instead -- and
+    the tests that pin the invariant do both.
+    """
+
+    return set(OPERATOR_SURFACE) if context.operator_panel else set()
 
 
 def authorized() -> dict[str, str]:

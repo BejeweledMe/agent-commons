@@ -11,7 +11,7 @@ import hashlib
 import logging
 import threading
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,12 +27,64 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.runtime.model import profile_tool_summary
+from agent_commons.runtime.model import (
+    BuiltinProfileId,
+    profile_tool_summary,
+    validate_model_name,
+)
 from agent_commons.services.manager import CommonsManager
+from agent_commons.services.roles import role_model
 from agent_commons.ui.graph import build_graph
 from agent_commons.views import bounded_copy, truncate_utf8
 
 _LOG = logging.getLogger("agent_commons.ui")
+
+#: The one wording for "this panel cannot launch yet", shared by the direct-call
+#: refusal here and the typed ``launch_not_configured`` HTTP refusal in
+#: `ui.server`, so the two can never drift into two explanations of one state.
+LAUNCH_NOT_CONFIGURED = (
+    "no runtime environment is configured for this panel: launching a provider "
+    "needs an operator session and an operator profile config"
+)
+
+#: A provider was resolved but one of the executables every profile needs beside
+#: it was not.  The wave contract froze this code after `ui.setup` found the
+#: state reachable and refused to invent a code for it: that module may not
+#: extend the frozen table, so the binding lives here, on the wiring that turns
+#: its answer into an HTTP refusal the first-run screen can draw.
+SETUP_SUPPORT_BINARY_UNRESOLVED = "setup_support_binary_unresolved"
+
+#: What the operator can do about a panel that lost the singleness race, said
+#: once.  The refusal reaches the frontend from two directions -- a non-GET
+#: route refused before its body is read, and `/api/meta` on the very first
+#: load -- and the two must not grow into two pieces of advice for one state.
+PANEL_ALREADY_OPEN_ACTIONS = ("use the panel that already serves this project",)
+
+#: The frozen code the wave contract gives that state.  Named here rather than
+#: imported from `ui.session_owner` so this module keeps no import edge to it;
+#: the class that raises it owns the string and this is checked against it.
+PANEL_ALREADY_OPEN = "panel_already_open"
+
+#: Why a model name typed into the hire form was refused, in terms the person
+#: looking at the field can act on.  The rule itself lives in `runtime.model`
+#: and is not restated here; what is restated is the way out, because a
+#: refusal that names no satisfiable rule is a dead end on a form.
+MODEL_NAME_REFUSED = (
+    "that is not a usable model name: it must start with a letter or digit and may "
+    "then contain letters, digits, and . _ : / - up to 256 characters. Leave the "
+    "field empty to run the model the profile already names"
+)
+
+#: What a preflight result means, said once.  `preflight_profile` checks fixed
+#: argv and MCP startup and carries no credential at all, so a signed-out
+#: provider and a working one are indistinguishable to it
+#: (decision.5QPR0HQYNAG3XKBMMKBJCAG1RB).  A green preflight is therefore a
+#: statement about structure, never about authorization.
+PREFLIGHT_CREDENTIAL_FREE = (
+    "this check is structural: it verifies the fixed launch flags and the MCP "
+    "handshake without any credential, so it cannot tell a signed-out provider "
+    "from an authorized one -- a green result does not mean you are logged in"
+)
 
 
 def _iso_now() -> str:
@@ -57,6 +109,39 @@ def _elapsed_seconds(started_at: Any, ended_at: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return elapsed if elapsed >= 0 else None
+
+
+def _session_refusal_view(refusal: ConfigurationError | None) -> dict[str, Any] | None:
+    """How `/api/meta` reports a refusal it survived, or None when there is one.
+
+    Only a refusal carrying one of the wave's frozen codes is reported: the
+    frontend draws by code, and a refusal with no code is something it could
+    only render as raw text.  The uncoded ones all mean "this directory is not
+    set up yet", and `GET /api/setup` answers that question properly, so
+    silence here sends the tab to the surface that can actually explain it.
+
+    ``address`` is the one field the operator needs and cannot derive: which
+    window is the live one.  It is host and port and deliberately not a URL --
+    each panel's bearer token lives only in its own tab's fragment, so a link
+    built here would open a page that cannot authorize itself and would look
+    broken rather than occupied.
+    """
+
+    code = getattr(refusal, "code", None)
+    if refusal is None or not code:
+        return None
+    details = getattr(refusal, "details", None)
+    port = details.get("port") if isinstance(details, Mapping) else None
+    return {
+        "code": str(code),
+        "message": str(refusal),
+        "address": (
+            f"127.0.0.1:{port}" if isinstance(port, int) and not isinstance(port, bool) else None
+        ),
+        "safe_next_actions": (
+            list(PANEL_ALREADY_OPEN_ACTIONS) if str(code) == PANEL_ALREADY_OPEN else []
+        ),
+    }
 
 
 def _session_state(session: Any) -> str:
@@ -122,33 +207,56 @@ class UIContext:
         state_base: Path | None = None,
         state_source: str = "default",
         writer_session_id: str | None = None,
+        session_provider: Callable[[], str] | None = None,
+        session_owner: Any | None = None,
         catalog_path: Path | None = None,
-        catalog_editing: bool = False,
         profile_config: Path | None = None,
-        launch_enabled: bool = False,
         runtime_factory: Any | None = None,
     ) -> None:
         self.repo = repo
         self._state_root = state_root
         self._state_base = state_base
         self._state_source = state_source
+        # The operator catalogue is read in any mode -- a read-only panel still
+        # shows what the roles were built from -- and edited only by a panel
+        # that has a session, which is what `catalog_editing_enabled` answers.
         self._catalog_path = catalog_path
-        # A separate gate from --enable-writes on purpose.  Editing presets and
-        # editing the set of things a child process may run are different
-        # magnitudes of privilege, and one checkbox for both would hide that.
-        self._catalog_editing = bool(catalog_editing)
-        # Launching a provider is a third, larger privilege still: it spawns a
-        # billable subscription process.  It has its own gate and needs the
-        # operator profile config, exactly like the CLI broker.
+        # Launching a provider spawns a billable subscription process, and it
+        # needs the operator profile config, exactly like the CLI broker.
         self._profile_config = profile_config
-        self._launch_enabled = bool(launch_enabled)
         # Tests inject a runtime service built over a fake runner here; in
         # production it is None and the service is built from the profile config.
         self._runtime_factory = runtime_factory
         # A writable context is opt-in and needs a real operator session, the
         # same identity the CLI writes under.  Absent one, this stays the
         # read-only server it has always been.
-        self.writer_session_id = writer_session_id
+        #
+        # Three ways in, and exactly one may be used.  A caller that already
+        # holds a resolved session id passes it and it never changes; a caller
+        # that owns the session's whole lifetime passes a provider or the owner
+        # object itself, because the id is then not a constant -- a session that
+        # outlives its TTL is replaced by a fresh one under the same identity,
+        # and every reader has to see the replacement without anybody
+        # remembering to re-assign a field.  The owner additionally carries the
+        # whole session lineage (for blocker answers scoped to a previous
+        # session) and the pre-launch TTL guarantee.  Passing more than one is a
+        # programmer error, not an operator one: there would be no honest rule
+        # for which wins.
+        given = [
+            item
+            for item in (writer_session_id, session_provider, session_owner)
+            if item is not None
+        ]
+        if len(given) > 1:
+            raise TypeError("pass writer_session_id, session_provider, or session_owner, not two")
+        self._writer_session_id = writer_session_id
+        self._session_provider = session_provider
+        self._session_owner = session_owner
+        # The typed reason `writes_enabled` last answered False, when there was
+        # one.  Kept so the request path can tell "no workspace yet" apart from
+        # "another panel owns this project" instead of collapsing both into the
+        # first-run refusal.
+        self._session_refusal: ConfigurationError | None = None
         self.server_instance_id = uuid.uuid4().hex
         # One poller runs per SSE connection, so sequence and graph are shared
         # mutable state across worker threads.
@@ -176,23 +284,459 @@ class UIContext:
             thread.join(timeout=timeout)
 
     @property
+    def writer_session_id(self) -> str | None:
+        """The session this panel records under, or None when it is read-only.
+
+        Computed rather than stored, so that an owner able to replace the
+        session behind it is not obliged to reach into this object.  Every read
+        goes through here; nothing caches the answer.  A caller that needs two
+        consistent looks at it -- a check and then a use -- must read it once
+        into a local, because a provider is free to hand back a different id
+        between two calls.
+        """
+
+        if self._session_owner is not None:
+            # `ensure_active` is a cheap in-memory liveness check that only
+            # touches the registry -- and repairs, replacing an expired session
+            # with a fresh one under the same identity -- when expiry is near.
+            # Routing every read through it is what moved "is the session
+            # alive" from once at startup to before every write.
+            return str(self._session_owner.ensure_active())
+        if self._session_provider is not None:
+            return self._session_provider()
+        return self._writer_session_id
+
+    @property
+    def writer_session_ids(self) -> tuple[str, ...]:
+        """Every session id this panel has written under, the current one last.
+
+        Blocker answers are scoped to the session that asked the question, and
+        those scopes are immutable.  A panel whose session expired and was
+        recovered must still recognise requests addressed to its previous
+        sessions, so filters compare against this whole set rather than the
+        single current id.
+        """
+
+        if self._session_owner is not None:
+            self._session_owner.ensure_active()
+            return tuple(str(item) for item in self._session_owner.session_ids())
+        session_id = self.writer_session_id
+        return (session_id,) if session_id is not None else ()
+
+    def session_lineage(self) -> tuple[str, ...]:
+        """The lineage the stream watches for a replaced session, kept fresh.
+
+        The already-open tab fetched ``/api/meta`` exactly once, at boot, and
+        compares nodes against that cached ``writer_session_id`` forever; the
+        stream is the only channel it keeps reading.  This is what the stream
+        polls: for an owner the liveness is refreshed first, so an expiry the
+        laptop slept through is noticed within one poll interval instead of at
+        the next write or the next quarter-hourly heartbeat.  A context bound
+        to a fixed id has a lineage of one that can never grow, and a
+        read-only panel has none: neither ever reports a recovery.
+        """
+
+        if self._session_owner is not None:
+            self._session_owner.refresh_liveness()
+            return tuple(str(item) for item in self._session_owner.session_ids())
+        if self._writer_session_id is not None:
+            return (str(self._writer_session_id),)
+        return ()
+
+    @property
+    def operator_panel(self) -> bool:
+        """Whether this panel acts at all, rather than only shows.
+
+        Structural and settled at construction: a panel either was handed the
+        means to hold an operator session -- an owner, a provider, or an
+        already-resolved id -- or it was not, and nothing that happens while it
+        serves can change the answer.  This is the *only* thing the route table
+        is built from, because FastAPI builds that table once while every other
+        piece of state the panel has (a workspace, an operator config, a
+        catalogue) can now appear while it is already serving.
+
+        Deliberately not "a session can be obtained": obtaining one needs a
+        workspace, and creating the workspace is itself one of the routes.
+        """
+
+        return (
+            self._session_owner is not None
+            or self._session_provider is not None
+            or self._writer_session_id is not None
+        )
+
+    def session_or_refusal(self) -> tuple[str | None, ConfigurationError | None]:
+        """The session this panel can write under *right now*, and why not.
+
+        One answer, not two reads.  Whether writes are possible and the typed
+        reason they are not are the same fact seen from two sides, and every
+        caller needs both: asking `writes_enabled` and then `session_refusal`
+        is two looks at a value a session owner is free to change between them,
+        so a concurrent caller could pair "no session" with somebody else's
+        reason -- or with none at all.  Callers that need the pair consistent
+        take it from here; the two properties below remain for callers that
+        genuinely want only one half.
+
+        Never raises.  A panel opened on a directory that is not a workspace
+        yet is an operator panel that cannot obtain a session -- the owner
+        cannot resolve a workspace that does not exist -- and it becomes one
+        that can the moment `POST /api/setup/initialize` returns, in the same
+        process.  A refusal from the session machinery is therefore an answer
+        here rather than something to propagate: raising out of something
+        handlers consult as a precondition would turn "not set up yet", or
+        "another panel owns this project", into a 500.
+        """
+
+        try:
+            session_id = self.writer_session_id
+        except ConfigurationError as exc:
+            _LOG.debug("this panel cannot hold a session yet: %s", exc)
+            self._session_refusal = exc
+            return None, exc
+        self._session_refusal = None
+        return session_id, None
+
+    @property
     def writes_enabled(self) -> bool:
-        return self.writer_session_id is not None
+        """Whether a session can be obtained *right now*. Never raises.
+
+        This is the executable half of the pair whose structural half is
+        `operator_panel`: handlers read it, the route table does not.
+        """
+
+        return self.session_or_refusal()[0] is not None
+
+    @property
+    def session_refusal(self) -> ConfigurationError | None:
+        """The typed refusal behind the last False from ``writes_enabled``.
+
+        Most of the time the reason is the obvious one -- no workspace yet --
+        and the caller's own state check already names it.  The exception is a
+        panel that lost the singleness race while its lock was deferred: its
+        refusal is ``PanelAlreadyOpenError``, and reporting that panel as
+        "not set up yet" sends the operator to a first-run screen that cannot
+        help.  Handlers read this to keep that refusal under its own name.
+
+        A caller that also needs the session id must use `session_or_refusal`
+        instead: these two properties are separate reads and nothing keeps
+        them describing the same instant.
+        """
+
+        return self._session_refusal
 
     @property
     def catalog_editing_enabled(self) -> bool:
-        return self._catalog_editing and self._catalog_path is not None
+        """Whether this panel may write the operator catalogue back to disk.
+
+        Two conditions, and both are states rather than switches: there has to
+        be a catalogue file to edit, and the panel has to be one that acts at
+        all.  A panel without a session shows the catalogue and changes nothing
+        -- that is what read-only means.
+
+        Like `launch_enabled`, this decides whether an edit is *permitted*, not
+        whether the route exists.  The generated runtime config names a
+        catalogue beside itself and the panel adopts both while it is already
+        serving, so a route table built from this would answer 404 to the very
+        editing the first-run screen had just switched on.  `POST` is refused by
+        `_require_catalog_editing`, which says which half is missing.
+        """
+
+        return self._catalog_path is not None and self.writes_enabled
 
     @property
     def launch_enabled(self) -> bool:
-        # Launch needs writes (a real operator session records the delegation),
-        # its own gate, and either a profile config to build the runtime from or
-        # an injected runtime factory (tests).
-        return (
-            self._launch_enabled
-            and self.writes_enabled
-            and (self._profile_config is not None or self._runtime_factory is not None)
+        # Launch needs writes (a real operator session records the delegation)
+        # and either a profile config to build the runtime from or an injected
+        # runtime factory (tests).  Like every other capability here this one
+        # does not decide whether a route exists: the operator config can appear
+        # while the panel is already serving, so the route is always there for
+        # an operator panel and refuses by `launch_not_configured` until this is
+        # true.
+        return self.writes_enabled and (
+            self._profile_config is not None or self._runtime_factory is not None
         )
+
+    # -- first run ------------------------------------------------------------
+    #
+    # Everything below is the wiring between `ui.setup` and the panel's HTTP
+    # surface.  It sequences that module and names its refusals; it repeats none
+    # of its checks, because a second copy of "is this executable safe to run"
+    # is exactly how the two answers start to disagree.
+
+    @staticmethod
+    def _unresolved_support_binaries(discovery: Any) -> tuple[str, ...]:
+        """Support executables every generated profile needs, that did not resolve.
+
+        Named off the discovery the module already produced rather than probed
+        again: this is a classification of its answer, not a second opinion.
+        """
+
+        return tuple(probe.name for probe in (discovery.mcp, discovery.git) if not probe.found)
+
+    def setup_status(self) -> dict[str, Any]:
+        """What the first-run screen needs, and the one place paths leave here.
+
+        The panel hands out no filesystem path anywhere else, and this is the
+        narrow, deliberate exception: while the runtime is still unconfigured
+        the operator has to see which binaries were found and where the config
+        is about to be written, because that is the decision being asked of
+        them.  The moment the state is `configured` the exception closes and the
+        same route answers with the state and nothing else -- the paths are not
+        redacted, they are not gathered at all.
+        """
+
+        from agent_commons.ui import setup
+
+        report = setup.setup_state_report(self.repo, profile_config=self._profile_config)
+        state = report["state"]
+        status: dict[str, Any] = {
+            "state": state,
+            # Whether this panel can act on the state at all.  On `--read-only`
+            # none of the setup routes exist, and this route is the only one
+            # the first-run screen is guaranteed to reach -- `/api/meta` says
+            # nothing before a workspace exists -- so without this bit the
+            # screen would offer buttons whose routes answer 404.
+            "operator_panel": self.operator_panel,
+            "launch_enabled": self.launch_enabled,
+            "catalog_editing_enabled": self.catalog_editing_enabled,
+        }
+        if state == setup.SETUP_CONFIGURED:
+            return status
+        if state == setup.CONFIG_REJECTED_BY_LOADER:
+            # The loader's own refusal text and the file it refused, exactly
+            # as `POST /api/setup/runtime-config` reports the same failure --
+            # a bare state code here left the operator with "your file does
+            # not work" and the terminal as the only place to learn why.  The
+            # file itself is the operator's own and stays untouched where it
+            # stands; only a just-generated config the read-back refuses is
+            # ever renamed aside, and that happens in the generator.
+            status["rejected_reason"] = report["rejected_reason"]
+            status["rejected_path"] = report["rejected_path"]
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        status["providers"] = discovery.describe()
+        status["providers_found"] = list(discovery.providers_found)
+        status["providers_missing"] = list(discovery.providers_missing)
+        status["support_missing"] = list(missing)
+        status["config_path"] = str(self._profile_config or setup.default_runtime_config_path())
+        # What would refuse a write attempted right now, said before the
+        # operator clicks rather than only after: no provider at all is the
+        # frozen `setup_no_provider_found`, and a provider without the
+        # executables every profile needs beside it is the code this wave added.
+        status["blocking_refusal"] = (
+            setup.SETUP_NO_PROVIDER_FOUND
+            if not discovery.providers_found
+            else (SETUP_SUPPORT_BINARY_UNRESOLVED if missing else None)
+        )
+        return status
+
+    def initialize_workspace(self) -> dict[str, Any]:
+        """Create the workspace in this directory, through the code `init` runs.
+
+        `CommonsManager.initialize` is the same entry point the CLI command
+        calls; there is no second initializer.  The report is trimmed to what
+        the screen can use, because the full one lists every file written and
+        this surface does not publish paths.
+        """
+
+        from agent_commons.ui import setup
+
+        if setup.setup_state(self.repo) == setup.SETUP_NOT_A_REPOSITORY:
+            raise setup.SetupError(
+                setup.SETUP_NOT_A_REPOSITORY,
+                "this directory is not a git repository, so there is nothing for "
+                "a workspace to attach to",
+            )
+        report = CommonsManager.initialize(self.repo, integrations=("codex", "claude"))
+        self.invalidate()
+        return {
+            "workspace_id": report["workspace_id"],
+            "integrations": list(report["integrations"]),
+            "changed": bool(report["changed"]),
+            "state": setup.setup_state(self.repo, profile_config=self._profile_config),
+        }
+
+    def configure_runtime(self) -> dict[str, Any]:
+        """Generate the operator runtime config and adopt it without a restart.
+
+        Discovery runs once and is handed to the generator, so the profiles that
+        get written are the ones the operator was just shown rather than the
+        result of a second probe that could answer differently.
+        """
+
+        from agent_commons.ui import setup
+
+        if setup.setup_state(self.repo, profile_config=self._profile_config) == (
+            setup.SETUP_CONFIGURED
+        ):
+            raise setup.SetupError(
+                setup.SETUP_CONFIGURED,
+                "this environment already has a working runtime config; add profiles for "
+                "a newly discovered provider with the configured-profiles action, or edit "
+                "the file manually",
+            )
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        if discovery.providers_found and missing:
+            # `ui.setup` raises an uncoded ConfigurationError here on purpose --
+            # it may not extend the frozen refusal table by itself -- and keeps
+            # every resolver reason in the message.  This is where the frozen
+            # code gets attached, with those reasons carried through.
+            reasons = "; ".join(
+                f"{probe.name} [{refusal.candidate}]: {refusal.reason}"
+                for probe in (discovery.mcp, discovery.git)
+                if not probe.found
+                for refusal in probe.refusals
+            )
+            raise setup.SetupError(
+                SETUP_SUPPORT_BINARY_UNRESOLVED,
+                "a provider was found but "
+                + " and ".join(missing)
+                + " could not be resolved, and every generated profile names both"
+                + (f": {reasons}" if reasons else ""),
+                details={"missing": list(missing), "discovery": discovery.describe()},
+            )
+        written = setup.generate_runtime_config(
+            self.repo,
+            state_root=self._state_root,
+            state_base=self._state_base,
+            discovery=discovery,
+        )
+        adopted = self.adopt_runtime_config(written["path"])
+        # The written path is deliberately not echoed: this panel is configured
+        # from here on, and `setup_status` stops naming paths at the same moment.
+        return {
+            "state": setup.SETUP_CONFIGURED,
+            "providers_found": written["providers_found"],
+            "providers_missing": written["providers_missing"],
+            **adopted,
+        }
+
+    def add_discovered_providers(self) -> dict[str, Any]:
+        """Add profiles only when the current config still proves machine-made."""
+
+        from agent_commons.ui import setup
+
+        state = setup.setup_state(self.repo, profile_config=self._profile_config)
+        if state != setup.SETUP_CONFIGURED:
+            raise setup.SetupError(
+                state,
+                "profiles can be added only to a working configured environment; "
+                "use the ordinary setup action for this state",
+            )
+        default_config = setup.default_runtime_config_path().resolve()
+        if self._profile_config is not None and self._profile_config.resolve() != default_config:
+            raise setup.SetupError(
+                setup.SETUP_CONFIGURED,
+                "a custom runtime config is operator-owned; add profiles by editing the "
+                "file manually",
+            )
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        if discovery.providers_found and missing:
+            reasons = "; ".join(
+                f"{probe.name} [{refusal.candidate}]: {refusal.reason}"
+                for probe in (discovery.mcp, discovery.git)
+                if not probe.found
+                for refusal in probe.refusals
+            )
+            raise setup.SetupError(
+                SETUP_SUPPORT_BINARY_UNRESOLVED,
+                "a provider was found but "
+                + " and ".join(missing)
+                + " could not be resolved, and every generated profile names both"
+                + (f": {reasons}" if reasons else ""),
+                details={"missing": list(missing), "discovery": discovery.describe()},
+            )
+        written = setup.add_discovered_provider_profiles(
+            self.repo,
+            state_root=self._state_root,
+            state_base=self._state_base,
+            discovery=discovery,
+        )
+        adopted = self.adopt_runtime_config(written["path"])
+        return {
+            "state": setup.SETUP_CONFIGURED,
+            "added_providers": written["added_providers"],
+            "changed": written["changed"],
+            **adopted,
+        }
+
+    def adopt_runtime_config(self, path: str | Path) -> dict[str, Any]:
+        """Take a runtime config into a panel that is already serving.
+
+        This is the whole point of writing the config from the panel: a first
+        run that ends in "now restart me" is not a first run that worked.  Three
+        pieces of state have to move together, and each was a trap on its own:
+
+        - `_profile_config`, which is what `launch_enabled` and the runtime
+          service read;
+        - `_profile_info`, which is cached for the life of the process by
+          design.  A panel that adopted a config without dropping it would keep
+          answering "the model is fixed in the profile" forever, because the
+          cache was filled from the *unconfigured* read;
+        - `_catalog_path`, which the generated config names beside itself.
+
+        Loaded through the same guarded loader the launch path uses, so a config
+        this panel adopts is exactly one a launch would accept, and a refusal
+        arrives here instead of at the operator's first Run.
+        """
+
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+        target = Path(path).expanduser()
+        configuration = load_runtime_configuration(target, workspace_root=self.repo)
+        with self._guard:
+            self._profile_config = target
+            self._profile_info = None
+            if configuration.catalog_path is not None:
+                self._catalog_path = configuration.catalog_path
+        # The graph is unchanged, but everything derived beside it -- the
+        # catalogue, the launch options -- is not, and the panel polls for that
+        # through the same fingerprint.
+        self.invalidate()
+        return {
+            "profiles": [str(profile_id) for profile_id in configuration.profiles.profile_ids],
+            "launch_enabled": self.launch_enabled,
+            "catalog_editing_enabled": self.catalog_editing_enabled,
+        }
+
+    def setup_preflight(self) -> dict[str, Any]:
+        """Run the credential-free compatibility check over configured profiles.
+
+        `preflight_profile` debuts in the panel here.  It starts provider `--help`
+        and MCP handshake processes and consumes no delegation attempt; what it
+        cannot do is tell an unauthorized provider from an authorized one, and
+        the answer says so in every response rather than only in a tooltip.
+        """
+
+        from agent_commons.runtime.preflight import preflight_profile
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+        from agent_commons.ui import setup
+
+        if self._profile_config is None:
+            raise setup.SetupError(
+                setup.SETUP_UNCONFIGURED,
+                "there is no operator runtime config to check yet; the check runs "
+                "against the profiles the first-run screen writes",
+            )
+        configuration = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        state_root = self.paths().state_root
+        results = [
+            preflight_profile(
+                configuration.profiles,
+                profile_id,
+                workspace_root=self.repo,
+                state_root=state_root,
+            )
+            for profile_id in configuration.profiles.profile_ids
+        ]
+        return {
+            "credential_free": True,
+            "note": PREFLIGHT_CREDENTIAL_FREE,
+            "ok": all(bool(result["ok"]) for result in results),
+            "profiles": results,
+        }
 
     def manager(self) -> CommonsManager:
         return CommonsManager(
@@ -210,19 +754,28 @@ class UIContext:
         CLI and the MCP adapter use, opened under an explicit operator session.
         """
 
-        if self.writer_session_id is None:
+        session_id = self.writer_session_id
+        if session_id is None:
             raise ConfigurationError(
-                "this UI was started read-only; restart with --enable-writes to record events"
+                "this panel holds no operator session, so it records no canonical event"
             )
-        manager = CommonsManager(
+        return self._writer_bound(session_id)
+
+    def _writer_bound(self, session_id: str) -> CommonsManager:
+        """A writer manager over one already-resolved session id.
+
+        Split from :meth:`writer` so a caller that needs the id *and* the
+        manager reads the (possibly rotating) session exactly once and binds
+        both to the same value.
+        """
+
+        return CommonsManager(
             self.repo,
-            session_id=self.writer_session_id,
+            session_id=session_id,
             state_root=self._state_root,
             state_base=self._state_base,
             state_source=self._state_source,
         )
-        # Invalidate the cached graph so the next poll reflects the write.
-        return manager
 
     def invalidate(self) -> None:
         with self._guard:
@@ -238,19 +791,57 @@ class UIContext:
     def fingerprint(self) -> str:
         return ledger_fingerprint(self.paths())
 
+    def _workspace_id(self) -> str | None:
+        """This project's workspace id, or None when there is no workspace yet.
+
+        Never raises.  A panel is now expected to serve a directory that is not
+        a workspace at all -- that is the whole first-run screen -- and the tab
+        fetches `/api/meta` before anything else, so an exception here is a tab
+        that never loads and an operator with no way in but the terminal.
+        Which state this actually is remains `GET /api/setup`'s question; the
+        honest answer here is that there is no id to report.
+        """
+
+        try:
+            return str(self.manager().workspace_id)
+        except (CommonsError, OSError) as exc:
+            _LOG.debug("no workspace to report on this panel yet: %s", exc)
+            return None
+
     def meta(self) -> dict[str, Any]:
+        """Boot facts for a tab, answerable in every state the panel can be in.
+
+        This is the first request a tab makes and the tab renders nothing until
+        it returns, so it must not fail for anything the panel is designed to
+        survive.  Two such states used to raise straight out of here into a
+        500: a directory with no workspace yet, and a panel that lost the
+        deferred singleness race, whose session read raises
+        ``PanelAlreadyOpenError``.  The second one is the worse of the two --
+        the operator's second window would go blank with no way to learn that
+        the first window is the live one, or where it is.
+
+        Both are now reported rather than raised.  A refusal that carries a
+        frozen code travels in ``session_refusal``; one that does not is left
+        as an absence, because inventing a verdict here would put a second
+        first-run state machine beside `GET /api/setup`, which owns that
+        question.
+        """
+
         from agent_commons import __version__
         from agent_commons.ui import META_SCHEMA, TRUST_NOTE, TRUTH_LAYERS
 
-        manager = self.manager()
+        # One look at the session, four fields derived from it: read twice and
+        # a panel could be told it is writable and given no id to write as.
+        session_id, refusal = self.session_or_refusal()
         return {
             "schema": META_SCHEMA,
             "agent_commons_version": __version__,
-            "workspace_id": manager.workspace_id,
+            "workspace_id": self._workspace_id(),
             "repo": str(self.repo),
-            "read_only": not self.writes_enabled,
-            "writes_enabled": self.writes_enabled,
-            "writer_session_id": self.writer_session_id,
+            "read_only": session_id is None,
+            "writes_enabled": session_id is not None,
+            "writer_session_id": session_id,
+            "session_refusal": _session_refusal_view(refusal),
             "server_instance_id": self.server_instance_id,
             "trust_note": TRUST_NOTE,
             "truth_layers": list(TRUTH_LAYERS),
@@ -338,11 +929,10 @@ class UIContext:
         panel asks; the rest stays where it is configured.
 
         Read through the same guarded loader the launch path uses, so a config
-        this surface would accept is exactly one a launch would accept.  The
-        `--enable-launch` gate is deliberately not consulted: permission to
-        spawn a billable process and permission to say which model a profile
-        names are different privileges, and the config is operator-owned either
-        way.
+        this surface would accept is exactly one a launch would accept.
+        `launch_enabled` is deliberately not consulted: permission to spawn a
+        billable process and permission to say which model a profile names are
+        different privileges, and the config is operator-owned either way.
 
         Never raises.  A missing, unreadable, or malformed config makes this
         empty, and the panel then says the model is fixed in the profile rather
@@ -385,6 +975,64 @@ class UIContext:
             self._profile_info = summary
         return summary
 
+    def model_options(self, snapshot: Any) -> dict[str, list[str]]:
+        """Models the hire form may offer, per provider, from honest sources only.
+
+        The panel may not invent a model name -- a name it made up would be a
+        name that is not the one that runs, and the frontend asset is pinned
+        against carrying any.  So every string here comes from somewhere this
+        project can actually point at:
+
+        - the model each configured profile names, which is what a launch would
+          use anyway;
+        - the model each active role was already hired on, so the second role
+          on a project is a pick from a list rather than retyping.
+
+        Neither source is a claim that a name is valid *now*: a model can be
+        retired by its provider between the config being written and this
+        request, and this surface has no way to ask.  It is a list of what this
+        machine and this project have already chosen, which is why the field
+        stays free text with this offered beside it rather than a closed
+        select.  Every candidate is re-validated on the way out: these arrive
+        from an operator file and from replayed events, and a name that could
+        not survive a launch has no business being offered for one.
+
+        A key per provider, always present and possibly empty, so the form can
+        look one up by the selected profile's provider without knowing which
+        providers exist.
+        """
+
+        options: dict[str, set[str]] = {
+            profile_id.provider.value: set() for profile_id in BuiltinProfileId
+        }
+
+        def offer(provider: str | None, model: Any) -> None:
+            if provider not in options or not isinstance(model, str):
+                return
+            try:
+                validated = validate_model_name(model)
+            except ValidationError:
+                # An operator file or a replayed event named something no
+                # launch would accept.  Dropping it silently is right: the
+                # catalogue is a list of offers, and this is not one.
+                _LOG.debug("a recorded model name is not offerable: %r", model[:64])
+                return
+            if validated is not None:
+                options[provider].add(validated)
+
+        for info in self.profile_info().values():
+            offer(str(info.get("provider")), info.get("model"))
+        for record in snapshot.agents.values():
+            if record.get("state") != "active":
+                continue
+            try:
+                provider = BuiltinProfileId(str(record.get("profile_id"))).provider.value
+            except ValueError:
+                # A role recorded against a profile this build does not know.
+                continue
+            offer(provider, role_model(record))
+        return {provider: sorted(models) for provider, models in sorted(options.items())}
+
     def catalog(self) -> dict[str, Any]:
         """What the gear panel may offer, and who owns each half of it.
 
@@ -422,6 +1070,11 @@ class UIContext:
             # choice actually starts.  Empty when the operator config could not
             # be read: the panel falls back to "fixed in the profile".
             "profile_info": self.profile_info(),
+            # Models to offer beside the hire form's free-text field, keyed by
+            # provider.  The panel names no model of its own, so this is the
+            # only place the form's suggestions can come from; empty lists are
+            # normal and mean the field is simply typed into.
+            "model_options": self.model_options(snapshot),
             # Read-only reference: the same composition a launch receives, so
             # the Tools view can never drift from what actually runs.
             "profile_tools": profile_tool_summary(),
@@ -438,16 +1091,20 @@ class UIContext:
     # -- catalogue editing ----------------------------------------------------
 
     def _require_catalog_editing(self) -> Path:
-        if not self.catalog_editing_enabled:
+        # Named states, not missing switches: each branch says which half of
+        # `catalog_editing_enabled` is false, so the refusal is actionable.  The
+        # path check comes first and is not an assert -- `python -O` strips
+        # assertions, and a stripped guard would let None reach
+        # write_role_catalog and raise an opaque TypeError instead of a refusal
+        # (O2, 2026-08-10 review).
+        if self._catalog_path is None:
             raise ConfigurationError(
-                "catalogue editing is off; restart with --role-catalog and --enable-catalog-editing"
+                "this panel has no operator catalogue configured, so there is nothing to edit"
             )
-        # Not an assert: catalog_editing_enabled already guarantees a path, but
-        # `python -O` strips assertions, and a stripped guard here would let
-        # None reach write_role_catalog and raise an opaque TypeError instead of
-        # this refusal (O2, 2026-08-10 review).
-        if self._catalog_path is None:  # pragma: no cover - defended, not reachable
-            raise ConfigurationError("catalogue editing is on but no catalogue path is configured")
+        if not self.writes_enabled:
+            raise ConfigurationError(
+                "this panel holds no operator session; it shows the catalogue and changes nothing"
+            )
         return self._catalog_path
 
     def _catalog_users(self, section: str, entry_id: str) -> list[str]:
@@ -516,9 +1173,13 @@ class UIContext:
             _participant_id,
         )
 
-        manager = self.writer() if self.writes_enabled else self.manager()
+        # One read of the (possibly rotating) session lineage binds both the
+        # manager and the answerability filter to the same value; a second read
+        # through the provider could observe a different session between them.
+        session_ids = self.writer_session_ids
+        manager = self._writer_bound(session_ids[-1]) if session_ids else self.manager()
         try:
-            operations = CommunicationRuntimeService(manager).inbox()
+            operations = CommunicationRuntimeService(manager, session_lineage=session_ids).inbox()
         except (CommonsError, OSError) as exc:
             # A corrupt or unreadable communication store is not "no blockers":
             # swallowing it silently made a real failure indistinguishable from
@@ -530,8 +1191,11 @@ class UIContext:
             _LOG.warning("communication inbox unavailable, live answers disabled: %s", exc)
             operations = ()
         # Scopes store a deterministic pseudonym, not the registry session id,
-        # so the comparison has to be made in the same space.
-        answerable = _participant_id(str(self.writer_session_id)) if self.writer_session_id else ""
+        # so the comparison has to be made in the same space.  The whole owned
+        # lineage participates: a scope recorded against a session this panel
+        # has since replaced still belongs to this panel, and hiding its answer
+        # form would orphan the blocker forever.
+        answerable = {_participant_id(str(item)) for item in session_ids}
         found = []
         for record in operations:
             if record.get("state") not in {"open", "replied"}:
@@ -547,7 +1211,7 @@ class UIContext:
                     "task_id": scope.get("task_id"),
                     "metadata": record.get("metadata"),
                     "deadline": record.get("deadline"),
-                    "answerable_here": bool(answerable) and answerable in recipients,
+                    "answerable_here": bool(answerable & recipients),
                     "answer_from_session": sorted(recipients),
                 }
             )
@@ -738,7 +1402,22 @@ class UIContext:
                     )
 
     def create_agent(self, *, from_preset_id: str | None = None, **fields: Any) -> dict[str, Any]:
+        """Hire a role, once, with the model it will run on for its whole life.
+
+        The model is chosen here and nowhere else.  A role's accumulated
+        context is built for the model that built it, so moving a hired role to
+        another one would need that context recomputed -- the gear panel
+        therefore has no model field and is not going to grow one; it edits
+        skills, the system prompt, the reachable MCP servers, and how much the
+        role decides on its own.
+
+        Empty means the profile's model stands, which is why blank is
+        normalized to absent rather than refused: an untouched free-text box
+        must mean "you choose", not "run a role named ''".
+        """
+
         manager = self.writer()
+        fields["model"] = self._chosen_model(fields.get("model"))
         if from_preset_id:
             preset = manager.get_agent(from_preset_id)
             if not preset.get("template"):
@@ -749,10 +1428,42 @@ class UIContext:
             for key in ("skills", "tool_allowlist"):
                 if not fields.get(key):
                     fields[key] = tuple(preset.get(key) or ())
+            if fields["model"] is None:
+                # A preset that was saved with a model is a preset whose whole
+                # point includes it; hiring from it and silently getting the
+                # profile's model instead would be the template not applying.
+                fields["model"] = role_model(preset)
         self._check_role_selection(
             fields.get("profile_id"), fields.get("skills"), fields.get("tool_allowlist")
         )
         return manager.create_agent(**fields)
+
+    @staticmethod
+    def _chosen_model(value: Any) -> str | None:
+        """The model this hire names, refused here rather than at launch.
+
+        The runtime validates it again when the profile is replaced, and
+        `create_agent` validates it once more before it becomes an immutable
+        event -- but neither of those refusals reaches the person who typed it.
+        This one lands on the form, while the field is still on screen.
+
+        Which is also why the message is rewritten rather than passed through.
+        The rule is one rule and its inner refusal -- "model is not a safe
+        identifier" -- is right for a log and useless on a form: it names no
+        rule the operator can satisfy and no way out of the field.  This one
+        says what a model name may contain and that leaving it empty is a
+        legitimate answer, which is the whole point of refusing here.
+        """
+
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return validate_model_name(text)
+        except ValidationError as exc:
+            raise ValidationError(MODEL_NAME_REFUSED) from exc
 
     # -- launch (MUST-4) ------------------------------------------------------
 
@@ -784,8 +1495,8 @@ class UIContext:
         config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
         runner = None
         if config.demo:
-            # Demo mode: complete the run without launching a provider, so the
-            # panel's Run closes the loop in a scratch workspace without billing.
+            # An internal/dev config can bind the runner seam without launching
+            # a provider.  The panel never creates or advertises this mode.
             from agent_commons.runtime.demo import DemoRunner
 
             runner = DemoRunner(manager.paths.state_root)
@@ -953,10 +1664,19 @@ class UIContext:
         """
 
         if not self.launch_enabled:
-            raise ConfigurationError(
-                "launching is off; restart with --enable-writes --profile-config and "
-                "--enable-launch"
-            )
+            raise ConfigurationError(LAUNCH_NOT_CONFIGURED)
+        limits = dict(self._DEFAULT_RUN_LIMITS)
+        if wall_time_seconds:
+            limits["wall_time_seconds"] = int(wall_time_seconds)
+        if self._session_owner is not None:
+            # A forced heartbeat *before* `create_delegation`, not merely before
+            # the child starts: the runtime refuses a child unless the parent
+            # session TTL covers the wall time plus a finalization margin, and
+            # by launch time that refusal would arrive raw from the broker in a
+            # background thread.  Renewing here also pins the session for the
+            # whole launch window, so the requester recorded on the delegation
+            # is the session the background thread launches under.
+            self._session_owner.ensure_run_ttl(int(limits["wall_time_seconds"]))
         writer = self.writer()
         role = writer.get_agent(agent_id)
         if role.get("state") != "active":
@@ -976,9 +1696,6 @@ class UIContext:
             if profile_id.endswith("independent-reviewer")
             else "implementation"
         )
-        limits = dict(self._DEFAULT_RUN_LIMITS)
-        if wall_time_seconds:
-            limits["wall_time_seconds"] = int(wall_time_seconds)
         delegation = writer.create_delegation(
             target_ref={"kind": "task", "id": task_id},
             target_revision=str(task.get("effective_revision") or task["revision"]),
@@ -1050,7 +1767,9 @@ class UIContext:
 
         if not isinstance(answer, Mapping) or not answer:
             raise ValidationError("an answer needs at least one field")
-        service = CommunicationRuntimeService(self.writer())
+        session_ids = self.writer_session_ids
+        manager = self._writer_bound(session_ids[-1]) if session_ids else self.writer()
+        service = CommunicationRuntimeService(manager, session_lineage=session_ids)
         return service.reply_to_input(
             operation_id,
             idempotency_key=idempotency_key or f"ui-reply-{operation_id}",

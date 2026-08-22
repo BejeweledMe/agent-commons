@@ -45,7 +45,7 @@ def test_support_report_is_secret_free_and_does_not_disclose_paths(tmp_path: Pat
     assert body["supported_platform"] is True
     assert body["supported_operating_systems"] == ["darwin", "linux"]
     assert body["core_release_stage"] == "alpha"
-    assert body["broker_release_stage"] == "experimental_manual_opt_in"
+    assert body["broker_release_stage"] == "experimental"
     assert body["state_root_explicit"] is True
     assert body["state_config_source"] == "flag:state-root"
     assert body["state_mode"] == "exact"

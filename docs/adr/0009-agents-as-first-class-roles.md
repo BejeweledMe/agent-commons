@@ -1,6 +1,6 @@
 # ADR 0009: Agents as first-class roles
 
-Status: accepted; **amended 2026-08-11** after two review rounds.
+Status: accepted; **amended 2026-08-11** after two review rounds; **superseded in part by ADR 0010** (Q2's flag-gated route table and Q4's catalogue-gate justification — the rest of this ADR stands).
 
 > **What ships today, and what an earlier edition of this ADR overclaimed.**
 > The first edition of this document said autonomous role creation ships "with

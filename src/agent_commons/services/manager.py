@@ -972,6 +972,7 @@ class CommonsManager(RoleCommands):
                     event_type,
                     payload_value,
                     actor_session_id=session.session_id,
+                    actor=actor,
                     relations=normalized_relations,
                 )
                 self._enforce_workspace_policy(

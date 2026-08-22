@@ -1,8 +1,9 @@
 """The operator catalogue, edited from the panel and read by the broker.
 
 Two properties matter and neither is provable from the context object alone:
-the routes exist only behind their own gate, and what the panel writes is a
-file the next launch can actually load.
+the routes exist on every operator panel and refuse by name until a catalogue
+is configured, and what the panel writes is a file the next launch can actually
+load.
 """
 
 from __future__ import annotations
@@ -17,7 +18,13 @@ from agent_commons.errors import ConfigurationError
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import CATALOG_ROUTES, MUTATING_ROUTES, create_app
-from tests.ui.conftest import PORT, authorized
+from tests.ui.conftest import (
+    OPERATOR_SURFACE,
+    PORT,
+    authorized,
+    expected_surface,
+    mutating_surface,
+)
 
 
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
@@ -43,46 +50,90 @@ def editable(workspace: dict[str, Any], tmp_path: Path) -> UIContext:
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
         catalog_path=tmp_path / "catalog.yaml",
-        catalog_editing=True,
     )
 
 
-def test_catalogue_routes_exist_only_behind_their_own_gate(
+def _writing_context(workspace: dict[str, Any], **extra: Any) -> UIContext:
+    manager = CommonsManager(workspace["repo"], state_root=workspace["state_root"])
+    session = manager.start_session(
+        stable_instance_id=f"catalog-surface-{len(extra)}-window",
+        principal="operator",
+        client="claude",
+        software="claude-code",
+        role="operator",
+    )
+    return UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        writer_session_id=str(session["session_id"]),
+        **extra,
+    )
+
+
+def test_the_catalogue_routes_exist_before_a_catalogue_does_and_refuse_until_then(
     workspace: dict[str, Any], tmp_path: Path
 ) -> None:
-    """Editing presets and changing what a run is told to do are not one switch."""
+    """Editing presets and changing what a run is told to do are not one thing,
+    but the difference is a refusal and no longer a missing route.
 
-    writable_only = UIContext(
-        workspace["repo"],
-        state_root=workspace["state_root"],
-        writer_session_id=None,
-        catalog_path=tmp_path / "catalog.yaml",
-    )
-    with _client(writable_only) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
-    assert found == set()
+    The catalogue path used to gate registration, and that quietly broke the
+    promise this wave is about: the first-run screen writes a runtime config
+    that names a `catalog.yaml` beside itself, the panel adopts both while it is
+    serving, and `POST /api/catalog/entries` still answered 404 because the
+    route table had been decided at startup.  Both panels here carry the routes;
+    only one of them may use them.
+    """
 
-    editing = UIContext(
-        workspace["repo"],
-        state_root=workspace["state_root"],
-        catalog_path=tmp_path / "catalog.yaml",
-        catalog_editing=True,
-    )
+    without = _writing_context(workspace)
+    with _client(without) as client:
+        found = mutating_surface(client.app)
+        refused = client.post(
+            "/api/catalog/entries",
+            headers=authorized(),
+            json={"section": "skills", "id": "x", "title": "X"},
+        )
+    assert found == expected_surface(without) == OPERATOR_SURFACE
+    assert set(MUTATING_ROUTES) | set(CATALOG_ROUTES) <= found
+    assert without.catalog_editing_enabled is False
+    # Refused, not absent, and the refusal names which half of the state is
+    # missing rather than pretending the surface does not exist.
+    assert refused.status_code == 409, refused.text
+    assert "no operator catalogue" in refused.json()["error"]["message"]
+
+    editing = _writing_context(workspace, catalog_path=tmp_path / "catalog.yaml")
     with _client(editing) as client:
-        found = {
-            (method, route.path)
-            for route in client.app.routes
-            for method in (getattr(route, "methods", set()) or set())
-            if method not in {"GET", "HEAD"}
-        }
-    # Catalogue editing brings its own routes and none of the role-write ones.
-    assert found == set(CATALOG_ROUTES)
-    assert not found & set(MUTATING_ROUTES)
+        found = mutating_surface(client.app)
+        accepted = client.post(
+            "/api/catalog/entries",
+            headers=authorized(),
+            json={"section": "skills", "id": "x", "title": "X", "instruction": "do it"},
+        )
+    assert found == expected_surface(editing) == OPERATOR_SURFACE
+    assert accepted.status_code == 200, accepted.text
+
+
+def test_a_panel_without_a_session_edits_no_catalogue_however_configured(
+    workspace: dict[str, Any], tmp_path: Path
+) -> None:
+    """The read-only invariant outranks a configured catalogue path.
+
+    A read-only panel still *reads* the catalogue -- that is why the path is
+    accepted at all -- but it registers no route of any method but GET, and the
+    refusal for a direct call says which half of the state is missing.
+    """
+
+    reading_only = UIContext(
+        workspace["repo"],
+        state_root=workspace["state_root"],
+        catalog_path=tmp_path / "catalog.yaml",
+    )
+    assert reading_only.catalog_editing_enabled is False
+    with _client(reading_only) as client:
+        assert mutating_surface(client.app) == expected_surface(reading_only) == set()
+    with pytest.raises(ConfigurationError, match="no operator session"):
+        reading_only.save_catalog_entry(
+            section="skills", entry_id="anything", title="Anything", instruction="do it"
+        )
 
 
 def test_a_saved_skill_is_a_file_the_next_launch_can_load(

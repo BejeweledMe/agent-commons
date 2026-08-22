@@ -5,6 +5,82 @@ Versioning once a stable release line is declared.
 
 ## Unreleased
 
+- **The terminal step disappears: `git clone … && make sync && agent-commons
+  ui` is now the whole bootstrap.** Reaching a working panel used to mean
+  opening a terminal four times — `init`, `session start`, `ui` with three
+  capability flags, and hand-writing a `runtime.yaml` whose shape was
+  documented nowhere but the error messages that rejected it. All four moves
+  into the panel itself. `agent-commons ui` on an uninitialized directory no
+  longer refuses; it serves a first-run screen that creates the project here
+  (the same initializer `agent-commons init` runs, not a second one), finds
+  `claude`/`codex` on `PATH` and writes an operator runtime config for
+  whichever it found. If it finds neither, it says run functionality is
+  unavailable and directs the operator to install a subscribed CLI before
+  looking again. The panel opens, renews on a 15-minute heartbeat, and closes an
+  operator session of its own — nobody runs `session start` for it, and an
+  externally selected `AGENT_COMMONS_SESSION_ID` is deliberately not adopted,
+  since the panel would hold no ownership nonce for a session it did not open
+  and so could never renew it. Two panels on one project is refused rather
+  than silently shared: an exclusive lock file under the state root holds the
+  bound port, and the second panel to start names the first one's address
+  instead of racing it for one session's renewal window.
+- **All three capability flags are gone; `--read-only` replaces them.**
+  `--enable-writes`, `--enable-catalog-editing`, and `--enable-launch` are
+  removed from `agent-commons ui`. There are no capability flags left at
+  all — what the panel can do follows from what is configured (a session, an
+  operator runtime config, a catalogue beside it), not from what was passed
+  on the command line, and the panel says which of those pieces are missing
+  rather than which flag would unlock them. `--role-catalog` and
+  `--profile-config` remain, now as pure path overrides rather than
+  privilege switches. The route-registration formula changes with them: a
+  writing panel now registers its whole non-`GET` surface — the union of
+  `MUTATING_ROUTES`, `CATALOG_ROUTES`, `LAUNCH_ROUTES`, and the new
+  `SETUP_ROUTES` — unconditionally, the moment it can hold a session at all,
+  because the panel's own first-run screen can create the workspace, write
+  the runtime config, and adopt a catalogue beside it while already serving,
+  and FastAPI builds its route table exactly once. What used to be "the route
+  doesn't exist" is now a typed 409 from the handler instead —
+  `setup_uninitialized`, `launch_not_configured`, the catalogue's own
+  refusal — and the invariant test now asserts the registered surface
+  against that literal union rather than against the same conditions the
+  registration used, so the two cannot silently agree with each other while
+  disagreeing with the code.
+- **The panel no longer offers demo mode.** The product route
+  `POST /api/setup/demo-config`, its response field, and its controls are
+  removed. With neither supported provider present, first run honestly says
+  execution is unavailable and points to documentation plus a rescan. The
+  internal `demo: true` runner seam remains for development and hermetic tests,
+  but is not an onboarding promise.
+- **Generated runtime configuration is written once and only regenerated
+  additively when ownership is proved.** A second
+  `POST /api/setup/runtime-config` refuses a working file without changing its
+  bytes. `POST /api/setup/add-discovered-providers` is parameterless and can
+  add profiles for a newly discovered provider only after reconstructing the
+  exact expected bytes of the existing generated config. A hand edit gives a
+  typed refusal; there is no YAML merge. These boundaries implement
+  `decision.1A08MD6B8TXRWVNX00DJZD98DY` alongside the product-surface decision
+  `decision.2ZTHNGPQVMHZ5RF614HQPWCKYV`.
+- **A hired role may now choose its model, and only once.** The hire form
+  offers a model list assembled server-side from configured profiles' models
+  and the models already running on the project's roles, plus free text; the
+  asset itself names no model, which a test asserts, so the operator never
+  reads the offered list as complete. The choice is stored in the existing
+  `agent.v1` schema's `payload.extensions.model` — no schema change, no
+  migration — and delivered to the launch through `dataclasses.replace` on
+  the frozen profile, which re-runs its own validation for the new model.
+  There is deliberately no way to change a hired role's model later: a model
+  change means rebuilding the role's context for a different model, which
+  this version does not do, so the setting is absent from role settings
+  rather than present and inert.
+- **There is no confirmation dialog before a launch spends your provider
+  subscription, and that is the owner's decision, not an oversight.** Coming
+  to Codex or Claude Code directly does not ask per window whether spending
+  is authorized; the panel now holds itself to the same standard instead of
+  interposing a click the underlying tools do not have. The fact that this
+  product runs billable provider processes on the operator's own subscription
+  moves into documentation instead of a dialog — stated plainly in the
+  [README](README.md#configure-a-provider-before-running-work) and the
+  [threat model](docs/THREAT_MODEL.md) rather than learned from a bill.
 - **The loop closes: a finished run now has somewhere to be accepted.**
   Two blind round-3 testers, working in parallel and on different models,
   reached `succeeded` and independently reported the same blocker — nothing
@@ -146,12 +222,9 @@ Versioning once a stable release line is declared.
   other library views, Runs show role and task names with the run's canonical
   summary line (ids stay in the tooltip), the header's trust wording collapsed
   into an ⓘ tooltip, and the hire form's terms carry translated tooltips.
-- **Demo mode closes the loop without a provider.** `demo: true` in the
-  operator runtime config swaps the provider CLI for a DemoRunner at the same
-  runner seam: an implementation run completes with an honest
-  "no provider was launched" summary, so a newcomer can watch
-  Hire → Task → Run → result finish in a scratch workspace without a
-  subscription. Reviews and verifications are never simulated.
+- **The internal demo runner remains a development seam.** `demo: true` can
+  bind it for hermetic runtime tests, but it is not a panel bootstrap or a
+  product promise for users without a provider.
 
 - **Agents become a first-class standing role**, separate from the situational
   run they perform. New canonical events `agent.created`, `agent.reconfigured`,
@@ -195,7 +268,9 @@ Versioning once a stable release line is declared.
   The invariant test now proves three things instead of one: the mutating
   surface equals an explicit allowlist, every route dies when `record_event` is
   removed, and each route's event is found in the ledger after being driven over
-  HTTP.
+  HTTP. (`--enable-writes` itself is gone — see "the terminal step
+  disappears" and "all three capability flags are gone" above; the allowlist
+  and its invariant test outlive the flag.)
 - **`agent-commons ui --enable-launch --profile-config <file>`** lets the panel
   put a role to work: a Run action records a delegation on the role's behalf and
   runs it through the same `DelegationRuntimeService` the CLI broker uses — one
@@ -204,7 +279,9 @@ Versioning once a stable release line is declared.
   with its own route allowlist. A Runs surface shows each run's live phase —
   launching → running → terminal — as metadata only, never any provider output,
   and the change detector folds in the runtime attempt so the panel moves as the
-  run does.
+  run does. (`--enable-launch` is gone too; the launch route now registers on
+  every operator panel and refuses `launch_not_configured` until a runtime
+  config exists — see "all three capability flags are gone" above.)
 - The graph shows roles as nodes with their reporting lineage, and rings any
   node waiting on a human decision so a blocker is visible without opening a
   list. Both sources of that state — a delegation in `input_needed` and an open
@@ -236,7 +313,9 @@ Versioning once a stable release line is declared.
   recording a role and changing what every delegated run is told to do are
   different magnitudes of privilege. Provider profiles stay out of the UI at any
   gate. The file is validated in full and published atomically at mode 0600, so
-  a rejected edit leaves the previous one byte-identical.
+  a rejected edit leaves the previous one byte-identical. (`--enable-catalog-editing`
+  is gone; the privilege distinction it named is unchanged, it is just no longer
+  a flag — see "all three capability flags are gone" above.)
 - **A required skill now reaches the process.** Catalogue skills carry
   operator-authored instruction text appended to the run's bounded instruction,
   resolved at launch and asserted against the bytes the provider receives. A

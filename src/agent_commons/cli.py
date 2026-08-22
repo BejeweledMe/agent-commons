@@ -318,6 +318,45 @@ def init_command(
     )
 
 
+def _operator_runtime_config(
+    state: CLIState, role_catalog: Path | None
+) -> tuple[Path | None, Path | None]:
+    """The operator runtime config already on disk, and the catalogue it names.
+
+    Only called when no `--profile-config` was given.  The panel writes this
+    file itself, at a path fixed in `ui.setup`, and then has to find it again on
+    the next start -- otherwise first run succeeds exactly once per project and
+    every start after it serves a panel that reports "configured" and can do
+    nothing, because the state and the capability were reading different things.
+
+    Two rules keep this honest.  The loader decides: a file it refuses is not
+    adopted at all, so the panel stays unconfigured and the first-run screen
+    says so, rather than a launch failing later with a parse error.  And an
+    explicit `--role-catalog` outranks the catalogue the config names, because
+    the flag is the operator saying where to read it from.
+    """
+
+    from agent_commons.services.delegation_runtime import load_runtime_configuration
+    from agent_commons.ui.setup import default_runtime_config_path
+
+    candidate = default_runtime_config_path()
+    if candidate.is_symlink() or not candidate.is_file():
+        return None, role_catalog
+    try:
+        configuration = load_runtime_configuration(candidate, workspace_root=state.repo)
+    except CommonsError as exc:
+        # Said once, at the terminal, and then not repeated: the panel's setup
+        # screen is where the operator fixes or rewrites this file.
+        click.echo(
+            f"note: ignoring the operator runtime config at {candidate}: {exc}",
+            err=True,
+        )
+        return None, role_catalog
+    if role_catalog is None and configuration.catalog_path is not None:
+        role_catalog = configuration.catalog_path
+    return candidate, role_catalog
+
+
 @cli.command("ui")
 @click.option(
     "--port",
@@ -328,73 +367,88 @@ def init_command(
 )
 @click.option("--no-browser", is_flag=True, help="Do not open a browser automatically.")
 @click.option(
-    "--enable-writes",
+    "--read-only",
+    "ui_read_only",
     is_flag=True,
-    help="Allow the role panel to record canonical events under the active session.",
+    help="Serve a view that records nothing; the panel opens no session of its own.",
 )
 @click.option(
     "--role-catalog",
     type=click.Path(dir_okay=False, path_type=Path),
-    help="Operator-owned catalogue of selectable skills and tools.",
-)
-@click.option(
-    "--enable-catalog-editing",
-    is_flag=True,
-    help="Also allow editing that catalogue from the panel. Separate from "
-    "--enable-writes: this changes what child processes may run.",
+    help="Override the operator-owned catalogue of selectable skills and tools.",
 )
 @click.option(
     "--profile-config",
     "profile_config",
     type=click.Path(dir_okay=False, path_type=Path),
-    help="Operator-owned runtime profile config; required to launch runs from the panel.",
-)
-@click.option(
-    "--enable-launch",
-    is_flag=True,
-    help="Allow the panel to launch a delegation (spawn a provider run). Separate "
-    "from --enable-writes: this starts a billable subscription process.",
+    help="Override the operator-owned runtime profile config runs are launched from.",
 )
 @click.pass_obj
 def ui_command(
     state: CLIState,
     port: int,
     no_browser: bool,
-    enable_writes: bool,
+    ui_read_only: bool,
     role_catalog: Path | None,
-    enable_catalog_editing: bool,
     profile_config: Path | None,
-    enable_launch: bool,
 ) -> None:
-    """Serve a local view of this workspace on loopback; read-only by default.
+    """Serve the role panel on loopback; the panel owns its own session.
 
-    With --enable-writes the role panel records through the same
+    The panel opens, renews, and finally closes an operator session of its own
+    -- nobody runs ``session start`` for it -- and records through the same
     ``CommonsManager`` the CLI and MCP adapter use.  There is no second write
-    path.  It binds 127.0.0.1 only; there is deliberately no --host flag.
+    path.  With --read-only it opens no session and records nothing.  It binds
+    127.0.0.1 only; there is deliberately no --host flag.
+
+    There are no capability flags: what the panel can do follows from what is
+    configured -- a session it owns, an operator catalogue, a runtime profile
+    config -- and the panel says which of those are missing.  --role-catalog and
+    --profile-config only override where those two files are read from.
     """
 
     try:
         from agent_commons.ui.context import UIContext
         from agent_commons.ui.server import serve
+        from agent_commons.ui.session_owner import ProjectSessionOwner
     except ImportError as exc:  # pragma: no cover - exercised with a stubbed import
         raise ConfigurationError("UI support is not installed; install agent-commons[ui]") from exc
 
-    if enable_catalog_editing and role_catalog is None:
-        raise ConfigurationError(
-            "--enable-catalog-editing requires --role-catalog naming the file to edit"
+    read_only = ui_read_only or state.read_only
+    owner = None
+    if not read_only:
+        if state.session_id is not None:
+            # An externally selected session comes without its ownership nonce,
+            # so the panel could never renew or close it.  Refusing to adopt it
+            # is what keeps every panel session owned end to end.
+            click.echo(
+                "note: ignoring the selected session "
+                f"{state.session_id} (AGENT_COMMONS_SESSION_ID or --session-id): "
+                "the panel cannot renew a session it does not own, so it opens "
+                "and owns its own session instead",
+                err=True,
+            )
+        # The owner resolves its workspace lazily.  It deliberately does not
+        # fail here when there is none: a directory with no workspace is the
+        # state the panel's own first-run screen exists to leave, and refusing
+        # at the terminal is precisely the refusal this panel removes.
+        owner = ProjectSessionOwner(
+            state.repo,
+            state_root=state.state_root,
+            state_base=state.state_base,
+            state_source=state.state_source,
         )
-    writer_session_id = None
-    if enable_writes:
-        # Writes need the operator's own session, resolved and checked exactly
-        # as the CLI resolves it, so the UI cannot record under a nameless actor.
-        # Refuse here rather than at the first POST: the failure belongs where
-        # the operator is still watching, not in a browser tab an hour later.
-        if state.session_id is None:
-            error = ValidationError("--enable-writes requires an explicitly selected session")
-            error.code = "session_not_selected"  # type: ignore[attr-defined]
-            error.details = {"selection": "AGENT_COMMONS_SESSION_ID or --session-id"}  # type: ignore[attr-defined]
-            raise error
-        writer_session_id = str(state.manager().show_session(state.session_id)["session_id"])
+        # Become the one panel for this project before the server binds and
+        # before anything at all can open a session.  Taken any later, a
+        # second panel whose predecessor's session had expired would open a
+        # brand-new session first, hit the lock only afterwards, and abandon
+        # that session for its whole TTL -- while telling the operator it was
+        # sharing the first panel's.  The refusal therefore happens here, at
+        # the terminal, and names the first panel's port.  On a directory with
+        # no workspace there is nowhere to put the lock yet, so the owner
+        # remembers the request and takes it the moment the workspace exists,
+        # still before any session.  `emit` rewrites the held lock with the
+        # port that was actually bound.
+        owner.acquire_panel_lock(port)
 
     if role_catalog is not None:
         # Load the catalogue once at startup so an invalid file fails here, while
@@ -404,32 +458,44 @@ def ui_command(
 
         load_role_catalog(role_catalog, workspace_root=state.repo)
 
-    if enable_launch:
-        if not enable_writes:
-            raise ConfigurationError("--enable-launch requires --enable-writes")
-        if profile_config is None:
-            raise ConfigurationError(
-                "--enable-launch requires --profile-config naming the runtime profile config"
-            )
+    if profile_config is not None:
         # Fail here, at the terminal, if the profile config is invalid — not at
         # the first launch from a browser tab.
         from agent_commons.services.delegation_runtime import load_runtime_configuration
 
         load_runtime_configuration(profile_config, workspace_root=state.repo)
+    else:
+        # No flag: find the operator config the panel's own first-run screen
+        # wrote last time.  Without this the first run of a project worked and
+        # every run after it did not -- `setup_state` already answers off this
+        # same default path, so the panel reported a configured runtime while
+        # `launch_enabled` (which reads the flag) stayed false, and the operator
+        # got a panel that said "set up" and could neither launch nor edit the
+        # catalogue.  The loader decides: a file it will not accept leaves the
+        # panel unconfigured rather than half configured, and the first-run
+        # screen is what the operator sees.
+        profile_config, role_catalog = _operator_runtime_config(state, role_catalog)
 
     context = UIContext(
         state.repo,
         state_root=state.state_root,
         state_base=state.state_base,
         state_source=state.state_source,
-        writer_session_id=writer_session_id,
+        session_owner=owner,
         catalog_path=role_catalog,
-        catalog_editing=enable_catalog_editing,
         profile_config=profile_config,
-        launch_enabled=enable_launch,
     )
 
     def emit(bound_port: int, token: str) -> None:
+        writer_session_id = None
+        if owner is not None:
+            # The lock was taken in the command body, before the server bound
+            # a socket and before any session existed; this call only rewrites
+            # the already-held lock with the port that was actually bound (or,
+            # on a directory with no workspace, updates the port the deferred
+            # lock will record once there is a state root to hold it).
+            owner.acquire_panel_lock(bound_port)
+            writer_session_id = owner.start()
         url = f"http://127.0.0.1:{bound_port}/#t={token}"
         if state.json_output:
             state.emit(
@@ -439,31 +505,51 @@ def ui_command(
                     "port": bound_port,
                     "token": token,
                     "repo": str(state.repo),
-                    "read_only": not enable_writes,
+                    "read_only": read_only,
                     "writer_session_id": writer_session_id,
-                    "catalog_editing": enable_catalog_editing,
+                    # Same key as ever, now a state rather than a flag: the
+                    # panel edits the catalogue when it has one and has a
+                    # session to act under.  Read after `owner.start()`, so the
+                    # session it reports on is the one that exists.
+                    "catalog_editing": context.catalog_editing_enabled,
                 }
             )
             return
-        click.echo(
-            "Agent Commons UI — read-only" if not enable_writes else "Agent Commons UI — writable"
-        )
+        click.echo("Agent Commons UI — read-only" if read_only else "Agent Commons UI — writable")
         click.echo(f"  url     {url}")
         click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
-        if enable_writes:
+        if not read_only and writer_session_id is not None:
             click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
+            click.echo("          the panel opened this session itself and renews it;")
             click.echo("          anyone holding this token writes as that session")
+        elif not read_only:
+            click.echo("  writes  pending — this directory has no workspace yet, so there is")
+            click.echo("          nothing to record into; the panel offers first run, and it")
+            click.echo("          opens its own session as soon as the workspace exists")
         else:
             click.echo("  writes  disabled — this server records no canonical event")
-        if enable_catalog_editing:
+        if context.catalog_editing_enabled:
             click.echo(f"  catalog editable at {role_catalog}")
             click.echo("          adding a skill changes what delegated runs are told to do")
+        if not read_only and not context.launch_enabled:
+            click.echo("  launch  not configured — no runtime profile config is in effect,")
+            click.echo("          so a run is refused in the panel rather than started")
         click.echo("  trust   loopback reachability alone is not authentication")
         click.echo("  note    the token is not stored on disk; opening a browser exposes")
         click.echo("          the URL to other processes of this user via the process list")
-        click.echo("  stop    Ctrl-C")
+        click.echo("  stop    Ctrl-C closes the panel session unless a run is still live")
 
-    serve(context, port=port, open_browser=not no_browser, emit=emit)
+    try:
+        serve(context, port=port, open_browser=not no_browser, emit=emit)
+    finally:
+        if owner is not None:
+            outcome = owner.shutdown()
+            if outcome["session_id"] is not None and not outcome["closed"]:
+                # Deliberate: closing under live work would orphan the run.
+                click.echo(
+                    f"panel session {outcome['session_id']} left open: {outcome['reason']}",
+                    err=True,
+                )
 
 
 @cli.group("chat")
@@ -578,7 +664,7 @@ def support_command(state: CLIState, show_paths: bool) -> None:
         "supported_platform": True,
         "supported_operating_systems": ["darwin", "linux"],
         "core_release_stage": "alpha",
-        "broker_release_stage": "experimental_manual_opt_in",
+        "broker_release_stage": "experimental",
         "canonical_workspace_available": paths.commons_root.is_dir(),
         "state_root_explicit": paths.state_mode == "exact",
         "state_config_source": paths.state_source,
@@ -1871,8 +1957,8 @@ def _runtime_service(
         catalog = load_role_catalog(role_catalog, workspace_root=state.repo)
     runner = None
     if config.demo:
-        # No provider is launched; the demo runner completes runs so the loop
-        # closes without a subscription or a billable process.
+        # An explicitly supplied internal/development config may bind the
+        # runner seam without launching a provider.
         from agent_commons.runtime.demo import DemoRunner
 
         runner = DemoRunner(manager.paths.state_root)

@@ -14,7 +14,7 @@ import hmac
 import os
 import stat
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -843,18 +843,27 @@ class CommunicationStore:
         responder_session_id: str,
         idempotency_key: str,
         answer: Mapping[str, Any],
+        authorized_recipient_session_ids: Collection[str] | None = None,
     ) -> OperationRecord:
         self._require_writable()
         if not isinstance(idempotency_key, str) or not 0 < len(idempotency_key) <= 256:
             raise ValidationError("communication reply idempotency key is invalid")
         if not isinstance(answer, Mapping):
             raise ValidationError("communication reply answer must be a mapping")
+        if isinstance(authorized_recipient_session_ids, (str, bytes)):
+            raise ValidationError(
+                "authorized_recipient_session_ids must be a collection of sessions"
+            )
+        authorized = frozenset(authorized_recipient_session_ids or (responder_session_id,))
+        for session_id in authorized:
+            _require_typed("authorized recipient session id", session_id, "session")
         self.security_policy.assert_safe(dict(answer), context="operational communication reply")
         self._assert_metadata_within_budget(answer)
         with exclusive_lock(self.lock_path, policy=COMMUNICATION_STORAGE):
             record = self._load(operation_id)
-            self._assert_participant(record, responder_session_id)
-            if responder_session_id not in record.scope.allowed_recipient_session_ids:
+            if responder_session_id not in authorized or not authorized.intersection(
+                record.scope.allowed_recipient_session_ids
+            ):
                 raise CommunicationAuthorizationError(
                     "only an allowed recipient may reply to this communication operation"
                 )
