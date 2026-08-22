@@ -14,8 +14,9 @@ Versioning once a stable release line is declared.
   longer refuses; it serves a first-run screen that creates the project here
   (the same initializer `agent-commons init` runs, not a second one), finds
   `claude`/`codex` on `PATH` and writes an operator runtime config for
-  whichever it found, or offers a provider-free demo config when it found
-  none. The panel opens, renews on a 15-minute heartbeat, and closes an
+  whichever it found. If it finds neither, it says run functionality is
+  unavailable and directs the operator to install a subscribed CLI before
+  looking again. The panel opens, renews on a 15-minute heartbeat, and closes an
   operator session of its own — nobody runs `session start` for it, and an
   externally selected `AGENT_COMMONS_SESSION_ID` is deliberately not adopted,
   since the panel would hold no ownership nonce for a session it did not open
@@ -44,16 +45,21 @@ Versioning once a stable release line is declared.
   against that literal union rather than against the same conditions the
   registration used, so the two cannot silently agree with each other while
   disagreeing with the code.
-- **Demo mode is reachable from the panel, not just by hand-writing YAML.**
-  `POST /api/setup/demo-config` writes an operator config with `demo: true`
-  and no executable named, so it is accepted with zero providers installed —
-  the whole Hire-to-finished-result loop, watchable without a subscription.
-  Like the other two first-run writes, it takes no parameter: the config
-  always lands on the frozen `$XDG_CONFIG_HOME/agent-commons/runtime.yaml`
-  path (directory `0700`, file `0600`), so a bearer token cannot aim any of
-  these three routes at a path or a mode of its own choosing. The hand-written
-  path (`demo: true` in a YAML file passed via `--profile-config`) still
-  works unchanged.
+- **The panel no longer offers demo mode.** The product route
+  `POST /api/setup/demo-config`, its response field, and its controls are
+  removed. With neither supported provider present, first run honestly says
+  execution is unavailable and points to documentation plus a rescan. The
+  internal `demo: true` runner seam remains for development and hermetic tests,
+  but is not an onboarding promise.
+- **Generated runtime configuration is written once and only regenerated
+  additively when ownership is proved.** A second
+  `POST /api/setup/runtime-config` refuses a working file without changing its
+  bytes. `POST /api/setup/add-discovered-providers` is parameterless and can
+  add profiles for a newly discovered provider only after reconstructing the
+  exact expected bytes of the existing generated config. A hand edit gives a
+  typed refusal; there is no YAML merge. These boundaries implement
+  `decision.1A08MD6B8TXRWVNX00DJZD98DY` alongside the product-surface decision
+  `decision.2ZTHNGPQVMHZ5RF614HQPWCKYV`.
 - **A hired role may now choose its model, and only once.** The hire form
   offers a model list assembled server-side from configured profiles' models
   and the models already running on the project's roles, plus free text; the
@@ -73,7 +79,7 @@ Versioning once a stable release line is declared.
   interposing a click the underlying tools do not have. The fact that this
   product runs billable provider processes on the operator's own subscription
   moves into documentation instead of a dialog — stated plainly in the
-  [README](README.md#see-the-whole-loop-without-a-provider-demo-mode) and the
+  [README](README.md#configure-a-provider-before-running-work) and the
   [threat model](docs/THREAT_MODEL.md) rather than learned from a bill.
 - **The loop closes: a finished run now has somewhere to be accepted.**
   Two blind round-3 testers, working in parallel and on different models,
@@ -216,12 +222,9 @@ Versioning once a stable release line is declared.
   other library views, Runs show role and task names with the run's canonical
   summary line (ids stay in the tooltip), the header's trust wording collapsed
   into an ⓘ tooltip, and the hire form's terms carry translated tooltips.
-- **Demo mode closes the loop without a provider.** `demo: true` in the
-  operator runtime config swaps the provider CLI for a DemoRunner at the same
-  runner seam: an implementation run completes with an honest
-  "no provider was launched" summary, so a newcomer can watch
-  Hire → Task → Run → result finish in a scratch workspace without a
-  subscription. Reviews and verifications are never simulated.
+- **The internal demo runner remains a development seam.** `demo: true` can
+  bind it for hermetic runtime tests, but it is not a panel bootstrap or a
+  product promise for users without a provider.
 
 - **Agents become a first-class standing role**, separate from the situational
   run they perform. New canonical events `agent.created`, `agent.reconfigured`,

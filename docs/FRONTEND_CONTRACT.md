@@ -81,6 +81,12 @@ way `setup_state`/`launch_enabled`/`catalog_editing_enabled` on `GET
 /api/setup` and `GET /api/catalog` do, and drive first-run and blocked-action
 UI off those typed codes rather than off which requests happen to fail.
 
+The current setup tuple is exactly `POST /api/setup/initialize`,
+`POST /api/setup/runtime-config`, and
+`POST /api/setup/add-discovered-providers`. The last route derives its only
+input from trusted discovery and a byte-for-byte proof of the currently
+generated config; it never receives a YAML fragment or a path from the browser.
+
 ## Honesty rules
 
 - The panel never advances state client-side: every repaint after a write

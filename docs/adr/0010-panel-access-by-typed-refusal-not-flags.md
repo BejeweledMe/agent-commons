@@ -144,9 +144,9 @@ actual first-run experience more than the flag was buying in deliberate
 consent, given that the same person does not re-consent per window in the
 tools this product wraps. The fact this ADR will not paper over is that
 **removing the flag removed the consent act**, and the product's answer is to
-say so in documentation instead of in a dialog — in the README's demo-mode
-section and in `docs/THREAT_MODEL.md`'s "local UI as a write surface" section,
-both rewritten alongside this ADR to state plainly that launching a role
+say so in documentation instead of in a dialog — in the README's provider
+configuration section and in `docs/THREAT_MODEL.md`'s "local UI as a write surface"
+section, both rewritten alongside this ADR to state plainly that launching a role
 spends a real, billable subscription with no confirmation step. An ADR that
 described only the routing mechanism and stayed silent on this would be the
 same kind of documentation drift this wave's own README and threat-model

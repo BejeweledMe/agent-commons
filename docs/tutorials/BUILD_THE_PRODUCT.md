@@ -52,7 +52,7 @@ run the roles this project hires.
 
 `[SCREENSHOT: workspace just created, panel now asking about runtime setup]`
 
-## 3. Find a provider, or choose demo
+## 3. Find a provider
 
 The panel looks for `claude` and `codex` on `PATH` and reports what it found.
 
@@ -60,9 +60,10 @@ The panel looks for `claude` and `codex` on `PATH` and reports what it found.
   an operator runtime config for it — the generated file that pins the exact
   executable, sandbox, and trust mode this wave's contract fixes in code, not
   in the browser.
-- **No provider was found.** *(mock)* The screen says so, and offers demo mode
-  as one of its listed ways forward rather than a dead end: the whole loop
-  below works with a demo config that names no executable at all.
+- **No provider was found.** *(mock)* The screen says run functionality is
+  unavailable. Install `claude` or `codex` with the operator's subscription,
+  then choose **Look again**. The guide is available from the same screen; it
+  does not offer a simulated run.
 
 `[SCREENSHOT: provider discovery result, both the found and the not-found case]`
 
@@ -104,10 +105,9 @@ configured, launches it through the same broker path the CLI uses. There is no
 separate confirmation dialog before a real provider launch spends your
 subscription's usage — the panel does not ask per run, the same way opening
 Codex or Claude Code directly does not ask per window. That fact belongs in
-documentation instead, which is why it is stated here and in the [demo mode
-section](../../README.md#see-the-whole-loop-without-a-provider-demo-mode) of
-the README rather than in a click-through dialog. In demo mode the same button
-runs the loop without spending anything, because no provider process starts.
+documentation instead, which is why it is stated here and in the [provider
+configuration section](../../README.md#configure-a-provider-before-running-work)
+of the README rather than in a click-through dialog.
 
 `[SCREENSHOT: run in progress, phase shown as metadata only]`
 

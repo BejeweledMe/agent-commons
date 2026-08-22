@@ -314,6 +314,13 @@ breaks every one of them, which is asserted by test, alongside a literal
 assertion that the registered surface equals that union — not a value derived
 from the same conditions the registration itself used.
 
+The setup member of that union is deliberately fixed to
+`POST /api/setup/initialize`, `POST /api/setup/runtime-config`, and
+`POST /api/setup/add-discovered-providers`. The first config write is guarded
+against replacing a working file. The additive route accepts no input, proves
+the current generated file byte-for-byte, and refuses rather than merging any
+operator edit.
+
 Provider runners, OpenTelemetry exporters, and an eventual AHP adapter are
 replaceable optional edges. None defines canonical entities or bypasses the
 manager. Remote multi-host execution remains a later service deployment with a

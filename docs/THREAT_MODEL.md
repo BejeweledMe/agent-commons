@@ -335,17 +335,22 @@ panel mode. Acting on it needs a writing panel: `POST /api/setup/initialize`
 creates the workspace through the same initializer `agent-commons init` runs;
 `POST /api/setup/runtime-config` discovers `claude`/`codex` on `PATH` (through
 the same `resolve_trusted_executable` every profile launch already used — no
-new check), writes the generated config to the frozen path
+new check), writes the generated config once to the frozen path
 (`$XDG_CONFIG_HOME/agent-commons/runtime.yaml`, directory `0700`, file `0600`),
 and reads it back through the same loader the launch path uses before calling
-it accepted; `POST /api/setup/demo-config` writes the same shape with
-`demo: true` and no executable named, so it succeeds with zero providers
-installed. None of the three takes a parameter — the directory a workspace is
-created in is always the one the panel was opened on, the config always lands
-on the frozen path, and demo is a named operation rather than a flag on the
-general write — so a bearer token cannot aim any of these writes at a path or
-a mode of its own choosing, and there is deliberately no field anywhere on the
-first-run screen to type an executable path into.
+it accepted. A later parameterless
+`POST /api/setup/add-discovered-providers` may add profiles only when it can
+reconstruct the exact bytes of the existing generated configuration: a manually
+edited file, a custom configuration, or a provider that is no longer
+discoverable is refused without mutation. No route accepts a path, mode, or
+YAML fragment, so a bearer token cannot aim a write or ask the server to merge
+operator-authored YAML; there is deliberately no executable-path field on the
+first-run screen.
+
+`decision.2ZTHNGPQVMHZ5RF614HQPWCKYV` removes demo from the product surface:
+with no supported provider, execution is unavailable rather than simulated.
+`decision.1A08MD6B8TXRWVNX00DJZD98DY` fixes the one-write and byte-ownership
+proof for later additive generation.
 
 ### Panel session ownership and singleness
 
