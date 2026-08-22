@@ -1957,8 +1957,8 @@ def _runtime_service(
         catalog = load_role_catalog(role_catalog, workspace_root=state.repo)
     runner = None
     if config.demo:
-        # No provider is launched; the demo runner completes runs so the loop
-        # closes without a subscription or a billable process.
+        # An explicitly supplied internal/development config may bind the
+        # runner seam without launching a provider.
         from agent_commons.runtime.demo import DemoRunner
 
         runner = DemoRunner(manager.paths.state_root)

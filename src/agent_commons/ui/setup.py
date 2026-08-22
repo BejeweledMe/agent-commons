@@ -54,7 +54,6 @@ from agent_commons.operator_files import (
     replace_operator_file,
 )
 from agent_commons.runtime.model import (
-    DEMO_UNRESOLVED_EXECUTABLE,
     ClaudePermissionMode,
     CodexApprovalPolicy,
     CodexSandbox,
@@ -376,7 +375,9 @@ def _tighten_operator_directory(directory: Path) -> None:
         os.close(descriptor)
 
 
-def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
+def _profile_bodies(
+    discovery: ProviderDiscovery, *, providers: frozenset[str] | None = None
+) -> dict[str, dict[str, Any]]:
     """Fixed launch modes per profile; only found providers are written at all.
 
     The modes are the security-bearing half of the config and are not
@@ -391,7 +392,7 @@ def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
         "git_executable": discovery.git.path,
     }
     profiles: dict[str, dict[str, Any]] = {}
-    if discovery.codex.found:
+    if discovery.codex.found and (providers is None or "codex" in providers):
         profiles["codex-builder"] = {
             "executable": discovery.codex.path,
             **shared,
@@ -406,7 +407,7 @@ def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
             "approval_policy": CodexApprovalPolicy.NEVER.value,
             "trusted_workspace": True,
         }
-    if discovery.claude.found:
+    if discovery.claude.found and (providers is None or "claude" in providers):
         profiles["claude-builder"] = {
             "executable": discovery.claude.path,
             **shared,
@@ -419,53 +420,6 @@ def _profile_bodies(discovery: ProviderDiscovery) -> dict[str, dict[str, Any]]:
             "permission_mode": ClaudePermissionMode.DONT_ASK.value,
         }
     return profiles
-
-
-def _demo_profile_bodies() -> dict[str, dict[str, Any]]:
-    """All four fixed profiles over inert placeholder executables.
-
-    The demo config consults no discovery and records no real path: the
-    DemoRunner never launches the processes these fields would name, and a
-    constant file tells no bearer of the panel token anything about the
-    operator's machine.  The placeholder cannot resolve -- that is its point:
-    a config later hand-edited from ``demo: true`` to ``demo: false`` gains
-    no launchable capability by accident, because outside demo tolerance the
-    same profiles refuse to build.  The launch modes stay exactly the fixed,
-    never-UI-selectable modes of the real generator, so demo mode exercises
-    the same policy surface it demonstrates.
-    """
-
-    shared = {
-        "mcp_executable": DEMO_UNRESOLVED_EXECUTABLE,
-        "git_executable": DEMO_UNRESOLVED_EXECUTABLE,
-    }
-    return {
-        "codex-builder": {
-            "executable": DEMO_UNRESOLVED_EXECUTABLE,
-            **shared,
-            "sandbox": CodexSandbox.WORKSPACE_WRITE.value,
-            "approval_policy": CodexApprovalPolicy.NEVER.value,
-            "trusted_workspace": True,
-        },
-        "codex-independent-reviewer": {
-            "executable": DEMO_UNRESOLVED_EXECUTABLE,
-            **shared,
-            "sandbox": CodexSandbox.READ_ONLY.value,
-            "approval_policy": CodexApprovalPolicy.NEVER.value,
-            "trusted_workspace": True,
-        },
-        "claude-builder": {
-            "executable": DEMO_UNRESOLVED_EXECUTABLE,
-            **shared,
-            "permission_mode": ClaudePermissionMode.ACCEPT_EDITS.value,
-            "trusted_workspace": True,
-        },
-        "claude-independent-reviewer": {
-            "executable": DEMO_UNRESOLVED_EXECUTABLE,
-            **shared,
-            "permission_mode": ClaudePermissionMode.DONT_ASK.value,
-        },
-    }
 
 
 def _assert_safe_placement(
@@ -555,37 +509,113 @@ def generate_runtime_config(
     }
 
 
-def generate_demo_runtime_config(
+def add_discovered_provider_profiles(
     repo: str | Path,
     *,
     state_root: str | Path | None = None,
     state_base: str | Path | None = None,
     config_directory: str | Path | None = None,
+    discovery: ProviderDiscovery | None = None,
 ) -> dict[str, Any]:
-    """Write a ``demo: true`` config that requires no resolvable provider.
+    """Add newly discovered provider profiles to an unchanged generated config.
 
-    This is the named separate operation behind ``POST /api/setup/demo-config``:
-    demo is its own route, never a parameter on the real generator, so the
-    security property "no setup route accepts a parameter" stays true whole.
-    Requiring nothing resolvable is its entire point -- a machine on which
-    ``setup_no_provider_found`` blocks the real generator is exactly the
-    machine this one exists for -- so no discovery is consulted at all, and
-    the written file is a constant modulo the catalogue path.  Placement, the
-    ownership refusals, the private modes, the catalogue seeded beside it,
-    and the loader read-back are the same shared discipline as the real
-    generator; only the profile bodies and the ``demo`` flag differ.
+    This is deliberately not a YAML merge.  Before it writes, it regenerates
+    the exact bytes for the provider families the current file already names.
+    A mismatch proves the operator has edited the file, so this operation
+    refuses and leaves that file alone.  A matching file may be regenerated
+    with the union of those families and today's discovery through the same
+    write-and-read-back discipline as the initial configuration.
     """
 
     root = Path(repo).expanduser().resolve()
+    directory = (
+        Path(config_directory).expanduser() if config_directory else default_config_directory()
+    )
+    target = directory / "runtime.yaml"
+    configuration = load_runtime_configuration(target, workspace_root=root)
+    existing = frozenset(
+        profile_id.value.split("-", 1)[0]
+        for profile_id in configuration.profiles.profile_ids
+        if profile_id.value.split("-", 1)[0] in {"claude", "codex"}
+    )
+    if not existing:
+        raise SetupError(
+            SETUP_CONFIGURED,
+            "the working runtime config does not name generated claude or codex profiles; "
+            "add profiles by editing the file manually",
+        )
+
+    found = discovery if discovery is not None else discover_providers(root)
+    if not found.providers_found:
+        raise SetupError(
+            SETUP_CONFIGURED,
+            "the working runtime config cannot be proved generated because its provider "
+            "is no longer discoverable; add profiles by editing the file manually",
+        )
+    for required in (found.mcp, found.git):
+        if not required.found:
+            reasons = "; ".join(
+                f"{refusal.candidate}: {refusal.reason}" for refusal in required.refusals
+            )
+            raise ConfigurationError(
+                f"required {required.role} executable is unavailable: {required.name}"
+                + (f" ({reasons})" if reasons else "")
+            )
+    discovered = frozenset(found.providers_found)
+    if not existing <= discovered:
+        unavailable = ", ".join(sorted(existing - discovered))
+        raise SetupError(
+            SETUP_CONFIGURED,
+            "the working runtime config cannot be proved generated because its provider "
+            f"is no longer discoverable ({unavailable}); add profiles by editing the file manually",
+        )
+
+    catalog_path = directory / "catalog.yaml"
+    expected = _runtime_config_bytes(
+        catalog_path=catalog_path,
+        profiles=_profile_bodies(found, providers=existing),
+        demo=False,
+    )
+    if target.read_bytes() != expected:
+        raise SetupError(
+            SETUP_CONFIGURED,
+            "the runtime config was edited manually; add provider profiles by editing the "
+            "file manually",
+        )
+
+    added = tuple(name for name in found.providers_found if name not in existing)
+    if not added:
+        return {
+            "path": str(target),
+            "added_providers": [],
+            "changed": False,
+        }
     written = _write_and_prove(
         root,
-        config_directory=config_directory,
-        profiles=_demo_profile_bodies(),
-        demo=True,
+        config_directory=directory,
+        profiles=_profile_bodies(found, providers=existing | discovered),
+        demo=False,
         state_root=state_root,
         state_base=state_base,
     )
-    return {**written, "demo": True}
+    return {**written, "added_providers": list(added), "changed": True}
+
+
+def _runtime_config_bytes(
+    *, catalog_path: Path, profiles: dict[str, dict[str, Any]], demo: bool
+) -> bytes:
+    """Render the one deterministic runtime config representation.
+
+    The additive operation compares these bytes with the current file before
+    it writes anything, so generation and the ownership proof cannot drift.
+    """
+
+    body = {
+        "profiles": profiles,
+        "catalog": str(catalog_path),
+        "demo": demo,
+    }
+    return yaml.safe_dump(body, allow_unicode=True, sort_keys=True, width=88).encode("utf-8")
 
 
 def _write_and_prove(
@@ -597,14 +627,12 @@ def _write_and_prove(
     state_root: str | Path | None,
     state_base: str | Path | None,
 ) -> dict[str, Any]:
-    """The shared write discipline both generators go through, unbranched.
+    """The shared write discipline used by product-generated configs.
 
     Placement refusals in their fixed order, the post-mkdir descriptor
     tightening, the atomic 0600 replace, the seeded catalogue, and the
     read-back through the guarded launch loader -- with a refused file renamed
     to ``runtime.yaml.rejected`` rather than left posing as a working config.
-    Kept as one function so the demo generator cannot drift a weaker copy of
-    any of it.
     """
 
     directory = (
@@ -626,12 +654,7 @@ def _write_and_prove(
     directory.mkdir(parents=True, exist_ok=True)
     _tighten_operator_directory(directory)
 
-    body = {
-        "profiles": profiles,
-        "catalog": str(catalog_path),
-        "demo": demo,
-    }
-    encoded = yaml.safe_dump(body, allow_unicode=True, sort_keys=True, width=88).encode("utf-8")
+    encoded = _runtime_config_bytes(catalog_path=catalog_path, profiles=profiles, demo=demo)
     replace_operator_file(target, encoded, label=_LABEL)
     if not catalog_path.exists():
         # An operator-edited catalogue survives regeneration untouched; only

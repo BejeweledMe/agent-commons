@@ -528,12 +528,6 @@ class UIContext:
             if not discovery.providers_found
             else (SETUP_SUPPORT_BINARY_UNRESOLVED if missing else None)
         )
-        # Demo is one of the exits from every unconfigured state, and the only
-        # one when no provider resolves at all -- without naming it here, the
-        # person `setup_no_provider_found` stops would be left with "write the
-        # YAML by hand", the exact terminal step this panel exists to remove.
-        # Said explicitly so the screen offers it rather than deriving it.
-        status["demo_available"] = True
         return status
 
     def initialize_workspace(self) -> dict[str, Any]:
@@ -572,6 +566,15 @@ class UIContext:
 
         from agent_commons.ui import setup
 
+        if setup.setup_state(self.repo, profile_config=self._profile_config) == (
+            setup.SETUP_CONFIGURED
+        ):
+            raise setup.SetupError(
+                setup.SETUP_CONFIGURED,
+                "this environment already has a working runtime config; add profiles for "
+                "a newly discovered provider with the configured-profiles action, or edit "
+                "the file manually",
+            )
         discovery = setup.discover_providers(self.repo)
         missing = self._unresolved_support_binaries(discovery)
         if discovery.providers_found and missing:
@@ -609,44 +612,55 @@ class UIContext:
             **adopted,
         }
 
-    def configure_demo_runtime(self) -> dict[str, Any]:
-        """Write the demo runtime config and adopt it; no provider is needed.
-
-        The separate named operation the wave decision froze: demo is its own
-        parameterless route, never a flag on the real write, so "no setup
-        route accepts a parameter" stays true and a bearer of the panel token
-        still cannot choose a mode.  No discovery runs here at all --
-        requiring nothing resolvable is this operation's single purpose, and
-        the machine it exists for is exactly the one `setup_no_provider_found`
-        stops everywhere else.
-
-        A configured environment refuses this write outright.  The route is
-        registered for the panel's whole life while the first-run screen only
-        offers it before setup, so without the refusal a bare authorized POST
-        would silently replace the operator's working `runtime.yaml` -- a file
-        this product did not write and has no business destroying.  The demo
-        config is an exit from the unconfigured states, never an overwrite of
-        a config the loader already accepted.
-        """
+    def add_discovered_providers(self) -> dict[str, Any]:
+        """Add profiles only when the current config still proves machine-made."""
 
         from agent_commons.ui import setup
 
-        if setup.setup_state(self.repo, profile_config=self._profile_config) == (
-            setup.SETUP_CONFIGURED
-        ):
+        state = setup.setup_state(self.repo, profile_config=self._profile_config)
+        if state != setup.SETUP_CONFIGURED:
+            raise setup.SetupError(
+                state,
+                "profiles can be added only to a working configured environment; "
+                "use the ordinary setup action for this state",
+            )
+        default_config = setup.default_runtime_config_path().resolve()
+        if self._profile_config is not None and self._profile_config.resolve() != default_config:
             raise setup.SetupError(
                 setup.SETUP_CONFIGURED,
-                "this environment already has a working runtime config; the demo "
-                "write is an exit from the unconfigured states and will not "
-                "replace the operator's own file",
+                "a custom runtime config is operator-owned; add profiles by editing the "
+                "file manually",
             )
-        written = setup.generate_demo_runtime_config(
+        discovery = setup.discover_providers(self.repo)
+        missing = self._unresolved_support_binaries(discovery)
+        if discovery.providers_found and missing:
+            reasons = "; ".join(
+                f"{probe.name} [{refusal.candidate}]: {refusal.reason}"
+                for probe in (discovery.mcp, discovery.git)
+                if not probe.found
+                for refusal in probe.refusals
+            )
+            raise setup.SetupError(
+                SETUP_SUPPORT_BINARY_UNRESOLVED,
+                "a provider was found but "
+                + " and ".join(missing)
+                + " could not be resolved, and every generated profile names both"
+                + (f": {reasons}" if reasons else ""),
+                details={"missing": list(missing), "discovery": discovery.describe()},
+            )
+        written = setup.add_discovered_provider_profiles(
             self.repo,
             state_root=self._state_root,
             state_base=self._state_base,
+            discovery=discovery,
         )
         adopted = self.adopt_runtime_config(written["path"])
-        return {"state": setup.SETUP_CONFIGURED, **adopted}
+        return {
+            "state": setup.SETUP_CONFIGURED,
+            "added_providers": written["added_providers"],
+            "changed": written["changed"],
+            **adopted,
+        }
 
     def adopt_runtime_config(self, path: str | Path) -> dict[str, Any]:
         """Take a runtime config into a panel that is already serving.
@@ -683,7 +697,6 @@ class UIContext:
         self.invalidate()
         return {
             "profiles": [str(profile_id) for profile_id in configuration.profiles.profile_ids],
-            "demo": configuration.demo,
             "launch_enabled": self.launch_enabled,
             "catalog_editing_enabled": self.catalog_editing_enabled,
         }
@@ -1482,8 +1495,8 @@ class UIContext:
         config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
         runner = None
         if config.demo:
-            # Demo mode: complete the run without launching a provider, so the
-            # panel's Run closes the loop in a scratch workspace without billing.
+            # An internal/dev config can bind the runner seam without launching
+            # a provider.  The panel never creates or advertises this mode.
             from agent_commons.runtime.demo import DemoRunner
 
             runner = DemoRunner(manager.paths.state_root)

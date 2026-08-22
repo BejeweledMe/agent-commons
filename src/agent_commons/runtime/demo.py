@@ -1,12 +1,10 @@
-"""A no-provider demo runner.
+"""An internal no-provider runner seam.
 
-Demo mode exists for one reason: a newcomer should be able to see the whole
-Hire -> Task -> Run -> result loop close in a scratch workspace, without a
-subscription and without launching any billable process.  The DemoRunner stands
-in for the provider CLI at the exact runner seam the real broker uses -- so this
-is still the one launch path, not a second one -- and, as the run's bound child
-session, records an honest ``delegation.succeeded`` whose summary says plainly
-that no provider ran.
+``DemoRunner`` lets development and hermetic tests exercise the broker's one
+runner seam without launching a provider process.  It remains an explicitly
+configured internal mechanic; product bootstrap and the operator panel do not
+create or advertise it.  As the run's bound child session, it records an honest
+``delegation.succeeded`` summary that says plainly that no provider ran.
 
 It only self-completes an ``implementation`` run.  It never fabricates a review
 or a verification: for those purposes it returns without a canonical outcome, so
@@ -34,7 +32,7 @@ _DEMO_PID = 424242
 
 
 class DemoRunner:
-    """Complete a run without launching a provider, honestly labelled as a demo."""
+    """Complete an internal run without launching a provider."""
 
     def __init__(self, state_root: str | Path) -> None:
         self._state_root = Path(state_root)

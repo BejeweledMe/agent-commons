@@ -154,12 +154,9 @@ class RuntimeConfiguration:
     #: broker sharing it resolves the same catalogue; a role that selects a
     #: skill this cannot supply fails closed rather than running without it.
     catalog: Mapping[str, Any] = field(default_factory=empty_catalog)
-    #: Demo mode: no real provider is launched.  Every run is simulated by the
-    #: DemoRunner, which completes the delegation as its bound child with an
-    #: honest "demo run -- no provider" summary.  This exists so a newcomer can
-    #: see the whole Hire -> Task -> Run -> result loop close in a scratch
-    #: workspace without a subscription or any billable process.  It is opt-in
-    #: through the operator config and never the default.
+    #: Internal/development runner seam: no real provider is launched.  The
+    #: DemoRunner is opt-in through an operator config and is not exposed as a
+    #: product bootstrap or panel setup mode.
     demo: bool = False
     #: Where ``catalog`` was read from, when it was named at all.  The contents
     #: above are everything a launch needs; a panel additionally needs the path,
