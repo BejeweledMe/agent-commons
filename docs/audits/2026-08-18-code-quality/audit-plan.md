@@ -194,6 +194,20 @@ ISP-шаг A8.
 MCP и CLI можно выполнять параллельными ветками после A2: они не должны
 одновременно менять публичные имена или payloads.
 
+#### A4.5. Выделить сборку instruction из runtime
+
+**Решение владельца:** принято в `decision.0E25PERWJMD1PGRHS3K4B6QQZR`.
+
+Механически вынести существующую сборку instruction из
+`services/delegation_runtime.py` в тематический service-модуль с типизированным
+in-memory входом и выходом. `DelegationRuntimeService` только вызывает этот
+строитель. В коммите этого шага нельзя менять текст instruction, provider
+контракт, `runtime.yaml`, хранение prompt-данных или persisted-формат.
+
+Это structural seam для последующей компиляции Context Pack; сама инъекция
+Context Pack — отдельная поведенческая и data-semantics работа после A8, а не
+часть A4.5.
+
 #### A5. Типизировать доменную границу вертикальными срезами
 
 1. Typed delegation/maintenance envelope после schema-validation.
