@@ -1152,9 +1152,6 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-tk-accept" data-i18n="guide_tk_accept_h"></h3>
           <p data-i18n="guide_tk_accept_p"></p>
           <p class="mono dim" data-i18n="guide_tk_accept_ex"></p>
-          <h3 id="g-tk-demo" data-i18n="guide_tk_demo_h"></h3>
-          <p data-i18n="guide_tk_demo_p"></p>
-          <p class="mono dim" data-i18n="guide_tk_demo_ex"></p>
         </div>
         <div id="gpage-links" hidden>
           <p class="dim guidelead" data-i18n="guide_ref_lead"></p>
@@ -1612,12 +1609,12 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
     <div class="actions">
       <button type="button" class="cta" id="setup-init" hidden data-i18n="setup_init_button"></button>
       <button type="button" class="cta" id="setup-write" hidden data-i18n="setup_write_button"></button>
-      <button type="button" id="setup-demo" hidden data-i18n="setup_demo_button"></button>
       <button type="button" id="setup-rescan" hidden data-i18n="setup_rescan_button"></button>
+      <button type="button" id="setup-guide" hidden data-i18n="setup_no_provider_guide">Open the guide</button>
       <button type="button" id="setup-preflight" hidden data-i18n="setup_preflight_button"></button>
+      <button type="button" id="setup-add-providers" hidden data-i18n="setup_add_discovered_providers_button">Add profiles for a newly found provider</button>
       <button type="button" id="setup-later" hidden data-i18n="setup_later_button"></button>
     </div>
-    <p class="note" id="setup-demo-offer" hidden data-i18n="setup_demo_offer"></p>
     <p class="result" id="setup-result"></p>
     <p class="note" id="setup-preflight-note" hidden data-i18n="setup_preflight_credential_free"></p>
     <div id="setup-preflight-rows"></div>
@@ -2333,9 +2330,6 @@ const STRINGS = {
     guide_tk_accept_h: "Success is not acceptance",
     guide_tk_accept_p: "delegation.succeeded closes the run, not the task: the task stays exactly where it was, because acceptance is a human act. task.accepted demands a current, approved, independent review of the exact task revision — independent meaning its author is none of the sessions that did the work (the record lists those as work_author_session_ids), so nobody accepts their own result. Without such a review the write is refused. If the bound review later goes stale, the acceptance is stripped the next time the picture is rebuilt.",
     guide_tk_accept_ex: "a green tick in the graph means accepted or approved only; succeeded stays informational blue",
-    guide_tk_demo_h: "Demo mode",
-    guide_tk_demo_p: "With demo: true in the operator config no provider is launched. The launch path stays the same one — request, limits, states — but at the final step, where the real provider process would start, a stand-in named DemoRunner answers instead. It self-completes only implementation runs, with an honest summary saying no provider ran; it never fabricates a review or verification — those runs end needs_operator instead. Opt-in, never the default.",
-    guide_tk_demo_ex: "demo run of a reviewer role → no verdict is invented; the delegation ends needs_operator",
     guide_ln_record_h: "What a link records",
     guide_ln_record_p: "agent.link_opened writes from_agent_id, to_agent_id, allowed_action, deadline_seconds and a reason; agent.link_closed must name the revision it closes, so a blind close is refused. The domain validates the whole record: both roles active, no self-link, and the opener holds open_links. allowed_action is a typed enum — ask or handoff_work — never an open flag.",
     guide_ln_record_ex: "close without expected_revision → refused; a link stays open until an explicit agent.link_closed",
@@ -2611,11 +2605,9 @@ const STRINGS = {
     count_agents: "roles",
     count_templates: "templates",
     // --- first run ---------------------------------------------------------
-    // There are no capability switches any more, so none of these sentences may
-    // send a person back to a terminal: every state on this screen ends in a
-    // button, and the one command that survives here — `git init` — survives
-    // only because a directory that is not a repository cannot be made one from
-    // a page served out of it.
+    // There are no capability switches any more. The one exception is an
+    // unavailable provider: the panel says so honestly, offers the guide and
+    // a rescan, and does not simulate a run it cannot make.
     setup_title: "Set this project up",
     setup_intro: "A role can run once three things exist: a git repository, a workspace inside it, and a runtime config outside it naming the programs a run is allowed to start. This screen writes the last two; nothing here needs a terminal.",
     // The same three things, said by a panel that can write none of them: this
@@ -2629,16 +2621,15 @@ const STRINGS = {
     setup_all_set: "This project is set up. Roles can be hired and runs can be started; there is nothing left to do here.",
     setup_found_title: "What was found on this machine",
     setup_binary_missing: "not found",
-    setup_found_none: "Neither claude nor codex resolved to a program this panel is allowed to start, so no provider config can be written. Demo mode is the way on, and it is not a preview: a role is hired, a task is created, Run starts a run and it finishes with a recorded result, exactly as a real one would.",
+    setup_found_none: "Run functionality is unavailable: neither claude nor codex was found. Install the CLI for one of them with your subscription, then press “Look again”.",
     setup_found_partial: "Only {found} resolved. Profiles are written for it and for nothing else — the roles offered when you hire will be its roles, and {missing} will simply not appear until it is installed and you look again.",
     setup_support_missing: "A provider was found, but a program every written profile names did not resolve:",
-    setup_support_missing_after: "Nothing can be written until it does: a profile naming a program this panel cannot resolve would fail at the first run instead of failing here. Install it and press “Look again”. Demo mode needs none of them.",
+    setup_support_missing_after: "Nothing can be written until it does: a profile naming a program this panel cannot resolve would fail at the first run instead of failing here. Install it and press “Look again”.",
     setup_path_label: "Will be written to",
     setup_trust_warning: "Read this before pressing. The profiles written here let a run start those programs on your behalf with this working tree writable: a builder role's process can create, change and delete files anywhere under this repository, and it does so without asking per action. Nothing outside the repository is granted, no credential is written, and reviewer profiles get read-only access — but the working tree itself is genuinely exposed, so do this on a project whose git history you are willing to fall back on.",
     setup_write_button: "Write the config and set this panel up",
     setup_written: "Set up. The panel adopted the config as it stands — no restart — and the profiles are offered from now on.",
     setup_initialized: "Workspace created. The panel opened its own session in it and is now recording.",
-    setup_demo_written: "Demo mode set up. The whole loop works and no provider is ever started.",
     setup_rejected_existing: "There is already an operator runtime config at the path below, and this panel's own launch loader will not accept it. Your file is untouched: the panel did not write it and will not rename or overwrite anything it did not write. Nothing will run until it is repaired or replaced.",
     setup_manual_yaml: "Replacing it from here overwrites it with a freshly generated config. Repairing it means editing it yourself — this panel will not edit a file it did not write. What the loader objected to is below, in its own words.",
     // The loader's refusal, and the file it refused. Both arrive beside the
@@ -2649,12 +2640,14 @@ const STRINGS = {
     setup_rejected_no_reason: "This panel was not told what the loader objected to, only that it refused. Running a launch from the terminal in this directory will print the reason.",
     setup_rejected: "The config this panel generated was refused by its own launch loader, so it was never adopted, and it was moved aside to runtime.yaml.rejected rather than left posing as a working config. The loader's reason:",
     setup_rescan_button: "Look again",
-    setup_demo_offer: "Demo mode writes a config with demo: true. No provider process is ever started and nothing leaves this machine, but the whole loop closes — hire, task, Run, a recorded result. Use it to learn the panel, or to keep working while a provider is missing.",
-    setup_demo_button: "Set up demo mode instead",
+    setup_no_provider_guide: "Open the guide",
     setup_later_button: "Not now — go to the board",
     setup_reopen: "Set the runtime up…",
     setup_working: "working…",
     setup_preflight_button: "Check the configured profiles",
+    setup_add_discovered_providers_button: "Add profiles for a newly found provider",
+    setup_providers_added: "Added profiles for: {providers}.",
+    setup_no_new_providers: "No newly discovered providers to add.",
     setup_preflight_credential_free: "The check starts each provider with --help and shakes hands with the MCP server. It consumes no run and no subscription quota — and for exactly that reason it cannot tell an authorized provider from an unauthorized one: it proves the programs exist and answer, and nothing about your account.",
     setup_preflight_ok: "answered",
     setup_preflight_bad: "did not answer",
@@ -3031,9 +3024,6 @@ const STRINGS = {
     guide_tk_accept_h: "Успех — не приёмка",
     guide_tk_accept_p: "delegation.succeeded закрывает прогон, но не задачу: задача остаётся ровно там, где была, потому что приёмка — действие человека. task.accepted требует актуального одобренного независимого ревью точной ревизии задачи — независимое значит написанное не теми сессиями, что делали работу (их список в записи называется work_author_session_ids): никто не принимает собственный результат. Без такого ревью запись отклоняется. Если привязанное ревью потом устареет, приёмка снимется при следующей пересборке картины.",
     guide_tk_accept_ex: "зелёная галка в графе — только accepted или approved; succeeded остаётся информационным синим",
-    guide_tk_demo_h: "Demo-режим",
-    guide_tk_demo_p: "С demo: true в конфиге оператора провайдер не запускается. Путь прогона остаётся тем же одним — запрос, лимиты, состояния, — но на последнем шаге, где стартовал бы настоящий процесс провайдера, вместо него отвечает заглушка DemoRunner. Она сама завершает только implementation-прогоны, с честным summary о том, что провайдер не работал; ревью и верификации она не выдумывает — такие прогоны уходят в needs_operator. Включается явно и никогда не по умолчанию.",
-    guide_tk_demo_ex: "demo-прогон роли ревьюера → вердикт не выдумывается; делегирование уходит в needs_operator",
     guide_ln_record_h: "Что записывает связь",
     guide_ln_record_p: "agent.link_opened записывает from_agent_id, to_agent_id, allowed_action, deadline_seconds и причину; agent.link_closed обязан назвать ревизию, которую закрывает, — слепое закрытие отклоняется. Домен проверяет запись целиком: обе роли активны, связь не сама на себя, у открывающего есть open_links. allowed_action — типизированный enum (ask или handoff_work), а не флаг «открыто».",
     guide_ln_record_ex: "закрытие без expected_revision → отказ; связь открыта до явного agent.link_closed",
@@ -3318,16 +3308,15 @@ const STRINGS = {
     setup_all_set: "Проект настроен. Роли можно нанимать, прогоны — вести; здесь больше нечего делать.",
     setup_found_title: "Что нашлось на этой машине",
     setup_binary_missing: "не найдена",
-    setup_found_none: "Ни claude, ни codex не разрешились в программу, которую панели позволено стартовать, поэтому файл с профилями провайдера написать не из чего. Выход — демонстрационный режим, и это не витрина: роль нанимается, задача создаётся, «Прогон» ведёт прогон до конца, и результат записывается ровно так же, как настоящий.",
+    setup_found_none: "Функционал недоступен: не найдены ни claude, ни codex. Установите CLI одного из них с вашей подпиской и нажмите «Посмотреть снова».",
     setup_found_partial: "Разрешилась только {found}. Профили пишутся для неё и больше ни для кого — при найме будут предложены её роли, а {missing} просто не появится, пока вы её не установите и не посмотрите снова.",
     setup_support_missing: "Провайдер нашёлся, но программа, которую называет каждый записываемый профиль, не разрешилась:",
-    setup_support_missing_after: "Пока это не исправлено, писать нечего: профиль с программой, которую панель не может разрешить, упал бы на первом прогоне вместо того, чтобы отказать здесь. Установите её и нажмите «Посмотреть снова». Демонстрационному режиму ни одна из них не нужна.",
+    setup_support_missing_after: "Пока это не исправлено, писать нечего: профиль с программой, которую панель не может разрешить, упал бы на первом прогоне вместо того, чтобы отказать здесь. Установите её и нажмите «Посмотреть снова».",
     setup_path_label: "Будет записан в",
     setup_trust_warning: "Прочитайте до того, как нажмёте. Профили, которые здесь пишутся, позволяют прогону стартовать эти программы от вашего имени с правом записи в это рабочее дерево: процесс роли-исполнителя может создавать, менять и удалять файлы в любом месте под этим репозиторием и делает это, не спрашивая на каждом действии. Ничего за пределами репозитория не выдаётся, никакие учётные данные не пишутся, роли-ревьюеры получают доступ только на чтение — но само рабочее дерево открыто по-настоящему, поэтому делайте это на проекте, на историю git которого вы готовы опереться.",
     setup_write_button: "Записать файл и настроить эту панель",
     setup_written: "Настроено. Панель приняла файл как есть, перезагружать ничего не нужно, и профили предлагаются начиная с этого момента.",
     setup_initialized: "Рабочее пространство создано. Панель открыла в нём собственную сессию и ведёт запись.",
-    setup_demo_written: "Демонстрационный режим настроен. Весь круг работает, ни один провайдер не стартует.",
     setup_rejected_existing: "По пути ниже уже лежит операторский файл среды выполнения, и собственный загрузчик этой панели его не принимает. Ваш файл не тронут: панель его не писала и не переименовывает и не перезаписывает то, чего не писала. Пока он не починен или не заменён, работать ничего не будет.",
     setup_manual_yaml: "Замена отсюда перезапишет его свежесгенерированным файлом. Починка означает править его самому — файл, который панель не писала, она не редактирует. Что именно не устроило загрузчик, сказано ниже его же словами.",
     setup_rejected_why: "Причина от загрузчика:",
@@ -3335,12 +3324,14 @@ const STRINGS = {
     setup_rejected_no_reason: "Этой панели не сообщили, что именно не устроило загрузчик, — только то, что он отказал. Причину напечатает попытка начать прогон из терминала в этом каталоге.",
     setup_rejected: "Файл, который панель сгенерировала, её собственный загрузчик не принял, поэтому файл не был принят в работу и убран в сторону под именем runtime.yaml.rejected, а не оставлен изображать рабочий. Причина от загрузчика:",
     setup_rescan_button: "Посмотреть снова",
-    setup_demo_offer: "Демонстрационный режим пишет файл с demo: true. Ни один процесс провайдера не стартует и ничего не покидает эту машину, но круг замыкается целиком — наём, задача, «Прогон», записанный результат. Годится, чтобы освоить панель или продолжать работу, пока провайдера нет.",
-    setup_demo_button: "Настроить демонстрационный режим",
+    setup_no_provider_guide: "Открыть справочник",
     setup_later_button: "Не сейчас — на доску",
     setup_reopen: "Настроить среду выполнения…",
     setup_working: "выполняется…",
     setup_preflight_button: "Проверить настроенные профили",
+    setup_add_discovered_providers_button: "Добавить профили нового провайдера",
+    setup_providers_added: "Добавлены профили: {providers}.",
+    setup_no_new_providers: "Новых найденных провайдеров нет.",
     setup_preflight_credential_free: "Проверка стартует каждого провайдера с --help и здоровается с MCP-сервером. Она не тратит ни одного прогона и ни одной квоты подписки — и именно поэтому не отличает авторизованного провайдера от неавторизованного: она доказывает, что программы существуют и отвечают, и ничего о вашей учётной записи.",
     setup_preflight_ok: "ответил",
     setup_preflight_bad: "не ответил",
@@ -8056,6 +8047,7 @@ const SETUP_BINARIES = ["claude", "codex", "agent-commons-mcp", "git"];
 let setupInfo = null;
 let setupSetAside = false;
 let setupOpenedByHand = false;
+let setupGuideOpened = false;
 
 async function loadSetup() {
   try { setupInfo = await api("/api/setup"); }
@@ -8091,9 +8083,9 @@ function setupLead(state) {
   return ["setup_unconfigured_lead"];
 }
 
-// What would refuse a write attempted right now, said before the click rather
-// than only after it — the server answers this in `blocking_refusal`, and the
-// screen's job is to turn it into a sentence and a disabled button.
+  // What would refuse a write attempted right now, said before the click rather
+  // than only after it — the server answers this in `blocking_refusal`, and the
+  // screen's job is to turn it into a sentence and offer only a real next step.
 function setupBlockingNote(info) {
   if (info.blocking_refusal === SETUP_NO_PROVIDER) { return t("setup_found_none"); }
   if (info.blocking_refusal === SETUP_SUPPORT_MISSING) {
@@ -8159,7 +8151,7 @@ function paintSetup() {
   const info = setupInfo;
   const state = info.state;
   const boardless = setupHasNoBoard();
-  screen.hidden = !(boardless || setupOpenedByHand ||
+  screen.hidden = setupGuideOpened || !(boardless || setupOpenedByHand ||
     (setupNeedsAttention() && !setupSetAside));
   if (screen.hidden) { return; }
 
@@ -8222,22 +8214,22 @@ function paintSetup() {
   const init = document.getElementById("setup-init");
   init.hidden = observing || state !== "setup_uninitialized";
   const write = document.getElementById("setup-write");
-  write.hidden = observing || !configurable;
-  // Refused before the click rather than after it: the sentence above says
-  // which program is missing, and the button says the same thing by being dead.
-  write.disabled = blocked;
+  // With no provider the only actions are documentation and another scan. A
+  // found provider missing a required support binary remains visible but
+  // disabled with its exact reason, because installing that helper is the
+  // concrete fix and it is already named on this screen.
+  const noProvider = info.blocking_refusal === SETUP_NO_PROVIDER;
+  write.hidden = observing || !configurable || noProvider;
+  write.disabled = blocked && !noProvider;
   write.title = blocked ? setupBlockingNote(info) : "";
-  const demo = document.getElementById("setup-demo");
-  demo.hidden = observing || !configurable;
-  const offer = document.getElementById("setup-demo-offer");
-  // Demo is named on every unconfigured state, and it is the LEAD when nothing
-  // else can be written: `setup_no_provider_found` without it is a dead end,
-  // which is the one thing this screen may not be.  The sentence names the
-  // button, so it goes wherever the button goes.
-  offer.hidden = observing || !(configurable && info.demo_available);
   document.getElementById("setup-rescan").hidden = false;
-  document.getElementById("setup-preflight").hidden = !setupIsConfigured(state);
-  document.getElementById("setup-preflight-note").hidden = !setupIsConfigured(state);
+  document.getElementById("setup-guide").hidden =
+    observing || info.blocking_refusal !== SETUP_NO_PROVIDER;
+  document.getElementById("setup-preflight").hidden = observing || !setupIsConfigured(state);
+  document.getElementById("setup-add-providers").hidden =
+    observing || !setupIsConfigured(state);
+  document.getElementById("setup-preflight-note").hidden =
+    observing || !setupIsConfigured(state);
   // Boardless states have nothing to go back to; every other opening does.
   document.getElementById("setup-later").hidden = boardless;
 }
@@ -8245,6 +8237,7 @@ function paintSetup() {
 function openSetup() {
   setupOpenedByHand = true;
   setupSetAside = false;
+  setupGuideOpened = false;
   document.getElementById("setup-result").textContent = "";
   paintSetup();
   loadSetup().then(paintSetup);
@@ -8303,15 +8296,45 @@ document.getElementById("setup-init").addEventListener("click", () => {
 document.getElementById("setup-write").addEventListener("click", () => {
   setupWrite("/api/setup/runtime-config", "setup_written");
 });
-document.getElementById("setup-demo").addEventListener("click", () => {
-  setupWrite("/api/setup/demo-config", "setup_demo_written");
-});
 document.getElementById("setup-rescan").addEventListener("click", () => {
   document.getElementById("setup-result").textContent = "";
   loadSetup().then(paintSetup);
 });
+document.getElementById("setup-guide").addEventListener("click", () => {
+  setupGuideOpened = true;
+  paintSetup();
+  viewShow("guide");
+});
 document.getElementById("setup-later").addEventListener("click", closeSetup);
 document.getElementById("board-setup").addEventListener("click", openSetup);
+
+async function addDiscoveredProviders() {
+  const result = document.getElementById("setup-result");
+  const buttons = document.querySelectorAll("#setup .actions button");
+  for (const button of buttons) { button.disabled = true; }
+  result.className = "result";
+  result.textContent = t("setup_working");
+  let report = null;
+  let failure = null;
+  try { report = await post("/api/setup/add-discovered-providers", {}); }
+  catch (error) { failure = error; }
+  for (const button of buttons) { button.disabled = false; }
+  await loadSetup();
+  if (failure) {
+    result.className = "result bad";
+    result.textContent = setupRefusalText(failure);
+    paintSetup();
+    return;
+  }
+  const added = (report && report.added_providers) || [];
+  result.className = "result ok";
+  result.textContent = added.length
+    ? said("setup_providers_added", { providers: added.join(", ") })
+    : t("setup_no_new_providers");
+  paintSetup();
+  await boot();
+}
+document.getElementById("setup-add-providers").addEventListener("click", addDiscoveredProviders);
 
 async function runSetupPreflight() {
   const result = document.getElementById("setup-result");
