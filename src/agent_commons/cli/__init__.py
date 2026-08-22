@@ -2,37 +2,23 @@
 
 from __future__ import annotations
 
-import importlib.util
-import json
-import os
-import platform
 import shlex
 import sys
-from dataclasses import dataclass
-from importlib import metadata
 from pathlib import Path
 from typing import Any
 
 import click
-import yaml
 from click.core import ParameterSource
 
 from agent_commons import __version__
-from agent_commons.config import CommonsPaths
-from agent_commons.core.ids import is_typed_id
-from agent_commons.core.refs import parse_ref
 from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
 from agent_commons.platform_support import require_supported_platform
 from agent_commons.runtime import (
-    ATTEMPT_SCHEMA,
-    REQUEST_SCHEMA,
     AttemptStore,
     BuiltinProfileId,
     TerminalToolAuditStore,
-    error_safe_next_actions,
     preflight_profile,
 )
-from agent_commons.runtime.source_contract import agent_commons_source_sha256
 from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
@@ -47,167 +33,8 @@ from agent_commons.services.provider_canary import (
 )
 from agent_commons.ui import STARTED_SCHEMA
 
-
-class CommonsGroup(click.Group):
-    """Render domain failures as concise, non-traceback CLI errors."""
-
-    def invoke(self, ctx: click.Context) -> Any:
-        try:
-            return super().invoke(ctx)
-        except CommonsError as exc:
-            return self._render_error(ctx, exc)
-        except FileNotFoundError as exc:
-            return self._render_error(ctx, exc)
-
-    @staticmethod
-    def _render_error(ctx: click.Context, exc: Exception) -> Any:
-        state = ctx.obj
-        safe_actions = list(getattr(exc, "safe_next_actions", error_safe_next_actions(exc)))
-        if isinstance(state, CLIState) and state.json_output:
-            error: dict[str, Any] = {
-                "type": type(exc).__name__,
-                "message": str(exc),
-                "safe_next_actions": safe_actions,
-            }
-            if code := getattr(exc, "code", None):
-                error["code"] = code
-            if details := getattr(exc, "details", None):
-                error["details"] = details
-            state.emit(
-                {
-                    "ok": False,
-                    "error": error,
-                }
-            )
-            ctx.exit(1)
-        actions = "\n".join(f"  - {action}" for action in safe_actions)
-        raise click.ClickException(f"{exc}\nSafe next actions:\n{actions}") from exc
-
-
-@dataclass
-class CLIState:
-    repo: Path
-    session_id: str | None
-    json_output: bool
-    state_root: Path | None
-    state_base: Path | None
-    state_source: str
-    read_only: bool
-
-    def manager(self) -> CommonsManager:
-        return CommonsManager(
-            self.repo,
-            session_id=self.session_id,
-            state_root=self.state_root,
-            state_base=self.state_base,
-            state_source=self.state_source,
-            read_only=self.read_only,
-        )
-
-    def emit(self, value: Any) -> None:
-        if self.json_output:
-            click.echo(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
-            return
-        click.echo(yaml.safe_dump(value, allow_unicode=True, sort_keys=False).rstrip())
-
-
-def _json_object(value: str, label: str) -> dict[str, Any]:
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError as exc:
-        raise ValidationError(f"{label} must be valid JSON: {exc.msg}") from exc
-    if not isinstance(parsed, dict):
-        raise ValidationError(f"{label} must be a JSON object")
-    return parsed
-
-
-_REFERENCE_KINDS = (
-    "artifact",
-    "decision",
-    "delegation",
-    "event",
-    "finding",
-    "handoff",
-    "manifest",
-    "objective",
-    "review",
-    "task",
-    "thread",
-    "verification",
-)
-
-
-def _input_error(
-    message: str, *, code: str, field: str, allowed_kinds: tuple[str, ...]
-) -> ValidationError:
-    error = ValidationError(message)
-    error.code = code  # type: ignore[attr-defined]
-    error.details = {  # type: ignore[attr-defined]
-        "field": field,
-        "allowed_kinds": list(allowed_kinds),
-        "example": f"{allowed_kinds[0]}:<id>",
-    }
-    return error
-
-
-def _ref(
-    value: str,
-    *,
-    field: str,
-    allowed_kinds: tuple[str, ...] = _REFERENCE_KINDS,
-) -> dict[str, str]:
-    try:
-        parsed = parse_ref(value)
-    except ValidationError as exc:
-        raise _input_error(
-            f"{field} must use '<kind>:<id>' syntax; example: {allowed_kinds[0]}:<id>",
-            code="invalid_typed_ref",
-            field=field,
-            allowed_kinds=allowed_kinds,
-        ) from exc
-    if parsed.kind not in allowed_kinds:
-        raise _input_error(
-            f"{field} kind must be one of: {', '.join(allowed_kinds)}",
-            code="unsupported_ref_kind",
-            field=field,
-            allowed_kinds=allowed_kinds,
-        )
-    return parsed.as_dict()
-
-
-def _refs(
-    values: tuple[str, ...],
-    *,
-    field: str = "reference",
-    allowed_kinds: tuple[str, ...] = _REFERENCE_KINDS,
-) -> list[dict[str, str]]:
-    return [_ref(value, field=field, allowed_kinds=allowed_kinds) for value in values]
-
-
-def _idem(function: Any) -> Any:
-    return click.option(
-        "--idempotency-key",
-        help="Stable retry identity for this canonical write.",
-    )(function)
-
-
-def _expected(function: Any) -> Any:
-    function = click.argument("expected_revision")(function)
-    return click.argument("entity_id")(function)
-
-
-def _installed_version(distribution: str) -> str | None:
-    try:
-        return metadata.version(distribution)
-    except metadata.PackageNotFoundError:
-        return None
-
-
-def _module_available(module: str) -> bool:
-    try:
-        return importlib.util.find_spec(module) is not None
-    except (ImportError, ValueError):
-        return False
+from ._shared import CLIState, CommonsGroup, _expected, _idem, _json_object, _ref, _refs
+from .workspace import doctor_command, init_command, search_command, support_command
 
 
 @click.group(cls=CommonsGroup)
@@ -289,33 +116,7 @@ def cli(
     )
 
 
-@cli.command("init")
-@click.option("--integration", multiple=True, type=click.Choice(("codex", "claude")))
-@click.option("--workspace-name")
-@click.option("--replace-onboarding", is_flag=True)
-@click.option("--replace-skills", is_flag=True)
-@click.pass_obj
-def init_command(
-    state: CLIState,
-    integration: tuple[str, ...],
-    workspace_name: str | None,
-    replace_onboarding: bool,
-    replace_skills: bool,
-) -> None:
-    """Initialize or safely update a workspace and client integrations."""
-
-    if state.read_only:
-        raise ValidationError("init is unavailable in read-only mode")
-    selected = integration or ("codex", "claude")
-    state.emit(
-        CommonsManager.initialize(
-            state.repo,
-            integrations=selected,
-            workspace_name=workspace_name,
-            replace_onboarding=replace_onboarding,
-            replace_skills=replace_skills,
-        )
-    )
+cli.add_command(init_command)
 
 
 def _operator_runtime_config(
@@ -613,80 +414,8 @@ def chat_say(
     )
 
 
-@cli.command("search")
-@click.argument("query")
-@click.option("--limit", type=int, default=25, show_default=True)
-@click.option("--kind", "subject_kind", help="Restrict to one entity kind, e.g. agent or task.")
-@click.pass_obj
-def search_command(state: CLIState, query: str, limit: int, subject_kind: str | None) -> None:
-    """Search canonical history by free text.
-
-    Reads the rebuildable projection, which is synchronized first.  Results
-    point at event IDs; inspect them canonically before relying on one.
-    """
-
-    state.emit(state.manager().search_history(query, limit=limit, subject_kind=subject_kind))
-
-
-@cli.command("support")
-@click.option("--show-paths", is_flag=True, help="Include resolved local paths explicitly.")
-@click.pass_obj
-def support_command(state: CLIState, show_paths: bool) -> None:
-    """Report secret-free component and state availability for support requests."""
-
-    paths = CommonsPaths.for_workspace(
-        state.repo,
-        state_root=state.state_root,
-        state_base=state.state_base,
-        state_source=state.state_source,
-    )
-    workspace_id: str | None = None
-    config_path = paths.commons_root / "workspace.yaml"
-    if config_path.is_file() and not config_path.is_symlink():
-        try:
-            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, yaml.YAMLError):
-            config = None
-        if isinstance(config, dict) and is_typed_id(config.get("workspace_id"), "workspace"):
-            workspace_id = config["workspace_id"]
-            paths = paths.for_workspace_id(workspace_id)
-    ownership = paths.ownership_report(workspace_id) if workspace_id is not None else None
-    report = {
-        "schema": "agent_commons.support.v1",
-        "agent_commons_version": __version__,
-        "agent_commons_source_sha256": agent_commons_source_sha256(),
-        "workspace_schema": "agent-commons.workspace.v1",
-        "runtime_request_schema": REQUEST_SCHEMA,
-        "runtime_attempt_schema": ATTEMPT_SCHEMA,
-        "python_version": platform.python_version(),
-        "python_implementation": platform.python_implementation(),
-        "platform": sys.platform,
-        "supported_platform": True,
-        "supported_operating_systems": ["darwin", "linux"],
-        "core_release_stage": "alpha",
-        "broker_release_stage": "experimental",
-        "canonical_workspace_available": paths.commons_root.is_dir(),
-        "state_root_explicit": paths.state_mode == "exact",
-        "state_config_source": paths.state_source,
-        "state_mode": paths.state_mode,
-        "workspace_id": workspace_id,
-        "state_owner_status": ownership["status"] if ownership else "workspace-unavailable",
-        "state_owner_match": ownership["match"] if ownership else None,
-        "state_root_exists": paths.state_root.is_dir(),
-        "state_root_readable": paths.state_root.is_dir() and os.access(paths.state_root, os.R_OK),
-        "state_root_writable": paths.state_root.is_dir() and os.access(paths.state_root, os.W_OK),
-        "mcp_extra_available": _module_available("mcp.server.fastmcp"),
-        "mcp_package_version": _installed_version("mcp"),
-        "opentelemetry_api_available": _module_available("opentelemetry.trace"),
-        "opentelemetry_api_version": _installed_version("opentelemetry-api"),
-        "read_only": state.read_only,
-    }
-    if show_paths:
-        report["resolved_repo"] = str(paths.repo_root)
-        report["resolved_commons_root"] = str(paths.commons_root)
-        report["resolved_state_root"] = str(paths.state_root)
-        report["resolved_state_base"] = str(paths.state_base) if paths.state_base else None
-    state.emit(report)
+cli.add_command(search_command)
+cli.add_command(support_command)
 
 
 @cli.group("session")
@@ -3128,16 +2857,7 @@ def index_rebuild(state: CLIState) -> None:
     state.emit(state.manager().rebuild_index())
 
 
-@cli.command("doctor")
-@click.pass_context
-def doctor_command(ctx: click.Context) -> None:
-    """Validate history, receipts, manifests, projections, coordination, and index."""
-
-    state: CLIState = ctx.obj
-    report = state.manager().doctor()
-    state.emit(report)
-    if not report["ok"]:
-        ctx.exit(2)
+cli.add_command(doctor_command)
 
 
 if __name__ == "__main__":  # pragma: no cover
