@@ -1,0 +1,32 @@
+{
+  "en": {
+    "app_title": "Design Gallery",
+    "language": "Language",
+    "switch_to_english": "Switch to English",
+    "switch_to_russian": "Switch to Russian",
+    "canvas_label": "Design Gallery canvas",
+    "checking_access": "Checking secure Gallery access…",
+    "authentication_required": "Authentication is required",
+    "authentication_help": "Open the Gallery from the URL printed by Agent Commons UI.",
+    "gallery_unavailable": "Gallery is unavailable",
+    "gallery_unavailable_help": "The Gallery could not verify this workspace. Refresh the UI URL and try again.",
+    "gallery_data_unavailable": "No published design package is available",
+    "gallery_data_unavailable_help": "Publishing and listing design packages are not in this build yet. This empty canvas intentionally contains no sample screens.",
+    "status_code": "Status code"
+  },
+  "ru": {
+    "app_title": "Галерея дизайна",
+    "language": "Язык",
+    "switch_to_english": "Переключить на английский",
+    "switch_to_russian": "Переключить на русский",
+    "canvas_label": "Полотно галереи дизайна",
+    "checking_access": "Проверяем защищённый доступ к галерее…",
+    "authentication_required": "Требуется аутентификация",
+    "authentication_help": "Откройте галерею по URL, который вывел Agent Commons UI.",
+    "gallery_unavailable": "Галерея недоступна",
+    "gallery_unavailable_help": "Галерея не смогла проверить это рабочее пространство. Обновите URL UI и попробуйте снова.",
+    "gallery_data_unavailable": "Нет опубликованного пакета дизайна",
+    "gallery_data_unavailable_help": "Публикация и показ пакетов дизайна ещё не входят в эту сборку. Это пустое полотно намеренно не содержит примерных экранов.",
+    "status_code": "Код статуса"
+  }
+}

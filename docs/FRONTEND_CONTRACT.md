@@ -1,10 +1,12 @@
 # The frontend contract
 
-The panel is one file — `src/agent_commons/ui/static/index.html` — served
-with a strict CSP and no build step. Every rule below is enforced by a named
-test, so this document is a map of the laws, not their only copy: break one
-and the suite says so. Read this before editing the asset; otherwise the
-tests will teach it to you one failure at a time.
+The legacy panel is one file — `src/agent_commons/ui/static/index.html` —
+served with a strict CSP and no build step. The first migrated screen, Design
+Gallery, is a separately built React Flow application. Both surfaces are served
+at once. Every rule below is enforced by a named test, so this document is a
+map of the laws, not their only copy: break one and the suite says so. Read the
+applicable section before editing a surface; otherwise the tests will teach it
+to you one failure at a time.
 
 ## One file, one writer, no toolchain
 
@@ -15,6 +17,31 @@ tests will teach it to you one failure at a time.
 - One agent edits the file at a time. Take the workspace claim
   `path:src/agent_commons/ui/static/index.html` before touching it; the file
   is ~7000 lines and concurrent edits do not merge.
+
+## Incremental React Flow migration
+
+- Design Gallery lives at `/gallery`, alongside the legacy root, and is built
+  from `frontend/gallery/` into the packaged
+  `src/agent_commons/ui/static/gallery/` directory. The generated bundle is
+  checked in and `ui/static/**/*` is wheel package data: cloning and launching
+  the product never asks an operator to run npm. `npm ci && npm run build` in
+  `frontend/gallery/` is the reproducible maintainer rebuild path.
+- Do not modify the legacy asset while migrating Gallery. Its single-writer
+  claim remains in force until the last legacy screen leaves it. A Gallery
+  writer claims `path:frontend/gallery` and
+  `path:src/agent_commons/ui/static/gallery` instead.
+- The Gallery shell and its hashed same-origin assets contain no workspace data
+  and may load without a bearer header; its API calls carry the bearer token
+  from the URL fragment. Never put that token in a query string, an asset URL,
+  source code or local storage. The Gallery document uses its own CSP limited
+  to same-origin scripts/styles and has no inline script or style.
+- `frontend/gallery/src/i18n.json` is the Gallery-owned paired locale source.
+  A Gallery term may not be copied into the legacy string table; when a term is
+  rendered by both stacks, it must first move to a shared source. The temporary
+  disjoint keyspaces prevent translation drift during the incremental move.
+- Every Gallery state is semantic and accessible: checking, missing bearer,
+  typed backend refusal, and empty data. Before Design Package reads exist, the
+  screen says so and renders no sample cards or demo screens.
 
 ## CSP-safe DOM only
 

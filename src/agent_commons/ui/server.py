@@ -23,21 +23,23 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from agent_commons.errors import CommonsError
-from agent_commons.ui import ENTITY_SCHEMA, read_spa
+from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
 from agent_commons.ui.context import (
     LAUNCH_NOT_CONFIGURED,
     PANEL_ALREADY_OPEN_ACTIONS,
     UIContext,
 )
 from agent_commons.ui.security import (
-    PUBLIC_PATHS,
     SECURITY_HEADERS,
     allowed_hosts,
     allowed_origins,
     bearer_token,
     content_security_policy,
+    gallery_content_security_policy,
+    is_public_path,
     new_token,
     token_matches,
 )
@@ -296,7 +298,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
             origin = request.headers.get("origin")
             if origin is not None and origin not in origins:
                 response = _error(403, "forbidden_origin", "cross-origin requests are refused")
-            elif request.url.path not in PUBLIC_PATHS and not _authorized(request):
+            elif not is_public_path(request.url.path) and not _authorized(request):
                 response = _error(
                     401,
                     "unauthorized",
@@ -340,12 +342,29 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
 
     app.add_exception_handler(_NotInitialized, _not_initialized)
 
+    # The Gallery bundle holds no workspace data, so it is served as a public
+    # shell like the legacy root. Its API bootstrap still needs the bearer token
+    # from the URL fragment; resource fetches cannot attach that header.
+    gallery_directory = gallery_static_directory()
+    app.mount(
+        "/gallery/assets",
+        StaticFiles(directory=gallery_directory / "assets"),
+        name="gallery-assets",
+    )
+
     @app.get("/", response_class=HTMLResponse)
     async def index() -> Response:
         nonce = secrets.token_urlsafe(16)
         body = read_spa().replace("__CSP_NONCE__", nonce)
         response = HTMLResponse(body)
         response.headers["Content-Security-Policy"] = content_security_policy(nonce)
+        return response
+
+    @app.get("/gallery", response_class=HTMLResponse)
+    @app.get("/gallery/", response_class=HTMLResponse)
+    async def gallery() -> Response:
+        response = HTMLResponse(read_gallery_shell())
+        response.headers["Content-Security-Policy"] = gallery_content_security_policy()
         return response
 
     @app.get("/favicon.ico")
@@ -355,6 +374,18 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     @app.get("/api/meta")
     async def meta() -> Response:
         return JSONResponse(await asyncio.to_thread(context.meta))
+
+    @app.get("/api/gallery", dependencies=reads_workspace)
+    async def gallery_bootstrap() -> Response:
+        # This feature deliberately lands before preview and Design Package
+        # reads. Returning an authenticated, typed refusal gives the React
+        # screen a stable honest state without fabricating designs or growing
+        # UIContext with a temporary workflow.
+        return _error(
+            409,
+            "gallery_data_unavailable",
+            "published design packages are not available in this build",
+        )
 
     @app.get("/api/graph", dependencies=reads_workspace)
     async def graph() -> Response:

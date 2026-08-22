@@ -8,6 +8,7 @@ htmlcov/
 dist/
 build/
 .venv/
+frontend/gallery/node_modules/
 .agent-commons/cache/
 .agent-commons/.state/
 .agent-commons/events/

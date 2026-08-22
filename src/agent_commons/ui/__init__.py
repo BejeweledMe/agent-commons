@@ -7,6 +7,7 @@ CLI can report a missing optional dependency instead of failing to start.
 from __future__ import annotations
 
 from importlib import resources
+from pathlib import Path
 
 GRAPH_SCHEMA = "agent_commons.ui.graph.v1"
 META_SCHEMA = "agent_commons.ui.meta.v1"
@@ -26,13 +27,27 @@ def read_spa() -> str:
     return resources.files("agent_commons.ui").joinpath("static/index.html").read_text("utf-8")
 
 
+def gallery_static_directory() -> Path:
+    """Return the packaged React Gallery directory served by the local UI."""
+
+    return Path(str(resources.files("agent_commons.ui").joinpath("static/gallery")))
+
+
+def read_gallery_shell() -> str:
+    """Read the packaged React Gallery entry document from the wheel."""
+
+    return gallery_static_directory().joinpath("index.html").read_text("utf-8")
+
+
 __all__ = [
     "CATALOG_SCHEMA",
     "ENTITY_SCHEMA",
     "GRAPH_SCHEMA",
+    "gallery_static_directory",
     "META_SCHEMA",
     "STARTED_SCHEMA",
     "TRUST_NOTE",
     "TRUTH_LAYERS",
+    "read_gallery_shell",
     "read_spa",
 ]

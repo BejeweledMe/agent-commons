@@ -22,7 +22,19 @@ SECURITY_HEADERS = {
 }
 
 #: Paths that intentionally need no token: they contain no workspace data.
-PUBLIC_PATHS = frozenset({"/", "/favicon.ico"})
+PUBLIC_PATHS = frozenset({"/", "/favicon.ico", "/gallery", "/gallery/"})
+
+
+def is_public_path(path: str) -> bool:
+    """Whether a request names static frontend bytes rather than workspace data.
+
+    The Gallery shell uses the same fragment-held bearer token as the legacy
+    panel. Browser subresource requests cannot attach that token, so only its
+    prebuilt code and CSS are public; every Gallery data request remains behind
+    the usual bearer-token middleware.
+    """
+
+    return path in PUBLIC_PATHS or path.startswith("/gallery/assets/")
 
 
 def new_token() -> str:
@@ -54,6 +66,23 @@ def content_security_policy(nonce: str) -> str:
         "default-src 'none'; "
         f"script-src 'nonce-{nonce}'; "
         f"style-src 'nonce-{nonce}'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "base-uri 'none'; "
+        "form-action 'none'; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "require-trusted-types-for 'script'"
+    )
+
+
+def gallery_content_security_policy() -> str:
+    """CSP for the separately-built, same-origin React Gallery assets."""
+
+    return (
+        "default-src 'none'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
         "img-src 'self' data:; "
         "connect-src 'self'; "
         "base-uri 'none'; "

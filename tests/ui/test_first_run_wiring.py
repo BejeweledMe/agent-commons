@@ -193,10 +193,18 @@ def _reading_paths(app: Any) -> list[str]:
 #: plausible value proves the point.
 _PATH_FILLERS = {"{kind}": "task", "{entity_id}": "task.00000000000000000000000001"}
 
-#: The reading routes that must answer before a workspace exists: the SPA and
-#: its icon, `/api/meta` (the tab renders nothing until it returns), and
-#: `GET /api/setup` -- the one entry point that names the state.
-_ANSWERS_IN_EVERY_STATE = {"/", "/favicon.ico", "/api/meta", "/api/setup"}
+#: The reading routes that must answer before a workspace exists: the SPA,
+#: public Gallery shell, their static entry points, `/api/meta` (the tab
+#: renders nothing until it returns), and `GET /api/setup` -- the one entry
+#: point that names the state.
+_ANSWERS_IN_EVERY_STATE = {
+    "/",
+    "/favicon.ico",
+    "/gallery",
+    "/gallery/",
+    "/api/meta",
+    "/api/setup",
+}
 
 
 def _walk_reading_surface(client: Any) -> dict[str, Any]:
@@ -220,10 +228,10 @@ def test_every_reading_route_on_a_bare_repository_refuses_by_name_or_answers(
     reading half let the manager's ConfigurationError escape -- as a 500 on
     the graph and runs, and as a 422 named after the exception class on the
     catalogue -- so the tab on a bare repository could not load against a
-    fully working backend.  Every reading route now either answers (the four
-    routes first run itself depends on) or refuses 409 with the frozen code in
-    the exact shape the writing routes use, and `ConfigurationError` reaches
-    no response in any form.
+    fully working backend.  Every reading route now either answers (the public
+    shells and routes first run itself depends on) or refuses 409 with the
+    frozen code in the exact shape the writing routes use, and
+    `ConfigurationError` reaches no response in any form.
     """
 
     import subprocess
