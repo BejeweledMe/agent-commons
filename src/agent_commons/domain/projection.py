@@ -13,6 +13,7 @@ from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
 from .task_review_envelopes import ReviewEnvelope, TaskEnvelope
+from .thread_handoff_envelopes import HandoffEnvelope, ThreadEnvelope
 from .validation import EVENT_SPECS, validate_payload
 
 TASK_STATES = {
@@ -367,18 +368,21 @@ def _apply_effective_event(
             # sees the same state the write path did.
             _retire_lifetime_roles_for_task(snapshot, task_id)
     elif event_type in THREAD_STATES:
-        thread_id = str(payload["thread_id"])
+        if not isinstance(typed_envelope, ThreadEnvelope):
+            raise ValidationError(f"missing typed thread envelope for {event_type}")
+        thread_id = typed_envelope.thread_id
+        thread_payload = typed_envelope.to_payload()
         _apply(
             snapshot.threads,
             thread_id,
-            event,
-            str(payload.get("resolution") or THREAD_STATES[event_type]),
+            {**event, "payload": thread_payload},
+            str(typed_envelope.resolution or THREAD_STATES[event_type]),
         )
         if event_type == "thread.replied":
             snapshot.threads[thread_id].setdefault("messages", []).append(
                 {
-                    "message_id": payload["message_id"],
-                    "body": payload["body"],
+                    "message_id": typed_envelope.message_id,
+                    "body": typed_envelope.body,
                     "actor": deepcopy(event.get("actor")),
                     "recorded_at": event.get("recorded_at"),
                 }
@@ -432,10 +436,12 @@ def _apply_effective_event(
             DECISION_STATES[event_type],
         )
     elif event_type.startswith("handoff."):
+        if not isinstance(typed_envelope, HandoffEnvelope):
+            raise ValidationError(f"missing typed handoff envelope for {event_type}")
         _apply(
             snapshot.handoffs,
-            str(payload["handoff_id"]),
-            event,
+            typed_envelope.handoff_id,
+            {**event, "payload": typed_envelope.to_payload()},
             "acknowledged" if event_type == "handoff.acknowledged" else "open",
         )
     elif event_type in DELEGATION_STATES:

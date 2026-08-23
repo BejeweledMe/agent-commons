@@ -298,6 +298,61 @@ def test_typed_task_and_review_envelopes_round_trip_manager_events(
         )
 
 
+def test_typed_thread_and_handoff_envelopes_round_trip_manager_events(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """Thread messages and handoff records preserve their canonical payloads."""
+
+    _, _, builder, reviewer = workspace
+    opened = builder.open_thread(
+        thread_type="question",
+        subject="Which task envelope should be replayed?",
+        desired_outcome="Confirm the typed reducer path.",
+        to=("reviewer",),
+        idempotency_key="typed-thread-opened",
+    )
+    thread_id = opened["entity_ref"]["id"]
+    replied = reviewer.reply_thread(
+        thread_id,
+        opened["revision"],
+        body="Replay the validated typed envelope.",
+        idempotency_key="typed-thread-replied",
+    )
+    resolved = reviewer.resolve_thread(
+        thread_id,
+        replied["revision"],
+        resolution="resolved",
+        summary="The typed replay path is confirmed.",
+        idempotency_key="typed-thread-resolved",
+    )
+    handoff = builder.create_handoff(
+        to=("reviewer",),
+        completed=("typed thread envelope",),
+        active=("typed handoff envelope",),
+        next_actions=("acknowledge the handoff",),
+        blockers=("none",),
+        risks=("none",),
+        open_questions=("none",),
+        idempotency_key="typed-handoff-created",
+    )
+    acknowledged = reviewer.acknowledge_handoff(
+        handoff["entity_ref"]["id"],
+        handoff["revision"],
+        note="The typed handoff envelope was received.",
+        idempotency_key="typed-handoff-acknowledged",
+    )
+
+    for result in (opened, replied, resolved, handoff, acknowledged):
+        stored = builder.show_event(result["event_id"])["event"]
+        payload = stored["payload"]
+        envelope = parse_event_envelope(str(stored["event_type"]), payload)
+
+        assert envelope is not None
+        assert canonical_json_bytes(serialize_event_envelope(envelope)) == canonical_json_bytes(
+            payload
+        )
+
+
 def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
     monkeypatch: pytest.MonkeyPatch,

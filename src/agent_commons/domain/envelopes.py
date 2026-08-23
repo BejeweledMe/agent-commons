@@ -498,7 +498,12 @@ def parse_event_envelope(
         )
     from .task_review_envelopes import parse_task_review_envelope
 
-    return parse_task_review_envelope(event_type, payload)
+    task_or_review = parse_task_review_envelope(event_type, payload)
+    if task_or_review is not None:
+        return task_or_review
+    from .thread_handoff_envelopes import parse_thread_handoff_envelope
+
+    return parse_thread_handoff_envelope(event_type, payload)
 
 
 def serialize_event_envelope(envelope: TypedEventEnvelope) -> Mapping[str, object]:
