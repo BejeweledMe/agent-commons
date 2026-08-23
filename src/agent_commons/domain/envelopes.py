@@ -508,7 +508,12 @@ def parse_event_envelope(
         return thread_or_handoff
     from .truth_evidence_envelopes import parse_truth_evidence_envelope
 
-    return parse_truth_evidence_envelope(event_type, payload)
+    truth_or_evidence = parse_truth_evidence_envelope(event_type, payload)
+    if truth_or_evidence is not None:
+        return truth_or_evidence
+    from .agent_role_envelopes import parse_agent_role_envelope
+
+    return parse_agent_role_envelope(event_type, payload)
 
 
 def serialize_event_envelope(envelope: TypedEventEnvelope) -> Mapping[str, object]:

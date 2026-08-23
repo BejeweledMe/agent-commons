@@ -481,6 +481,73 @@ def test_typed_truth_and_evidence_envelopes_round_trip_manager_events(
         )
 
 
+def test_typed_role_and_agent_link_envelopes_round_trip_manager_events(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """Role and role-link records preserve their canonical payloads."""
+
+    _, _, builder, _ = workspace
+    source = builder.create_agent(
+        name="Typed source role",
+        profile_id="codex-builder",
+        grants={"create_roles": "deny", "retire_roles": "deny", "open_links": "deny"},
+        rationale="Exercise the typed role envelope.",
+        skills=("code.review",),
+        tool_allowlist=("repo.read",),
+        turnover_budget=0,
+        template=True,
+        idempotency_key="typed-agent-source-created",
+    )
+    target = builder.create_agent(
+        name="Typed target role",
+        profile_id="claude-builder",
+        rationale="Receive a typed role link.",
+        idempotency_key="typed-agent-target-created",
+    )
+    reconfigured = builder.reconfigure_agent(
+        source["entity_ref"]["id"],
+        source["revision"],
+        changes={
+            "name": "Typed source role reconfigured",
+            "skills": [],
+            "tool_allowlist": ["repo.read", "repo.status"],
+            "turnover_budget": None,
+        },
+        reason="Exercise the typed reconfiguration envelope.",
+        idempotency_key="typed-agent-reconfigured",
+    )
+    opened = builder.open_agent_link(
+        from_agent_id=source["entity_ref"]["id"],
+        to_agent_id=target["entity_ref"]["id"],
+        allowed_action="handoff_work",
+        deadline_seconds=60,
+        reason="Exercise the typed role-link envelope.",
+        idempotency_key="typed-agent-link-opened",
+    )
+    closed = builder.close_agent_link(
+        opened["entity_ref"]["id"],
+        opened["revision"],
+        reason="Exercise the typed closed-link envelope.",
+        idempotency_key="typed-agent-link-closed",
+    )
+    retired = builder.retire_agent(
+        target["entity_ref"]["id"],
+        target["revision"],
+        reason="Exercise the typed retirement envelope.",
+        idempotency_key="typed-agent-retired",
+    )["retired"][0]
+
+    for result in (source, target, reconfigured, opened, closed, retired):
+        stored = builder.show_event(result["event_id"])["event"]
+        payload = stored["payload"]
+        envelope = parse_event_envelope(str(stored["event_type"]), payload)
+
+        assert envelope is not None
+        assert canonical_json_bytes(serialize_event_envelope(envelope)) == canonical_json_bytes(
+            payload
+        )
+
+
 def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
     monkeypatch: pytest.MonkeyPatch,

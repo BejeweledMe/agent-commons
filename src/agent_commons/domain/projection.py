@@ -7,6 +7,7 @@ from typing import Any
 
 from agent_commons.errors import LifecycleConflictError, ValidationError
 
+from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
 from .collections import collection_for
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .invalidations import derive_invalidation_state
@@ -497,10 +498,12 @@ def _apply_effective_event(
             DELEGATION_STATES[event_type],
         )
     elif event_type in AGENT_STATES:
-        agent_id = str(payload["agent_id"])
-        agent_payload = dict(payload)
-        if event_type == "agent.reconfigured":
-            agent_payload = {**agent_payload, **deepcopy(dict(payload["changes"]))}
+        if not isinstance(typed_envelope, AgentEnvelope):
+            raise ValidationError(f"missing typed agent envelope for {event_type}")
+        agent_id = typed_envelope.agent_id
+        agent_payload = dict(typed_envelope.to_payload())
+        if isinstance(typed_envelope, AgentReconfiguredEnvelope):
+            agent_payload = {**agent_payload, **deepcopy(typed_envelope.changes.to_payload())}
             agent_payload.pop("changes", None)
         _apply(
             snapshot.agents,
@@ -518,10 +521,12 @@ def _apply_effective_event(
             # the same terminal state.
             _retire_lifetime_role_if_task_closed(snapshot, agent_id)
     elif event_type in AGENT_LINK_STATES:
+        if not isinstance(typed_envelope, AgentLinkEnvelope):
+            raise ValidationError(f"missing typed agent link envelope for {event_type}")
         _apply(
             snapshot.agent_links,
-            str(payload["link_id"]),
-            event,
+            typed_envelope.link_id,
+            {**event, "payload": typed_envelope.to_payload()},
             AGENT_LINK_STATES[event_type],
         )
     else:  # pragma: no cover - kept defensive if the registry is extended incorrectly
