@@ -75,12 +75,14 @@ def test_projection_read_verifies_document_hashes(tmp_path: Path) -> None:
     events = EventStore(paths, schemas)
     manifests = ManifestStore(paths, schemas)
     event = events.append(event_document())
+    manifest = manifests.put(manifest_document(related_ref={"kind": "note", "id": "note.1"}))
 
     with SQLiteIndex(paths, events, manifests) as index:
         index.rebuild()
         projected = index.read_projection(workspace_id=workspace_id())
         assert projected.events == (event.event,)
-        assert projected.source_count == 1
+        assert projected.manifest_ids == (manifest.manifest_id,)
+        assert projected.source_count == 2
         assert len(projected.verified_head_sha256) == 64
         index.connection.execute(
             "UPDATE events SET document_json = ? WHERE event_id = ?",

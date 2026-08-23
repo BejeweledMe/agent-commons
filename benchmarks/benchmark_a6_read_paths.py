@@ -69,6 +69,7 @@ class ReadPathProfile(TypedDict):
     repeats: int
     fixed_point_passes: int
     source: str
+    components: dict[str, ReadPathReport]
     paths: dict[str, ReadPathReport]
 
 
@@ -189,25 +190,61 @@ def _summarize(scope: str, samples: list[Measurement]) -> ReadPathReport:
 
 
 def _profile_manager_read_paths(
-    manager: CommonsManager, *, repeats: int, source: str
+    manager: CommonsManager, *, repeats: int, source: str, include_full_paths: bool = True
 ) -> ReadPathProfile:
-    """Measure the three paths after priming one disposable verified projection."""
+    """Measure verified-reader components and, optionally, the composite read paths."""
 
     if repeats < 1:
         raise ValueError("repeats must be positive")
     with SQLiteIndex(manager.paths, manager.events, manager.manifests) as index:
         index.sync()
         projected = index.read_projection(workspace_id=manager.workspace_id)
-    in_memory_events = projected.events
-    in_memory_manifests = projected.manifest_ids
-    expected_event_count = len(in_memory_events)
-    baseline = project_events(in_memory_events, known_manifest_ids=in_memory_manifests)
-    expected_passes = int(baseline.replay_metrics["fixed_point_passes"])
-    _assert_replay_shape(
-        baseline,
-        expected_event_count=expected_event_count,
-        expected_passes=expected_passes,
-    )
+        in_memory_events = projected.events
+        in_memory_manifests = projected.manifest_ids
+        expected_event_count = len(in_memory_events)
+        baseline = project_events(in_memory_events, known_manifest_ids=in_memory_manifests)
+        expected_passes = int(baseline.replay_metrics["fixed_point_passes"])
+        _assert_replay_shape(
+            baseline,
+            expected_event_count=expected_event_count,
+            expected_passes=expected_passes,
+        )
+
+        def warm_sync() -> None:
+            sync = index.sync()
+            if sync.indexed != 0 or sync.removed != 0:
+                raise AssertionError(f"expected an unchanged ledger during profile, got {sync!r}")
+
+        def verified_projection_read() -> None:
+            candidate = index.read_projection(workspace_id=manager.workspace_id)
+            if (
+                len(candidate.events) != expected_event_count
+                or len(candidate.manifest_ids) != len(in_memory_manifests)
+                or candidate.source_count != expected_event_count + len(in_memory_manifests)
+            ):
+                raise AssertionError("verified projection changed during profile")
+
+        def in_memory_replay() -> None:
+            _assert_replay_shape(
+                project_events(in_memory_events, known_manifest_ids=in_memory_manifests),
+                expected_event_count=expected_event_count,
+                expected_passes=expected_passes,
+            )
+
+        components = {
+            "sqlite_sync": _summarize(
+                "warm SQLiteIndex.sync() only",
+                [_measure(warm_sync) for _ in range(repeats)],
+            ),
+            "sqlite_read_projection": _summarize(
+                "verified SQLiteIndex.read_projection() only",
+                [_measure(verified_projection_read) for _ in range(repeats)],
+            ),
+            "project_events": _summarize(
+                "project_events over the verified event tuple already in memory",
+                [_measure(in_memory_replay) for _ in range(repeats)],
+            ),
+        }
 
     def canonical_snapshot() -> None:
         _assert_replay_shape(
@@ -226,11 +263,19 @@ def _profile_manager_read_paths(
             expected_passes=expected_passes,
         )
 
-    def in_memory_replay() -> None:
-        _assert_replay_shape(
-            project_events(in_memory_events, known_manifest_ids=in_memory_manifests),
-            expected_event_count=expected_event_count,
-            expected_passes=expected_passes,
+    paths = {"in_memory_replay": components["project_events"]}
+    if include_full_paths:
+        paths.update(
+            {
+                "commons_manager_snapshot": _summarize(
+                    "canonical files plus in-memory replay",
+                    [_measure(canonical_snapshot) for _ in range(repeats)],
+                ),
+                "verified_sqlite_read": _summarize(
+                    "warm sync, verified SQLite read, then in-memory replay",
+                    [_measure(verified_sqlite_read) for _ in range(repeats)],
+                ),
+            }
         )
 
     return {
@@ -241,20 +286,8 @@ def _profile_manager_read_paths(
         "repeats": repeats,
         "fixed_point_passes": expected_passes,
         "source": source,
-        "paths": {
-            "commons_manager_snapshot": _summarize(
-                "canonical files plus in-memory replay",
-                [_measure(canonical_snapshot) for _ in range(repeats)],
-            ),
-            "verified_sqlite_read": _summarize(
-                "warm sync, verified SQLite read, then in-memory replay",
-                [_measure(verified_sqlite_read) for _ in range(repeats)],
-            ),
-            "in_memory_replay": _summarize(
-                "project_events over the verified event tuple already in memory",
-                [_measure(in_memory_replay) for _ in range(repeats)],
-            ),
-        },
+        "components": components,
+        "paths": paths,
     }
 
 
@@ -266,6 +299,21 @@ def profile_read_paths(*, event_count: int = 20_000, repeats: int = 3) -> ReadPa
         return _profile_manager_read_paths(manager, repeats=repeats, source="synthetic_two_pass")
 
 
+def profile_projection_components(
+    *, event_count: int = 20_000, repeats: int = 3
+) -> ReadPathProfile:
+    """Measure only the three separable verified-projection components synthetically."""
+
+    with tempfile.TemporaryDirectory(prefix="agent-commons-a6-profile-") as temporary:
+        manager = _write_workspace(Path(temporary), event_count=event_count)
+        return _profile_manager_read_paths(
+            manager,
+            repeats=repeats,
+            source="synthetic_two_pass",
+            include_full_paths=False,
+        )
+
+
 def profile_workspace_read_paths(
     repo_root: Path, *, state_root: Path | None = None, repeats: int = 3
 ) -> ReadPathProfile:
@@ -273,6 +321,20 @@ def profile_workspace_read_paths(
 
     manager = CommonsManager(repo_root, state_root=state_root)
     return _profile_manager_read_paths(manager, repeats=repeats, source="existing_workspace")
+
+
+def profile_workspace_projection_components(
+    repo_root: Path, *, state_root: Path | None = None, repeats: int = 3
+) -> ReadPathProfile:
+    """Measure only the three separable components on one quiet existing workspace."""
+
+    manager = CommonsManager(repo_root, state_root=state_root)
+    return _profile_manager_read_paths(
+        manager,
+        repeats=repeats,
+        source="existing_workspace",
+        include_full_paths=False,
+    )
 
 
 def main() -> None:
@@ -283,21 +345,35 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--repo", type=Path)
     parser.add_argument("--state-root", type=Path)
+    parser.add_argument("--components-only", action="store_true")
     arguments = parser.parse_args()
     if arguments.state_root is not None and arguments.repo is None:
         parser.error("--state-root requires --repo")
     try:
         if arguments.repo is None:
-            result = profile_read_paths(
-                event_count=arguments.event_count,
-                repeats=arguments.repeats,
-            )
+            if arguments.components_only:
+                result = profile_projection_components(
+                    event_count=arguments.event_count,
+                    repeats=arguments.repeats,
+                )
+            else:
+                result = profile_read_paths(
+                    event_count=arguments.event_count,
+                    repeats=arguments.repeats,
+                )
         else:
-            result = profile_workspace_read_paths(
-                arguments.repo,
-                state_root=arguments.state_root,
-                repeats=arguments.repeats,
-            )
+            if arguments.components_only:
+                result = profile_workspace_projection_components(
+                    arguments.repo,
+                    state_root=arguments.state_root,
+                    repeats=arguments.repeats,
+                )
+            else:
+                result = profile_workspace_read_paths(
+                    arguments.repo,
+                    state_root=arguments.state_root,
+                    repeats=arguments.repeats,
+                )
     except ValueError as exc:
         parser.error(str(exc))
     print(json.dumps(result, sort_keys=True))

@@ -26,6 +26,11 @@ env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID \
   --repo /absolute/repository/path --state-root /absolute/state/path --repeats 3
 ```
 
+Чтобы разложить verified путь на независимые измерения `sync()`,
+`read_projection()` и replay, добавь `--components-only` к одной из команд
+выше. В этом режиме composite `snapshot()` и manager verified-read намеренно
+не выполняются.
+
 Профайлер создаёт во временном каталоге валидный 20 000-event canonical ledger
 из уже зафиксированного A0 two-pass workload. SQLite index прогревается до
 начала замеров. Конструктор manager, создание fixture и первый index sync вне
@@ -79,17 +84,42 @@ schema или source-coverage проверки не отключались.
    используемому `orient()`/`inbox()`; этот профиль не утверждает, что текущий
    read-only HTTP graph уже использует SQLite.
 
-## Подтверждённый кандидат следующей задачи (без оптимизации в A6.1)
+## A6.2 — компоненты verified-read и одна подтверждённая оптимизация
 
-Точный следующий seam: `SQLiteIndex.read_projection()` в
-`src/agent_commons/index/sqlite.py`. Он одновременно держит `event_rows`,
-`manifest_rows`, decoded `events`, `manifest_ids` и `head_rows`, а затем
-возвращает `ProjectionReadResult.events` как tuple, который
-`project_events()` снова materialize-ит в list.
+A6.2 добавил component profile на том же A0 two-pass fixture. До изменения он
+показал, что `SQLiteIndex.read_projection()` держит два лишних полных списка
+`sqlite3.Row` (`event_rows` и `manifest_rows`) одновременно с decoded
+`events`/`manifest_ids` и `head_rows`. Это именно duplicate materialization
+внутри verified-reader boundary, а не предположение о стоимости replay.
 
-Следующая задача должна сначала раздельно измерить `sync()`,
-`read_projection()` и `project_events()` на этом же fixture; затем может
-вводить один immutable ordered normalized sequence от verified reader к replay.
-Она обязана сохранить hash/workspace/source-coverage checks, ordering,
-fixed-point semantics, `ProjectionReadResult` compatibility и persisted JSON.
-Оптимизация числа fixed-point проходов не является кандидатом этого шага.
+Изменение в `src/agent_commons/index/sqlite.py` заменяет только оба
+`list(connection.execute(...))` на итерацию по cursor. Сами SQL-запросы,
+`ORDER BY`, hash/workspace/source-coverage checks, порядок `head_rows`,
+двухпроходный replay, `ProjectionReadResult` и persisted JSON не менялись.
+
+### 20 000-event synthetic fixture, три повтора
+
+| Компонент | До: медиана / max traced allocation | После: медиана / max traced allocation | Результат |
+|---|---:|---:|---|
+| warm `SQLiteIndex.sync()` | 13.774733 s / 44 164 771 B (42.12 MiB) | 13.862570 s / 44 164 771 B (42.12 MiB) | вне области изменения |
+| `SQLiteIndex.read_projection()` | 2.767364 s / 121 253 492 B (115.64 MiB) | 2.769011 s / 97 133 466 B (92.63 MiB) | −24 120 026 B (−23.00 MiB, −19.9%); время статистически без изменений |
+| `project_events()` над тем же verified tuple | 7.383677 s / 77 912 950 B (74.30 MiB) | 7.373201 s / 77 912 950 B (74.30 MiB) | вне области изменения |
+
+Оба synthetic profile run имели `fixed_point_passes=2`, а каждый sample
+`project_events()` подтвердил этот replay shape. Раздельное измерение не
+складывается в composite manager-path: оно служит для attribution allocation
+по границам, а не для нового SLO.
+
+### Тихий существующий workspace, 1 053 события, три повтора
+
+| Компонент | До: медиана / max traced allocation | После: медиана / max traced allocation | Результат |
+|---|---:|---:|---|
+| warm `SQLiteIndex.sync()` | 0.640792 s / 2 368 226 B (2.26 MiB) | 0.632647 s / 2 368 226 B (2.26 MiB) | вне области изменения |
+| `SQLiteIndex.read_projection()` | 0.245089 s / 10 815 291 B (10.31 MiB) | 0.243339 s / 8 226 015 B (7.85 MiB) | −2 589 276 B (−2.47 MiB, −23.9%) |
+| `project_events()` над тем же verified tuple | 0.570324 s / 5 071 764 B (4.84 MiB) | 0.575725 s / 5 071 764 B (4.84 MiB) | вне области изменения |
+
+Этот результат не меняет фиксированное число replay-проходов и не доказывает
+пользовательское latency-SLO. Он доказывает только устранение измеренного
+промежуточного хранения строк в verified reader. В частности,
+`project_events()` по-прежнему materialize-ит собственный вход; его возможная
+оптимизация требует отдельного профиля и задачи, а не расширения A6.2.

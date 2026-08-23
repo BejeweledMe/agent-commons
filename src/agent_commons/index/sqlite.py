@@ -529,29 +529,15 @@ class SQLiteIndex:
         if orphan is not None:
             raise IntegrityError("SQLite projection contains an orphaned document")
 
-        event_rows = list(
-            self.connection.execute(
-                """
-                SELECT source.identity, source.sha256, child.event_id,
-                       child.workspace_id, child.document_json
-                FROM source_files AS source
-                LEFT JOIN events AS child ON child.source_path = source.path
-                WHERE source.file_kind = 'event'
-                ORDER BY child.recorded_at, child.event_id
-                """
-            )
-        )
-        manifest_rows = list(
-            self.connection.execute(
-                """
-                SELECT source.identity, source.sha256, child.manifest_id,
-                       child.document_json
-                FROM source_files AS source
-                LEFT JOIN manifests AS child ON child.source_path = source.path
-                WHERE source.file_kind = 'manifest'
-                ORDER BY child.kind, child.manifest_id
-                """
-            )
+        event_rows = self.connection.execute(
+            """
+            SELECT source.identity, source.sha256, child.event_id,
+                   child.workspace_id, child.document_json
+            FROM source_files AS source
+            LEFT JOIN events AS child ON child.source_path = source.path
+            WHERE source.file_kind = 'event'
+            ORDER BY child.recorded_at, child.event_id
+            """
         )
         events: list[Mapping[str, Any]] = []
         manifest_ids: list[str] = []
@@ -574,6 +560,16 @@ class SQLiteIndex:
             head_rows.append(
                 {"kind": "event", "id": str(row["identity"]), "sha256": str(row["sha256"])}
             )
+        manifest_rows = self.connection.execute(
+            """
+            SELECT source.identity, source.sha256, child.manifest_id,
+                   child.document_json
+            FROM source_files AS source
+            LEFT JOIN manifests AS child ON child.source_path = source.path
+            WHERE source.file_kind = 'manifest'
+            ORDER BY child.kind, child.manifest_id
+            """
+        )
         for row in manifest_rows:
             if row["manifest_id"] is None or str(row["identity"]) != str(row["manifest_id"]):
                 raise IntegrityError("SQLite projection manifest source coverage is incomplete")
