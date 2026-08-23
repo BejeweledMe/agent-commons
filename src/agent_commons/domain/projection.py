@@ -8,6 +8,7 @@ from typing import Any
 from agent_commons.errors import LifecycleConflictError, ValidationError
 
 from .collections import collection_for
+from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
@@ -262,7 +263,12 @@ def _annotate_review_producer(
     review["producer_prior_verdict_count"] = len(earlier)
 
 
-def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) -> None:
+def _apply_effective_event(
+    snapshot: ProjectSnapshot,
+    event: Mapping[str, Any],
+    *,
+    typed_envelope: TypedEventEnvelope | None = None,
+) -> None:
     event_type = str(event["event_type"])
     payload = event["payload"]
     if event_type == "workspace.semantics_required":
@@ -423,8 +429,10 @@ def _apply_effective_event(snapshot: ProjectSnapshot, event: Mapping[str, Any]) 
             "acknowledged" if event_type == "handoff.acknowledged" else "open",
         )
     elif event_type in DELEGATION_STATES:
-        delegation_id = str(payload["delegation_id"])
-        delegation_payload = dict(payload)
+        if not isinstance(typed_envelope, DelegationEnvelope):
+            raise ValidationError(f"missing typed delegation envelope for {event_type}")
+        delegation_id = typed_envelope.delegation_id
+        delegation_payload = typed_envelope.to_payload()
         # The role a run acts for is carried as an event relation, not a payload
         # field: `relation.predicate` and `typedRef.kind` are open patterns, so
         # this binding costs no schema change and an older reader ignores it.
@@ -897,6 +905,7 @@ def _project_events_once(
             if known_identity is not None and known_identity != actor_identity:
                 raise LifecycleConflictError("session actor identity changed during replay")
             validate_payload(event_type, payload)
+            typed_envelope = parse_event_envelope(event_type, payload)
             workspace_id = event.get("workspace_id")
             if snapshot.workspace_id is not None and workspace_id != snapshot.workspace_id:
                 raise LifecycleConflictError(
@@ -916,7 +925,7 @@ def _project_events_once(
                 # delegation event cannot silently rebind the run on replay.
                 relations=event.get("relations") or (),
             )
-            _apply_effective_event(snapshot, event)
+            _apply_effective_event(snapshot, event, typed_envelope=typed_envelope)
             snapshot.session_identities.setdefault(actor_session_id, actor_identity)
             snapshot.effective_event_revisions[event_id] = str(
                 event.get("_effective_correction_id") or event_id

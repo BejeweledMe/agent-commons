@@ -9,6 +9,8 @@ import pytest
 
 import agent_commons.services.manager as manager_module
 import agent_commons.storage.idempotency as idempotency_module
+from agent_commons.core.canonical import canonical_json_bytes
+from agent_commons.domain.envelopes import parse_event_envelope, serialize_event_envelope
 from agent_commons.domain.projection import ProjectionIssue, ProjectSnapshot
 from agent_commons.errors import (
     IdempotencyConflictError,
@@ -118,6 +120,71 @@ def test_idempotency_repairs_missing_receipt_and_defers_optional_index_sync(
     assert report["performance"]["canonical_write_index_policy"] == "deferred"
     with sqlite3.connect(manager.paths.index_db) as connection:
         assert connection.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 1
+
+
+def test_typed_delegation_and_maintenance_envelopes_round_trip_manager_events(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """The post-schema manager path preserves the canonical payload bytes."""
+
+    _, _, manager, _ = workspace
+    task = manager.create_task(
+        title="Type the replay boundary",
+        description="Exercise the existing immutable event path.",
+        acceptance_criteria=("Payload bytes remain canonical.",),
+        idempotency_key="typed-envelope-task",
+    )
+    stored_task = manager.show_event(task["event_id"])
+    delegation = manager.create_delegation(
+        target_ref={"kind": "task", "id": stored_task["event"]["payload"]["task_id"]},
+        target_revision=task["event_id"],
+        target_profile="codex-builder",
+        purpose="implementation",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 900,
+            "max_attempts": 2,
+            "max_concurrency": 1,
+            "budget": {"unit": "tokens", "limit": 10_000},
+        },
+        idempotency_key="typed-envelope-delegation",
+    )
+    objective = manager.create_objective(
+        title="Maintain the typed replay boundary",
+        description="Exercise the independent maintenance path.",
+        acceptance_criteria=("Maintenance payload bytes remain canonical.",),
+        idempotency_key="typed-envelope-objective",
+    )
+    stored_objective = manager.show_event(objective["event_id"])
+    correction = manager.correct_event(
+        objective["event_id"],
+        expected_target_sha256=stored_objective["canonical_sha256"],
+        replacement_payload={
+            **stored_objective["event"]["payload"],
+            "description": "Exercise the independent immutable correction path.",
+        },
+        idempotency_key="typed-envelope-correction",
+    )
+    invalidation = manager.invalidate_event(
+        objective["event_id"],
+        reason="Exercise the typed maintenance envelope.",
+        idempotency_key="typed-envelope-invalidation",
+    )
+    revocation = manager.revoke_invalidation(
+        invalidation["event_id"],
+        reason="Keep the characterization fixture healthy.",
+        idempotency_key="typed-envelope-revocation",
+    )
+
+    for result in (delegation, correction, invalidation, revocation):
+        stored = manager.show_event(result["event_id"])["event"]
+        payload = stored["payload"]
+        envelope = parse_event_envelope(str(stored["event_type"]), payload)
+
+        assert envelope is not None
+        assert canonical_json_bytes(serialize_event_envelope(envelope)) == canonical_json_bytes(
+            payload
+        )
 
 
 def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(

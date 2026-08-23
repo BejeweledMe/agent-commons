@@ -21,6 +21,7 @@ from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.domain.acceptance import select_qualifying_review
 from agent_commons.domain.collections import COLLECTIONS, collection_for
+from agent_commons.domain.envelopes import parse_event_envelope
 from agent_commons.domain.invalidations import derive_invalidation_state
 from agent_commons.domain.lifecycle import (
     acting_agent_id,
@@ -243,7 +244,14 @@ class CommonsManager(RoleCommands, ArtifactCommands):
         return config
 
     def _validate_stored_event(self, event: Mapping[str, Any]) -> None:
-        validate_payload(str(event.get("event_type", "")), event.get("payload") or {})
+        event_type = str(event.get("event_type", ""))
+        payload = event.get("payload") or {}
+        validate_payload(event_type, payload)
+        # EventStore calls this only after SchemaRegistry has accepted the
+        # immutable event and its payload.  Parse the A5.1 families here, at
+        # that named boundary; projection consumes the same typed envelope
+        # after its existing replay validation.
+        parse_event_envelope(event_type, payload)
         self.policy.assert_safe(event, context="canonical event")
 
     def _validate_stored_manifest(self, manifest: Mapping[str, Any]) -> None:
