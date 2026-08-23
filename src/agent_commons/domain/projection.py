@@ -14,6 +14,12 @@ from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
 from .task_review_envelopes import ReviewEnvelope, TaskEnvelope
 from .thread_handoff_envelopes import HandoffEnvelope, ThreadEnvelope
+from .truth_evidence_envelopes import (
+    ArtifactEnvelope,
+    DecisionEnvelope,
+    FindingEnvelope,
+    VerificationEnvelope,
+)
 from .validation import EVENT_SPECS, validate_payload
 
 TASK_STATES = {
@@ -388,9 +394,11 @@ def _apply_effective_event(
                 }
             )
     elif event_type in {"artifact.registered", "artifact.revised"}:
-        artifact_payload = deepcopy(dict(payload))
+        if not isinstance(typed_envelope, ArtifactEnvelope):
+            raise ValidationError(f"missing typed artifact envelope for {event_type}")
+        artifact_payload = typed_envelope.to_payload()
         artifact_payload["content_revision"] = artifact_payload.pop("revision")
-        artifact_id = str(payload["artifact_id"])
+        artifact_id = typed_envelope.artifact_id
         # Every session that produced a revision of this evidence, not just the
         # most recent one.  Independence is decided against this set, so losing
         # earlier authors would let the original writer review its own work.
@@ -425,14 +433,30 @@ def _apply_effective_event(
         if event_type == "review.completed":
             _annotate_review_producer(snapshot, review_id, event)
     elif event_type == "verification.recorded":
-        _apply(snapshot.verifications, str(payload["verification_id"]), event, "recorded")
+        if not isinstance(typed_envelope, VerificationEnvelope):
+            raise ValidationError(f"missing typed verification envelope for {event_type}")
+        _apply(
+            snapshot.verifications,
+            typed_envelope.verification_id,
+            {**event, "payload": typed_envelope.to_payload()},
+            "recorded",
+        )
     elif event_type in FINDING_STATES:
-        _apply(snapshot.findings, str(payload["finding_id"]), event, FINDING_STATES[event_type])
+        if not isinstance(typed_envelope, FindingEnvelope):
+            raise ValidationError(f"missing typed finding envelope for {event_type}")
+        _apply(
+            snapshot.findings,
+            typed_envelope.finding_id,
+            {**event, "payload": typed_envelope.to_payload()},
+            FINDING_STATES[event_type],
+        )
     elif event_type in DECISION_STATES:
+        if not isinstance(typed_envelope, DecisionEnvelope):
+            raise ValidationError(f"missing typed decision envelope for {event_type}")
         _apply(
             snapshot.decisions,
-            str(payload["decision_id"]),
-            event,
+            typed_envelope.decision_id,
+            {**event, "payload": typed_envelope.to_payload()},
             DECISION_STATES[event_type],
         )
     elif event_type.startswith("handoff."):
@@ -951,7 +975,7 @@ def _project_events_once(
             if event_type == "decision.accepted" and str(exc).startswith(
                 "conflicting accepted decisions for scope"
             ):
-                _apply_effective_event(snapshot, event)
+                _apply_effective_event(snapshot, event, typed_envelope=typed_envelope)
                 snapshot.effective_event_revisions[event_id] = str(
                     event.get("_effective_correction_id") or event_id
                 )

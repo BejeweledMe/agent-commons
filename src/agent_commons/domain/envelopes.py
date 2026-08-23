@@ -503,7 +503,12 @@ def parse_event_envelope(
         return task_or_review
     from .thread_handoff_envelopes import parse_thread_handoff_envelope
 
-    return parse_thread_handoff_envelope(event_type, payload)
+    thread_or_handoff = parse_thread_handoff_envelope(event_type, payload)
+    if thread_or_handoff is not None:
+        return thread_or_handoff
+    from .truth_evidence_envelopes import parse_truth_evidence_envelope
+
+    return parse_truth_evidence_envelope(event_type, payload)
 
 
 def serialize_event_envelope(envelope: TypedEventEnvelope) -> Mapping[str, object]:

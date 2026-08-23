@@ -353,6 +353,134 @@ def test_typed_thread_and_handoff_envelopes_round_trip_manager_events(
         )
 
 
+def test_typed_truth_and_evidence_envelopes_round_trip_manager_events(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """Truth and evidence records preserve their canonical payloads."""
+
+    repo, _, builder, reviewer = workspace
+    source = repo / "typed-evidence.txt"
+    source.write_text("first revision", encoding="utf-8")
+    registered = builder.register_artifact(
+        source,
+        media_type="text/plain",
+        classification="internal",
+        idempotency_key="typed-artifact-registered",
+    )
+    source.write_text("second revision", encoding="utf-8")
+    revised = builder.revise_artifact(
+        registered["entity_ref"]["id"],
+        registered["revision"],
+        source,
+        media_type="text/plain",
+        classification="restricted",
+        idempotency_key="typed-artifact-revised",
+    )
+    artifact_ref = revised["entity_ref"]
+    verification = reviewer.record_verification(
+        target_ref=artifact_ref,
+        target_revision=revised["revision"],
+        claim="The revised artifact is canonical evidence.",
+        evidence_refs=(artifact_ref,),
+        method="sha256",
+        outcome="pass",
+        idempotency_key="typed-verification-recorded",
+    )
+    reported = reviewer.report_finding(
+        summary="The artifact evidence remains available.",
+        severity="info",
+        evidence_refs=(artifact_ref,),
+        idempotency_key="typed-finding-reported",
+    )
+    contested = builder.contest_finding(
+        reported["entity_ref"]["id"],
+        reported["revision"],
+        reason="Exercise the contested typed envelope.",
+        idempotency_key="typed-finding-contested",
+    )
+    promoted = reviewer.promote_finding(
+        reported["entity_ref"]["id"],
+        contested["revision"],
+        summary="The evidence was independently confirmed.",
+        evidence_refs=(artifact_ref,),
+        idempotency_key="typed-finding-promoted",
+    )
+    resolved = builder.resolve_finding(
+        reported["entity_ref"]["id"],
+        promoted["revision"],
+        resolution="Resolved after typed replay.",
+        idempotency_key="typed-finding-resolved",
+    )
+    proposed = builder.propose_decision(
+        scope="typed.truth.evidence",
+        proposal="Retain typed truth envelopes.",
+        alternatives=("Use untyped mappings.",),
+        idempotency_key="typed-decision-proposed",
+    )
+    deferred = builder.defer_decision(
+        proposed["entity_ref"]["id"],
+        proposed["revision"],
+        reason="Exercise the deferred typed envelope.",
+        idempotency_key="typed-decision-deferred",
+    )
+    accepted = reviewer.accept_decision(
+        proposed["entity_ref"]["id"],
+        deferred["revision"],
+        rationale="Evidence supports the typed boundary.",
+        evidence_refs=(artifact_ref,),
+        dissent=("No dissent.",),
+        idempotency_key="typed-decision-accepted",
+    )
+    replacement = builder.propose_decision(
+        scope="typed.truth.evidence",
+        proposal="Keep the typed boundary under its replacement decision.",
+        idempotency_key="typed-decision-replacement",
+    )
+    superseded = builder.supersede_decision(
+        proposed["entity_ref"]["id"],
+        accepted["revision"],
+        replacement_decision_id=replacement["entity_ref"]["id"],
+        reason="Exercise the superseded typed envelope.",
+        idempotency_key="typed-decision-superseded",
+    )
+    rejected_proposal = builder.propose_decision(
+        scope="typed.truth.rejected",
+        proposal="Reject the alternative typed decision.",
+        idempotency_key="typed-decision-rejected-proposal",
+    )
+    rejected = reviewer.reject_decision(
+        rejected_proposal["entity_ref"]["id"],
+        rejected_proposal["revision"],
+        rationale="Exercise the rejected typed envelope.",
+        idempotency_key="typed-decision-rejected",
+    )
+
+    for result in (
+        registered,
+        revised,
+        verification,
+        reported,
+        contested,
+        promoted,
+        resolved,
+        proposed,
+        deferred,
+        accepted,
+        replacement,
+        superseded,
+        rejected_proposal,
+        rejected,
+    ):
+        stored = builder.show_event(result["event_id"])["event"]
+        payload = stored["payload"]
+        envelope = parse_event_envelope(str(stored["event_type"]), payload)
+
+        assert envelope is not None
+        assert canonical_json_bytes(serialize_event_envelope(envelope)) == canonical_json_bytes(
+            payload
+        )
+
+
 def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
     monkeypatch: pytest.MonkeyPatch,
