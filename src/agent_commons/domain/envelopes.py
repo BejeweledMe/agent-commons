@@ -189,7 +189,16 @@ class DelegationLimits:
         }
 
 
-class DelegationEnvelope:
+class EventEnvelope:
+    """Base class for one parsed, immutable event-family envelope."""
+
+    event_type: str
+
+    def to_payload(self) -> Mapping[str, object]:
+        raise NotImplementedError
+
+
+class DelegationEnvelope(EventEnvelope):
     """Base class for the closed delegation event family."""
 
     event_type: str
@@ -326,7 +335,7 @@ class DelegationFailureEnvelope(DelegationEnvelope):
         }
 
 
-class MaintenanceEnvelope:
+class MaintenanceEnvelope(EventEnvelope):
     """Base class for the closed maintenance event family."""
 
     event_type: str
@@ -391,7 +400,10 @@ class EventInvalidationRevokedEnvelope(MaintenanceEnvelope):
         return payload
 
 
-TypedEventEnvelope: TypeAlias = DelegationEnvelope | MaintenanceEnvelope
+# Every A5 vertical slice subclasses this immutable interface.  The closed
+# family-specific unions live with the family so this dispatcher can stay a
+# small, non-cyclic bridge between them.
+TypedEventEnvelope: TypeAlias = EventEnvelope
 
 
 def parse_event_envelope(
@@ -484,7 +496,9 @@ def parse_event_envelope(
             reason=_required_string(payload, "reason"),
             extensions=_optional_frozen_object(payload, "extensions"),
         )
-    return None
+    from .task_review_envelopes import parse_task_review_envelope
+
+    return parse_task_review_envelope(event_type, payload)
 
 
 def serialize_event_envelope(envelope: TypedEventEnvelope) -> Mapping[str, object]:
@@ -552,3 +566,15 @@ def _thaw_json(value: FrozenJsonValue) -> JsonValue:
     if isinstance(value, FrozenJsonArray):
         return [_thaw_json(item) for item in value.values]
     return value
+
+
+def freeze_json_object(value: Mapping[str, object]) -> FrozenJsonObject:
+    """Freeze a validated arbitrary JSON object for a typed envelope."""
+
+    return _freeze_object(value)
+
+
+def thaw_json_object(value: FrozenJsonObject) -> dict[str, JsonValue]:
+    """Restore the JSON object a typed envelope serializes to disk."""
+
+    return _thaw_object(value)

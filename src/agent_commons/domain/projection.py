@@ -12,6 +12,7 @@ from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envel
 from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
+from .task_review_envelopes import ReviewEnvelope, TaskEnvelope
 from .validation import EVENT_SPECS, validate_payload
 
 TASK_STATES = {
@@ -296,7 +297,11 @@ def _apply_effective_event(
     elif event_type == "objective.closed":
         _apply(snapshot.objectives, str(payload["objective_id"]), event, "closed")
     elif event_type == "task.revised":
-        task_id = str(payload["task_id"])
+        if not isinstance(typed_envelope, TaskEnvelope):
+            raise ValidationError(f"missing typed task envelope for {event_type}")
+        if typed_envelope.changes is None:
+            raise ValidationError("task.revised has no typed changes")
+        task_id = typed_envelope.task_id
         current = snapshot.tasks.get(task_id) or {}
         work_author_session_ids = {
             str(session_id)
@@ -307,8 +312,8 @@ def _apply_effective_event(
         if actor_session_id:
             work_author_session_ids.add(actor_session_id)
         revised_payload = {
-            **dict(payload),
-            **deepcopy(dict(payload["changes"])),
+            **typed_envelope.to_payload(),
+            **deepcopy(typed_envelope.changes.to_payload()),
             "work_author_session_ids": sorted(work_author_session_ids),
         }
         revised_payload.pop("changes", None)
@@ -319,7 +324,9 @@ def _apply_effective_event(
             str(current.get("state", "ready")),
         )
     elif event_type in TASK_STATES:
-        task_id = str(payload["task_id"])
+        if not isinstance(typed_envelope, TaskEnvelope):
+            raise ValidationError(f"missing typed task envelope for {event_type}")
+        task_id = typed_envelope.task_id
         current = snapshot.tasks.get(task_id) or {}
         work_author_session_ids = {
             str(session_id)
@@ -331,7 +338,7 @@ def _apply_effective_event(
             if actor_session_id:
                 work_author_session_ids.add(actor_session_id)
         task_payload = {
-            **dict(payload),
+            **typed_envelope.to_payload(),
             "work_author_session_ids": sorted(work_author_session_ids),
         }
         if event_type == "task.accepted":
@@ -401,12 +408,15 @@ def _apply_effective_event(
             "registered",
         )
     elif event_type.startswith("review."):
-        review_id = str(payload["review_id"])
+        if not isinstance(typed_envelope, ReviewEnvelope):
+            raise ValidationError(f"missing typed review envelope for {event_type}")
+        review_id = typed_envelope.review_id
+        review_payload = typed_envelope.to_payload()
         _apply(
             snapshot.reviews,
             review_id,
-            event,
-            "requested" if event_type == "review.requested" else str(payload["verdict"]),
+            {**event, "payload": review_payload},
+            "requested" if event_type == "review.requested" else str(typed_envelope.verdict),
         )
         if event_type == "review.completed":
             _annotate_review_producer(snapshot, review_id, event)

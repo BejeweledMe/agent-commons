@@ -187,6 +187,117 @@ def test_typed_delegation_and_maintenance_envelopes_round_trip_manager_events(
         )
 
 
+def test_typed_task_and_review_envelopes_round_trip_manager_events(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    """Task and review lifecycle records keep their canonical payload bytes."""
+
+    _, _, builder, reviewer = workspace
+    created = builder.create_task(
+        title="Type the task lifecycle",
+        description="Exercise each existing task transition.",
+        acceptance_criteria=("The stored payload round-trips exactly.",),
+        idempotency_key="typed-task-created",
+    )
+    task_id = created["entity_ref"]["id"]
+    revised = builder.revise_task(
+        task_id,
+        created["revision"],
+        changes={"description": "Exercise each existing typed task transition."},
+        idempotency_key="typed-task-revised",
+    )
+    taken = builder.take_task(task_id, revised["revision"], idempotency_key="typed-task-taken")
+    started = builder.start_task(task_id, taken["revision"], idempotency_key="typed-task-started")
+    blocked = builder.block_task(
+        task_id,
+        started["revision"],
+        reason="Exercise the blocked envelope.",
+        idempotency_key="typed-task-blocked",
+    )
+    unblocked = builder.unblock_task(
+        task_id,
+        blocked["revision"],
+        resolution="Continue the characterization path.",
+        idempotency_key="typed-task-unblocked",
+    )
+    completed = builder.complete_task(
+        task_id,
+        unblocked["revision"],
+        summary="The typed task payload is complete.",
+        idempotency_key="typed-task-completed",
+    )
+    submitted = builder.submit_task(
+        task_id,
+        completed["revision"],
+        summary="The typed task payload is ready for review.",
+        idempotency_key="typed-task-submitted",
+    )
+    requested = builder.request_review(
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=submitted["revision"],
+        criteria=("canonical payload fidelity",),
+        idempotency_key="typed-review-requested",
+    )
+    reviewed = reviewer.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=submitted["revision"],
+        verdict="approved",
+        summary="The review envelope round-trips.",
+        idempotency_key="typed-review-completed",
+    )
+    accepted = reviewer.accept_task(
+        task_id,
+        submitted["revision"],
+        summary="The task envelope includes the acceptance review binding.",
+        idempotency_key="typed-task-accepted",
+    )
+
+    cancelled = builder.create_task(
+        title="Exercise cancellation",
+        description="Reach the remaining task envelopes.",
+        acceptance_criteria=("Cancellation remains canonical.",),
+        idempotency_key="typed-task-cancel-created",
+    )
+    cancelled_id = cancelled["entity_ref"]["id"]
+    cancelled = builder.cancel_task(
+        cancelled_id,
+        cancelled["revision"],
+        reason="Exercise the cancellation envelope.",
+        idempotency_key="typed-task-cancelled",
+    )
+    reopened = builder.reopen_task(
+        cancelled_id,
+        cancelled["revision"],
+        reason="Exercise the reopened envelope.",
+        idempotency_key="typed-task-reopened",
+    )
+
+    for result in (
+        created,
+        revised,
+        taken,
+        started,
+        blocked,
+        unblocked,
+        completed,
+        submitted,
+        requested,
+        reviewed,
+        accepted,
+        cancelled,
+        reopened,
+    ):
+        stored = builder.show_event(result["event_id"])["event"]
+        payload = stored["payload"]
+        envelope = parse_event_envelope(str(stored["event_type"]), payload)
+
+        assert envelope is not None
+        assert canonical_json_bytes(serialize_event_envelope(envelope)) == canonical_json_bytes(
+            payload
+        )
+
+
 def test_one_write_reuses_a_bounded_number_of_receipt_scope_git_probes(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
     monkeypatch: pytest.MonkeyPatch,

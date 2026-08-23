@@ -248,7 +248,7 @@ class CommonsManager(RoleCommands, ArtifactCommands):
         payload = event.get("payload") or {}
         validate_payload(event_type, payload)
         # EventStore calls this only after SchemaRegistry has accepted the
-        # immutable event and its payload.  Parse the A5.1 families here, at
+        # immutable event and its payload.  Parse each completed A5 family at
         # that named boundary; projection consumes the same typed envelope
         # after its existing replay validation.
         parse_event_envelope(event_type, payload)
