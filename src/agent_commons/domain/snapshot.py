@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .agent_projection import AgentRecord
     from .artifact_projection import ArtifactRecord
     from .decision_projection import DecisionRecord
+    from .delegation_projection import DelegationRecord
     from .finding_projection import FindingRecord
     from .handoff_projection import HandoffRecord
     from .objective_projection import ObjectiveRecord
@@ -52,7 +53,7 @@ class ProjectSnapshot:
     decisions: dict[str, DecisionRecord] = field(default_factory=dict)
     artifacts: dict[str, ArtifactRecord] = field(default_factory=dict)
     handoffs: dict[str, HandoffRecord] = field(default_factory=dict)
-    delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
+    delegations: dict[str, DelegationRecord] = field(default_factory=dict)
     agents: dict[str, AgentRecord] = field(default_factory=dict)
     agent_links: dict[str, dict[str, Any]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -90,7 +91,7 @@ class ProjectSnapshot:
             "decisions": [record.to_dict() for record in self.decisions.values()],
             "artifacts": [record.to_dict() for record in self.artifacts.values()],
             "handoffs": [record.to_dict() for record in self.handoffs.values()],
-            "delegations": list(self.delegations.values()),
+            "delegations": [record.to_dict() for record in self.delegations.values()],
             "agents": [record.to_dict() for record in self.agents.values()],
             "agent_links": list(self.agent_links.values()),
             "warnings": sorted(set(self.warnings)),

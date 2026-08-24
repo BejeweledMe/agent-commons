@@ -12,6 +12,7 @@ from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfi
 from .artifact_projection import apply_artifact_record
 from .collections import collection_for
 from .decision_projection import apply_decision_record
+from .delegation_projection import apply_delegation_record
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .finding_projection import apply_finding_record
 from .handoff_projection import apply_handoff_record
@@ -479,7 +480,12 @@ def _apply_effective_event(
         if not isinstance(typed_envelope, DelegationEnvelope):
             raise ValidationError(f"missing typed delegation envelope for {event_type}")
         delegation_id = typed_envelope.delegation_id
-        delegation_payload = typed_envelope.to_payload()
+        if not isinstance(payload, Mapping):
+            raise ValidationError(f"delegation payload must be an object for {event_type}")
+        # Retain the exact raw effective payload ordering that replay validated.
+        # A typed envelope remains the authority for the identifier, but its
+        # reconstructed payload would replace the persisted wire ordering.
+        delegation_payload = deepcopy(dict(payload))
         # The role a run acts for is carried as an event relation, not a payload
         # field: `relation.predicate` and `typedRef.kind` are open patterns, so
         # this binding costs no schema change and an older reader ignores it.
@@ -497,7 +503,7 @@ def _apply_effective_event(
             bound_agent = _relation_object(event, delegation_id, "on_behalf_of", "agent")
             if bound_agent:
                 delegation_payload["agent_id"] = bound_agent
-        _apply(
+        apply_delegation_record(
             snapshot.delegations,
             delegation_id,
             {**event, "payload": delegation_payload},
