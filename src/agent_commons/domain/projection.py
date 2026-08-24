@@ -11,6 +11,7 @@ from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
 from .artifact_projection import apply_artifact_record
 from .collections import collection_for
+from .decision_projection import apply_decision_record
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .handoff_projection import apply_handoff_record
 from .invalidations import derive_invalidation_state
@@ -455,10 +456,11 @@ def _apply_effective_event(
     elif event_type in DECISION_STATES:
         if not isinstance(typed_envelope, DecisionEnvelope):
             raise ValidationError(f"missing typed decision envelope for {event_type}")
-        _apply(
+        apply_decision_record(
             snapshot.decisions,
             typed_envelope.decision_id,
-            {**event, "payload": typed_envelope.to_payload()},
+            event,
+            typed_envelope.to_payload(),
             DECISION_STATES[event_type],
         )
     elif event_type.startswith("handoff."):
@@ -755,15 +757,16 @@ def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
         current_evidence_revision=_current_evidence_revision,
         has_stale_evidence=lambda item: _has_stale_evidence(snapshot, item),
     )
-    for label, collection, effective_state in (
-        ("finding", snapshot.findings, "verified"),
-        ("decision", snapshot.decisions, "accepted"),
-    ):
-        for identifier, item in collection.items():
-            stale = _has_stale_evidence(snapshot, item)
-            item["stale"] = stale
-            if stale and item.get("state") == effective_state:
-                snapshot.warnings.append(f"{label} {identifier} has stale revision-bound evidence")
+    for identifier, finding in snapshot.findings.items():
+        stale = _has_stale_evidence(snapshot, finding)
+        finding["stale"] = stale
+        if stale and finding.get("state") == "verified":
+            snapshot.warnings.append(f"finding {identifier} has stale revision-bound evidence")
+    for identifier, decision in snapshot.decisions.items():
+        stale = _has_stale_evidence(snapshot, decision)
+        snapshot.decisions[identifier] = decision.with_stale(stale)
+        if stale and decision.get("state") == "accepted":
+            snapshot.warnings.append(f"decision {identifier} has stale revision-bound evidence")
 
 
 def _fail_closed_decision_conflicts(snapshot: ProjectSnapshot) -> None:
@@ -788,8 +791,7 @@ def _fail_closed_decision_conflicts(snapshot: ProjectSnapshot) -> None:
             event_ids=(snapshot.decisions[identifier]["revision"] for identifier in ordered),
         )
         for identifier in ordered:
-            snapshot.decisions[identifier]["state"] = "conflicted"
-            snapshot.decisions[identifier]["conflict"] = True
+            snapshot.decisions[identifier] = snapshot.decisions[identifier].with_conflict()
 
 
 def _project_events_once(

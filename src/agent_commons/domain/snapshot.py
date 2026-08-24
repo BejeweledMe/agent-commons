@@ -10,6 +10,7 @@ from .collections import collection_for
 if TYPE_CHECKING:
     from .agent_projection import AgentRecord
     from .artifact_projection import ArtifactRecord
+    from .decision_projection import DecisionRecord
     from .handoff_projection import HandoffRecord
     from .review_projection import ReviewRecord
     from .task_projection import TaskRecord
@@ -46,7 +47,7 @@ class ProjectSnapshot:
     reviews: dict[str, ReviewRecord] = field(default_factory=dict)
     verifications: dict[str, VerificationRecord] = field(default_factory=dict)
     findings: dict[str, dict[str, Any]] = field(default_factory=dict)
-    decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    decisions: dict[str, DecisionRecord] = field(default_factory=dict)
     artifacts: dict[str, ArtifactRecord] = field(default_factory=dict)
     handoffs: dict[str, HandoffRecord] = field(default_factory=dict)
     delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -84,7 +85,7 @@ class ProjectSnapshot:
             "reviews": [record.to_dict() for record in self.reviews.values()],
             "verifications": [record.to_dict() for record in self.verifications.values()],
             "findings": list(self.findings.values()),
-            "decisions": list(self.decisions.values()),
+            "decisions": [record.to_dict() for record in self.decisions.values()],
             "artifacts": [record.to_dict() for record in self.artifacts.values()],
             "handoffs": [record.to_dict() for record in self.handoffs.values()],
             "delegations": list(self.delegations.values()),
