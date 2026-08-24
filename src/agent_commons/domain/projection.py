@@ -18,6 +18,7 @@ from .snapshot import ProjectionIssue, ProjectSnapshot
 from .task_projection import apply_task_record
 from .task_review_envelopes import ReviewEnvelope, TaskEnvelope
 from .thread_handoff_envelopes import HandoffEnvelope, ThreadEnvelope
+from .thread_projection import apply_thread_record
 from .truth_evidence_envelopes import (
     ArtifactEnvelope,
     DecisionEnvelope,
@@ -381,20 +382,19 @@ def _apply_effective_event(
             raise ValidationError(f"missing typed thread envelope for {event_type}")
         thread_id = typed_envelope.thread_id
         thread_payload = typed_envelope.to_payload()
-        _apply(
+        apply_thread_record(
             snapshot.threads,
             thread_id,
-            {**event, "payload": thread_payload},
+            event,
+            thread_payload,
             str(typed_envelope.resolution or THREAD_STATES[event_type]),
         )
         if event_type == "thread.replied":
-            snapshot.threads[thread_id].setdefault("messages", []).append(
-                {
-                    "message_id": typed_envelope.message_id,
-                    "body": typed_envelope.body,
-                    "actor": deepcopy(event.get("actor")),
-                    "recorded_at": event.get("recorded_at"),
-                }
+            snapshot.threads[thread_id] = snapshot.threads[thread_id].with_message(
+                message_id=typed_envelope.message_id,
+                body=typed_envelope.body,
+                actor=deepcopy(event.get("actor")),
+                recorded_at=event.get("recorded_at"),
             )
     elif event_type in {"artifact.registered", "artifact.revised"}:
         if not isinstance(typed_envelope, ArtifactEnvelope):
