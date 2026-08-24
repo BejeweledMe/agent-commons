@@ -11,8 +11,9 @@ from agent_commons.config import CommonsPaths
 from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.domain.lifecycle import validate_transition
 from agent_commons.domain.projection import ProjectSnapshot
+from agent_commons.domain.transitions import TRANSITION_SPECS
 from agent_commons.domain.validation import EVENT_SPECS, validate_payload
-from agent_commons.errors import SecurityPolicyError, ValidationError
+from agent_commons.errors import LifecycleConflictError, SecurityPolicyError, ValidationError
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage import EventStore, ManifestStore
 
@@ -636,6 +637,60 @@ def test_minimal_specimen_validates_schema_domain_and_lifecycle(event_type: str)
         payload,
         actor_session_id=actor_session_id,
     )
+
+
+@pytest.mark.parametrize("event_type", sorted(TRANSITION_SPECS))
+def test_transition_specs_preserve_every_allowed_and_disallowed_source_state(
+    event_type: str,
+) -> None:
+    """The typed table is a structural move, so all prior state outcomes stay exact."""
+
+    payload = deepcopy(PAYLOADS[event_type])
+    actor_session_id = (
+        CHILD_SESSION_ID
+        if event_type in {"delegation.input_needed", "delegation.succeeded"}
+        else PARENT_SESSION_ID
+    )
+    event_spec = EVENT_SPECS[event_type]
+    family = event_spec.entity_kind or event_type.split(".", 1)[0]
+    collection_name = {
+        "objective": "objectives",
+        "task": "tasks",
+        "thread": "threads",
+        "artifact": "artifacts",
+        "review": "reviews",
+        "finding": "findings",
+        "decision": "decisions",
+        "handoff": "handoffs",
+        "delegation": "delegations",
+        "agent": "agents",
+        "agent_link": "agent_links",
+    }[family]
+    identifier = str(payload[event_spec.entity_id_field or f"{family}_id"])
+
+    for allowed_state in sorted(TRANSITION_SPECS[event_type].allowed_from_states):
+        snapshot = lifecycle_snapshot(event_type, payload)
+        getattr(snapshot, collection_name)[identifier]["state"] = allowed_state
+        validate_transition(
+            snapshot,
+            event_type,
+            payload,
+            actor_session_id=actor_session_id,
+        )
+
+    disallowed_state = "__not_allowed__"
+    snapshot = lifecycle_snapshot(event_type, payload)
+    getattr(snapshot, collection_name)[identifier]["state"] = disallowed_state
+    with pytest.raises(
+        LifecycleConflictError,
+        match=(rf"^{event_type} is not allowed from {family} state {disallowed_state}$"),
+    ):
+        validate_transition(
+            snapshot,
+            event_type,
+            payload,
+            actor_session_id=actor_session_id,
+        )
 
 
 def test_event_type_and_payload_family_mismatch_fails_closed() -> None:

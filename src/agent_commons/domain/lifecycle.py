@@ -21,58 +21,9 @@ from agent_commons.domain.states import (
     LIVE_WORKER_DELEGATION_STATES,
     NON_TERMINAL_DELEGATION_STATES,
 )
+from agent_commons.domain.transitions import transition_spec
 from agent_commons.domain.validation import EVENT_SPECS
 from agent_commons.errors import LifecycleConflictError, ValidationError
-
-_TASK_ALLOWED = {
-    "task.revised": {"ready", "assigned", "active", "blocked", "completed", "review"},
-    "task.taken": {"ready"},
-    "task.started": {"ready", "assigned"},
-    "task.blocked": {"assigned", "active"},
-    "task.unblocked": {"blocked"},
-    "task.completed": {"active"},
-    "task.submitted": {"completed"},
-    "task.accepted": {"review"},
-    "task.cancelled": {"ready", "assigned", "active", "blocked"},
-    "task.reopened": {"completed", "review", "accepted", "cancelled"},
-}
-
-_STATE_ALLOWED = {
-    "objective.revised": {"active"},
-    "objective.closed": {"active"},
-    "thread.replied": {"open"},
-    "thread.resolved": {"open"},
-    "review.completed": {"requested"},
-    "finding.promoted": {"reported", "contested"},
-    "finding.contested": {"reported", "verified"},
-    "finding.resolved": {"reported", "verified", "contested"},
-    "decision.accepted": {"proposed", "deferred"},
-    "decision.rejected": {"proposed", "deferred"},
-    "decision.deferred": {"proposed"},
-    "decision.superseded": {"accepted"},
-    "handoff.acknowledged": {"open"},
-    "artifact.revised": {"registered"},
-    "delegation.started": {"requested"},
-    "delegation.input_needed": {"active"},
-    "delegation.resumed": {"input_needed"},
-    "delegation.succeeded": {"active"},
-    "delegation.failed": {"requested", "active", "input_needed"},
-    # The current runtime has no authenticated stop/kill acknowledgement in a
-    # canonical event.  Cancellation is therefore safe only before launch;
-    # started work must be stopped and classified through timeout/failure/
-    # needs_operator reconciliation instead of merely changing ledger state.
-    "delegation.cancelled": {"requested"},
-    # A distinct operator-authorized recovery path terminalizes only work that
-    # never reached the canonical provider-start boundary.
-    "delegation.recovered": {"requested"},
-    "delegation.timed_out": {"requested", "active", "input_needed"},
-    "delegation.needs_operator": {"requested", "active", "input_needed"},
-    # A role leaves service; the ledger keeps everything it did.  There is no
-    # delete, so there is no transition out of `retired`.
-    "agent.reconfigured": {"active"},
-    "agent.retired": {"active"},
-    "agent.link_closed": {"open"},
-}
 
 _DELEGATION_MONOTONIC_LIMITS = (
     "max_depth",
@@ -158,8 +109,8 @@ def validate_transition(
         raise ValidationError(f"{event_type} has no {id_field}")
     current = require_entity(snapshot, family, identifier)
     require_revision(current, str(payload.get("expected_revision", "")))
-    allowed = _TASK_ALLOWED.get(event_type) or _STATE_ALLOWED.get(event_type)
-    if allowed is not None and current.get("state") not in allowed:
+    transition = transition_spec(event_type)
+    if transition is not None and not transition.allows(current.get("state")):
         raise LifecycleConflictError(
             f"{event_type} is not allowed from {family} state {current.get('state')}"
         )
