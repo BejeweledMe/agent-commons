@@ -7,6 +7,7 @@ from typing import Any
 
 from agent_commons.errors import LifecycleConflictError, ValidationError
 
+from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
 from .collections import collection_for
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
@@ -196,16 +197,14 @@ def _retire_lifetime_roles_for_task(snapshot: ProjectSnapshot, task_id: str) -> 
     to forget, so `retired_by: lifetime` records carry no such event by design.
     """
 
-    for record in snapshot.agents.values():
+    for identifier, record in snapshot.agents.items():
         if record.get("state") != "active":
             continue
         lifetime = record.get("lifetime")
         if not isinstance(lifetime, Mapping) or lifetime.get("kind") != "task_scoped":
             continue
         if str(lifetime.get("task_id", "")) == task_id:
-            record["state"] = "retired"
-            record["retired_by"] = "lifetime"
-            record["retired_with_task_id"] = task_id
+            snapshot.agents[identifier] = record.with_lifetime_retirement(task_id)
 
 
 def _retire_lifetime_role_if_task_closed(snapshot: ProjectSnapshot, agent_id: str) -> None:
@@ -226,9 +225,7 @@ def _retire_lifetime_role_if_task_closed(snapshot: ProjectSnapshot, agent_id: st
         return
     task = snapshot.tasks.get(str(lifetime.get("task_id", "")))
     if task is not None and task.get("state") in _LIFETIME_CLOSING_TASK_STATES:
-        record["state"] = "retired"
-        record["retired_by"] = "lifetime"
-        record["retired_with_task_id"] = task.get("id")
+        snapshot.agents[agent_id] = record.with_lifetime_retirement(str(task.get("id", "")))
 
 
 def _annotate_review_producer(
@@ -502,17 +499,17 @@ def _apply_effective_event(
         if isinstance(typed_envelope, AgentReconfiguredEnvelope):
             agent_payload = {**agent_payload, **deepcopy(typed_envelope.changes.to_payload())}
             agent_payload.pop("changes", None)
-        _apply(
+        apply_agent_record(
             snapshot.agents,
             agent_id,
-            {**event, "payload": agent_payload},
+            event,
+            agent_payload,
             AGENT_STATES[event_type],
         )
         if event_type == "agent.created":
-            snapshot.agents[agent_id].setdefault("created_by_agent_id", None)
-            snapshot.agents[agent_id].setdefault("turnover_budget", None)
-            snapshot.agents[agent_id].setdefault("template", False)
-            snapshot.agents[agent_id]["created_event_id"] = str(event["event_id"])
+            snapshot.agents[agent_id] = snapshot.agents[agent_id].with_created_defaults(
+                str(event["event_id"])
+            )
             # A role born after its task already closed is retired at once, so
             # the two event orders -- task-then-role and role-then-task -- reach
             # the same terminal state.

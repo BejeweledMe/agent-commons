@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from agent_commons.domain.agent_projection import AgentRecord
 from agent_commons.domain.agents import PROFILE_NARROWING
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
@@ -316,9 +317,10 @@ def test_a_name_no_launch_would_accept_is_never_offered(
     # Reach past the write guard the way a foreign writer or an older build
     # could have: the record exists, and this surface still refuses to offer it.
     snapshot = bound.snapshot()
-    snapshot.agents[str(good["entity_ref"]["id"])]["extensions"] = {
-        "model": "--dangerously-skip-permissions"
-    }
+    agent_id = str(good["entity_ref"]["id"])
+    malformed = snapshot.agents[agent_id].to_dict()
+    malformed["extensions"] = {"model": "--dangerously-skip-permissions"}
+    snapshot.agents[agent_id] = AgentRecord.from_projected_data(malformed)
     options = _context(workspace, None).model_options(snapshot)
 
     assert options == {"claude": [], "codex": []}

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from .collections import collection_for
 
 if TYPE_CHECKING:
+    from .agent_projection import AgentRecord
     from .task_projection import TaskRecord
     from .verification_projection import VerificationRecord
 
@@ -45,7 +46,7 @@ class ProjectSnapshot:
     artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
     handoffs: dict[str, dict[str, Any]] = field(default_factory=dict)
     delegations: dict[str, dict[str, Any]] = field(default_factory=dict)
-    agents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    agents: dict[str, AgentRecord] = field(default_factory=dict)
     agent_links: dict[str, dict[str, Any]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     issues: list[ProjectionIssue] = field(default_factory=list)
@@ -83,7 +84,7 @@ class ProjectSnapshot:
             "artifacts": list(self.artifacts.values()),
             "handoffs": list(self.handoffs.values()),
             "delegations": list(self.delegations.values()),
-            "agents": list(self.agents.values()),
+            "agents": [record.to_dict() for record in self.agents.values()],
             "agent_links": list(self.agent_links.values()),
             "warnings": sorted(set(self.warnings)),
             "issues": [issue.as_dict() for issue in self.issues],
