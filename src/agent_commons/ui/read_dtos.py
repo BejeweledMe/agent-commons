@@ -7,11 +7,41 @@ persisted events, or their serialized shapes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, TypeAlias, TypedDict, cast
 
-from agent_commons.domain.envelopes import JsonValue
+from agent_commons.domain.envelopes import (
+    FrozenJsonArray,
+    FrozenJsonObject,
+    FrozenJsonValue,
+    JsonValue,
+)
 from agent_commons.views import bounded_copy
+
+JsonValueInput: TypeAlias = JsonValue | FrozenJsonValue
+
+
+def _freeze_json(value: JsonValueInput) -> FrozenJsonValue:
+    """Recursively own a JSON value held by an immutable UI DTO."""
+
+    if isinstance(value, (FrozenJsonArray, FrozenJsonObject)):
+        return value
+    if isinstance(value, Mapping):
+        return FrozenJsonObject(tuple((key, _freeze_json(child)) for key, child in value.items()))
+    if isinstance(value, list):
+        return FrozenJsonArray(tuple(_freeze_json(child) for child in value))
+    return value
+
+
+def _thaw_json(value: FrozenJsonValue) -> JsonValue:
+    """Return a fresh standard JSON container from a DTO-owned value."""
+
+    if isinstance(value, FrozenJsonObject):
+        return {key: _thaw_json(child) for key, child in value.values}
+    if isinstance(value, FrozenJsonArray):
+        return [_thaw_json(child) for child in value.values]
+    return value
 
 
 class RunBlockedAttentionPayload(TypedDict):
@@ -85,55 +115,72 @@ class AttentionResponsePayload(TypedDict):
 @dataclass(frozen=True, slots=True)
 class RunBlockedAttention:
     identifier: str
-    agent_id: JsonValue
-    target_ref: JsonValue
-    run_state: JsonValue
-    reason_code: JsonValue
-    summary: JsonValue
-    operation_id: JsonValue
-    metadata: JsonValue
+    agent_id: JsonValueInput
+    target_ref: JsonValueInput
+    run_state: JsonValueInput
+    reason_code: JsonValueInput
+    summary: JsonValueInput
+    operation_id: JsonValueInput
+    metadata: JsonValueInput
     answerable_here: bool
     answer_from_session: tuple[str, ...]
-    deadline: JsonValue
+    deadline: JsonValueInput
+
+    def __post_init__(self) -> None:
+        for field in (
+            "agent_id",
+            "target_ref",
+            "run_state",
+            "reason_code",
+            "summary",
+            "operation_id",
+            "metadata",
+            "deadline",
+        ):
+            object.__setattr__(self, field, _freeze_json(getattr(self, field)))
 
     def to_wire(self) -> RunBlockedAttentionPayload:
         return {
             "kind": "run_blocked",
             "id": self.identifier,
-            "agent_id": self.agent_id,
-            "target_ref": self.target_ref,
-            "run_state": self.run_state,
-            "reason_code": self.reason_code,
-            "summary": self.summary,
-            "operation_id": self.operation_id,
-            "metadata": self.metadata,
+            "agent_id": _thaw_json(cast(FrozenJsonValue, self.agent_id)),
+            "target_ref": _thaw_json(cast(FrozenJsonValue, self.target_ref)),
+            "run_state": _thaw_json(cast(FrozenJsonValue, self.run_state)),
+            "reason_code": _thaw_json(cast(FrozenJsonValue, self.reason_code)),
+            "summary": _thaw_json(cast(FrozenJsonValue, self.summary)),
+            "operation_id": _thaw_json(cast(FrozenJsonValue, self.operation_id)),
+            "metadata": _thaw_json(cast(FrozenJsonValue, self.metadata)),
             "answerable_here": self.answerable_here,
             "answer_from_session": list(self.answer_from_session),
-            "deadline": self.deadline,
+            "deadline": _thaw_json(cast(FrozenJsonValue, self.deadline)),
         }
 
 
 @dataclass(frozen=True, slots=True)
 class WorkReturnedAttention:
     task_id: str
-    title: JsonValue
-    task_state: JsonValue
+    title: JsonValueInput
+    task_state: JsonValueInput
     task_revision: str
     delegation_id: str
-    agent_id: JsonValue
-    agent_name: JsonValue
+    agent_id: JsonValueInput
+    agent_name: JsonValueInput
+
+    def __post_init__(self) -> None:
+        for field in ("title", "task_state", "agent_id", "agent_name"):
+            object.__setattr__(self, field, _freeze_json(getattr(self, field)))
 
     def to_wire(self) -> WorkReturnedAttentionPayload:
         return {
             "kind": "work_returned",
             "id": self.task_id,
             "task_id": self.task_id,
-            "title": self.title,
-            "task_state": self.task_state,
+            "title": _thaw_json(cast(FrozenJsonValue, self.title)),
+            "task_state": _thaw_json(cast(FrozenJsonValue, self.task_state)),
             "task_revision": self.task_revision,
             "delegation_id": self.delegation_id,
-            "agent_id": self.agent_id,
-            "agent_name": self.agent_name,
+            "agent_id": _thaw_json(cast(FrozenJsonValue, self.agent_id)),
+            "agent_name": _thaw_json(cast(FrozenJsonValue, self.agent_name)),
         }
 
 
@@ -141,16 +188,20 @@ class WorkReturnedAttention:
 class ThreadAttention:
     identifier: str
     thread_type: str
-    subject: JsonValue
-    revision: JsonValue
+    subject: JsonValueInput
+    revision: JsonValueInput
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "subject", _freeze_json(self.subject))
+        object.__setattr__(self, "revision", _freeze_json(self.revision))
 
     def to_wire(self) -> ThreadAttentionPayload:
         return {
             "kind": "thread",
             "id": self.identifier,
             "thread_type": self.thread_type,
-            "subject": self.subject,
-            "revision": self.revision,
+            "subject": _thaw_json(cast(FrozenJsonValue, self.subject)),
+            "revision": _thaw_json(cast(FrozenJsonValue, self.revision)),
             "proposal": None,
         }
 
@@ -159,33 +210,42 @@ class ThreadAttention:
 class ProposalAttention:
     identifier: str
     thread_type: str
-    subject: JsonValue
-    revision: JsonValue
-    proposal: dict[str, JsonValue]
+    subject: JsonValueInput
+    revision: JsonValueInput
+    proposal: JsonValueInput
+
+    def __post_init__(self) -> None:
+        for field in ("subject", "revision", "proposal"):
+            object.__setattr__(self, field, _freeze_json(getattr(self, field)))
 
     def to_wire(self) -> ProposalAttentionPayload:
         return {
             "kind": "proposal",
             "id": self.identifier,
             "thread_type": self.thread_type,
-            "subject": self.subject,
-            "revision": self.revision,
-            "proposal": self.proposal,
+            "subject": _thaw_json(cast(FrozenJsonValue, self.subject)),
+            "revision": _thaw_json(cast(FrozenJsonValue, self.revision)),
+            "proposal": cast(
+                dict[str, JsonValue], _thaw_json(cast(FrozenJsonValue, self.proposal))
+            ),
         }
 
 
 @dataclass(frozen=True, slots=True)
 class ConfigBrokenAttention:
     agent_id: str
-    name: JsonValue
+    name: JsonValueInput
     missing_skills: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", _freeze_json(self.name))
 
     def to_wire(self) -> ConfigBrokenAttentionPayload:
         return {
             "kind": "config_broken",
             "id": self.agent_id,
             "agent_id": self.agent_id,
-            "name": self.name,
+            "name": _thaw_json(cast(FrozenJsonValue, self.name)),
             "missing_skills": list(self.missing_skills),
         }
 

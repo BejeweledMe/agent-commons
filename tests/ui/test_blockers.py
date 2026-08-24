@@ -149,6 +149,53 @@ def test_attention_dto_serializer_preserves_the_established_wire_shape() -> None
     }
 
 
+def test_attention_dtos_own_nested_json_and_return_fresh_wire_containers() -> None:
+    """A frozen DTO must not retain mutable input or expose internal JSON on output."""
+
+    metadata = {"context": {"choices": ["eu-west"]}}
+    proposal = {"action": "create_role", "candidates": ["Designer"]}
+    blocked = RunBlockedAttention(
+        identifier="delegation.blocked",
+        agent_id="agent.1",
+        target_ref={"kind": "task", "id": "task.1"},
+        run_state="input_needed",
+        reason_code="operator_input_required",
+        summary="Choose a region",
+        operation_id="operation.1",
+        metadata=metadata,
+        answerable_here=True,
+        answer_from_session=("session.1",),
+        deadline="2026-08-23T18:00:00Z",
+    )
+    requested_role = ProposalAttention(
+        identifier="thread.2",
+        thread_type="proposal",
+        subject="Add a designer",
+        revision="evt.3",
+        proposal=proposal,
+    )
+
+    metadata["context"]["choices"].append("us-east")
+    proposal["candidates"].append("Backend owner")
+
+    first_blocked = blocked.to_wire()
+    first_proposal = requested_role.to_wire()
+    assert first_blocked["metadata"] == {"context": {"choices": ["eu-west"]}}
+    assert first_proposal["proposal"] == {
+        "action": "create_role",
+        "candidates": ["Designer"],
+    }
+
+    first_blocked["metadata"]["context"]["choices"].append("mutated-wire")
+    first_proposal["proposal"]["candidates"].append("mutated-wire")
+
+    assert blocked.to_wire()["metadata"] == {"context": {"choices": ["eu-west"]}}
+    assert requested_role.to_wire()["proposal"] == {
+        "action": "create_role",
+        "candidates": ["Designer"],
+    }
+
+
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
     from fastapi.testclient import TestClient
 
