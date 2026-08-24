@@ -13,6 +13,7 @@ from .artifact_projection import apply_artifact_record
 from .collections import collection_for
 from .decision_projection import apply_decision_record
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
+from .finding_projection import apply_finding_record
 from .handoff_projection import apply_handoff_record
 from .invalidations import derive_invalidation_state
 from .review_projection import apply_review_record
@@ -447,10 +448,11 @@ def _apply_effective_event(
     elif event_type in FINDING_STATES:
         if not isinstance(typed_envelope, FindingEnvelope):
             raise ValidationError(f"missing typed finding envelope for {event_type}")
-        _apply(
+        apply_finding_record(
             snapshot.findings,
             typed_envelope.finding_id,
-            {**event, "payload": typed_envelope.to_payload()},
+            event,
+            typed_envelope.to_payload(),
             FINDING_STATES[event_type],
         )
     elif event_type in DECISION_STATES:
@@ -759,7 +761,7 @@ def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
     )
     for identifier, finding in snapshot.findings.items():
         stale = _has_stale_evidence(snapshot, finding)
-        finding["stale"] = stale
+        snapshot.findings[identifier] = finding.with_stale(stale)
         if stale and finding.get("state") == "verified":
             snapshot.warnings.append(f"finding {identifier} has stale revision-bound evidence")
     for identifier, decision in snapshot.decisions.items():
