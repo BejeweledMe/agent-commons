@@ -11,6 +11,7 @@ from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
 from .collections import collection_for
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
+from .handoff_projection import apply_handoff_record
 from .invalidations import derive_invalidation_state
 from .review_projection import apply_review_record
 from .revisions import resolve_revision, structural_correction_changes
@@ -461,10 +462,11 @@ def _apply_effective_event(
     elif event_type.startswith("handoff."):
         if not isinstance(typed_envelope, HandoffEnvelope):
             raise ValidationError(f"missing typed handoff envelope for {event_type}")
-        _apply(
+        apply_handoff_record(
             snapshot.handoffs,
             typed_envelope.handoff_id,
-            {**event, "payload": typed_envelope.to_payload()},
+            event,
+            typed_envelope.to_payload(),
             "acknowledged" if event_type == "handoff.acknowledged" else "open",
         )
     elif event_type in DELEGATION_STATES:
