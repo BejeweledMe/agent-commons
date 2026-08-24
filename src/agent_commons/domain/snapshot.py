@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .collections import collection_for
+
+if TYPE_CHECKING:
+    from .verification_projection import VerificationRecord
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,7 @@ class ProjectSnapshot:
     tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     threads: dict[str, dict[str, Any]] = field(default_factory=dict)
     reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
-    verifications: dict[str, dict[str, Any]] = field(default_factory=dict)
+    verifications: dict[str, VerificationRecord] = field(default_factory=dict)
     findings: dict[str, dict[str, Any]] = field(default_factory=dict)
     decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
     artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -73,7 +76,7 @@ class ProjectSnapshot:
             "tasks": list(self.tasks.values()),
             "threads": list(self.threads.values()),
             "reviews": list(self.reviews.values()),
-            "verifications": list(self.verifications.values()),
+            "verifications": [record.to_dict() for record in self.verifications.values()],
             "findings": list(self.findings.values()),
             "decisions": list(self.decisions.values()),
             "artifacts": list(self.artifacts.values()),

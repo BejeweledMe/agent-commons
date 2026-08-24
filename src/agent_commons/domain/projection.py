@@ -22,6 +22,7 @@ from .truth_evidence_envelopes import (
     VerificationEnvelope,
 )
 from .validation import EVENT_SPECS, validate_payload
+from .verification_projection import apply_verification_record, refresh_verification_staleness
 
 TASK_STATES = {
     "task.created": "ready",
@@ -436,12 +437,7 @@ def _apply_effective_event(
     elif event_type == "verification.recorded":
         if not isinstance(typed_envelope, VerificationEnvelope):
             raise ValidationError(f"missing typed verification envelope for {event_type}")
-        _apply(
-            snapshot.verifications,
-            typed_envelope.verification_id,
-            {**event, "payload": typed_envelope.to_payload()},
-            "recorded",
-        )
+        apply_verification_record(snapshot.verifications, typed_envelope, event)
     elif event_type in FINDING_STATES:
         if not isinstance(typed_envelope, FindingEnvelope):
             raise ValidationError(f"missing typed finding envelope for {event_type}")
@@ -725,10 +721,7 @@ def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
         task["artifact_stale"] = stale
         if stale:
             snapshot.warnings.append(f"task {identifier} has stale revision-bound artifacts")
-    for label, collection in (
-        ("review", snapshot.reviews),
-        ("verification", snapshot.verifications),
-    ):
+    for label, collection in (("review", snapshot.reviews),):
         for identifier, item in collection.items():
             target = item.get("target_ref") or {}
             target_kind = str(target.get("kind", ""))
@@ -754,6 +747,11 @@ def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
                 snapshot.warnings.append(
                     f"{label} {identifier} is stale for current target revision"
                 )
+    refresh_verification_staleness(
+        snapshot,
+        current_evidence_revision=_current_evidence_revision,
+        has_stale_evidence=lambda item: _has_stale_evidence(snapshot, item),
+    )
     for label, collection, effective_state in (
         ("finding", snapshot.findings, "verified"),
         ("decision", snapshot.decisions, "accepted"),
