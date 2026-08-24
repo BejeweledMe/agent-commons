@@ -16,6 +16,7 @@ type GalleryState =
   | { kind: "gallery_unavailable"; code: string };
 
 type ApiError = { error?: { code?: string } };
+type SessionExchange = { api_base?: unknown };
 
 function exchangeCodeFromFragment(): string | null {
   return new URLSearchParams(window.location.hash.slice(1)).get("c");
@@ -36,10 +37,11 @@ function GalleryApp(): ReactElement {
   useEffect(() => {
     const controller = new AbortController();
     const exchangeCode = exchangeCodeFromFragment();
+    let apiBase = "";
     // The exchange code is a one-time capability, never an API credential.
     // Remove it before the first network request so it cannot remain in a
-    // copied URL or history entry. A subsequent Gallery tab uses the same
-    // same-origin HTTP-only session cookie and needs no fragment at all.
+    // copied URL or history entry. The returned API base stays only in this
+    // page's memory and scopes the HTTP-only cookie to this server process.
     window.history.replaceState(null, "", window.location.pathname);
 
     async function loadGallery(): Promise<Response> {
@@ -54,8 +56,16 @@ function GalleryApp(): ReactElement {
         if (!exchange.ok) {
           throw new Error("local_session_exchange_failed");
         }
+        const payload = (await exchange.json()) as SessionExchange;
+        if (typeof payload.api_base !== "string" || !payload.api_base.startsWith("/api/")) {
+          throw new Error("local_session_exchange_failed");
+        }
+        apiBase = payload.api_base;
       }
-      return fetch("/api/gallery", {
+      if (!apiBase) {
+        throw new Error("local_session_exchange_failed");
+      }
+      return fetch(`${apiBase}/gallery`, {
         credentials: "same-origin",
         signal: controller.signal,
       });

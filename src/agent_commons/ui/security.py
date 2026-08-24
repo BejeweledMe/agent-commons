@@ -46,6 +46,24 @@ SESSION_TTL_SECONDS: Final = 8 * 60 * 60
 _MAX_EXCHANGE_CODE_LENGTH: Final = 512
 
 
+def new_token() -> str:
+    """Return a 256-bit opaque secret held only in process memory."""
+
+    return secrets.token_urlsafe(32)
+
+
+def new_api_base() -> str:
+    """Return the private, per-process route prefix for browser API calls.
+
+    Cookie ``Domain`` matching deliberately ignores the loopback port.  The
+    API base is therefore an additional process-local capability: a cookie
+    scoped to this opaque path cannot be attached to another server's ordinary
+    ``/api`` routes.
+    """
+
+    return f"/api/{new_token()}"
+
+
 @dataclass
 class LocalBrowserSession:
     """One exchange code and its separate finite-lived browser session.
@@ -57,6 +75,7 @@ class LocalBrowserSession:
 
     exchange_code: str
     session_token: str
+    api_base: str = field(default_factory=new_api_base)
     created_at: float = field(default_factory=time.monotonic)
     exchange_ttl_seconds: int = EXCHANGE_CODE_TTL_SECONDS
     session_ttl_seconds: int = SESSION_TTL_SECONDS
@@ -103,17 +122,11 @@ def is_public_path(path: str) -> bool:
 
     The Gallery shell and its same-origin assets contain no workspace data.
     Both browser clients exchange a short-lived fragment code for a cookie
-    before calling data routes, so only this narrowly public route is exempt
-    from normal session middleware.
+    before calling their process-private API base, so only this narrowly
+    public route is exempt from normal session middleware.
     """
 
     return path in PUBLIC_PATHS or path.startswith("/gallery/assets/")
-
-
-def new_token() -> str:
-    """Return a 256-bit opaque secret held only in process memory."""
-
-    return secrets.token_urlsafe(32)
 
 
 def token_matches(presented: str, expected: str) -> bool:

@@ -2302,13 +2302,15 @@ def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
     assert "shellOpen.sidebar = false;" in sidebar
     assert "applyShell();" in sidebar
     # (c) A hash that arrives after load exchanges a fresh one-time code into
-    # a local session before the tab reloads. No browser storage or bearer
-    # header retains a credential.
+    # a local session before the tab reboots from its in-memory API base. No
+    # browser storage or bearer header retains a credential.
     assert 'window.addEventListener("hashchange"' in body
     taker = body.split('window.addEventListener("hashchange"', 1)[1].split("});", 1)[0]
     assert "establishLocalSession(fresh)" in taker
-    assert "location.reload();" in taker
+    assert "void boot();" in taker
     assert 'fetch("/api/auth/exchange"' in body
+    assert 'fetch(apiPath("/api/stream")' in body
+    assert "api_base" in body
     assert "sessionStorage" not in body
     assert "Authorization" not in body
     english, russian = _language_tables()

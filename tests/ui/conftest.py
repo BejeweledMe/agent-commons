@@ -99,6 +99,7 @@ def client(context: UIContext):  # type: ignore[no-untyped-def]
         token="test-token",
         exchange_code="test-exchange-code",
         port=PORT,
+        api_base="/api",
     )
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client
@@ -134,6 +135,7 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
         token="test-token",
         exchange_code="test-exchange-code",
         port=PORT,
+        api_base="/api",
     )
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client

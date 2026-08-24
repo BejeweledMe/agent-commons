@@ -106,10 +106,11 @@ def test_gallery_source_uses_react_flow_and_a_cookie_session_typed_refusal() -> 
     package = json.loads((_GALLERY_SOURCE / "package.json").read_text("utf-8"))
 
     assert 'from "@xyflow/react"' in source
-    assert 'fetch("/api/gallery"' in source
+    assert "fetch(`${apiBase}/gallery`" in source
     assert 'fetch("/api/auth/exchange"' in source
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
+    assert "api_base" in source
     assert "Authorization" not in source
     assert "tokenFromFragment" not in source
     assert "gallery_data_unavailable" in source

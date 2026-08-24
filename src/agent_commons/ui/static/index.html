@@ -3384,6 +3384,14 @@ function exchangeCodeFromFragment() {
   return new URLSearchParams(location.hash.slice(1)).get("c");
 }
 
+let apiBase = "";
+
+function apiPath(path) {
+  return apiBase && path.startsWith("/api/")
+    ? apiBase + path.slice("/api".length)
+    : path;
+}
+
 async function establishLocalSession(code) {
   const response = await fetch("/api/auth/exchange", {
     method: "POST",
@@ -3392,6 +3400,14 @@ async function establishLocalSession(code) {
     body: JSON.stringify({ code: code }),
   });
   if (!response.ok) { throw new Error("local_session_exchange_failed"); }
+  const payload = await response.json();
+  if (!payload || typeof payload.api_base !== "string" || !payload.api_base.startsWith("/api/")) {
+    throw new Error("local_session_exchange_failed");
+  }
+  // This opaque, per-process route capability is held only in this page's
+  // memory. The HTTP-only cookie is scoped to the same path, so it cannot be
+  // attached to another loopback server's ordinary /api endpoints.
+  apiBase = payload.api_base;
 }
 
 const initialExchangeCode = exchangeCodeFromFragment();
@@ -3404,13 +3420,14 @@ let authReady = initialExchangeCode
   : Promise.resolve();
 // Following the printed URL while this tab is already open changes only the
 // fragment, and a fragment-only navigation never reloads the page. Exchange
-// the fresh single-use code after clearing it, then restart on the new session.
+// the fresh single-use code after clearing it, then re-run the boot sequence
+// without losing the new per-process API base held in this page's memory.
 window.addEventListener("hashchange", () => {
   const fresh = exchangeCodeFromFragment();
   if (!fresh) { return; }
   history.replaceState(null, "", location.pathname);
   void establishLocalSession(fresh).then(() => {
-    location.reload();
+    void boot();
   }).catch(() => undefined);
 });
 
@@ -3418,7 +3435,7 @@ function authHeaders(extra) {
   return Object.assign({}, extra || {});
 }
 async function post(path, body) {
-  const response = await fetch(path, {
+  const response = await fetch(apiPath(path), {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
@@ -3622,7 +3639,7 @@ function said(key, values) {
 }
 
 async function api(path) {
-  const response = await fetch(path, { headers: authHeaders() });
+  const response = await fetch(apiPath(path), { headers: authHeaders() });
   if (!response.ok) { throw new Error(t("request_failed") + " " + response.status); }
   return response.json();
 }
@@ -7905,7 +7922,7 @@ async function connect() {
       setStream("reconnecting", "stream_connecting");
       const headers = authHeaders({ "Accept": "text/event-stream" });
       if (lastEventId) { headers["Last-Event-ID"] = lastEventId; }
-      const response = await fetch("/api/stream", { headers: headers });
+      const response = await fetch(apiPath("/api/stream"), { headers: headers });
       if (!response.ok && STREAM_HALTED_BY.indexOf(await streamRefusalCode(response)) >= 0) {
         // The loop ends rather than backing off: this project has no history to
         // stream and will not grow one until somebody sets it up.  The first-run

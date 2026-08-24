@@ -19,6 +19,7 @@ import secrets
 import socket
 import webbrowser
 from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
@@ -44,6 +45,7 @@ from agent_commons.ui.security import (
     content_security_policy,
     gallery_content_security_policy,
     is_public_path,
+    new_api_base,
     new_token,
 )
 from agent_commons.ui.session_owner import PanelAlreadyOpenError
@@ -207,6 +209,25 @@ def _missing_workspace_refusal(missing: str | None) -> _NotInitialized:
     )
 
 
+@dataclass(frozen=True)
+class _BoundApiRoutes:
+    """Register logical ``/api`` routes under one opaque process-local base."""
+
+    app: FastAPI
+    api_base: str
+
+    def _bound_path(self, path: str) -> str:
+        if not path.startswith("/api/"):
+            raise ValueError(f"API routes must start with /api/: {path}")
+        return self.api_base + path.removeprefix("/api")
+
+    def get(self, path: str, **kwargs: Any) -> Callable[[Any], Any]:
+        return self.app.get(self._bound_path(path), **kwargs)
+
+    def post(self, path: str, **kwargs: Any) -> Callable[[Any], Any]:
+        return self.app.post(self._bound_path(path), **kwargs)
+
+
 class _RouteGroup:
     """Where one group of routes attaches, and what must hold before any runs.
 
@@ -219,7 +240,9 @@ class _RouteGroup:
     request body is read.
     """
 
-    def __init__(self, app: FastAPI, *, requires: list[Any] | None = None) -> None:
+    def __init__(
+        self, app: FastAPI | _BoundApiRoutes, *, requires: list[Any] | None = None
+    ) -> None:
         self._app = app
         self._requires = list(requires or ())
 
@@ -227,7 +250,7 @@ class _RouteGroup:
         return self._app.post(path, dependencies=self._requires)
 
 
-def _workspace_bound(app: FastAPI, context: UIContext) -> _RouteGroup:
+def _workspace_bound(app: FastAPI | _BoundApiRoutes, context: UIContext) -> _RouteGroup:
     """The route group that needs a workspace existing right now.
 
     The panel's non-GET surface is registered structurally -- see ``create_app``
@@ -292,22 +315,45 @@ def create_app(
     token: str,
     port: int,
     exchange_code: str | None = None,
+    api_base: str | None = None,
 ) -> FastAPI:
     """Build the local UI with a private session token and exchange code.
 
     ``token`` remains the private session credential argument for test and
     embedding compatibility. ``serve`` always supplies a distinct, short-lived
     ``exchange_code``; callers which omit it receive a fresh code unavailable
-    to unauthenticated requests.
+    to unauthenticated requests. Browser-facing callers also receive an opaque
+    API base, so a cookie cannot authenticate another loopback port's ordinary
+    ``/api`` route. The only compatibility exception is a direct constructor
+    with *no* ``exchange_code``: it selects ``/api`` for existing in-process
+    tests and cannot produce a browser launch capability. ``serve`` always
+    supplies an exchange code and therefore never selects that exception.
     """
 
     app = FastAPI(title="Agent Commons UI", docs_url=None, redoc_url=None, openapi_url=None)
     hosts = allowed_hosts(port)
     origins = allowed_origins(port)
+    selected_api_base = (
+        api_base
+        if api_base is not None
+        else new_api_base()
+        if exchange_code is not None
+        else "/api"
+    )
+    if selected_api_base != "/api" and (
+        not selected_api_base.startswith("/api/")
+        or selected_api_base.endswith("/")
+        or "?" in selected_api_base
+        or "#" in selected_api_base
+    ):
+        raise ValueError("api_base must be a non-empty /api/<opaque-path> prefix")
     browser_session = LocalBrowserSession(
         exchange_code=exchange_code if exchange_code is not None else new_token(),
         session_token=token,
+        api_base=selected_api_base,
     )
+    app.state.api_base = browser_session.api_base
+    api_routes = _BoundApiRoutes(app, browser_session.api_base)
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Any]) -> Response:
@@ -320,6 +366,14 @@ def create_app(
             origin = request.headers.get("origin")
             if origin is not None and origin not in origins:
                 response = _error(403, "forbidden_origin", "cross-origin requests are refused")
+            elif (
+                request.url.path.startswith("/api/")
+                and request.url.path != AUTH_EXCHANGE_PATH
+                and not _is_bound_api_path(request)
+            ):
+                response = _error(
+                    404, "not_found", "this API route is not available in this process"
+                )
             elif not is_public_path(request.url.path) and not _authorized(request):
                 response = _error(
                     401,
@@ -335,6 +389,10 @@ def create_app(
 
     def _authorized(request: Request) -> bool:
         return browser_session.session_matches(request.cookies.get(SESSION_COOKIE_NAME))
+
+    def _is_bound_api_path(request: Request) -> bool:
+        path = request.url.path
+        return path == browser_session.api_base or path.startswith(browser_session.api_base + "/")
 
     def _same_origin(request: Request) -> bool:
         """Require the exchange fetch to come from this exact loopback origin."""
@@ -354,26 +412,25 @@ def create_app(
         if not _same_origin(request):
             return _error(403, "forbidden_origin", "cross-origin requests are refused")
         body = await _json_body(request)
-        session_token = browser_session.consume_exchange_code(body.get("code"))
-        if session_token is None:
+        if browser_session.consume_exchange_code(body.get("code")) is None:
             return _error(
                 401,
                 "unauthorized",
                 "the local browser session could not be established",
                 ["reopen the URL printed by `agent-commons ui`"],
             )
-        response = Response(status_code=204)
+        response = JSONResponse({"api_base": browser_session.api_base})
         # The product deliberately binds HTTP loopback only. A Secure cookie
         # would be dropped on required http://127.0.0.1, so this process-bound
         # cookie relies on loopback Host/origin checks plus HttpOnly and
         # SameSite=Strict, without a Domain attribute.
         response.set_cookie(
             key=SESSION_COOKIE_NAME,
-            value=session_token,
+            value=browser_session.session_token,
             max_age=SESSION_TTL_SECONDS,
             httponly=True,
             samesite="strict",
-            path="/",
+            path=browser_session.api_base,
         )
         return response
 
@@ -433,11 +490,11 @@ def create_app(
     async def favicon() -> Response:
         return Response(status_code=204)
 
-    @app.get("/api/meta")
+    @api_routes.get("/api/meta")
     async def meta() -> Response:
         return JSONResponse(await asyncio.to_thread(context.meta))
 
-    @app.get("/api/gallery", dependencies=reads_workspace)
+    @api_routes.get("/api/gallery", dependencies=reads_workspace)
     async def gallery_bootstrap() -> Response:
         # This feature deliberately lands before preview and Design Package
         # reads. Returning an authenticated, typed refusal gives the React
@@ -449,7 +506,7 @@ def create_app(
             "published design packages are not available in this build",
         )
 
-    @app.get("/api/artifacts/{artifact_id}/preview", dependencies=reads_workspace)
+    @api_routes.get("/api/artifacts/{artifact_id}/preview", dependencies=reads_workspace)
     async def artifact_preview(artifact_id: str) -> Response:
         # The response contains raw workspace bytes, so it goes through the
         # same browser-session middleware as every data route. The reader deliberately
@@ -464,12 +521,12 @@ def create_app(
             return _error(exc.status_code, exc.code, str(exc))
         return Response(content=preview.content, media_type=preview.media_type)
 
-    @app.get("/api/graph", dependencies=reads_workspace)
+    @api_routes.get("/api/graph", dependencies=reads_workspace)
     async def graph() -> Response:
         await asyncio.to_thread(context.refresh_if_changed)
         return JSONResponse(await asyncio.to_thread(context.graph))
 
-    @app.get("/api/entities/{kind}/{entity_id}", dependencies=reads_workspace)
+    @api_routes.get("/api/entities/{kind}/{entity_id}", dependencies=reads_workspace)
     async def entity(kind: str, entity_id: str) -> Response:
         if kind not in _ENTITY_KINDS:
             return _error(400, "unknown_kind", "unsupported entity kind")
@@ -487,7 +544,7 @@ def create_app(
             }
         )
 
-    @app.get("/api/search", dependencies=reads_workspace)
+    @api_routes.get("/api/search", dependencies=reads_workspace)
     async def search(request: Request) -> Response:
         query = request.query_params.get("q", "")
         kind = request.query_params.get("kind") or None
@@ -501,26 +558,26 @@ def create_app(
             await asyncio.to_thread(context.search, query=query, limit=limit, subject_kind=kind)
         )
 
-    @app.get("/api/operations", dependencies=reads_workspace)
+    @api_routes.get("/api/operations", dependencies=reads_workspace)
     async def operations() -> Response:
         return JSONResponse(await asyncio.to_thread(context.pending_operations))
 
-    @app.get("/api/chat", dependencies=reads_workspace)
+    @api_routes.get("/api/chat", dependencies=reads_workspace)
     async def chat() -> Response:
         return JSONResponse(await asyncio.to_thread(context.engagements))
 
-    @app.get("/api/proposals", dependencies=reads_workspace)
+    @api_routes.get("/api/proposals", dependencies=reads_workspace)
     async def proposals() -> Response:
         return JSONResponse(await asyncio.to_thread(context.agent_proposals))
 
-    @app.get("/api/attention", dependencies=reads_workspace)
+    @api_routes.get("/api/attention", dependencies=reads_workspace)
     async def attention() -> Response:
         # One canonical queue: the same source as the amber ring and the footer
         # count, so the list can never be empty while the graph says N are
         # waiting on you.
         return JSONResponse(await asyncio.to_thread(context.attention))
 
-    @app.get("/api/catalog", dependencies=reads_workspace)
+    @api_routes.get("/api/catalog", dependencies=reads_workspace)
     async def catalog() -> Response:
         try:
             return JSONResponse(await asyncio.to_thread(context.catalog))
@@ -529,25 +586,25 @@ def create_app(
             # fault: name it rather than returning an opaque 500 (round 2).
             return _error(422, type(exc).__name__, str(exc))
 
-    @app.get("/api/launch", dependencies=reads_workspace)
+    @api_routes.get("/api/launch", dependencies=reads_workspace)
     async def launch_options() -> Response:
         # The roles and tasks the panel needs to offer a run, plus whether
         # launching is enabled at all. Readable in any mode; acting on it is not.
         return JSONResponse(await asyncio.to_thread(context.launch_options))
 
-    @app.get("/api/runs", dependencies=reads_workspace)
+    @api_routes.get("/api/runs", dependencies=reads_workspace)
     async def runs() -> Response:
         # Live and recent run phases, metadata only. Readable in any mode.
         return JSONResponse(await asyncio.to_thread(context.runs))
 
-    @app.get("/api/setup")
+    @api_routes.get("/api/setup")
     async def setup_status() -> Response:
         # Readable in any mode; acting on it needs a writing panel. This is the
         # one route that names operator paths, and only until the runtime is
         # configured -- see `UIContext.setup_status`.
         return JSONResponse(await asyncio.to_thread(context.setup_status))
 
-    @app.get("/api/setup/preflight", dependencies=reads_workspace)
+    @api_routes.get("/api/setup/preflight", dependencies=reads_workspace)
     async def setup_preflight() -> Response:
         try:
             return JSONResponse(await asyncio.to_thread(context.setup_preflight))
@@ -566,15 +623,15 @@ def create_app(
         # What is still false at request time is refused by the handler, with a
         # code the panel can draw: `setup_uninitialized`, `launch_not_configured`,
         # or the catalogue's own named refusal.
-        recording = _workspace_bound(app, context)
+        recording = _workspace_bound(api_routes, context)
         _register_writes(recording, context)
         _register_launch(recording, context)
         _register_catalog_writes(recording, context)
         # First run is the one surface that must answer before the workspace
         # exists -- it is what makes it exist -- so it is bound to nothing.
-        _register_setup(_RouteGroup(app), context)
+        _register_setup(_RouteGroup(api_routes), context)
 
-    @app.get("/api/stream", dependencies=reads_workspace)
+    @api_routes.get("/api/stream", dependencies=reads_workspace)
     async def stream(request: Request) -> Response:
         last_event_id = request.headers.get("last-event-id")
         return StreamingResponse(

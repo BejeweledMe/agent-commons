@@ -148,13 +148,14 @@ def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) ->
             },
         )
         exchanged = conn.getresponse()
-        assert exchanged.status == 204
+        assert exchanged.status == 200
         cookie = exchanged.getheader("Set-Cookie")
         assert cookie is not None
-        exchanged.read()
+        api_base = json.loads(exchanged.read())["api_base"]
+        assert api_base.startswith("/api/")
         conn.request(
             "GET",
-            "/api/stream",
+            f"{api_base}/stream",
             headers={
                 "Accept": "text/event-stream",
                 "Cookie": cookie,
@@ -216,6 +217,7 @@ def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_fir
             token="test-session-token",
             exchange_code="test-exchange-code",
             port=49999,
+            api_base="/api",
         )
         headers = {"Cookie": "agent_commons_ui_session=test-session-token"}
         with TestClient(app, base_url="http://127.0.0.1:49999") as client:

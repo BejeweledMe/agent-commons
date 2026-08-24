@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from urllib.request import Request as UrlRequest
+
 import pytest
+from fastapi.testclient import TestClient
 
 from agent_commons.ui.security import (
     AUTH_EXCHANGE_PATH,
@@ -13,6 +16,7 @@ from agent_commons.ui.security import (
     bearer_token,
     token_matches,
 )
+from agent_commons.ui.server import create_app
 from tests.ui.conftest import PORT, authorized
 
 _API_PATHS = ("/api/meta", "/api/graph", "/api/entities/task/task.01K00000000000000000000000")
@@ -57,12 +61,14 @@ def test_exchange_code_creates_an_http_only_same_site_session_once(client) -> No
         json={"code": "test-exchange-code"},
     )
 
-    assert exchanged.status_code == 204
+    assert exchanged.status_code == 200
+    assert exchanged.json() == {"api_base": "/api"}
     cookie = exchanged.headers["set-cookie"].lower()
     assert f"{SESSION_COOKIE_NAME}=" in cookie
     assert "httponly" in cookie
     assert "samesite=strict" in cookie
     assert f"max-age={SESSION_TTL_SECONDS}" in cookie
+    assert "path=/api" in cookie
     assert "secure" not in cookie
     assert "test-exchange-code" not in exchanged.text
     assert client.get("/api/meta").status_code == 200
@@ -90,7 +96,55 @@ def test_exchange_requires_an_exact_same_origin_without_consuming_the_code(clien
         headers={"Origin": f"http://127.0.0.1:{PORT}"},
         json={"code": "test-exchange-code"},
     )
-    assert accepted.status_code == 204
+    assert accepted.status_code == 200
+
+
+def test_cookie_cannot_reach_another_loopback_port_without_the_private_api_path(
+    context,
+) -> None:  # type: ignore[no-untyped-def]
+    """A browser cookie jar ignores ports, but honors a process-bound path."""
+
+    first_port = 51234
+    second_port = 51235
+    first_app = create_app(
+        context,
+        token="first-session",
+        exchange_code="first-exchange-code",
+        port=first_port,
+    )
+    second_app = create_app(
+        context,
+        token="second-session",
+        exchange_code="second-exchange-code",
+        port=second_port,
+    )
+
+    with TestClient(first_app, base_url=f"http://127.0.0.1:{first_port}") as first_client:
+        exchange = first_client.post(
+            AUTH_EXCHANGE_PATH,
+            headers={"Origin": f"http://127.0.0.1:{first_port}"},
+            json={"code": "first-exchange-code"},
+        )
+        assert exchange.status_code == 200
+        first_api_base = exchange.json()["api_base"]
+        assert first_api_base != "/api"
+        assert first_api_base.startswith("/api/")
+        assert first_client.get(f"{first_api_base}/meta").status_code == 200
+        assert first_client.get("/api/meta").status_code == 404
+
+        # Use the jar filled by the actual Set-Cookie response to prepare a
+        # request to a different loopback port. Domain matching would allow it
+        # across ports, but the opaque Path must prevent attachment.
+        cross_port_request = UrlRequest(f"http://127.0.0.1:{second_port}/api/meta")
+        first_client.cookies.jar.add_cookie_header(cross_port_request)
+        assert cross_port_request.get_header("Cookie") is None
+
+        with TestClient(
+            second_app,
+            base_url=f"http://127.0.0.1:{second_port}",
+            cookies=first_client.cookies,
+        ) as second_client:
+            assert second_client.get("/api/meta").status_code == 404
 
 
 def test_exchange_and_session_expiry_are_finite() -> None:

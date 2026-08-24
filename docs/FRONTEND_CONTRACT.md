@@ -34,11 +34,14 @@ to you one failure at a time.
   and may load without a session. The printed URL holds only a short-lived,
   single-use opaque exchange code in its fragment; both Gallery and the legacy
   panel clear that fragment before their first network request, exchange the
-  code at same-origin `POST /api/auth/exchange`, and then rely on an HTTP-only,
-  `SameSite=Strict`, process-local cookie. Never put an exchange code or a
-  session credential in a query string, an asset URL, source code, browser
-  storage, or an `Authorization` header. The Gallery document uses its own CSP
-  limited to same-origin scripts/styles and has no inline script or style.
+  code at same-origin `POST /api/auth/exchange`, and then use the returned
+  opaque per-process API base held only in page memory. The HTTP-only,
+  `SameSite=Strict` cookie is scoped to that base, so a second loopback port's
+  ordinary `/api` route cannot receive it. Never put an exchange code, API
+  base, or session credential in a query string, an asset URL, source code,
+  browser storage, or an `Authorization` header. The Gallery document uses its
+  own CSP limited to same-origin scripts/styles and has no inline script or
+  style.
 - `frontend/gallery/src/i18n.json` is the Gallery-owned paired locale source.
   A Gallery term may not be copied into the legacy string table; when a term is
   rendered by both stacks, it must first move to a shared source. The temporary
@@ -106,7 +109,8 @@ runtime config, or the catalogue exist. A read-only panel registers none of
 those canonical-write routes. Both panel modes additionally expose the one
 narrow public `AUTH_ROUTE`, `POST /api/auth/exchange`: it is not a ledger or
 operational write, accepts only the short-lived exchange code with an exact
-same-origin check, sets no response body, and cannot read workspace data. What
+same-origin check, returns only the opaque in-memory API base, and cannot read
+workspace data. What
 changes over the panel's lifetime is never the canonical route table, only
 whether a given call succeeds: an unconfigured environment answers a real POST
 with a typed 409 (`setup_uninitialized`,
