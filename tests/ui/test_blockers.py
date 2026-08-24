@@ -24,6 +24,14 @@ from agent_commons.runtime import (
 from agent_commons.services import CommonsManager
 from agent_commons.services.communication import CommunicationRuntimeService
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.read_dtos import (
+    AttentionResponse,
+    ConfigBrokenAttention,
+    ProposalAttention,
+    RunBlockedAttention,
+    ThreadAttention,
+    WorkReturnedAttention,
+)
 from agent_commons.ui.server import MUTATING_ROUTES, create_app
 from tests.ui.conftest import PORT, authorized
 
@@ -34,6 +42,111 @@ LIMITS = {
     "max_concurrency": 1,
     "budget": {"unit": "provider_units", "limit": 1},
 }
+
+
+def test_attention_dto_serializer_preserves_the_established_wire_shape() -> None:
+    """The typed seam must not alter the response consumed by the existing panel."""
+
+    response = AttentionResponse(
+        items=(
+            RunBlockedAttention(
+                identifier="delegation.blocked",
+                agent_id="agent.1",
+                target_ref={"kind": "task", "id": "task.1"},
+                run_state="input_needed",
+                reason_code="operator_input_required",
+                summary="Choose a region",
+                operation_id="operation.1",
+                metadata={"question": "Which region?"},
+                answerable_here=True,
+                answer_from_session=("session.1",),
+                deadline="2026-08-23T18:00:00Z",
+            ),
+            WorkReturnedAttention(
+                task_id="task.1",
+                title="Wire the endpoint",
+                task_state="active",
+                task_revision="evt.1",
+                delegation_id="delegation.done",
+                agent_id="agent.1",
+                agent_name="Backend owner",
+            ),
+            ThreadAttention(
+                identifier="thread.1",
+                thread_type="question",
+                subject="Which region?",
+                revision="evt.2",
+            ),
+            ProposalAttention(
+                identifier="thread.2",
+                thread_type="proposal",
+                subject="Add a designer",
+                revision="evt.3",
+                proposal={"action": "create_role", "name": "Designer"},
+            ),
+            ConfigBrokenAttention(
+                agent_id="agent.2",
+                name="Frontend owner",
+                missing_skills=("design-review",),
+            ),
+        ),
+        writes_enabled=True,
+    )
+
+    assert response.to_wire() == {
+        "items": [
+            {
+                "kind": "run_blocked",
+                "id": "delegation.blocked",
+                "agent_id": "agent.1",
+                "target_ref": {"kind": "task", "id": "task.1"},
+                "run_state": "input_needed",
+                "reason_code": "operator_input_required",
+                "summary": "Choose a region",
+                "operation_id": "operation.1",
+                "metadata": {"question": "Which region?"},
+                "answerable_here": True,
+                "answer_from_session": ["session.1"],
+                "deadline": "2026-08-23T18:00:00Z",
+            },
+            {
+                "kind": "work_returned",
+                "id": "task.1",
+                "task_id": "task.1",
+                "title": "Wire the endpoint",
+                "task_state": "active",
+                "task_revision": "evt.1",
+                "delegation_id": "delegation.done",
+                "agent_id": "agent.1",
+                "agent_name": "Backend owner",
+            },
+            {
+                "kind": "thread",
+                "id": "thread.1",
+                "thread_type": "question",
+                "subject": "Which region?",
+                "revision": "evt.2",
+                "proposal": None,
+            },
+            {
+                "kind": "proposal",
+                "id": "thread.2",
+                "thread_type": "proposal",
+                "subject": "Add a designer",
+                "revision": "evt.3",
+                "proposal": {"action": "create_role", "name": "Designer"},
+            },
+            {
+                "kind": "config_broken",
+                "id": "agent.2",
+                "agent_id": "agent.2",
+                "name": "Frontend owner",
+                "missing_skills": ["design-review"],
+            },
+        ],
+        "count": 5,
+        "writes_enabled": True,
+    }
 
 
 def _client(context: UIContext):  # type: ignore[no-untyped-def]

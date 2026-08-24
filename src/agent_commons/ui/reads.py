@@ -11,12 +11,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog
 from agent_commons.domain.agents import PROFILE_NARROWING
 from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.collections import collection_for
+from agent_commons.domain.envelopes import JsonValue
 from agent_commons.errors import CommonsError, ValidationError
 from agent_commons.runtime.model import (
     BuiltinProfileId,
@@ -25,6 +26,15 @@ from agent_commons.runtime.model import (
 )
 from agent_commons.services.roles import role_model
 from agent_commons.ui.actions import SETUP_SUPPORT_BINARY_UNRESOLVED
+from agent_commons.ui.read_dtos import (
+    AttentionItem,
+    AttentionResponse,
+    ConfigBrokenAttention,
+    ProposalAttention,
+    RunBlockedAttention,
+    ThreadAttention,
+    WorkReturnedAttention,
+)
 from agent_commons.views import bounded_copy
 
 _LOG = logging.getLogger("agent_commons.ui")
@@ -48,6 +58,12 @@ def _elapsed_seconds(started_at: Any, ended_at: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return elapsed if elapsed >= 0 else None
+
+
+def _attention_json(value: object) -> JsonValue:
+    """Type a value already validated by the canonical or runtime read boundary."""
+
+    return cast(JsonValue, value)
 
 
 class UIReads:
@@ -230,13 +246,13 @@ class UIReads:
 
         snapshot = self.manager().snapshot()
         canonical_attention = awaits_human(snapshot)
-        answerable_by_delegation: dict[str, dict[str, Any]] = {}
+        answerable_by_delegation: dict[str, Mapping[str, object]] = {}
         for operation in self.pending_operations():
             delegation_id = str(operation.get("delegation_id") or "")
             if delegation_id:
-                answerable_by_delegation[delegation_id] = operation
+                answerable_by_delegation[delegation_id] = cast(Mapping[str, object], operation)
 
-        items: list[dict[str, Any]] = []
+        items: list[AttentionItem] = []
         for attention_item in canonical_attention.items:
             if attention_item.kind != "run_blocked":
                 continue
@@ -244,22 +260,23 @@ class UIReads:
             record = attention_item.record
             operation = answerable_by_delegation.get(delegation_id)
             items.append(
-                {
-                    "kind": "run_blocked",
-                    "id": delegation_id,
-                    "agent_id": record.get("agent_id"),
-                    "target_ref": record.get("target_ref"),
-                    "run_state": record.get("state"),
-                    "reason_code": record.get("reason_code"),
-                    "summary": record.get("summary"),
-                    "operation_id": (operation or {}).get("operation_id"),
-                    "metadata": (operation or {}).get("metadata"),
-                    "answerable_here": bool((operation or {}).get("answerable_here")),
-                    "answer_from_session": (operation or {}).get("answer_from_session") or [],
-                    "deadline": (operation or {}).get("deadline"),
-                }
+                RunBlockedAttention(
+                    identifier=delegation_id,
+                    agent_id=_attention_json(record.get("agent_id")),
+                    target_ref=_attention_json(record.get("target_ref")),
+                    run_state=_attention_json(record.get("state")),
+                    reason_code=_attention_json(record.get("reason_code")),
+                    summary=_attention_json(record.get("summary")),
+                    operation_id=_attention_json((operation or {}).get("operation_id")),
+                    metadata=_attention_json((operation or {}).get("metadata")),
+                    answerable_here=bool((operation or {}).get("answerable_here")),
+                    answer_from_session=tuple(
+                        cast(list[str], (operation or {}).get("answer_from_session") or [])
+                    ),
+                    deadline=_attention_json((operation or {}).get("deadline")),
+                )
             )
-        returned: dict[str, dict[str, Any]] = {}
+        returned: dict[str, WorkReturnedAttention] = {}
         for attention_item in canonical_attention.items:
             if attention_item.kind != "work_returned":
                 continue
@@ -271,17 +288,15 @@ class UIReads:
             assert task is not None
             agent_id = record.get("agent_id")
             agent = snapshot.agents.get(str(agent_id)) if agent_id else None
-            returned[task_id] = {
-                "kind": "work_returned",
-                "id": task_id,
-                "task_id": task_id,
-                "title": task.get("title"),
-                "task_state": task.get("state"),
-                "task_revision": str(task.get("effective_revision") or task.get("revision")),
-                "delegation_id": delegation_id,
-                "agent_id": agent_id,
-                "agent_name": agent.get("name") if agent else None,
-            }
+            returned[task_id] = WorkReturnedAttention(
+                task_id=task_id,
+                title=_attention_json(task.get("title")),
+                task_state=_attention_json(task.get("state")),
+                task_revision=str(task.get("effective_revision") or task.get("revision")),
+                delegation_id=delegation_id,
+                agent_id=_attention_json(agent_id),
+                agent_name=_attention_json(agent.get("name") if agent else None),
+            )
         items.extend(returned.values())
         for attention_item in canonical_attention.items:
             if attention_item.kind != "thread":
@@ -291,16 +306,25 @@ class UIReads:
             thread_type = str(record.get("thread_type", ""))
             proposal = (record.get("extensions") or {}).get("staff_proposal")
             is_proposal = isinstance(proposal, Mapping) and proposal.get("action") == "create_role"
-            items.append(
-                {
-                    "kind": "proposal" if is_proposal else "thread",
-                    "id": thread_id,
-                    "thread_type": thread_type,
-                    "subject": record.get("subject"),
-                    "revision": record.get("revision"),
-                    "proposal": dict(proposal) if is_proposal else None,
-                }
-            )
+            if is_proposal:
+                items.append(
+                    ProposalAttention(
+                        identifier=thread_id,
+                        thread_type=thread_type,
+                        subject=_attention_json(record.get("subject")),
+                        revision=_attention_json(record.get("revision")),
+                        proposal=cast(dict[str, JsonValue], dict(proposal)),
+                    )
+                )
+            else:
+                items.append(
+                    ThreadAttention(
+                        identifier=thread_id,
+                        thread_type=thread_type,
+                        subject=_attention_json(record.get("subject")),
+                        revision=_attention_json(record.get("revision")),
+                    )
+                )
         if self._catalog_path is not None:
             from agent_commons.catalog import catalog_ids
 
@@ -318,19 +342,13 @@ class UIReads:
                     missing = sorted(set(record.get("skills") or ()) - known)
                     if missing:
                         items.append(
-                            {
-                                "kind": "config_broken",
-                                "id": agent_id,
-                                "agent_id": agent_id,
-                                "name": record.get("name"),
-                                "missing_skills": missing,
-                            }
+                            ConfigBrokenAttention(
+                                agent_id=agent_id,
+                                name=_attention_json(record.get("name")),
+                                missing_skills=tuple(missing),
+                            )
                         )
-        return {
-            "items": [bounded_copy(item) for item in items],
-            "count": len(items),
-            "writes_enabled": self.writes_enabled,
-        }
+        return AttentionResponse(items=tuple(items), writes_enabled=self.writes_enabled).to_wire()
 
     def engagements(self) -> list[dict[str, Any]]:
         """The main chats, readable whether or not this server writes."""
