@@ -9,6 +9,7 @@ from .collections import collection_for
 
 if TYPE_CHECKING:
     from .agent_projection import AgentRecord
+    from .review_projection import ReviewRecord
     from .task_projection import TaskRecord
     from .verification_projection import VerificationRecord
 
@@ -39,7 +40,7 @@ class ProjectSnapshot:
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)
     tasks: dict[str, TaskRecord] = field(default_factory=dict)
     threads: dict[str, dict[str, Any]] = field(default_factory=dict)
-    reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
+    reviews: dict[str, ReviewRecord] = field(default_factory=dict)
     verifications: dict[str, VerificationRecord] = field(default_factory=dict)
     findings: dict[str, dict[str, Any]] = field(default_factory=dict)
     decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -77,7 +78,7 @@ class ProjectSnapshot:
             "objectives": list(self.objectives.values()),
             "tasks": [record.to_dict() for record in self.tasks.values()],
             "threads": list(self.threads.values()),
-            "reviews": list(self.reviews.values()),
+            "reviews": [record.to_dict() for record in self.reviews.values()],
             "verifications": [record.to_dict() for record in self.verifications.values()],
             "findings": list(self.findings.values()),
             "decisions": list(self.decisions.values()),

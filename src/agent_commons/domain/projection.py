@@ -12,6 +12,7 @@ from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfi
 from .collections import collection_for
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .invalidations import derive_invalidation_state
+from .review_projection import apply_review_record
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
 from .task_projection import apply_task_record
@@ -252,7 +253,6 @@ def _annotate_review_producer(
     actor_session = str((event.get("actor") or {}).get("session_id", ""))
     bindings = session_agent_map(snapshot.delegations)
     producer_roles = sorted(bindings.get(actor_session, frozenset()))
-    review["producer_agent_ids"] = producer_roles
     modes = [
         str(snapshot.agents[role].get("context_mode"))
         for role in producer_roles
@@ -260,7 +260,6 @@ def _annotate_review_producer(
     ]
     # A run acting for no role is a plain window; there is no producing role to
     # attribute a context mode to, and the surface says so rather than guessing.
-    review["producer_context_mode"] = modes[0] if modes else None
     target_ref = review.get("target_ref") or {}
     earlier: set[str] = set()
     for role in producer_roles:
@@ -268,7 +267,11 @@ def _annotate_review_producer(
             prior_verdicts(snapshot.reviews, bindings, agent_id=role, target_ref=target_ref)
         )
     earlier.discard(review_id)
-    review["producer_prior_verdict_count"] = len(earlier)
+    snapshot.reviews[review_id] = review.with_producer_annotation(
+        producer_agent_ids=producer_roles,
+        producer_context_mode=modes[0] if modes else None,
+        producer_prior_verdict_count=len(earlier),
+    )
 
 
 def _apply_effective_event(
@@ -424,10 +427,11 @@ def _apply_effective_event(
             raise ValidationError(f"missing typed review envelope for {event_type}")
         review_id = typed_envelope.review_id
         review_payload = typed_envelope.to_payload()
-        _apply(
+        apply_review_record(
             snapshot.reviews,
             review_id,
-            {**event, "payload": review_payload},
+            event,
+            review_payload,
             "requested" if event_type == "review.requested" else str(typed_envelope.verdict),
         )
         if event_type == "review.completed":
@@ -719,32 +723,29 @@ def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
         snapshot.tasks[identifier] = task.with_artifact_stale(stale)
         if stale:
             snapshot.warnings.append(f"task {identifier} has stale revision-bound artifacts")
-    for label, collection in (("review", snapshot.reviews),):
-        for identifier, item in collection.items():
-            target = item.get("target_ref") or {}
-            target_kind = str(target.get("kind", ""))
-            target_id = str(target.get("id", ""))
-            current = _current_evidence_revision(snapshot, target)
-            if target_kind == "task":
-                task = snapshot.tasks.get(target_id)
-                if task and task.get("state") == "accepted":
-                    accepted_subject_revision = task.get("accepted_subject_revision")
-                    if isinstance(accepted_subject_revision, str):
-                        current = accepted_subject_revision
-            stale = (
-                current is None
-                or item.get("target_revision") != current
-                or _has_stale_evidence(snapshot, item)
-                or (
-                    target_kind == "task"
-                    and bool((snapshot.tasks.get(target_id) or {}).get("artifact_stale"))
-                )
+    for identifier, item in snapshot.reviews.items():
+        target = item.get("target_ref") or {}
+        target_kind = str(target.get("kind", ""))
+        target_id = str(target.get("id", ""))
+        current = _current_evidence_revision(snapshot, target)
+        if target_kind == "task":
+            task = snapshot.tasks.get(target_id)
+            if task and task.get("state") == "accepted":
+                accepted_subject_revision = task.get("accepted_subject_revision")
+                if isinstance(accepted_subject_revision, str):
+                    current = accepted_subject_revision
+        stale = (
+            current is None
+            or item.get("target_revision") != current
+            or _has_stale_evidence(snapshot, item)
+            or (
+                target_kind == "task"
+                and bool((snapshot.tasks.get(target_id) or {}).get("artifact_stale"))
             )
-            item["stale"] = stale
-            if stale:
-                snapshot.warnings.append(
-                    f"{label} {identifier} is stale for current target revision"
-                )
+        )
+        snapshot.reviews[identifier] = item.with_stale(stale)
+        if stale:
+            snapshot.warnings.append(f"review {identifier} is stale for current target revision")
     refresh_verification_staleness(
         snapshot,
         current_evidence_revision=_current_evidence_revision,
