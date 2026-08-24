@@ -452,7 +452,6 @@ def _apply_effective_event(
             snapshot.findings,
             typed_envelope.finding_id,
             event,
-            typed_envelope.to_payload(),
             FINDING_STATES[event_type],
         )
     elif event_type in DECISION_STATES:

@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from agent_commons.core.canonical import canonical_sha256
+from agent_commons.core.canonical import canonical_json_bytes, canonical_sha256, loads_json_strict
 from agent_commons.domain.finding_projection import FindingRecord
 from agent_commons.domain.projection import project_events
 from agent_commons.views import orientation, render_views
@@ -28,6 +28,52 @@ def _event(
         "subject_refs": [{"kind": subject_kind, "id": subject_id}],
         "relations": [],
     }
+
+
+def test_finding_record_preserves_the_raw_canonical_reported_payload_order() -> None:
+    """Replay the persisted event, not a hand-ordered fixture, as the oracle."""
+
+    finding_id = "finding.00000000000000000000000001"
+    source_event = _event(
+        1,
+        "finding.reported",
+        {
+            "summary": "The persisted payload order is the wire contract.",
+            "finding_id": finding_id,
+            "extensions": {"audit": {"source": "A5"}},
+            "evidence_refs": [],
+            "severity": "normal",
+        },
+        "finding",
+        finding_id,
+    )
+    persisted = loads_json_strict(canonical_json_bytes(source_event))
+    assert isinstance(persisted, dict)
+    raw_payload = persisted["payload"]
+    assert isinstance(raw_payload, dict)
+
+    # This is the raw-dict projection shape before FindingRecord froze it.  Its
+    # key order comes from canonical event bytes, not this test's source literal.
+    legacy_wire = {
+        **raw_payload,
+        "id": finding_id,
+        "state": "reported",
+        "revision": persisted["event_id"],
+        "effective_revision": persisted["event_id"],
+        "recorded_at": persisted["recorded_at"],
+        "actor": persisted["actor"],
+        "author_session_ids": ["session.builder"],
+        "stale": False,
+    }
+
+    snapshot = project_events([persisted])
+    record = snapshot.findings[finding_id]
+
+    assert list(record) == list(legacy_wire)
+    assert record.to_dict() == legacy_wire
+    assert json.dumps(record.to_dict(), separators=(",", ":")) == json.dumps(
+        legacy_wire, separators=(",", ":")
+    )
 
 
 def test_finding_record_is_frozen_and_preserves_replay_wire_and_staleness(tmp_path) -> None:

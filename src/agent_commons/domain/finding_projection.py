@@ -1,13 +1,14 @@
 """Frozen finding projection records and their finding-only reducer.
 
 Finding events remain canonical JSON mappings.  This module receives their
-already-validated typed envelopes and freezes the projected finding read model
+already-validated effective events and freezes the projected finding read model
 without changing the mapping-shaped contract used by truth and view consumers.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 
 from .envelopes import FrozenJsonObject, JsonValue, freeze_json_object, thaw_json_object
@@ -61,13 +62,19 @@ def apply_finding_record(
     collection: dict[str, FindingRecord],
     identifier: str,
     event: Mapping[str, object],
-    payload: Mapping[str, object],
     state: str,
 ) -> None:
     """Apply one finding event without retaining a mutable projected finding."""
 
     current = collection.get(identifier)
     current_data = current.to_dict() if current is not None else {}
+    payload_value = event.get("payload")
+    if not isinstance(payload_value, Mapping):
+        raise TypeError("finding projection event payload must be an object")
+    # The persisted effective event is the source of the legacy mapping's key
+    # order.  Reconstructing this from a typed envelope would keep values but
+    # silently replace the original canonical insertion order.
+    payload = deepcopy(dict(payload_value))
     authors = {
         str(session_id)
         for session_id in current_data.get("author_session_ids", [])
