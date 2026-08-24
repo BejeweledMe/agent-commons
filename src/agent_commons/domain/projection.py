@@ -16,6 +16,7 @@ from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envel
 from .finding_projection import apply_finding_record
 from .handoff_projection import apply_handoff_record
 from .invalidations import derive_invalidation_state
+from .objective_projection import apply_objective_record
 from .review_projection import apply_review_record
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
@@ -296,21 +297,21 @@ def _apply_effective_event(
         )
         return
     if event_type == "objective.created":
-        _apply(snapshot.objectives, str(payload["objective_id"]), event, "active")
+        apply_objective_record(snapshot.objectives, str(payload["objective_id"]), event, "active")
     elif event_type == "objective.revised":
         revised_payload = {
             **dict(payload),
             **deepcopy(dict(payload["changes"])),
         }
         revised_payload.pop("changes", None)
-        _apply(
+        apply_objective_record(
             snapshot.objectives,
             str(payload["objective_id"]),
             {**event, "payload": revised_payload},
             "active",
         )
     elif event_type == "objective.closed":
-        _apply(snapshot.objectives, str(payload["objective_id"]), event, "closed")
+        apply_objective_record(snapshot.objectives, str(payload["objective_id"]), event, "closed")
     elif event_type == "task.revised":
         if not isinstance(typed_envelope, TaskEnvelope):
             raise ValidationError(f"missing typed task envelope for {event_type}")

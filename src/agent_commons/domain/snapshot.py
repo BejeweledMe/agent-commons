@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .decision_projection import DecisionRecord
     from .finding_projection import FindingRecord
     from .handoff_projection import HandoffRecord
+    from .objective_projection import ObjectiveRecord
     from .review_projection import ReviewRecord
     from .task_projection import TaskRecord
     from .thread_projection import ThreadRecord
@@ -42,7 +43,7 @@ class ProjectionIssue:
 @dataclass
 class ProjectSnapshot:
     workspace_id: str | None = None
-    objectives: dict[str, dict[str, Any]] = field(default_factory=dict)
+    objectives: dict[str, ObjectiveRecord] = field(default_factory=dict)
     tasks: dict[str, TaskRecord] = field(default_factory=dict)
     threads: dict[str, ThreadRecord] = field(default_factory=dict)
     reviews: dict[str, ReviewRecord] = field(default_factory=dict)
@@ -80,7 +81,7 @@ class ProjectSnapshot:
     def to_dict(self) -> dict[str, Any]:
         return {
             "workspace_id": self.workspace_id,
-            "objectives": list(self.objectives.values()),
+            "objectives": [record.to_dict() for record in self.objectives.values()],
             "tasks": [record.to_dict() for record in self.tasks.values()],
             "threads": [record.to_dict() for record in self.threads.values()],
             "reviews": [record.to_dict() for record in self.reviews.values()],
