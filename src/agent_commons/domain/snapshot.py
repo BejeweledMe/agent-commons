@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from .collections import collection_for
 
 if TYPE_CHECKING:
+    from .task_projection import TaskRecord
     from .verification_projection import VerificationRecord
 
 
@@ -35,7 +36,7 @@ class ProjectionIssue:
 class ProjectSnapshot:
     workspace_id: str | None = None
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)
-    tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    tasks: dict[str, TaskRecord] = field(default_factory=dict)
     threads: dict[str, dict[str, Any]] = field(default_factory=dict)
     reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
     verifications: dict[str, VerificationRecord] = field(default_factory=dict)
@@ -73,7 +74,7 @@ class ProjectSnapshot:
         return {
             "workspace_id": self.workspace_id,
             "objectives": list(self.objectives.values()),
-            "tasks": list(self.tasks.values()),
+            "tasks": [record.to_dict() for record in self.tasks.values()],
             "threads": list(self.threads.values()),
             "reviews": list(self.reviews.values()),
             "verifications": [record.to_dict() for record in self.verifications.values()],

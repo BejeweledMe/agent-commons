@@ -13,6 +13,7 @@ from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envel
 from .invalidations import derive_invalidation_state
 from .revisions import resolve_revision, structural_correction_changes
 from .snapshot import ProjectionIssue, ProjectSnapshot
+from .task_projection import apply_task_record
 from .task_review_envelopes import ReviewEnvelope, TaskEnvelope
 from .thread_handoff_envelopes import HandoffEnvelope, ThreadEnvelope
 from .truth_evidence_envelopes import (
@@ -326,7 +327,7 @@ def _apply_effective_event(
             "work_author_session_ids": sorted(work_author_session_ids),
         }
         revised_payload.pop("changes", None)
-        _apply(
+        apply_task_record(
             snapshot.tasks,
             task_id,
             {**event, "payload": revised_payload},
@@ -357,14 +358,14 @@ def _apply_effective_event(
                     "effective_revision", current.get("revision")
                 ),
             }
-            _apply(
+            apply_task_record(
                 snapshot.tasks,
                 task_id,
                 {**event, "payload": accepted_payload},
                 TASK_STATES[event_type],
             )
         else:
-            _apply(
+            apply_task_record(
                 snapshot.tasks,
                 task_id,
                 {**event, "payload": task_payload},
@@ -718,7 +719,7 @@ def _has_stale_artifacts(snapshot: ProjectSnapshot, item: Mapping[str, Any]) -> 
 def _mark_bound_evidence_stale(snapshot: ProjectSnapshot) -> None:
     for identifier, task in snapshot.tasks.items():
         stale = _has_stale_artifacts(snapshot, task)
-        task["artifact_stale"] = stale
+        snapshot.tasks[identifier] = task.with_artifact_stale(stale)
         if stale:
             snapshot.warnings.append(f"task {identifier} has stale revision-bound artifacts")
     for label, collection in (("review", snapshot.reviews),):
