@@ -1,6 +1,8 @@
 # Agent Commons: текущее состояние продукта и архитектуры
 
-**Срез репозитория:** `a96b195` (`Introduce Frozen Artifact Projection Record`), 24 августа 2026 года.
+**Функциональный срез репозитория:** `f998e33` (`Introduce Frozen Decision Projection Record`),
+24 августа 2026 года. Последующие documentation-only commits не меняют описываемое поведение
+продукта.
 **Назначение страницы:** дать человеку, новому участнику команды или новому агенту одну
 честную карту продукта: какую проблему он решает, что уже работает, как устроен и что
 согласовано, но ещё не является функциональностью.
@@ -108,14 +110,22 @@ Agent Commons сохраняет **ключевые проверяемые фа�
 stateDiagram-v2
     [*] --> ready: task created
     ready --> assigned: take
+    ready --> active: start
     assigned --> active: start
+    assigned --> blocked: block
     active --> blocked: block
     blocked --> active: unblock
     active --> completed: complete
     completed --> review: submit
     review --> accepted: current independent approval
+    ready --> cancelled: cancel
+    assigned --> cancelled: cancel
+    active --> cancelled: cancel
+    blocked --> cancelled: cancel
+    completed --> ready: reopen
     review --> ready: reopen
     accepted --> ready: reopen
+    cancelled --> ready: reopen
 
     state "delegation" as delegation {
       [*] --> requested
@@ -388,7 +398,7 @@ format не меняется в structural commits, behaviour и structure не 
 | Участок | Подтверждённые шаги | Что из этого следует, а что нет |
 | --- | --- | --- |
 | A3/A4/A4.5 | `784ead9` roles, `a455200` UI reads/actions, `38c8f43` scoped repo reader, `7f91803` CLI package, `e4134a1` instruction composition | Появились полезные seams; это не означает, что каждый composition root уже тонкий. |
-| A5 | Typed envelopes `7a3e0f7`…`9a1beae`, frozen projection records `df5ba8b`…`a96b195`, `d1661de` TransitionSpec | Typed in-memory границы становятся реальными; работа по всем семействам и adapters ещё продолжается. |
+| A5 | Typed envelopes `7a3e0f7`…`9a1beae`, frozen projection records `df5ba8b`…`f998e33`, `d1661de` TransitionSpec | Typed in-memory границы становятся реальными; работа по всем семействам и adapters ещё продолжается. |
 | A6 | `503d37f` profile и `27b6eaa` streamed verified rows | Есть измеренная оптимизация allocation, но она была разрешена узким исключением до полного A5; повторное профилирование после A5 обязательно. |
 | A7 | `8225f1c` UI DTO и `d71b066` deep-freeze | UI-local slice защищён от shallow mutation; широкий manager → MCP/CLI/UI DTO migration ещё впереди. |
 | A8 | Нет завершённого продуктового перехода к narrow collaborators | Новые feature методы не должны возвращаться в разбираемые фасады. |
