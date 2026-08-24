@@ -2285,9 +2285,10 @@ def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
     very view a click chooses, and the tester was escaping it with Esc;
     choosing a section closes it.  (c) Following the printed URL in an
     already-open tab is a fragment-only navigation that never reloads the
-    page — the tab now takes the fresh token from the hash and boots again,
-    and the unauthorized pill says the tab will pick the token up rather than
-    prescribing the exact step that was just seen not to work."""
+        page — the tab now exchanges the fresh code from the hash and boots
+        again, and the unauthorized pill says how to establish a new local
+        session rather than prescribing the exact step that was just seen not
+        to work."""
 
     body = read_spa()
     # (a) The pressed state is stated in CSS, on the aria attribute the
@@ -2300,11 +2301,16 @@ def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
     assert "window.matchMedia(NARROW_SHELL).matches" in sidebar
     assert "shellOpen.sidebar = false;" in sidebar
     assert "applyShell();" in sidebar
-    # (c) A hash that arrives after load carries a fresh token into a reload.
+    # (c) A hash that arrives after load exchanges a fresh one-time code into
+    # a local session before the tab reloads. No browser storage or bearer
+    # header retains a credential.
     assert 'window.addEventListener("hashchange"' in body
     taker = body.split('window.addEventListener("hashchange"', 1)[1].split("});", 1)[0]
-    assert 'sessionStorage.setItem("ac_ui_token", fresh);' in taker
+    assert "establishLocalSession(fresh)" in taker
     assert "location.reload();" in taker
+    assert 'fetch("/api/auth/exchange"' in body
+    assert "sessionStorage" not in body
+    assert "Authorization" not in body
     english, russian = _language_tables()
-    assert "token" in _value(english, "stream_unauthorized")
-    assert "токен" in _value(russian, "stream_unauthorized")
+    assert "local session" in _value(english, "stream_unauthorized")
+    assert "локальную сессию" in _value(russian, "stream_unauthorized")

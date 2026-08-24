@@ -287,7 +287,7 @@ def ui_command(
         profile_config=profile_config,
     )
 
-    def emit(bound_port: int, token: str) -> None:
+    def emit(bound_port: int, exchange_code: str) -> None:
         writer_session_id = None
         if owner is not None:
             # The lock was taken in the command body, before the server bound
@@ -297,14 +297,14 @@ def ui_command(
             # lock will record once there is a state root to hold it).
             owner.acquire_panel_lock(bound_port)
             writer_session_id = owner.start()
-        url = f"http://127.0.0.1:{bound_port}/#t={token}"
+        url = f"http://127.0.0.1:{bound_port}/#c={exchange_code}"
         if state.json_output:
             state.emit(
                 {
                     "schema": STARTED_SCHEMA,
                     "url": url,
                     "port": bound_port,
-                    "token": token,
+                    "exchange_code": exchange_code,
                     "repo": str(state.repo),
                     "read_only": read_only,
                     "writer_session_id": writer_session_id,
@@ -322,7 +322,7 @@ def ui_command(
         if not read_only and writer_session_id is not None:
             click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
             click.echo("          the panel opened this session itself and renews it;")
-            click.echo("          anyone holding this token writes as that session")
+            click.echo("          anyone holding the short-lived URL code may establish a session")
         elif not read_only:
             click.echo("  writes  pending — this directory has no workspace yet, so there is")
             click.echo("          nothing to record into; the panel offers first run, and it")
@@ -336,8 +336,8 @@ def ui_command(
             click.echo("  launch  not configured — no runtime profile config is in effect,")
             click.echo("          so a run is refused in the panel rather than started")
         click.echo("  trust   loopback reachability alone is not authentication")
-        click.echo("  note    the token is not stored on disk; opening a browser exposes")
-        click.echo("          the URL to other processes of this user via the process list")
+        click.echo("  note    the one-time URL code is not stored on disk; the browser clears")
+        click.echo("          it before requests and keeps only an HTTP-only local session")
         click.echo("  stop    Ctrl-C closes the panel session unless a run is still live")
 
     try:

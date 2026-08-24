@@ -17,8 +17,8 @@ type GalleryState =
 
 type ApiError = { error?: { code?: string } };
 
-function tokenFromFragment(): string | null {
-  return new URLSearchParams(window.location.hash.slice(1)).get("t");
+function exchangeCodeFromFragment(): string | null {
+  return new URLSearchParams(window.location.hash.slice(1)).get("c");
 }
 
 function message(locale: Locale, key: MessageKey): string {
@@ -34,17 +34,34 @@ function GalleryApp(): ReactElement {
   );
 
   useEffect(() => {
-    const token = tokenFromFragment();
-    if (token === null) {
-      setState({ kind: "authentication_required", code: "unauthorized" });
-      return;
+    const controller = new AbortController();
+    const exchangeCode = exchangeCodeFromFragment();
+    // The exchange code is a one-time capability, never an API credential.
+    // Remove it before the first network request so it cannot remain in a
+    // copied URL or history entry. A subsequent Gallery tab uses the same
+    // same-origin HTTP-only session cookie and needs no fragment at all.
+    window.history.replaceState(null, "", window.location.pathname);
+
+    async function loadGallery(): Promise<Response> {
+      if (exchangeCode !== null) {
+        const exchange = await fetch("/api/auth/exchange", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ code: exchangeCode }),
+          signal: controller.signal,
+        });
+        if (!exchange.ok) {
+          throw new Error("local_session_exchange_failed");
+        }
+      }
+      return fetch("/api/gallery", {
+        credentials: "same-origin",
+        signal: controller.signal,
+      });
     }
 
-    const controller = new AbortController();
-    void fetch("/api/gallery", {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    })
+    void loadGallery()
       .then(async (response) => {
         const payload = (await response.json()) as ApiError;
         const code = payload.error?.code ?? "gallery_unavailable";
@@ -58,6 +75,10 @@ function GalleryApp(): ReactElement {
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        if (error instanceof Error && error.message === "local_session_exchange_failed") {
+          setState({ kind: "authentication_required", code: "unauthorized" });
           return;
         }
         setState({ kind: "gallery_unavailable", code: "gallery_unavailable" });

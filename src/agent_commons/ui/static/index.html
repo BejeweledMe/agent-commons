@@ -781,11 +781,11 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
      canonical strings from the server that no table here could hold. -->
 <div id="panel-refusal" hidden>
   <p class="note warn" id="panel-refusal-note"></p>
-  <!-- The address is an ADDRESS and deliberately not a link.  Each panel's
-       bearer token lives only in its own tab's URL fragment, so a link built
-       here would open a page that cannot authorize itself: the operator would
-       read the busy panel as a broken one.  It rides as the same id chip every
-       confirmation uses, because what they need to do with it is copy it. -->
+  <!-- The address is an ADDRESS and deliberately not a link. A new browser
+       needs its own one-time code to establish a local HTTP-only session, so
+       a link built here could open a page that cannot authorize itself. It
+       rides as the same id chip every confirmation uses, because what they
+       need to do with it is copy it. -->
   <p class="note" id="panel-refusal-where" hidden>
     <span class="idlbl" id="panel-refusal-where-label"></span>
     <code class="idchip" id="panel-refusal-address"></code>
@@ -1181,7 +1181,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <!-- Was "Three gates", and it described all three capability switches
                in full long after the CLI stopped having any.  The heading kept
                its place because the subject did not go away with them —
-               loopback, one bearer token, nothing stored — only the sentence
+               loopback, a local session, nothing stored — only the sentence
                about how a capability is turned on did.  What decides now is
                what is CONFIGURED, and the panel says which of those it is
                missing rather than which switch to add.  No switch this product
@@ -1962,7 +1962,7 @@ const STRINGS = {
     stream_reconnecting: "reconnecting",
     stream_gap_resume: "resumed with a gap",
     stream_unavailable: "live updates unavailable — reload to refresh",
-    stream_unauthorized: "no access — open the printed URL again; this tab picks up its token",
+    stream_unauthorized: "no access — open the printed URL again to establish a new local session",
     writes_disabled: "writes disabled",
     writes_enabled: "writes enabled",
     writes_enabled_tip: "This panel may record events in the ledger. The session it writes as is one click behind the workspace name.",
@@ -2350,8 +2350,8 @@ const STRINGS = {
     guide_lm_panel_h: "What this panel actually launches",
     guide_lm_panel_p: "A UI run is one bounded leaf: max_depth 0, one attempt, 600 seconds of wall time, budget 1 provider_units — no children, no fan-out. It goes through the same DelegationRuntimeService the CLI broker uses, under the role's operator-allowlisted profile; the panel may change the wall time and nothing else.",
     guide_lm_panel_ex: "Run on the board → delegation.requested at depth 0, then the provider process; state changes reach the panel over the event stream",
-    guide_lm_access_h: "Loopback, one token, nothing stored",
-    guide_lm_access_p: "The server listens on loopback behind a bearer token held in memory and printed once. There are no capability switches: what the panel can do follows from what exists — an operator session of its own makes it record at all, a catalogue file makes that catalogue editable, a runtime config makes runs startable — and each of the three is written from the panel's own first-run screen. A view opened to record nothing registers no route that is not a GET. Profiles are never editable from here in any state. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
+    guide_lm_access_h: "Loopback, local session, nothing stored",
+    guide_lm_access_p: "The server listens on loopback. A short-lived one-time code is printed once, cleared from the URL before requests, and exchanged for an HTTP-only local session held only in this server process. There are no capability switches: what the panel can do follows from what exists — an operator session of its own makes it record at all, a catalogue file makes that catalogue editable, a runtime config makes runs startable — and each of the three is written from the panel's own first-run screen. A view opened to record nothing registers no canonical write route; both views expose only the narrow session-exchange POST besides reads. Profiles are never editable from here in any state. The panel stores no prompts and no transcripts — Runs shows phases and metadata only.",
     guide_lm_access_ex: "a run before the runtime config exists → launch_not_configured, and the first-run screen rather than a restart",
     guide_ct_file_h: "The catalogue is an operator file",
     guide_ct_file_p: "Skills and tools live in one YAML file outside the delegated workspace: a regular non-symlink file, not group/world writable, owned by the operator or root, at most 64 KiB. It is kept apart from the profile config because the two have different writers: the panel may edit the catalogue when it has one, never what a provider process is. Writes are atomic — full validation, then rename — so a rejected edit leaves the old file byte-identical.",
@@ -2681,7 +2681,7 @@ const STRINGS = {
     stream_reconnecting: "переподключение",
     stream_gap_resume: "возобновлено с пропуском",
     stream_unavailable: "живые обновления недоступны — перезагрузите страницу",
-    stream_unauthorized: "нет доступа — откройте напечатанную ссылку ещё раз; вкладка подхватит из неё токен",
+    stream_unauthorized: "нет доступа — откройте напечатанную ссылку ещё раз, чтобы создать новую локальную сессию",
     writes_disabled: "запись отключена",
     writes_enabled: "запись включена",
     writes_enabled_tip: "Панель может записывать события в журнал. Сессия, от имени которой она пишет, \u2014 в одном щелчке за именем рабочего пространства.",
@@ -3044,8 +3044,8 @@ const STRINGS = {
     guide_lm_panel_h: "Что реально запускает панель",
     guide_lm_panel_p: "Прогон из панели — один ограниченный лист: max_depth 0, одна попытка, 600 секунд wall time, бюджет 1 provider_units — без детей и без веера. Он идёт через тот же DelegationRuntimeService, что и CLI-брокер, под профилем роли из allowlist-а оператора; панель может поменять wall time и больше ничего.",
     guide_lm_panel_ex: "Run на доске → delegation.requested с depth 0, затем процесс провайдера; смены состояний приходят в панель по стриму событий",
-    guide_lm_access_h: "Loopback, один токен, ничего не хранится",
-    guide_lm_access_p: "Сервер слушает loopback за bearer-токеном, который держится в памяти и печатается один раз. Переключателей возможностей нет: панель может ровно то, для чего есть основание — собственная операторская сессия делает её пишущей вообще, файл каталога делает каталог правимым, файл среды выполнения делает прогоны возможными, — и все три пишутся с её же экрана настройки. Вид, открытый чтобы ничего не записывать, не регистрирует ни одного маршрута кроме GET. Профили отсюда не редактируются ни в каком состоянии. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
+    guide_lm_access_h: "Loopback, локальная сессия, ничего не хранится",
+    guide_lm_access_p: "Сервер слушает loopback. Короткоживущий одноразовый код печатается один раз, удаляется из URL до запросов и обменивается на локальную HTTP-only сессию, существующую только в памяти этого процесса. Переключателей возможностей нет: панель может ровно то, для чего есть основание — собственная операторская сессия делает её пишущей вообще, файл каталога делает каталог правимым, файл среды выполнения делает прогоны возможными, — и все три пишутся с её же экрана настройки. Вид, открытый чтобы ничего не записывать, не регистрирует канонических маршрутов записи; у обоих видов есть только узкий POST для обмена сессии помимо чтения. Профили отсюда не редактируются ни в каком состоянии. Панель не хранит промпты и транскрипты — «Прогоны» показывают только фазы и метаданные.",
     guide_lm_access_ex: "прогон до того, как есть файл среды выполнения → launch_not_configured и экран настройки, а не перезагрузка",
     guide_ct_file_h: "Каталог — файл оператора",
     guide_ct_file_p: "Навыки и инструменты живут в одном YAML-файле вне делегируемого workspace: обычный файл без симлинков, не group/world-writable, владелец — оператор или root, не больше 64 KiB. Он отделён от конфига профилей, потому что у них разные писатели: панель может править каталог, когда он у неё есть, но никогда — то, чем является процесс провайдера. Запись атомарна — полная валидация, затем rename, — отклонённая правка оставляет старый файл байт-в-байт.",
@@ -3380,26 +3380,42 @@ function applyI18n() {
 }
 
 // --- auth -----------------------------------------------------------------
-const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
-if (hashToken) { sessionStorage.setItem("ac_ui_token", hashToken); }
-const TOKEN = hashToken || sessionStorage.getItem("ac_ui_token") || "";
+function exchangeCodeFromFragment() {
+  return new URLSearchParams(location.hash.slice(1)).get("c");
+}
+
+async function establishLocalSession(code) {
+  const response = await fetch("/api/auth/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ code: code }),
+  });
+  if (!response.ok) { throw new Error("local_session_exchange_failed"); }
+}
+
+const initialExchangeCode = exchangeCodeFromFragment();
+// Clear the code before any request. It must never survive in history, browser
+// storage, a copied URL, or a later request; the server returns an HTTP-only
+// cookie and no script-visible credential.
 history.replaceState(null, "", location.pathname);
+let authReady = initialExchangeCode
+  ? establishLocalSession(initialExchangeCode).catch(() => undefined)
+  : Promise.resolve();
 // Following the printed URL while this tab is already open changes only the
-// fragment, and a fragment-only navigation never reloads the page: the round-5
-// tester did exactly that, held a fresh token, and stayed "unauthorized" while
-// the pill told them to do the thing they had just done. Take the token and
-// boot again.
+// fragment, and a fragment-only navigation never reloads the page. Exchange
+// the fresh single-use code after clearing it, then restart on the new session.
 window.addEventListener("hashchange", () => {
-  const fresh = new URLSearchParams(location.hash.slice(1)).get("t");
+  const fresh = exchangeCodeFromFragment();
   if (!fresh) { return; }
-  sessionStorage.setItem("ac_ui_token", fresh);
   history.replaceState(null, "", location.pathname);
-  location.reload();
+  void establishLocalSession(fresh).then(() => {
+    location.reload();
+  }).catch(() => undefined);
 });
 
 function authHeaders(extra) {
-  const headers = Object.assign({ "Authorization": "Bearer " + TOKEN }, extra || {});
-  return headers;
+  return Object.assign({}, extra || {});
 }
 async function post(path, body) {
   const response = await fetch(path, {
@@ -7850,9 +7866,9 @@ function fitView() {
 document.getElementById("board-fit").addEventListener("click", fitView);
 
 // --- SSE over fetch -------------------------------------------------------
-// EventSource cannot send an Authorization header, and putting the token in the
-// query string would leak it into logs and history, so the stream is read
-// manually from a fetch body instead.
+// EventSource cannot carry this panel's Last-Event-ID header. The same-origin
+// HTTP-only session cookie participates in fetch automatically, so the stream
+// is read manually from a fetch body instead.
 let lastEventId = null;
 
 // A refusal is not a dropped connection, and the reconnect loop cannot tell
@@ -8419,10 +8435,10 @@ function paintWorkspaceIdentity() {
 //
 // Two things are honest to say and one is not.  The sentence and the safe next
 // actions come from the frozen code and from the server; the ADDRESS is shown
-// as an address and never as a link, because each panel's bearer token lives
-// only in its own tab's URL fragment — a link assembled here would open a page
-// with no way to authorize itself, and the operator would read the panel that
-// is merely busy as one that is broken.  `address` may also be null, when the
+// as an address and never as a link, because a new browser needs its own
+// one-time code to establish a local session. A link assembled here would open
+// a page with no way to authorize itself, and the operator would read the panel
+// that is merely busy as one that is broken. `address` may also be null, when the
 // lock file that holds the first panel's port cannot be read; then the panel
 // says it does not know rather than printing an empty chip.
 function paintPanelRefusal() {
@@ -8564,6 +8580,7 @@ function applyLanguage() {
 let streamStarted = false;
 
 async function boot() {
+  await authReady;
   // The first question, and the only one that has an answer in every state:
   // whether there is a project here to boot at all.  It is asked before
   // `/api/meta` because `/api/meta` reads a workspace and raises without one,

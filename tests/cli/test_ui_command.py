@@ -20,6 +20,7 @@ from click.testing import CliRunner
 
 from agent_commons.cli import cli
 from agent_commons.services import CommonsManager
+from agent_commons.ui import STARTED_SCHEMA
 
 
 @pytest.fixture
@@ -65,7 +66,7 @@ def _serve_spy(captured: dict[str, Any]) -> Any:
         captured["context"] = context
         captured["port"] = port
         captured["open_browser"] = open_browser
-        emit(port or 49999, "test-token")
+        emit(port or 49999, "test-exchange-code")
 
     return serve
 
@@ -83,6 +84,10 @@ def test_the_ui_command_opens_and_owns_its_own_session_by_default(
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
+    assert payload["schema"] == STARTED_SCHEMA == "agent_commons.ui.started.v2"
+    assert payload["url"].endswith("/#c=test-exchange-code")
+    assert payload["exchange_code"] == "test-exchange-code"
+    assert "token" not in payload
     assert payload["read_only"] is False
     assert str(payload["writer_session_id"]).startswith("session.")
     assert captured["context"].writes_enabled is True
@@ -131,12 +136,28 @@ def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) ->
         assert proc.stdout is not None
         started = json.loads(proc.stdout.readline())
         conn = http.client.HTTPConnection("127.0.0.1", int(started["port"]), timeout=30)
+        code = json.dumps({"code": started["exchange_code"]})
+        conn.request(
+            "POST",
+            "/api/auth/exchange",
+            body=code,
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(len(code)),
+                "Origin": f"http://127.0.0.1:{started['port']}",
+            },
+        )
+        exchanged = conn.getresponse()
+        assert exchanged.status == 204
+        cookie = exchanged.getheader("Set-Cookie")
+        assert cookie is not None
+        exchanged.read()
         conn.request(
             "GET",
             "/api/stream",
             headers={
-                "Authorization": f"Bearer {started['token']}",
                 "Accept": "text/event-stream",
+                "Cookie": cookie,
             },
         )
         response = conn.getresponse()
@@ -189,9 +210,14 @@ def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_fir
     seen: dict[str, Any] = {}
 
     def serve(context: Any, *, port: int, open_browser: bool, emit: Any) -> None:
-        emit(port or 49999, "test-token")
-        app = create_app(context, token="test-token", port=49999)
-        headers = {"Authorization": "Bearer test-token"}
+        emit(port or 49999, "test-exchange-code")
+        app = create_app(
+            context,
+            token="test-session-token",
+            exchange_code="test-exchange-code",
+            port=49999,
+        )
+        headers = {"Cookie": "agent_commons_ui_session=test-session-token"}
         with TestClient(app, base_url="http://127.0.0.1:49999") as client:
             seen["before"] = client.get("/api/setup", headers=headers).json()
             seen["refused"] = client.post(

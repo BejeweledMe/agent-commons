@@ -101,13 +101,17 @@ def test_gallery_locale_source_is_paired_and_has_no_demo_copy() -> None:
     assert "демо" not in " ".join(messages["ru"].values()).lower()
 
 
-def test_gallery_source_uses_react_flow_and_an_authenticated_typed_refusal() -> None:
+def test_gallery_source_uses_react_flow_and_a_cookie_session_typed_refusal() -> None:
     source = (_GALLERY_SOURCE / "src" / "main.tsx").read_text("utf-8")
     package = json.loads((_GALLERY_SOURCE / "package.json").read_text("utf-8"))
 
     assert 'from "@xyflow/react"' in source
     assert 'fetch("/api/gallery"' in source
-    assert "Authorization: `Bearer ${token}`" in source
+    assert 'fetch("/api/auth/exchange"' in source
+    assert 'credentials: "same-origin"' in source
+    assert "window.history.replaceState" in source
+    assert "Authorization" not in source
+    assert "tokenFromFragment" not in source
     assert "gallery_data_unavailable" in source
     assert "@xyflow/react" in package["dependencies"]
     assert package["scripts"]["build"] == "tsc -b && vite build"

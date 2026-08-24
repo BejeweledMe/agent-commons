@@ -52,7 +52,7 @@ def _artifact(
     return registered["entity_ref"]["id"], source, content
 
 
-def test_preview_route_requires_bearer_and_returns_verified_image(client, workspace) -> None:  # type: ignore[no-untyped-def]
+def test_preview_route_requires_a_local_session(client, workspace) -> None:  # type: ignore[no-untyped-def]
     artifact_id, _source, content = _artifact(workspace)
     path = f"/api/artifacts/{artifact_id}/preview"
 
@@ -60,7 +60,7 @@ def test_preview_route_requires_bearer_and_returns_verified_image(client, worksp
     response = client.get(path, headers=authorized())
 
     assert missing.status_code == 401
-    assert missing.headers["WWW-Authenticate"].startswith("Bearer")
+    assert missing.headers["WWW-Authenticate"].startswith("Session")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.headers["Cache-Control"] == "no-store"

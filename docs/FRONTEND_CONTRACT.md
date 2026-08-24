@@ -31,15 +31,20 @@ to you one failure at a time.
   writer claims `path:frontend/gallery` and
   `path:src/agent_commons/ui/static/gallery` instead.
 - The Gallery shell and its hashed same-origin assets contain no workspace data
-  and may load without a bearer header; its API calls carry the bearer token
-  from the URL fragment. Never put that token in a query string, an asset URL,
-  source code or local storage. The Gallery document uses its own CSP limited
-  to same-origin scripts/styles and has no inline script or style.
+  and may load without a session. The printed URL holds only a short-lived,
+  single-use opaque exchange code in its fragment; both Gallery and the legacy
+  panel clear that fragment before their first network request, exchange the
+  code at same-origin `POST /api/auth/exchange`, and then rely on an HTTP-only,
+  `SameSite=Strict`, process-local cookie. Never put an exchange code or a
+  session credential in a query string, an asset URL, source code, browser
+  storage, or an `Authorization` header. The Gallery document uses its own CSP
+  limited to same-origin scripts/styles and has no inline script or style.
 - `frontend/gallery/src/i18n.json` is the Gallery-owned paired locale source.
   A Gallery term may not be copied into the legacy string table; when a term is
   rendered by both stacks, it must first move to a shared source. The temporary
   disjoint keyspaces prevent translation drift during the incremental move.
-- Every Gallery state is semantic and accessible: checking, missing bearer,
+- Every Gallery state is semantic and accessible: checking, missing local
+  session,
   typed backend refusal, and empty data. Before Design Package reads exist, the
   screen says so and renders no sample cards or demo screens.
 
@@ -93,14 +98,18 @@ to you one failure at a time.
 
 ## A registered route is not a usable route
 
-A writing panel registers its whole non-`GET` surface unconditionally — the
-union of `MUTATING_ROUTES`, `CATALOG_ROUTES`, `LAUNCH_ROUTES`, and
-`SETUP_ROUTES` in `src/agent_commons/ui/server.py` — the instant it can hold a
-session at all, before the workspace, the operator runtime config, or the
-catalogue exist. A read-only panel registers none of it; that half of the
-invariant is unconditional too. What changes over the panel's lifetime is
-never the route table, only whether a given call succeeds: an unconfigured
-environment answers a real POST with a typed 409 (`setup_uninitialized`,
+A writing panel registers its whole canonical non-`GET` surface
+unconditionally — the union of `MUTATING_ROUTES`, `CATALOG_ROUTES`,
+`LAUNCH_ROUTES`, and `SETUP_ROUTES` in `src/agent_commons/ui/server.py` — the
+instant it can hold a session at all, before the workspace, the operator
+runtime config, or the catalogue exist. A read-only panel registers none of
+those canonical-write routes. Both panel modes additionally expose the one
+narrow public `AUTH_ROUTE`, `POST /api/auth/exchange`: it is not a ledger or
+operational write, accepts only the short-lived exchange code with an exact
+same-origin check, sets no response body, and cannot read workspace data. What
+changes over the panel's lifetime is never the canonical route table, only
+whether a given call succeeds: an unconfigured environment answers a real POST
+with a typed 409 (`setup_uninitialized`,
 `launch_not_configured`, a catalogue refusal), not a 404. Never treat a 404 as
 "this panel can't do that yet" and never treat reaching a route without an
 error as proof of capability — read the response body's `error.code`, the same

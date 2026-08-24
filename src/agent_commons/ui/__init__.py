@@ -12,7 +12,7 @@ from pathlib import Path
 GRAPH_SCHEMA = "agent_commons.ui.graph.v1"
 META_SCHEMA = "agent_commons.ui.meta.v1"
 ENTITY_SCHEMA = "agent_commons.ui.entity.v1"
-STARTED_SCHEMA = "agent_commons.ui.started.v1"
+STARTED_SCHEMA = "agent_commons.ui.started.v2"
 CATALOG_SCHEMA = "agent_commons.ui.catalog.v1"
 
 TRUST_NOTE = "loopback reachability alone is not authentication"

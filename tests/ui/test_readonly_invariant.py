@@ -17,6 +17,7 @@ import pytest
 
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.security import AUTH_ROUTES
 from agent_commons.ui.server import (
     CATALOG_ROUTES,
     LAUNCH_ROUTES,
@@ -81,9 +82,12 @@ def test_streaming_does_not_change_any_canonical_file(
     assert tree_digest(commons_root) == before
 
 
-def test_app_exposes_no_mutating_route(client) -> None:  # type: ignore[no-untyped-def]
+def test_read_only_app_exposes_no_canonical_mutating_route(client) -> None:  # type: ignore[no-untyped-def]
     for route in client.app.routes:
         methods = getattr(route, "methods", set()) or set()
+        if ("POST", route.path) in AUTH_ROUTES:
+            assert methods == {"POST"}
+            continue
         assert methods <= {"GET", "HEAD"}, f"{route.path} exposes {methods}"
 
 

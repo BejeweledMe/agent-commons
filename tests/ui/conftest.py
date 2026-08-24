@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from agent_commons.services import CommonsManager
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.security import AUTH_ROUTES, SESSION_COOKIE_NAME
 from agent_commons.ui.server import (
     CATALOG_ROUTES,
     LAUNCH_ROUTES,
@@ -93,7 +94,12 @@ def client(context: UIContext):  # type: ignore[no-untyped-def]
 
     from agent_commons.ui.server import create_app
 
-    app = create_app(context, token="test-token", port=PORT)
+    app = create_app(
+        context,
+        token="test-token",
+        exchange_code="test-exchange-code",
+        port=PORT,
+    )
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client
 
@@ -123,7 +129,12 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
 
     from agent_commons.ui.server import create_app
 
-    app = create_app(writable, token="test-token", port=PORT)
+    app = create_app(
+        writable,
+        token="test-token",
+        exchange_code="test-exchange-code",
+        port=PORT,
+    )
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as test_client:
         yield test_client
 
@@ -140,17 +151,18 @@ OPERATOR_SURFACE: frozenset[tuple[str, str]] = frozenset(
 
 
 def mutating_surface(app: FastAPI) -> set[tuple[str, str]]:
-    """The non-GET (method, path) pairs an assembled app actually registers.
+    """The canonical-write pairs an assembled app actually registers.
 
-    Read from the built router, not from the declaration, so the two can
-    disagree and be caught disagreeing.
+    The one public auth exchange is intentionally excluded: it makes an
+    in-memory HTTP-only session, never changes the workspace or operation
+    stores, and must be present for read-only panels too.
     """
 
     return {
         (method, route.path)
         for route in app.routes
         for method in (getattr(route, "methods", set()) or set())
-        if method not in {"GET", "HEAD"}
+        if method not in {"GET", "HEAD"} and (method, route.path) not in AUTH_ROUTES
     }
 
 
@@ -169,7 +181,9 @@ def expected_surface(context: UIContext) -> set[tuple[str, str]]:
 
 
 def authorized() -> dict[str, str]:
-    return {"Authorization": "Bearer test-token"}
+    """The process-private local-browser session used by direct app fixtures."""
+
+    return {"Cookie": f"{SESSION_COOKIE_NAME}=test-token"}
 
 
 def tree_digest(root: Path) -> dict[str, str]:

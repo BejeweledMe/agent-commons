@@ -34,15 +34,17 @@ from agent_commons.ui.context import (
     UIContext,
 )
 from agent_commons.ui.security import (
+    AUTH_EXCHANGE_PATH,
     SECURITY_HEADERS,
+    SESSION_COOKIE_NAME,
+    SESSION_TTL_SECONDS,
+    LocalBrowserSession,
     allowed_hosts,
     allowed_origins,
-    bearer_token,
     content_security_policy,
     gallery_content_security_policy,
     is_public_path,
     new_token,
-    token_matches,
 )
 from agent_commons.ui.session_owner import PanelAlreadyOpenError
 from agent_commons.ui.setup import (
@@ -139,9 +141,10 @@ LAUNCH_ROUTES = (("POST", "/api/delegations"),)
 #: initial operator runtime config and adopts it into this running panel, and
 #: one may add profiles for a provider subsequently found by trusted discovery.
 #: The latter derives both its input and ownership proof from the current file;
-#: neither route accepts a parameter, so a bearer token cannot choose a path or
-#: a mode.  All are registered by any operator panel -- a read-only one
-#: registers none, so the zero-non-GET invariant is untouched -- and the
+#: neither route accepts a parameter, so an authenticated browser session
+#: cannot choose a path or a mode. All are registered by any operator panel --
+#: a read-only one registers none of these canonical writes, while its narrow
+#: auth exchange stays separate -- and the
 #: reading half of the same surface (`GET /api/setup`, `GET /api/setup/preflight`)
 #: is in no tuple at all.  These are also the only non-GET routes not bound to
 #: an existing workspace: initialization is what makes the workspace exist.
@@ -266,7 +269,7 @@ def _error(status: int, code: str, message: str, actions: list[str] | None = Non
         payload["error"]["safe_next_actions"] = actions
     response = JSONResponse(payload, status_code=status)
     if status == 401:
-        response.headers["WWW-Authenticate"] = 'Bearer realm="agent-commons-ui"'
+        response.headers["WWW-Authenticate"] = 'Session realm="agent-commons-ui"'
     return response
 
 
@@ -283,10 +286,28 @@ def _sse(
     return ("\n".join(lines) + "\n\n").encode("utf-8")
 
 
-def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
+def create_app(
+    context: UIContext,
+    *,
+    token: str,
+    port: int,
+    exchange_code: str | None = None,
+) -> FastAPI:
+    """Build the local UI with a private session token and exchange code.
+
+    ``token`` remains the private session credential argument for test and
+    embedding compatibility. ``serve`` always supplies a distinct, short-lived
+    ``exchange_code``; callers which omit it receive a fresh code unavailable
+    to unauthenticated requests.
+    """
+
     app = FastAPI(title="Agent Commons UI", docs_url=None, redoc_url=None, openapi_url=None)
     hosts = allowed_hosts(port)
     origins = allowed_origins(port)
+    browser_session = LocalBrowserSession(
+        exchange_code=exchange_code if exchange_code is not None else new_token(),
+        session_token=token,
+    )
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Any]) -> Response:
@@ -303,7 +324,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
                 response = _error(
                     401,
                     "unauthorized",
-                    "a bearer token is required",
+                    "an authenticated local browser session is required",
                     ["reopen the URL printed by `agent-commons ui`"],
                 )
             else:
@@ -313,8 +334,48 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
         return response
 
     def _authorized(request: Request) -> bool:
-        presented = bearer_token(request.headers.get("authorization"))
-        return presented is not None and token_matches(presented, token)
+        return browser_session.session_matches(request.cookies.get(SESSION_COOKIE_NAME))
+
+    def _same_origin(request: Request) -> bool:
+        """Require the exchange fetch to come from this exact loopback origin."""
+
+        host = request.headers.get("host", "")
+        return request.headers.get("origin") == f"{request.url.scheme}://{host}"
+
+    @app.post(AUTH_EXCHANGE_PATH)
+    async def exchange_browser_code(request: Request) -> Response:
+        """Turn the printed single-use fragment code into an HTTP-only cookie.
+
+        This is the sole unauthenticated non-GET route. It writes no canonical
+        or operational record, never echoes its request body, and requires the
+        same loopback Host and exact-origin protections as all UI requests.
+        """
+
+        if not _same_origin(request):
+            return _error(403, "forbidden_origin", "cross-origin requests are refused")
+        body = await _json_body(request)
+        session_token = browser_session.consume_exchange_code(body.get("code"))
+        if session_token is None:
+            return _error(
+                401,
+                "unauthorized",
+                "the local browser session could not be established",
+                ["reopen the URL printed by `agent-commons ui`"],
+            )
+        response = Response(status_code=204)
+        # The product deliberately binds HTTP loopback only. A Secure cookie
+        # would be dropped on required http://127.0.0.1, so this process-bound
+        # cookie relies on loopback Host/origin checks plus HttpOnly and
+        # SameSite=Strict, without a Domain attribute.
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_token,
+            max_age=SESSION_TTL_SECONDS,
+            httponly=True,
+            samesite="strict",
+            path="/",
+        )
+        return response
 
     async def _require_workspace_to_read() -> None:
         # The reading half of the precondition the writing routes already
@@ -344,8 +405,8 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     app.add_exception_handler(_NotInitialized, _not_initialized)
 
     # The Gallery bundle holds no workspace data, so it is served as a public
-    # shell like the legacy root. Its API bootstrap still needs the bearer token
-    # from the URL fragment; resource fetches cannot attach that header.
+    # shell like the legacy root. Its API bootstrap uses the same HTTP-only
+    # browser session established from the one-time fragment code.
     gallery_directory = gallery_static_directory()
     app.mount(
         "/gallery/assets",
@@ -391,7 +452,7 @@ def create_app(context: UIContext, *, token: str, port: int) -> FastAPI:
     @app.get("/api/artifacts/{artifact_id}/preview", dependencies=reads_workspace)
     async def artifact_preview(artifact_id: str) -> Response:
         # The response contains raw workspace bytes, so it goes through the
-        # same bearer middleware as every data route. The reader deliberately
+        # same browser-session middleware as every data route. The reader deliberately
         # receives only an artifact id: manifest resolution owns the source
         # path and rejects a replaced or unsafe file before bytes reach HTTP.
         def _read_preview():
@@ -797,8 +858,9 @@ def _register_setup(router: _RouteGroup, context: UIContext) -> None:
     this surface, not an omission: the directory a workspace is created in is
     the one the panel was opened on, the operator config always lands on the
     frozen XDG path, and discovered-provider regeneration derives its input
-    from the current config and trusted discovery.  A bearer token therefore
-    cannot aim any of these writes at a path or a mode of its choosing, which
+    from the current config and trusted discovery. An authenticated browser
+    session therefore cannot aim any of these writes at a path or a mode of its
+    choosing, which
     is also why no manual "type the binary path here" field exists anywhere on
     the first-run screen.
     """
@@ -995,12 +1057,18 @@ def serve(
     listener.bind(("127.0.0.1", port))
     listener.listen(64)
     bound_port = listener.getsockname()[1]
-    token = new_token()
-    app = create_app(context, token=token, port=bound_port)
+    session_token = new_token()
+    exchange_code = new_token()
+    app = create_app(
+        context,
+        token=session_token,
+        exchange_code=exchange_code,
+        port=bound_port,
+    )
     if emit is not None:
-        emit(bound_port, token)
+        emit(bound_port, exchange_code)
     if open_browser:
-        webbrowser.open(f"http://127.0.0.1:{bound_port}/#t={token}")
+        webbrowser.open(f"http://127.0.0.1:{bound_port}/#c={exchange_code}")
     config = uvicorn.Config(
         app,
         log_level="warning",
