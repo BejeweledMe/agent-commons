@@ -111,6 +111,12 @@ def test_gallery_source_uses_react_flow_and_a_cookie_session_typed_refusal() -> 
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
     assert "api_base" in source
+    assert "let apiBase = storedApiBase();" in source
+    assert "window.sessionStorage.getItem(API_BASE_STORAGE_KEY)" in source
+    assert "window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in source
+    assert "clearStoredApiBase();" in source
+    assert "response.status === 401 || response.status === 404" in source
+    assert "localStorage" not in source
     assert "Authorization" not in source
     assert "tokenFromFragment" not in source
     assert "gallery_data_unavailable" in source

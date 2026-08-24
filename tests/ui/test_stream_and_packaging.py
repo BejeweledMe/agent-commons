@@ -2302,8 +2302,8 @@ def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
     assert "shellOpen.sidebar = false;" in sidebar
     assert "applyShell();" in sidebar
     # (c) A hash that arrives after load exchanges a fresh one-time code into
-    # a local session before the tab reboots from its in-memory API base. No
-    # browser storage or bearer header retains a credential.
+    # a local session before the tab reboots from its session-scoped API base.
+    # No bearer header or durable cross-tab browser storage retains a credential.
     assert 'window.addEventListener("hashchange"' in body
     taker = body.split('window.addEventListener("hashchange"', 1)[1].split("});", 1)[0]
     assert "establishLocalSession(fresh)" in taker
@@ -2311,7 +2311,17 @@ def test_the_narrow_shell_answers_the_press_and_a_fresh_token_reloads() -> None:
     assert 'fetch("/api/auth/exchange"' in body
     assert 'fetch(apiPath("/api/stream")' in body
     assert "api_base" in body
-    assert "sessionStorage" not in body
+    assert "restoreLocalSession" in body
+    assert "let apiBase = storedApiBase();" in body
+    restore = body.split("async function restoreLocalSession() {", 1)[1].split("\n}", 1)[0]
+    assert 'fetch(apiPath("/api/meta")' in restore
+    assert "clearStoredApiBase();" in restore
+    assert "sessionStorage.getItem(API_BASE_STORAGE_KEY)" in body
+    assert "sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in body
+    assert "sessionStorage.removeItem(API_BASE_STORAGE_KEY)" in body
+    assert "clearStoredApiBase();" in body
+    assert "localStorage.getItem(API_BASE_STORAGE_KEY)" not in body
+    assert "localStorage.setItem(API_BASE_STORAGE_KEY" not in body
     assert "Authorization" not in body
     english, russian = _language_tables()
     assert "local session" in _value(english, "stream_unauthorized")

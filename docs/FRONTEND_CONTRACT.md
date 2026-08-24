@@ -35,13 +35,17 @@ to you one failure at a time.
   single-use opaque exchange code in its fragment; both Gallery and the legacy
   panel clear that fragment before their first network request, exchange the
   code at same-origin `POST /api/auth/exchange`, and then use the returned
-  opaque per-process API base held only in page memory. The HTTP-only,
-  `SameSite=Strict` cookie is scoped to that base, so a second loopback port's
-  ordinary `/api` route cannot receive it. Never put an exchange code, API
-  base, or session credential in a query string, an asset URL, source code,
-  browser storage, or an `Authorization` header. The Gallery document uses its
-  own CSP limited to same-origin scripts/styles and has no inline script or
-  style.
+  opaque per-process API base. The base is a routing capability, not a
+  standalone credential: the HTTP-only, `SameSite=Strict` cookie remains
+  required and is scoped to that base, so a second loopback port's ordinary
+  `/api` route cannot receive it. To make a normal refresh work, both shells
+  retain the base only in `sessionStorage`, which is scoped to the exact origin
+  and current browser session; they never use `localStorage`, so a newly opened
+  browser session must receive a fresh `#c` handoff. Clear the stored base on a
+  failed session restoration. Never put an exchange code or session credential
+  in a query string, an asset URL, source code, browser storage, or an
+  `Authorization` header. The Gallery document uses its own CSP limited to
+  same-origin scripts/styles and has no inline script or style.
 - `frontend/gallery/src/i18n.json` is the Gallery-owned paired locale source.
   A Gallery term may not be copied into the legacy string table; when a term is
   rendered by both stacks, it must first move to a shared source. The temporary

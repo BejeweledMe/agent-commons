@@ -3384,7 +3384,35 @@ function exchangeCodeFromFragment() {
   return new URLSearchParams(location.hash.slice(1)).get("c");
 }
 
-let apiBase = "";
+const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
+const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
+
+function storedApiBase() {
+  try {
+    const value = sessionStorage.getItem(API_BASE_STORAGE_KEY);
+    if (value && API_BASE_PATTERN.test(value)) { return value; }
+    if (value) { sessionStorage.removeItem(API_BASE_STORAGE_KEY); }
+  } catch (error) {
+    // A browser that blocks sessionStorage can still use one freshly exchanged
+    // in-memory route capability; it simply cannot restore it after refresh.
+  }
+  return "";
+}
+
+let apiBase = storedApiBase();
+
+function clearStoredApiBase() {
+  apiBase = "";
+  try { sessionStorage.removeItem(API_BASE_STORAGE_KEY); }
+  catch (error) { /* storage is already unavailable */ }
+}
+
+function rememberApiBase(value) {
+  if (!API_BASE_PATTERN.test(value)) { throw new Error("local_session_exchange_failed"); }
+  apiBase = value;
+  try { sessionStorage.setItem(API_BASE_STORAGE_KEY, value); }
+  catch (error) { /* the current page still holds the in-memory value */ }
+}
 
 function apiPath(path) {
   return apiBase && path.startsWith("/api/")
@@ -3401,23 +3429,33 @@ async function establishLocalSession(code) {
   });
   if (!response.ok) { throw new Error("local_session_exchange_failed"); }
   const payload = await response.json();
-  if (!payload || typeof payload.api_base !== "string" || !payload.api_base.startsWith("/api/")) {
+  if (!payload || typeof payload.api_base !== "string") {
     throw new Error("local_session_exchange_failed");
   }
-  // This opaque, per-process route capability is held only in this page's
-  // memory. The HTTP-only cookie is scoped to the same path, so it cannot be
-  // attached to another loopback server's ordinary /api endpoints.
-  apiBase = payload.api_base;
+  // This opaque, per-process route capability is scoped to this exact
+  // origin's sessionStorage so a normal refresh can recover it. The HTTP-only
+  // cookie is scoped to the same path, so it cannot be attached to another
+  // loopback server's ordinary /api endpoints.
+  rememberApiBase(payload.api_base);
+}
+
+async function restoreLocalSession() {
+  if (!apiBase) { return; }
+  const response = await fetch(apiPath("/api/meta"), { credentials: "same-origin" });
+  if (!response.ok) {
+    clearStoredApiBase();
+    throw new Error("local_session_restore_failed");
+  }
 }
 
 const initialExchangeCode = exchangeCodeFromFragment();
 // Clear the code before any request. It must never survive in history, browser
 // storage, a copied URL, or a later request; the server returns an HTTP-only
-// cookie and no script-visible credential.
+// cookie and a route capability kept only in this origin's sessionStorage.
 history.replaceState(null, "", location.pathname);
 let authReady = initialExchangeCode
-  ? establishLocalSession(initialExchangeCode).catch(() => undefined)
-  : Promise.resolve();
+  ? establishLocalSession(initialExchangeCode).catch(() => { clearStoredApiBase(); })
+  : restoreLocalSession().catch(() => undefined);
 // Following the printed URL while this tab is already open changes only the
 // fragment, and a fragment-only navigation never reloads the page. Exchange
 // the fresh single-use code after clearing it, then re-run the boot sequence
@@ -3428,7 +3466,7 @@ window.addEventListener("hashchange", () => {
   history.replaceState(null, "", location.pathname);
   void establishLocalSession(fresh).then(() => {
     void boot();
-  }).catch(() => undefined);
+  }).catch(() => { clearStoredApiBase(); });
 });
 
 function authHeaders(extra) {
@@ -3442,6 +3480,7 @@ async function post(path, body) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401) { clearStoredApiBase(); }
     // Refusals name the guard they tripped; that string is the useful part.
     // The backend message is canonical and stays verbatim in any language.
     const failure = new Error((payload.error && payload.error.message) ||
@@ -3640,6 +3679,7 @@ function said(key, values) {
 
 async function api(path) {
   const response = await fetch(apiPath(path), { headers: authHeaders() });
+  if (response.status === 401) { clearStoredApiBase(); }
   if (!response.ok) { throw new Error(t("request_failed") + " " + response.status); }
   return response.json();
 }
@@ -7923,6 +7963,11 @@ async function connect() {
       const headers = authHeaders({ "Accept": "text/event-stream" });
       if (lastEventId) { headers["Last-Event-ID"] = lastEventId; }
       const response = await fetch(apiPath("/api/stream"), { headers: headers });
+      if (response.status === 401) {
+        clearStoredApiBase();
+        setStream("gap", "stream_unauthorized");
+        return;
+      }
       if (!response.ok && STREAM_HALTED_BY.indexOf(await streamRefusalCode(response)) >= 0) {
         // The loop ends rather than backing off: this project has no history to
         // stream and will not grow one until somebody sets it up.  The first-run

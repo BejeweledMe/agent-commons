@@ -17,9 +17,46 @@ type GalleryState =
 
 type ApiError = { error?: { code?: string } };
 type SessionExchange = { api_base?: unknown };
+const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
+const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
 
 function exchangeCodeFromFragment(): string | null {
   return new URLSearchParams(window.location.hash.slice(1)).get("c");
+}
+
+function storedApiBase(): string {
+  try {
+    const value = window.sessionStorage.getItem(API_BASE_STORAGE_KEY);
+    if (value !== null && API_BASE_PATTERN.test(value)) {
+      return value;
+    }
+    if (value !== null) {
+      window.sessionStorage.removeItem(API_BASE_STORAGE_KEY);
+    }
+  } catch {
+    // A fresh exchange still works when storage is disabled for this tab.
+  }
+  return "";
+}
+
+function clearStoredApiBase(): void {
+  try {
+    window.sessionStorage.removeItem(API_BASE_STORAGE_KEY);
+  } catch {
+    // There is no durable value to clear when storage is disabled.
+  }
+}
+
+function rememberApiBase(value: unknown): string {
+  if (typeof value !== "string" || !API_BASE_PATTERN.test(value)) {
+    throw new Error("local_session_exchange_failed");
+  }
+  try {
+    window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value);
+  } catch {
+    // Keep the capability in this page's closure if storage is unavailable.
+  }
+  return value;
 }
 
 function message(locale: Locale, key: MessageKey): string {
@@ -37,11 +74,12 @@ function GalleryApp(): ReactElement {
   useEffect(() => {
     const controller = new AbortController();
     const exchangeCode = exchangeCodeFromFragment();
-    let apiBase = "";
+    let apiBase = storedApiBase();
     // The exchange code is a one-time capability, never an API credential.
     // Remove it before the first network request so it cannot remain in a
-    // copied URL or history entry. The returned API base stays only in this
-    // page's memory and scopes the HTTP-only cookie to this server process.
+    // copied URL or history entry. The returned API base stays in this exact
+    // origin's sessionStorage, so refresh can restore it without sharing it
+    // with a newly opened browser session.
     window.history.replaceState(null, "", window.location.pathname);
 
     async function loadGallery(): Promise<Response> {
@@ -54,21 +92,29 @@ function GalleryApp(): ReactElement {
           signal: controller.signal,
         });
         if (!exchange.ok) {
+          clearStoredApiBase();
           throw new Error("local_session_exchange_failed");
         }
         const payload = (await exchange.json()) as SessionExchange;
-        if (typeof payload.api_base !== "string" || !payload.api_base.startsWith("/api/")) {
+        try {
+          apiBase = rememberApiBase(payload.api_base);
+        } catch {
+          clearStoredApiBase();
           throw new Error("local_session_exchange_failed");
         }
-        apiBase = payload.api_base;
       }
       if (!apiBase) {
         throw new Error("local_session_exchange_failed");
       }
-      return fetch(`${apiBase}/gallery`, {
+      const response = await fetch(`${apiBase}/gallery`, {
         credentials: "same-origin",
         signal: controller.signal,
       });
+      if (response.status === 401 || response.status === 404) {
+        clearStoredApiBase();
+        throw new Error("local_session_exchange_failed");
+      }
+      return response;
     }
 
     void loadGallery()
