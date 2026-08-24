@@ -9,6 +9,7 @@ from agent_commons.errors import LifecycleConflictError, ValidationError
 
 from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
+from .artifact_projection import apply_artifact_record
 from .collections import collection_for
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .handoff_projection import apply_handoff_record
@@ -417,10 +418,11 @@ def _apply_effective_event(
         if actor_session_id:
             evidence_authors.add(actor_session_id)
         artifact_payload["evidence_author_session_ids"] = sorted(evidence_authors)
-        _apply(
+        apply_artifact_record(
             snapshot.artifacts,
             artifact_id,
-            {**event, "payload": artifact_payload},
+            event,
+            artifact_payload,
             "registered",
         )
     elif event_type.startswith("review."):
