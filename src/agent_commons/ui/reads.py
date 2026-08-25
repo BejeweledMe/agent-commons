@@ -382,7 +382,7 @@ class UIReads:
             record = attempt.as_dict()
             delegation_id = str(record["correlation"]["delegation_id"])
             delegation = delegations.get(delegation_id) or {}
-            live = store.process_is_live(record.get("pid"))
+            live = not attempt.state.terminal and store.process_is_live(attempt.pid)
             try:
                 audit = audit_store.get(delegation_id)
                 rejection_details = [

@@ -18,6 +18,8 @@ import pytest
 
 from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
+    Attempt,
+    AttemptState,
     AttemptStore,
     ProcessResult,
     RunOutcome,
@@ -394,12 +396,18 @@ def _finished_run(workspace: dict[str, Any]) -> dict[str, Any]:
     return fixture
 
 
-def test_a_finished_run_says_when_it_started_and_how_long_it_took(
+def test_a_finished_run_never_probes_liveness_and_says_how_long_it_took(
     workspace: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Finding 28: a run was unreadable -- no start time, no elapsed time."""
+    """A terminal state outranks a PID that the operating system may reuse."""
 
     fixture = _finished_run(workspace)
+
+    def terminal_probe(_: AttemptStore, __: int | None) -> bool:
+        raise AssertionError("terminal attempts must not trigger an OS liveness probe")
+
+    monkeypatch.setattr(AttemptStore, "process_is_live", terminal_probe)
     run = fixture["context"].runs()[0]
 
     assert run["live"] is False
@@ -417,9 +425,23 @@ def test_a_live_run_reports_a_start_time_and_no_duration(
     workspace: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A moving run gets None: a duration computed here is stale on arrival."""
+    """A running attempt with a live PID gets no stale computed duration."""
 
     fixture = _finished_run(workspace)
+    original = AttemptStore.list_attempts
+
+    def running_attempt(self: AttemptStore) -> tuple[Attempt, ...]:
+        return tuple(
+            replace(
+                attempt,
+                state=AttemptState.RUNNING,
+                reason="process_started",
+                exit_code=None,
+            )
+            for attempt in original(self)
+        )
+
+    monkeypatch.setattr(AttemptStore, "list_attempts", running_attempt)
     monkeypatch.setattr(AttemptStore, "process_is_live", lambda self, pid: True)
     run = fixture["context"].runs()[0]
 
