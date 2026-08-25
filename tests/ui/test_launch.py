@@ -8,6 +8,8 @@ runtime orchestration tests do, and completes the run as the bound child.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
@@ -75,13 +77,14 @@ class FakeRunner:
     def run(self, invocation: Any, **values: Any) -> ProcessResult:
         del invocation
         self.calls += 1
-        values["on_started"](7100 + self.calls)
+        pid = _dead_pid()
+        values["on_started"](pid)
         self.after_start(values["child_session_id"])
         return ProcessResult(
             outcome=RunOutcome.SUCCEEDED,
             reason=RunReason.COMPLETED,
             exit_code=0,
-            pid=7100 + self.calls,
+            pid=pid,
             duration_seconds=0.1,
             stdout=b"ephemeral provider content",
             stderr=b"",
@@ -89,6 +92,20 @@ class FakeRunner:
             stderr_bytes_seen=0,
             output_truncated=False,
         )
+
+
+def _dead_pid() -> int:
+    """Return a PID that belongs to a child process that has been reaped.
+
+    The run surface probes its recorded PID.  A fabricated number can belong
+    to an unrelated daemon on CI, particularly on macOS, and turn a finished
+    fake run into a misleadingly live one.
+    """
+
+    process = subprocess.Popen([sys.executable, "-c", ""])
+    pid = process.pid
+    assert process.wait() == 0
+    return pid
 
 
 def _client(context: UIContext):  # type: ignore[no-untyped-def]
