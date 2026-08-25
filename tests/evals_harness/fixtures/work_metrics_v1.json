@@ -15,6 +15,7 @@
         {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "reviewer", "independent": true},
         {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "reviewer", "verdict": "approved"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 1, "denominator": 1}
     },
     {
@@ -25,6 +26,7 @@
         {"event_type": "task.completed", "offset_seconds": -10, "actor_kind": "builder"},
         {"event_type": "task.submitted", "offset_seconds": -1, "actor_kind": "builder"}
       ],
+      "binding": {},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
     },
     {
@@ -38,6 +40,7 @@
         {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"},
         {"event_type": "event.corrected", "offset_seconds": -1, "actor_kind": "builder"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2", "effective_task_revision": "task:main@5"},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
     },
     {
@@ -50,6 +53,7 @@
         {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "builder", "independent": false},
         {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "builder", "verdict": "approved"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
     },
     {
@@ -62,6 +66,7 @@
         {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "reviewer", "independent": true},
         {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "reviewer", "verdict": "changes_requested"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
       "expectation": {"metric_id": "review_disposition_latency", "state": "complete", "numerator": 8, "denominator": 1}
     },
     {
@@ -71,6 +76,7 @@
         {"event_type": "handoff.created", "offset_seconds": -600, "actor_kind": "builder"},
         {"event_type": "handoff.acknowledged", "offset_seconds": -60, "actor_kind": "reviewer"}
       ],
+      "binding": {},
       "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "complete", "numerator": 540, "denominator": 1}
     },
     {
@@ -79,6 +85,7 @@
       "events": [
         {"event_type": "handoff.created", "offset_seconds": -3600, "actor_kind": "builder"}
       ],
+      "binding": {},
       "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "unsupported", "numerator": null, "denominator": null}
     },
     {
@@ -87,6 +94,7 @@
       "events": [
         {"event_type": "handoff.created", "offset_seconds": -1296000, "actor_kind": "builder"}
       ],
+      "binding": {},
       "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "unsupported", "numerator": null, "denominator": null}
     },
     {
@@ -101,12 +109,14 @@
         {"event_type": "delegation.needs_operator", "offset_seconds": -50, "actor_kind": "builder", "reason_code": "provider_auth"},
         {"event_type": "delegation.needs_operator", "offset_seconds": -40, "actor_kind": "builder", "reason_code": "unknown"}
       ],
+      "binding": {},
       "expectation": {"metric_id": "needs_operator_rate", "state": "complete", "numerator": 2, "denominator": 6}
     },
     {
       "case_id": "empty_review_queue",
       "kind": "empty",
       "events": [],
+      "binding": {},
       "expectation": {"metric_id": "current_review_coverage", "state": "empty", "numerator": null, "denominator": null}
     },
     {
@@ -120,6 +130,7 @@
         {"event_type": "review.completed", "offset_seconds": -20, "actor_kind": "reviewer", "verdict": "approved"},
         {"event_type": "task.accepted", "offset_seconds": -10, "actor_kind": "reviewer"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2", "acceptance_task_revision": "task:main@4", "acceptance_review_ref": "review:main", "acceptance_review_revision": "review:main@2"},
       "expectation": {"metric_id": "false_strict_acceptance", "state": "complete", "numerator": 0, "denominator": 1}
     },
     {
@@ -133,6 +144,7 @@
         {"event_type": "task.accepted", "offset_seconds": -20, "actor_kind": "reviewer"},
         {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2", "acceptance_task_revision": "task:main@4", "acceptance_review_ref": "review:main", "acceptance_review_revision": "review:main@1"},
       "expectation": {"metric_id": "false_strict_acceptance", "state": "complete", "numerator": 1, "denominator": 1}
     },
     {
@@ -145,8 +157,10 @@
         {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
         {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"},
         {"event_type": "event.corrected", "offset_seconds": -9, "actor_kind": "builder"},
+        {"event_type": "event.retry", "offset_seconds": -2, "actor_kind": "builder"},
         {"event_type": "event.retry", "offset_seconds": -1, "actor_kind": "builder"}
       ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2", "effective_task_revision": "task:main@5", "retry_key": "retry:main", "retry_expected_revision": "task:main@5"},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
     },
     {
@@ -158,7 +172,44 @@
         {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
         {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"}
       ],
+      "binding": {"retry_key": "retry:main", "retry_expected_revision": "task:main@4"},
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_revision_mismatch",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"}
+      ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@3", "completion_target_revision": "task:main@3", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_orphan_pair",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"}
+      ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:orphan", "request_target_revision": "task:orphan@4", "completion_target_revision": "task:orphan@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_age_not_measurable",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"}
+      ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "completion_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1", "completion_expected_revision": "review:main@1", "completion_revision": "review:main@2"},
+      "expectation": {"metric_id": "review_queue_age", "state": "not_measurable", "numerator": null, "denominator": null}
     }
   ]
 }

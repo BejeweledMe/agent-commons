@@ -30,7 +30,7 @@ CaseKind = Literal[
     "replay",
     "empty",
 ]
-MetricState = Literal["complete", "empty", "unsupported"]
+MetricState = Literal["complete", "empty", "not_measurable", "unsupported"]
 ActorKind = Literal["builder", "reviewer", "operator"]
 EventType = Literal[
     "task.created",
@@ -54,6 +54,7 @@ EventType = Literal[
 MetricId = Literal[
     "current_review_coverage",
     "review_disposition_latency",
+    "review_queue_age",
     "handoff_acknowledgement_latency",
     "needs_operator_rate",
     "needs_operator_taxonomy_completeness",
@@ -95,7 +96,26 @@ class FixtureCaseWire(TypedDict):
     case_id: str
     kind: CaseKind
     events: list[FixtureEventWire]
+    binding: FixtureBindingWire
     expectation: FixtureExpectationWire
+
+
+class FixtureBindingWire(TypedDict, total=False):
+    task_ref: str
+    task_revision: str
+    target_task_ref: str
+    request_target_revision: str
+    completion_target_revision: str
+    review_ref: str
+    request_revision: str
+    completion_expected_revision: str
+    completion_revision: str
+    effective_task_revision: str
+    acceptance_task_revision: str
+    acceptance_review_ref: str
+    acceptance_review_revision: str
+    retry_key: str
+    retry_expected_revision: str
 
 
 class FixtureDocumentWire(TypedDict):
@@ -129,12 +149,34 @@ class FixtureExpectation:
 
 
 @dataclass(frozen=True, slots=True)
+class FixtureBinding:
+    """Opaque identifiers and revisions needed to prove semantic joins without prose."""
+
+    task_ref: str | None = None
+    task_revision: str | None = None
+    target_task_ref: str | None = None
+    request_target_revision: str | None = None
+    completion_target_revision: str | None = None
+    review_ref: str | None = None
+    request_revision: str | None = None
+    completion_expected_revision: str | None = None
+    completion_revision: str | None = None
+    effective_task_revision: str | None = None
+    acceptance_task_revision: str | None = None
+    acceptance_review_ref: str | None = None
+    acceptance_review_revision: str | None = None
+    retry_key: str | None = None
+    retry_expected_revision: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class FixtureCase:
     """A deterministic scenario comprising only typed identifiers and codes."""
 
     case_id: str
     kind: CaseKind
     events: tuple[FixtureEvent, ...]
+    binding: FixtureBinding
     expectation: FixtureExpectation
 
 
@@ -152,7 +194,9 @@ class WorkMetricsFixture:
 _CASE_KINDS: Final[frozenset[str]] = frozenset(
     {"review_pair", "handoff", "delegation", "strict_acceptance", "replay", "empty"}
 )
-_METRIC_STATES: Final[frozenset[str]] = frozenset({"complete", "empty", "unsupported"})
+_METRIC_STATES: Final[frozenset[str]] = frozenset(
+    {"complete", "empty", "not_measurable", "unsupported"}
+)
 _ACTOR_KINDS: Final[frozenset[str]] = frozenset({"builder", "reviewer", "operator"})
 _EVENT_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -179,6 +223,7 @@ _METRIC_IDS: Final[frozenset[str]] = frozenset(
     {
         "current_review_coverage",
         "review_disposition_latency",
+        "review_queue_age",
         "handoff_acknowledgement_latency",
         "needs_operator_rate",
         "needs_operator_taxonomy_completeness",
@@ -227,6 +272,12 @@ _SENSITIVE_KEY_PARTS: Final[frozenset[str]] = frozenset(
 )
 _CASE_ID_PATTERN: Final = compile_pattern(r"^[a-z][a-z0-9_]{2,63}$")
 _WINDOWS_ABSOLUTE_PATH: Final = compile_pattern(r"^(?:[A-Za-z]:[\\/]|\\\\)")
+_OPAQUE_REF_PATTERN: Final = compile_pattern(r"^(?:task|review):[a-z][a-z0-9_]{0,31}$")
+_OPAQUE_REVISION_PATTERN: Final = compile_pattern(
+    r"^(?:task|review):[a-z][a-z0-9_]{0,31}@[1-9][0-9]*$"
+)
+_RETRY_KEY_PATTERN: Final = compile_pattern(r"^retry:[a-z][a-z0-9_]{0,31}$")
+_BINDING_FIELDS: Final[frozenset[str]] = frozenset(FixtureBinding.__dataclass_fields__)
 _REQUIRED_CASE_IDS: Final[frozenset[str]] = frozenset(
     {
         "review_current_pair",
@@ -243,6 +294,9 @@ _REQUIRED_CASE_IDS: Final[frozenset[str]] = frozenset(
         "strict_acceptance_invalid",
         "correction_and_retry",
         "reordered_retry",
+        "review_revision_mismatch",
+        "review_orphan_pair",
+        "review_age_not_measurable",
     }
 )
 
@@ -295,7 +349,7 @@ def load_work_metrics_fixture(path: Path | None = None) -> WorkMetricsFixture:
 def _parse_case(value: object, index: int) -> FixtureCase:
     path = f"$.cases[{index}]"
     mapping = _require_mapping(value, path)
-    _require_exact_keys(mapping, {"case_id", "kind", "events", "expectation"}, path)
+    _require_exact_keys(mapping, {"case_id", "kind", "events", "binding", "expectation"}, path)
     case_id = _require_string(mapping["case_id"], f"{path}.case_id")
     if not _CASE_ID_PATTERN.fullmatch(case_id):
         raise ValidationError("W0 fixture case_id must be a bounded identifier")
@@ -304,8 +358,16 @@ def _parse_case(value: object, index: int) -> FixtureCase:
         _parse_event(event, f"{path}.events[{event_index}]")
         for event_index, event in enumerate(_require_list(mapping["events"], f"{path}.events"))
     )
+    binding = _parse_binding(mapping["binding"], f"{path}.binding")
+    _validate_case_binding(events, binding, path)
     expectation = _parse_expectation(mapping["expectation"], f"{path}.expectation")
-    return FixtureCase(case_id=case_id, kind=kind, events=events, expectation=expectation)
+    return FixtureCase(
+        case_id=case_id,
+        kind=kind,
+        events=events,
+        binding=binding,
+        expectation=expectation,
+    )
 
 
 def _parse_event(value: object, path: str) -> FixtureEvent:
@@ -367,12 +429,83 @@ def _parse_expectation(value: object, path: str) -> FixtureExpectation:
         raise ValidationError("complete W0 expectations require numerator and denominator")
     if state == "empty" and (numerator is not None or denominator is not None):
         raise ValidationError("empty W0 expectations cannot report a numeric value")
+    if state in {"not_measurable", "unsupported"} and (
+        numerator is not None or denominator is not None
+    ):
+        raise ValidationError("non-complete W0 expectations cannot report a numeric value")
     return FixtureExpectation(
         metric_id=metric_id,
         state=state,
         numerator=numerator,
         denominator=denominator,
     )
+
+
+def _parse_binding(value: object, path: str) -> FixtureBinding:
+    mapping = _require_mapping(value, path)
+    if not set(mapping) <= _BINDING_FIELDS:
+        raise ValidationError(f"W0 fixture has unsupported binding fields at {path}")
+    values = {
+        field: _require_optional_binding_value(field, mapping.get(field), f"{path}.{field}")
+        for field in _BINDING_FIELDS
+    }
+    return FixtureBinding(**values)
+
+
+def _require_optional_binding_value(field: str, value: object, path: str) -> str | None:
+    if value is None:
+        return None
+    parsed = _require_string(value, path)
+    if field in {"task_ref", "target_task_ref", "review_ref", "acceptance_review_ref"}:
+        if not _OPAQUE_REF_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture binding reference is malformed")
+    elif field == "retry_key":
+        if not _RETRY_KEY_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture retry key is malformed")
+    elif not _OPAQUE_REVISION_PATTERN.fullmatch(parsed):
+        raise ValidationError("W0 fixture binding revision is malformed")
+    return parsed
+
+
+def _validate_case_binding(
+    events: tuple[FixtureEvent, ...], binding: FixtureBinding, path: str
+) -> None:
+    event_types = {event.event_type for event in events}
+    if {"review.requested", "review.completed"} & event_types:
+        _require_binding_fields(
+            binding,
+            (
+                "task_ref",
+                "task_revision",
+                "target_task_ref",
+                "request_target_revision",
+                "completion_target_revision",
+                "review_ref",
+                "request_revision",
+                "completion_expected_revision",
+                "completion_revision",
+            ),
+            path,
+        )
+    if "task.accepted" in event_types:
+        _require_binding_fields(
+            binding,
+            (
+                "acceptance_task_revision",
+                "acceptance_review_ref",
+                "acceptance_review_revision",
+            ),
+            path,
+        )
+    if "event.corrected" in event_types:
+        _require_binding_fields(binding, ("effective_task_revision",), path)
+    if "event.retry" in event_types:
+        _require_binding_fields(binding, ("retry_key", "retry_expected_revision"), path)
+
+
+def _require_binding_fields(binding: FixtureBinding, fields: tuple[str, ...], path: str) -> None:
+    if any(getattr(binding, field) is None for field in fields):
+        raise ValidationError(f"W0 fixture is missing required opaque bindings at {path}")
 
 
 def _parse_fixed_now(value: object) -> datetime:

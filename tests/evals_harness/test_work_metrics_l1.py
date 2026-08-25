@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .fixture_loader import FixtureCase, load_work_metrics_fixture
-from .work_metrics_cases import assess_case, materialize_fixture
+from .work_metrics_cases import assess_case, grade_case, materialize_fixture
 
 
 def _case(case_id: str) -> FixtureCase:
@@ -35,6 +35,9 @@ def test_corpus_has_all_required_w0_boundary_cases_and_terminal_states() -> None
         "strict_acceptance_invalid",
         "correction_and_retry",
         "reordered_retry",
+        "review_revision_mismatch",
+        "review_orphan_pair",
+        "review_age_not_measurable",
     } <= names
     assert {
         "delegation.succeeded",
@@ -61,6 +64,7 @@ def test_l1_replay_keeps_staleness_strict_acceptance_and_retry_visible() -> None
     assert valid.false_strict_acceptance is False
     assert invalid.false_strict_acceptance is True
     assert retry.duplicate_retry is True
+    assert retry.cas_conflict is False
     assert reordered.reordered_input is True
 
 
@@ -73,7 +77,29 @@ def test_l1_never_counts_missing_or_nonindependent_review_as_a_current_pair() ->
 
     assert missing.current_independent_review is False
     assert nonindependent.current_independent_review is False
-    assert changes_requested.current_independent_review is False
+    assert changes_requested.current_independent_review is True
+
+
+def test_l1_rejects_orphan_and_revision_mismatched_review_links() -> None:
+    fixture = load_work_metrics_fixture()
+
+    mismatch = assess_case(_case("review_revision_mismatch"), fixture.fixed_now)
+    orphan = assess_case(_case("review_orphan_pair"), fixture.fixed_now)
+    reordered = assess_case(_case("reordered_retry"), fixture.fixed_now)
+
+    assert mismatch.revision_mismatch is True
+    assert mismatch.current_independent_review is False
+    assert orphan.orphan_review is True
+    assert orphan.current_independent_review is False
+    assert reordered.duplicate_retry is False
+    assert reordered.cas_conflict is True
+
+
+def test_l0_grader_treats_each_fixture_expectation_as_an_oracle() -> None:
+    fixture = load_work_metrics_fixture()
+
+    assert all(grade_case(case, fixture.fixed_now) == case.expectation for case in fixture.cases)
+    assert _case("review_age_not_measurable").expectation.state == "not_measurable"
 
 
 def test_materialisation_is_repeatable_and_uses_only_the_injected_clock() -> None:
