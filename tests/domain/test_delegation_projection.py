@@ -8,6 +8,7 @@ import pytest
 
 from agent_commons.core.canonical import canonical_json_bytes, canonical_sha256, loads_json_strict
 from agent_commons.domain.delegation_projection import DelegationRecord
+from agent_commons.domain.envelopes import DelegationEnvelope, parse_event_envelope
 from agent_commons.domain.projection import project_events
 
 WORKSPACE_ID = "workspace.00000000000000000000000001"
@@ -49,11 +50,17 @@ def _persisted(event: dict[str, object]) -> dict[str, object]:
 def _legacy_apply(
     current: dict[str, object], event: dict[str, object], state: str
 ) -> dict[str, object]:
-    """The raw-mapping delegation reducer that existed before DelegationRecord."""
+    """Apply a delegation exactly as the immediate pre-slice projection did."""
 
-    payload = event["payload"]
+    raw_payload = event["payload"]
+    assert isinstance(raw_payload, dict)
+    envelope = parse_event_envelope(str(event["event_type"]), raw_payload)
+    assert isinstance(envelope, DelegationEnvelope)
+    # This is the pre-slice delegation branch's actual payload source.  It is
+    # intentionally not the event's raw mapping: that would change public
+    # insertion order when source events order equivalent keys differently.
+    payload = envelope.to_payload()
     actor = event["actor"]
-    assert isinstance(payload, dict)
     assert isinstance(actor, dict)
     authors = {
         str(session_id) for session_id in current.get("author_session_ids", []) if str(session_id)
@@ -211,6 +218,24 @@ def test_delegation_record_preserves_canonical_replay_bytes_through_correction()
     exposed_result["id"] = "task.tampered"
     assert record["limits"] == legacy_wire["limits"]
     assert record["result_refs"] == legacy_wire["result_refs"]
+
+    legacy_target_ref = legacy_wire["target_ref"]
+    actual_target_ref = record["target_ref"]
+    assert isinstance(legacy_target_ref, dict)
+    assert isinstance(actual_target_ref, dict)
+    assert list(actual_target_ref) == list(legacy_target_ref)
+    assert json.dumps(actual_target_ref, separators=(",", ":")) == json.dumps(
+        legacy_target_ref, separators=(",", ":")
+    )
+
+    legacy_limits = legacy_wire["limits"]
+    actual_limits = record["limits"]
+    assert isinstance(legacy_limits, dict)
+    assert isinstance(actual_limits, dict)
+    assert list(actual_limits) == list(legacy_limits)
+    assert json.dumps(actual_limits, separators=(",", ":")) == json.dumps(
+        legacy_limits, separators=(",", ":")
+    )
 
     assert list(record) == list(legacy_wire)
     assert record.to_dict() == legacy_wire

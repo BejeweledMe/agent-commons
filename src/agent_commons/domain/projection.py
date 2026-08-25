@@ -480,12 +480,10 @@ def _apply_effective_event(
         if not isinstance(typed_envelope, DelegationEnvelope):
             raise ValidationError(f"missing typed delegation envelope for {event_type}")
         delegation_id = typed_envelope.delegation_id
-        if not isinstance(payload, Mapping):
-            raise ValidationError(f"delegation payload must be an object for {event_type}")
-        # Retain the exact raw effective payload ordering that replay validated.
-        # A typed envelope remains the authority for the identifier, but its
-        # reconstructed payload would replace the persisted wire ordering.
-        delegation_payload = deepcopy(dict(payload))
+        # The immediate parent projected the validated typed payload.  Keep
+        # that order as the public mapping/wire contract while the record
+        # layer takes its private recursive copy below.
+        delegation_payload = typed_envelope.to_payload()
         # The role a run acts for is carried as an event relation, not a payload
         # field: `relation.predicate` and `typedRef.kind` are open patterns, so
         # this binding costs no schema change and an older reader ignores it.
