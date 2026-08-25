@@ -56,6 +56,7 @@ __all__ = (
     "DENY_ALL",
     "GRANT_LEVELS",
     "GRANT_NAMES",
+    "NON_TERMINAL_DELEGATION_STATES",
     "PROFILE_NARROWING",
     "agent_delegations",
     "descendants",
