@@ -1,0 +1,164 @@
+{
+  "schema": "agent_commons.work_metrics_fixture.v1",
+  "fixture_id": "work_metrics_v1",
+  "fixed_now": "2026-08-25T12:00:00Z",
+  "ledger_semantics_version": 2,
+  "cases": [
+    {
+      "case_id": "review_current_pair",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.started", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -10, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "reviewer", "verdict": "approved"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 1, "denominator": 1}
+    },
+    {
+      "case_id": "review_missing_pair",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -10, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -1, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_stale_pair",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"},
+        {"event_type": "event.corrected", "offset_seconds": -1, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_nonindependent_pair",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -10, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "builder", "independent": false},
+        {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "builder", "verdict": "approved"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "review_changes_requested",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -10, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -9, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -1, "actor_kind": "reviewer", "verdict": "changes_requested"}
+      ],
+      "expectation": {"metric_id": "review_disposition_latency", "state": "complete", "numerator": 8, "denominator": 1}
+    },
+    {
+      "case_id": "handoff_acknowledged",
+      "kind": "handoff",
+      "events": [
+        {"event_type": "handoff.created", "offset_seconds": -600, "actor_kind": "builder"},
+        {"event_type": "handoff.acknowledged", "offset_seconds": -60, "actor_kind": "reviewer"}
+      ],
+      "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "complete", "numerator": 540, "denominator": 1}
+    },
+    {
+      "case_id": "handoff_open_fresh",
+      "kind": "handoff",
+      "events": [
+        {"event_type": "handoff.created", "offset_seconds": -3600, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "unsupported", "numerator": null, "denominator": null}
+    },
+    {
+      "case_id": "handoff_open_aged",
+      "kind": "handoff",
+      "events": [
+        {"event_type": "handoff.created", "offset_seconds": -1296000, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "handoff_acknowledgement_latency", "state": "unsupported", "numerator": null, "denominator": null}
+    },
+    {
+      "case_id": "delegation_terminals",
+      "kind": "delegation",
+      "events": [
+        {"event_type": "delegation.requested", "offset_seconds": -100, "actor_kind": "builder"},
+        {"event_type": "delegation.succeeded", "offset_seconds": -90, "actor_kind": "builder"},
+        {"event_type": "delegation.failed", "offset_seconds": -80, "actor_kind": "builder", "reason_code": "provider_unavailable"},
+        {"event_type": "delegation.cancelled", "offset_seconds": -70, "actor_kind": "operator"},
+        {"event_type": "delegation.timed_out", "offset_seconds": -60, "actor_kind": "builder"},
+        {"event_type": "delegation.needs_operator", "offset_seconds": -50, "actor_kind": "builder", "reason_code": "provider_auth"},
+        {"event_type": "delegation.needs_operator", "offset_seconds": -40, "actor_kind": "builder", "reason_code": "unknown"}
+      ],
+      "expectation": {"metric_id": "needs_operator_rate", "state": "complete", "numerator": 2, "denominator": 6}
+    },
+    {
+      "case_id": "empty_review_queue",
+      "kind": "empty",
+      "events": [],
+      "expectation": {"metric_id": "current_review_coverage", "state": "empty", "numerator": null, "denominator": null}
+    },
+    {
+      "case_id": "strict_acceptance_valid",
+      "kind": "strict_acceptance",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -60, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -50, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -30, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -20, "actor_kind": "reviewer", "verdict": "approved"},
+        {"event_type": "task.accepted", "offset_seconds": -10, "actor_kind": "reviewer"}
+      ],
+      "expectation": {"metric_id": "false_strict_acceptance", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "strict_acceptance_invalid",
+      "kind": "strict_acceptance",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -60, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -50, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -30, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "task.accepted", "offset_seconds": -20, "actor_kind": "reviewer"},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"}
+      ],
+      "expectation": {"metric_id": "false_strict_acceptance", "state": "complete", "numerator": 1, "denominator": 1}
+    },
+    {
+      "case_id": "correction_and_retry",
+      "kind": "replay",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -19, "actor_kind": "reviewer", "independent": true},
+        {"event_type": "review.completed", "offset_seconds": -10, "actor_kind": "reviewer", "verdict": "approved"},
+        {"event_type": "event.corrected", "offset_seconds": -9, "actor_kind": "builder"},
+        {"event_type": "event.retry", "offset_seconds": -1, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    },
+    {
+      "case_id": "reordered_retry",
+      "kind": "replay",
+      "events": [
+        {"event_type": "event.retry", "offset_seconds": -1, "actor_kind": "builder"},
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"}
+      ],
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 0, "denominator": 1}
+    }
+  ]
+}
