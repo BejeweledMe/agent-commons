@@ -9,14 +9,19 @@
 
 ## 1. Рекомендация и границы
 
-Собрать **восемь логических ролей** и запускать не больше трёх worker-agents
-одновременно под координацией одного program lead: доступно четыре параллельных
-слота, включая координатора. В общем checkout среди них разрешён **ровно один
-Git writer**, остальные read-only. Три writer-а допустимы только когда program
-lead заранее подготовил каждому отдельный worktree/branch от одной pinned базы:
+Собрать **восемь логических ролей**. В текущем in-app Codex доступно четыре
+параллельных слота, включая координатора, то есть до трёх Codex worker-agents.
+Фактическая командная параллельность — минимум из этих Codex slots, прошедших
+preflight и бюджета доступных Claude worker profiles, числа изолированных
+worktree и способности program lead последовательно прогонять CI. В общем
+checkout среди всех провайдеров разрешён **ровно один Git writer**, остальные
+read-only. Три writer-а допустимы только когда program lead заранее подготовил
+каждому отдельный worktree/branch от одной pinned базы:
 результат передаётся только commit-ом, затем наступают quiescence, exact-revision
 review и последовательный cherry-pick/integration. Path claim не заменяет эту
-изоляцию и не делает незакоммиченные байты безопасными.
+изоляцию и не делает незакоммиченные байты безопасными. Claude, запускаемый
+через broker profile, требует его preflight; прямой console read-only reviewer
+не получает write tools и также не делает shared checkout writer-ом.
 
 Это план **команды, реализующей продукт**, а не разрешение продуктовым агентам
 самим рекурсивно нанимать подчинённых. Действующее
@@ -71,7 +76,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | 1. Program lead / integrator | Декомпозиция, decisions, task graph, claims, exact-revision integration, CI. Не пишет feature semantics за другие роли. | coordination records, integration commits | Вся программа |
 | 2. Semantic architect + governance | H0: ADR/RFC для local parent acceptance, risk review и upward escalation; старые данные, replay, rollback, typed refusals. | новый ADR / proposal, golden fixture specification | Wave 1 |
-| 3. Structural architect | Точный первый незавершённый slice из A3 -> A4 -> A4.5 -> A5 -> A8, без поведения. | один audit module per task | Wave 1 |
+| 3. Structural architect | Сначала R-status reconciliation по exact task/review revisions; затем точный первый не принятый slice по порядку audit-plan, без поведения. | один audit module per task | Wave 1 |
 | 4. Eval / QA engineer | W0 metric dictionary, sanitised fixtures, L0/L1 graders, regression matrix и release gates. | `tests/evals_harness/`, dedicated test paths, eval docs | Wave 1 |
 | 5. Python work-state engineer | W1 frozen read models, `RunView`, work health, reason codes. | `domain/work_state.py`, `services/work_metrics.py` | После G1 |
 | 6. Attention UI engineer | Parent queues, human pull reads, typed UI DTO, explanation-first UX. | `ui/attention_queue.py` adapter over `domain.attention.awaits_human()`, `ui/read_dtos.py`, designated React subtree | После W1 contract |
@@ -89,7 +94,7 @@ immutable subject revision и не изменяет его bytes.
 Активны: program lead, semantic architect, structural architect, eval/QA.
 
 - semantic architect не пишет runtime code: выпускает H0 и fixture contract;
-- structural architect продолжает только подтверждённый первый незавершённый audit slice;
+- structural architect сначала выпускает R-status reconciliation, затем продолжает только подтверждённый первый не принятый audit slice;
 - eval engineer измеряет baseline и готовит deterministic cases без production metric surface;
 - program lead принимает только non-overlapping результаты и назначает reviews.
 
@@ -97,8 +102,8 @@ immutable subject revision и не изменяет его bytes.
 оформляет результаты этих трёх ролей, а две другие роли остаются read-only до
 quiescence и exact-revision review.
 
-**Выход:** H0 готова к owner/reviewer decision; статус точного следующего
-audit slice и A5/A7 перепроверен;
+**Выход:** H0 готова к owner/reviewer decision; R-status matrix фиксирует
+точный следующий audit slice и статус A5/A7;
 fixtures не меняют production semantics.
 
 ### Wave 2 — параллельные read-only и Gallery результаты
