@@ -159,21 +159,21 @@ independent review до W3. `W*` — новая control-plane программа
 | Derived work vocabulary | `domain/work_state.py` | `ExecutionPhase`, `AcceptancePhase`, frozen `AcceptanceView`, `ReviewLoopGap`, `derive_acceptance_view(...)` | Python domain + software architecture | W1, после typed task/review slice A5 |
 | Dependency readiness | `domain/work_readiness.py` | frozen `TaskReadiness`, `ReadinessReason`, `evaluate_task_readiness(task, snapshot, policy) -> TaskReadiness` | Python domain | W5 only; pure, deterministic |
 | Derived run join | `domain/work_state.py` or narrow `domain/run_view.py` | frozen `RunView`, `derive_run_view(delegation, attempts, task, reviews)` | Python domain + runtime | W1; no ID/event |
-| Metrics | `services/work_metrics.py` | `MetricWindow`, `WorkHealthMetrics`, `measure_work_health(snapshot, observed_at)` | Python backend + ML/evals | W0/W1 |
+| Metrics | `services/work_metrics.py` | frozen non-canonical `MetricObservation`, `MetricWindow`, `WorkHealthMetrics`, `measure_work_health(snapshot, observed_at)` | Python backend + ML/evals | W0/W1 |
 | Advisory planning | `services/work_planning.py` | `WorkCandidate`, `build_pull_plan(snapshot, policy, now) -> tuple[WorkCandidate, ...]` | Backend + product | W5 only; no write/assignment |
-| Parent closure policy | `domain/delegation_acceptance.py` | frozen `ParentAcceptanceDecision`, `ParentAcceptanceHold`, `decide_parent_acceptance(...)` | Python domain + product/governance | W3 after H0; distinct from `task.accepted` |
-| Risk-review policy | `domain/review_pairing.py` | frozen `ReviewRequirement`, `ReviewPairingDecision`, `ReviewPairingRefusal`, `decide_review_pairing(...)` | Python domain + product/governance | W3 after H0; product/security/competence triggers |
+| Parent closure policy | `domain/delegation_acceptance.py` | frozen `ParentAcceptanceDecision`, `ParentAcceptanceHold`, `AuthoritativeParentBinding`, `decide_parent_acceptance(...)` | Python domain + product/governance | W3 after H0; distinct from `task.accepted` |
+| Risk-review policy | `domain/review_pairing.py` | versioned frozen `ReviewRequirement` (scope, reason, policy version, required competence/authority, subject revision), `ReviewPairingDecision`, `ReviewPairingRefusal`, `decide_review_pairing(...)` | Python domain + product/governance | W3 after H0; product/security/competence triggers |
 | Hierarchical closure orchestration | `services/delegation_acceptance.py`, `services/review_pairing.py` | narrow ports for parent closure, pair-or-hold, exact-revision retry; no facade method | Python backend | W3; never a `CommonsManager` method |
-| Escalation policy | `domain/escalation.py`, `services/escalations.py` | frozen `EscalationRequirement`, `EscalationPacket`, `route_to_parent(...)` | Python domain/backend + product | W3 after H0; parent-to-parent only |
+| Escalation policy | `domain/escalation.py`, `services/escalations.py` | frozen `EscalationRequirement`, `EscalationPacket`, `route_to_immediate_parent(...)`, typed audited human override | Python domain/backend + product | W3 after H0; parent-to-parent only |
 | Finalisation boundary | `services/delegation_finalization.py` | `FinalizationEvidence`, `FinalizationOutcome`, `DelegationFinalizationService.evaluate(...)` | Runtime/backend + security | W4 after decision |
 | Existing runtime integration | `services/delegation_runtime.py` | composition call into finalisation service only; preserve provider contract until behavioural change is approved | Runtime/backend | W4 |
-| Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | frozen card DTO mapping, deterministic grouping/dedup; `list_attention_queue(...)` | Python UI backend | W1/W3; parent queue plus human pull reads |
+| Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | adapter over `domain.attention.awaits_human()`, frozen card DTO mapping, deterministic merge/dedup and parity checks; `list_attention_queue(...)` | Python UI backend | W1/W3; parent queue plus human pull reads |
 | UI wire types | `ui/read_dtos.py` | `TypedDict` payloads for Work Health, `RunView`, Attention and typed refusal | Backend + frontend | A7/W1 |
 | HTTP transport | `ui/server.py`, `ui/security.py` | thin read endpoints; existing mutation routes only after semantic decision | Python UI/backend + security | W1/W3 |
 | MCP transport | `mcp/tools/work.py` after A4 MCP registration split | `register_work_tools(scope)`; no lifecycle rules in tool closure | Platform/MCP | W1; no growth in `build_server` |
 | Eval harness | existing public `agent_commons.evals` + `tests/evals_harness/` as permitted by audit | fixture workspace, state graders, trace sanitation, replay regressions | QA + ML/evals + backend | W0 onward |
-| Context compilation | `services/delegation_instruction.py`, then `services/context_compiler.py` | approved `CompiledContext` and frozen binding from the separate plan | Runtime/backend + ML/security | P3/F3-F4 only |
-| Gallery reads | `services/artifact_content.py`, `ui/reads.py`, React Flow subtree | verified image reader, revision-bound Gallery DTO; existing contracts from Gallery plan | Backend/security + frontend/design | P2/F1-F2 |
+| Context compilation | `services/delegation_instruction.py`, then `services/context_compiler.py` | approved `CompiledContext`, source classification/snapshot, effective-child-grant check and typed redaction/refusal | Runtime/backend + ML/security | P3/F3-F4 only |
+| Gallery reads | `services/artifact_content.py`, `ui/reads.py`, React Flow subtree | F1/F2 conformance/regression, revision-bound Gallery DTO; F4 role/task/run entry and provenance-bound feedback from the separate plan | Backend/security + frontend/design | P2/F1-F2, then F4 |
 
 ### 3.1. Contract rules for the new work plane
 
@@ -197,6 +197,14 @@ independent review до W3. `W*` — новая control-plane программа
    facts. A valid finalisation never equals task acceptance.
 6. Any UI/MCP mutation supplies expected revision and idempotency key;
    readers expose typed refusal, empty, stale and unavailable states.
+7. `MetricObservation` is derived/non-canonical and identifies the input with
+   snapshot or fixture hash, query version, code revision and observed-at. W0
+   first ships only fixtures, formulas and documentation; no production metric
+   surface is owned until G1.
+8. A Context Pack compiler first checks the classification of every selected
+   source and the effective grants of each child role. Unknown classification,
+   missing grant or unsafe content gives typed redaction/refusal; an immutable
+   binding never widens a child's access.
 
 ## 4. Delivery phases
 
@@ -227,10 +235,11 @@ green; no W/P code is smuggled into it.
 
 Deliverables:
 
-1. A versioned, read-only metric query and data dictionary: snapshot revision,
-   time window, numerator, denominator, exclusion and query version for review
-   coverage, `needs_operator` taxonomy, handoff age, objective coverage and
-   operator routing load.
+1. A versioned, read-only metric query and data dictionary: snapshot or fixture
+   hash, code revision, observed-at, time window, numerator, denominator,
+   exclusion and query version for review coverage, `needs_operator` taxonomy,
+   handoff age, objective coverage and operator routing load. This identifies a
+   reproducible `MetricObservation`; it does not create a canonical metric event.
 2. A sanitised fixture workspace and golden replay corpus. It contains no live
    workspace copy, private worker output, random timestamps or secrets.
 3. Deterministic W0 cases: unpaired submitted task, stale request, self-review
@@ -246,8 +255,9 @@ a work package: it needs a later explicit owner supersede or a UI replacement.
 
 **Exit gate:** each metric has an owner and action; fixtures run in a fresh
 workspace; replay equivalence is demonstrated for unchanged behaviour; owner
-has selected *which* loop may enter W3. Historical 24-Aug figures never pass
-this gate by themselves.
+has selected *which* loop may enter W3. W0 remains fixture/formula/documentation
+work until G1 assigns a production read surface. Historical 24-Aug figures
+never pass this gate by themselves.
 
 ### Phase W1 — derived work health, before automation
 
@@ -260,7 +270,10 @@ Deliverables:
   over existing projections;
 - deterministic read-side metrics and reason-code links to exact subject
   revisions/evidence;
-- read-only operator Attention Queue with deduplication and controlled clock;
+- read-only operator Attention Queue built over the existing
+  `domain.attention.awaits_human()` selector, with deterministic merge/dedup,
+  controlled clock and a parity test proving that existing canonical attention
+  items retain the same owner and next action;
 - low-noise UI/MCP work-health read surfaces after their A4/A7 seams
   exist. `task next` and dependency readiness remain deferred to W5 and are
   not a prerequisite for repairing the review loop.
@@ -302,17 +315,37 @@ The vertical has three deliberately separate outcomes:
 
 H0 must choose and specify the event vocabulary/order, old-data handling,
 crash/retry/CAS/replay behaviour, route or hold semantics, visibility and
-rollback. A composite user action may use an idempotent reconciler internally,
-but a success response cannot silently leave a policy-required review unpaired.
-Historical repair remains a separate operator-confirmed reversible batch: it
-only appends history and never disposes of old work.
+rollback. Its mandatory transition table binds each closure to the exact
+delegation/result revision and one `AuthoritativeParentBinding`; it defines
+`accepted`, `returned` and `held`, one live closure per result, retry/invalidation
+behaviour and the paths `required review -> approved -> parent close`,
+`changes requested -> returned` and `blocked decision -> hold`. The binding
+source, legacy/human fallback and replay invariant are owner-reviewed rather
+than inferred from a session alone.
+
+`ReviewRequirement` is a versioned policy input: scope, reason code, policy
+version, subject revision and required competence/authority are mandatory.
+Unknown or conflicting classification, or absence of a qualified independent
+reviewer, is a typed hold. A composite user action may use an idempotent
+reconciler internally, but a success response cannot silently leave a
+policy-required review unpaired.
+
+The same RFC defines the immediate-parent route for both typed escalation and
+existing thread/handoff entry points: a subordinate cannot address `operator`,
+`*` or an upper-level agent directly. A human may use an explicit, audited
+override with reason and expected revision. The human-action matrix distinguishes
+inspect, comment/request clarification, return, reassign, request independent
+review, resolve/escalate and strict `task.accepted`; each has an actor, evidence
+and lifecycle effect. Historical repair remains a separate operator-confirmed
+reversible batch: it only appends history and never disposes of old work.
 
 **Exit gate:** every new in-scope delegated result has one explicit local
 outcome (parent accepted, returned, or hold); 100% of policy-required review
-transitions are paired or explicitly held; false strict acceptance = 0;
-self-review = 0; every escalation card names its immediate owner, exact
-revision, reason and next safe action. Disabling the new path preserves ledger
-history and returns only to the prior explicit flow.
+transitions are paired or explicitly held; `false_strict_acceptance = 0` and
+`invalid_local_closure = 0` under their separate definitions; self-review = 0;
+every escalation card names its immediate owner, exact revision, reason and next
+safe action. Disabling the new path preserves ledger history and returns only to
+the prior explicit flow.
 
 ### Phase W4 — runtime preflight and bounded finalisation
 
@@ -417,7 +450,8 @@ reasoning, raw provider args/output and secrets are excluded.
 | --- | --- | --- | --- |
 | Local parent-closure coverage | explicit parent accepted, returned or held results / all new in-scope delegated results | Hard invariant: 100% only after H0/W3 | Workflow owner: investigate any missing outcome; never infer closure from provider exit. |
 | Required-review pairing coverage | paired current independently-routable requests / all new in-scope required-review revisions | Hard invariant: 100% only after H0/W3 | Workflow owner: hold/refuse bad transition, investigate any gap. |
-| False acceptance | accepts without required current independent evidence / all accepts | Hard invariant: 0 | Governance owner: invalidate/disable path, incident review. |
+| False strict acceptance | `task.accepted` transitions without required current independent evidence / all strict task acceptances | Hard invariant: 0 | Governance owner: invalidate/disable path, incident review. |
+| Invalid local closure | local closures whose `ReviewRequirement=required` lacks current qualified evidence, or whose parent/result binding is stale / all local closures | Hard invariant: 0 | Workflow owner: create typed hold, invalidate/reconcile the closure and add a regression case. |
 | Self-review / stale launch | prohibited self-review or stale-target launch / all respective attempts | Hard invariant: 0 | Runtime/governance: block/kill switch. |
 | Finalisation integrity | valid attested terminal canonical results / eligible terminal outcomes | Hard safety gate: 0 invalid successes; broadening needs 50 observed eligible gap-free outcomes | Runtime/security: disable finaliser and add regression case. |
 | `needs_operator` taxonomy completeness | typed reason cases / all terminal `needs_operator` cases | Data-quality invariant: 100% | Runtime: classify before announcing rate improvement. |
@@ -460,6 +494,7 @@ weaken hash/schema verification or supply an excuse to change event meaning.
 | Pull planning | dry-run by default, explanation/policy/revision included, write re-check through existing command | remove recommendation surface; backend/product |
 | Writable runs | single worker until isolated worktree + attestation + merge owner are approved | retain manual execution; runtime/security |
 | Evals/traces | sanitised fixtures and bounded metadata; retention/erasure decision before L3 | stop canary/data collection; ML-evals/privacy |
+| Context Pack | source classification/snapshot and effective child grant before compile; typed redaction/refusal on unknown or unsafe content | disable compile/fan-out surface; preserve immutable bindings; security/runtime |
 | Gallery preview | existing PNG/JPEG, current revision, classification and verified-reader contract | disable preview route; no raw URL fallback; security/backend |
 
 ## 8. Context Pack and Design Gallery remain a parallel approved programme
@@ -474,8 +509,8 @@ PNG/JPEG; demo and `runtime.yaml` are not product state.
 | --- | --- | --- |
 | F1 verified image preview | Supported as implemented by fact check; must retain its security contract. | Shares artifact revision/classification discipline only. |
 | F2 React Flow Gallery shell | Supported as an honest shell returning `gallery_data_unavailable` until Design Package reads exist. | Does not prove work closure or scheduler value. |
-| F3 Context Pack semantic slice | Already approved but still a separate schema/event/projection/migration project after A8. | May later supply frozen binding/fingerprint to `RunView`; it does not promise provider KV-cache reuse. |
-| F4 Design Package, feedback provenance and compiler | Approved programme work after its own gates. | Feedback V1 can open existing review discussion; automatic task/region annotations need another workflow decision. |
+| F3 Context Pack semantic slice | Separate schema/event/projection/migration project after A8, gated by source classification/snapshot, effective child grants, typed redaction/refusal and leakage tests. The owner later chooses the revision-selection UX and pilot criteria. | May later supply frozen binding/fingerprint to `RunView`; it does not promise provider KV-cache reuse. |
+| F4 Design Package, feedback provenance and compiler | Approved programme work after its own gates. F1/F2 are internal readiness, not user-value proof; the first user path is published package -> ordered cards -> safe preview -> feedback. | The role/task/run entry point, package/screen revision, producer recipient, desired outcome and feedback status are typed provenance; automatic task/region annotations need another workflow decision. |
 | Manifest, token policy, cache, Pack diff | Proposed extension, not silently added. | D8 plus deterministic selection/leakage/truncation/cache-key evals required. |
 
 Cross-dependencies are intentionally narrow: A5/A7/A8 typed/revision seams,
@@ -498,7 +533,7 @@ not borrow scheduler, arbitrary media or editing scope to look more complete.
 | H0-hierarchical RFC | Event/schema/replay/rollback proposal for accepted local-parent closure, risk review and upward escalation | Product, software architecture, Python backend, governance, QA | accepted D1/D2 | ADR/proposal and golden old-ledger fixtures only |
 | W3-closure | Parent acceptance, policy-required review pairing and escalation vertical | Python domain/backend, governance, QA, UI | H0 accepted plus W1 reads | `domain/delegation_acceptance.py`, `domain/review_pairing.py`, `domain/escalation.py`, narrow services |
 | W4-finaliser | Preflight/finalisation contract | Runtime, security, QA/ML-evals | D3, W0 L2 harness | `services/delegation_finalization.py` |
-| P-F1/F2 | Safe preview and Gallery reads/shell | Backend/security, frontend/design | approved programme gates | designated Gallery subtree; no legacy `index.html` |
+| P-F1/F2 | Conformance/regression for existing safe preview and Gallery shell | Backend/security, frontend/design | approved programme gates | designated Gallery subtree; no legacy `index.html` |
 | P-F3/F4 | Pack/Package semantic slices | Python domain/backend, runtime, security, frontend/design | A8 + existing accepted decisions | separate schemas/reducers/services |
 
 The single-writer claim on `src/agent_commons/ui/static/index.html` remains

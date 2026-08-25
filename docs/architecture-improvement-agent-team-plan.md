@@ -9,11 +9,14 @@
 
 ## 1. Рекомендация и границы
 
-Собрать **восемь логических ролей**, но запускать не больше трёх пишущих
-worker-agents одновременно под координацией одного program lead: доступно
-четыре параллельных слота, включая координатора. Восемь одновременных writers
-не ускорят программу: они создадут конфликт claims, статического UI и долгих
-полных проверок.
+Собрать **восемь логических ролей** и запускать не больше трёх worker-agents
+одновременно под координацией одного program lead: доступно четыре параллельных
+слота, включая координатора. В общем checkout среди них разрешён **ровно один
+Git writer**, остальные read-only. Три writer-а допустимы только когда program
+lead заранее подготовил каждому отдельный worktree/branch от одной pinned базы:
+результат передаётся только commit-ом, затем наступают quiescence, exact-revision
+review и последовательный cherry-pick/integration. Path claim не заменяет эту
+изоляцию и не делает незакоммиченные байты безопасными.
 
 Это план **команды, реализующей продукт**, а не разрешение продуктовым агентам
 самим рекурсивно нанимать подчинённых. Действующее
@@ -56,8 +59,8 @@ flowchart TD
 
 | Gate | Что должно быть верно | Что блокирует |
 | --- | --- | --- |
-| G0 | H0 описывает event/schema, replay, idempotency, compatibility и rollback; её принимают владелец и независимый reviewer. | Любой W3 write path. |
-| G1 | A5/A7 дают требуемые typed task/review/delegation и UI seams; W0 фиксирует baseline и deterministic graders. | W1 typed read surfaces. |
+| G0 | H0 описывает event/schema, replay, idempotency, compatibility и rollback, authoritative parent binding, one-live-closure state machine, fail-closed `ReviewRequirement` и immediate-parent route; её принимают владелец и независимый reviewer. | Любой W3 write path. |
+| G1 | Первый незавершённый audit slice подтверждён по audit-plan; A5/A7 дают требуемые typed task/review/delegation и UI seams; W0 фиксирует reproducible baseline и deterministic graders. | W1 typed read surfaces. |
 | G2 | W1 читает состояние детерминированно; Attention прошла human precision sample. | Поведенческий W3. |
 | G3 | W3 доказывает local closure, policy review pairing, no self-review и корректную эскалацию. | W4 finalisation и любой `task next`. |
 | G4 | D3/D4 приняты отдельно, security/evals зелёные. | W4/W5 соответственно. |
@@ -68,12 +71,12 @@ flowchart TD
 | --- | --- | --- | --- |
 | 1. Program lead / integrator | Декомпозиция, decisions, task graph, claims, exact-revision integration, CI. Не пишет feature semantics за другие роли. | coordination records, integration commits | Вся программа |
 | 2. Semantic architect + governance | H0: ADR/RFC для local parent acceptance, risk review и upward escalation; старые данные, replay, rollback, typed refusals. | новый ADR / proposal, golden fixture specification | Wave 1 |
-| 3. Structural architect | Невыполненные A5-A8 строго в порядке аудита, без поведения. | один audit module per task | Wave 1 |
+| 3. Structural architect | Точный первый незавершённый slice из A3 -> A4 -> A4.5 -> A5 -> A8, без поведения. | один audit module per task | Wave 1 |
 | 4. Eval / QA engineer | W0 metric dictionary, sanitised fixtures, L0/L1 graders, regression matrix и release gates. | `tests/evals_harness/`, dedicated test paths, eval docs | Wave 1 |
 | 5. Python work-state engineer | W1 frozen read models, `RunView`, work health, reason codes. | `domain/work_state.py`, `services/work_metrics.py` | После G1 |
-| 6. Attention UI engineer | Parent queues, human pull reads, typed UI DTO, explanation-first UX. | `ui/attention_queue.py`, `ui/read_dtos.py`, designated React subtree | После W1 contract |
-| 7. Context Pack engineer | Уже одобренные F3/F4 slices, context compiler and provenance only. | separate Pack schemas/reducers/services; no KV-cache extension | После A8 |
-| 8. Gallery engineer | F1/F2 verified PNG/JPEG preview and React Flow Gallery reads/shell. | designated Gallery backend and React Flow subtree; no legacy static UI writer overlap | Параллельно, по Gallery gates |
+| 6. Attention UI engineer | Parent queues, human pull reads, typed UI DTO, explanation-first UX. | `ui/attention_queue.py` adapter over `domain.attention.awaits_human()`, `ui/read_dtos.py`, designated React subtree | После W1 contract |
+| 7. Context Pack engineer | Уже одобренные F3/F4 slices, context compiler and provenance only. | separate Pack schemas/reducers/services; source classification/effective child grant/redaction gate; no KV-cache extension | После A8 |
+| 8. Gallery engineer | F1/F2 conformance/regression, затем F4 role/task/run entry and provenance-bound feedback. | designated Gallery backend and React Flow subtree; no legacy static UI writer overlap | Параллельно, по Gallery gates |
 
 Security/reliability review — не девятая competing write lane: это обязательная
 независимая review роль для H0, W3, W4 и preview boundary. Она получает
@@ -86,11 +89,16 @@ immutable subject revision и не изменяет его bytes.
 Активны: program lead, semantic architect, structural architect, eval/QA.
 
 - semantic architect не пишет runtime code: выпускает H0 и fixture contract;
-- structural architect продолжает только очередной незавершённый audit slice;
-- eval engineer измеряет baseline и готовит deterministic cases;
+- structural architect продолжает только подтверждённый первый незавершённый audit slice;
+- eval engineer измеряет baseline и готовит deterministic cases без production metric surface;
 - program lead принимает только non-overlapping результаты и назначает reviews.
 
-**Выход:** H0 готова к owner/reviewer decision; A5/A7 status перепроверен;
+Если у writer-ов нет отдельных worktree, один назначенный writer последовательно
+оформляет результаты этих трёх ролей, а две другие роли остаются read-only до
+quiescence и exact-revision review.
+
+**Выход:** H0 готова к owner/reviewer decision; статус точного следующего
+audit slice и A5/A7 перепроверен;
 fixtures не меняют production semantics.
 
 ### Wave 2 — параллельные read-only и Gallery результаты
@@ -115,18 +123,22 @@ W3 выпускается маленькими commits: canonical semantic write
 service orchestration, UI adapter, then independent review. Никакого параллельного
 изменения тех же event families или lifecycle validators.
 
-**Выход:** G3; только затем планируется W4. Другие готовые роли не простаивают:
-они продолжают Gallery/Pack или следующую structural slice, если claims не
-пересекаются.
+**Выход:** G3; только затем планируется W4. Wave 3 уже использует все четыре
+слота: новая write-роль стартует лишь после явной паузы/завершения одного
+участника и quiescence его worktree. Gallery/Pack/structural работа продолжается
+только в отдельном worktree и не одновременно с его review/integration.
 
 ## 5. Операционный контракт команды
 
 1. Один task — один проверяемый outcome и один активный writer claim на путь.
+   В общем checkout только один Git writer; параллельные writer-ы получают
+   отдельные worktree/branches от pinned base и передают только commit.
 2. До любого write: `doctor`, bounded orient/inbox, task take/start, narrow claim.
 3. Каждый agent передаёт exact commit, changed paths, `make check` evidence,
    remaining risks и request for review; не передаёт raw transcripts или secrets.
 4. Structure и behaviour — разные commits. Полный `make check` и GitHub CI
-   сериализуются program lead, чтобы shared checkout не смешивал evidence.
+   сериализуются program lead после quiescence, чтобы shared checkout не смешивал
+   evidence; integration идёт одним последовательным commit/cherry-pick потоком.
 5. Independent reviewer не пишет subject и проверяет immutable exact revision.
 6. `src/agent_commons/ui/static/index.html` остаётся single-writer path; ни одна
    из этих волн не получает исключения из `FRONTEND_CONTRACT.md`.
