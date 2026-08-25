@@ -11,11 +11,13 @@
 
 Собрать **восемь логических ролей**. В текущем in-app Codex доступно четыре
 параллельных слота, включая координатора, то есть до трёх Codex worker-agents.
-Фактическая командная параллельность — минимум из этих Codex slots, прошедших
-preflight и бюджета доступных Claude worker profiles, числа изолированных
-worktree и способности program lead последовательно прогонять CI. В общем
-checkout среди всех провайдеров разрешён **ровно один Git writer**, остальные
-read-only. Три writer-а допустимы только когда program lead заранее подготовил
+Claude образует отдельный provider pool: к этим трём можно добавить только тех
+Claude workers, для которых прошли профильный preflight и budget reservation.
+Число **writer-ов** при этом ограничено количеством изолированных worktree и
+способностью program lead последовательно прогонять CI; read-only reviewers
+могут работать без отдельного worktree. В общем checkout среди всех провайдеров
+разрешён **ровно один Git writer**, остальные read-only. Три writer-а допустимы
+только когда program lead заранее подготовил
 каждому отдельный worktree/branch от одной pinned базы:
 результат передаётся только commit-ом, затем наступают quiescence, exact-revision
 review и последовательный cherry-pick/integration. Path claim не заменяет эту

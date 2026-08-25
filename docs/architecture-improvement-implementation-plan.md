@@ -213,14 +213,16 @@ independent review до W3. `W*` — новая control-plane программа
 **Purpose:** make target seams available, not add control-plane semantics.
 
 The original audit records A0–A2.2 as performed and lays out A3–A8, but its
-status text is not a launch authority: the live ledger already contains accepted
-A3 and completed/review A4/A4.5 slices. **R-status reconciliation** is the first
-structural action of every Wave 1: read the exact task/review revisions for
-A3–A8, publish an immutable accepted/review/incomplete matrix, and choose the
-first unaccepted slice from that matrix. No structural writer starts by assuming
-that A3 is open; A6's permitted profiling exception remains governed by the
-audit plan. Each eventual completion is confirmed by its own exact-revision
-review.
+status text is not a launch authority: the live ledger already contains a
+`completed_unaccepted` A3 and completed/review A4/A4.5 slices. **R-status
+reconciliation** is the first structural action of every Wave 1: read the exact
+task/review revisions for A3–A8, publish an immutable matrix with separate exact
+task state and review state (`ready`, `active`, `completed_unaccepted`,
+`submitted/review_requested`, `accepted`), and choose the first unaccepted slice
+from that matrix. A completed A3 receives exact-revision review rather than a
+repeat source write. No structural writer starts by assuming that A3 is open;
+A6's permitted profiling exception remains governed by the audit plan. Each
+eventual completion is confirmed by its own exact-revision review.
 
 | Audit step | Control-plane benefit | Constraint / owner |
 | --- | --- | --- |
