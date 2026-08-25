@@ -10,9 +10,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import cache
 from typing import Literal, NotRequired, TypeAlias, TypedDict, cast
 
+from agent_commons.core.schema_registry import SchemaRegistry
+
 from .envelopes import EventEnvelope, FrozenJsonObject, JsonValue, TypedRef, TypedRefPayload
+from .validation import validate_payload
 
 
 class RevisionBoundRefPayload(TypedDict):
@@ -234,9 +238,16 @@ TaskReviewEnvelope: TypeAlias = TaskEnvelope | ReviewEnvelope
 def parse_task_review_envelope(
     event_type: str, payload: Mapping[str, object]
 ) -> TaskReviewEnvelope | None:
-    """Parse a task or review payload that has already passed validation."""
+    """Parse one task or review payload under its normal validation contract.
+
+    Storage and projection normally validate an event before reaching this
+    parser.  The exported parser applies that same domain and family-schema
+    contract defensively, so a direct caller cannot construct a typed envelope
+    from malformed input.
+    """
 
     if event_type in _TASK_EVENT_TYPES:
+        _validate_family_payload(event_type, payload, "commons.payload.task.v1")
         return TaskEnvelope(
             event_type=cast(TaskEventType, event_type),
             task_id=_required_string(payload, "task_id"),
@@ -257,6 +268,7 @@ def parse_task_review_envelope(
             extensions=_optional_frozen_object(payload, "extensions"),
         )
     if event_type in _REVIEW_EVENT_TYPES:
+        _validate_family_payload(event_type, payload, "commons.payload.review.v1")
         return ReviewEnvelope(
             event_type=cast(ReviewEventType, event_type),
             review_id=_required_string(payload, "review_id"),
@@ -271,6 +283,24 @@ def parse_task_review_envelope(
             extensions=_optional_frozen_object(payload, "extensions"),
         )
     return None
+
+
+@cache
+def _payload_schemas() -> SchemaRegistry:
+    """Load the packaged payload schemas once for defensive direct parsing."""
+
+    return SchemaRegistry()
+
+
+def _validate_family_payload(
+    event_type: str,
+    payload: Mapping[str, object],
+    schema_name: str,
+) -> None:
+    """Apply the existing domain and JSON Schema payload contract."""
+
+    validate_payload(event_type, payload)
+    _payload_schemas().validate(schema_name, payload)
 
 
 def _required_string(payload: Mapping[str, object], field: str) -> str:
