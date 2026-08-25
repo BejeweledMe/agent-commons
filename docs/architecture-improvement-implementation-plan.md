@@ -24,21 +24,27 @@ assessment-отчёта в [`docs/reviews/`](reviews/). Входные review о
 
 Нужно развивать две независимые продуктовые ставки:
 
-1. **Замкнуть управляемую петлю работы.** Пользователь должен видеть, что
-   submitted work либо дошёл до актуальной независимой проверки, либо получил
-   объяснимое безопасное следующее действие. Нельзя подменять это новым
-   scheduler-ом, provider exit или количеством ролей.
+1. **Замкнуть управляемую петлю работы.** Большинство делегированных
+   технических результатов принимает их непосредственный parent-owner.
+   Независимая проверка нужна лишь для заранее определённых рисков,
+   компетентностного разрыва или вопроса вне полномочий parent-owner; тогда
+   работа получает актуальный review request либо объяснимый hold. Вопросы
+   эскалируются на один уровень за раз, а человек сохраняет pull-доступ к
+   любой ветке. Нельзя подменять это scheduler-ом, provider exit или
+   количеством ролей.
 2. **Не потерять ценность общего исследования и визуальных результатов.**
    Утверждённые Context Pack и read-only Design Gallery продолжаются отдельной
    программой с их собственными semantic gates; это не демонстрация автономии
    и не зависимость от scheduler-а.
 
 Первый минимальный вертикальный результат — не «автономная компания», а
-**review-pairing loop**: для каждого нового task revision, который по выбранной
-политике требует independent review, появляется ровно один актуальный,
-маршрутизируемый review request либо typed refusal/hold с понятной причиной.
-`completed` при этом не становится `accepted`, а provider completion не
-становится review или acceptance.
+**hierarchical closure loop**: parent-owner либо локально принимает результат
+своей делегации, либо поднимает его в требуемую независимую проверку или
+эскалацию. Локальная приёмка не является independent review и не меняет
+строгий смысл `task.accepted`; provider completion не становится ни review,
+ни acceptance. Политика утверждена в
+`decision.3JJTDQ7J5RN8846K8FGG9QKAM1` и совместима с действующим строгим
+`decision.2FFQCGQKQ21VS1MQHNFCQEZWKJ`.
 
 ### 1.1. Что подтверждено, что требует переизмерения
 
@@ -117,11 +123,10 @@ flowchart TD
     A7 --> A8[A8 collaborators instead of facade]
   end
 
-  M0[W0: versioned read-only measurement + eval fixtures] --> D1{Owner: review-pairing contract}
+  M0[W0: versioned read-only measurement + eval fixtures] --> H0[H0: hierarchical-closure semantic RFC]
   A8 --> W1[W1: derived WorkState / RunView / metrics / Attention reads]
   M0 --> W1
-  D1 --> W3[W3: review-pairing behavioural vertical]
-  D2{Owner: reviewer routing and independence} --> W3
+  H0 --> W3[W3: parent closure, risk review, escalation]
   W1 --> W3
 
   D3{Owner: finalisation trust envelope} --> W4[W4: preflight then parent finalizer]
@@ -137,9 +142,12 @@ flowchart TD
   W3 -. provenance only, no scheduler dependency .-> P3
 ```
 
-`W*` — новая control-plane программа. `P*` — уже утверждённая программа
-Context Pack / Gallery. Рёбра из решений означают **stop gate**, а не
-предварительно выбранный вариант.
+`H0` не переоткрывает продуктовую политику: он переводит принятое
+`decision.3JJTDQ7J5RN8846K8FGG9QKAM1` в event/schema, replay,
+compatibility и rollback contract, который должен пройти отдельное owner и
+independent review до W3. `W*` — новая control-plane программа. `P*` — уже
+утверждённая программа Context Pack / Gallery. Рёбра из решений означают
+**stop gate**, а не предварительно выбранный вариант.
 
 ## 3. Целевая карта компонентов и contracts
 
@@ -153,11 +161,13 @@ Context Pack / Gallery. Рёбра из решений означают **stop g
 | Derived run join | `domain/work_state.py` or narrow `domain/run_view.py` | frozen `RunView`, `derive_run_view(delegation, attempts, task, reviews)` | Python domain + runtime | W1; no ID/event |
 | Metrics | `services/work_metrics.py` | `MetricWindow`, `WorkHealthMetrics`, `measure_work_health(snapshot, observed_at)` | Python backend + ML/evals | W0/W1 |
 | Advisory planning | `services/work_planning.py` | `WorkCandidate`, `build_pull_plan(snapshot, policy, now) -> tuple[WorkCandidate, ...]` | Backend + product | W5 only; no write/assignment |
-| Review-pair policy | `domain/review_pairing.py` | frozen `ReviewPairingDecision`, `ReviewPairingRefusal`, `decide_review_pairing(...)` | Python domain + product | W3 after owner decision |
-| Review-pair orchestration | `services/review_pairing.py` | `ReviewPairingService.pair_or_refuse(...)` over narrow task/review/event ports | Python backend | W3; never a `CommonsManager` method |
+| Parent closure policy | `domain/delegation_acceptance.py` | frozen `ParentAcceptanceDecision`, `ParentAcceptanceHold`, `decide_parent_acceptance(...)` | Python domain + product/governance | W3 after H0; distinct from `task.accepted` |
+| Risk-review policy | `domain/review_pairing.py` | frozen `ReviewRequirement`, `ReviewPairingDecision`, `ReviewPairingRefusal`, `decide_review_pairing(...)` | Python domain + product/governance | W3 after H0; product/security/competence triggers |
+| Hierarchical closure orchestration | `services/delegation_acceptance.py`, `services/review_pairing.py` | narrow ports for parent closure, pair-or-hold, exact-revision retry; no facade method | Python backend | W3; never a `CommonsManager` method |
+| Escalation policy | `domain/escalation.py`, `services/escalations.py` | frozen `EscalationRequirement`, `EscalationPacket`, `route_to_parent(...)` | Python domain/backend + product | W3 after H0; parent-to-parent only |
 | Finalisation boundary | `services/delegation_finalization.py` | `FinalizationEvidence`, `FinalizationOutcome`, `DelegationFinalizationService.evaluate(...)` | Runtime/backend + security | W4 after decision |
 | Existing runtime integration | `services/delegation_runtime.py` | composition call into finalisation service only; preserve provider contract until behavioural change is approved | Runtime/backend | W4 |
-| Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | frozen card DTO mapping, deterministic grouping/dedup; `list_attention_queue(...)` | Python UI backend | W1; `UIContext` delegates only |
+| Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | frozen card DTO mapping, deterministic grouping/dedup; `list_attention_queue(...)` | Python UI backend | W1/W3; parent queue plus human pull reads |
 | UI wire types | `ui/read_dtos.py` | `TypedDict` payloads for Work Health, `RunView`, Attention and typed refusal | Backend + frontend | A7/W1 |
 | HTTP transport | `ui/server.py`, `ui/security.py` | thin read endpoints; existing mutation routes only after semantic decision | Python UI/backend + security | W1/W3 |
 | MCP transport | `mcp/tools/work.py` after A4 MCP registration split | `register_work_tools(scope)`; no lifecycle rules in tool closure | Platform/MCP | W1; no growth in `build_server` |
@@ -264,33 +274,45 @@ unknowns and next safe action; a blinded sample of at least 20 cards is used
 to calibrate precision before it becomes a primary surface. A card is never a
 Decision or Acceptance merely because it is visible.
 
-### Phase W3 — one review-pairing closure loop
+### Phase W3 — hierarchical closure loop
 
-**Start only after owner decision D1 and reviewer-routing decision D2.**
+**Start only after H0, the semantic/migration contract implementing accepted
+`decision.3JJTDQ7J5RN8846K8FGG9QKAM1`, has owner and independent review.**
+It is not a backlog migration or scheduler.
 
-The implementation is one vertical, not a backlog migration or scheduler:
+The vertical has three deliberately separate outcomes:
 
-- formulate `required review` eligibility and independence using existing
-  principal/session predicates;
-- for an in-scope new revision, create one current request with an eligible
-  route **or** return a typed hold/refusal; do not fabricate a verdict;
-- make duplicate retries idempotent and stale/revised targets explicit;
-- expose unpaired/unroutable state in Attention and a reviewer-facing
-  revision-bound queue;
-- conduct historical repair only as an operator-confirmed, reversible batch;
-  it appends new history and never rewrites or auto-disposes old work.
+1. **Local parent acceptance.** For ordinary delegated technical work, the
+   parent-owner checks the result against the delegated outcome and accepts it
+   locally or returns it. This is a new, explicit semantic concept; it must
+   not be encoded as `independent=True`, `task.accepted`, a provider exit, or
+   an inferred state.
+2. **Independent review.** A current revision needs one independently
+   routable review request or typed hold when it materially changes product
+   positioning, user experience, security or strategy; when a product decision
+   blocks progress; or when the parent-owner lacks the competence to accept
+   the relevant part. The reviewer is distinct from both work authors and the
+   requester/parent. A designer may assess visual criteria of frontend work,
+   but a technically competent owner still accepts the technical result.
+3. **Parent-to-parent escalation.** A child sends unresolved matters only to
+   its immediate parent. That parent resolves locally or forwards a bounded
+   packet — decision needed, alternatives, recommendation, exact revision and
+   evidence refs — upward. The human owner may pull-read or directly intervene
+   in any branch, but child agents do not proactively bypass the chain.
 
-Two choices exist, and the plan chooses neither:
+H0 must choose and specify the event vocabulary/order, old-data handling,
+crash/retry/CAS/replay behaviour, route or hold semantics, visibility and
+rollback. A composite user action may use an idempotent reconciler internally,
+but a success response cannot silently leave a policy-required review unpaired.
+Historical repair remains a separate operator-confirmed reversible batch: it
+only appends history and never disposes of old work.
 
-| Variant | Benefit | Cost / required contract |
-| --- | --- | --- |
-| A. Composite semantic action | No successful user path can end in unpaired required-review state. | Define event vocabulary/order, retry/crash/replay behaviour, routing/refusal, old-history migration and rollback. |
-| B. Two existing actions + idempotent reconciler | Preserves existing event vocabulary and makes recovery explicit. | Intermediate gap remains a product state; define detection cadence, authority to repair, idempotency, user visibility and backlog handling. |
-
-**Exit gate:** 100% of *new, in-scope* required-review transitions are paired
-or explicitly refused in deterministic tests and a declared live sample;
-false acceptance = 0 and self-review = 0. Disabling coupling must leave ledger
-history intact and return only to the prior explicit flow.
+**Exit gate:** every new in-scope delegated result has one explicit local
+outcome (parent accepted, returned, or hold); 100% of policy-required review
+transitions are paired or explicitly held; false strict acceptance = 0;
+self-review = 0; every escalation card names its immediate owner, exact
+revision, reason and next safe action. Disabling the new path preserves ledger
+history and returns only to the prior explicit flow.
 
 ### Phase W4 — runtime preflight and bounded finalisation
 
@@ -357,12 +379,12 @@ implementation agent may prepare proposals, but cannot select an alternative.
 
 | ID | Decision for owner | Alternatives to resolve | Why it gates work | Decision owner / consulted lanes |
 | --- | --- | --- | --- | --- |
-| D1 | What is the review-pairing user contract? | composite action; separate actions plus reconciler; refuse vs hold when route absent | Changes visible task/review semantics, crash recovery and possibly event history. | Product/business; backend, governance, QA |
-| D2 | Who may receive/review work and what is independent? | initial routing rules, fallback operator, no-route behaviour | Title/model label cannot infer trust; self-review invariant is product trust. | Governance/product; security, backend |
+| D1 | Hierarchical local acceptance and independent-review policy | **Accepted:** `decision.3JJTDQ7J5RN8846K8FGG9QKAM1`; parent accepts ordinary delegated technical work locally, while risk/competence/authority triggers independent review | Resolves the user contract but not event/schema/replay design; H0 is still required. | Product owner; backend, governance, QA |
+| D2 | Escalation and human-access policy | **Accepted:** immediate-parent escalation only for C-level product, positioning, UX, security and strategy matters; the human owner may pull-read/intervene anywhere | Resolves routing direction; H0 must still define packet, timeout, permissions and old-data handling. | Product owner; governance, security, backend |
 | D3 | What trust envelope permits parent finalisation? | minimum evidence, reason codes, duplicate/stale handling, human-only cases | Worker report is untrusted; bad choice can falsely claim terminal success. | Runtime/security; product, QA |
-| D4 | What does dependency unlock mean? | `completed`, `accepted`, explicit per-policy rule, or no pull yet | Changes readiness and user expectation; an `AcceptancePolicy` field is persisted semantics. | Product/business; domain/backend |
+| D4 | What does dependency unlock mean? | local parent acceptance, strict `task.accepted`, explicit per-policy rule, or no pull yet | Local and strict acceptance now have intentionally different meanings; readiness must not guess between them. | Product/business; domain/backend |
 | D5 | Is objective adoption required, optional or out of first-loop scope? | mandatory new work; encouraged; defer | Objectives = 0 is evidence to study, not permission to add gating. | Product/business; UX |
-| D6 | Which handoff semantics are real? | recipient types, transfer, supersede, expiry, manual only | Each can require new events/replay rules; ageing visibility alone does not. | Product/governance; backend |
+| D6 | Which handoff/escalation semantics are real? | recipient types, transfer, supersede, expiry, acknowledgement and parent-hop packet | Parent-only escalation direction is accepted in D2; each remaining lifecycle detail can still require events/replay rules. | Product/governance; backend |
 | D7 | What trace privacy/retention is acceptable? | bounded fields, retention/erasure, real-provider canary access | Evals require evidence but must not create transcript storage. | Product/privacy/security; ML-evals |
 | D8 | Are Context Pack extensions in scope? | manifest, token policy, cache, Pack diff each separately | They exceed approved Pack MVP; cache must be correct/privacy-safe. | Product; ML/backend/security |
 | D9 | Is constrained push dispatch ever desired? | retain pull; approved limited push after gates | It supersedes VISION and adds SRE/security responsibility. | Owner/product; security/SRE/runtime |
@@ -393,7 +415,8 @@ reasoning, raw provider args/output and secrets are excluded.
 
 | Metric | Definition | Type / proposed gate | Owner and failure action |
 | --- | --- | --- | --- |
-| Required-review pairing coverage | paired current independently-routable requests / all new in-scope required-review revisions | Hard invariant: 100% only after D1/W3 | Workflow owner: hold/refuse bad transition, investigate any gap. |
+| Local parent-closure coverage | explicit parent accepted, returned or held results / all new in-scope delegated results | Hard invariant: 100% only after H0/W3 | Workflow owner: investigate any missing outcome; never infer closure from provider exit. |
+| Required-review pairing coverage | paired current independently-routable requests / all new in-scope required-review revisions | Hard invariant: 100% only after H0/W3 | Workflow owner: hold/refuse bad transition, investigate any gap. |
 | False acceptance | accepts without required current independent evidence / all accepts | Hard invariant: 0 | Governance owner: invalidate/disable path, incident review. |
 | Self-review / stale launch | prohibited self-review or stale-target launch / all respective attempts | Hard invariant: 0 | Runtime/governance: block/kill switch. |
 | Finalisation integrity | valid attested terminal canonical results / eligible terminal outcomes | Hard safety gate: 0 invalid successes; broadening needs 50 observed eligible gap-free outcomes | Runtime/security: disable finaliser and add regression case. |
@@ -472,7 +495,8 @@ not borrow scheduler, arbitrary media or editing scope to look more complete.
 | W1-domain | Work state/run pure records | Python domain, software | A5 task/review/delegation typed inputs | `domain/work_state.py` |
 | W5-readiness | Later advisory `task next` predicate | Python domain, backend, product | D4 and W1/W3/W4 evidence | `domain/work_readiness.py`, `services/work_planning.py` |
 | W1-surface | Attention/read DTO and transport reads | UI backend, frontend/design | A4/A7, W1-domain | `ui/attention_queue.py`, `ui/read_dtos.py`, React subtree |
-| W3-pairing | Selected semantic review-pair contract | Product, Python backend, governance, QA | D1/D2 plus migration proposal | `domain/review_pairing.py`, `services/review_pairing.py` |
+| H0-hierarchical RFC | Event/schema/replay/rollback proposal for accepted local-parent closure, risk review and upward escalation | Product, software architecture, Python backend, governance, QA | accepted D1/D2 | ADR/proposal and golden old-ledger fixtures only |
+| W3-closure | Parent acceptance, policy-required review pairing and escalation vertical | Python domain/backend, governance, QA, UI | H0 accepted plus W1 reads | `domain/delegation_acceptance.py`, `domain/review_pairing.py`, `domain/escalation.py`, narrow services |
 | W4-finaliser | Preflight/finalisation contract | Runtime, security, QA/ML-evals | D3, W0 L2 harness | `services/delegation_finalization.py` |
 | P-F1/F2 | Safe preview and Gallery reads/shell | Backend/security, frontend/design | approved programme gates | designated Gallery subtree; no legacy `index.html` |
 | P-F3/F4 | Pack/Package semantic slices | Python domain/backend, runtime, security, frontend/design | A8 + existing accepted decisions | separate schemas/reducers/services |
@@ -490,9 +514,10 @@ typed refusals, paired locales, glossary and CSP-safe DOM still apply.
    before each, then independently review exact revision.
 3. Implement W1 pure domain types/tests, then service aggregation, then UI DTO
    and one transport surface. These are separate commits; W1 remains read-only.
-4. Stop for D1/D2 before any W3 write path. Create the semantic/migration
-   proposal and its tests before implementation.
-5. Deliver W3 only after approval; conduct backlog repair in a separately
+4. D1/D2 are accepted product policy, but stop for H0 before any W3 write
+   path. Create and independently review the semantic/migration proposal and
+   golden tests before implementation.
+5. Deliver W3 only after H0 approval; conduct backlog repair in a separately
    authorised batch with its own reports and rollback path.
 6. Run W4 only after W3 evidence and D3; preflight and finaliser stay separate
    behavioural commits because their attack surfaces differ.
