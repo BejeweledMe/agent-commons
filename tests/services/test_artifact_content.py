@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -163,6 +164,52 @@ def test_reader_refuses_a_missing_or_symlinked_source(tmp_path: Path) -> None:
         reader.read(artifact_id)
 
     assert symlink.value.code == "artifact_preview_symlink_source"
+
+
+@pytest.mark.parametrize(
+    "hostile_path",
+    [
+        lambda _tmp_path: "../outside.png",
+        lambda tmp_path: str(tmp_path / "outside.png"),
+    ],
+    ids=["relative-traversal", "absolute"],
+)
+def test_reader_refuses_a_manifest_source_path_that_escapes_the_workspace_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hostile_path: Callable[[Path], str],
+) -> None:
+    reader, manager, _source, artifact_id = _reader(tmp_path, content=_png())
+    # The decoy outside the repo root is byte-identical to the manifest, so if the
+    # traversal guard were missing every later size and digest check would pass.
+    (tmp_path / "outside.png").write_bytes(_png())
+    bundle = manager.get_artifact_bundle(artifact_id)
+    bundle["manifest"]["source"] = {"path": hostile_path(tmp_path)}
+    monkeypatch.setattr(manager, "get_artifact_bundle", lambda _artifact_id: bundle)
+
+    with pytest.raises(ArtifactPreviewRefusal) as raised:
+        reader.read(artifact_id)
+
+    assert raised.value.code == "artifact_preview_manifest_invalid"
+    assert raised.value.status_code == 409
+
+
+def test_reader_refuses_a_symlinked_intermediate_directory_component(tmp_path: Path) -> None:
+    reader, _manager, source, artifact_id = _reader(tmp_path, content=_png())
+    screens = source.parent
+    real = screens.parent / "real-screens"
+    screens.rename(real)
+    screens.symlink_to(real, target_is_directory=True)
+    assert screens.is_symlink()
+    assert (screens / "first-screen").read_bytes() == _png()
+
+    with pytest.raises(ArtifactPreviewRefusal) as raised:
+        reader.read(artifact_id)
+
+    # O_DIRECTORY outranks O_NOFOLLOW (ENOTDIR, not ELOOP, on Darwin and Linux), so the
+    # non-regular-source refusal is the fail-closed contract for an intermediate symlink.
+    assert raised.value.code == "artifact_preview_non_regular_source"
+    assert raised.value.status_code == 409
 
 
 def test_reader_refuses_byte_and_pixel_bombs(tmp_path: Path) -> None:
