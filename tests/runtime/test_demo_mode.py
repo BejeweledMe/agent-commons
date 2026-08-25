@@ -462,5 +462,5 @@ def test_placeholder_fills_only_the_unresolvable_leg(tmp_path: Path) -> None:
             delegation_id="delegation-0001",
         )
     )
-    assert invocation.argv[0] == "/bin/echo"
+    assert invocation.argv[0] == str(Path("/bin/echo").resolve())
     assert DEMO_UNRESOLVED_EXECUTABLE in " ".join(invocation.argv)
