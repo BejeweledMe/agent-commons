@@ -19,6 +19,18 @@
       "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 1, "denominator": 1}
     },
     {
+      "case_id": "review_open_current",
+      "kind": "review_pair",
+      "events": [
+        {"event_type": "task.created", "offset_seconds": -40, "actor_kind": "builder"},
+        {"event_type": "task.completed", "offset_seconds": -30, "actor_kind": "builder"},
+        {"event_type": "task.submitted", "offset_seconds": -20, "actor_kind": "builder"},
+        {"event_type": "review.requested", "offset_seconds": -10, "actor_kind": "reviewer", "independent": true}
+      ],
+      "binding": {"task_ref": "task:main", "task_revision": "task:main@4", "target_task_ref": "task:main", "request_target_revision": "task:main@4", "review_ref": "review:main", "request_revision": "review:main@1"},
+      "expectation": {"metric_id": "current_review_coverage", "state": "complete", "numerator": 1, "denominator": 1}
+    },
+    {
       "case_id": "review_missing_pair",
       "kind": "review_pair",
       "events": [

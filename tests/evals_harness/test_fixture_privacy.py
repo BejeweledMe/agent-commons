@@ -46,6 +46,7 @@ def test_fixture_load_is_deterministic_and_contains_only_closed_synthetic_codes(
         ('"fixed_now": "2026-08-25T12:00:00Z"', '"fixed_now": "2026-08-25T12:00:01Z"'),
         ('"case_id": "review_current_pair"', '"case_id": "/private/unsafe"'),
         ('"task_ref": "task:main"', '"task_ref": "unsafe_ref"'),
+        ('"task_revision": "task:main@4"', '"task_revision": "review:main@4"'),
     ],
 )
 def test_fixture_loader_fails_closed_for_unknown_private_or_nonfixed_input(

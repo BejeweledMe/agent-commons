@@ -272,15 +272,36 @@ _SENSITIVE_KEY_PARTS: Final[frozenset[str]] = frozenset(
 )
 _CASE_ID_PATTERN: Final = compile_pattern(r"^[a-z][a-z0-9_]{2,63}$")
 _WINDOWS_ABSOLUTE_PATH: Final = compile_pattern(r"^(?:[A-Za-z]:[\\/]|\\\\)")
-_OPAQUE_REF_PATTERN: Final = compile_pattern(r"^(?:task|review):[a-z][a-z0-9_]{0,31}$")
-_OPAQUE_REVISION_PATTERN: Final = compile_pattern(
-    r"^(?:task|review):[a-z][a-z0-9_]{0,31}@[1-9][0-9]*$"
-)
+_TASK_REF_PATTERN: Final = compile_pattern(r"^task:[a-z][a-z0-9_]{0,31}$")
+_REVIEW_REF_PATTERN: Final = compile_pattern(r"^review:[a-z][a-z0-9_]{0,31}$")
+_TASK_REVISION_PATTERN: Final = compile_pattern(r"^task:[a-z][a-z0-9_]{0,31}@[1-9][0-9]*$")
+_REVIEW_REVISION_PATTERN: Final = compile_pattern(r"^review:[a-z][a-z0-9_]{0,31}@[1-9][0-9]*$")
 _RETRY_KEY_PATTERN: Final = compile_pattern(r"^retry:[a-z][a-z0-9_]{0,31}$")
 _BINDING_FIELDS: Final[frozenset[str]] = frozenset(FixtureBinding.__dataclass_fields__)
+_TASK_REFERENCE_FIELDS: Final[frozenset[str]] = frozenset({"task_ref", "target_task_ref"})
+_REVIEW_REFERENCE_FIELDS: Final[frozenset[str]] = frozenset({"review_ref", "acceptance_review_ref"})
+_TASK_REVISION_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "task_revision",
+        "request_target_revision",
+        "completion_target_revision",
+        "effective_task_revision",
+        "acceptance_task_revision",
+        "retry_expected_revision",
+    }
+)
+_REVIEW_REVISION_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "request_revision",
+        "completion_expected_revision",
+        "completion_revision",
+        "acceptance_review_revision",
+    }
+)
 _REQUIRED_CASE_IDS: Final[frozenset[str]] = frozenset(
     {
         "review_current_pair",
+        "review_open_current",
         "review_missing_pair",
         "review_stale_pair",
         "review_nonindependent_pair",
@@ -456,14 +477,23 @@ def _require_optional_binding_value(field: str, value: object, path: str) -> str
     if value is None:
         return None
     parsed = _require_string(value, path)
-    if field in {"task_ref", "target_task_ref", "review_ref", "acceptance_review_ref"}:
-        if not _OPAQUE_REF_PATTERN.fullmatch(parsed):
-            raise ValidationError("W0 fixture binding reference is malformed")
+    if field in _TASK_REFERENCE_FIELDS:
+        if not _TASK_REF_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture task reference is malformed")
+    elif field in _REVIEW_REFERENCE_FIELDS:
+        if not _REVIEW_REF_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture review reference is malformed")
     elif field == "retry_key":
         if not _RETRY_KEY_PATTERN.fullmatch(parsed):
             raise ValidationError("W0 fixture retry key is malformed")
-    elif not _OPAQUE_REVISION_PATTERN.fullmatch(parsed):
-        raise ValidationError("W0 fixture binding revision is malformed")
+    elif field in _TASK_REVISION_FIELDS:
+        if not _TASK_REVISION_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture task revision is malformed")
+    elif field in _REVIEW_REVISION_FIELDS:
+        if not _REVIEW_REVISION_PATTERN.fullmatch(parsed):
+            raise ValidationError("W0 fixture review revision is malformed")
+    else:
+        raise AssertionError(f"unrecognised W0 fixture binding field: {field}")
     return parsed
 
 
@@ -471,7 +501,7 @@ def _validate_case_binding(
     events: tuple[FixtureEvent, ...], binding: FixtureBinding, path: str
 ) -> None:
     event_types = {event.event_type for event in events}
-    if {"review.requested", "review.completed"} & event_types:
+    if "review.requested" in event_types:
         _require_binding_fields(
             binding,
             (
@@ -479,9 +509,22 @@ def _validate_case_binding(
                 "task_revision",
                 "target_task_ref",
                 "request_target_revision",
-                "completion_target_revision",
                 "review_ref",
                 "request_revision",
+            ),
+            path,
+        )
+    if "review.completed" in event_types:
+        _require_binding_fields(
+            binding,
+            (
+                "task_ref",
+                "task_revision",
+                "target_task_ref",
+                "request_target_revision",
+                "review_ref",
+                "request_revision",
+                "completion_target_revision",
                 "completion_expected_revision",
                 "completion_revision",
             ),

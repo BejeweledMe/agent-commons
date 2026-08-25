@@ -91,15 +91,17 @@ def assess_case(case: FixtureCase, fixed_now: datetime) -> ReplayAssessment:
     retries = tuple(event for event in trace if event.event_type == "event.retry")
     binding = case.binding
     orphan_review = review_requested is not None and binding.task_ref != binding.target_task_ref
-    revision_mismatch = review_requested is not None and (
-        binding.task_revision != binding.request_target_revision
-        or binding.request_target_revision != binding.completion_target_revision
+    request_revision_mismatch = binding.task_revision != binding.request_target_revision
+    completion_revision_mismatch = review_completed is not None and (
+        binding.request_target_revision != binding.completion_target_revision
         or binding.request_revision != binding.completion_expected_revision
+    )
+    revision_mismatch = review_requested is not None and (
+        request_revision_mismatch or completion_revision_mismatch
     )
     review_join_valid = (
         submitted is not None
         and review_requested is not None
-        and review_completed is not None
         and binding.task_ref is not None
         and binding.review_ref is not None
         and not orphan_review
@@ -150,7 +152,7 @@ def assess_case(case: FixtureCase, fixed_now: datetime) -> ReplayAssessment:
         review_is_stale=review_is_stale,
         false_strict_acceptance=false_strict_acceptance,
         reordered_input=raw_offsets != tuple(sorted(raw_offsets)),
-        duplicate_retry=len(retries) > 1 and binding.retry_key is not None,
+        duplicate_retry=(len(retries) > 1 and binding.retry_key is not None and not cas_conflict),
         orphan_review=orphan_review,
         revision_mismatch=revision_mismatch,
         cas_conflict=cas_conflict,

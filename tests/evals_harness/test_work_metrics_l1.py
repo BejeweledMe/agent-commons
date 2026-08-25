@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .fixture_loader import FixtureCase, load_work_metrics_fixture
 from .work_metrics_cases import assess_case, grade_case, materialize_fixture
 
@@ -22,6 +24,7 @@ def test_corpus_has_all_required_w0_boundary_cases_and_terminal_states() -> None
 
     assert {
         "review_current_pair",
+        "review_open_current",
         "review_missing_pair",
         "review_stale_pair",
         "review_nonindependent_pair",
@@ -53,6 +56,7 @@ def test_l1_replay_keeps_staleness_strict_acceptance_and_retry_visible() -> None
     fixture = load_work_metrics_fixture()
 
     current = assess_case(_case("review_current_pair"), fixture.fixed_now)
+    open_review = assess_case(_case("review_open_current"), fixture.fixed_now)
     stale = assess_case(_case("review_stale_pair"), fixture.fixed_now)
     valid = assess_case(_case("strict_acceptance_valid"), fixture.fixed_now)
     invalid = assess_case(_case("strict_acceptance_invalid"), fixture.fixed_now)
@@ -60,6 +64,7 @@ def test_l1_replay_keeps_staleness_strict_acceptance_and_retry_visible() -> None
     reordered = assess_case(_case("reordered_retry"), fixture.fixed_now)
 
     assert current.current_independent_review is True
+    assert open_review.current_independent_review is True
     assert stale.review_is_stale is True
     assert valid.false_strict_acceptance is False
     assert invalid.false_strict_acceptance is True
@@ -78,6 +83,20 @@ def test_l1_never_counts_missing_or_nonindependent_review_as_a_current_pair() ->
     assert missing.current_independent_review is False
     assert nonindependent.current_independent_review is False
     assert changes_requested.current_independent_review is True
+
+
+def test_l1_does_not_label_an_invalid_retry_cas_as_an_idempotent_duplicate() -> None:
+    fixture = load_work_metrics_fixture()
+    original = _case("correction_and_retry")
+    invalid_retry = replace(
+        original,
+        binding=replace(original.binding, retry_expected_revision="task:main@4"),
+    )
+
+    assessment = assess_case(invalid_retry, fixture.fixed_now)
+
+    assert assessment.cas_conflict is True
+    assert assessment.duplicate_retry is False
 
 
 def test_l1_rejects_orphan_and_revision_mismatched_review_links() -> None:
