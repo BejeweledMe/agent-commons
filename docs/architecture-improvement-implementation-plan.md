@@ -94,7 +94,10 @@ assessment-отчёта в [`docs/reviews/`](reviews/). Входные review о
 
 Одна canonical write boundary остаётся принципом, но это не означает рост
 `CommonsManager`: после A8 она должна выражаться узкими collaborators и
-композиционными адаптерами. CLI/MCP/UI являются тонкими transport adapters;
+композиционными адаптерами. Принятое
+`decision.4TZDDRT5PF84KXV6RHQAPTG5BX` дополнительно замораживает CLI для
+security fixes: в W0–W6 нет новых CLI-команд, CLI-decomposition или
+behavioural repair. UI и MCP являются тонкими transport adapters;
 они не вычисляют authority, readiness, acceptance или lifecycle.
 
 ### 2.3. Единственный граф зависимостей программы
@@ -106,7 +109,7 @@ Mermaid ниже показывает зависимости **пакетов р
 ```mermaid
 flowchart TD
   subgraph R[Обязательный structural путь аудита]
-    A3[A3 domain roles] --> A4[A4 UI/MCP/CLI composition]
+    A3[A3 domain roles] --> A4[A4 UI/MCP composition; CLI excluded]
     A4 --> A45[A4.5 instruction-builder seam]
     A45 --> A5[A5 typed event/projection slices]
     A5 --> A6[A6 replay profile and optimization]
@@ -118,14 +121,15 @@ flowchart TD
   A8 --> W1[W1: derived WorkState / RunView / metrics / Attention reads]
   M0 --> W1
   D1 --> W3[W3: review-pairing behavioural vertical]
+  D2{Owner: reviewer routing and independence} --> W3
   W1 --> W3
 
-  D2{Owner: finalisation trust envelope} --> W4[W4: preflight then parent finalizer]
+  D3{Owner: finalisation trust envelope} --> W4[W4: preflight then parent finalizer]
   W3 --> W4
-  D3{Owner: dependency unlock / authority / admission} --> W5[W5: policy-bound pull workflow]
+  D4{Owner: dependency unlock / authority / admission} --> W5[W5: policy-bound pull workflow]
   W4 --> W5
-  D4{Owner: VISION supersede + security/SRE gate} --> Push[Optional constrained push dispatch]
-  W5 --> D4
+  D9{Owner: VISION supersede + security/SRE gate} --> Push[Optional constrained push dispatch]
+  W5 --> D9
 
   A8 --> P1[Approved Context Pack / Gallery programme]
   P1 --> P2[F1/F2 safe preview and Gallery reads]
@@ -156,7 +160,6 @@ Context Pack / Gallery. Рёбра из решений означают **stop g
 | Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | frozen card DTO mapping, deterministic grouping/dedup; `list_attention_queue(...)` | Python UI backend | W1; `UIContext` delegates only |
 | UI wire types | `ui/read_dtos.py` | `TypedDict` payloads for Work Health, `RunView`, Attention and typed refusal | Backend + frontend | A7/W1 |
 | HTTP transport | `ui/server.py`, `ui/security.py` | thin read endpoints; existing mutation routes only after semantic decision | Python UI/backend + security | W1/W3 |
-| CLI transport | `cli/work.py` after A4 CLI extraction | read-only `work health`; later `task next --dry-run`; explicit `--workspace` scope | Platform/CLI | W1, then W5; no root-CLI growth |
 | MCP transport | `mcp/tools/work.py` after A4 MCP registration split | `register_work_tools(scope)`; no lifecycle rules in tool closure | Platform/MCP | W1; no growth in `build_server` |
 | Eval harness | existing public `agent_commons.evals` + `tests/evals_harness/` as permitted by audit | fixture workspace, state graders, trace sanitation, replay regressions | QA + ML/evals + backend | W0 onward |
 | Context compilation | `services/delegation_instruction.py`, then `services/context_compiler.py` | approved `CompiledContext` and frozen binding from the separate plan | Runtime/backend + ML/security | P3/F3-F4 only |
@@ -182,7 +185,7 @@ Context Pack / Gallery. Рёбра из решений означают **stop g
 5. Worker-supplied finalisation input is untrusted. The parent independently
    verifies known refs, hashes, scope, size, fresh target revision and terminal
    facts. A valid finalisation never equals task acceptance.
-6. Any web/CLI/MCP mutation supplies expected revision and idempotency key;
+6. Any UI/MCP mutation supplies expected revision and idempotency key;
    readers expose typed refusal, empty, stale and unavailable states.
 
 ## 4. Delivery phases
@@ -198,11 +201,11 @@ confirmed by its own exact-revision review.
 | Audit step | Control-plane benefit | Constraint / owner |
 | --- | --- | --- |
 | A3 `domain/roles.py` | Gives a narrow home for future authority vocabulary. | Do not put authority/admission policy into roles before owner decision. Python domain. |
-| A4 composition (UI/MCP/CLI) | Creates locations for Work reads/actions/tool groups. | Do not add control-plane methods to `UIContext`, root CLI or `build_server`. Platform/UI. |
+| A4 composition (UI/MCP; CLI excluded) | Creates locations for Work reads/actions and MCP tool groups. | CLI decomposition and features stay frozen by `decision.4TZDDRT5PF84KXV6RHQAPTG5BX`; do not add control-plane methods to `UIContext` or `build_server`. Platform/UI. |
 | A4.5 instruction seam | Later lets Context Compiler consume typed input. | Mechanical extraction only: no prompt, `runtime.yaml` or persisted change. Runtime. |
 | A5 typed vertical records | Supplies typed Task/Review/Delegation inputs for derived views. | Existing JSON/events round-trip byte-for-byte. Python domain. |
 | A6 replay work | Establishes profiled baseline and safe golden-replay workflow. | No semantic migration or performance conclusion before profiling. Software/performance. |
-| A7 DTOs | Provides narrow UI/MCP/CLI transport for reads. | Public wire shape stays stable in structural commits. Backend/frontend. |
+| A7 DTOs | Provides narrow UI/MCP transport for reads. | Public wire shape stays stable in structural commits. Backend/frontend. |
 | A8 collaborators | Lets services be consumed without expanding `CommonsManager`. | New feature API lives in thematic services; facade migration has its own window. Architecture/platform. |
 
 **Exit:** every structural commit is behaviour-neutral, separately reviewed and
@@ -221,17 +224,15 @@ Deliverables:
 2. A sanitised fixture workspace and golden replay corpus. It contains no live
    workspace copy, private worker output, random timestamps or secrets.
 3. Deterministic W0 cases: unpaired submitted task, stale request, self-review
-   attempt, no-session orient, foreign-session non-borrowing, historical stale
-   evidence, duplicate retry and safe provider terminal ambiguity.
-4. The narrow read-only orient repair, if independently scoped: it must require
-   explicit workspace/session scope, perform zero canonical writes and never
-   borrow another session. It is a standalone behavioural fix, not a shortcut
-   to a broader CLI feature.
-5. Documentation of the first three business-loop contracts, with blank owner
+   attempt, historical stale evidence, duplicate retry and safe provider
+   terminal ambiguity.
+4. Documentation of the first three business-loop contracts, with blank owner
    decision fields rather than implied defaults.
 
 **Owners:** Python backend + QA/ML-evals for query/harness; product/business for
-metric purpose; platform for orient; independent reviewer for replay/privacy.
+metric purpose; independent reviewer for replay/privacy. The observed
+read-only-orient issue remains a documented CLI-freeze exception candidate, not
+a work package: it needs a later explicit owner supersede or a UI replacement.
 
 **Exit gate:** each metric has an owner and action; fixtures run in a fresh
 workspace; replay equivalence is demonstrated for unchanged behaviour; owner
@@ -250,7 +251,7 @@ Deliverables:
 - deterministic read-side metrics and reason-code links to exact subject
   revisions/evidence;
 - read-only operator Attention Queue with deduplication and controlled clock;
-- low-noise UI/CLI/MCP work-health read surfaces after their A4/A7 seams
+- low-noise UI/MCP work-health read surfaces after their A4/A7 seams
   exist. `task next` and dependency readiness remain deferred to W5 and are
   not a prerequisite for repairing the review loop.
 
@@ -468,7 +469,6 @@ not borrow scheduler, arbitrary media or editing scope to look more complete.
 | R-A3…A8 | Remaining audit structural slices | Software architecture, Python domain, platform, UI | audit sequence | one target module per task |
 | W0-metrics | Query, metric dictionary, read-only view | Python backend, product, ML-evals | none | `services/work_metrics.py`, docs/eval fixtures |
 | W0-harness | Sanitised fixtures and L0/L1 graders | QA, ML-evals, Python backend | metric definitions | `tests/evals_harness/` / test paths |
-| W0-orient | Explicit unscoped read-only orient repair | Platform, QA/security | independently scoped owner approval | narrow CLI/service tests |
 | W1-domain | Work state/run pure records | Python domain, software | A5 task/review/delegation typed inputs | `domain/work_state.py` |
 | W5-readiness | Later advisory `task next` predicate | Python domain, backend, product | D4 and W1/W3/W4 evidence | `domain/work_readiness.py`, `services/work_planning.py` |
 | W1-surface | Attention/read DTO and transport reads | UI backend, frontend/design | A4/A7, W1-domain | `ui/attention_queue.py`, `ui/read_dtos.py`, React subtree |
