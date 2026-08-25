@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import NotRequired
+from typing import NotRequired, cast
 
 from .envelopes import FrozenJsonObject, JsonValue, TypedRef, freeze_json_object, thaw_json_object
 from .snapshot import ProjectSnapshot
@@ -52,6 +52,7 @@ class VerificationRecord(Mapping[str, object]):
     recorded_at: str
     actor: FrozenJsonObject
     author_session_ids: tuple[str, ...]
+    payload: FrozenJsonObject
     stale: bool = False
 
     @classmethod
@@ -79,6 +80,7 @@ class VerificationRecord(Mapping[str, object]):
             recorded_at=str(event.get("recorded_at", "")),
             actor=freeze_json_object(actor),
             author_session_ids=(actor_session_id,) if actor_session_id else (),
+            payload=freeze_json_object(envelope.to_payload()),
         )
 
     def with_stale(self, stale: bool) -> VerificationRecord:
@@ -89,27 +91,19 @@ class VerificationRecord(Mapping[str, object]):
     def to_dict(self) -> VerificationRecordPayload:
         """Return the pre-existing JSON-shaped read contract without exposing internals."""
 
-        payload: VerificationRecordPayload = {
-            "verification_id": self.verification_id,
-            "target_ref": self.target_ref.to_payload(),
-            "target_revision": self.target_revision,
-            "claim": self.claim,
-            "evidence_refs": [item.to_payload() for item in self.evidence_refs],
-            "id": self.verification_id,
-            "state": "recorded",
-            "revision": self.revision,
-            "effective_revision": self.effective_revision,
-            "recorded_at": self.recorded_at,
-            "actor": thaw_json_object(self.actor),
-            "author_session_ids": list(self.author_session_ids),
-            "stale": self.stale,
-        }
-        if self.method is not None:
-            payload["method"] = self.method
-        if self.outcome is not None:
-            payload["outcome"] = self.outcome
-        if self.extensions is not None:
-            payload["extensions"] = thaw_json_object(self.extensions)
+        payload = cast(VerificationRecordPayload, thaw_json_object(self.payload))
+        payload.update(
+            {
+                "id": self.verification_id,
+                "state": "recorded",
+                "revision": self.revision,
+                "effective_revision": self.effective_revision,
+                "recorded_at": self.recorded_at,
+                "actor": thaw_json_object(self.actor),
+                "author_session_ids": list(self.author_session_ids),
+                "stale": self.stale,
+            }
+        )
         return payload
 
     def __getitem__(self, key: str) -> object:
