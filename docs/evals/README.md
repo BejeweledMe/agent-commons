@@ -1,5 +1,9 @@
 # Offline workflow evaluation catalog
 
+The planned, read-only W0 work-loop metric dictionary and deterministic fixture
+contract is documented in [work-metrics-w0.md](work-metrics-w0.md). It does not
+change this catalog's current implemented/planned/unsupported case statuses.
+
 `agent_commons.evals` is a versioned, deterministic 25-case catalog for the
 Agent Commons workflow roadmap. It is intentionally provider-free: no model,
 network service, prompt, response, transcript, secret, or customer data is
