@@ -53,6 +53,7 @@ from .findings import FindingCommands
 from .handoffs import HandoffCommands
 from .maintenance import MaintenanceCommands
 from .objectives import ObjectiveCommands
+from .public_views import _public_claim, _public_session
 from .receipts import ReceiptCommands
 from .reviews import ReviewCommands
 from .roles import RoleCommands
@@ -80,33 +81,6 @@ def _require_mapping(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ConfigurationError(f"{label} must be a mapping")
     return dict(value)
-
-
-def _public_session(
-    session: Session,
-    *,
-    include_nonce: bool = False,
-    effective_at: float | None = None,
-) -> dict[str, Any]:
-    value = asdict(session)
-    value["capabilities"] = list(session.capabilities)
-    effectively_active = (
-        not session.expired if effective_at is None else session.active_at(effective_at)
-    )
-    value["effective_status"] = (
-        "expired" if session.status == "active" and not effectively_active else session.status
-    )
-    if not include_nonce:
-        value.pop("nonce", None)
-    return value
-
-
-def _public_claim(value: Any, *, include_nonce: bool = False) -> dict[str, Any]:
-    result = asdict(value)
-    result["resources"] = list(value.resources)
-    if not include_nonce:
-        result.pop("nonce", None)
-    return result
 
 
 class CommonsManager(
