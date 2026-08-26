@@ -98,14 +98,6 @@ class RoleTransitionContext:
     require_entity: RoleEntityResolver
 
 
-_ROLE_GRANT_LEVELS = {"deny", "ask", "auto"}
-_ROLE_TARGET_PROFILES = {
-    "codex-builder",
-    "codex-independent-reviewer",
-    "claude-builder",
-    "claude-independent-reviewer",
-}
-_ROLE_CONTEXT_MODES = {"fresh", "accumulated"}
 _ROLE_ORIGINS = {"human", "agent"}
 _ROLE_AUTHORIZATIONS = {"human", "human_confirmed", "automatic"}
 _ROLE_RETIRED_BY = {"human", "agent", "cascade"}
@@ -161,7 +153,7 @@ def _validate_agent_grants(value: Any, field: str) -> None:
     if not isinstance(value, Mapping) or set(value) != set(GRANT_NAMES):
         raise ValidationError(f"{field} must contain exactly {', '.join(GRANT_NAMES)}")
     for name in GRANT_NAMES:
-        if value[name] not in _ROLE_GRANT_LEVELS:
+        if value[name] not in GRANT_LEVELS:
             raise ValidationError(f"{field}.{name} must be deny, ask, or auto")
 
 
@@ -184,9 +176,9 @@ def _validate_agent_created(
 ) -> None:
     _validate_agent_grants(payload["grants"], "grants")
     _validate_agent_lifetime(payload["lifetime"])
-    if payload["profile_id"] not in _ROLE_TARGET_PROFILES:
+    if payload["profile_id"] not in PROFILE_NARROWING:
         raise ValidationError("invalid agent profile_id")
-    if payload["context_mode"] not in _ROLE_CONTEXT_MODES:
+    if payload["context_mode"] not in CONTEXT_MODES:
         raise ValidationError("context_mode must be fresh or accumulated")
     if payload["origin"] not in _ROLE_ORIGINS:
         raise ValidationError("origin must be human or agent")
@@ -242,7 +234,7 @@ def _validate_agent_reconfigured(
         raise ValidationError("changes contains immutable agent fields: " + ", ".join(unsupported))
     if "grants" in changes:
         _validate_agent_grants(changes["grants"], "changes.grants")
-    if "context_mode" in changes and changes["context_mode"] not in _ROLE_CONTEXT_MODES:
+    if "context_mode" in changes and changes["context_mode"] not in CONTEXT_MODES:
         raise ValidationError("changes.context_mode must be fresh or accumulated")
     if "name" in changes and (not isinstance(changes["name"], str) or not changes["name"].strip()):
         raise ValidationError("changes.name must be a non-empty string")
