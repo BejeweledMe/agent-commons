@@ -133,6 +133,82 @@ def test_decision_record_is_frozen_and_preserves_replay_wire_and_truth_views(tmp
     assert snapshot.issues == []
 
 
+def test_decision_record_preserves_effective_payload_key_order_through_correction() -> None:
+    decision_id = "decision.00000000000000000000000001"
+    proposed = _event(
+        1,
+        "decision.proposed",
+        {
+            "scope": "architecture.projection",
+            "decision_id": decision_id,
+            "proposal": "Freeze the projected decision record.",
+            "alternatives": ["Leave mutable dictionaries."],
+            "extensions": {
+                "zebra": {"second": "value", "first": "value"},
+                "alpha": "value",
+            },
+        },
+        "decision",
+        decision_id,
+    )
+    corrected_payload = {
+        "alternatives": ["Leave mutable dictionaries."],
+        "decision_id": decision_id,
+        "extensions": {
+            "zebra": {"second": "value", "first": "value"},
+            "alpha": "value",
+        },
+        "proposal": "Freeze the projected decision record.",
+        "scope": "architecture.projection",
+    }
+    correction = _event(
+        2,
+        "event.corrected",
+        {
+            "target_event_id": proposed["event_id"],
+            "expected_target_sha256": canonical_sha256(proposed),
+            "replacement_payload": corrected_payload,
+        },
+        "event",
+        proposed["event_id"],
+    )
+
+    snapshot = project_events([proposed, correction])
+    record = snapshot.decisions[decision_id]
+    wire_record = snapshot.to_dict()["decisions"][0]
+
+    expected_keys = [
+        *corrected_payload,
+        "id",
+        "state",
+        "revision",
+        "effective_revision",
+        "recorded_at",
+        "actor",
+        "author_session_ids",
+        "stale",
+    ]
+    assert list(record) == expected_keys
+    assert list(wire_record) == expected_keys
+    assert list(record["extensions"]) == list(corrected_payload["extensions"])
+    nested = record["extensions"]["zebra"]
+    assert list(nested) == list(corrected_payload["extensions"]["zebra"])
+    assert json.dumps(wire_record, separators=(",", ":")) == (
+        '{"alternatives":["Leave mutable dictionaries."],'
+        '"decision_id":"decision.00000000000000000000000001",'
+        '"extensions":{"zebra":{"second":"value","first":"value"},'
+        '"alpha":"value"},'
+        '"proposal":"Freeze the projected decision record.",'
+        '"scope":"architecture.projection",'
+        '"id":"decision.00000000000000000000000001",'
+        '"state":"proposed","revision":"evt.00000000000000000000000001",'
+        '"effective_revision":"evt.00000000000000000000000002",'
+        '"recorded_at":"2026-01-01T00:00:01Z",'
+        '"actor":{"session_id":"session.builder","role_id":"builder"},'
+        '"author_session_ids":["session.builder"],"stale":false}'
+    )
+
+
 def test_decision_record_preserves_terminal_transitions_and_fail_closed_conflicts() -> None:
     deferred_id = "decision.00000000000000000000000001"
     rejected_id = "decision.00000000000000000000000002"

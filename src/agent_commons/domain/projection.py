@@ -463,7 +463,6 @@ def _apply_effective_event(
             snapshot.decisions,
             typed_envelope.decision_id,
             event,
-            typed_envelope.to_payload(),
             DECISION_STATES[event_type],
         )
     elif event_type.startswith("handoff."):

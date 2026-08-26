@@ -8,6 +8,7 @@ without changing the mapping-shaped contract used by truth and view consumers.
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 
 from .envelopes import FrozenJsonObject, JsonValue, freeze_json_object, thaw_json_object
@@ -69,13 +70,20 @@ def apply_decision_record(
     collection: dict[str, DecisionRecord],
     identifier: str,
     event: Mapping[str, object],
-    payload: Mapping[str, object],
     state: str,
 ) -> None:
     """Apply one decision event without retaining a mutable projected decision."""
 
     current = collection.get(identifier)
     current_data = current.to_dict() if current is not None else {}
+    payload_value = event.get("payload")
+    if not isinstance(payload_value, Mapping):
+        raise TypeError("decision projection event payload must be an object")
+    # Projection has already validated this effective event.  Its persisted
+    # payload is the legacy mapping's ordering source, including any corrected
+    # replacement payload, so freeze a private copy without rebuilding it from
+    # the typed envelope's field order.
+    payload = deepcopy(dict(payload_value))
     authors = {
         str(session_id)
         for session_id in current_data.get("author_session_ids", [])
