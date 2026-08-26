@@ -30,6 +30,7 @@ import time
 import tracemalloc
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypedDict
@@ -213,6 +214,11 @@ class _PhaseCollector:
         }
 
 
+_ACTIVE_PHASE_COLLECTOR: ContextVar[_PhaseCollector | None] = ContextVar(
+    "agent_commons_a6_active_phase_collector", default=None
+)
+
+
 _PAYLOAD_SCHEMAS = {
     "artifact": "commons.payload.artifact.v1",
     "objective": "commons.payload.objective.v1",
@@ -322,6 +328,8 @@ def _timed_wrapper(
     """Wrap one projection helper while preserving its arguments and return value."""
 
     def wrapped(*args: object, **keywords: object) -> object:
+        if _ACTIVE_PHASE_COLLECTOR.get() is not collector:
+            return original(*args, **keywords)
         with collector.phase(label):
             return original(*args, **keywords)
 
@@ -347,6 +355,8 @@ def _instrument_projection(collector: _PhaseCollector) -> Iterator[None]:
         setattr(module, name, _timed_wrapper(collector, label, original))
 
     def project_events_once(*args: object, **keywords: object) -> object:
+        if _ACTIVE_PHASE_COLLECTOR.get() is not collector:
+            return original_project_events_once(*args, **keywords)
         label = collector.project_events_once_label(keywords)
         with collector.phase(label):
             return original_project_events_once(*args, **keywords)
@@ -369,6 +379,18 @@ def _instrument_projection(collector: _PhaseCollector) -> Iterator[None]:
     finally:
         for module, name, original in reversed(originals):
             setattr(module, name, original)
+
+
+@contextmanager
+def _instrumented_projection_context(collector: _PhaseCollector) -> Iterator[None]:
+    """Activate one collector only in this context while globals are temporarily wrapped."""
+
+    with _instrument_projection(collector):
+        token = _ACTIVE_PHASE_COLLECTOR.set(collector)
+        try:
+            yield
+        finally:
+            _ACTIVE_PHASE_COLLECTOR.reset(token)
 
 
 def _replay_integrity(snapshot: ProjectSnapshot) -> ReplayIntegrity:
@@ -406,7 +428,7 @@ def _instrumented_replay_sample(
     """
 
     collector = _PhaseCollector()
-    with _instrument_projection(collector):
+    with _instrumented_projection_context(collector):
         gc.collect()
         tracemalloc.start()
         started = time.perf_counter()

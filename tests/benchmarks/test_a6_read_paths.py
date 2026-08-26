@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,9 @@ from agent_commons.domain import lifecycle, projection
 from agent_commons.domain.projection import project_events
 from benchmarks.benchmark_a6_read_paths import (
     _PHASE_LABELS,
+    _instrumented_projection_context,
     _instrumented_replay_sample,
+    _PhaseCollector,
     _replay_integrity,
     _write_workspace,
     profile_projection_components,
@@ -141,3 +144,28 @@ def test_instrumentation_restores_projection_globals_after_a_replay_error() -> N
         assert lifecycle.validate_transition is original_transition
     finally:
         projection.derive_invalidation_state = original_invalidation
+
+
+def test_instrumentation_bypasses_the_collector_in_an_outside_thread() -> None:
+    events = tuple(workload(event_count=16, expected_passes=2))
+    baseline = project_events(events)
+    snapshots = []
+    errors: list[BaseException] = []
+
+    def replay_outside_instrumented_context() -> None:
+        try:
+            snapshots.append(project_events(events))
+        except BaseException as exc:  # pragma: no cover - asserted below if a worker fails
+            errors.append(exc)
+
+    collector = _PhaseCollector()
+    with _instrumented_projection_context(collector):
+        worker = threading.Thread(target=replay_outside_instrumented_context)
+        worker.start()
+        worker.join(timeout=10)
+
+    assert not worker.is_alive()
+    assert errors == []
+    assert len(snapshots) == 1
+    assert _replay_integrity(snapshots[0]) == _replay_integrity(baseline)
+    assert all(calls == 0 for calls in collector.phase_call_counts.values())
