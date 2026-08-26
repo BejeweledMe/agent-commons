@@ -10,6 +10,7 @@ from agent_commons.errors import LifecycleConflictError, ValidationError
 from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
 from .artifact_projection import apply_artifact_record
+from .chronology import chronological_key
 from .collections import collection_for
 from .decision_projection import apply_decision_record
 from .delegation_projection import apply_delegation_record
@@ -841,7 +842,7 @@ def _project_events_once(
 ) -> ProjectSnapshot:
     raw = sorted(
         (dict(event) for event in events),
-        key=lambda item: (str(item.get("recorded_at", "")), str(item.get("event_id", ""))),
+        key=lambda item: chronological_key(item.get("recorded_at"), item.get("event_id")),
     )
     relations = [relation for event in raw for relation in (event.get("relations") or [])]
     invalidation = derive_invalidation_state(raw, relations)

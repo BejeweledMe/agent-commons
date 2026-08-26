@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 
 from agent_commons.core.canonical import canonical_sha256
 from agent_commons.domain.projection import project_events
@@ -12,7 +13,9 @@ def event(number: int, event_type: str, payload: dict, subject_kind: str, subjec
         "event_id": f"evt.{number:026d}",
         "workspace_id": "workspace.00000000000000000000000001",
         "event_type": event_type,
-        "recorded_at": f"2026-01-01T00:00:{number:02d}Z",
+        "recorded_at": (datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=number))
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z"),
         "actor": {"session_id": "session.test", "role_id": "builder"},
         "payload": payload,
         "subject_refs": [{"kind": subject_kind, "id": subject_id}],
@@ -57,6 +60,92 @@ def test_task_lifecycle_and_revision() -> None:
     assert snapshot.tasks[task_id]["state"] == "completed"
     assert snapshot.tasks[task_id]["revision"] == completed["event_id"]
     assert snapshot.tasks[task_id]["work_author_session_ids"] == ["session.test"]
+
+
+def test_task_lifecycle_orders_mixed_precision_timestamps_chronologically() -> None:
+    task_id = "task.00000000000000000000000001"
+    created = event(
+        1,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Mixed precision task",
+            "description": "Preserve causal replay order",
+            "acceptance_criteria": [],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    started = event(
+        2,
+        "task.started",
+        {"task_id": task_id, "expected_revision": created["event_id"]},
+        "task",
+        task_id,
+    )
+    completed = event(
+        3,
+        "task.completed",
+        {
+            "task_id": task_id,
+            "expected_revision": started["event_id"],
+            "summary": "Completed after a fractional timestamp",
+        },
+        "task",
+        task_id,
+    )
+    created["recorded_at"] = "2026-08-26T12:00:00Z"
+    started["recorded_at"] = "2026-08-26T12:00:00.100000Z"
+    completed["recorded_at"] = "2026-08-26T12:00:00.200000Z"
+
+    snapshot = project_events([completed, started, created])
+
+    assert snapshot.tasks[task_id]["state"] == "completed"
+    assert snapshot.tasks[task_id]["revision"] == completed["event_id"]
+
+
+def test_task_lifecycle_uses_event_id_for_equal_timestamp_tie_breaks() -> None:
+    task_id = "task.00000000000000000000000001"
+    created = event(
+        1,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Equal instant task",
+            "description": "Keep deterministic ordering",
+            "acceptance_criteria": [],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    started = event(
+        2,
+        "task.started",
+        {"task_id": task_id, "expected_revision": created["event_id"]},
+        "task",
+        task_id,
+    )
+    completed = event(
+        3,
+        "task.completed",
+        {
+            "task_id": task_id,
+            "expected_revision": started["event_id"],
+            "summary": "Completed at the same instant",
+        },
+        "task",
+        task_id,
+    )
+    timestamp = "2026-08-26T12:00:00Z"
+    for item in (created, started, completed):
+        item["recorded_at"] = timestamp
+
+    snapshot = project_events([completed, started, created])
+
+    assert snapshot.tasks[task_id]["state"] == "completed"
+    assert snapshot.tasks[task_id]["revision"] == completed["event_id"]
 
 
 def test_projection_indexes_corrections_by_target_and_reports_bounded_work() -> None:

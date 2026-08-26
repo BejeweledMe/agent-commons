@@ -64,3 +64,23 @@ def test_select_qualifying_review_uses_recorded_time_then_id() -> None:
 
     assert select_qualifying_review(snapshot, "task.1") is snapshot.reviews["review.b"]
     assert select_qualifying_review(snapshot, "task.missing") is None
+
+
+def test_select_qualifying_review_orders_mixed_precision_timestamps_as_instants() -> None:
+    snapshot = ProjectSnapshot(
+        tasks={"task.1": {"id": "task.1", "revision": "evt.current"}},
+        reviews={
+            "review.whole-second": review(
+                "review.whole-second",
+                recorded_at="2026-08-19T00:00:00Z",
+            ),
+            "review.fractional-second": review(
+                "review.fractional-second",
+                recorded_at="2026-08-19T00:00:00.100000Z",
+            ),
+        },
+    )
+
+    assert (
+        select_qualifying_review(snapshot, "task.1") is snapshot.reviews["review.fractional-second"]
+    )

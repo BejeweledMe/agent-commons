@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from .chronology import chronological_key
 from .snapshot import ProjectSnapshot
 
 
@@ -32,9 +33,6 @@ def select_qualifying_review(
             and review.get("target_revision") == target_revision
             and str((review.get("actor") or {}).get("session_id", "")) not in work_author_sessions
         ),
-        key=lambda review: (
-            str(review.get("recorded_at", "")),
-            str(review.get("id", "")),
-        ),
+        key=lambda review: chronological_key(review.get("recorded_at"), review.get("id")),
     )
     return qualifying[-1] if qualifying else None
