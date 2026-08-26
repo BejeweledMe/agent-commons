@@ -61,7 +61,7 @@ env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE \
 | Компонент | Медиана | Samples, с | Max additional traced allocation |
 |---|---:|---|---:|
 | warm `SQLiteIndex.sync()` | 0.628094 с | 0.628094 / 0.627550 / 0.629141 | 3 376 862 B (3.22 MiB) |
-| `SQLiteIndex.read_projection()` | 0.238828 с | 0.238828 / 0.238376 / 0.238979 | 11 802 008 B (11.25 MiB) |
+| `SQLiteIndex.read_projection()` | 0.238828 с | 0.238828 / 0.238376 / 0.238979 | 11 802 008 B (11.26 MiB) |
 | `project_events()` по verified tuple в памяти | 2.033753 с | 2.021872 / 2.033753 / 2.051581 | 9 693 280 B (9.25 MiB) |
 
 Samples описывают независимые операции, поэтому их нельзя складывать в latency
