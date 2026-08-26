@@ -20,13 +20,18 @@ from agent_commons.config import CommonsPaths
 from agent_commons.errors import CommonsError, ConfigurationError
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.actions import (
-    LAUNCH_NOT_CONFIGURED,
     MODEL_NAME_REFUSED,
     PREFLIGHT_CREDENTIAL_FREE,
     SETUP_SUPPORT_BINARY_UNRESOLVED,
     UIActions,
 )
 from agent_commons.ui.graph import build_graph
+from agent_commons.ui.launch import (
+    LAUNCH_NOT_CONFIGURED,
+    LaunchRequest,
+    LaunchResult,
+    UILaunchCoordinator,
+)
 from agent_commons.ui.reads import UIReads, session_state
 
 _LOG = logging.getLogger("agent_commons.ui")
@@ -155,7 +160,33 @@ class UIContext(UIReads, UIActions):
         # server lifetime; a failed read is an honest empty answer, not a retry
         # on every catalogue poll.
         self._profile_info: dict[str, dict[str, Any]] | None = None
-        self._launch_threads: list[threading.Thread] = []
+        self._launch_coordinator = UILaunchCoordinator(self)
+
+    def await_launches(self, timeout: float = 30.0) -> None:
+        """Join background launches through the dedicated coordinator."""
+
+        self._launch_coordinator.await_launches(timeout=timeout)
+
+    def run_role_on_task(
+        self,
+        *,
+        agent_id: str,
+        task_id: str,
+        wall_time_seconds: int | None = None,
+        idempotency_key: str | None = None,
+        background: bool = True,
+    ) -> LaunchResult:
+        """Delegate the existing launch call to the dedicated coordinator."""
+
+        return self._launch_coordinator.run(
+            LaunchRequest(
+                agent_id=agent_id,
+                task_id=task_id,
+                wall_time_seconds=wall_time_seconds,
+                idempotency_key=idempotency_key,
+                background=background,
+            )
+        )
 
     @property
     def writer_session_id(self) -> str | None:

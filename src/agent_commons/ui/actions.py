@@ -1,41 +1,24 @@
-"""Writing workflows and launch coordination for the local UI.
+"""Writing workflows for the local UI.
 
 ``UIActions`` is deliberately a state-free mixin.  ``UIContext`` keeps the
 session, manager factory, cache, and graph; this module owns the workflows that
-can mutate an operator file, record a canonical event, or start a provider.
-Keeping those concerns out of the cache facade lets another presentation surface
-reuse the same workflows without growing ``UIContext`` again.
+can mutate an operator file or record a canonical event. Provider-launch
+coordination is isolated in :mod:`agent_commons.ui.launch`.
 """
 
 from __future__ import annotations
 
-import logging
-import threading
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
-from agent_commons.errors import (
-    CommonsError,
-    ConfigurationError,
-    LifecycleConflictError,
-    ValidationError,
-)
+from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
 from agent_commons.runtime.model import profile_tool_summary, validate_model_name
 from agent_commons.services.manager import CommonsManager
 from agent_commons.services.roles import role_model
+from agent_commons.ui.launch import LAUNCH_NOT_CONFIGURED as LAUNCH_NOT_CONFIGURED
 from agent_commons.views import truncate_utf8
-
-_LOG = logging.getLogger("agent_commons.ui")
-
-#: The one wording for "this panel cannot launch yet", shared by the direct-call
-#: refusal here and the typed ``launch_not_configured`` HTTP refusal in
-#: `ui.server`, so the two can never drift into two explanations of one state.
-LAUNCH_NOT_CONFIGURED = (
-    "no runtime environment is configured for this panel: launching a provider "
-    "needs an operator session and an operator profile config"
-)
 
 #: A provider was resolved but one of the executables every profile needs beside
 #: it was not.  The wave contract froze this code after `ui.setup` found the
@@ -62,19 +45,13 @@ PREFLIGHT_CREDENTIAL_FREE = (
 
 
 class UIActions:
-    """Panel workflows that write or coordinate a provider launch.
+    """Panel workflows that write through the operator manager.
 
     The mixin intentionally depends only on the narrow context capabilities it
     uses (session access, manager factories, cache invalidation, and configured
     paths).  It owns no parallel state and therefore cannot bypass the single
     read-only/writer manager boundary on ``UIContext``.
     """
-
-    def await_launches(self, timeout: float = 30.0) -> None:
-        """Join any background launch threads. For tests and clean shutdown."""
-
-        for thread in list(self._launch_threads):
-            thread.join(timeout=timeout)
 
     @staticmethod
     def _unresolved_support_binaries(discovery: Any) -> tuple[str, ...]:
@@ -371,123 +348,6 @@ class UIActions:
             return validate_model_name(text)
         except ValidationError as exc:
             raise ValidationError(MODEL_NAME_REFUSED) from exc
-
-    #: A UI-launched run is one bounded leaf with one provider attempt.
-    _DEFAULT_RUN_LIMITS: dict[str, Any] = {
-        "max_depth": 0,
-        "wall_time_seconds": 600,
-        "max_attempts": 1,
-        "max_concurrency": 1,
-        "budget": {"unit": "provider_units", "limit": 1},
-    }
-
-    def _runtime_service(self, manager: CommonsManager) -> Any:
-        """Build the same runtime service the CLI uses, under the writer session."""
-
-        if self._runtime_factory is not None:
-            return self._runtime_factory(manager)
-        from agent_commons.services.delegation_runtime import (
-            DelegationRuntimeService,
-            load_runtime_configuration,
-        )
-
-        config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
-        runner = None
-        if config.demo:
-            # An internal/dev config can bind the runner seam without the panel
-            # advertising demo capability.
-            from agent_commons.runtime.demo import DemoRunner
-
-            runner = DemoRunner(manager.paths.state_root)
-        return DelegationRuntimeService(
-            manager,
-            profiles=config.profiles,
-            operator_limits=config.limits,
-            catalog=config.catalog,
-            runner=runner,
-        )
-
-    def run_role_on_task(
-        self,
-        *,
-        agent_id: str,
-        task_id: str,
-        wall_time_seconds: int | None = None,
-        idempotency_key: str | None = None,
-        background: bool = True,
-    ) -> dict[str, Any]:
-        """Record a bounded delegation for a role, then run it through the broker."""
-
-        if not self.launch_enabled:
-            raise ConfigurationError(LAUNCH_NOT_CONFIGURED)
-        limits = dict(self._DEFAULT_RUN_LIMITS)
-        if wall_time_seconds:
-            limits["wall_time_seconds"] = int(wall_time_seconds)
-        if self._session_owner is not None:
-            self._session_owner.ensure_run_ttl(int(limits["wall_time_seconds"]))
-        writer = self.writer()
-        role = writer.get_agent(agent_id)
-        if role.get("state") != "active":
-            raise ValidationError("only an active role can be given work")
-        if role.get("template"):
-            raise ValidationError("a role preset is a template and is never employed")
-        task = writer.snapshot().tasks.get(task_id)
-        if task is None:
-            raise ValidationError(f"no such task: {task_id}")
-        profile_id = str(role["profile_id"])
-        purpose = "implementation"
-        if profile_id.endswith("independent-reviewer"):
-            purpose = "independent_review"
-        delegation = writer.create_delegation(
-            target_ref={"kind": "task", "id": task_id},
-            target_revision=str(task.get("effective_revision") or task["revision"]),
-            target_profile=profile_id,
-            purpose=purpose,
-            limits=limits,
-            on_behalf_of_agent_id=agent_id,
-            idempotency_key=idempotency_key,
-        )
-        delegation_id = str(delegation["entity_ref"]["id"])
-        launch_key = f"ui-launch-{delegation_id}"
-
-        def _launch() -> None:
-            try:
-                self._runtime_service(self.writer()).run(
-                    delegation_id, delegation["revision"], idempotency_key=launch_key
-                )
-            except Exception as exc:  # a launch failure is reported, never silent
-                _LOG.warning("UI launch of %s failed: %s", delegation_id, exc)
-                try:
-                    self.writer().mark_delegation_needs_operator(
-                        delegation_id,
-                        str(delegation["revision"]),
-                        reason_code="launch_failed",
-                        summary=f"the panel could not start this run: {exc}",
-                        idempotency_key=f"{launch_key}:launch-failed",
-                    )
-                    self.invalidate()
-                except CommonsError as write_failure:  # pragma: no cover - defence
-                    _LOG.warning(
-                        "UI launch failure of %s could not be recorded: %s",
-                        delegation_id,
-                        write_failure,
-                    )
-            finally:
-                self.invalidate()
-
-        if background:
-            thread = threading.Thread(target=_launch, name=launch_key, daemon=True)
-            self._launch_threads.append(thread)
-            thread.start()
-        else:
-            _launch()
-        self.invalidate()
-        return {
-            "delegation_id": delegation_id,
-            "target_profile": profile_id,
-            "purpose": purpose,
-            "launched": True,
-        }
 
     def answer_operation(
         self, *, operation_id: str, answer: Mapping[str, Any], idempotency_key: str | None = None
