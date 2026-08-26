@@ -9,6 +9,8 @@ dist/
 build/
 .venv/
 frontend/gallery/node_modules/
+frontend/work/node_modules/
+frontend/work/tsconfig.tsbuildinfo
 .agent-commons/cache/
 .agent-commons/.state/
 .agent-commons/events/
