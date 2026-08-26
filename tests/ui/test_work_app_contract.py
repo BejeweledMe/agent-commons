@@ -31,6 +31,14 @@ def _source(relative_path: str) -> str:
     return (_WORK_SOURCE / relative_path).read_text("utf-8")
 
 
+def _bundle_tree(root: Path) -> dict[str, bytes]:
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def test_work_bundle_is_a_packaged_same_origin_shell() -> None:
     shell = read_work_shell()
     assets = work_static_directory() / "assets"
@@ -88,6 +96,27 @@ def test_work_source_and_build_contract_stays_separate_from_gallery() -> None:
     assert 'entryFileNames: "assets/work-[hash].js"' in vite
     assert "createRoot" in entry
     assert 'import "./styles.css"' in entry
+
+
+def test_work_checked_in_bundle_is_fresh_from_its_pinned_frontend_source(tmp_path: Path) -> None:
+    """Rebuilding elsewhere must reproduce the exact packaged Work tree.
+
+    ``make check`` installs the locked frontend dependencies before pytest.  The
+    temporary ``outDir`` is essential: this regression guard may never rewrite
+    the checked-in package assets it is comparing.
+    """
+
+    rebuilt = tmp_path / "rebuilt-work"
+    result = subprocess.run(
+        ["npm", "run", "build", "--", "--outDir", str(rebuilt)],
+        cwd=_WORK_SOURCE,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _bundle_tree(rebuilt) == _bundle_tree(work_static_directory())
 
 
 def test_work_locales_are_paired_and_include_actionable_failure_guidance() -> None:
