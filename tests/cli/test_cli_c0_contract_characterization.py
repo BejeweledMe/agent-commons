@@ -45,6 +45,15 @@ TOP_LEVEL_COMMANDS = (
 )
 
 
+def test_registered_top_level_command_set_matches_inventory() -> None:
+    """The migration inventory names every registered CLI family exactly once."""
+
+    expected_commands = frozenset(TOP_LEVEL_COMMANDS)
+
+    assert len(TOP_LEVEL_COMMANDS) == len(expected_commands)
+    assert frozenset(cli.commands) == expected_commands
+
+
 def test_each_registered_top_level_command_has_a_help_surface() -> None:
     """Every currently registered family stays reachable for migration inventory."""
 
