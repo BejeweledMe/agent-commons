@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from agent_commons.core.canonical import canonical_sha256
 from agent_commons.domain.projection import project_events
 from agent_commons.views import orientation
@@ -701,6 +703,175 @@ def test_artifact_change_or_manifest_loss_revokes_task_acceptance() -> None:
         assert snapshot.tasks[task_id]["artifact_stale"] is True
         assert snapshot.reviews[review_id]["stale"] is True
         assert ("event", accepted["event_id"]) in snapshot.stale_refs
+
+
+def test_accepted_task_keeps_only_current_self_evidence() -> None:
+    """Acceptance must not make review evidence on its own subject stale."""
+
+    task_id = "task.00000000000000000000000001"
+    foreign_task_id = "task.00000000000000000000000002"
+    review_id = "review.00000000000000000000000001"
+    verification_id = "verification.00000000000000000000000001"
+    foreign_created = event(
+        1,
+        "task.created",
+        {
+            "task_id": foreign_task_id,
+            "title": "Foreign task",
+            "description": "Makes foreign evidence stale.",
+            "acceptance_criteria": ["starts"],
+            "priority": "normal",
+        },
+        "task",
+        foreign_task_id,
+    )
+    foreign_started = event(
+        2,
+        "task.started",
+        {"task_id": foreign_task_id, "expected_revision": foreign_created["event_id"]},
+        "task",
+        foreign_task_id,
+    )
+    created = event(
+        3,
+        "task.created",
+        {
+            "task_id": task_id,
+            "title": "Reviewed task",
+            "description": "Acceptance keeps its submitted evidence current.",
+            "acceptance_criteria": ["review approved"],
+            "priority": "normal",
+        },
+        "task",
+        task_id,
+    )
+    started = event(
+        4,
+        "task.started",
+        {"task_id": task_id, "expected_revision": created["event_id"]},
+        "task",
+        task_id,
+    )
+    completed = event(
+        5,
+        "task.completed",
+        {"task_id": task_id, "expected_revision": started["event_id"], "summary": "done"},
+        "task",
+        task_id,
+    )
+    submitted = event(
+        6,
+        "task.submitted",
+        {"task_id": task_id, "expected_revision": completed["event_id"], "summary": "ready"},
+        "task",
+        task_id,
+    )
+    requested = event(
+        7,
+        "review.requested",
+        {
+            "review_id": review_id,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": submitted["event_id"],
+            "criteria": ["correctness"],
+            "independent": True,
+        },
+        "review",
+        review_id,
+    )
+    approved = event(
+        8,
+        "review.completed",
+        {
+            "review_id": review_id,
+            "expected_revision": requested["event_id"],
+            "target_revision": submitted["event_id"],
+            "verdict": "approved",
+            "summary": "approved",
+            "evidence_refs": [
+                {
+                    "ref": {"kind": "task", "id": task_id},
+                    "revision": submitted["event_id"],
+                }
+            ],
+        },
+        "review",
+        review_id,
+    )
+    approved["actor"] = {"session_id": "session.reviewer", "role_id": "reviewer"}
+    verification = event(
+        9,
+        "verification.recorded",
+        {
+            "verification_id": verification_id,
+            "target_ref": {"kind": "task", "id": task_id},
+            "target_revision": submitted["event_id"],
+            "claim": "reviewed task is complete",
+            "evidence_refs": [
+                {
+                    "ref": {"kind": "task", "id": task_id},
+                    "revision": submitted["event_id"],
+                }
+            ],
+        },
+        "verification",
+        verification_id,
+    )
+    accepted = event(
+        10,
+        "task.accepted",
+        {
+            "task_id": task_id,
+            "expected_revision": submitted["event_id"],
+            "summary": "accepted",
+            "acceptance_review": {
+                "ref": {"kind": "review", "id": review_id},
+                "revision": approved["event_id"],
+            },
+        },
+        "task",
+        task_id,
+    )
+    history = [
+        foreign_created,
+        foreign_started,
+        created,
+        started,
+        completed,
+        submitted,
+        requested,
+        approved,
+        verification,
+        accepted,
+    ]
+
+    current = project_events(history)
+
+    assert current.tasks[task_id]["state"] == "accepted"
+    assert current.tasks[task_id]["accepted_subject_revision"] == submitted["event_id"]
+    assert current.reviews[review_id]["stale"] is False
+    assert current.verifications[verification_id]["stale"] is False
+
+    stale_self_history = deepcopy(history)
+    stale_self_history[7]["payload"]["evidence_refs"][0]["revision"] = completed["event_id"]
+    stale_self = project_events(stale_self_history)
+
+    assert stale_self.tasks[task_id]["state"] == "review"
+    assert stale_self.reviews[review_id]["stale"] is True
+    assert ("event", accepted["event_id"]) in stale_self.stale_refs
+
+    stale_foreign_history = deepcopy(history)
+    stale_foreign_history[7]["payload"]["evidence_refs"] = [
+        {
+            "ref": {"kind": "task", "id": foreign_task_id},
+            "revision": foreign_created["event_id"],
+        }
+    ]
+    stale_foreign = project_events(stale_foreign_history)
+
+    assert stale_foreign.tasks[task_id]["state"] == "review"
+    assert stale_foreign.reviews[review_id]["stale"] is True
+    assert ("event", accepted["event_id"]) in stale_foreign.stale_refs
 
 
 def test_verification_and_pending_review_become_stale_after_target_revision() -> None:

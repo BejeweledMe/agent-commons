@@ -711,9 +711,42 @@ def _has_stale_evidence(snapshot: ProjectSnapshot, item: Mapping[str, Any]) -> b
         ref = bound.get("ref")
         if not isinstance(ref, Mapping):
             return True
+        if _is_accepted_task_subject_evidence(snapshot, item, ref, bound.get("revision")):
+            continue
         if _current_evidence_revision(snapshot, ref) != bound.get("revision"):
             return True
     return False
+
+
+def _is_accepted_task_subject_evidence(
+    snapshot: ProjectSnapshot,
+    item: Mapping[str, Any],
+    evidence_ref: Mapping[str, Any],
+    evidence_revision: object,
+) -> bool:
+    """Recognize evidence on the accepted subject, not its acceptance event.
+
+    A review or verification can bind its own task at the submitted revision.
+    Acceptance advances that task's record, so comparing the binding with the
+    post-acceptance revision would make the acceptance invalidate itself during
+    replay.  The exception is deliberately limited to that self-reference and
+    only to the revision captured as the accepted subject.
+    """
+
+    target = item.get("target_ref")
+    if (
+        not isinstance(target, Mapping)
+        or target.get("kind") != "task"
+        or evidence_ref.get("kind") != "task"
+        or evidence_ref.get("id") != target.get("id")
+    ):
+        return False
+    task = snapshot.tasks.get(str(target.get("id", "")))
+    return (
+        task is not None
+        and task.get("state") == "accepted"
+        and evidence_revision == task.get("accepted_subject_revision")
+    )
 
 
 def _has_stale_artifacts(snapshot: ProjectSnapshot, item: Mapping[str, Any]) -> bool:
