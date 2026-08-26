@@ -3,19 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from agent_commons.domain.agents import (
-    CONTEXT_MODES,
-    GRANT_NAMES,
-    PROFILE_NARROWING,
-    effective_grants,
-    grant_level,
-    lineage,
-    principals,
-    retirement_blockers,
-    session_agent_map,
-    turnover_blockers,
-)
 from agent_commons.domain.collections import collection_for
+from agent_commons.domain.roles import (
+    RoleTransitionContext,
+    principals,
+    session_agent_map,
+    validate_role_transition,
+)
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.states import (
     LIVE_WORKER_DELEGATION_STATES,
@@ -308,11 +302,19 @@ def validate_transition(
                 "task acceptance requires a review completed outside the work-author principals"
             )
     if event_type == "agent.reconfigured":
-        _validate_agent_reconfiguration(
-            snapshot, current, payload, actor_session_id=actor_session_id
+        validate_role_transition(
+            event_type,
+            _role_transition_context(snapshot, actor_session_id),
+            payload,
+            current=current,
         )
     if event_type == "agent.retired":
-        _validate_agent_retirement(snapshot, current, payload, actor_session_id=actor_session_id)
+        validate_role_transition(
+            event_type,
+            _role_transition_context(snapshot, actor_session_id),
+            payload,
+            current=current,
+        )
     if event_type == "decision.accepted":
         scope = str(current.get("scope", ""))
         conflicts = [
@@ -396,11 +398,24 @@ def _validate_creation(
             require_entity(snapshot, "task", str(dependency))
     if event_type == "delegation.requested":
         _validate_delegation_request(snapshot, payload, actor_session_id=actor_session_id)
-        _validate_role_binding(snapshot, payload, relations, actor_session_id=actor_session_id)
+        validate_role_transition(
+            event_type,
+            _role_transition_context(snapshot, actor_session_id),
+            payload,
+            relations=relations,
+        )
     if event_type == "agent.created":
-        _validate_agent_creation(snapshot, payload, actor_session_id=actor_session_id)
+        validate_role_transition(
+            event_type,
+            _role_transition_context(snapshot, actor_session_id),
+            payload,
+        )
     if event_type == "agent.link_opened":
-        _validate_agent_link(snapshot, payload, actor_session_id=actor_session_id)
+        validate_role_transition(
+            event_type,
+            _role_transition_context(snapshot, actor_session_id),
+            payload,
+        )
 
 
 def _current_ref_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]) -> str | None:
@@ -475,320 +490,17 @@ def acting_agent_id(snapshot: ProjectSnapshot, actor_session_id: str) -> str | N
     return str(latest["agent_id"])
 
 
-def _require_grant(
-    snapshot: ProjectSnapshot,
-    actor_agent_id: str,
-    grant: str,
-    *,
-    approval: str,
-    action: str,
-) -> None:
-    """Check a standing permission against its *effective* level.
+def _role_transition_context(
+    snapshot: ProjectSnapshot, actor_session_id: str
+) -> RoleTransitionContext:
+    def role_entity(kind: str, identifier: str) -> Mapping[str, Any]:
+        return require_entity(snapshot, kind, identifier)
 
-    Effective, not stored: a level lowered on any ancestor applies to the next
-    call, including from work that is already running.
-    """
-
-    level = effective_grants(snapshot.agents, actor_agent_id)[grant]
-    if level == "deny":
-        raise LifecycleConflictError(f"role {actor_agent_id} may not {action}")
-    if level == "ask" and approval != "human_confirmed":
-        raise LifecycleConflictError(
-            f"role {actor_agent_id} may {action} only with human confirmation"
-            + (
-                " (the automatic level is withheld until its guarantees hold;"
-                " see docs/audits/2026-08-10-standing-roles-review.md)"
-                if approval == "automatic"
-                else ""
-            )
-        )
-    if level == "auto" and approval not in {"automatic", "human_confirmed"}:
-        raise LifecycleConflictError(f"role {actor_agent_id} recorded an unauthorized {action}")
-
-
-#: Fields a confirmation may not quietly differ on.  Approving a proposal has to
-#: mean approving *that* proposal, or the ledger records "role X asked for this"
-#: next to something X never asked for.
-_PROPOSAL_BOUND_FIELDS = ("name", "profile_id", "grants", "context_mode", "rationale")
-
-
-def _assert_confirms_its_proposal(
-    snapshot: ProjectSnapshot,
-    payload: Mapping[str, Any],
-    *,
-    creator_id: str,
-) -> None:
-    """Tie a human-confirmed role to the open proposal a role actually made."""
-
-    reference = payload["proposal_ref"]
-    thread = require_entity(snapshot, "thread", str(reference.get("id", "")))
-    if thread.get("state") != "open":
-        raise LifecycleConflictError("a role proposal is confirmed only while its thread is open")
-    if thread.get("thread_type") != "proposal":
-        raise LifecycleConflictError("proposal_ref must name a proposal thread")
-    proposed = (thread.get("extensions") or {}).get("staff_proposal")
-    if not isinstance(proposed, Mapping) or proposed.get("action") != "create_role":
-        raise LifecycleConflictError("proposal thread carries no role-creation proposal")
-
-    # The proposing session must have been running as the role now credited
-    # with the proposal.  This is what makes `created_by_agent_id` a fact rather
-    # than a claim the confirming human types in.
-    proposer_session = str((thread.get("actor") or {}).get("session_id", ""))
-    bindings = session_agent_map(snapshot.delegations)
-    if creator_id not in bindings.get(proposer_session, frozenset()):
-        raise LifecycleConflictError(
-            "the proposal thread was not opened by a session running as the crediting role"
-        )
-    differing = sorted(
-        field for field in _PROPOSAL_BOUND_FIELDS if proposed.get(field) != payload.get(field)
-    )
-    if differing:
-        raise LifecycleConflictError(
-            "a confirmation cannot change what was proposed: " + ", ".join(differing)
-        )
-
-
-def _validate_agent_creation(
-    snapshot: ProjectSnapshot,
-    payload: Mapping[str, Any],
-    *,
-    actor_session_id: str,
-) -> None:
-    creator_id = payload.get("created_by_agent_id")
-    acting = acting_agent_id(snapshot, actor_session_id)
-    origin = str(payload["origin"])
-
-    if origin == "human":
-        if acting is not None:
-            raise LifecycleConflictError(
-                "a session running as a role cannot record a human-created role"
-            )
-        return
-
-    creator = require_entity(snapshot, "agent", str(creator_id))
-    if creator.get("state") != "active":
-        raise LifecycleConflictError("a retired role cannot create another role")
-    approval = str(payload["approval"])
-    if approval == "automatic" and acting != str(creator_id):
-        raise LifecycleConflictError(
-            "an automatic role creation must be recorded by the creating role's own session"
-        )
-    if approval == "human_confirmed" and acting is not None:
-        raise LifecycleConflictError(
-            "a human-confirmed role creation is recorded by the confirming human's session"
-        )
-    if approval == "human_confirmed":
-        _assert_confirms_its_proposal(snapshot, payload, creator_id=str(creator_id))
-    _require_grant(
-        snapshot,
-        str(creator_id),
-        "create_roles",
-        approval=approval,
-        action="create roles",
-    )
-
-    creator_grants = effective_grants(snapshot.agents, str(creator_id))
-    new_grants = dict(payload["grants"])
-    for name in GRANT_NAMES:
-        if grant_level(new_grants[name]) > grant_level(creator_grants[name]):
-            raise LifecycleConflictError(
-                f"a created role cannot hold a wider {name} grant than its creator"
-            )
-    # The only thing between "an agent hired a helper" and an unbounded number of
-    # generations, each formally within its own rights.
-    if approval == "automatic" and grant_level(new_grants["create_roles"]) >= grant_level(
-        creator_grants["create_roles"]
-    ):
-        raise LifecycleConflictError(
-            "an automatically created role must hold a strictly narrower create_roles grant"
-        )
-    creator_profile = str(creator.get("profile_id", ""))
-    requested_profile = str(payload["profile_id"])
-    allowed_profiles = PROFILE_NARROWING.get(creator_profile, frozenset())
-    if requested_profile not in allowed_profiles:
-        allowed = ", ".join(sorted(allowed_profiles)) or "none"
-        raise LifecycleConflictError(
-            "a created role cannot hold a wider provider profile than its creator: role "
-            "profiles are provider-specific execution authority, so cross-provider profiles "
-            "are intentionally incomparable; "
-            f"creator profile {creator_profile}; requested profile {requested_profile}; "
-            f"allowed child profiles: {allowed}. To use another provider, create "
-            f"{requested_profile} directly as a human-owned role instead."
-        )
-    for field in ("tool_allowlist", "skills"):
-        creator_values = creator.get(field)
-        if not creator_values:
-            continue
-        widened = sorted(set(payload.get(field) or ()) - set(creator_values))
-        if widened:
-            raise LifecycleConflictError(
-                f"a created role cannot add {field} entries its creator lacks: "
-                + ", ".join(widened)
-            )
-    if (
-        CONTEXT_MODES[str(payload["context_mode"])]
-        < CONTEXT_MODES[str(creator.get("context_mode", "accumulated"))]
-    ):
-        raise LifecycleConflictError("a created role cannot weaken its creator's context isolation")
-    # A missing budget is the narrowest case, not an unbounded one: payload
-    # validation already refuses a role that may create or retire without one,
-    # so `null` here means the role has no such right to bound.
-    budget = payload.get("turnover_budget")
-    creator_budget = creator.get("turnover_budget")
-    if (
-        isinstance(creator_budget, int)
-        and not isinstance(creator_budget, bool)
-        and isinstance(budget, int)
-        and not isinstance(budget, bool)
-        and budget > creator_budget
-    ):
-        raise LifecycleConflictError(
-            "a created role cannot hold a turnover budget wider than its creator"
-        )
-    blocked = turnover_blockers(snapshot.agents, str(creator_id))
-    if blocked:
-        raise LifecycleConflictError("role turnover budget is exhausted for: " + ", ".join(blocked))
-
-
-def _validate_agent_reconfiguration(
-    snapshot: ProjectSnapshot,
-    current: Mapping[str, Any],
-    payload: Mapping[str, Any],
-    *,
-    actor_session_id: str,
-) -> None:
-    changes = dict(payload["changes"])
-    acting = acting_agent_id(snapshot, actor_session_id)
-    if acting is not None:
-        raise LifecycleConflictError("a role's configuration is changed by a human, not by a role")
-    if (
-        "context_mode" in changes
-        and CONTEXT_MODES[str(changes["context_mode"])]
-        < CONTEXT_MODES[str(current.get("context_mode", "accumulated"))]
-    ):
-        # Weakening isolation is the change a later "optimisation" makes by
-        # accident, so it costs an explicit gate and a recorded reason.
-        if payload.get("isolation_downgrade") is None:
-            raise LifecycleConflictError(
-                "weakening a role's context isolation requires a recorded isolation_downgrade"
-            )
-    creator_id = current.get("created_by_agent_id")
-    # The grants and budget a reconfigure would leave the role holding: changed
-    # values win, unchanged ones keep their stored value.  Every check below
-    # reads this post-change view, so reconfiguration is held to the same
-    # invariants as creation rather than trusting the one snapshot the write
-    # happened under.
-    new_grants = {
-        name: str((changes.get("grants") or current.get("grants") or {}).get(name, "deny"))
-        for name in GRANT_NAMES
-    }
-    new_budget = (
-        changes.get("turnover_budget")
-        if "turnover_budget" in changes
-        else current.get("turnover_budget")
-    )
-    if "grants" in changes and creator_id:
-        creator_grants = effective_grants(snapshot.agents, str(creator_id))
-        for name in GRANT_NAMES:
-            if grant_level(new_grants[name]) > grant_level(creator_grants[name]):
-                raise LifecycleConflictError(
-                    f"a role cannot be reconfigured past its creator's {name} grant"
-                )
-        # Strict decrease is enforced at automatic creation so the chain
-        # terminates; a reconfigure that restored an automatically-created role
-        # to its creator's level would defeat it one generation at a time.
-        # Mirror creation exactly -- the rule binds `approval: automatic`, not
-        # a role a human confirmed at an equal level on purpose.
-        if str(current.get("approval", "")) == "automatic" and grant_level(
-            new_grants["create_roles"]
-        ) >= grant_level(creator_grants["create_roles"]):
-            raise LifecycleConflictError(
-                "an automatically-created role keeps a strictly narrower create_roles grant "
-                "than its creator"
-            )
-    if "grants" in changes or "turnover_budget" in changes:
-        # A role that may create or retire needs a ceiling, exactly as at
-        # creation; reconfiguration used to grant the right and skip the budget,
-        # so a null-budget root removed the ceiling for its whole subtree (H1).
-        needs_budget = any(new_grants[name] != "deny" for name in ("create_roles", "retire_roles"))
-        if needs_budget and (isinstance(new_budget, bool) or not isinstance(new_budget, int)):
-            raise LifecycleConflictError(
-                "a role that may create or retire roles requires an integer turnover_budget"
-            )
-        if creator_id and isinstance(new_budget, int) and not isinstance(new_budget, bool):
-            creator_budget = (snapshot.agents.get(str(creator_id)) or {}).get("turnover_budget")
-            if (
-                isinstance(creator_budget, int)
-                and not isinstance(creator_budget, bool)
-                and new_budget > creator_budget
-            ):
-                raise LifecycleConflictError(
-                    "a role cannot be reconfigured to a turnover budget wider than its creator"
-                )
-
-
-def _validate_agent_retirement(
-    snapshot: ProjectSnapshot,
-    current: Mapping[str, Any],
-    payload: Mapping[str, Any],
-    *,
-    actor_session_id: str,
-) -> None:
-    agent_id = str(payload["agent_id"])
-    blockers = retirement_blockers(
-        agents=snapshot.agents,
-        delegations=snapshot.delegations,
-        reviews=snapshot.reviews,
-        agent_id=agent_id,
-    )
-    if blockers:
-        raise LifecycleConflictError(
-            "a role owing live work cannot be retired: " + "; ".join(blockers)
-        )
-    acting = acting_agent_id(snapshot, actor_session_id)
-    if acting is None:
-        return
-    if str(current.get("origin", "human")) == "human":
-        raise LifecycleConflictError("a role never retires a human-created role")
-    lineage_ids = set()
-    walker = current.get("created_by_agent_id")
-    seen: set[str] = set()
-    while walker and str(walker) not in seen:
-        seen.add(str(walker))
-        lineage_ids.add(str(walker))
-        walker = (snapshot.agents.get(str(walker)) or {}).get("created_by_agent_id")
-    if acting not in lineage_ids:
-        raise LifecycleConflictError("a role may retire only roles below it in its own lineage")
-    _require_grant(
-        snapshot,
-        acting,
-        "retire_roles",
-        approval="automatic",
-        action="retire roles",
-    )
-
-
-def _validate_agent_link(
-    snapshot: ProjectSnapshot,
-    payload: Mapping[str, Any],
-    *,
-    actor_session_id: str,
-) -> None:
-    source = require_entity(snapshot, "agent", str(payload["from_agent_id"]))
-    target = require_entity(snapshot, "agent", str(payload["to_agent_id"]))
-    if source.get("state") != "active" or target.get("state") != "active":
-        raise LifecycleConflictError("a temporary link requires two roles in service")
-    acting = acting_agent_id(snapshot, actor_session_id)
-    if acting is None:
-        return
-    if acting != str(payload["from_agent_id"]):
-        raise LifecycleConflictError("a role may open a link only from itself")
-    _require_grant(
-        snapshot,
-        acting,
-        "open_links",
-        approval="automatic",
-        action="open links",
+    return RoleTransitionContext(
+        snapshot=snapshot,
+        actor_session_id=actor_session_id,
+        acting_agent_id=acting_agent_id(snapshot, actor_session_id),
+        require_entity=role_entity,
     )
 
 
@@ -950,78 +662,6 @@ def _delegation_allows_verification(
         and review.get("target_revision") == target_revision
         for review in snapshot.reviews.values()
     )
-
-
-def _validate_role_binding(
-    snapshot: ProjectSnapshot,
-    payload: Mapping[str, Any],
-    relations: Sequence[Mapping[str, Any]],
-    *,
-    actor_session_id: str,
-) -> None:
-    """Who may put a run under a standing role.
-
-    Acting for a role *is* holding its authority: a session bound to a role
-    receives that role's effective grants and its staff-changing tools.  Without
-    this check anyone able to open a delegation could name any role and hand a
-    session of their choosing everything that role may do.
-
-    The rule mirrors retirement.  A human window -- one running as no role --
-    may staff any active role, because that is the ordinary way work starts and
-    every local session is equally trusted in MVP-0 anyway.  A session already
-    running as a role may staff only itself or a role below it in its own
-    lineage.  Widening that is exactly what a temporary link is for.
-    """
-
-    delegation_id = str(payload.get("delegation_id", ""))
-    agent_id = ""
-    for relation in relations:
-        subject = relation.get("subject")
-        target = relation.get("object")
-        if (
-            relation.get("predicate") == "on_behalf_of"
-            and isinstance(subject, Mapping)
-            and isinstance(target, Mapping)
-            and subject.get("id") == delegation_id
-            and target.get("kind") == "agent"
-        ):
-            agent_id = str(target.get("id", ""))
-    if not agent_id:
-        return
-
-    role = require_entity(snapshot, "agent", agent_id)
-    if role.get("state") != "active":
-        raise LifecycleConflictError(f"a retired role cannot take new work: {agent_id}")
-    if role.get("template"):
-        raise LifecycleConflictError("a role preset is a template and is never employed")
-    if role.get("profile_id") != payload.get("target_profile"):
-        raise LifecycleConflictError(
-            "a delegation on behalf of a role must use that role's profile"
-        )
-    acting = acting_agent_id(snapshot, actor_session_id)
-    if acting is None or acting == agent_id:
-        return
-    if acting in {str(record["id"]) for record in lineage(snapshot.agents, agent_id)}:
-        return
-    # An open link is the one thing that widens this, which is what a typed
-    # action was for.  There is no expiry to check: replay has no clock, and
-    # using one would make the same events project differently over time -- the
-    # reason session liveness is excluded from replay too.  A link ends only
-    # when it is explicitly closed; `deadline_seconds` is optional recorded
-    # intent that constrains nothing (the earlier promise to surface expiry
-    # elsewhere was never kept, and the bounds that do hold agents are attempts,
-    # provider units and depth).
-    if not any(
-        link.get("state") == "open"
-        and link.get("allowed_action") == "handoff_work"
-        and str(link.get("from_agent_id")) == acting
-        and str(link.get("to_agent_id")) == agent_id
-        for link in snapshot.agent_links.values()
-    ):
-        raise LifecycleConflictError(
-            f"role {acting} may staff only itself, a role it created, or a role it holds "
-            f"a handoff_work link to, not {agent_id}"
-        )
 
 
 def _validate_delegation_request(
