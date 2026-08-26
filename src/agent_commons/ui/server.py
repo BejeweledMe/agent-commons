@@ -55,6 +55,7 @@ from agent_commons.ui.setup import (
     SetupError,
     missing_workspace_state,
 )
+from agent_commons.ui.work_routes import register_work_routes
 
 
 class _ExpectedShutdownCancellationFilter(logging.Filter):
@@ -470,6 +471,7 @@ def create_app(
         StaticFiles(directory=gallery_directory / "assets"),
         name="gallery-assets",
     )
+    register_work_routes(app)
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> Response:

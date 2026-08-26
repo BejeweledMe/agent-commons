@@ -39,6 +39,18 @@ def read_gallery_shell() -> str:
     return gallery_static_directory().joinpath("index.html").read_text("utf-8")
 
 
+def work_static_directory() -> Path:
+    """Return the packaged React Work application directory served by the local UI."""
+
+    return Path(str(resources.files("agent_commons.ui").joinpath("static/work")))
+
+
+def read_work_shell() -> str:
+    """Read the packaged React Work application entry document from the wheel."""
+
+    return work_static_directory().joinpath("index.html").read_text("utf-8")
+
+
 __all__ = [
     "CATALOG_SCHEMA",
     "ENTITY_SCHEMA",
@@ -50,4 +62,6 @@ __all__ = [
     "TRUTH_LAYERS",
     "read_gallery_shell",
     "read_spa",
+    "read_work_shell",
+    "work_static_directory",
 ]

@@ -114,7 +114,9 @@ class LocalBrowserSession:
 #: Paths that intentionally need no existing browser session.  Static frontend
 #: bytes contain no workspace data; the exchange route validates its own
 #: single-use code before setting a cookie.
-PUBLIC_PATHS = frozenset({"/", "/favicon.ico", "/gallery", "/gallery/", AUTH_EXCHANGE_PATH})
+PUBLIC_PATHS = frozenset(
+    {"/", "/favicon.ico", "/gallery", "/gallery/", "/work", "/work/", AUTH_EXCHANGE_PATH}
+)
 
 
 def is_public_path(path: str) -> bool:
@@ -126,7 +128,11 @@ def is_public_path(path: str) -> bool:
     public route is exempt from normal session middleware.
     """
 
-    return path in PUBLIC_PATHS or path.startswith("/gallery/assets/")
+    return (
+        path in PUBLIC_PATHS
+        or path.startswith("/gallery/assets/")
+        or path.startswith("/work/assets/")
+    )
 
 
 def token_matches(presented: str, expected: str) -> bool:
@@ -179,6 +185,23 @@ def content_security_policy(nonce: str) -> str:
 
 def gallery_content_security_policy() -> str:
     """CSP for the separately-built, same-origin React Gallery assets."""
+
+    return (
+        "default-src 'none'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "base-uri 'none'; "
+        "form-action 'none'; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "require-trusted-types-for 'script'"
+    )
+
+
+def work_content_security_policy() -> str:
+    """CSP for the separately-built, same-origin React Work application assets."""
 
     return (
         "default-src 'none'; "
