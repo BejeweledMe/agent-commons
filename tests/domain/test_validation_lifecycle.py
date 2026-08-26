@@ -16,6 +16,23 @@ DECISION_ID = "decision.00000000000000000000000001"
 REPLACEMENT_ID = "decision.00000000000000000000000002"
 REVIEW_ID = "review.00000000000000000000000001"
 REVIEW_REVISION = "evt.00000000000000000000000002"
+AGENT_ID = "agent.00000000000000000000000001"
+ACTOR_AGENT_ID = "agent.00000000000000000000000002"
+DELEGATION_ID = "delegation.00000000000000000000000001"
+
+
+def _human_created_role_payload() -> dict[str, object]:
+    return {
+        "agent_id": AGENT_ID,
+        "name": "Backend engineer",
+        "profile_id": "codex-builder",
+        "grants": {"create_roles": "deny", "retire_roles": "deny", "open_links": "deny"},
+        "context_mode": "fresh",
+        "origin": "human",
+        "approval": "human",
+        "rationale": "Own the implementation boundary.",
+        "lifetime": {"kind": "persistent"},
+    }
 
 
 def test_thread_reply_spec_requires_cas_revision() -> None:
@@ -109,6 +126,132 @@ def test_correction_hash_and_parent_ids_are_strict() -> None:
                 "expected_target_sha256": "a" * 64,
                 "superseded_correction_event_ids": ["evt.bad"],
             },
+        )
+
+
+def test_role_payload_validation_preserves_specific_error_order() -> None:
+    created = _human_created_role_payload()
+    created["grants"] = {"create_roles": "invalid"}
+    created["profile_id"] = "invalid-profile"
+    with pytest.raises(ValidationError, match="grants must contain exactly"):
+        validate_payload("agent.created", created)
+
+    created = _human_created_role_payload()
+    created["profile_id"] = "invalid-profile"
+    created["origin"] = "invalid-origin"
+    with pytest.raises(ValidationError, match="invalid agent profile_id"):
+        validate_payload("agent.created", created)
+
+    with pytest.raises(ValidationError, match="changes contains immutable agent fields: immutable"):
+        validate_payload(
+            "agent.reconfigured",
+            {
+                "agent_id": AGENT_ID,
+                "expected_revision": EVENT_ID,
+                "changes": {"immutable": "value", "context_mode": "invalid-mode"},
+                "reason": "Correct configuration.",
+            },
+        )
+
+    with pytest.raises(ValidationError, match="retired_by must be human, agent, or cascade"):
+        validate_payload(
+            "agent.retired",
+            {
+                "agent_id": AGENT_ID,
+                "expected_revision": EVENT_ID,
+                "reason": "The role is no longer needed.",
+                "retired_by": "invalid-retirer",
+                "cascade_of": "agent.invalid",
+            },
+        )
+
+    with pytest.raises(ValidationError, match="invalid link allowed_action"):
+        validate_payload(
+            "agent.link_opened",
+            {
+                "link_id": "link.00000000000000000000000001",
+                "from_agent_id": AGENT_ID,
+                "to_agent_id": AGENT_ID,
+                "allowed_action": "invalid-action",
+                "reason": "Coordinate the implementation.",
+            },
+        )
+
+
+def test_role_lifecycle_validation_preserves_guard_order() -> None:
+    actor = {
+        "id": ACTOR_AGENT_ID,
+        "state": "active",
+        "revision": EVENT_ID,
+        "origin": "human",
+    }
+    actor_binding = {
+        "id": DELEGATION_ID,
+        "agent_id": ACTOR_AGENT_ID,
+        "child_session_id": "session.role",
+        "state": "succeeded",
+    }
+    with pytest.raises(
+        LifecycleConflictError,
+        match="a session running as a role cannot record a human-created role",
+    ):
+        validate_transition(
+            ProjectSnapshot(
+                agents={ACTOR_AGENT_ID: actor},
+                delegations={DELEGATION_ID: actor_binding},
+            ),
+            "agent.created",
+            _human_created_role_payload(),
+            actor_session_id="session.role",
+        )
+
+    retiring_role = {
+        "id": AGENT_ID,
+        "state": "active",
+        "revision": EVENT_ID,
+        "origin": "human",
+    }
+    with pytest.raises(LifecycleConflictError, match="a role owing live work cannot be retired"):
+        validate_transition(
+            ProjectSnapshot(
+                agents={AGENT_ID: retiring_role, ACTOR_AGENT_ID: actor},
+                delegations={
+                    DELEGATION_ID: actor_binding,
+                    "delegation.00000000000000000000000002": {
+                        "id": "delegation.00000000000000000000000002",
+                        "agent_id": AGENT_ID,
+                        "state": "active",
+                    },
+                },
+            ),
+            "agent.retired",
+            {
+                "agent_id": AGENT_ID,
+                "expected_revision": EVENT_ID,
+                "reason": "The service is no longer needed.",
+                "retired_by": "agent",
+            },
+            actor_session_id="session.role",
+        )
+
+    with pytest.raises(
+        LifecycleConflictError,
+        match="agent does not exist: agent.00000000000000000000000003",
+    ):
+        validate_transition(
+            ProjectSnapshot(
+                agents={ACTOR_AGENT_ID: actor},
+                delegations={DELEGATION_ID: actor_binding},
+            ),
+            "agent.link_opened",
+            {
+                "link_id": "link.00000000000000000000000001",
+                "from_agent_id": "agent.00000000000000000000000003",
+                "to_agent_id": ACTOR_AGENT_ID,
+                "allowed_action": "ask",
+                "reason": "Coordinate the implementation.",
+            },
+            actor_session_id="session.role",
         )
 
 
