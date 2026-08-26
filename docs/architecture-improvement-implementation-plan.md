@@ -100,13 +100,37 @@ assessment-отчёта в [`docs/reviews/`](reviews/). Входные review о
 
 Одна canonical write boundary остаётся принципом, но это не означает рост
 `CommonsManager`: после A8 она должна выражаться узкими collaborators и
-композиционными адаптерами. Принятое
-`decision.4TZDDRT5PF84KXV6RHQAPTG5BX` дополнительно замораживает CLI для
-security fixes: в W0–W6 нет новых CLI-команд, CLI-decomposition или
-behavioural repair. UI и MCP являются тонкими transport adapters;
-они не вычисляют authority, readiness, acceptance или lifecycle.
+композиционными адаптерами. Принятое replacement-решение
+`decision.65J1MEQNYC1GNHJYK9KDBDK49S` supersede-ит прежний полный CLI-freeze:
+CLI больше не является центром развития продукта, но сохраняется как legacy
+compatibility, bootstrap и emergency/recovery adapter. В W0–W6 нет новых
+CLI-команд, CLI-decomposition или behavioural repair. UI и MCP являются
+тонкими transport adapters; они не вычисляют authority, readiness, acceptance
+или lifecycle. Security fixes сохраняют обычное исключение, но их
+compatibility impact должен быть явно охарактеризован.
 
-### 2.3. Единственный граф зависимостей программы
+### 2.3. Поэтапный уход от CLI без потери операционной способности
+
+Это не обещание UI-only и не разрешение немедленно ломать существующие
+скрипты. Решение различает три аудитории; C0 должен подтвердить или уточнить
+их реальные command-family и successors:
+
+| Класс потребителя | Целевой transport | До какого gate живёт CLI | Нельзя считать заменой |
+| --- | --- | --- | --- |
+| Normal human product workflow | UI | Пока UI не проходит целиком путь setup -> work -> delegation -> review/attention с typed refusals и E2E evidence. | Одна отдельная UI-кнопка или read-only экран. |
+| Agent worker | Purpose-scoped MCP | Пока необходимый tool catalog и grants не покрывают конкретный worker flow. | Универсальный scripting API: MCP намеренно scope-bound. |
+| Bootstrap, unattended automation, diagnosis, recovery и broker operations | После A8 — typed thematic service/Python boundary; тонкий CLI остаётся compatibility/emergency adapter. | Пока successor не имеет versioned contract, recovery tests и migration guide. | UI: она не запускает headless workflow и не даёт честную recovery-автоматизацию. |
+
+Все новые product capabilities после A8 начинаются в тематическом
+`domain/*`/`services/*` contract и лишь затем получают UI или MCP adapter. Это
+не означает внешний HTTP API: первым supported automation boundary может быть
+узкий versioned Python/service contract. Существующие `cli/_shared.py` и
+`cli/workspace.py` grandfathered как единственное уже сделанное исключение для
+still-live bootstrap. Дальнейшее разбиение `cli/__init__.py`, изменение
+публичного command/help/JSON/exit-code contract или удаление команд требует
+отдельного owner-authorised bounded migration decision.
+
+### 2.4. Единственный граф зависимостей программы
 
 Mermaid ниже показывает зависимости **пакетов работ и owner gates**, а не
 введение DAG engine для задач. Обычные task writes уже ацикличны по порядку
@@ -140,6 +164,14 @@ flowchart TD
   P1 --> P2[F1/F2 safe preview and Gallery reads]
   P1 --> P3[F3/F4 separate Pack / Design Package semantics]
   W3 -. provenance only, no scheduler dependency .-> P3
+
+  C0[C0: CLI consumer and parity inventory] --> C1[C1: UI migration of normal human workflows]
+  A8 --> C2[C2: typed service/Python automation boundary design]
+  C0 --> C2
+  DC1{Owner: UI surface contract} --> C1
+  DC2{Owner: automation family} --> C2
+  C1 --> C3[C3: owner-gated normal-flow CLI deprecation]
+  C2 --> C4[C4: owner-gated emergency/automation contract migration]
 ```
 
 `H0` не переоткрывает продуктовую политику: он переводит принятое
@@ -148,6 +180,12 @@ compatibility и rollback contract, который должен пройти о�
 independent review до W3. `W*` — новая control-plane программа. `P*` — уже
 утверждённая программа Context Pack / Gallery. Рёбра из решений означают
 **stop gate**, а не предварительно выбранный вариант.
+
+`C0` может начаться как documentation/evidence slice и не меняет CLI. `C1`
+следует UI-first продуктовой цели, но не включает CLI removal. `C2` начинается
+после A8, когда сервисные границы действительно существуют; до него нельзя
+объявлять MCP или UI универсальной заменой automation. `C3` и `C4` — будущие
+owner gates, не implementation work этого плана.
 
 ## 3. Целевая карта компонентов и contracts
 
@@ -167,6 +205,7 @@ independent review до W3. `W*` — новая control-plane программа
 | Escalation policy | `domain/escalation.py`, `services/escalations.py` | frozen `EscalationRequirement`, `EscalationPacket`, `route_to_immediate_parent(...)`, typed audited human override | Python domain/backend + product | W3 after H0; parent-to-parent only |
 | Finalisation boundary | `services/delegation_finalization.py` | `FinalizationEvidence`, `FinalizationOutcome`, `DelegationFinalizationService.evaluate(...)` | Runtime/backend + security | W4 after decision |
 | Existing runtime integration | `services/delegation_runtime.py` | composition call into finalisation service only; preserve provider contract until behavioural change is approved | Runtime/backend | W4 |
+| Automation service boundary | thematic `services/*` and typed `domain/*` contracts introduced by the owning feature | versioned request/result dataclass or `TypedDict`, typed refusals, compatibility characterization; UI/MCP/legacy CLI adapt the same service | Software architecture + Python backend + QA | C2, only after A8 and a separate automation-scope decision |
 | Attention adapter | `ui/attention_queue.py` with `ui/reads.py` adapter | adapter over `domain.attention.awaits_human()`, frozen card DTO mapping, deterministic merge/dedup and parity checks; `list_attention_queue(...)` | Python UI backend | W1/W3; parent queue plus human pull reads |
 | UI wire types | `ui/read_dtos.py` | `TypedDict` payloads for Work Health, `RunView`, Attention and typed refusal | Backend + frontend | A7/W1 |
 | HTTP transport | `ui/server.py`, `ui/security.py` | thin read endpoints; existing mutation routes only after semantic decision | Python UI/backend + security | W1/W3 |
@@ -227,7 +266,7 @@ eventual completion is confirmed by its own exact-revision review.
 | Audit step | Control-plane benefit | Constraint / owner |
 | --- | --- | --- |
 | A3 `domain/roles.py` | Gives a narrow home for future authority vocabulary. | Do not put authority/admission policy into roles before owner decision. Python domain. |
-| A4 composition (UI/MCP; CLI excluded) | Creates locations for Work reads/actions and MCP tool groups. | CLI decomposition and features stay frozen by `decision.4TZDDRT5PF84KXV6RHQAPTG5BX`; do not add control-plane methods to `UIContext` or `build_server`. Platform/UI. |
+| A4 composition (UI/MCP; CLI excluded) | Creates locations for Work reads/actions and MCP tool groups. | New product capability stays out of CLI under `decision.65J1MEQNYC1GNHJYK9KDBDK49S`; do not add control-plane methods to `UIContext` or `build_server`. Platform/UI. |
 | A4.5 instruction seam | Later lets Context Compiler consume typed input. | Mechanical extraction only: no prompt, `runtime.yaml` or persisted change. Runtime. |
 | A5 typed vertical records | Supplies typed Task/Review/Delegation inputs for derived views. | Existing JSON/events round-trip byte-for-byte. Python domain. |
 | A6 replay work | Establishes profiled baseline and safe golden-replay workflow. | No semantic migration or performance conclusion before profiling. Software/performance. |
@@ -236,6 +275,71 @@ eventual completion is confirmed by its own exact-revision review.
 
 **Exit:** every structural commit is behaviour-neutral, separately reviewed and
 green; no W/P code is smuggled into it.
+
+### Phase C0 — make CLI dependency measurable before changing it
+
+**Purpose:** replace an undifferentiated “remove CLI” wish with a bounded,
+evidence-backed migration map. This phase is documentation and characterization
+only: it does not add a command, alter CLI behaviour, or start a decomposition.
+
+Deliverables:
+
+1. A versioned inventory mapping every supported CLI command family to its
+   human, agent or automation consumer; current input/output/error contract;
+   candidate UI, MCP or service-boundary successor; and migration state.
+   “Supported” здесь ограничен зарегистрированным command tree, репозиторными
+   docs/callers и явно заявленными владельцем external consumers. Неизвестный
+   внешний script — compatibility risk, а не бесконечный блокер C0.
+2. A compatibility characterization for each retained command family: command
+   tree and `--help`, JSON shape, typed refusal/error, exit code, and recovery
+   behaviour where relevant. This is a guard for legacy callers, not an excuse
+   to preserve undocumented accidental output forever.
+3. A normal-human-flow parity scorecard. A flow is migratable only when its UI
+   path has setup, permission/refusal, success and recovery E2E evidence — not
+   merely a matching mutation endpoint.
+4. A classed retirement proposal: normal product flow may become eligible for
+   deprecation after UI parity; bootstrap, unattended automation, diagnosis,
+   recovery and broker operations remain legacy until C2 has selected and
+   tested their service/Python successor.
+
+**Owners:** software architecture + Python backend inventory the contract;
+frontend/design owns human-flow parity; platform/MCP owns worker-scope evidence;
+QA owns characterization and recovery cases; product owner approves every
+deprecation class. No single owner may declare another transport a replacement
+without its competence evidence.
+
+**Exit gate:** каждая command family из bounded support envelope имеет named
+consumer и disposition. План называет explicit “no successor yet” rows вместо
+молчаливого допущения UI или MCP parity; неизвестный external use остаётся
+документированным compatibility risk. C0 может рекомендовать C1/C2 work, но
+не может remove, warn on или further split CLI.
+
+### Phase C1/C2 — replace dependencies through services, not another monolith
+
+**C1:** до первого writer нужен отдельный owner-approved UI-surface contract:
+route, target directory, build/package delivery, session/auth boundary,
+localisation and `FRONTEND_CONTRACT` compatibility, plus exclusive path-claim.
+Нельзя неявно писать в Gallery React subtree или legacy `index.html`: Gallery
+остаётся своей product surface, а legacy asset сохраняет single-writer law.
+После этого C1 мигрирует только normal human product workflows в выбранную
+surface, по одному полному flow за раз. CLI fallback живёт весь compatibility
+period.
+
+**C2:** after A8, design a narrow typed service/Python contract for the one
+automation/recovery family selected by product. It must have explicit authority,
+idempotency, expected-revision and typed-refusal semantics, plus hermetic
+recovery and compatibility tests. UI, MCP and the legacy CLI consume that
+contract; the CLI is not allowed to accumulate a second business-logic path.
+
+**Stop gates:** a future C3 normal-flow deprecation requires an owner decision,
+published migration guide, compatibility window and demonstrated absence of
+CLI-only consumers within the bounded support envelope; unknown external use
+остаётся описанным compatibility risk, а не скрытым assertion of absence. A
+future C4 emergency/automation migration
+requires the C2 contract, recovery drills and an owner decision. Neither gate
+authorises a broad `cli/__init__.py` split; a small contract-preserving split is
+a separate, measured exception if file-level contention or safety evidence
+actually requires it.
 
 ### Phase W0 — evidence, metric contract and hermetic harness
 
@@ -258,8 +362,9 @@ Deliverables:
 
 **Owners:** Python backend + QA/ML-evals for query/harness; product/business for
 metric purpose; independent reviewer for replay/privacy. The observed
-read-only-orient issue remains a documented CLI-freeze exception candidate, not
-a work package: it needs a later explicit owner supersede or a UI replacement.
+read-only-orient issue remains a documented legacy-CLI migration candidate, not
+a work package: it needs a later explicit owner migration decision and a
+supported UI or service-boundary replacement.
 
 **Exit gate:** each metric has an owner and action; fixtures run in a fresh
 workspace; replay equivalence is demonstrated for unchanged behaviour; owner
@@ -533,6 +638,9 @@ not borrow scheduler, arbitrary media or editing scope to look more complete.
 | Package | Outcome | Lanes | Preconditions | Isolated path claim |
 | --- | --- | --- | --- | --- |
 | R-A3…A8 | Remaining audit structural slices | Software architecture, Python domain, platform, UI | audit sequence | one target module per task |
+| C0-CLI inventory | Consumer map, compatibility characterization and UI/MCP/service parity scorecard | Software architecture, Python backend, frontend/design, platform/MCP, QA | accepted `decision.65J1MEQNYC1GNHJYK9KDBDK49S` | dedicated docs/evidence file; no CLI source claim |
+| C1 UI-flow parity | One normal human workflow at a time, with E2E and refusal/recovery evidence | Frontend/design, UI backend, QA, product | C0 row + owner-approved UI-surface contract + relevant W/P semantic gate | newly designated route/subtree and matching tests; neither Gallery nor legacy asset by default |
+| C2 automation boundary design | ADR and contract fixtures for one selected service/Python automation/recovery family | Software architecture, Python backend, runtime/security, QA | C0 exit + A8 + product-selected family | ADR/fixtures only before implementation |
 | W0-metrics | Query, metric dictionary, read-only view | Python backend, product, ML-evals | none | `services/work_metrics.py`, docs/eval fixtures |
 | W0-harness | Sanitised fixtures and L0/L1 graders | QA, ML-evals, Python backend | metric definitions | `tests/evals_harness/` / test paths |
 | W1-domain | Work state/run pure records | Python domain, software | A5 task/review/delegation typed inputs | `domain/work_state.py` |
@@ -581,6 +689,9 @@ Re-open the ordering only with evidence, not preference:
   operator action;
 - derived `RunView` cannot represent a demonstrated retry/worktree/context
   workflow without conflicting historical answers;
+- C0 finds a supported automation, bootstrap or recovery consumer for which the
+  proposed UI/MCP/service successor cannot preserve authority, recovery or
+  compatibility guarantees;
 - a user-approved Context Pack extension demonstrates material value and
   passes privacy/cache/leakage evals;
 - the owner explicitly changes VISION and accepts scheduler security/SRE
