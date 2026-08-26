@@ -1,8 +1,9 @@
 """Shared session, manager, and graph cache for the local UI.
 
-Read models live in :mod:`agent_commons.ui.reads`; workflows and launch
-coordination live in :mod:`agent_commons.ui.actions`.  This compatibility facade
-keeps their existing ``UIContext`` call surface while owning only shared state.
+Read models live in :mod:`agent_commons.ui.reads`; workflows live in
+:mod:`agent_commons.ui.actions`; launch coordination lives in
+:mod:`agent_commons.ui.launch`.  This compatibility facade keeps their existing
+``UIContext`` call surface while owning only shared state.
 """
 
 from __future__ import annotations
