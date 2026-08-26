@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog
+from agent_commons.core.bounded import bounded_copy
 from agent_commons.domain.agents import PROFILE_NARROWING
 from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.collections import collection_for
@@ -35,7 +36,6 @@ from agent_commons.ui.read_dtos import (
     ThreadAttention,
     WorkReturnedAttention,
 )
-from agent_commons.views import bounded_copy
 
 _LOG = logging.getLogger("agent_commons.ui")
 

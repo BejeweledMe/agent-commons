@@ -4,9 +4,21 @@ import json
 
 import pytest
 
+from agent_commons import views as legacy_views
+from agent_commons.core import bounded as core_bounded
 from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.errors import IntegrityError
+from agent_commons.presentation import views as canonical_views
 from agent_commons.views import inbox_view, orientation, render_views
+
+
+def test_legacy_view_exports_preserve_canonical_function_identity() -> None:
+    assert legacy_views.addressed_spellings is canonical_views.addressed_spellings
+    assert legacy_views.inbox_view is canonical_views.inbox_view
+    assert legacy_views.orientation is canonical_views.orientation
+    assert legacy_views.render_views is canonical_views.render_views
+    assert legacy_views.bounded_copy is core_bounded.bounded_copy
+    assert legacy_views.truncate_utf8 is core_bounded.truncate_utf8
 
 
 def test_render_views_rejects_symlink_destination_and_target(tmp_path) -> None:

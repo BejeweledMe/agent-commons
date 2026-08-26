@@ -11,13 +11,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, TypeAlias, TypedDict, cast
 
+from agent_commons.core.bounded import bounded_copy
 from agent_commons.domain.envelopes import (
     FrozenJsonArray,
     FrozenJsonObject,
     FrozenJsonValue,
     JsonValue,
 )
-from agent_commons.views import bounded_copy
 
 JsonValueInput: TypeAlias = JsonValue | FrozenJsonValue
 

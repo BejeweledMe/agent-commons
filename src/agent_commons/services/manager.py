@@ -41,10 +41,15 @@ from agent_commons.errors import (
 from agent_commons.index import SQLiteIndex, search_existing_projection
 from agent_commons.integrations import initialize_workspace
 from agent_commons.platform_support import lock_exclusive, require_supported_platform, unlock
+from agent_commons.presentation.views import (
+    addressed_spellings,
+    inbox_view,
+    orientation,
+    render_views,
+)
 from agent_commons.security import SecurityPolicy
 from agent_commons.storage import EventRecord, EventStore, ManifestStore, ReceiptRecovery
 from agent_commons.storage.events import semantic_event_body
-from agent_commons.views import addressed_spellings, inbox_view, orientation, render_views
 
 from .artifacts import ArtifactCommands
 from .decisions import DecisionCommands

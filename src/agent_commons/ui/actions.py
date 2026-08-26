@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_role_catalog
+from agent_commons.core.bounded import truncate_utf8
 from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
 from agent_commons.runtime.model import profile_tool_summary, validate_model_name
 from agent_commons.services.manager import CommonsManager
 from agent_commons.services.roles import role_model
 from agent_commons.ui.launch import LAUNCH_NOT_CONFIGURED as LAUNCH_NOT_CONFIGURED
-from agent_commons.views import truncate_utf8
 
 #: A provider was resolved but one of the executables every profile needs beside
 #: it was not.  The wave contract froze this code after `ui.setup` found the

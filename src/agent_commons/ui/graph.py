@@ -12,12 +12,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from agent_commons.core.bounded import truncate_utf8
 from agent_commons.domain.agents import effective_grants
 from agent_commons.domain.attention import awaits_human
 from agent_commons.domain.projection import ProjectSnapshot
 from agent_commons.services.roles import role_model
 from agent_commons.ui import GRAPH_SCHEMA
-from agent_commons.views import truncate_utf8
 
 MAX_NODES = 2_000
 MAX_EDGES = 4_000
