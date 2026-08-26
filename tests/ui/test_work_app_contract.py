@@ -1,0 +1,171 @@
+"""Contracts for the isolated React Work application.
+
+These checks intentionally cover the boundary between the data-free public
+shell and the existing, cookie-authenticated local UI APIs.  They do not
+duplicate component behaviour that belongs in the Work application's own
+TypeScript tests: their job is to keep a future workflow from quietly becoming
+another unauthenticated panel or another inline-script surface.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from agent_commons.ui import read_work_shell, work_static_directory
+from agent_commons.ui.context import UIContext
+from agent_commons.ui.security import is_public_path, work_content_security_policy
+from agent_commons.ui.server import create_app
+from agent_commons.ui.setup import SETUP_UNINITIALIZED
+from tests.ui.conftest import authorized
+
+_REPOSITORY_ROOT = Path(__file__).parents[2]
+_WORK_SOURCE = _REPOSITORY_ROOT / "frontend" / "work"
+
+
+def _source(relative_path: str) -> str:
+    return (_WORK_SOURCE / relative_path).read_text("utf-8")
+
+
+def test_work_bundle_is_a_packaged_same_origin_shell() -> None:
+    shell = read_work_shell()
+    assets = work_static_directory() / "assets"
+
+    assert '<script type="module" crossorigin src="/work/assets/work-' in shell
+    assert assets.is_dir()
+    assert any(path.suffix == ".js" for path in assets.iterdir())
+    assert any(path.suffix == ".css" for path in assets.iterdir())
+
+
+def test_work_shell_and_assets_are_public_but_the_workspace_api_is_not(client) -> None:  # type: ignore[no-untyped-def]
+    shell = client.get("/work")
+    assert shell.status_code == 200
+    assert "Content-Security-Policy" in shell.headers
+    assert "script-src 'self'" in shell.headers["Content-Security-Policy"]
+
+    source = re.search(r'src="(/work/assets/[^\"]+\.js)"', shell.text)
+    assert source is not None
+    assert client.get(source.group(1)).status_code == 200
+
+    refused = client.get("/api/setup")
+    assert refused.status_code == 401
+    assert refused.json()["error"]["code"] == "unauthorized"
+    assert client.get("/api/setup", headers=authorized()).status_code == 200
+
+
+def test_work_public_path_rule_never_exposes_an_api() -> None:
+    assert is_public_path("/work") is True
+    assert is_public_path("/work/") is True
+    assert is_public_path("/work/assets/work-anything.js") is True
+    assert is_public_path("/api/work") is False
+    assert is_public_path("/work/api/setup") is False
+
+
+def test_work_csp_allows_only_packaged_same_origin_assets() -> None:
+    policy = work_content_security_policy()
+    assert "script-src 'self'" in policy
+    assert "style-src 'self'" in policy
+    assert "connect-src 'self'" in policy
+    assert "unsafe-inline" not in policy
+    assert "unsafe-eval" not in policy
+
+
+def test_work_source_and_build_contract_stays_separate_from_gallery() -> None:
+    package = json.loads(_source("package.json"))
+    vite = _source("vite.config.ts")
+    entry = _source("src/main.tsx")
+
+    assert package["name"] == "agent-commons-work"
+    assert package["scripts"]["build"] == "tsc -b && vite build"
+    assert package["dependencies"]["react"]
+    assert package["dependencies"]["react-dom"]
+    assert 'base: "/work/"' in vite
+    assert 'outDir: "../../src/agent_commons/ui/static/work"' in vite
+    assert 'entryFileNames: "assets/work-[hash].js"' in vite
+    assert "createRoot" in entry
+    assert 'import "./styles.css"' in entry
+
+
+def test_work_locales_are_paired_and_include_actionable_failure_guidance() -> None:
+    messages = json.loads(_source("src/i18n.json"))
+    assert set(messages) == {"en", "ru"}
+    assert set(messages["en"]) == set(messages["ru"])
+
+    failure_keys = {
+        "failure_access_title",
+        "failure_access_next",
+        "failure_setup_title",
+        "failure_setup_next",
+        "failure_launch_title",
+        "failure_launch_next",
+        "failure_validation_title",
+        "failure_validation_next",
+        "failure_unavailable_title",
+        "failure_unavailable_next",
+        "failure_unknown_title",
+        "failure_unknown_next",
+        "safe_next_actions",
+    }
+    assert failure_keys <= set(messages["en"])
+    for locale in ("en", "ru"):
+        for key in failure_keys:
+            assert messages[locale][key].strip(), (
+                f"{locale}.{key} must tell the operator what to do"
+            )
+
+    panel = _source("src/components/FailurePanel.tsx")
+    assert "failure.nextStep" in panel
+    assert "failure.safeNextActions" in panel
+    assert 'role="alert"' in panel
+
+
+def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
+    source = _source("src/api.ts")
+
+    assert "exchangeCodeFromFragment" in source
+    assert 'fetch("/api/auth/exchange"' in source
+    assert 'credentials: "same-origin"' in source
+    assert "window.history.replaceState" in source
+    assert "window.sessionStorage.getItem(API_BASE_STORAGE_KEY)" in source
+    assert "window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in source
+    assert "clearStoredApiBase();" in source
+    assert "localStorage" not in source
+    assert "Authorization" not in source
+    assert "tokenFromFragment" not in source
+
+
+def test_work_client_drives_failures_from_typed_refusal_codes() -> None:
+    source = _source("src/api.ts")
+    entry = _source("src/main.tsx")
+
+    assert "parseApiError" in source
+    assert "safeNextActions" in source
+    assert "new ApiProblem" in source
+    assert 'code.startsWith("setup_")' in entry
+    assert 'code === "launch_not_configured"' in entry
+    assert 'code === "invalid_request"' in entry
+    assert "safeNextActions" in entry
+    assert "problem?.apiError?.message" not in entry
+
+
+def test_work_uses_existing_setup_refusal_shape_without_a_404_feature_probe(tmp_path: Path) -> None:
+    repository = tmp_path / "bare-repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True, capture_output=True)
+    context = UIContext(
+        repository,
+        state_root=tmp_path / "state",
+        writer_session_id="session.00000000000000000000000003",
+    )
+    app = create_app(context, token="test-token", port=51234)
+
+    with TestClient(app, base_url="http://127.0.0.1:51234") as work_client:
+        refusal = work_client.post("/api/tasks", headers=authorized(), json={})
+
+    assert refusal.status_code == 409
+    assert refusal.json()["error"]["code"] == SETUP_UNINITIALIZED
+    assert refusal.json()["error"]["safe_next_actions"]
