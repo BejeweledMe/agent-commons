@@ -28,11 +28,14 @@ import statistics
 import tempfile
 import time
 import tracemalloc
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
-from agent_commons.core.canonical import canonical_json_file_bytes
+from agent_commons.core.canonical import canonical_json_file_bytes, canonical_sha256
+from agent_commons.domain import lifecycle, projection
 from agent_commons.domain.projection import ProjectSnapshot, project_events
 from agent_commons.index.sqlite import SQLiteIndex
 from agent_commons.services import CommonsManager
@@ -71,6 +74,143 @@ class ReadPathProfile(TypedDict):
     source: str
     components: dict[str, ReadPathReport]
     paths: dict[str, ReadPathReport]
+    replay_phase_profile: InstrumentedReplayReport
+    instrumentation_overhead: InstrumentationOverheadReport
+
+
+class PhaseTiming(TypedDict):
+    """Exclusive elapsed time and invocation count for one replay phase."""
+
+    calls: int
+    exclusive_elapsed_seconds: float
+
+
+class ReplayIntegrity(TypedDict):
+    """Stable observable result used to compare instrumented and baseline replay."""
+
+    snapshot_sha256: str
+    known_event_ids: list[str]
+    applied_event_ids: list[str]
+    fixed_point_passes: int
+
+
+class InstrumentedReplaySample(ReplayIntegrity):
+    """One timed replay with benchmark-local phase accounting."""
+
+    root_elapsed_seconds: float
+    peak_allocated_bytes: int
+    phases: dict[str, PhaseTiming]
+    residual_elapsed_seconds: float
+
+
+class InstrumentedReplayReport(TypedDict):
+    """Repeated phase-accounted replay measurements over one verified event tuple."""
+
+    scope: str
+    median_elapsed_seconds: float
+    max_peak_allocated_bytes: int
+    samples: list[InstrumentedReplaySample]
+    median_phase_exclusive_seconds: dict[str, float]
+    calls_per_sample: dict[str, int]
+
+
+class InstrumentationOverheadSample(TypedDict):
+    """Matched baseline and instrumented observations from one repeat."""
+
+    baseline_elapsed_seconds: float
+    instrumented_elapsed_seconds: float
+    observed_delta_seconds: float
+
+
+class InstrumentationOverheadReport(TypedDict):
+    """Observed overhead of benchmark-only timing wrappers, not a production budget."""
+
+    scope: str
+    median_observed_delta_seconds: float
+    samples: list[InstrumentationOverheadSample]
+
+
+_PHASE_LABELS = (
+    "fixed_point_planning",
+    "project_events_once.probe",
+    "project_events_once.normal",
+    "project_events_once.final",
+    "invalidation",
+    "revision_resolution",
+    "acceptance_staleness",
+    "cas_conflict_detection",
+    "payload_validation",
+    "event_envelope_parsing",
+    "transition_validation",
+    "event_application",
+    "bound_evidence_staleness",
+    "decision_conflict_detection",
+)
+
+
+@dataclass
+class _PhaseFrame:
+    """One active timed region, with child time excluded before reporting."""
+
+    label: str
+    started_at: float
+    child_elapsed_seconds: float = 0.0
+
+
+@dataclass
+class _PhaseCollector:
+    """Collect an exclusive timing tree without changing projection semantics."""
+
+    phase_elapsed_seconds: dict[str, float] = field(
+        default_factory=lambda: {label: 0.0 for label in _PHASE_LABELS}
+    )
+    phase_call_counts: dict[str, int] = field(
+        default_factory=lambda: {label: 0 for label in _PHASE_LABELS}
+    )
+    _stack: list[_PhaseFrame] = field(default_factory=list)
+    _project_events_once_calls: int = 0
+
+    @contextmanager
+    def phase(self, label: str) -> Iterator[None]:
+        """Measure one nested phase and attribute only time not spent in its children."""
+
+        if label not in self.phase_elapsed_seconds:
+            raise ValueError(f"unknown replay phase {label}")
+        frame = _PhaseFrame(label=label, started_at=time.perf_counter())
+        self._stack.append(frame)
+        self.phase_call_counts[label] += 1
+        try:
+            yield
+        finally:
+            elapsed = time.perf_counter() - frame.started_at
+            popped = self._stack.pop()
+            if popped is not frame:  # pragma: no cover - defensive against broken wrappers
+                raise RuntimeError("replay phase timing stack became unbalanced")
+            exclusive = max(0.0, elapsed - frame.child_elapsed_seconds)
+            self.phase_elapsed_seconds[label] += exclusive
+            if self._stack:
+                self._stack[-1].child_elapsed_seconds += elapsed
+
+    def project_events_once_label(self, keywords: Mapping[str, object]) -> str:
+        """Name the fixed-point pass from its stable call sequence and inputs."""
+
+        self._project_events_once_calls += 1
+        if keywords.get("forced_stale_acceptance_ids"):
+            return "project_events_once.final"
+        if self._project_events_once_calls == 1 and keywords.get("exempt_acceptance_ids"):
+            return "project_events_once.probe"
+        return "project_events_once.normal"
+
+    def report(self) -> dict[str, PhaseTiming]:
+        """Return every declared phase so a zero-call branch remains explicit."""
+
+        return {
+            label: {
+                "calls": self.phase_call_counts[label],
+                "exclusive_elapsed_seconds": self.phase_elapsed_seconds[label],
+            }
+            for label in _PHASE_LABELS
+        }
 
 
 _PAYLOAD_SCHEMAS = {
@@ -176,6 +316,186 @@ def _measure(operation: Callable[[], object]) -> Measurement:
     return {"elapsed_seconds": elapsed, "peak_allocated_bytes": peak}
 
 
+def _timed_wrapper(
+    collector: _PhaseCollector, label: str, original: Callable[..., object]
+) -> Callable[..., object]:
+    """Wrap one projection helper while preserving its arguments and return value."""
+
+    def wrapped(*args: object, **keywords: object) -> object:
+        with collector.phase(label):
+            return original(*args, **keywords)
+
+    return wrapped
+
+
+@contextmanager
+def _instrument_projection(collector: _PhaseCollector) -> Iterator[None]:
+    """Temporarily attach timing wrappers and restore every module global on exit.
+
+    The benchmark installs wrappers only around the individual in-memory profile
+    call.  It does not alter the checked-in production module or leave a global
+    patch behind for a later baseline sample.
+    """
+
+    originals: list[tuple[object, str, object]] = []
+
+    def replace(module: object, name: str, label: str) -> None:
+        original = getattr(module, name)
+        if not callable(original):  # pragma: no cover - protects benchmark assumptions
+            raise TypeError(f"{module!r}.{name} is not callable")
+        originals.append((module, name, original))
+        setattr(module, name, _timed_wrapper(collector, label, original))
+
+    def project_events_once(*args: object, **keywords: object) -> object:
+        label = collector.project_events_once_label(keywords)
+        with collector.phase(label):
+            return original_project_events_once(*args, **keywords)
+
+    try:
+        original_project_events_once = projection._project_events_once
+        originals.append((projection, "_project_events_once", original_project_events_once))
+        projection._project_events_once = project_events_once
+        replace(projection, "derive_invalidation_state", "invalidation")
+        replace(projection, "resolve_revision", "revision_resolution")
+        replace(projection, "_stale_task_acceptance_ids", "acceptance_staleness")
+        replace(projection, "_cas_conflicts", "cas_conflict_detection")
+        replace(projection, "validate_payload", "payload_validation")
+        replace(projection, "parse_event_envelope", "event_envelope_parsing")
+        replace(lifecycle, "validate_transition", "transition_validation")
+        replace(projection, "_apply_effective_event", "event_application")
+        replace(projection, "_mark_bound_evidence_stale", "bound_evidence_staleness")
+        replace(projection, "_fail_closed_decision_conflicts", "decision_conflict_detection")
+        yield
+    finally:
+        for module, name, original in reversed(originals):
+            setattr(module, name, original)
+
+
+def _replay_integrity(snapshot: ProjectSnapshot) -> ReplayIntegrity:
+    """Capture the observable replay result that instrumentation must preserve."""
+
+    return {
+        "snapshot_sha256": canonical_sha256(snapshot.to_dict()),
+        "known_event_ids": sorted(snapshot.known_event_ids),
+        "applied_event_ids": list(snapshot.effective_event_revisions),
+        "fixed_point_passes": int(snapshot.replay_metrics["fixed_point_passes"]),
+    }
+
+
+def _assert_matching_replay(actual: ReplayIntegrity, expected: ReplayIntegrity) -> None:
+    """Reject a timing run that changed the fixed-point result rather than timing it."""
+
+    if actual != expected:
+        raise AssertionError(
+            "instrumented replay differs from the uninstrumented baseline: "
+            f"expected {expected!r}, got {actual!r}"
+        )
+
+
+def _instrumented_replay_sample(
+    events: tuple[Mapping[str, Any], ...],
+    *,
+    known_manifest_ids: tuple[str, ...] | None,
+    expected_integrity: ReplayIntegrity | None = None,
+) -> InstrumentedReplaySample:
+    """Measure one replay with temporary call instrumentation and whole-run peak memory.
+
+    ``tracemalloc`` deliberately remains whole-run only: attributing allocation
+    samples to nested helpers would perturb the replay and is not needed to
+    choose the next A6 investigation.
+    """
+
+    collector = _PhaseCollector()
+    with _instrument_projection(collector):
+        gc.collect()
+        tracemalloc.start()
+        started = time.perf_counter()
+        try:
+            with collector.phase("fixed_point_planning"):
+                snapshot = projection.project_events(events, known_manifest_ids=known_manifest_ids)
+        finally:
+            elapsed = time.perf_counter() - started
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+    integrity = _replay_integrity(snapshot)
+    if expected_integrity is not None:
+        _assert_matching_replay(integrity, expected_integrity)
+    phases = collector.report()
+    accounted = sum(timing["exclusive_elapsed_seconds"] for timing in phases.values())
+    if accounted > elapsed + 1e-9:
+        raise AssertionError(
+            f"exclusive replay phases exceed their root timing: {accounted:.9f} > {elapsed:.9f}"
+        )
+    return {
+        **integrity,
+        "root_elapsed_seconds": elapsed,
+        "peak_allocated_bytes": peak,
+        "phases": phases,
+        "residual_elapsed_seconds": max(0.0, elapsed - accounted),
+    }
+
+
+def _summarize_instrumented_replay(
+    samples: list[InstrumentedReplaySample],
+) -> InstrumentedReplayReport:
+    """Summarize repeated instrumentation runs without hiding individual samples."""
+
+    if not samples:
+        raise ValueError("benchmark requires at least one instrumented replay sample")
+    calls_per_sample = {label: samples[0]["phases"][label]["calls"] for label in _PHASE_LABELS}
+    for sample in samples[1:]:
+        for label, expected_calls in calls_per_sample.items():
+            calls = sample["phases"][label]["calls"]
+            if calls != expected_calls:
+                raise AssertionError(
+                    f"replay phase {label} changed call count between samples: "
+                    f"expected {expected_calls}, got {calls}"
+                )
+    return {
+        "scope": "instrumented project_events over the verified event tuple already in memory",
+        "median_elapsed_seconds": statistics.median(
+            sample["root_elapsed_seconds"] for sample in samples
+        ),
+        "max_peak_allocated_bytes": max(sample["peak_allocated_bytes"] for sample in samples),
+        "samples": samples,
+        "median_phase_exclusive_seconds": {
+            label: statistics.median(
+                sample["phases"][label]["exclusive_elapsed_seconds"] for sample in samples
+            )
+            for label in _PHASE_LABELS
+        },
+        "calls_per_sample": calls_per_sample,
+    }
+
+
+def _summarize_instrumentation_overhead(
+    baseline_samples: list[Measurement],
+    instrumented_samples: list[InstrumentedReplaySample],
+) -> InstrumentationOverheadReport:
+    """Report observed wrapper cost against matched normal benchmark samples."""
+
+    if len(baseline_samples) != len(instrumented_samples):
+        raise AssertionError("baseline and instrumented replay repeat counts differ")
+    samples = [
+        {
+            "baseline_elapsed_seconds": baseline["elapsed_seconds"],
+            "instrumented_elapsed_seconds": instrumented["root_elapsed_seconds"],
+            "observed_delta_seconds": (
+                instrumented["root_elapsed_seconds"] - baseline["elapsed_seconds"]
+            ),
+        }
+        for baseline, instrumented in zip(baseline_samples, instrumented_samples, strict=True)
+    ]
+    return {
+        "scope": "instrumented replay minus the matching normal replay sample",
+        "median_observed_delta_seconds": statistics.median(
+            sample["observed_delta_seconds"] for sample in samples
+        ),
+        "samples": samples,
+    }
+
+
 def _summarize(scope: str, samples: list[Measurement]) -> ReadPathReport:
     if not samples:
         raise ValueError("benchmark requires at least one sample")
@@ -203,6 +523,7 @@ def _profile_manager_read_paths(
         in_memory_manifests = projected.manifest_ids
         expected_event_count = len(in_memory_events)
         baseline = project_events(in_memory_events, known_manifest_ids=in_memory_manifests)
+        baseline_integrity = _replay_integrity(baseline)
         expected_passes = int(baseline.replay_metrics["fixed_point_passes"])
         _assert_replay_shape(
             baseline,
@@ -231,6 +552,15 @@ def _profile_manager_read_paths(
                 expected_passes=expected_passes,
             )
 
+        replay_baseline_samples = [_measure(in_memory_replay) for _ in range(repeats)]
+        instrumented_replay_samples = [
+            _instrumented_replay_sample(
+                in_memory_events,
+                known_manifest_ids=in_memory_manifests,
+                expected_integrity=baseline_integrity,
+            )
+            for _ in range(repeats)
+        ]
         components = {
             "sqlite_sync": _summarize(
                 "warm SQLiteIndex.sync() only",
@@ -242,7 +572,7 @@ def _profile_manager_read_paths(
             ),
             "project_events": _summarize(
                 "project_events over the verified event tuple already in memory",
-                [_measure(in_memory_replay) for _ in range(repeats)],
+                replay_baseline_samples,
             ),
         }
 
@@ -288,6 +618,10 @@ def _profile_manager_read_paths(
         "source": source,
         "components": components,
         "paths": paths,
+        "replay_phase_profile": _summarize_instrumented_replay(instrumented_replay_samples),
+        "instrumentation_overhead": _summarize_instrumentation_overhead(
+            replay_baseline_samples, instrumented_replay_samples
+        ),
     }
 
 
