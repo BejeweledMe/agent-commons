@@ -115,7 +115,15 @@ class LocalBrowserSession:
 #: bytes contain no workspace data; the exchange route validates its own
 #: single-use code before setting a cookie.
 PUBLIC_PATHS = frozenset(
-    {"/", "/favicon.ico", "/gallery", "/gallery/", "/work", "/work/", AUTH_EXCHANGE_PATH}
+    {
+        "/",
+        "/favicon.ico",
+        "/gallery",
+        "/gallery/",
+        "/work",
+        "/work/",
+        AUTH_EXCHANGE_PATH,
+    }
 )
 
 

@@ -202,6 +202,8 @@ _ANSWERS_IN_EVERY_STATE = {
     "/favicon.ico",
     "/gallery",
     "/gallery/",
+    "/work",
+    "/work/",
     "/api/meta",
     "/api/setup",
 }
