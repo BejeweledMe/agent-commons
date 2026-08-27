@@ -156,9 +156,15 @@ def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
     source = _source("src/api.ts")
 
     assert "exchangeCodeFromFragment" in source
+    assert "restoreStoredSession" in source
+    assert 'await this.get("/setup", signal)' in source
     assert 'fetch("/api/auth/exchange"' in source
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
+    history_clear = source.index("window.history.replaceState")
+    stored_session_restore = source.index("await this.restoreStoredSession")
+    fresh_exchange = source.index('fetch("/api/auth/exchange"')
+    assert history_clear < stored_session_restore < fresh_exchange
     assert "window.sessionStorage.getItem(API_BASE_STORAGE_KEY)" in source
     assert "window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in source
     assert "clearStoredApiBase();" in source

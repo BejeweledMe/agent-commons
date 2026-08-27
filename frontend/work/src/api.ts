@@ -180,14 +180,16 @@ export class WorkApi {
 
   async connect(signal: AbortSignal): Promise<void> {
     const exchangeCode = exchangeCodeFromFragment();
-    this.apiBase = storedApiBase();
     window.history.replaceState(null, "", window.location.pathname);
-    if (exchangeCode === null) {
-      if (!this.apiBase) {
-        throw new ApiProblem(401, { code: "unauthorized", message: "", safeNextActions: [] });
-      }
+
+    if (await this.restoreStoredSession(signal)) {
       return;
     }
+
+    if (exchangeCode === null) {
+      throw new ApiProblem(401, { code: "unauthorized", message: "", safeNextActions: [] });
+    }
+
     const response = await fetch("/api/auth/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -205,6 +207,25 @@ export class WorkApi {
     } catch (error: unknown) {
       clearStoredApiBase();
       throw error;
+    }
+  }
+
+  private async restoreStoredSession(signal: AbortSignal): Promise<boolean> {
+    const storedBase = storedApiBase();
+    if (!storedBase) {
+      return false;
+    }
+    this.apiBase = storedBase;
+    try {
+      await this.get("/setup", signal);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+      clearStoredApiBase();
+      this.apiBase = "";
+      return false;
     }
   }
 
