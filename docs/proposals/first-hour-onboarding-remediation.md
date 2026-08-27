@@ -57,7 +57,7 @@ The client may say “used or expired”; it must not claim to know which indist
 
 The existing setup read already provides found/missing providers, missing support binaries, config location, and a blocking refusal ([UIReads](../../src/agent_commons/ui/reads.py#L72-L102)); legacy has first-run guide/rescan coverage ([first-run tests](../../tests/ui/test_first_run_screen.py#L177-L203)). Work keeps only state, writes, and launch enabled ([contracts](../../frontend/work/src/contracts.ts#L9-L13), [parser](../../frontend/work/src/api.ts#L63-L72)), making a blocking runtime failure generic.
 
-**Slice S2:** use a typed read DTO for the already exposed safe fields: blocking refusal, provider/support names, and loader-rejection detail where appropriate. Work names the missing executable before a click, disables Configure while blocked, and offers **Check again**. It does not invent an install button, raw-YAML editor, or browser file picker.
+**Slice S2:** use a typed `SetupGuidanceDTO`, not a pass-through setup/read error. Its only displayable fields are: (a) a closed `blocker_code` enum; (b) closed-allowlist canonical tool names (`Claude`, `Codex`, `git`, `agent-commons-mcp`) required for that code; (c) a paired locale `next_action_key`; and (d) an optional, explicitly user-revealed *location label* from a closed vocabulary such as “workspace configuration” — never a raw path. The adapter must redact everything else: raw loader/parser/provider error, rejection reason, config contents, absolute or home path, secret/token, and stderr. Work names the missing executable before a click, disables Configure while blocked, and offers **Check again**. It does not invent an install button, raw-YAML editor, or browser file picker.
 
 Candidate RU: “Прогон пока не запустится: в этой среде не найден ни Claude, ни Codex. Установите любой из CLI, затем нажмите «Проверить снова». Рабочее пространство сохранено.” For a support dependency, name agent-commons-mcp or git, never “Install it”.
 
@@ -111,21 +111,21 @@ Use temporary Git repos, state roots, XDG config, and fake executable stubs only
 
 1. CLI/UI integration: plain output, JSON output, and opt-in `webbrowser.open` emit `/work#c=<code>`; /work assets public, APIs private; one exchange succeeds and the repeat remains non-oracular 401.
 2. Client contract: it strips `#c` with `history.replaceState` before any restoration, exchange, or request; valid stored opaque base restores before stale-fragment exchange; a stale fragment cannot clear or replace a live cookie-plus-base session; no code in history, referrer, or storage; paired honest copy.
-3. Setup fixtures: no provider, partial provider, missing MCP, missing Git, and rejected config preserve typed fields; blocked Configure and post-refresh recovery are visible.
+3. Setup fixtures: no provider, partial provider, missing MCP, missing Git, and rejected config yield only the `SetupGuidanceDTO` allowlist; sentinel raw parser/provider reason, config body, absolute/home path, fake secret, and fake stderr are absent from the serialized DTO and rendered DOM. Blocked Configure and post-refresh recovery are visible.
 4. Scope/handoff: in a real `serve()` fixture with a non-`/api` opaque API base, Work identity succeeds only through `${apiBase}/meta`, while raw `/api/meta` remains unavailable; Work shows that authenticated bound repo before Initialize, has no switch control, and post-launch copy distinguishes run from accepted work.
 
 Start from [Work contract tests](../../tests/ui/test_work_app_contract.py) and [auth tests](../../tests/ui/test_auth.py). Source/HTTP tests do **not** prove the browser journey.
 
 ### Browser/usability gate
 
-No Playwright/Selenium capability exists today. A separate frontend-toolchain decision may add browser E2E for manual handoff → first Work action, no-provider/fresh-handoff recovery, Cold Start to launch, and legacy drawer reachability. Before broad delivery, run at least 10 moderated clean-machine sessions with proposed targets:
+No Playwright/Selenium capability exists today. A separate frontend-toolchain decision may add browser E2E for manual handoff → first Work action, no-provider/fresh-handoff recovery, Cold Start to launch, and legacy drawer reachability. Before broad delivery, run at least 10 moderated clean-machine sessions. “First meaningful action” is **not** synonymous with Initialize: stratify by starting environment and report the two legitimate outcomes separately. For a ready environment it is successful Initialize; for a truthfully blocked environment it is correctly naming the displayed requirement and safe next action. Do not count a correct blocked outcome as abandonment, and do not combine the two rates into an activation target.
 
 | Measure | Target | Safety guardrail |
 | --- | --- | --- |
-| First meaningful UI action | ≥85% initialize in ≤10 min without restart | one-use auth tests pass |
+| First meaningful action — ready environment | ≥85% successful Initialize in ≤10 min without restart | one-use auth tests pass |
+| First meaningful action — blocked environment | ≥90% name the displayed requirement and next action in ≤30 sec; no Initialize required | typed allowlist/redaction tests pass |
 | Intended-browser auth | ≥95% first attempt | no cause oracle |
 | Terminal crossings before first writable UI action | median ≤1; p90 ≤2 | no silent config/setup write |
-| Setup comprehension | ≥90% identify missing requirement + next action in 30 sec | no raw config/credential exposure |
 | Target repo comprehension | 100% before Initialize | no project picker |
 | Core loop | ≥80% launch → review request → human acceptance in ≤15 min | review/accept guard 100% |
 
