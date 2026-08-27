@@ -30,9 +30,11 @@ developer`, `Product designer`, or `Independent reviewer`. In the Work screen,
 create one with a name, a **Runtime profile**, a short explanation of what it is
 responsible for, and a starting context.
 
-Choose **Fresh** when a role should start without earlier work context. Choose
-**Accumulated** only when you want that role to continue with its own previous
-context. A role is not the same thing as a single attempt to do work.
+Choose **Fresh** when a role should be marked as starting without earlier work
+context. **Accumulated** records a less-isolated context mode and makes that
+provenance visible when the role reviews work. In the current runtime it does
+not carry one run's conversation or working context into a later run. A role is
+not the same thing as a single attempt to do work.
 
 ### Task
 
@@ -84,6 +86,10 @@ your default browser. That URL contains a short-lived, one-time sign-in code.
   and open the newly printed URL once in that browser.
 - If the browser says its session is no longer active, stop the local UI, start
   it again, and use the newly printed URL. Do not expect an old URL to work.
+
+The current failure text can suggest opening the printed URL again. Do not use
+that as a way to reuse a consumed or expired code: start the local UI again and
+use a fresh URL instead.
 
 Keep the local URL private while the panel is running. It gives a browser access
 to this local panel; it is not a link to share with collaborators.
@@ -156,10 +162,13 @@ to **Open legacy panel**. This is the current workflow boundary:
 - The full panel is for detailed run monitoring, the **Runs** view, review,
   acceptance, and recovery.
 
-In the full panel, a run can be requested, active, succeeded, failed, timed
-out, or `needs_operator`. `needs_operator` means the system cannot safely
-continue on its own. Inspect it before retrying or creating another run; it is
-not a successful result.
+In the full panel, a run can be requested, active, `input_needed`, succeeded,
+failed, timed out, or `needs_operator`. `input_needed` means the run is waiting
+for a human answer. Open **Attention**: when this panel can answer the request,
+answering it resumes the run. If the provider already exited or no answer is
+available, the run becomes `needs_operator`. `needs_operator` means the system
+cannot safely continue on its own. Inspect it before retrying or creating
+another run; it is not a successful result.
 
 ## Review and accept completed work
 
@@ -197,8 +206,9 @@ attempts, and **Main chat** for a conversation that is not itself a task. Use
 **Role catalogue** to reuse a saved role template. A template makes hiring
 faster; it does not change the local provider configuration.
 
-Use task **Settings** only when you mean to create a new version. The UI warns
-that prior reviews then become stale, so review the updated task again.
+To change a task, open it and use **Record → Edit task…**. Saving creates a new
+version. The UI warns that prior reviews then become stale, so review the
+updated task again.
 
 ## Handle blockers and common problems
 
@@ -209,6 +219,7 @@ that prior reviews then become stale, so review the updated task again.
 | **Runtime configuration has not been created** or **The runtime is not ready to start work** | No usable local provider runtime is available. | Configure the runtime; if it remains blocked, install/authenticate Claude or Codex and refresh status. |
 | **No runtime profiles are available yet** | A configured runtime has no selectable profile. | Use the full panel or technical operator guide to check the runtime configuration. |
 | **waiting on you** | A run, task, review, or question needs a human decision. | Open the linked item and take the next action shown. |
+| `input_needed` | A live run is waiting for an answer from a person. | Open **Attention** and answer it if this panel offers an answer action. If it cannot be answered or the provider has exited, inspect the resulting `needs_operator` item. |
 | `needs_operator` | The system reached an outcome it cannot safely resolve. | Inspect the run and task in the full panel. Do not assume success or blindly retry. |
 | Acceptance is refused | The task lacks a current approved independent review, or the task changed after review. | Send the current task version for an independent review, then accept only after approval. |
 
