@@ -5,7 +5,7 @@ import { ApiProblem, WorkApi } from "./api";
 import { AppHeader } from "./components/AppHeader";
 import { FailurePanel } from "./components/FailurePanel";
 import { WorkflowCard } from "./components/WorkflowCard";
-import type { Failure, WorkspaceData } from "./contracts";
+import type { Failure, SetupGuidanceNextActionKey, WorkspaceData } from "./contracts";
 import { type Locale, type MessageKey, translate } from "./i18n";
 import "./styles.css";
 
@@ -33,6 +33,16 @@ type FormErrors = ReadonlySet<string>;
 const emptyRole: RoleDraft = { name: "", profileId: "", rationale: "", contextMode: "fresh" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "" };
 const emptyRun: RunDraft = { agentId: "", taskId: "" };
+
+const guidanceActionMessage: Readonly<Record<SetupGuidanceNextActionKey, MessageKey>> = {
+  choose_git_repository: "guidance_choose_repository",
+  initialize_workspace: "guidance_initialize_workspace",
+  install_provider_and_check_again: "guidance_install_provider",
+  install_support_tool_and_check_again: "guidance_install_support_tool",
+  configure_runtime: "guidance_configure_runtime",
+  repair_workspace_configuration: "guidance_repair_configuration",
+  setup_ready: "guidance_ready"
+};
 
 function failureFrom(error: unknown, text: (key: MessageKey) => string): Failure {
   const problem = error instanceof ApiProblem ? error : null;
@@ -114,6 +124,7 @@ function WorkApp(): ReactElement {
   const [taskErrors, setTaskErrors] = useState<FormErrors>(new Set());
   const [runErrors, setRunErrors] = useState<FormErrors>(new Set());
   const [showFullProjectPath, setShowFullProjectPath] = useState(false);
+  const [configurationConfirmationOpen, setConfigurationConfirmationOpen] = useState(false);
   const apiRef = useRef(new WorkApi());
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
 
@@ -251,6 +262,14 @@ function WorkApp(): ReactElement {
   const roleOptions = launch?.roles ?? [];
   const taskOptions = launch?.tasks ?? [];
   const environmentReady = configured && Boolean(launch?.launchEnabled);
+  const guidance = data.guidance?.blockerCode === null ? null : data.guidance;
+  const canConfigureRuntime = data.setup.state === "setup_unconfigured"
+    && guidance?.nextActionKey === "configure_runtime";
+
+  function confirmRuntimeConfiguration(): void {
+    setConfigurationConfirmationOpen(false);
+    void perform("runtime", (signal) => apiRef.current.setup("runtime", signal), "action_complete");
+  }
 
   return (
     <main className="work-app">
@@ -282,8 +301,25 @@ function WorkApp(): ReactElement {
             <p>{configured ? text("workspace_ready") : text("workspace_needs_setup")}</p>
             <p className="small-copy">{configured ? text("runtime_help") : text("environment_help")}</p>
             {!configured ? (
-              <div className="button-row">
-                {data.setup.state === "setup_uninitialized" ? (
+              <>
+                {guidance !== null ? (
+                  <section aria-live="polite" className="notice">
+                    {guidance.tools.length > 0 ? (
+                      <p>{text("guidance_missing_tools")} <strong>{guidance.tools.join(", ")}</strong></p>
+                    ) : null}
+                    <p>{text(guidanceActionMessage[guidance.nextActionKey])}</p>
+                    <button
+                      className="button button-secondary"
+                      disabled={activeAction !== null}
+                      onClick={() => void refresh()}
+                      type="button"
+                    >
+                      {text("check_again")}
+                    </button>
+                  </section>
+                ) : null}
+                <div className="button-row">
+                  {data.setup.state === "setup_uninitialized" ? (
                   <button
                     className="button button-primary"
                     disabled={activeAction !== null}
@@ -292,18 +328,40 @@ function WorkApp(): ReactElement {
                   >
                     {activeAction === "initialize" ? text("working") : text("initialize_workspace")}
                   </button>
-                ) : null}
-                {data.setup.state !== "setup_not_a_repository" && data.setup.state !== "setup_configured" ? (
+                  ) : null}
+                  {canConfigureRuntime ? (
                   <button
                     className="button button-primary"
-                    disabled={activeAction !== null || data.setup.state === "setup_uninitialized"}
-                    onClick={() => void perform("runtime", (signal) => apiRef.current.setup("runtime", signal), "action_complete")}
+                    disabled={activeAction !== null}
+                    onClick={() => setConfigurationConfirmationOpen(true)}
                     type="button"
                   >
-                    {activeAction === "runtime" ? text("working") : text("configure_runtime")}
+                    {text("configure_runtime")}
                   </button>
+                  ) : null}
+                </div>
+                {configurationConfirmationOpen ? (
+                  <section
+                    aria-describedby="configuration-confirmation-details"
+                    aria-labelledby="configuration-confirmation-title"
+                    aria-modal="true"
+                    className="notice"
+                    role="dialog"
+                  >
+                    <h3 id="configuration-confirmation-title">{text("configuration_confirmation_title")}</h3>
+                    <p id="configuration-confirmation-details">{text("configuration_confirmation_write")}</p>
+                    <p>{text("configuration_confirmation_non_actions")}</p>
+                    <div className="button-row">
+                      <button className="button button-primary" disabled={activeAction !== null} onClick={confirmRuntimeConfiguration} type="button">
+                        {activeAction === "runtime" ? text("working") : text("configuration_confirmation_confirm")}
+                      </button>
+                      <button className="button button-secondary" disabled={activeAction !== null} onClick={() => setConfigurationConfirmationOpen(false)} type="button">
+                        {text("configuration_confirmation_cancel")}
+                      </button>
+                    </div>
+                  </section>
                 ) : null}
-              </div>
+              </>
             ) : null}
           </WorkflowCard>
           <WorkflowCard ready={roleOptions.length > 0} title={text("step_role")}>

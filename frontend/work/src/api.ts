@@ -5,6 +5,10 @@ import type {
   LaunchOptions,
   Profile,
   RoleOption,
+  SetupGuidance,
+  SetupGuidanceBlockerCode,
+  SetupGuidanceNextActionKey,
+  SetupGuidanceTool,
   SetupStatus,
   TaskOption,
   WorkspaceData,
@@ -13,6 +17,29 @@ import type {
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
 const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
+const SETUP_GUIDANCE_BLOCKER_CODES = new Set<SetupGuidanceBlockerCode>([
+  "setup_not_a_repository",
+  "setup_uninitialized",
+  "setup_unconfigured",
+  "setup_no_provider_found",
+  "setup_support_binary_unresolved",
+  "setup_config_rejected_by_loader"
+]);
+const SETUP_GUIDANCE_TOOLS = new Set<SetupGuidanceTool>([
+  "Claude",
+  "Codex",
+  "git",
+  "agent-commons-mcp"
+]);
+const SETUP_GUIDANCE_ACTION_KEYS = new Set<SetupGuidanceNextActionKey>([
+  "choose_git_repository",
+  "initialize_workspace",
+  "install_provider_and_check_again",
+  "install_support_tool_and_check_again",
+  "configure_runtime",
+  "repair_workspace_configuration",
+  "setup_ready"
+]);
 
 export class ApiProblem extends Error {
   readonly status: number;
@@ -70,6 +97,36 @@ function parseSetup(value: unknown): SetupStatus {
     launchEnabled: booleanAt(value, "launch_enabled"),
     writesEnabled: booleanAt(value, "writes_enabled", true)
   };
+}
+
+function parseSetupGuidance(value: unknown): SetupGuidance {
+  if (!isObject(value)) {
+    throw new ApiProblem(502, null);
+  }
+  const blockerCode = value.blocker_code;
+  const nextActionKey = value.next_action_key;
+  const locationLabel = value.location_label;
+  const rawTools = value.tools;
+  if (
+    (blockerCode !== null && (typeof blockerCode !== "string" || !SETUP_GUIDANCE_BLOCKER_CODES.has(blockerCode as SetupGuidanceBlockerCode)))
+    || typeof nextActionKey !== "string"
+    || !SETUP_GUIDANCE_ACTION_KEYS.has(nextActionKey as SetupGuidanceNextActionKey)
+    || (locationLabel !== null && locationLabel !== "workspace_configuration")
+    || !Array.isArray(rawTools)
+    || rawTools.some((tool) => typeof tool !== "string" || !SETUP_GUIDANCE_TOOLS.has(tool as SetupGuidanceTool))
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    blockerCode: blockerCode as SetupGuidanceBlockerCode | null,
+    tools: rawTools as SetupGuidanceTool[],
+    nextActionKey: nextActionKey as SetupGuidanceNextActionKey,
+    locationLabel
+  };
+}
+
+function shouldLoadSetupGuidance(setup: SetupStatus): boolean {
+  return setup.state !== "setup_uninitialized" && setup.state !== "setup_not_a_repository";
 }
 
 function parseMeta(value: unknown): WorkspaceMeta {
@@ -251,8 +308,9 @@ export class WorkApi {
     ]);
     const setup = parseSetup(setupValue);
     const meta = parseMeta(metaValue);
+    const guidance = await this.loadSetupGuidance(setup, signal);
     if (setup.state !== "setup_configured") {
-      return { meta, setup, catalog: null, launch: null };
+      return { meta, setup, guidance, catalog: null, launch: null };
     }
     const [catalogResult, launchResult] = await Promise.allSettled([
       this.get("/catalog", signal),
@@ -264,9 +322,27 @@ export class WorkApi {
     return {
       meta,
       setup,
+      guidance,
       catalog: catalogResult.status === "fulfilled" ? parseCatalog(catalogResult.value) : null,
       launch: launchResult.status === "fulfilled" ? parseLaunch(launchResult.value) : null
     };
+  }
+
+  private async loadSetupGuidance(
+    setup: SetupStatus,
+    signal: AbortSignal
+  ): Promise<SetupGuidance | null> {
+    if (!shouldLoadSetupGuidance(setup)) {
+      return null;
+    }
+    try {
+      return parseSetupGuidance(await this.get("/work/setup-guidance", signal));
+    } catch (error: unknown) {
+      if (error instanceof ApiProblem && error.status === 409) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async setup(action: "initialize" | "runtime", signal: AbortSignal): Promise<void> {

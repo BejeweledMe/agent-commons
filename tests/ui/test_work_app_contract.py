@@ -263,6 +263,174 @@ def test_work_reads_project_identity_only_through_the_authenticated_opaque_api_b
     assert "review_in_legacy" in entry
 
 
+def test_work_setup_guidance_is_closed_typed_and_only_loaded_after_setup() -> None:
+    api = _source("src/api.ts")
+    contracts = _source("src/contracts.ts")
+
+    assert "SetupGuidanceBlockerCode" in contracts
+    assert "SetupGuidanceTool" in contracts
+    assert "SetupGuidanceNextActionKey" in contracts
+    assert "parseSetupGuidance" in api
+    assert "SETUP_GUIDANCE_BLOCKER_CODES" in api
+    assert "SETUP_GUIDANCE_TOOLS" in api
+    assert "SETUP_GUIDANCE_ACTION_KEYS" in api
+    assert 'this.get("/work/setup-guidance", signal)' in api
+    assert 'fetch("/api/work/setup-guidance"' not in api
+    assert 'setup.state !== "setup_uninitialized"' in api
+    assert "error.status === 409" in api
+    assert api.index('this.get("/setup", signal)') < api.index(
+        'this.get("/work/setup-guidance", signal)'
+    )
+
+
+def test_work_guidance_is_user_actionable_without_automatic_setup_mutation() -> None:
+    messages = json.loads(_source("src/i18n.json"))
+    entry = _source("src/main.tsx")
+
+    keys = {
+        "check_again",
+        "guidance_missing_tools",
+        "guidance_install_provider",
+        "guidance_install_support_tool",
+        "configuration_confirmation_title",
+        "configuration_confirmation_write",
+        "configuration_confirmation_non_actions",
+        "configuration_confirmation_confirm",
+        "configuration_confirmation_cancel",
+    }
+    assert keys <= set(messages["en"])
+    for locale in ("en", "ru"):
+        for key in keys:
+            assert messages[locale][key].strip()
+
+    assert "guidance.tools.join" in entry
+    assert "onClick={() => void refresh()}" in entry
+    assert "onClick={() => setConfigurationConfirmationOpen(true)}" in entry
+    assert 'role="dialog"' in entry
+    assert 'aria-modal="true"' in entry
+    assert entry.count('apiRef.current.setup("runtime", signal)') == 1
+    assert "function confirmRuntimeConfiguration" in entry
+    assert 'guidance?.nextActionKey === "configure_runtime"' in entry
+
+
+def test_work_guidance_reconciles_uninitialized_and_409_without_rendering_raw_values(
+    tmp_path: Path,
+) -> None:
+    compiled = tmp_path / "compiled"
+    compiler = _WORK_SOURCE / "node_modules" / ".bin" / "tsc"
+    result = subprocess.run(
+        [
+            str(compiler),
+            "--ignoreConfig",
+            "--target",
+            "ES2022",
+            "--module",
+            "ESNext",
+            "--moduleResolution",
+            "Bundler",
+            "--lib",
+            "ES2022,DOM",
+            "--outDir",
+            str(compiled),
+            str(_WORK_SOURCE / "src" / "api.ts"),
+        ],
+        cwd=_WORK_SOURCE,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    script = textwrap.dedent(
+        """
+        import assert from "node:assert/strict";
+        import { pathToFileURL } from "node:url";
+
+        const apiBase = "/api/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        const storage = new Map([["agent_commons.ui.api_base", apiBase]]);
+        const calls = [];
+        let setupState = "setup_unconfigured";
+        let guidance = {
+          blocker_code: "setup_support_binary_unresolved",
+          tools: ["git"],
+          next_action_key: "install_support_tool_and_check_again",
+          location_label: null
+        };
+        globalThis.window = {
+          location: { hash: "", pathname: "/work" },
+          history: { replaceState: () => {} },
+          sessionStorage: {
+            getItem: (key) => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, value),
+            removeItem: (key) => storage.delete(key)
+          }
+        };
+        globalThis.fetch = async (url) => {
+          calls.push(url);
+          if (url === `${apiBase}/setup`) {
+            return { ok: true, status: 200, json: async () => ({ state: setupState }) };
+          }
+          if (url === `${apiBase}/meta`) {
+            return { ok: true, status: 200, json: async () => ({ repo: "/work/project" }) };
+          }
+          if (url === `${apiBase}/work/setup-guidance`) {
+            if (guidance === "409") {
+              return {
+                ok: false,
+                status: 409,
+                json: async () => ({ error: { code: "setup_uninitialized" } })
+              };
+            }
+            return { ok: true, status: 200, json: async () => guidance };
+          }
+          throw new Error(`unexpected ${url}`);
+        };
+        const { WorkApi } = await import(pathToFileURL(process.argv[2]).href);
+        const api = new WorkApi();
+        await api.connect(new AbortController().signal);
+
+        calls.length = 0;
+        const supported = await api.load(new AbortController().signal);
+        assert.deepEqual(calls, [
+          `${apiBase}/setup`, `${apiBase}/meta`, `${apiBase}/work/setup-guidance`
+        ]);
+        assert.deepEqual(supported.guidance.tools, ["git"]);
+
+        calls.length = 0;
+        guidance = "409";
+        const unavailable = await api.load(new AbortController().signal);
+        assert.equal(unavailable.guidance, null);
+
+        calls.length = 0;
+        setupState = "setup_uninitialized";
+        const uninitialized = await api.load(new AbortController().signal);
+        assert.equal(uninitialized.guidance, null);
+        assert.equal(calls.includes(`${apiBase}/work/setup-guidance`), false);
+
+        setupState = "setup_unconfigured";
+        guidance = {
+          blocker_code: "setup_support_binary_unresolved",
+          tools: ["raw-detail-DO-NOT-RENDER"],
+          next_action_key: "install_support_tool_and_check_again",
+          location_label: null
+        };
+        await assert.rejects(api.load(new AbortController().signal), (error) => {
+          assert.equal(error.message, "request_unavailable");
+          assert.equal(error.message.includes("raw-detail-DO-NOT-RENDER"), false);
+          return true;
+        });
+        """
+    )
+    node = subprocess.run(
+        ["node", "--input-type=module", "-", str(compiled / "api.js")],
+        check=False,
+        input=script,
+        capture_output=True,
+        text=True,
+    )
+    assert node.returncode == 0, node.stdout + node.stderr
+
+
 def test_work_run_handoff_waits_for_finished_work_before_prompting_for_review() -> None:
     messages = json.loads(_source("src/i18n.json"))
 
