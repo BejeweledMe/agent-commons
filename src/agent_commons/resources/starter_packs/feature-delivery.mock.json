@@ -1,0 +1,46 @@
+{
+  "format": "agent-commons.starter-pack.v1",
+  "id": "starter.feature-delivery.mock",
+  "version": "0.1.0",
+  "title": "Feature delivery (example)",
+  "summary": "An implementer and an independent reviewer for a small technical change.",
+  "blueprints": [
+    {
+      "id": "feature-delivery",
+      "title": "Feature delivery",
+      "summary": "Plan, implement, then independently review a bounded change.",
+      "roles": [
+        {
+          "id": "implementer",
+          "name": "Implementer",
+          "purpose": "Build the scoped change and report verifiable evidence.",
+          "fresh_context": true,
+          "skill_refs": ["software-engineering", "qa-testing"],
+          "runtime_instruction": "Implement only the approved scope. Run relevant checks and report evidence."
+        },
+        {
+          "id": "independent-reviewer",
+          "name": "Independent reviewer",
+          "purpose": "Assess the submitted work without inheriting the implementer's context.",
+          "fresh_context": true,
+          "skill_refs": ["qa-testing"],
+          "runtime_instruction": "Review the exact submitted revision. Record evidence-backed approval or requested changes."
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "payloads/feature-delivery.md",
+      "sha256": "e2b49bc12dd42b5e16470fd50ec186694af768902d96aa97df44a4743c729f21",
+      "size": 86
+    }
+  ],
+  "source": {
+    "kind": "bundled",
+    "resource": "feature-delivery.mock.json"
+  },
+  "compatibility": {
+    "agent_commons": ">=0.1.0,<1.0.0"
+  }
+}

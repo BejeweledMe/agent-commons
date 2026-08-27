@@ -1,0 +1,46 @@
+{
+  "format": "agent-commons.starter-pack.v1",
+  "id": "starter.product-discovery.mock",
+  "version": "0.1.0",
+  "title": "Product discovery (example)",
+  "summary": "A researcher and product reviewer for an evidence-backed product question.",
+  "blueprints": [
+    {
+      "id": "product-discovery",
+      "title": "Product discovery",
+      "summary": "Gather evidence, then review the recommendation before an owner decides.",
+      "roles": [
+        {
+          "id": "researcher",
+          "name": "Researcher",
+          "purpose": "Collect bounded evidence and state assumptions and open questions.",
+          "fresh_context": true,
+          "skill_refs": ["business-product-consulting"],
+          "runtime_instruction": "Research the assigned question. Separate facts, assumptions, risks, and unresolved decisions."
+        },
+        {
+          "id": "product-reviewer",
+          "name": "Product reviewer",
+          "purpose": "Check whether evidence supports the recommendation without making the owner's decision.",
+          "fresh_context": true,
+          "skill_refs": ["business-product-consulting"],
+          "runtime_instruction": "Review the recommendation against its evidence. Escalate product decisions that require an owner."
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "payloads/product-discovery.md",
+      "sha256": "af8f7e98a05c4683330fe7b2b1bec1190f47e72c110d4218a4e94d1982a219a3",
+      "size": 87
+    }
+  ],
+  "source": {
+    "kind": "bundled",
+    "resource": "product-discovery.mock.json"
+  },
+  "compatibility": {
+    "agent_commons": ">=0.1.0,<1.0.0"
+  }
+}
