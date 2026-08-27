@@ -89,6 +89,7 @@ where = ["src"]
 agent_commons = [
   "resources/schemas/**/*.json",
   "resources/skills/**/*",
+  "resources/starter_packs/**/*",
   "resources/templates/**/*",
   "ui/static/**/*",
 ]
