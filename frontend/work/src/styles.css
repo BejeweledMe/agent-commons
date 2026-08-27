@@ -148,6 +148,34 @@ p {
   margin-bottom: 8px;
 }
 
+.project-label {
+  color: #9ec1ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.project-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.project-path-toggle,
+.notice-link {
+  background: transparent;
+  border: 0;
+  color: #b3ccff;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.project-path-toggle {
+  margin: -6px 0 12px;
+}
+
 .small-copy {
   color: #b9c8e2;
   font-size: 0.91rem;
@@ -289,6 +317,10 @@ fieldset .button {
   line-height: 1.5;
   margin: 0;
   padding: 12px 14px;
+}
+
+.notice p {
+  margin-bottom: 8px;
 }
 
 .failure-panel,

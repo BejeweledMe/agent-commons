@@ -7,7 +7,8 @@ import type {
   RoleOption,
   SetupStatus,
   TaskOption,
-  WorkspaceData
+  WorkspaceData,
+  WorkspaceMeta
 } from "./contracts";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
@@ -69,6 +70,17 @@ function parseSetup(value: unknown): SetupStatus {
     launchEnabled: booleanAt(value, "launch_enabled"),
     writesEnabled: booleanAt(value, "writes_enabled", true)
   };
+}
+
+function parseMeta(value: unknown): WorkspaceMeta {
+  if (!isObject(value)) {
+    throw new ApiProblem(502, null);
+  }
+  const repo = stringAt(value, "repo");
+  if (!repo) {
+    throw new ApiProblem(502, null);
+  }
+  return { repo };
 }
 
 function profileLabel(profileId: string, profileInfo: unknown): string {
@@ -233,9 +245,14 @@ export class WorkApi {
   }
 
   async load(signal: AbortSignal): Promise<WorkspaceData> {
-    const setup = parseSetup(await this.get("/setup", signal));
+    const [setupValue, metaValue] = await Promise.all([
+      this.get("/setup", signal),
+      this.get("/meta", signal)
+    ]);
+    const setup = parseSetup(setupValue);
+    const meta = parseMeta(metaValue);
     if (setup.state !== "setup_configured") {
-      return { setup, catalog: null, launch: null };
+      return { meta, setup, catalog: null, launch: null };
     }
     const [catalogResult, launchResult] = await Promise.allSettled([
       this.get("/catalog", signal),
@@ -245,6 +262,7 @@ export class WorkApi {
       throw catalogResult.reason;
     }
     return {
+      meta,
       setup,
       catalog: catalogResult.status === "fulfilled" ? parseCatalog(catalogResult.value) : null,
       launch: launchResult.status === "fulfilled" ? parseLaunch(launchResult.value) : null

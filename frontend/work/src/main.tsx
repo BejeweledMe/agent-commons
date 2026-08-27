@@ -98,6 +98,11 @@ function validation(errors: readonly string[], field: string): boolean {
   return errors.includes(field);
 }
 
+function repositoryBasename(path: string): string {
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  return segments.at(-1) ?? path;
+}
+
 function WorkApp(): ReactElement {
   const [locale, setLocale] = useState<Locale>("en");
   const [state, setState] = useState<AppState>({ kind: "checking" });
@@ -108,6 +113,7 @@ function WorkApp(): ReactElement {
   const [roleErrors, setRoleErrors] = useState<FormErrors>(new Set());
   const [taskErrors, setTaskErrors] = useState<FormErrors>(new Set());
   const [runErrors, setRunErrors] = useState<FormErrors>(new Set());
+  const [showFullProjectPath, setShowFullProjectPath] = useState(false);
   const apiRef = useRef(new WorkApi());
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
 
@@ -252,6 +258,16 @@ function WorkApp(): ReactElement {
       <div className="work-layout">
         <aside className="progress-panel" aria-label={text("current_status")}>
           <p className="eyebrow">{text("current_status")}</p>
+          <p className="project-label">{text("project_label")}</p>
+          <p className="project-name">{showFullProjectPath ? data.meta.repo : repositoryBasename(data.meta.repo)}</p>
+          <button
+            className="project-path-toggle"
+            onClick={() => setShowFullProjectPath((visible) => !visible)}
+            type="button"
+          >
+            {text(showFullProjectPath ? "hide_full_project_path" : "show_full_project_path")}
+          </button>
+          <p className="small-copy">{text("project_scope_help")}</p>
           <p className="status-title">{setupLabel(data.setup.state, text)}</p>
           <p>{environmentReady ? text("configured") : text("not_configured")}</p>
           <button className="button button-secondary" disabled={activeAction !== null} onClick={() => void refresh()} type="button">
@@ -356,7 +372,12 @@ function WorkApp(): ReactElement {
           </WorkflowCard>
           <WorkflowCard ready={false} title={text("step_run")}>
             <p className="small-copy">{text("run_help")}</p>
-            {notice === "run_started" ? <p className="notice" role="status">{text("run_started_help")}</p> : null}
+            {notice === "run_started" ? (
+              <div className="notice" role="status">
+                <p>{text("run_started_help")}</p>
+                <a className="notice-link" href="/">{text("review_in_legacy")}</a>
+              </div>
+            ) : null}
             <form noValidate onSubmit={submitRun}>
               <fieldset disabled={!environmentReady || activeAction !== null}>
                 <label htmlFor="run-role">{text("select_role")}</label>

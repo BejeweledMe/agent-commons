@@ -251,6 +251,18 @@ def test_work_preserves_a_live_stored_session_when_a_stale_fragment_meets_a_5xx(
     assert node.returncode == 0, node.stdout + node.stderr
 
 
+def test_work_reads_project_identity_only_through_the_authenticated_opaque_api_base() -> None:
+    api = _source("src/api.ts")
+    entry = _source("src/main.tsx")
+
+    assert 'this.get("/meta", signal)' in api
+    assert 'fetch("/api/meta"' not in api
+    assert "repositoryBasename" in entry
+    assert "showFullProjectPath" in entry
+    assert 'href="/"' in entry
+    assert "review_in_legacy" in entry
+
+
 def test_work_client_drives_failures_from_typed_refusal_codes() -> None:
     source = _source("src/api.ts")
     entry = _source("src/main.tsx")

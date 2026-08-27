@@ -41,7 +41,12 @@ export type LaunchOptions = {
   tasks: readonly TaskOption[];
 };
 
+export type WorkspaceMeta = {
+  repo: string;
+};
+
 export type WorkspaceData = {
+  meta: WorkspaceMeta;
   setup: SetupStatus;
   catalog: Catalog | null;
   launch: LaunchOptions | null;
