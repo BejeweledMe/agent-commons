@@ -1127,7 +1127,7 @@ def serve(
     if emit is not None:
         emit(bound_port, exchange_code)
     if open_browser:
-        webbrowser.open(f"http://127.0.0.1:{bound_port}/#c={exchange_code}")
+        webbrowser.open(f"http://127.0.0.1:{bound_port}/work#c={exchange_code}")
     config = uvicorn.Config(
         app,
         log_level="warning",

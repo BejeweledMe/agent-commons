@@ -297,7 +297,7 @@ def ui_command(
             # lock will record once there is a state root to hold it).
             owner.acquire_panel_lock(bound_port)
             writer_session_id = owner.start()
-        url = f"http://127.0.0.1:{bound_port}/#c={exchange_code}"
+        url = f"http://127.0.0.1:{bound_port}/work#c={exchange_code}"
         if state.json_output:
             state.emit(
                 {

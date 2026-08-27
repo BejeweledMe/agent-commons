@@ -13,6 +13,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -21,6 +22,7 @@ from click.testing import CliRunner
 from agent_commons.cli import cli
 from agent_commons.services import CommonsManager
 from agent_commons.ui import STARTED_SCHEMA
+from agent_commons.ui.context import UIContext
 
 
 @pytest.fixture
@@ -85,18 +87,65 @@ def test_the_ui_command_opens_and_owns_its_own_session_by_default(
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["schema"] == STARTED_SCHEMA == "agent_commons.ui.started.v2"
-    assert payload["url"].endswith("/#c=test-exchange-code")
+    assert payload["url"].endswith("/work#c=test-exchange-code")
     assert payload["exchange_code"] == "test-exchange-code"
     assert "token" not in payload
     assert payload["read_only"] is False
     assert str(payload["writer_session_id"]).startswith("session.")
     assert captured["context"].writes_enabled is True
+    assert captured["open_browser"] is False
     # `serve` returning closed the panel's session behind itself.  This spy
     # returns immediately, so it proves the cleanup wiring and nothing about
     # signals; whether Ctrl-C actually makes the real server return is the
     # subject of `test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected`.
     shown = CommonsManager(repo, read_only=True).show_session(payload["writer_session_id"])
     assert shown["status"] == "closed"
+
+
+def test_the_real_server_auto_opens_the_same_work_handoff_that_the_cli_emits(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default browser must consume the Work URL, not the legacy root shell."""
+
+    from agent_commons.ui import server
+
+    opened: list[str] = []
+    emitted: list[tuple[int, str]] = []
+
+    class Listener:
+        def setsockopt(self, *_: object) -> None:
+            pass
+
+        def bind(self, _: tuple[str, int]) -> None:
+            pass
+
+        def listen(self, _: int) -> None:
+            pass
+
+        def getsockname(self) -> tuple[str, int]:
+            return ("127.0.0.1", 54321)
+
+    class Server:
+        should_exit = False
+
+        def __init__(self, _: object) -> None:
+            pass
+
+        def run(self, *, sockets: list[Listener]) -> None:
+            assert len(sockets) == 1
+
+    monkeypatch.setattr(server.socket, "socket", lambda *_: Listener())
+    monkeypatch.setattr(server, "new_token", lambda: "one-use-code")
+    monkeypatch.setattr(server, "create_app", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(server.webbrowser, "open", opened.append)
+    fake_uvicorn = SimpleNamespace(Config=lambda *_args, **_kwargs: object(), Server=Server)
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+
+    server.serve(UIContext(repo), port=0, emit=lambda port, code: emitted.append((port, code)))
+
+    expected = "http://127.0.0.1:54321/work#c=one-use-code"
+    assert emitted == [(54321, "one-use-code")]
+    assert opened == [expected]
 
 
 def test_ctrl_c_stops_the_panel_while_a_stream_is_still_connected(repo: Path) -> None:
