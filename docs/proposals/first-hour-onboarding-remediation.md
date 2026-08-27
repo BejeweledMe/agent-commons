@@ -17,7 +17,7 @@
 ### Confirmed fact chain
 
 1. agent-commons ui auto-opens a browser unless --no-browser is supplied: [cli command](../../src/agent_commons/cli/__init__.py#L161-L170) and [serve](../../src/agent_commons/ui/server.py#L1103-L1130).
-2. Today terminal output and auto-open receive the same `/#c=<code>` link ([CLI emit](../../src/agent_commons/cli/__init__.py#L290-L300)). S1 must migrate the emitted plain-text URL, emitted JSON URL, and an explicit opt-in browser open together to the same Work route: `/work#c=<code>`.
+2. Today terminal output and auto-open receive the same `/#c=<code>` link ([CLI emit](../../src/agent_commons/cli/__init__.py#L290-L300)). S1 must migrate the emitted plain-text URL, emitted JSON URL, and the existing default-browser auto-open together to the same Work route: `/work#c=<code>`. `--no-browser` remains the explicit manual-browser-choice path.
 3. The code is intentionally one-use and short-lived; the first tab consumes it under lock ([LocalBrowserSession](../../src/agent_commons/ui/security.py#L67-L101)). A repeat correctly gets a non-oracular 401 unauthorized ([auth test](../../tests/ui/test_auth.py#L56-L82)).
 4. /work is a separate public React shell ([work routes](../../src/agent_commons/ui/work_routes.py#L13-L35)). If the system browser consumed the code at /, taking that same fragment to /work must fail.
 5. Work gives a fragment priority over a stored API base and clears the stored base on failed exchange ([Work API](../../frontend/work/src/api.ts#L181-L208)). Its current “open the printed URL again” recovery copy is therefore false ([Work locales](../../frontend/work/src/i18n.json#L56-L67)).
@@ -36,16 +36,16 @@
 
 | Option | Benefit | Cost / risk | Recommendation |
 | --- | --- | --- | --- |
-| A. Auto-open `/work#c=<code>` instead of the legacy root route | Removes legacy-first route mismatch. | The system browser still consumes the code before the user can choose another browser. | Insufficient alone. |
-| B. Manual Work handoff by default; explicit --open-browser opt-in | User selects browser; simplest reversible fix; security model unchanged. | One deliberate terminal-to-browser transfer; CLI default change needs owner approval and migration note. | **Recommended immediate P0 path.** |
+| A. Auto-open `/work#c=<code>` in the default browser; retain `--no-browser` for a manual browser choice | Preserves the current familiar launch flow while removing the legacy-first route mismatch. | The user who needs another browser must opt out before launch. | **Approved for S1.** |
+| B. Manual Work handoff by default; explicit browser-open opt-in | User selects the browser every time. | Adds a terminal-to-browser step to the common path and changes the established launch default. | Not selected. |
 | C. Authenticated replacement-code flow | Later allows switching browser without restarting. | New security-sensitive auth surface: invalidation, rate limit and threat-model review required. | Defer. |
 
 Every option also needs this exact client sequence. First read `c` into a local variable and immediately remove the fragment with `history.replaceState` **before** either stored-base restoration, exchange, or any API request. Next, if a validated stored opaque API base exists, probe/restore that live cookie-bound session first. Only when that restoration is not live may Work exchange the captured fresh fragment. A stale or failed fragment may not clear or replace a successfully restored session; only when neither restoration nor exchange yields a live session may the client clear its stored base and show recovery. This keeps the code out of history/referrer while preserving the one-use rule; it does not make an old code reusable.
 
-**Candidate paired copy**
+**Approved paired copy direction**
 
-- EN terminal: “This sign-in link is single-use. Open it once in the browser you want. Use --open-browser only for your default browser.”
-- RU terminal: “Ссылка для входа одноразовая. Откройте её один раз в нужном браузере. Используйте --open-browser, только если нужен браузер по умолчанию.”
+- EN terminal: “The panel opens in your default browser. This sign-in link is single-use. To use another browser, start with `--no-browser` and open the newly printed Work URL once there.”
+- RU terminal: “Панель откроется в браузере по умолчанию. Ссылка для входа одноразовая. Чтобы выбрать другой браузер, запустите с `--no-browser` и один раз откройте там новый напечатанный адрес Work.”
 - EN consumed state: “This sign-in link has already been used or expired. Stop the local UI, start it again, then open the newly printed Work URL once in this browser.”
 - RU consumed state: “Эта ссылка для входа уже использована или устарела. Остановите локальную панель, запустите её снова и один раз откройте новый напечатанный адрес Work в этом браузере.”
 
@@ -135,9 +135,9 @@ Do not add telemetry now. Any later approved measurement may store only aggregat
 
 | Decision | Options | Recommendation |
 | --- | --- | --- |
-| DC-P0-1 browser default | auto-open root; auto-open Work; manual Work + opt-in --open-browser; future reissue | **Manual Work + opt-in**; harden same-tab restoration. |
-| DC-P1-1 setup detail | exact missing executables; OS-specific install commands; generic docs | **Exact executables + Check again** now. |
-| DC-P1-2 local path | basename + reveal full path; always full path; no identity | **Basename + reveal**. |
+| DC-P0-1 browser default | auto-open root; auto-open Work; manual Work + browser opt-in; future reissue | **Approved: auto-open Work in the default browser; retain `--no-browser` for manual browser choice.** Retain one-use 60-second code, loopback/opaque-base/cookie protections, and harden same-tab restoration. |
+| DC-P1-1 setup detail | exact missing executables; OS-specific install commands; generic docs | **Approved: exact missing executable/tool name + Check again.** Do not auto-install, invoke installers, edit configuration, or act for the user. |
+| DC-P1-2 local path | basename + reveal full path; always full path; no identity | **Approved: basename + explicit reveal-full-path control.** |
 | DC-MEASURE-1 persistence | moderated study only; new browser telemetry/events | **Moderated study only** now. |
 
-After decisions: implement S1, S2, S3, and S4 in separate behaviour commits and claims; run clean-environment make check before each; seek exact independent review and green CI. Rollback is UI/adapter reversion only: no ledger migration or canonical-state repair is involved, and the legacy panel/CLI fallback remains.
+**Authorized delivery order.** S1 is first because it changes the browser/auth handoff and must receive a focused security review before integration. S2, S3, and S4 are authorized after S1's reviewed interface is available; their investigation and test design may proceed in parallel, but frontend source changes require one writer and must land as separate behaviour commits. S2 uses only the approved typed allowlist/redaction response and **Check again**; it does not install or configure anything. Run clean-environment `make check` before each commit; seek exact independent review and green CI. Rollback is UI/adapter reversion only: no ledger migration or canonical-state repair is involved, and the legacy panel/CLI fallback remains.
