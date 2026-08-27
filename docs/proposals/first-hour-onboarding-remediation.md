@@ -17,7 +17,7 @@
 ### Confirmed fact chain
 
 1. agent-commons ui auto-opens a browser unless --no-browser is supplied: [cli command](../../src/agent_commons/cli/__init__.py#L161-L170) and [serve](../../src/agent_commons/ui/server.py#L1103-L1130).
-2. Terminal output and the auto-open receive the same /#c=<code> link ([CLI emit](../../src/agent_commons/cli/__init__.py#L290-L300)).
+2. Today terminal output and auto-open receive the same `/#c=<code>` link ([CLI emit](../../src/agent_commons/cli/__init__.py#L290-L300)). S1 must migrate the emitted plain-text URL, emitted JSON URL, and an explicit opt-in browser open together to the same Work route: `/work#c=<code>`.
 3. The code is intentionally one-use and short-lived; the first tab consumes it under lock ([LocalBrowserSession](../../src/agent_commons/ui/security.py#L67-L101)). A repeat correctly gets a non-oracular 401 unauthorized ([auth test](../../tests/ui/test_auth.py#L56-L82)).
 4. /work is a separate public React shell ([work routes](../../src/agent_commons/ui/work_routes.py#L13-L35)). If the system browser consumed the code at /, taking that same fragment to /work must fail.
 5. Work gives a fragment priority over a stored API base and clears the stored base on failed exchange ([Work API](../../frontend/work/src/api.ts#L181-L208)). Its current “open the printed URL again” recovery copy is therefore false ([Work locales](../../frontend/work/src/i18n.json#L56-L67)).
@@ -36,11 +36,11 @@
 
 | Option | Benefit | Cost / risk | Recommendation |
 | --- | --- | --- | --- |
-| A. Auto-open /work#c instead of /#c | Removes legacy-first route mismatch. | The system browser still consumes the code before the user can choose another browser. | Insufficient alone. |
+| A. Auto-open `/work#c=<code>` instead of the legacy root route | Removes legacy-first route mismatch. | The system browser still consumes the code before the user can choose another browser. | Insufficient alone. |
 | B. Manual Work handoff by default; explicit --open-browser opt-in | User selects browser; simplest reversible fix; security model unchanged. | One deliberate terminal-to-browser transfer; CLI default change needs owner approval and migration note. | **Recommended immediate P0 path.** |
 | C. Authenticated replacement-code flow | Later allows switching browser without restarting. | New security-sensitive auth surface: invalidation, rate limit and threat-model review required. | Defer. |
 
-Every option also needs a small client hardening: when a valid stored opaque API base exists, restore it before trying a stale fragment; a bad old fragment must not erase a live same-tab session. This does not make an old code reusable.
+Every option also needs this exact client sequence. First read `c` into a local variable and immediately remove the fragment with `history.replaceState` **before** either stored-base restoration, exchange, or any API request. Next, if a validated stored opaque API base exists, probe/restore that live cookie-bound session first. Only when that restoration is not live may Work exchange the captured fresh fragment. A stale or failed fragment may not clear or replace a successfully restored session; only when neither restoration nor exchange yields a live session may the client clear its stored base and show recovery. This keeps the code out of history/referrer while preserving the one-use rule; it does not make an old code reusable.
 
 **Candidate paired copy**
 
@@ -63,9 +63,9 @@ Candidate RU: “Прогон пока не запустится: в этой с
 
 ### P1-SCOPE — the target project is invisible before mutation
 
---repo defaults to . and resolves once when the UI process starts ([CLI state](../../src/agent_commons/cli/__init__.py#L40-L116)). There is no project picker. Authenticated /api/meta already knows repo and workspace ID, but Work does not load it. A browser-side switch would also change process-bound state, config, and panel ownership; it is not a small frontend feature.
+--repo defaults to . and resolves once when the UI process starts ([CLI state](../../src/agent_commons/cli/__init__.py#L40-L116)). There is no project picker. The authenticated meta handler already knows repo and workspace ID, but Work does not load it. In `serve()` mode, browser APIs are bound at an opaque process path `/api/<random>`; raw `/api/meta` is intentionally unavailable (the latter is only direct-constructor test compatibility). A browser-side switch would also change process-bound state, config, and panel ownership; it is not a small frontend feature.
 
-**Slice S3:** after auth and before Initialize, Work calls existing /api/meta; it shows repo basename, an explicit “show full path” control, and what initialization writes. Wrong project fallback: stop the panel and restart with --repo <path>; nothing has been written yet. Do not add a picker.
+**Slice S3:** after auth and before Initialize, Work calls the existing meta handler only through its authenticated opaque Work API base (`${apiBase}/meta`), never raw `/api/meta`; it shows repo basename, an explicit “show full path” control, and what initialization writes. Wrong project fallback: stop the panel and restart with --repo <path>; nothing has been written yet. Do not add a picker.
 
 ### P1-HANDOFF — Cold Start ends at launch
 
@@ -89,7 +89,7 @@ ui.security              ┘  (security invariants unchanged)
 frontend/work API + i18n ── recovery and live-session restoration
                               │
 typed setup read DTO ──────── Work setup explanation
-existing /api/meta ────────── bound-repo confirmation
+existing `${apiBase}/meta` ─── bound-repo confirmation
 legacy panel (unchanged) ◄─── Work launch-success handoff
 ~~~
 
@@ -97,7 +97,7 @@ legacy panel (unchanged) ◄─── Work launch-success handoff
 | --- | --- | --- | --- |
 | S1 P0 handoff | product owner; Python UI/security; Work frontend; security QA | cli init, UI server, optional Work route constant, Work API + i18n, focused tests | no reusable code, event/schema, manager/UIContext, or legacy-static growth |
 | S2 setup clarity | Python UI read-model; Work frontend; UX; QA | read DTO, existing setup serialization if required, Work contracts/API/UI/i18n/tests | reuse current GET setup; no setup-write or config-semantics change |
-| S3 repo clarity | Work frontend/UX; privacy review | Work source/tests, existing GET meta | show, never switch, project |
+| S3 repo clarity | Work frontend/UX; privacy review | Work source/tests, existing GET meta through opaque `apiBase` | show, never switch, project; never call raw `/api/meta` in serve mode |
 | S4 launch handoff | Work frontend/UX; QA | Work source/tests | no Runs/review/accept API or legacy-static modification |
 | later Runs/review/accept | product, frontend, backend, security, QA | separate plan | follows work-state/review-loop gates |
 
@@ -109,10 +109,10 @@ New boundaries are typed DTOs/frozen records, not untyped dictionaries. Paired R
 
 Use temporary Git repos, state roots, XDG config, and fake executable stubs only: no real provider, credentials, user path, task, or output.
 
-1. CLI/UI integration: emitted address and selected browser policy; /work assets public, APIs private; one exchange succeeds and the repeat remains non-oracular 401.
-2. Client contract: valid stored base restores before stale fragment exchange; failed stale URL cannot clear a live session; no code in history, referrer, or storage; paired honest copy.
+1. CLI/UI integration: plain output, JSON output, and opt-in `webbrowser.open` emit `/work#c=<code>`; /work assets public, APIs private; one exchange succeeds and the repeat remains non-oracular 401.
+2. Client contract: it strips `#c` with `history.replaceState` before any restoration, exchange, or request; valid stored opaque base restores before stale-fragment exchange; a stale fragment cannot clear or replace a live cookie-plus-base session; no code in history, referrer, or storage; paired honest copy.
 3. Setup fixtures: no provider, partial provider, missing MCP, missing Git, and rejected config preserve typed fields; blocked Configure and post-refresh recovery are visible.
-4. Scope/handoff: Work shows authenticated bound repo before Initialize; has no switch control; post-launch copy distinguishes run from accepted work.
+4. Scope/handoff: in a real `serve()` fixture with a non-`/api` opaque API base, Work identity succeeds only through `${apiBase}/meta`, while raw `/api/meta` remains unavailable; Work shows that authenticated bound repo before Initialize, has no switch control, and post-launch copy distinguishes run from accepted work.
 
 Start from [Work contract tests](../../tests/ui/test_work_app_contract.py) and [auth tests](../../tests/ui/test_auth.py). Source/HTTP tests do **not** prove the browser journey.
 
