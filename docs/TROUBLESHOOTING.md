@@ -1,4 +1,9 @@
-# Troubleshooting Agent Commons
+# Technical troubleshooting for Agent Commons
+
+> This reference is for developers and operators diagnosing the CLI, local
+> runtime, or provider integration. UI users should first see [Handle blockers
+> and common problems](user/en/README.md#handle-blockers-and-common-problems)
+> or [Как разбираться с блокировками и проблемами](user/ru/README.md#как-разбираться-с-блокировками-и-проблемами).
 
 Start with safe metadata. These commands never need raw provider output:
 

@@ -1,4 +1,10 @@
-# Agent Commons quickstart
+# Technical operator quickstart
+
+> This is a terminal-oriented guide for developers and operators. For normal
+> use of the local web interface, start with the [English user guide](user/en/README.md)
+> or [руководством пользователя на русском](user/ru/README.md). The commands
+> below expose implementation and coordination details that most UI users do
+> not need.
 
 This guide adds Agent Commons to an existing Git project and walks through one
 manual author/reviewer cycle. It needs no broker, MCP server, API key, or paid

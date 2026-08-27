@@ -1,4 +1,9 @@
-# User workflows
+# Technical workflow examples
+
+> This document is for developers and operators working through the CLI and
+> implementation-level coordination. It is not the primary product guide. For
+> the UI mental model and everyday workflows, see the [English user guide](user/en/README.md)
+> or [руководство пользователя на русском](user/ru/README.md).
 
 The examples describe the shared operating flow rather than client-specific
 prompt syntax. Each participant begins by reading the generated onboarding
