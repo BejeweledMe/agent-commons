@@ -23,6 +23,10 @@ _PACK_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
 _ITEM_ID = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 _SEMVER = re.compile(r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_COMPATIBILITY_RANGE = re.compile(
+    r"^>=(?P<minimum>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"),<(?P<maximum>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))$"
+)
 
 
 class StarterPackValidationError(ValidationError):
@@ -291,7 +295,24 @@ def _parse_compatibility(value: object) -> str:
         frozenset({"agent_commons"}),
         unknown_code="starter_pack_manifest_unknown_field",
     )
-    return _required_string(mapping.get("agent_commons"), 160, "starter_pack_manifest_invalid")
+    compatibility = _required_string(
+        mapping.get("agent_commons"), 160, "starter_pack_manifest_invalid"
+    )
+    match = _COMPATIBILITY_RANGE.fullmatch(compatibility)
+    if match is None:
+        _reject("starter_pack_manifest_invalid")
+    minimum = _semantic_version(match.group("minimum"))
+    maximum = _semantic_version(match.group("maximum"))
+    if minimum >= maximum:
+        _reject("starter_pack_manifest_invalid")
+    return compatibility
+
+
+def _semantic_version(value: str) -> tuple[int, int, int]:
+    """Return a version only after the bounded manifest grammar accepted it."""
+
+    major, minor, patch = value.split(".")
+    return int(major), int(minor), int(patch)
 
 
 def _mapping(value: object, code: str) -> dict[str, object]:

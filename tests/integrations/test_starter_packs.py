@@ -87,6 +87,26 @@ def test_parser_rejects_a_role_id_reused_by_two_blueprints() -> None:
         parse_manifest_bytes(json.dumps(document).encode("utf-8"))
 
 
+@pytest.mark.parametrize(
+    "compatibility",
+    [
+        "definitely-not-a-version-constraint",
+        ">=0.1.0",
+        ">=0.1.0,<=1.0.0",
+        ">=1.0.0,<1.0.0",
+        ">=2.0.0,<1.0.0",
+    ],
+)
+def test_parser_rejects_unbounded_or_semantically_empty_compatibility_ranges(
+    compatibility: str,
+) -> None:
+    document = _manifest("starter.feature-delivery.mock", "payloads/example.md", b"example\n")
+    document["compatibility"] = {"agent_commons": compatibility}
+
+    with pytest.raises(StarterPackValidationError, match="starter_pack_manifest_invalid"):
+        parse_manifest_bytes(json.dumps(document).encode("utf-8"))
+
+
 def test_directory_registry_rejects_tampered_payload_without_any_write(tmp_path: Path) -> None:
     root = _write_valid_bundle(tmp_path / "starter-packs")
     before = {
