@@ -223,9 +223,12 @@ export class WorkApi {
       if (error instanceof DOMException && error.name === "AbortError") {
         throw error;
       }
-      clearStoredApiBase();
-      this.apiBase = "";
-      return false;
+      if (error instanceof ApiProblem && (error.status === 401 || error.status === 404)) {
+        clearStoredApiBase();
+        this.apiBase = "";
+        return false;
+      }
+      throw error;
     }
   }
 

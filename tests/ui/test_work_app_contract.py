@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -171,6 +172,83 @@ def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
     assert "localStorage" not in source
     assert "Authorization" not in source
     assert "tokenFromFragment" not in source
+
+
+def test_work_preserves_a_live_stored_session_when_a_stale_fragment_meets_a_5xx(
+    tmp_path: Path,
+) -> None:
+    """A transient probe failure must not spend a stale fragment or erase a live base."""
+
+    compiled = tmp_path / "compiled"
+    compiler = _WORK_SOURCE / "node_modules" / ".bin" / "tsc"
+    result = subprocess.run(
+        [
+            str(compiler),
+            "--ignoreConfig",
+            "--target",
+            "ES2022",
+            "--module",
+            "ESNext",
+            "--moduleResolution",
+            "Bundler",
+            "--lib",
+            "ES2022,DOM",
+            "--outDir",
+            str(compiled),
+            str(_WORK_SOURCE / "src" / "api.ts"),
+        ],
+        cwd=_WORK_SOURCE,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    script = textwrap.dedent(
+        """
+        import assert from "node:assert/strict";
+        import { pathToFileURL } from "node:url";
+
+        const storedBase = "/api/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const storage = new Map([["agent_commons.ui.api_base", storedBase]]);
+        let removed = 0;
+        let exchangeAttempts = 0;
+        globalThis.window = {
+          location: { hash: "#c=stale-code", pathname: "/work" },
+          history: { replaceState: () => {} },
+          sessionStorage: {
+            getItem: (key) => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, value),
+            removeItem: (key) => { removed += 1; storage.delete(key); }
+          }
+        };
+        globalThis.fetch = async (url) => {
+          if (url === "/api/auth/exchange") {
+            exchangeAttempts += 1;
+            throw new Error("a transient stored-session failure must not exchange the fragment");
+          }
+          assert.equal(url, `${storedBase}/setup`);
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ error: { code: "temporarily_unavailable" } })
+          };
+        };
+        const { WorkApi } = await import(pathToFileURL(process.argv[2]).href);
+        await assert.rejects(new WorkApi().connect(new AbortController().signal));
+        assert.equal(exchangeAttempts, 0);
+        assert.equal(removed, 0);
+        assert.equal(storage.get("agent_commons.ui.api_base"), storedBase);
+        """
+    )
+    node = subprocess.run(
+        ["node", "--input-type=module", "-", str(compiled / "api.js")],
+        check=False,
+        input=script,
+        capture_output=True,
+        text=True,
+    )
+    assert node.returncode == 0, node.stdout + node.stderr
 
 
 def test_work_client_drives_failures_from_typed_refusal_codes() -> None:
