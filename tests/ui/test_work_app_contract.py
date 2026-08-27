@@ -263,6 +263,22 @@ def test_work_reads_project_identity_only_through_the_authenticated_opaque_api_b
     assert "review_in_legacy" in entry
 
 
+def test_work_run_handoff_waits_for_finished_work_before_prompting_for_review() -> None:
+    messages = json.loads(_source("src/i18n.json"))
+
+    assert (
+        "When the run has finished and the work is ready, request Review in the legacy panel."
+        in messages["en"]["run_started_help"]
+    )
+    assert "Next, request Review" not in messages["en"]["run_started_help"]
+    assert "when work is ready for Review" in messages["en"]["review_in_legacy"]
+
+    russian_handoff = messages["ru"]["run_started_help"]
+    assert "Когда прогон завершится и работа будет готова, запросите Review" in russian_handoff
+    assert "Далее запросите Review" not in russian_handoff
+    assert "когда работа готова к Review" in messages["ru"]["review_in_legacy"]
+
+
 def test_work_client_drives_failures_from_typed_refusal_codes() -> None:
     source = _source("src/api.ts")
     entry = _source("src/main.tsx")
