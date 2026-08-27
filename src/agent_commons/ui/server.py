@@ -606,6 +606,17 @@ def create_app(
         # configured -- see `UIContext.setup_status`.
         return JSONResponse(await asyncio.to_thread(context.setup_status))
 
+    @api_routes.get("/api/work/setup-guidance", dependencies=reads_workspace)
+    async def work_setup_guidance(reveal_location: bool = False) -> Response:
+        """Serve Work's redacted setup contract, never the legacy setup read."""
+
+        return JSONResponse(
+            await asyncio.to_thread(
+                context.work_setup_guidance,
+                reveal_location_label=reveal_location,
+            )
+        )
+
     @api_routes.get("/api/setup/preflight", dependencies=reads_workspace)
     async def setup_preflight() -> Response:
         try:

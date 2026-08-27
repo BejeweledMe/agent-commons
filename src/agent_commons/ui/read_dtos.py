@@ -22,6 +22,64 @@ from agent_commons.domain.envelopes import (
 JsonValueInput: TypeAlias = JsonValue | FrozenJsonValue
 
 
+# The Work application must never render a runtime loader error, executable
+# resolver detail, or operator-file location.  Keep this vocabulary closed at
+# the Python boundary: adding a displayable setup condition is an intentional
+# UI-contract change, rather than an accidental pass-through of a new error.
+SetupGuidanceBlockerCode: TypeAlias = Literal[
+    "setup_not_a_repository",
+    "setup_uninitialized",
+    "setup_unconfigured",
+    "setup_no_provider_found",
+    "setup_support_binary_unresolved",
+    "setup_config_rejected_by_loader",
+]
+SetupGuidanceTool: TypeAlias = Literal["Claude", "Codex", "git", "agent-commons-mcp"]
+SetupGuidanceNextActionKey: TypeAlias = Literal[
+    "choose_git_repository",
+    "initialize_workspace",
+    "install_provider_and_check_again",
+    "install_support_tool_and_check_again",
+    "configure_runtime",
+    "repair_workspace_configuration",
+    "setup_ready",
+]
+SetupGuidanceLocationLabel: TypeAlias = Literal["workspace_configuration"]
+
+
+class SetupGuidancePayload(TypedDict):
+    """The complete, redacted wire contract for Work setup guidance."""
+
+    blocker_code: SetupGuidanceBlockerCode | None
+    tools: list[SetupGuidanceTool]
+    next_action_key: SetupGuidanceNextActionKey
+    location_label: SetupGuidanceLocationLabel | None
+
+
+@dataclass(frozen=True, slots=True)
+class SetupGuidanceDTO:
+    """Closed-vocabulary setup explanation safe to return to Work.
+
+    This deliberately cannot carry a path, a loader/refusal message, config
+    text, provider output, or an arbitrary diagnostic string.  The optional
+    generic location label is supplied only after the browser explicitly asks
+    to reveal it; it still never identifies a filesystem location.
+    """
+
+    blocker_code: SetupGuidanceBlockerCode | None
+    tools: tuple[SetupGuidanceTool, ...]
+    next_action_key: SetupGuidanceNextActionKey
+    location_label: SetupGuidanceLocationLabel | None = None
+
+    def to_wire(self) -> SetupGuidancePayload:
+        return {
+            "blocker_code": self.blocker_code,
+            "tools": list(self.tools),
+            "next_action_key": self.next_action_key,
+            "location_label": self.location_label,
+        }
+
+
 def _freeze_json(value: JsonValueInput) -> FrozenJsonValue:
     """Recursively own a JSON value held by an immutable UI DTO."""
 

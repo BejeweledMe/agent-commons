@@ -33,6 +33,12 @@ from agent_commons.ui.read_dtos import (
     ConfigBrokenAttention,
     ProposalAttention,
     RunBlockedAttention,
+    SetupGuidanceBlockerCode,
+    SetupGuidanceDTO,
+    SetupGuidanceLocationLabel,
+    SetupGuidanceNextActionKey,
+    SetupGuidancePayload,
+    SetupGuidanceTool,
     ThreadAttention,
     WorkReturnedAttention,
 )
@@ -100,6 +106,73 @@ class UIReads:
             else (SETUP_SUPPORT_BINARY_UNRESOLVED if missing else None)
         )
         return status
+
+    def work_setup_guidance(self, *, reveal_location_label: bool = False) -> SetupGuidancePayload:
+        """Return the narrow setup explanation that the Work client may render.
+
+        ``setup_status`` remains the legacy panel's technical first-run read,
+        including temporary paths and guarded-loader details.  Work consumes
+        this separate DTO so a future field added to that legacy shape cannot
+        accidentally become browser-visible here.
+        """
+
+        from agent_commons.ui import setup
+
+        report = setup.setup_state_report(self.repo, profile_config=self._profile_config)
+        state = str(report["state"])
+        blocker_code: SetupGuidanceBlockerCode | None
+        tools: tuple[SetupGuidanceTool, ...]
+        next_action_key: SetupGuidanceNextActionKey
+        location_label: SetupGuidanceLocationLabel | None = None
+
+        if state == setup.SETUP_CONFIGURED:
+            blocker_code = None
+            tools = ()
+            next_action_key = "setup_ready"
+        elif state == setup.SETUP_NOT_A_REPOSITORY:
+            blocker_code = "setup_not_a_repository"
+            tools = ()
+            next_action_key = "choose_git_repository"
+        elif state == setup.SETUP_UNINITIALIZED:
+            blocker_code = "setup_uninitialized"
+            tools = ()
+            next_action_key = "initialize_workspace"
+        elif state == setup.CONFIG_REJECTED_BY_LOADER:
+            blocker_code = "setup_config_rejected_by_loader"
+            tools = ()
+            next_action_key = "repair_workspace_configuration"
+            if reveal_location_label:
+                location_label = "workspace_configuration"
+        else:
+            discovery = setup.discover_providers(self.repo)
+            if not discovery.providers_found:
+                blocker_code = "setup_no_provider_found"
+                tools = ("Claude", "Codex")
+                next_action_key = "install_provider_and_check_again"
+            else:
+                missing = self._unresolved_support_binaries(discovery)
+                supported_names: dict[str, SetupGuidanceTool] = {
+                    "agent-commons-mcp": "agent-commons-mcp",
+                    "git": "git",
+                }
+                required_tools = tuple(
+                    supported_names[name] for name in missing if name in supported_names
+                )
+                if required_tools:
+                    blocker_code = "setup_support_binary_unresolved"
+                    tools = required_tools
+                    next_action_key = "install_support_tool_and_check_again"
+                else:
+                    blocker_code = "setup_unconfigured"
+                    tools = ()
+                    next_action_key = "configure_runtime"
+
+        return SetupGuidanceDTO(
+            blocker_code=blocker_code,
+            tools=tools,
+            next_action_key=next_action_key,
+            location_label=location_label,
+        ).to_wire()
 
     def profile_info(self) -> dict[str, dict[str, Any]]:
         """Which provider and model each configured profile would run."""
