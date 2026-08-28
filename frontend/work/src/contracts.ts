@@ -79,6 +79,39 @@ export type WorkspaceData = {
   launch: LaunchOptions | null;
 };
 
+export type StarterPackSourceKind = "bundled";
+
+export type StarterPackContextMode = "fresh";
+
+export type StarterPackRole = {
+  id: string;
+  name: string;
+  purpose: string;
+  contextMode: StarterPackContextMode;
+  skills: readonly string[];
+};
+
+export type StarterPackBlueprint = {
+  id: string;
+  title: string;
+  summary: string;
+  roles: readonly StarterPackRole[];
+};
+
+export type StarterPack = {
+  id: string;
+  version: string;
+  title: string;
+  summary: string;
+  sourceKind: StarterPackSourceKind;
+  example: true;
+  blueprints: readonly StarterPackBlueprint[];
+};
+
+export type StarterPackCatalog = {
+  packs: readonly StarterPack[];
+};
+
 export type Failure = {
   code: string;
   title: string;

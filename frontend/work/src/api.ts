@@ -10,6 +10,10 @@ import type {
   SetupGuidanceNextActionKey,
   SetupGuidanceTool,
   SetupStatus,
+  StarterPack,
+  StarterPackBlueprint,
+  StarterPackCatalog,
+  StarterPackRole,
   TaskOption,
   WorkspaceData,
   WorkspaceMeta
@@ -197,6 +201,71 @@ function parseLaunch(value: unknown): LaunchOptions {
   };
 }
 
+function requiredStringAt(value: JsonObject, key: string): string {
+  const item = value[key];
+  if (typeof item !== "string" || item === "") {
+    throw new ApiProblem(502, null);
+  }
+  return item;
+}
+
+function parseStarterPackRole(value: unknown): StarterPackRole {
+  if (
+    !isObject(value)
+    || value.context_mode !== "fresh"
+    || !Array.isArray(value.skills)
+    || value.skills.some((skill) => typeof skill !== "string" || skill === "")
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    id: requiredStringAt(value, "id"),
+    name: requiredStringAt(value, "name"),
+    purpose: requiredStringAt(value, "purpose"),
+    contextMode: "fresh",
+    skills: value.skills as string[]
+  };
+}
+
+function parseStarterPackBlueprint(value: unknown): StarterPackBlueprint {
+  if (!isObject(value) || !Array.isArray(value.roles)) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    id: requiredStringAt(value, "id"),
+    title: requiredStringAt(value, "title"),
+    summary: requiredStringAt(value, "summary"),
+    roles: value.roles.map(parseStarterPackRole)
+  };
+}
+
+function parseStarterPack(value: unknown): StarterPack {
+  if (
+    !isObject(value)
+    || value.source_kind !== "bundled"
+    || value.example !== true
+    || !Array.isArray(value.blueprints)
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    id: requiredStringAt(value, "id"),
+    version: requiredStringAt(value, "version"),
+    title: requiredStringAt(value, "title"),
+    summary: requiredStringAt(value, "summary"),
+    sourceKind: "bundled",
+    example: true,
+    blueprints: value.blueprints.map(parseStarterPackBlueprint)
+  };
+}
+
+function parseStarterPackCatalog(value: unknown): StarterPackCatalog {
+  if (!isObject(value) || !Array.isArray(value.packs)) {
+    throw new ApiProblem(502, null);
+  }
+  return { packs: value.packs.map(parseStarterPack) };
+}
+
 function exchangeCodeFromFragment(): string | null {
   return new URLSearchParams(window.location.hash.slice(1)).get("c");
 }
@@ -343,6 +412,10 @@ export class WorkApi {
       }
       throw error;
     }
+  }
+
+  async loadStarterPacks(signal: AbortSignal): Promise<StarterPackCatalog> {
+    return parseStarterPackCatalog(await this.get("/work/starter-packs", signal));
   }
 
   async setup(action: "initialize" | "runtime", signal: AbortSignal): Promise<void> {

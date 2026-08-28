@@ -351,6 +351,130 @@ fieldset .button {
   padding-left: 22px;
 }
 
+.starter-packs-section {
+  background: #121f35;
+  border: 1px solid #384e72;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.starter-packs-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.starter-packs-header h2 {
+  font-size: 1.12rem;
+  margin-bottom: 0;
+}
+
+.example-badge {
+  background: #34305a;
+  border: 1px solid #8b80c8;
+  border-radius: 999px;
+  color: #e6dfff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 4px 11px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.starter-pack-card {
+  background: #0f1a2e;
+  border: 1px solid #33486c;
+  border-radius: 10px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.starter-pack-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.starter-pack-header h3 {
+  font-size: 1.02rem;
+  margin-bottom: 0;
+}
+
+.starter-pack-meta,
+.starter-pack-role-meta {
+  color: #9db1d1;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.starter-pack-meta {
+  margin-bottom: 8px;
+}
+
+.starter-pack-blueprint {
+  border-top: 1px solid #2c3f5f;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.starter-pack-blueprint h4 {
+  font-size: 0.96rem;
+  margin: 0 0 6px;
+}
+
+.starter-pack-roles-label {
+  color: #9ec1ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  margin: 12px 0 8px;
+  text-transform: uppercase;
+}
+
+.starter-pack-role-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.starter-pack-role {
+  background: #121f35;
+  border: 1px solid #33486c;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.starter-pack-role-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.starter-pack-role-meta {
+  margin: 6px 0 0;
+}
+
+.starter-pack-skills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  vertical-align: baseline;
+}
+
+.skill-chip {
+  background: #1e304e;
+  border: 1px solid #52698c;
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
 @media (max-width: 780px) {
   .app-header {
     flex-direction: column;
