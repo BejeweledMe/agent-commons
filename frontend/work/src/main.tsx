@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { ApiProblem, WorkApi } from "./api";
 import { AppHeader } from "./components/AppHeader";
 import { FailurePanel } from "./components/FailurePanel";
+import { StarterPacksSection } from "./components/StarterPacksSection";
 import { WorkflowCard } from "./components/WorkflowCard";
 import type { Failure, SetupGuidanceNextActionKey, WorkspaceData } from "./contracts";
 import { type Locale, type MessageKey, translate } from "./i18n";
@@ -456,6 +457,7 @@ function WorkApp(): ReactElement {
               </fieldset>
             </form>
           </WorkflowCard>
+          <StarterPacksSection api={apiRef.current} text={text} />
         </div>
       </div>
     </main>
