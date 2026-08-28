@@ -4,6 +4,12 @@
 поверх `docs/visual_multi_agent_orchestrator_prd.md`. Все выводы привязаны к
 фактическому коду, а не к идеализированной модели PRD.
 
+**Статус:** исторический proposal, не текущий implementation contract. В нём
+сохранены варианты `RunEventStore`, `runtime/observability.py` и `run export`,
+которые были withdrawn или не реализованы; текущую поверхность сверяйте с
+[ADR 0008](adr/0008-run-observability-store-withdrawn.md) и
+[Broker operations](BROKER_OPERATIONS.md).
+
 ---
 
 ## 0. Решения одним списком
@@ -689,7 +695,7 @@ workspace — **> 0.6**. У Codex этих цифр нет — отдельны�
 
 ---
 
-## 7. Observability
+## 7. Observability (historical proposal)
 
 ### 7.1 Два потока, не один
 
@@ -1020,7 +1026,7 @@ immutable.
 `worker_only`, и сервер с allowlist'ом едут в одном пакете — внешних
 потребителей, пиннящих имена, нет.
 
-### 14.3 Retention для RunEventStore
+### 14.3 Retention для RunEventStore (withdrawn proposal)
 
 Оценка объёма: 10⁴–10⁵ событий на run × 200–500 байт ≈ **2–50 МБ на run**. Двадцать
 ранов — до 1 ГБ в худшем случае. Значит размерный кап обязателен, одного лимита по

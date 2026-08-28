@@ -240,6 +240,10 @@ operational loop. Native Work views for Runs, review, acceptance, visual design
 artifacts, context inheritance, or automatic scheduling are not available in
 this release unless the UI explicitly shows them.
 
+The Work screen does include a read-only Starter Packs examples section with
+two bundled mock packs. It does not apply packs, create roles, change profiles
+or grants, download external skills, or start a run.
+
 The product records coordination and decisions. It does not itself grant
 permission to commit, push, deploy, publish, contact people, or perform other
 external actions.

@@ -15,6 +15,11 @@ The feature must stay additive to the existing file-ledger core, must not create
 a second source of project truth, and must fail closed rather than silently
 dropping or duplicating an operational exchange across a crash or restart.
 
+At the time this ADR was written, it defined the channel before implementation.
+The bounded communication slice is now implemented; see the delivered entry in
+the [roadmap](../ROADMAP.md). The implementation remains subject to the same
+canonical/operational boundary and does not make this ADR a second status board.
+
 ## Canonical/operational boundary
 
 Question, answer, progress, and blocker content described here never becomes a

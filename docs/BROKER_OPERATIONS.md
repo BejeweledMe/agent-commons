@@ -145,19 +145,16 @@ have been reused by an unrelated process of the same user, and checking that the
 pid still exists cannot tell the two apart. Check `broker attempts --diagnostic`
 before forcing a stop.
 
-## Run observability projection
+## Withdrawn: run observability projection
 
-`run list` and `run export <run-id>` read the disposable run store under the
-state root. Both are read-only and never create it: on a workspace that has
-never produced run events, `run list` answers with nothing and leaves no file
-behind.
+The former `run list` and `run export <run-id>` surface and its disposable run
+store were withdrawn by [ADR 0008](adr/0008-run-observability-store-withdrawn.md).
+There is no current `agent-commons run` command, and this historical proposal
+must not be used as an implementation or release contract.
 
-Retention never exports on your behalf. `run export` is how a run is kept beyond
-its configured tier, and it must be run before the tier expires.
-
-Note the current limitation plainly: no producer writes to this store yet. The
-broker does not emit run events, so these commands operate on an empty
-projection until the streaming runner exists.
+For current broker metadata and recovery use `delegation list/show`,
+`broker attempts --diagnostic`, and `broker reconcile`. Provider process exit
+and provider prose still never substitute for canonical finalization.
 
 ## Local UI
 

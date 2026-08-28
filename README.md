@@ -76,3 +76,20 @@ product, rather than for ordinary UI use:
 - [Technical troubleshooting](docs/TROUBLESHOOTING.md)
 - [Architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md),
   [vision](docs/VISION.md), and [roadmap](docs/ROADMAP.md)
+- [Documentation map and source-of-truth rules](docs/README.md)
+
+## Configure a provider before running work
+
+The UI can use a locally installed Claude or Codex provider. Configure and
+authenticate that provider under your own account before starting a real run;
+Agent Commons does not supply credentials or turn provider output into
+acceptance. See the [technical quickstart](docs/QUICKSTART.md) and
+[troubleshooting guide](docs/TROUBLESHOOTING.md).
+
+## Experimental local broker (manual opt-in)
+
+The optional broker is alpha software. Run its static preflight before any
+provider work and use the explicit canary only when you accept the provider
+usage cost. Its current contract, caps, recovery rules, and release gates are
+in [Broker operations](docs/BROKER_OPERATIONS.md); it is not an autonomous
+scheduler.

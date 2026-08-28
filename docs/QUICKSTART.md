@@ -24,8 +24,7 @@ Clone and install from the Agent Commons source checkout:
 ```bash
 git clone https://github.com/BejeweledMe/agent-commons.git
 cd agent-commons
-python3 -m venv .venv
-.venv/bin/python -m pip install .
+make sync
 export PATH="$PWD/.venv/bin:$PATH"
 agent-commons --version
 ```

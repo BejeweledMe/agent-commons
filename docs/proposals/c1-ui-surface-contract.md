@@ -491,6 +491,8 @@ stick), `thread` (L73: «Full thread governance не мигрирована») �
 4. Намерена ли printed-URL точка входа (`server.py:1128`,
    `cli/__init__.py:300`) стать surface-selectable — нигде не заявлено
    (вопрос §5e).
-5. `frontend/gallery/tsconfig.tsbuildinfo` отслеживается в git без
-   документированного намерения — упоминается только как контекст для
-   шаблона нового workspace.
+5. `frontend/gallery/tsconfig.tsbuildinfo` отслеживался в git без
+   документированного намерения — это было обнаружено как generated cache.
+   На cleanup-срезе 2026-08-28 файл удалён из рабочей копии этим diff, а
+   `*.tsbuildinfo` добавлен в `.gitignore`; после принятия diff этот пункт
+   больше не будет открытым C1-вопросом.

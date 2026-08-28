@@ -7,17 +7,15 @@ boundary need an explicit ADR.
 ## Development setup
 
 ```bash
-python -m venv .venv
-.venv/bin/pip install -e '.[test]'
-.venv/bin/pytest
-.venv/bin/ruff check .
-.venv/bin/ruff format --check .
-python -m build
+make sync
+make check
+uv run --locked python -m build
 ```
 
-The full `test` extra includes MCP because the repository suite crosses real
-MCP stdio. Use `test-core` only for a deliberately core-only environment and
-`test-mcp` for the optional surface. CI runs the full suite from clean
+`make sync` creates the locked uv-managed environment. Do not install packages
+into it with pip. The full `test` extra includes MCP because the repository
+suite crosses real MCP stdio. Use `test-core` only for a deliberately core-only
+environment and `test-mcp` for the optional surface. CI runs the full suite from clean
 environments on macOS/Linux with Python 3.11, 3.12, 3.13, and 3.14, then installs and
 smoke-tests the built wheel. Tests must not require network access or provider
 credentials.

@@ -6,6 +6,12 @@
 строгая локальная валидация. Внешняя библиотека skills, сетевое обновление,
 материализация файлов и UI-применение — следующие, отдельно проверяемые срезы.
 
+**Фактический baseline на `e071533`:** read-only bundled catalogue уже доставлен
+в Work. Реализованы registry/manifest validation, два mock-пака, узкий
+`GET /api/work/starter-packs` и секция примеров в Work UI. Apply/materialization,
+создание ролей, внешнее обновление, выбор profile и запуск по-прежнему остаются
+будущими возможностями ниже.
+
 **Аудитория:** product owner, implementer, reviewer и будущий maintainer.
 
 ## 1. Решение и границы
@@ -162,10 +168,10 @@ flowchart LR
 | `integrations/starter_packs/source.py` | Resolve только указанного release tag/commit, проверяет manifest/file hashes и совместимость. | Python backend / security | Будущее. |
 | `integrations/starter_packs/install.py` | Составляет preview и после explicit confirm атомарно materialize project-local copy. | Python backend | Будущее. |
 | `integrations/starter_packs/locks.py` | Читает/пишет lock record, хранит прошлую известную версию для rollback. | Python backend / release engineering | Будущее. |
-| `ui/starter_pack_dtos.py` | Узкие `TypedDict`/frozen dataclass DTO на границе UI. | Backend + frontend contract owner | Будущее. |
-| `ui/starter_packs.py` | Read/application service pack; не добавляет методы в `UIContext`. | Python backend | Будущее. |
-| `ui/starter_pack_routes.py` | Роуты с typed refusals, auth и CSRF/host checks через существующий server composition root. | Python backend / security | Будущее. |
-| `frontend/work/*` | Каталог, preview, confirm, выбор profile и понятные fallbacks. | Frontend + design | Будущее. |
+| `ui/starter_pack_dtos.py` | Узкие read DTO на границе UI. | Backend + frontend contract owner | Read-only каталог доставлен; write DTO будущие. |
+| `ui/starter_packs.py` | Read service pack; не добавляет методы в `UIContext`. | Python backend | Read-only каталог доставлен; application flow будущий. |
+| `ui/starter_pack_routes.py` | Read-only route с typed refusals, auth и host checks через существующий server composition root. | Python backend / security | `GET /api/work/starter-packs` доставлен; write routes будущие. |
+| `frontend/work/*` | Каталог и безопасные fallbacks; preview/confirm/profile/apply — отдельные следующие срезы. | Frontend + design | Read-only examples section доставлена; остальное будущее. |
 | Внешний `codex-pro-agent-skills` release | Публикует совместимый verified source. | Владелец skills-библиотеки / release engineering | Будущее, вне Agent Commons. |
 
 Новые modules размещаются по целевой карте аудита: `integrations/` — для
