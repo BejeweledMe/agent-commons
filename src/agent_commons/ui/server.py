@@ -55,6 +55,7 @@ from agent_commons.ui.setup import (
     SetupError,
     missing_workspace_state,
 )
+from agent_commons.ui.starter_pack_routes import register_starter_pack_routes
 from agent_commons.ui.work_routes import register_work_routes
 
 
@@ -616,6 +617,11 @@ def create_app(
                 reveal_location_label=reveal_location,
             )
         )
+
+    # The bundled examples contain no workspace data, but the existing Work
+    # contract reserves all data reads for initialized projects.  After first
+    # run, the route gives the normal role screen a non-empty example catalogue.
+    register_starter_pack_routes(api_routes, dependencies=reads_workspace)
 
     @api_routes.get("/api/setup/preflight", dependencies=reads_workspace)
     async def setup_preflight() -> Response:
