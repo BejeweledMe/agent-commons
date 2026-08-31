@@ -1,0 +1,41 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.0Q6H8FJV6DQKGJ060KVQPVB9MF",
+  "task_revision": "evt.01M1CFH9YMNG5CH9RKBHPEJXD7",
+  "slice": "G4 authenticated typed Design Package publish/revise authoring and revision-bound Gallery feedback",
+  "repository": {
+    "source_commit_for_release_gate": "563b19b33b6ecb73039d30e4974d3831de36fc9d",
+    "working_tree_before_focused_gate": "clean",
+    "scope": "The G4 implementation already exists on main (landed with commit f2a5074); this artifact records its acceptance evidence. Every G4 file below is hash-pinned at the release-gate commit, and this evidence document is the only source-tree change on top of it."
+  },
+  "files": {
+    "src/agent_commons/services/design_authoring.py": {"sha256": "b59ca2d253ab5e90f4309f36898226076da08ddf4775e4f31c2d74316ddee0b8", "bytes": 18955},
+    "src/agent_commons/services/design_feedback.py": {"sha256": "a342f9bccab1d5c99f59e8e3736c90320674b6b19e0426d9249fc25046c0edc8", "bytes": 7889},
+    "src/agent_commons/services/design_packages.py": {"sha256": "6c665f7dcb0a42818a277f128ecf1101cd9f20ab5a267d089552ebe2990516db", "bytes": 16822},
+    "src/agent_commons/ui/server.py": {"sha256": "0780be7acd728cf6821c5c55a2b052b5eddada34b5fa529496030c85f471d498", "bytes": 60556},
+    "src/agent_commons/ui/gallery_routes.py": {"sha256": "45437ad71082aacbf41eff35a8d87ddd64111fcc17d85176e33b584fa1c9861e", "bytes": 4979},
+    "frontend/gallery/src/AuthoringPanel.tsx": {"sha256": "b22efea1d85e234a3d6b2df299a06b5e7bb710e1dad8a24398757dac71ad0713", "bytes": 15498},
+    "frontend/gallery/src/main.tsx": {"sha256": "f3ac951440a931546684e62792f6c385ffb544fb7f42fcd665c187b4a4249e99", "bytes": 24458},
+    "frontend/gallery/src/contracts.ts": {"sha256": "aeef9faf42290c824e7f5450ad56324a66df3263bf191bcb7678c0ebe2ea511d", "bytes": 20333},
+    "frontend/gallery/src/i18n.json": {"sha256": "4eeb141f09fc1a904d713f9b9a3141140403b3c996332b99e1e0de8cf677aa0f", "bytes": 15828},
+    "tests/ui/test_gallery_authoring.py": {"sha256": "e7bdd231d24cfb639fd7c5d3ba76c6810744f8bf312a7efe4de04acb1e495c30", "bytes": 9991},
+    "tests/ui/test_gallery_feedback.py": {"sha256": "cb4428161edf896821e1d67e56f28054f01f3dc68913f0affc003bc4abf770be", "bytes": 3055},
+    "tests/services/test_design_feedback.py": {"sha256": "48a833621ce21ddbe33fa1006871df5c21376a158d0c457868807b925a12c9ce", "bytes": 13114},
+    "tests/services/test_design_packages.py": {"sha256": "bc3453d8d01c1b07929850b2199b3c539d0429466b31d61a2d1328665ea26562", "bytes": 19347},
+    "frontend/gallery/tests/gallery-contract.test.mjs": {"sha256": "df93cf7260262238a350057e3b8caa38dc571b51df0609cdc9935d0d49b9f9b9", "bytes": 17852},
+    "frontend/gallery/tests/gallery-a11y.test.mjs": {"sha256": "be28aa00056091ac88ce026842e9d214d3c4095a005d29c8bc962efef5c4a822", "bytes": 3058}
+  },
+  "verification": {
+    "release_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check", "result": "1734 passed, 13 skipped, 2 warnings", "duration_seconds": 485.57, "outcome": "passed"},
+    "focused_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/ui/test_gallery_authoring.py tests/ui/test_gallery_feedback.py tests/services/test_design_feedback.py tests/services/test_design_packages.py tests/ui/test_react_gallery.py", "result": "33 passed", "duration_seconds": 33.77, "outcome": "passed"}
+  },
+  "assertions": [
+    "POST /api/gallery/packages and POST /api/gallery/{design_package_id}/revisions drive the existing canonical design_package.created / design_package.revised commands through publish_from_selection / revise_from_selection; the browser submits only opaque candidate identifiers, bounded titles and an idempotency key — never paths, hashes, classifications, media types, producer identity or arbitrary entity bindings.",
+    "The candidate set is rebuilt server-side immediately before every write from the writer session's own current task/artifact revisions: producer provenance is enforced (task and artifact revision actor must equal the writing session), classifications are limited to public/internal, and each candidate is re-proved by the hardened ArtifactPreviewReader (manifest-authorized, descriptor-relative, O_NOFOLLOW, exact SHA-256, PNG/JPEG only) before becoming selectable.",
+    "Revision uses exact expected_revision compare-and-swap; stale packages, stale candidates, duplicate candidates, unknown fields and oversized selections receive typed refusals without a partial canonical write, and an idempotent retry replays only byte-identical stored content — a reused key over different content is refused.",
+    "POST /api/gallery/{design_package_id}/screens/{screen_id}/feedback opens an ordinary revision-bound review_discussion thread through the existing open_thread/reply_thread canonical path, holding the manager's canonical write lock from exact-snapshot revalidation through the initial reply; the binding pins design package revision, screen, artifact revision, sha256 content revision and producer task revision, and stale or mismatched provenance is refused before any thread event. No task is auto-created from a comment; feedback bodies are bounded to 8192 bytes.",
+    "The React Gallery authoring and feedback surfaces consume only the typed agent_commons.gallery-authoring.v1 / gallery-authoring-result.v1 DTOs over the cookie-session API base with closed bounded parsers; loading, empty, error, stale and saved states are explicit, superseded responses cannot clobber current UI state, and canonical success stays visible through a failed refresh.",
+    "EN/RU string parity, accessibility announcements, the Gallery CSP (same-origin scripts/styles, no inline script/style), Cache-Control: no-store and X-Content-Type-Options: nosniff on data routes, and the no-demo-data rule are unchanged and enforced by the pinned frontend contract, a11y and packaging tests."
+  ],
+  "safety": {"provider_data": "No prompt, transcript, raw provider output, credentials or environment values are recorded.", "canonical_truth": "This artifact is evidence only; Design Package, thread, task and review truth remains in the immutable ledger."}
+}
