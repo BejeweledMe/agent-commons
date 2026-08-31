@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -92,19 +93,22 @@ class FakeRunner:
         stdout: bytes = b"provider content must remain ephemeral",
         after_start: Callable[[str], None] | None = None,
         crash_after_start: bool = False,
+        pid: int | None = None,
     ) -> None:
         self.outcome = outcome
         self.reason = reason
         self.stdout = stdout
         self.after_start = after_start
         self.crash_after_start = crash_after_start
+        self.pid = pid
         self.calls = 0
 
     def run(self, invocation: Any, **values: Any) -> ProcessResult:
         del invocation
         self.calls += 1
+        process_id = self.pid if self.pid is not None else 7000 + self.calls
         if self.reason is not RunReason.START_FAILED:
-            values["on_started"](7000 + self.calls)
+            values["on_started"](process_id)
             if self.crash_after_start:
                 raise RuntimeError("simulated broker crash")
             if self.after_start is not None:
@@ -113,7 +117,7 @@ class FakeRunner:
             outcome=self.outcome,
             reason=self.reason,
             exit_code=0 if self.outcome is RunOutcome.SUCCEEDED else 1,
-            pid=None if self.reason is RunReason.START_FAILED else 7000 + self.calls,
+            pid=None if self.reason is RunReason.START_FAILED else process_id,
             duration_seconds=0.25,
             stdout=self.stdout,
             stderr=b"",
@@ -835,7 +839,11 @@ def test_reconcile_maps_ambiguous_running_attempt_to_canonical_needs_operator(
     manager, task = _workspace(tmp_path)
     _, delegation = _delegation(manager, task)
     delegation_id = delegation["entity_ref"]["id"]
-    runner = FakeRunner(crash_after_start=True)
+    # Reconciliation queries the recorded PID.  Do not assume a convenient
+    # numeric PID is dead: hosted macOS runners can legitimately use it.
+    exited = subprocess.Popen(["/bin/sh", "-c", "exit 0"])
+    assert exited.wait(timeout=5) == 0
+    runner = FakeRunner(crash_after_start=True, pid=exited.pid)
     service = DelegationRuntimeService(
         manager,
         runner=runner,  # type: ignore[arg-type]

@@ -318,7 +318,9 @@ def test_claude_probe_uses_only_fixed_no_model_argv_eof_and_bounds(tmp_path: Pat
     )
     assert status.state is ProviderInitializationState.READY
     assert runner.invocation is not None
-    assert runner.invocation.argv == ("/bin/echo", "mcp", "list")
+    # The trusted executable resolver normalizes a symlinked configured path
+    # before it becomes provider argv.  Linux commonly exposes /bin -> /usr/bin.
+    assert runner.invocation.argv == (str(Path("/bin/echo").resolve()), "mcp", "list")
     assert runner.invocation.stdin == b""
     assert runner.values["timeout_seconds"] == 3
     assert runner.values["max_output_bytes"] == 4096
