@@ -1,0 +1,46 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.5P553Q5DKG4N3ZEA7FZ2T9CQAX",
+  "task_revision": "evt.01M1BVFZ3JDJYAWZ8FPTWM6NFG",
+  "slice": "P2 one immutable ValidatedLaunchPlan per provider launch",
+  "repository": {
+    "commit": "82d4d7290390d2e06293551297454ca96d569f4f",
+    "ref": "main and origin/main",
+    "working_tree_before_verification": "clean",
+    "scope": "This evidence is bound to the exact task submission revision and the clean source commit inspected by the independent reviewer."
+  },
+  "files": {
+    "src/agent_commons/runtime/launch.py": {"sha256": "d639ed9c0b3913ee52d213e1a9b6e5a2884cd64b8445ec07c1441a552dea96bc", "bytes": 17576},
+    "src/agent_commons/runtime/adapters.py": {"sha256": "711f729907ed435e532902b26cc3702bbe15688e32a2a709863e09e8f28db044", "bytes": 20104},
+    "src/agent_commons/runtime/broker.py": {"sha256": "31b1125ae916b4432563818d58b668fabfef9a6176fa0e832a1e58c85c4ee5e5", "bytes": 10772},
+    "src/agent_commons/services/delegation_runtime.py": {"sha256": "cd190b451988cfaad57b9c910fc41c8a94146ae482c4f3d187ca9da11501a329", "bytes": 78014},
+    "tests/runtime/test_launch_plan.py": {"sha256": "1d508b9230ffd12f4ff3c49dfaa992f8134c30fc44040033a1b8cd375a4c353f", "bytes": 16834},
+    "tests/runtime/test_provider_adapters.py": {"sha256": "95af517f34f082292691a1d0888e428abfa4dd1a67fe81b65bd8e16028879867", "bytes": 33983},
+    "tests/services/test_delegation_launch_plan.py": {"sha256": "a35fa48ffcc845beec1d6b7a6e7059d1f92f1ea85678553cdee090cc0805823d", "bytes": 35493}
+  },
+  "verification": {
+    "release_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1734 passed, 13 skipped, 2 warnings",
+      "duration_seconds": 509.36,
+      "outcome": "passed"
+    },
+    "focused_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/runtime/test_launch_plan.py tests/runtime/test_provider_adapters.py tests/services/test_delegation_launch_plan.py",
+      "result": "83 passed",
+      "duration_seconds": 17.29,
+      "outcome": "passed"
+    }
+  },
+  "assertions": [
+    "The production service constructs one validated launch plan and the broker consumes that invocation unchanged.",
+    "Fingerprint verification covers provider, profile, argv and stdin before launch.",
+    "Unsupported or invalid requests refuse before child-session and attempt reservation.",
+    "A process exit without a terminal MCP result cannot become canonical success.",
+    "Codex and Claude built-in profile invocations remain parity-tested through their adapter wrappers."
+  ],
+  "safety": {
+    "provider_data": "No prompt, transcript, raw provider output, tool arguments, reasoning, credentials or environment values are recorded.",
+    "canonical_truth": "The artifact and verification are evidence only; canonical task and lifecycle truth remain in the immutable ledger."
+  }
+}
