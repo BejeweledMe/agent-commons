@@ -1,0 +1,30 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.4J4RW685TP3M0NV57C0K7RQHXD",
+  "task_revision": "evt.01M1BWJTYKK6AZW9GHMK9YD1W1",
+  "slice": "C2 exact immutable Context Pack launch binding",
+  "repository": {
+    "source_commit_for_release_gate": "82d4d7290390d2e06293551297454ca96d569f4f",
+    "evidence_commit": "8545483",
+    "working_tree_before_focused_gate": "clean",
+    "scope": "P2 evidence documentation is the only source-tree change between the release-gate commit and this evidence commit; every C2 file below is hash-pinned."
+  },
+  "files": {
+    "src/agent_commons/runtime/context_binding.py": {"sha256": "d630631600b3cecd0df46ae07981a31ae8cd435dfc28e4beae32ac74aca90d4b", "bytes": 23643},
+    "src/agent_commons/services/delegation_runtime.py": {"sha256": "cd190b451988cfaad57b9c910fc41c8a94146ae482c4f3d187ca9da11501a329", "bytes": 78014},
+    "src/agent_commons/storage/opstate.py": {"sha256": "1b8c558c23a1faa08e52de75361dcb70428f73689d88e968832119b7bbbadfdf", "bytes": 9106},
+    "tests/runtime/test_context_binding.py": {"sha256": "0428db495090f2f4151f66c1ffbaa338d5bc97403c181811cf4ed9d6949788fb", "bytes": 22580},
+    "tests/services/test_delegation_launch_plan.py": {"sha256": "a35fa48ffcc845beec1d6b7a6e7059d1f92f1ea85678553cdee090cc0805823d", "bytes": 35493}
+  },
+  "verification": {
+    "release_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check", "result": "1734 passed, 13 skipped, 2 warnings", "duration_seconds": 509.36, "outcome": "passed"},
+    "focused_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/runtime/test_context_binding.py tests/services/test_delegation_launch_plan.py", "result": "55 passed", "duration_seconds": 13.71, "outcome": "passed"}
+  },
+  "assertions": [
+    "The resolved Context Pack revision is compiled deterministically and bound once before child creation.",
+    "Missing, stale, oversized and unauthorized selections refuse before child-session or attempt reservation.",
+    "Later Context Pack revisions cannot mutate a launched run; fresh mode remains isolated.",
+    "Compiled context carries only bounded revisioned facts, decisions, references and questions; no transcript, reasoning, authority or mutable state is transferred."
+  ],
+  "safety": {"provider_data": "No prompt, transcript, raw output, credentials, tool arguments or environment values are recorded.", "canonical_truth": "This artifact is evidence only; Context Pack records and lifecycle truth remain in the immutable ledger."}
+}
