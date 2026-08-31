@@ -311,7 +311,7 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
             {"expected_revision": chain["task_revision"], "reason": "one more pass"},
         ),
     )
-    # Two routes refuse on a missing subject before they reach any write, so
+    # Three route families refuse on a missing subject before they reach any write, so
     # driving them here would prove nothing about the write path; they are
     # exercised end to end elsewhere (a real proposal thread in
     # tests/ui/test_role_graph.py, a real pending operation in
@@ -321,6 +321,11 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/agents/proposals/{thread_id}/approve"),
         ("POST", "/api/agents/proposals/{thread_id}/decline"),
         ("POST", "/api/operations/{operation_id}/answer"),
+        ("POST", "/api/gallery/{design_package_id}/screens/{screen_id}/feedback"),
+        ("POST", "/api/gallery/packages"),
+        ("POST", "/api/gallery/{design_package_id}/revisions"),
+        ("POST", "/api/work/context-packs"),
+        ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
     }
     covered = {
         ("POST", "/api/agents"),

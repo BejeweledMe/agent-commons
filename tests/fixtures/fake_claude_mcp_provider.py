@@ -37,6 +37,8 @@ def _value(result: Any) -> Any:
 
 async def _run() -> None:
     arguments = sys.argv[1:]
+    if "--tools" in arguments and arguments[arguments.index("--tools") + 1] != "ToolSearch":
+        raise RuntimeError("reviewer tool discovery is disabled or over-broad")
     config = json.loads(arguments[arguments.index("--mcp-config") + 1])
     body = config["mcpServers"]["agent-commons"]
     mcp_arguments = list(body["args"])
@@ -53,29 +55,20 @@ async def _run() -> None:
         async with ClientSession(reader, writer) as session:
             await session.initialize()
             names = {tool.name for tool in (await session.list_tools()).tools}
+            allowed_tools = set(arguments[arguments.index("--allowed-tools") + 1].split(","))
+            expected_allowed_tools = {f"mcp__agent-commons__{name}" for name in names}
+            if allowed_tools != expected_allowed_tools:
+                raise RuntimeError("reviewer allowed-tools projection is not exact")
             required = {
-                "commons_list_reviews",
-                "commons_show_review",
                 "commons_show_delegation",
                 "commons_repo_files",
                 "commons_repo_read",
-                "commons_complete_review",
-                "commons_succeed_delegation",
+                "commons_list_tasks",
+                "commons_read_artifact",
             }
             if not required.issubset(names):
                 raise RuntimeError("worker MCP tool contract is incomplete")
 
-            reviews = _value(
-                await session.call_tool("commons_list_reviews", {"state": "requested"})
-            )
-            if len(reviews) != 1:
-                raise RuntimeError("worker MCP did not expose exactly one review")
-            review = _value(
-                await session.call_tool(
-                    "commons_show_review",
-                    {"review_id": reviews[0]["id"]},
-                )
-            )
             files = _value(
                 await session.call_tool(
                     "commons_repo_files",
@@ -92,23 +85,81 @@ async def _run() -> None:
             if "return 42" not in read["content"]:
                 raise RuntimeError("scoped source read returned unexpected content")
 
-            _value(
-                await session.call_tool(
-                    "commons_complete_review",
-                    {
-                        "review_id": review["id"],
-                        "expected_revision": review["revision"],
-                        "target_revision": review["target_revision"],
-                        "verdict": "approved",
-                        "summary": (
-                            "Hermetic provider inspected the exact scoped source "
-                            "over real MCP stdio."
-                        ),
-                        "idempotency_key": "hermetic-provider-review-complete",
-                        "evidence_refs": None,
-                    },
+            if "commons_finalize_review" in names:
+                reviews = _value(
+                    await session.call_tool("commons_list_reviews", {"state": "requested"})
                 )
-            )
+                if len(reviews) != 1:
+                    raise RuntimeError("worker MCP did not expose exactly one review")
+                _value(
+                    await session.call_tool(
+                        "commons_show_review",
+                        {"review_id": reviews[0]["id"]},
+                    )
+                )
+                tasks = _value(await session.call_tool("commons_list_tasks", {"state": None}))
+                for artifact_ref in tasks[0].get("artifact_refs", []):
+                    registered = _value(
+                        await session.call_tool(
+                            "commons_read_artifact", {"artifact_id": artifact_ref["id"]}
+                        )
+                    )
+                    if "return 42" not in registered["content"]:
+                        raise RuntimeError("registered source read returned unexpected content")
+                _value(
+                    await session.call_tool(
+                        "commons_finalize_review",
+                        {
+                            "verdict": "approved",
+                            "summary": (
+                                "Hermetic provider inspected the exact scoped source "
+                                "over real MCP stdio."
+                            ),
+                        },
+                    )
+                )
+                return
+            if "commons_succeed_delegation" not in names:
+                raise RuntimeError("worker MCP terminal tool contract is incomplete")
+            if "commons_record_verification" in names:
+                delegation = _value(
+                    await session.call_tool(
+                        "commons_show_delegation",
+                        {"delegation_id": delegation_id},
+                    )
+                )
+                target_ref = delegation["target_ref"]
+                tasks = _value(await session.call_tool("commons_list_tasks", {"state": None}))
+                target_task = next(item for item in tasks if item["id"] == target_ref["id"])
+                evidence_refs = [
+                    f"{item['kind']}:{item['id']}" for item in target_task["artifact_refs"]
+                ]
+                if not evidence_refs:
+                    raise RuntimeError("verification canary has no immutable evidence")
+                verification = _value(
+                    await session.call_tool(
+                        "commons_record_verification",
+                        {
+                            "target_ref": f"{target_ref['kind']}:{target_ref['id']}",
+                            "target_revision": delegation["target_revision"],
+                            "claim": "The isolated source returns the expected integer.",
+                            "method": "Read the exact scoped source over real MCP stdio.",
+                            "outcome": "passed",
+                            "evidence_refs": evidence_refs,
+                            "idempotency_key": "hermetic-provider-verification-record",
+                        },
+                    )
+                )
+                result_refs = [f"verification:{verification['entity_ref']['id']}"]
+            else:
+                delegation = _value(
+                    await session.call_tool(
+                        "commons_show_delegation",
+                        {"delegation_id": delegation_id},
+                    )
+                )
+                target = delegation["target_ref"]
+                result_refs = [f"{target['kind']}:{target['id']}"]
             delegation = _value(
                 await session.call_tool(
                     "commons_show_delegation",
@@ -122,7 +173,7 @@ async def _run() -> None:
                         "delegation_id": delegation["id"],
                         "expected_revision": delegation["revision"],
                         "summary": "Hermetic real-stdio review completed.",
-                        "result_refs": [f"review:{review['id']}"],
+                        "result_refs": result_refs,
                         "idempotency_key": "hermetic-provider-delegation-succeed",
                     },
                 )
@@ -130,7 +181,13 @@ async def _run() -> None:
 
 
 if __name__ == "__main__":
-    if "--version" in sys.argv:
+    if sys.argv[1:] == ["auth", "status", "--json"]:
+        print(json.dumps({"loggedIn": True}))
+    elif sys.argv[1:] == ["mcp", "list"]:
+        print("No MCP servers configured")
+    elif sys.argv[1:] == ["auth", "login", "--claudeai"]:
+        print("provider-owned browser login completed")
+    elif "--version" in sys.argv:
         print("0.0.0 (Claude Code)")
     elif "--help" in sys.argv:
         print(_HELP_FLAGS)

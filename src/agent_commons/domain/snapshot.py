@@ -10,8 +10,10 @@ from .collections import collection_for
 if TYPE_CHECKING:
     from .agent_projection import AgentRecord
     from .artifact_projection import ArtifactRecord
+    from .context_pack import ContextPackRecord
     from .decision_projection import DecisionRecord
     from .delegation_projection import DelegationRecord
+    from .design_packages import DesignPackageRecord
     from .finding_projection import FindingRecord
     from .handoff_projection import HandoffRecord
     from .objective_projection import ObjectiveRecord
@@ -56,11 +58,26 @@ class ProjectSnapshot:
     delegations: dict[str, DelegationRecord] = field(default_factory=dict)
     agents: dict[str, AgentRecord] = field(default_factory=dict)
     agent_links: dict[str, dict[str, Any]] = field(default_factory=dict)
+    context_packs: dict[str, ContextPackRecord] = field(default_factory=dict)
+    # Historical records are keyed by the exact effective event revision and
+    # deliberately stay out of the public snapshot shape.  They are a replayed
+    # lookup index, not another source of truth.
+    context_pack_revisions: dict[tuple[str, str], ContextPackRecord] = field(default_factory=dict)
+    design_packages: dict[str, DesignPackageRecord] = field(default_factory=dict)
+    # Exact package revisions are a replayed lookup index, not another source
+    # of truth, and deliberately stay outside the public snapshot wire shape.
+    design_package_revisions: dict[tuple[str, str], DesignPackageRecord] = field(
+        default_factory=dict
+    )
     warnings: list[str] = field(default_factory=list)
     issues: list[ProjectionIssue] = field(default_factory=list)
     invalid_event_ids: set[str] = field(default_factory=set)
     stale_refs: set[tuple[str, str]] = field(default_factory=set)
     effective_event_revisions: dict[str, str] = field(default_factory=dict)
+    # Replay-only exact provenance from immutable event actors.  Accumulated
+    # ``*_author_session_ids`` remain necessary for review independence, but
+    # must never authorize an operation bound to one specific entity revision.
+    entity_revision_actor_session_ids: dict[tuple[str, str, str], str] = field(default_factory=dict)
     known_event_ids: set[str] = field(default_factory=set)
     known_manifest_ids: set[str] = field(default_factory=set)
     # Replay-only identity facts from immutable event actors.  Session ids may
@@ -79,8 +96,13 @@ class ProjectSnapshot:
             return None
         return str(collection[identifier]["revision"])
 
+    def entity_revision_actor(self, kind: str, identifier: str, revision: str) -> str | None:
+        """Return the immutable actor session for one effective entity revision."""
+
+        return self.entity_revision_actor_session_ids.get((kind, identifier, revision))
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        rendered = {
             "workspace_id": self.workspace_id,
             "objectives": [record.to_dict() for record in self.objectives.values()],
             "tasks": [record.to_dict() for record in self.tasks.values()],
@@ -102,3 +124,13 @@ class ProjectSnapshot:
             ],
             "semantics_required": self.semantics_required,
         }
+        # Preserve the old-ledger wire contract byte-for-byte.  A consumer sees
+        # the new collection only after the ledger actually contains this new
+        # canonical entity family.
+        if self.context_packs:
+            rendered["context_packs"] = [record.to_dict() for record in self.context_packs.values()]
+        if self.design_packages:
+            rendered["design_packages"] = [
+                record.to_dict() for record in self.design_packages.values()
+            ]
+        return rendered

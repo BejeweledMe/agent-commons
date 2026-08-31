@@ -684,6 +684,103 @@ def test_orphan_receipt_can_be_audited_and_permanently_abandoned(
     assert maintainer.doctor()["ok"] is True
 
 
+def test_task_acceptance_requires_delegated_review_terminal_success(
+    workspace: tuple[Path, Path, CommonsManager, CommonsManager],
+) -> None:
+    repo, state_root, builder, reviewer = workspace
+    created = builder.create_task(
+        title="Require the delegated terminal result",
+        description="An orphan review approval must not become accepted work.",
+        acceptance_criteria=("The delegated review succeeds canonically.",),
+        idempotency_key="delegated-acceptance-task",
+    )
+    task_id = created["entity_ref"]["id"]
+    started = builder.start_task(
+        task_id, created["revision"], idempotency_key="delegated-acceptance-start"
+    )
+    completed = builder.complete_task(
+        task_id,
+        started["revision"],
+        summary="Implementation is ready.",
+        idempotency_key="delegated-acceptance-complete",
+    )
+    submitted = builder.submit_task(
+        task_id,
+        completed["revision"],
+        summary="Ready for delegated review.",
+        idempotency_key="delegated-acceptance-submit",
+    )
+    requested = builder.request_review(
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=submitted["revision"],
+        criteria=("Check the exact submitted revision.",),
+        idempotency_key="delegated-acceptance-review",
+    )
+    child_session = builder.start_session(
+        stable_instance_id="delegated-acceptance-reviewer-12345678",
+        principal="operator-delegated-acceptance-reviewer",
+        client="claude-code",
+        software="claude-cli",
+        role="independent-reviewer",
+    )
+    delegation = builder.create_delegation(
+        target_ref=requested["entity_ref"],
+        target_revision=requested["revision"],
+        target_profile="claude-independent-reviewer",
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 300,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": {"unit": "provider_units", "limit": 1},
+        },
+        idempotency_key="delegated-acceptance-delegation",
+    )
+    active = builder.start_delegation(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        child_session_id=child_session["session_id"],
+        attempt=1,
+        idempotency_key="delegated-acceptance-delegation-start",
+    )
+    child = CommonsManager(repo, state_root=state_root, session_id=child_session["session_id"])
+    review = child.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=submitted["revision"],
+        verdict="approved",
+        summary="The exact delegated review is approved.",
+        idempotency_key="delegated-acceptance-review-complete",
+    )
+
+    with pytest.raises(
+        LifecycleConflictError,
+        match="delegated review terminal result",
+    ):
+        reviewer.accept_task(
+            task_id,
+            submitted["revision"],
+            summary="The orphan approval must not be accepted.",
+            idempotency_key="delegated-acceptance-before-terminal",
+        )
+
+    child.succeed_delegation(
+        delegation["entity_ref"]["id"],
+        active["revision"],
+        summary="The delegated review reached its terminal result.",
+        result_refs=(review["entity_ref"],),
+        idempotency_key="delegated-acceptance-terminal",
+    )
+    accepted = reviewer.accept_task(
+        task_id,
+        submitted["revision"],
+        summary="The delegated approval is now terminal and admissible.",
+        idempotency_key="delegated-acceptance-after-terminal",
+    )
+    assert accepted["event_type"] == "task.accepted"
+
+
 def test_task_acceptance_requires_current_independent_review(
     workspace: tuple[Path, Path, CommonsManager, CommonsManager],
 ) -> None:
@@ -1142,9 +1239,8 @@ def test_an_acceptance_stamps_the_semantics_floor_exactly_once(
     semantics version it needs.  Never earlier — an untouched workspace stays
     readable by old code — and never twice."""
 
-    from agent_commons.domain.projection import LEDGER_SEMANTICS_VERSION
-
     _, _, builder, reviewer = workspace
+    task_acceptance_semantics_version = 2
     assert builder.snapshot().semantics_required == 1
 
     def accepted_task(tag: str) -> None:
@@ -1193,14 +1289,14 @@ def test_an_acceptance_stamps_the_semantics_floor_exactly_once(
         )
 
     accepted_task("one")
-    assert builder.snapshot().semantics_required == LEDGER_SEMANTICS_VERSION
+    assert builder.snapshot().semantics_required == task_acceptance_semantics_version
     assert stamp_count() == 1
     assert builder.doctor()["ok"] is True
 
     # A second acceptance finds the floor already high enough and adds nothing.
     accepted_task("two")
     assert stamp_count() == 1
-    assert builder.snapshot().semantics_required == LEDGER_SEMANTICS_VERSION
+    assert builder.snapshot().semantics_required == task_acceptance_semantics_version
 
 
 def test_correction_cannot_rewrite_handoff_recipients(

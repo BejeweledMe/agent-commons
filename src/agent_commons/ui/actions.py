@@ -16,8 +16,10 @@ from agent_commons.catalog import CATALOG_SECTIONS, load_role_catalog, write_rol
 from agent_commons.core.bounded import truncate_utf8
 from agent_commons.errors import ConfigurationError, LifecycleConflictError, ValidationError
 from agent_commons.runtime.model import profile_tool_summary, validate_model_name
+from agent_commons.services.design_feedback import open_design_feedback
 from agent_commons.services.manager import CommonsManager
 from agent_commons.services.roles import role_model
+from agent_commons.ui.context_pack_dtos import context_pack_detail_payload
 from agent_commons.ui.launch import LAUNCH_NOT_CONFIGURED as LAUNCH_NOT_CONFIGURED
 
 #: A provider was resolved but one of the executables every profile needs beside
@@ -52,6 +54,47 @@ class UIActions:
     paths).  It owns no parallel state and therefore cannot bypass the single
     read-only/writer manager boundary on ``UIContext``.
     """
+
+    def start_provider_login(self, *, profile_id: str) -> dict[str, Any]:
+        """Start one fixed provider-owned login flow without canonical writes."""
+
+        return self._launch_coordinator.start_provider_login(profile_id)
+
+    def publish_context_pack(
+        self, *, draft: Mapping[str, object], idempotency_key: str
+    ) -> dict[str, Any]:
+        """Publish one canonical Context Pack through the operator writer."""
+
+        record = self.writer().context_packs.publish(draft, idempotency_key=idempotency_key)
+        return context_pack_detail_payload(record)
+
+    def revise_context_pack(
+        self,
+        *,
+        context_pack_id: str,
+        expected_revision: str,
+        draft: Mapping[str, object],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """CAS-revise one pack; the domain owns reference and stale validation."""
+
+        record = self.writer().context_packs.revise(
+            context_pack_id,
+            expected_revision,
+            draft,
+            idempotency_key=idempotency_key,
+        )
+        return context_pack_detail_payload(record)
+
+    def cancel_provider_login(self, *, profile_id: str) -> dict[str, Any]:
+        """Cancel the panel-owned login flow for one configured profile."""
+
+        return self._launch_coordinator.cancel_provider_login(profile_id)
+
+    def check_provider_auth(self, *, profile_id: str) -> dict[str, Any]:
+        """Refresh one configured profile's secret-free availability state."""
+
+        return self._launch_coordinator.check_provider_auth(profile_id)
 
     @staticmethod
     def _unresolved_support_binaries(discovery: Any) -> tuple[str, ...]:
@@ -604,4 +647,28 @@ class UIActions:
             opened["revision"],
             body=body_text,
             idempotency_key=f"{opened['idempotency_key']}:body",
+        )
+
+    def open_gallery_feedback(
+        self,
+        *,
+        design_package_id: str,
+        design_package_revision: str,
+        screen_id: str,
+        artifact_revision: str,
+        producer_task_revision: str,
+        body: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Record feedback through an exact-revision canonical discussion."""
+
+        return open_design_feedback(
+            self.writer(),
+            design_package_id=design_package_id,
+            design_package_revision=design_package_revision,
+            screen_id=screen_id,
+            artifact_revision=artifact_revision,
+            producer_task_revision=producer_task_revision,
+            body=body,
+            idempotency_key=idempotency_key,
         )

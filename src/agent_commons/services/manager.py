@@ -20,6 +20,19 @@ from agent_commons.core.ids import is_typed_id, stable_id
 from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.domain.collections import COLLECTIONS, collection_for
+from agent_commons.domain.context_pack import (
+    ContextPackRefusal,
+    ContextPackRefusalCode,
+    context_pack_correction_changes,
+    own_context_pack_payload,
+)
+from agent_commons.domain.design_packages import (
+    DesignPackageDraft,
+    DesignPackageRefusal,
+    DesignPackageRefusalCode,
+    design_package_correction_changes,
+    own_design_package_payload,
+)
 from agent_commons.domain.envelopes import parse_event_envelope
 from agent_commons.domain.invalidations import derive_invalidation_state
 from agent_commons.domain.lifecycle import (
@@ -52,8 +65,11 @@ from agent_commons.storage import EventRecord, EventStore, ManifestStore, Receip
 from agent_commons.storage.events import semantic_event_body
 
 from .artifacts import ArtifactCommands
+from .context_compiler import ContextCompiler
+from .context_packs import ContextPackCommands
 from .decisions import DecisionCommands
 from .delegations import DelegationCommands
+from .design_packages import DesignPackageCommands
 from .findings import FindingCommands
 from .handoffs import HandoffCommands
 from .maintenance import MaintenanceCommands
@@ -79,6 +95,8 @@ PAYLOAD_SCHEMAS = {
     "agent": "commons.payload.agent.v1",
     "event": "commons.payload.maintenance.v1",
     "workspace": "commons.payload.workspace.v1",
+    "context_pack": "commons.payload.context_pack.v1",
+    "design_package": "commons.payload.design_package.v1",
 }
 
 
@@ -113,6 +131,8 @@ class CommonsManager(
         state_base: str | Path | None = None,
         state_source: str | None = None,
         read_only: bool = False,
+        context_pack_writes_enabled: bool = True,
+        design_package_writes_enabled: bool = True,
     ) -> None:
         require_supported_platform()
         self.repo_root = Path(repo_root).expanduser().resolve()
@@ -169,6 +189,15 @@ class CommonsManager(
             validators=(self._validate_stored_manifest,),
         )
         self.session_id = session_id
+        if not isinstance(context_pack_writes_enabled, bool):
+            raise ConfigurationError("context_pack_writes_enabled must be a boolean")
+        self.context_pack_writes_enabled = context_pack_writes_enabled
+        if not isinstance(design_package_writes_enabled, bool):
+            raise ConfigurationError("design_package_writes_enabled must be a boolean")
+        self.design_package_writes_enabled = design_package_writes_enabled
+        self.context_compiler = ContextCompiler()
+        self.context_packs = ContextPackCommands(self)
+        self.design_packages = DesignPackageCommands(self)
         # Reentrancy depth for the cross-process canonical write lock.  A cascade
         # that records several events -- retiring a lineage as one action -- must
         # hold one critical section across all of them, so record_event reuses
@@ -839,6 +868,26 @@ class CommonsManager(
                     "a correction cannot change reference or causal fields: "
                     + ", ".join(structural_changes)
                 )
+            pack_changes = context_pack_correction_changes(
+                target_event_type,
+                original_payload,
+                replacement,
+            )
+            if pack_changes:
+                raise LifecycleConflictError(
+                    "a correction cannot change Context Pack provenance fields; "
+                    "publish context_pack.revised instead: " + ", ".join(pack_changes)
+                )
+            package_changes = design_package_correction_changes(
+                target_event_type,
+                original_payload,
+                replacement,
+            )
+            if package_changes:
+                raise LifecycleConflictError(
+                    "a correction cannot change Design Package provenance fields; "
+                    "publish design_package.revised instead: " + ", ".join(package_changes)
+                )
             if target_spec.entity_id_field is not None:
                 identity_field = target_spec.entity_id_field
                 original_identity = original_payload.get(identity_field)
@@ -899,8 +948,31 @@ class CommonsManager(
         tags: Sequence[str] = (),
         _manifest: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        payload_value = dict(payload)
+        if event_type in {"context_pack.created", "context_pack.revised"}:
+            payload_value = own_context_pack_payload(payload)
+        elif event_type in {"design_package.created", "design_package.revised"}:
+            payload_value = own_design_package_payload(payload)
+        else:
+            payload_value = dict(payload)
         spec = validate_payload(event_type, payload_value)
+        if event_type in {"context_pack.created", "context_pack.revised"}:
+            if not self.context_pack_writes_enabled:
+                raise ContextPackRefusal(
+                    ContextPackRefusalCode.UNAVAILABLE,
+                    "Context Pack publishing is disabled by operator configuration.",
+                    "Enable Context Pack writes explicitly or continue with fresh context.",
+                )
+            # Keep the universal canonical write entry point safe as well as
+            # the narrow service.  Imported histories may lack this stamp,
+            # but no current writer can create another unstamped pack event.
+            self._require_ledger_semantics(event_type)
+        if event_type in {"design_package.created", "design_package.revised"}:
+            if not self.design_package_writes_enabled:
+                raise DesignPackageRefusal(
+                    DesignPackageRefusalCode.UNAVAILABLE,
+                    "Design Package publishing is disabled by operator configuration.",
+                    "Enable Design Package writes explicitly to publish or revise packages.",
+                )
         family = event_type.split(".", 1)[0]
         try:
             payload_schema = PAYLOAD_SCHEMAS[family]
@@ -963,6 +1035,19 @@ class CommonsManager(
                 else None
             )
             if reservation is None and repair_candidate is None:
+                if event_type in {"design_package.created", "design_package.revised"}:
+                    draft = DesignPackageDraft.from_payload(
+                        {
+                            "title": payload_value["title"],
+                            "screens": payload_value["screens"],
+                        }
+                    )
+                    # Re-run the complete exact binding and verified preview
+                    # check inside the same canonical lock as append.  The
+                    # narrow service checks early for UX; this is the universal
+                    # write-boundary guard and closes direct record_event use.
+                    self.design_packages._validate_bindings(draft, snapshot)
+                    self._require_ledger_semantics(event_type)
                 validate_transition(
                     snapshot,
                     event_type,

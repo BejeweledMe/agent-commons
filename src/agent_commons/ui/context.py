@@ -19,6 +19,7 @@ from typing import Any
 
 from agent_commons.config import CommonsPaths
 from agent_commons.errors import CommonsError, ConfigurationError
+from agent_commons.runtime import ContextBindingRequest
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.actions import (
     MODEL_NAME_REFUSED,
@@ -133,6 +134,7 @@ class UIContext(UIReads, UIActions):
         catalog_path: Path | None = None,
         profile_config: Path | None = None,
         runtime_factory: Any | None = None,
+        design_package_writes_enabled: bool = True,
     ) -> None:
         self.repo = repo
         self._state_root = state_root
@@ -141,6 +143,7 @@ class UIContext(UIReads, UIActions):
         self._catalog_path = catalog_path
         self._profile_config = profile_config
         self._runtime_factory = runtime_factory
+        self._design_package_writes_enabled = design_package_writes_enabled
         given = [
             item
             for item in (writer_session_id, session_provider, session_owner)
@@ -176,8 +179,28 @@ class UIContext(UIReads, UIActions):
         wall_time_seconds: int | None = None,
         idempotency_key: str | None = None,
         background: bool = True,
+        context_pack_id: str | None = None,
+        context_pack_revision: str | None = None,
     ) -> LaunchResult:
         """Delegate the existing launch call to the dedicated coordinator."""
+
+        if (context_pack_id is None) != (context_pack_revision is None):
+            raise ConfigurationError(
+                "a Context Pack selection requires both its id and exact revision"
+            )
+        try:
+            context = (
+                ContextBindingRequest.fresh()
+                if context_pack_id is None
+                else ContextBindingRequest.accumulated(
+                    context_pack_id=context_pack_id,
+                    context_pack_revision=context_pack_revision,
+                )
+            )
+        except ValueError as exc:
+            raise ConfigurationError(
+                "the Context Pack selection must use typed exact identifiers"
+            ) from exc
 
         return self._launch_coordinator.run(
             LaunchRequest(
@@ -186,6 +209,7 @@ class UIContext(UIReads, UIActions):
                 wall_time_seconds=wall_time_seconds,
                 idempotency_key=idempotency_key,
                 background=background,
+                context=context,
             )
         )
 
@@ -276,6 +300,7 @@ class UIContext(UIReads, UIActions):
             state_base=self._state_base,
             state_source=self._state_source,
             read_only=True,
+            design_package_writes_enabled=self._design_package_writes_enabled,
         )
 
     def writer(self) -> CommonsManager:
@@ -297,6 +322,7 @@ class UIContext(UIReads, UIActions):
             state_root=self._state_root,
             state_base=self._state_base,
             state_source=self._state_source,
+            design_package_writes_enabled=self._design_package_writes_enabled,
         )
 
     def invalidate(self) -> None:

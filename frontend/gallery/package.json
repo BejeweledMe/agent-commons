@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "test": "node --test tests/*.test.mjs",
+    "test:a11y": "node --test tests/gallery-a11y.test.mjs",
+    "test:contracts": "node --test tests/gallery-contract.test.mjs"
   },
   "dependencies": {
-    "@xyflow/react": "12.11.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

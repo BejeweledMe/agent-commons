@@ -12,8 +12,14 @@ from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfi
 from .artifact_projection import apply_artifact_record
 from .chronology import chronological_key
 from .collections import collection_for
+from .context_pack import context_pack_correction_changes
+from .context_pack_envelopes import ContextPackEnvelope, parse_context_pack_envelope
+from .context_pack_projection import apply_context_pack_record
 from .decision_projection import apply_decision_record
 from .delegation_projection import apply_delegation_record
+from .design_package_envelopes import DesignPackageEnvelope, parse_design_package_envelope
+from .design_package_projection import apply_design_package_record
+from .design_packages import design_package_correction_changes
 from .envelopes import DelegationEnvelope, TypedEventEnvelope, parse_event_envelope
 from .finding_projection import apply_finding_record
 from .handoff_projection import apply_handoff_record
@@ -99,19 +105,26 @@ _LIFETIME_CLOSING_TASK_STATES = frozenset({"accepted", "cancelled"})
 
 #: The semantics version THIS build replays with.  Bumped only when replay
 #: semantics change such that an older reader would misjudge a healthy
-#: history — v2 is the causal acceptance guard: a v1 reader replays a
-#: twice-accepted chain into a false integrity failure
-#: (finding.026GYJFW71EAK7QTWDA0E1T6PR, seen live on 17 Aug 2026 when an old
-#: checkout's CLI read a newer ledger red).  A ledger stamped above this
-#: number makes the projection say "update agent-commons" instead of
-#: reporting integrity findings it cannot judge.
-LEDGER_SEMANTICS_VERSION = 2
+#: history.  Version 2 introduced the causal acceptance guard.  Version 3
+#: introduced canonical Context Pack events and their provenance-preserving
+#: correction rule.  Version 4 introduces canonical Design Package events and
+#: exact artifact/task provenance.  An older reader does not know those event
+#: families.  A ledger
+#: stamped above the reader makes projection say "update agent-commons"
+#: instead of reporting integrity findings it cannot judge.
+LEDGER_SEMANTICS_VERSION = 4
 
 #: Event types whose replay depends on newer-than-v1 semantics, and the
 #: version each one requires.  Writers consult this to stamp the ledger
 #: exactly when a write starts depending on the newer behaviour — never
 #: earlier, so an untouched workspace stays readable by old code.
-SEMANTICS_SENSITIVE_EVENTS = {"task.accepted": 2}
+SEMANTICS_SENSITIVE_EVENTS = {
+    "task.accepted": 2,
+    "context_pack.created": 3,
+    "context_pack.revised": 3,
+    "design_package.created": 4,
+    "design_package.revised": 4,
+}
 
 
 def _record_issue(
@@ -539,6 +552,24 @@ def _apply_effective_event(
             {**event, "payload": typed_envelope.to_payload()},
             AGENT_LINK_STATES[event_type],
         )
+    elif event_type in {"context_pack.created", "context_pack.revised"}:
+        if not isinstance(typed_envelope, ContextPackEnvelope):
+            raise ValidationError(f"missing typed Context Pack envelope for {event_type}")
+        apply_context_pack_record(
+            snapshot.context_packs,
+            snapshot.context_pack_revisions,
+            typed_envelope,
+            event,
+        )
+    elif event_type in {"design_package.created", "design_package.revised"}:
+        if not isinstance(typed_envelope, DesignPackageEnvelope):
+            raise ValidationError(f"missing typed Design Package envelope for {event_type}")
+        apply_design_package_record(
+            snapshot.design_packages,
+            snapshot.design_package_revisions,
+            typed_envelope,
+            event,
+        )
     else:  # pragma: no cover - kept defensive if the registry is extended incorrectly
         raise ValidationError(f"unsupported projection event type: {event_type}")
 
@@ -940,6 +971,34 @@ def _project_events_once(
                     event_ids=correction_event_ids,
                 )
                 continue
+            pack_changes = context_pack_correction_changes(
+                event_type,
+                original_payload,
+                replacement_payload,
+            )
+            if pack_changes:
+                _record_issue(
+                    snapshot,
+                    "context_pack_correction_provenance_change",
+                    f"event {event_id} correction cannot change Context Pack provenance; "
+                    "publish context_pack.revised instead: " + ", ".join(pack_changes),
+                    event_ids=correction_event_ids,
+                )
+                continue
+            package_changes = design_package_correction_changes(
+                event_type,
+                original_payload,
+                replacement_payload,
+            )
+            if package_changes:
+                _record_issue(
+                    snapshot,
+                    "design_package_correction_provenance_change",
+                    f"event {event_id} correction cannot change Design Package provenance; "
+                    "publish design_package.revised instead: " + ", ".join(package_changes),
+                    event_ids=correction_event_ids,
+                )
+                continue
         if (
             spec
             and spec.entity_id_field
@@ -993,6 +1052,10 @@ def _project_events_once(
                 raise LifecycleConflictError("session actor identity changed during replay")
             validate_payload(event_type, payload)
             typed_envelope = parse_event_envelope(event_type, payload)
+            if typed_envelope is None:
+                typed_envelope = parse_context_pack_envelope(event_type, payload)
+            if typed_envelope is None:
+                typed_envelope = parse_design_package_envelope(event_type, payload)
             workspace_id = event.get("workspace_id")
             if snapshot.workspace_id is not None and workspace_id != snapshot.workspace_id:
                 raise LifecycleConflictError(
@@ -1013,6 +1076,14 @@ def _project_events_once(
                 relations=event.get("relations") or (),
             )
             _apply_effective_event(snapshot, event, typed_envelope=typed_envelope)
+            spec = EVENT_SPECS.get(event_type)
+            if spec is not None and spec.entity_kind and spec.entity_id_field:
+                entity_id = payload.get(spec.entity_id_field)
+                if isinstance(entity_id, str) and entity_id:
+                    effective_revision = str(event.get("_effective_correction_id") or event_id)
+                    snapshot.entity_revision_actor_session_ids[
+                        (spec.entity_kind, entity_id, effective_revision)
+                    ] = actor_session_id
             snapshot.session_identities.setdefault(actor_session_id, actor_identity)
             snapshot.effective_event_revisions[event_id] = str(
                 event.get("_effective_correction_id") or event_id

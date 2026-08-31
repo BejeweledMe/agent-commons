@@ -57,7 +57,8 @@ async def _run() -> None:
         "commons_show_delegation",
         "commons_repo_files",
         "commons_repo_read",
-        "commons_succeed_delegation",
+        "commons_list_tasks",
+        "commons_read_artifact",
     }
     if not required_tools.issubset(enabled_tools):
         raise RuntimeError("Codex enabled_tools contract is incomplete")
@@ -100,39 +101,69 @@ async def _run() -> None:
             if "return 42" not in read["content"]:
                 raise RuntimeError("scoped source read returned unexpected content")
 
-            if "commons_complete_review" in enabled_tools:
+            if "commons_finalize_review" in enabled_tools:
                 reviews = _value(
                     await session.call_tool("commons_list_reviews", {"state": "requested"})
                 )
                 if len(reviews) != 1:
                     raise RuntimeError("worker MCP did not expose exactly one review")
-                review = _value(
+                _value(
                     await session.call_tool(
                         "commons_show_review",
                         {"review_id": reviews[0]["id"]},
                     )
                 )
+                tasks = _value(await session.call_tool("commons_list_tasks", {"state": None}))
+                for artifact_ref in tasks[0].get("artifact_refs", []):
+                    registered = _value(
+                        await session.call_tool(
+                            "commons_read_artifact", {"artifact_id": artifact_ref["id"]}
+                        )
+                    )
+                    if "return 42" not in registered["content"]:
+                        raise RuntimeError("registered source read returned unexpected content")
                 _value(
                     await session.call_tool(
-                        "commons_complete_review",
+                        "commons_finalize_review",
                         {
-                            "review_id": review["id"],
-                            "expected_revision": review["revision"],
-                            "target_revision": review["target_revision"],
                             "verdict": "approved",
                             "summary": (
                                 "Hermetic Codex provider inspected the exact scoped source "
                                 "over real MCP stdio."
                             ),
-                            "idempotency_key": "hermetic-codex-review-complete",
-                            "evidence_refs": None,
                         },
                     )
                 )
-                result_refs = [f"review:{review['id']}"]
+                return
+            elif "commons_record_verification" in enabled_tools:
+                target = delegation["target_ref"]
+                tasks = _value(await session.call_tool("commons_list_tasks", {"state": None}))
+                target_task = next(item for item in tasks if item["id"] == target["id"])
+                evidence_refs = [
+                    f"{item['kind']}:{item['id']}" for item in target_task["artifact_refs"]
+                ]
+                if not evidence_refs:
+                    raise RuntimeError("verification canary has no immutable evidence")
+                verification = _value(
+                    await session.call_tool(
+                        "commons_record_verification",
+                        {
+                            "target_ref": f"{target['kind']}:{target['id']}",
+                            "target_revision": delegation["target_revision"],
+                            "claim": "The isolated source returns the expected integer.",
+                            "method": "Read the exact scoped source over real MCP stdio.",
+                            "outcome": "passed",
+                            "evidence_refs": evidence_refs,
+                            "idempotency_key": "hermetic-codex-verification-record",
+                        },
+                    )
+                )
+                result_refs = [f"verification:{verification['entity_ref']['id']}"]
             else:
                 target = delegation["target_ref"]
                 result_refs = [f"{target['kind']}:{target['id']}"]
+            if "commons_succeed_delegation" not in enabled_tools:
+                raise RuntimeError("Codex terminal tool contract is incomplete")
             _value(
                 await session.call_tool(
                     "commons_succeed_delegation",
@@ -148,7 +179,15 @@ async def _run() -> None:
 
 
 if __name__ == "__main__":
-    if "--version" in sys.argv:
+    if sys.argv[1:] == ["login", "status"]:
+        print("Logged in using hermetic fixture", file=sys.stderr)
+    elif sys.argv[1:] == ["login"]:
+        print("provider-owned browser login completed")
+    elif sys.argv[1:] == ["app-server", "--stdio"]:
+        # Match the real Codex initialization contract: the app server starts
+        # without model work and exits cleanly when its stdin is already EOF.
+        pass
+    elif "--version" in sys.argv:
         print("codex-cli 0.0.0")
     elif "--help" in sys.argv:
         print(_EXEC_HELP_FLAGS if "exec" in sys.argv else _ROOT_HELP_FLAGS)

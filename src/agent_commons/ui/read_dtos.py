@@ -46,6 +46,124 @@ SetupGuidanceNextActionKey: TypeAlias = Literal[
 ]
 SetupGuidanceLocationLabel: TypeAlias = Literal["workspace_configuration"]
 
+ProviderAuthStateKey: TypeAlias = Literal[
+    "ready",
+    "authentication_required",
+    "authenticating",
+    "timed_out",
+    "cancelled",
+    "failed",
+    "unsupported",
+    "credential_store_unavailable",
+]
+ProviderAuthOperationKey: TypeAlias = Literal["status", "login"]
+ProviderAuthActionKey: TypeAlias = Literal[
+    "authenticate",
+    "cancel_authentication",
+    "check_again",
+    "continue_launch",
+]
+ProviderAuthFreshness: TypeAlias = Literal["fresh", "stale"]
+
+
+class LaunchContextPackPayload(TypedDict):
+    """One exact current Context Pack revision selectable by Work."""
+
+    context_pack_id: str
+    revision: str
+    summary: str
+    fact_count: int
+    open_question_count: int
+
+
+class LaunchContextPackOptionsStatusPayload(TypedDict):
+    """Freshness and fail-closed completeness state for the bounded option set."""
+
+    freshness: Literal["current"]
+    truncated: bool
+    refusal: Literal["context_pack_options_truncated"] | None
+
+
+@dataclass(frozen=True, slots=True)
+class LaunchContextPackDTO:
+    """Bounded, content-minimal Context Pack identity for a launch form.
+
+    Facts, sources, decisions, compiled text, transcripts, and provider data
+    deliberately stay behind the runtime boundary.  The summary is already
+    bounded by the canonical Context Pack schema and is copied into a plain
+    string here so projection containers never cross into the browser DTO.
+    """
+
+    context_pack_id: str
+    revision: str
+    summary: str
+    fact_count: int
+    open_question_count: int
+
+    def to_wire(self) -> LaunchContextPackPayload:
+        return {
+            "context_pack_id": self.context_pack_id,
+            "revision": self.revision,
+            "summary": self.summary,
+            "fact_count": self.fact_count,
+            "open_question_count": self.open_question_count,
+        }
+
+
+class ProviderAuthPayload(TypedDict):
+    """The complete secret-free provider availability contract for Work."""
+
+    profile_id: str
+    provider: Literal["claude", "codex"]
+    operation: ProviderAuthOperationKey
+    state: ProviderAuthStateKey
+    supported: bool
+    blocks_launch: bool
+    checked_at: str
+    freshness: ProviderAuthFreshness
+    fresh_for_seconds: int
+    action_ids: list[ProviderAuthActionKey]
+    post_start_recovery: Literal["new_run_only"]
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderAuthDTO:
+    """Closed, maintainer-authored auth state safe for browser persistence.
+
+    This record intentionally has no provider diagnostic text.  The Work app
+    renders every state and action from its paired EN/RU table, so raw process
+    output, OAuth material, account identifiers, and host paths cannot cross
+    this typed boundary by accident.
+    """
+
+    profile_id: str
+    provider: Literal["claude", "codex"]
+    operation: ProviderAuthOperationKey
+    state: ProviderAuthStateKey
+    supported: bool
+    blocks_launch: bool
+    checked_at: str
+    freshness: ProviderAuthFreshness
+    fresh_for_seconds: int
+    action_ids: tuple[ProviderAuthActionKey, ...]
+
+    def to_wire(self) -> ProviderAuthPayload:
+        return {
+            "profile_id": self.profile_id,
+            "provider": self.provider,
+            "operation": self.operation,
+            "state": self.state,
+            "supported": self.supported,
+            "blocks_launch": self.blocks_launch,
+            "checked_at": self.checked_at,
+            "freshness": self.freshness,
+            "fresh_for_seconds": self.fresh_for_seconds,
+            "action_ids": list(self.action_ids),
+            # A provider process that already started is never resumed by this
+            # surface.  Recovery is a fresh, separately bounded run.
+            "post_start_recovery": "new_run_only",
+        }
+
 
 class SetupGuidancePayload(TypedDict):
     """The complete, redacted wire contract for Work setup guidance."""

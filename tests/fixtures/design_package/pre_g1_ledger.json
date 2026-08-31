@@ -1,0 +1,71 @@
+{
+  "schema": "agent-commons.pre-g1-ledger-golden.v1",
+  "expected_semantics_required": 1,
+  "expected_snapshot_sha256": "73245415a8c1c5f17227fc0e4263467b02edec3c0e56e79f655ec1cfd95b66df",
+  "events": [
+    {
+      "event_id": "evt.00000000000000000000000001",
+      "workspace_id": "workspace.00000000000000000000000001",
+      "event_type": "objective.created",
+      "recorded_at": "2026-08-01T10:00:00Z",
+      "actor": {"session_id": "session.golden", "role_id": "operator"},
+      "payload": {
+        "objective_id": "objective.00000000000000000000000001",
+        "title": "Ship the sanitized fixture",
+        "description": "Exercise representative pre-Context-Pack projection bytes.",
+        "acceptance_criteria": ["The canonical replay remains deterministic."]
+      },
+      "subject_refs": [{"kind": "objective", "id": "objective.00000000000000000000000001"}],
+      "relations": []
+    },
+    {
+      "event_id": "evt.00000000000000000000000002",
+      "workspace_id": "workspace.00000000000000000000000001",
+      "event_type": "task.created",
+      "recorded_at": "2026-08-01T10:01:00Z",
+      "actor": {"session_id": "session.golden", "role_id": "operator"},
+      "payload": {
+        "task_id": "task.00000000000000000000000001",
+        "title": "Verify the prior ledger",
+        "description": "Replay objective and task lifecycle state.",
+        "acceptance_criteria": ["The task reaches completed state."],
+        "priority": "normal"
+      },
+      "subject_refs": [{"kind": "task", "id": "task.00000000000000000000000001"}],
+      "relations": [
+        {
+          "subject": {"kind": "task", "id": "task.00000000000000000000000001"},
+          "predicate": "supports",
+          "object": {"kind": "objective", "id": "objective.00000000000000000000000001"}
+        }
+      ]
+    },
+    {
+      "event_id": "evt.00000000000000000000000003",
+      "workspace_id": "workspace.00000000000000000000000001",
+      "event_type": "task.started",
+      "recorded_at": "2026-08-01T10:02:00Z",
+      "actor": {"session_id": "session.golden", "role_id": "operator"},
+      "payload": {
+        "task_id": "task.00000000000000000000000001",
+        "expected_revision": "evt.00000000000000000000000002"
+      },
+      "subject_refs": [{"kind": "task", "id": "task.00000000000000000000000001"}],
+      "relations": []
+    },
+    {
+      "event_id": "evt.00000000000000000000000004",
+      "workspace_id": "workspace.00000000000000000000000001",
+      "event_type": "task.completed",
+      "recorded_at": "2026-08-01T10:03:00Z",
+      "actor": {"session_id": "session.golden", "role_id": "operator"},
+      "payload": {
+        "task_id": "task.00000000000000000000000001",
+        "expected_revision": "evt.00000000000000000000000003",
+        "summary": "The representative pre-C1 lifecycle completed."
+      },
+      "subject_refs": [{"kind": "task", "id": "task.00000000000000000000000001"}],
+      "relations": []
+    }
+  ]
+}

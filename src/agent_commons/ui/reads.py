@@ -25,12 +25,20 @@ from agent_commons.runtime.model import (
     profile_tool_summary,
     validate_model_name,
 )
+from agent_commons.runtime.provider_qualification import ProviderQualificationStore
+from agent_commons.services.delegation_runtime import load_runtime_configuration
+from agent_commons.services.provider_availability import ProviderAvailabilityService
 from agent_commons.services.roles import role_model
 from agent_commons.ui.actions import SETUP_SUPPORT_BINARY_UNRESOLVED
+from agent_commons.ui.context_pack_dtos import (
+    context_pack_catalog_payload,
+    context_pack_detail_payload,
+)
 from agent_commons.ui.read_dtos import (
     AttentionItem,
     AttentionResponse,
     ConfigBrokenAttention,
+    LaunchContextPackDTO,
     ProposalAttention,
     RunBlockedAttention,
     SetupGuidanceBlockerCode,
@@ -74,6 +82,46 @@ def _attention_json(value: object) -> JsonValue:
 
 class UIReads:
     """Read-only UI models, layered over ``UIContext``'s shared state."""
+
+    def provider_auth_status(self, *, profile_id: str) -> dict[str, Any]:
+        """Return one short-lived, secret-free provider availability snapshot."""
+
+        return self._launch_coordinator.provider_auth_status(profile_id)
+
+    def provider_availability(self) -> list[dict[str, object]]:
+        """Join closed capabilities and current operational provider observations."""
+
+        config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        manager = self.manager()
+        auth_by_profile: dict[str, Mapping[str, Any]] = {}
+        for profile_id in config.profiles.profile_ids:
+            try:
+                auth_by_profile[profile_id.value] = self._launch_coordinator.provider_auth_status(
+                    profile_id.value
+                )
+            except Exception:  # noqa: BLE001 - availability collapses provider detail
+                continue
+        return ProviderAvailabilityService(
+            config.profiles,
+            workspace_root=self.repo,
+            qualifications=ProviderQualificationStore(
+                manager.paths.state_root,
+                read_only=True,
+            ),
+            limits=config.limits,
+        ).list(auth_by_profile=auth_by_profile)
+
+    def work_context_packs(self) -> dict[str, Any]:
+        """Return current Context Pack revisions through Work's narrow DTO."""
+
+        records = self.manager().context_packs.list()
+        return context_pack_catalog_payload(records)
+
+    def work_context_pack(self, *, context_pack_id: str) -> dict[str, Any]:
+        """Return the current exact revision for editing in Work."""
+
+        record = self.manager().context_packs.get(context_pack_id)
+        return context_pack_detail_payload(record)
 
     def setup_status(self) -> dict[str, Any]:
         """Return first-run state and only the temporary diagnostics it may expose."""
@@ -513,11 +561,16 @@ class UIReads:
         return [bounded_copy(item) for item in found]
 
     def launch_options(self) -> dict[str, Any]:
-        """Active roles and open tasks the panel may offer for a run."""
+        """Active roles, open tasks, and exact current packs offered for a run."""
 
         snapshot = self.manager().snapshot()
         roles = [
-            {"id": rid, "name": rec.get("name"), "profile_id": rec.get("profile_id")}
+            {
+                "id": rid,
+                "name": rec.get("name"),
+                "profile_id": rec.get("profile_id"),
+                "context_mode": rec.get("context_mode", "fresh"),
+            }
             for rid, rec in sorted(snapshot.agents.items())
             if rec.get("state") == "active" and not rec.get("template")
         ]
@@ -527,7 +580,34 @@ class UIReads:
             for tid, rec in sorted(snapshot.tasks.items())
             if rec.get("state") in open_states
         ]
-        return {"launch_enabled": self.launch_enabled, "roles": roles, "tasks": tasks}
+        context_pack_records = [
+            record
+            for _, record in sorted(snapshot.context_packs.items())
+            if record.state == "published"
+        ]
+        max_context_pack_options = 256
+        context_packs = [
+            LaunchContextPackDTO(
+                context_pack_id=record.context_pack_id,
+                revision=record.revision,
+                summary=str(record.draft.summary),
+                fact_count=len(record.draft.facts),
+                open_question_count=len(record.draft.open_questions),
+            ).to_wire()
+            for record in context_pack_records[:max_context_pack_options]
+        ]
+        context_packs_truncated = len(context_pack_records) > max_context_pack_options
+        return {
+            "launch_enabled": self.launch_enabled,
+            "roles": roles,
+            "tasks": tasks,
+            "context_packs": context_packs,
+            "context_pack_options_status": {
+                "freshness": "current",
+                "truncated": context_packs_truncated,
+                "refusal": ("context_pack_options_truncated" if context_packs_truncated else None),
+            },
+        }
 
     def entity(self, kind: str, entity_id: str) -> Mapping[str, Any] | None:
         """Return the existing bounded entity shape for one supported kind."""

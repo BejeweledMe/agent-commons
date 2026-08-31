@@ -19,6 +19,8 @@ REVIEW_REVISION = "evt.00000000000000000000000002"
 AGENT_ID = "agent.00000000000000000000000001"
 ACTOR_AGENT_ID = "agent.00000000000000000000000002"
 DELEGATION_ID = "delegation.00000000000000000000000001"
+CONTEXT_PACK_ID = "context_pack.00000000000000000000000001"
+ARTIFACT_ID = "artifact.00000000000000000000000001"
 
 
 def _human_created_role_payload() -> dict[str, object]:
@@ -45,6 +47,89 @@ def test_thread_reply_spec_requires_cas_revision() -> None:
                 "message_id": MESSAGE_ID,
                 "body": "reply",
             },
+        )
+
+
+def test_registered_created_family_cannot_bypass_duplicate_identity_guard() -> None:
+    snapshot = ProjectSnapshot(
+        context_packs={
+            CONTEXT_PACK_ID: {
+                "id": CONTEXT_PACK_ID,
+                "state": "published",
+                "revision": EVENT_ID,
+            }
+        }
+    )
+    payload = {
+        "context_pack_id": CONTEXT_PACK_ID,
+        "summary": "A second creation must not enter the ledger.",
+        "facts": [],
+        "decision_refs": [],
+        "open_questions": [],
+    }
+
+    with pytest.raises(LifecycleConflictError, match="context_pack already exists"):
+        validate_transition(
+            snapshot,
+            "context_pack.created",
+            payload,
+            actor_session_id="session.builder",
+        )
+
+
+def test_context_pack_creation_requires_exact_current_nonrestricted_sources() -> None:
+    source_revision = "evt.00000000000000000000000002"
+    snapshot = ProjectSnapshot(
+        artifacts={
+            ARTIFACT_ID: {
+                "id": ARTIFACT_ID,
+                "state": "registered",
+                "revision": source_revision,
+                "effective_revision": source_revision,
+                "classification": "internal",
+            }
+        }
+    )
+    payload = {
+        "context_pack_id": CONTEXT_PACK_ID,
+        "summary": "Exact sources only.",
+        "facts": [
+            {
+                "statement": "The artifact is bound.",
+                "source_refs": [
+                    {
+                        "ref": {"kind": "artifact", "id": ARTIFACT_ID},
+                        "revision": EVENT_ID,
+                    }
+                ],
+            }
+        ],
+        "decision_refs": [],
+        "open_questions": [],
+    }
+
+    with pytest.raises(LifecycleConflictError, match="source revision is stale"):
+        validate_transition(
+            snapshot,
+            "context_pack.created",
+            payload,
+            actor_session_id="session.builder",
+        )
+
+    payload["facts"][0]["source_refs"][0]["revision"] = source_revision  # type: ignore[index]
+    validate_transition(
+        snapshot,
+        "context_pack.created",
+        payload,
+        actor_session_id="session.builder",
+    )
+    snapshot.artifacts[ARTIFACT_ID]["classification"] = "restricted"  # type: ignore[index]
+    with pytest.raises(LifecycleConflictError, match="restricted artifacts"):
+        validate_transition(
+            snapshot,
+            "context_pack.created",
+            payload,
+            actor_session_id="session.builder",
         )
 
 

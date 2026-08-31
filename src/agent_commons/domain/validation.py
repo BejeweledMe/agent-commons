@@ -6,6 +6,8 @@ from typing import Any
 
 from agent_commons.core.ids import is_typed_id
 from agent_commons.core.refs import normalize_ref
+from agent_commons.domain.context_pack import validate_context_pack_payload
+from agent_commons.domain.design_packages import validate_design_package_payload
 from agent_commons.domain.roles import RolePayloadValidators, validate_role_payload
 from agent_commons.errors import ValidationError
 
@@ -26,6 +28,37 @@ EVENT_SPECS: dict[str, EventSpec] = {
         "workspace",
         "workspace_id",
         "policy",
+    ),
+    "context_pack.created": EventSpec(
+        ("context_pack_id", "summary", "facts", "decision_refs", "open_questions"),
+        "context_pack",
+        "context_pack_id",
+        "policy",
+    ),
+    "context_pack.revised": EventSpec(
+        (
+            "context_pack_id",
+            "expected_revision",
+            "summary",
+            "facts",
+            "decision_refs",
+            "open_questions",
+        ),
+        "context_pack",
+        "context_pack_id",
+        "policy",
+    ),
+    "design_package.created": EventSpec(
+        ("design_package_id", "title", "screens"),
+        "design_package",
+        "design_package_id",
+        "evidence",
+    ),
+    "design_package.revised": EventSpec(
+        ("design_package_id", "expected_revision", "title", "screens"),
+        "design_package",
+        "design_package_id",
+        "evidence",
     ),
     "objective.created": EventSpec(
         ("objective_id", "title", "description", "acceptance_criteria"),
@@ -301,6 +334,7 @@ _STRING_FIELDS = {
     "link_id",
     "profile_id",
     "context_mode",
+    "context_pack_id",
     "origin",
     "approval",
     "retired_by",
@@ -597,4 +631,6 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
                 validate_string_list=_validate_string_list,
             ),
         )
+    validate_context_pack_payload(event_type, payload)
+    validate_design_package_payload(event_type, payload)
     return spec

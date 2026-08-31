@@ -4,9 +4,21 @@ import { createRoot } from "react-dom/client";
 import { ApiProblem, WorkApi } from "./api";
 import { AppHeader } from "./components/AppHeader";
 import { FailurePanel } from "./components/FailurePanel";
+import { ContextPacksSection } from "./components/ContextPacksSection";
 import { StarterPacksSection } from "./components/StarterPacksSection";
+import { TrackerSection } from "./components/TrackerSection";
 import { WorkflowCard } from "./components/WorkflowCard";
-import type { Failure, SetupGuidanceNextActionKey, WorkspaceData } from "./contracts";
+import type {
+  ContextPackOption,
+  Failure,
+  ProviderAvailabilityRefusalCode,
+  ProviderCapabilityRefusalCode,
+  ProviderAuthAction,
+  ProviderAuthState,
+  ProviderAuthStatus,
+  SetupGuidanceNextActionKey,
+  WorkspaceData
+} from "./contracts";
 import { type Locale, type MessageKey, translate } from "./i18n";
 import "./styles.css";
 
@@ -28,12 +40,16 @@ type TaskDraft = {
   criteria: string;
 };
 
-type RunDraft = { agentId: string; taskId: string };
+type RunDraft = { agentId: string; taskId: string; contextPackKey: string };
 type FormErrors = ReadonlySet<string>;
 
 const emptyRole: RoleDraft = { name: "", profileId: "", rationale: "", contextMode: "fresh" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "" };
-const emptyRun: RunDraft = { agentId: "", taskId: "" };
+const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "" };
+
+function contextPackKey(option: ContextPackOption): string {
+  return `${option.contextPackId}@${option.revision}`;
+}
 
 const guidanceActionMessage: Readonly<Record<SetupGuidanceNextActionKey, MessageKey>> = {
   choose_git_repository: "guidance_choose_repository",
@@ -43,6 +59,39 @@ const guidanceActionMessage: Readonly<Record<SetupGuidanceNextActionKey, Message
   configure_runtime: "guidance_configure_runtime",
   repair_workspace_configuration: "guidance_repair_configuration",
   setup_ready: "guidance_ready"
+};
+
+const providerAuthStateMessage: Readonly<Record<ProviderAuthState, MessageKey>> = {
+  ready: "provider_auth_ready",
+  authentication_required: "provider_auth_required",
+  authenticating: "provider_auth_authenticating",
+  timed_out: "provider_auth_timed_out",
+  cancelled: "provider_auth_cancelled",
+  failed: "provider_auth_failed",
+  unsupported: "provider_auth_unsupported",
+  credential_store_unavailable: "provider_auth_credential_store_unavailable"
+};
+
+const providerAuthActionMessage: Readonly<Record<ProviderAuthAction, MessageKey>> = {
+  authenticate: "provider_auth_authenticate",
+  cancel_authentication: "provider_auth_cancel",
+  check_again: "provider_auth_check_again",
+  continue_launch: "provider_auth_continue_launch"
+};
+
+const availabilityRefusalMessage: Readonly<Record<ProviderAvailabilityRefusalCode, MessageKey>> = {
+  provider_installation_unavailable: "provider_availability_installation",
+  provider_initialization_failed: "provider_availability_initialization",
+  provider_qualification_required: "provider_availability_qualification_required",
+  provider_qualification_failed: "provider_availability_qualification_failed",
+  provider_authentication_required: "provider_availability_authentication_required",
+  provider_authentication_unconfirmed: "provider_availability_authentication_unconfirmed"
+};
+
+const capabilityRefusalMessage: Readonly<Record<ProviderCapabilityRefusalCode, MessageKey>> = {
+  provider_resume_unavailable: "provider_capability_resume_unavailable",
+  provider_skill_projection_unavailable: "provider_capability_skills_unavailable",
+  provider_monetary_budget_unavailable: "provider_capability_monetary_unavailable"
 };
 
 function failureFrom(error: unknown, text: (key: MessageKey) => string): Failure {
@@ -126,8 +175,14 @@ function WorkApp(): ReactElement {
   const [runErrors, setRunErrors] = useState<FormErrors>(new Set());
   const [showFullProjectPath, setShowFullProjectPath] = useState(false);
   const [configurationConfirmationOpen, setConfigurationConfirmationOpen] = useState(false);
+  const [pendingLaunchKey, setPendingLaunchKey] = useState<string | null>(null);
   const apiRef = useRef(new WorkApi());
+  const authPanelRef = useRef<HTMLElement | null>(null);
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   async function load(signal: AbortSignal): Promise<void> {
     setState({ kind: "checking" });
@@ -148,6 +203,53 @@ function WorkApp(): ReactElement {
     void load(controller.signal);
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (state.kind !== "ready") {
+      return;
+    }
+    const activeProfiles = state.data.providerAuth
+      .filter((status) => status.state === "authenticating")
+      .map((status) => status.profileId);
+    if (activeProfiles.length === 0) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void Promise.allSettled(
+        activeProfiles.map((profileId) => apiRef.current.providerAuthStatus(profileId, controller.signal))
+      ).then((results) => {
+        setState((current) => {
+          if (current.kind !== "ready") {
+            return current;
+          }
+          const byProfile = new Map(current.data.providerAuth.map((status) => [status.profileId, status]));
+          const errors = new Set(current.data.providerAuthErrors);
+          results.forEach((result, index) => {
+            const profileId = activeProfiles[index];
+            if (result.status === "fulfilled") {
+              byProfile.set(profileId, result.value);
+              errors.delete(profileId);
+            } else {
+              errors.add(profileId);
+            }
+          });
+          return {
+            ...current,
+            data: {
+              ...current.data,
+              providerAuth: [...byProfile.values()],
+              providerAuthErrors: [...errors]
+            }
+          };
+        });
+      });
+    }, 1500);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [state]);
 
   async function refresh(): Promise<void> {
     const controller = new AbortController();
@@ -227,14 +329,184 @@ function WorkApp(): ReactElement {
     });
   }
 
+  function focusAuthRecovery(): void {
+    window.setTimeout(() => authPanelRef.current?.focus(), 0);
+  }
+
+  function replaceProviderStatus(status: ProviderAuthStatus): void {
+    setState((current) => {
+      if (current.kind !== "ready") {
+        return current;
+      }
+      const remaining = current.data.providerAuth.filter(
+        (candidate) => candidate.profileId !== status.profileId
+      );
+      const providerAvailability = current.data.providerAvailability.map((availability) => {
+        if (availability.profileId !== status.profileId) {
+          return availability;
+        }
+        const oldRefusal = availability.refusal;
+        const nonAuthRefusal = oldRefusal !== null
+          && !["provider_authentication_required", "provider_authentication_unconfirmed"].includes(oldRefusal.code)
+          ? oldRefusal
+          : null;
+        const authRefusal = status.blocksLaunch
+          ? {
+              code: status.state === "authentication_required"
+                ? "provider_authentication_required" as const
+                : "provider_authentication_unconfirmed" as const,
+              remediation: status.state === "authentication_required"
+                ? ["authenticate_provider"]
+                : ["check_provider_authentication"]
+            }
+          : null;
+        const refusal = nonAuthRefusal ?? authRefusal;
+        return {
+          ...availability,
+          authentication: { state: status.state, freshness: status.freshness },
+          refusal,
+          launchable: refusal === null
+            && availability.installationState === "installed"
+            && availability.initializationState === "ready"
+            && availability.qualification.state === "qualified"
+            && (status.state === "ready" || status.state === "unsupported")
+        };
+      });
+      return {
+        ...current,
+        data: {
+          ...current.data,
+          providerAuth: [...remaining, status],
+          providerAvailability,
+          providerAuthErrors: current.data.providerAuthErrors.filter(
+            (profileId) => profileId !== status.profileId
+          )
+        }
+      };
+    });
+  }
+
+  async function launchSelectedRun(): Promise<void> {
+    if (state.kind !== "ready") {
+      return;
+    }
+    const selectedRole = state.data.launch?.roles.find((option) => option.id === run.agentId);
+    const selectedPack = state.data.launch?.contextPacks.find(
+      (option) => contextPackKey(option) === run.contextPackKey
+    );
+    const profileId = selectedRole?.profileId;
+    const authStatus = state.data.providerAuth.find((status) => status.profileId === profileId);
+    const key = pendingLaunchKey ?? crypto.randomUUID();
+    if (
+      profileId !== undefined
+      && (authStatus?.blocksLaunch === true || state.data.providerAuthErrors.includes(profileId))
+    ) {
+      setPendingLaunchKey(key);
+      focusAuthRecovery();
+      return;
+    }
+    setActiveAction("start-run");
+    const controller = new AbortController();
+    try {
+      await apiRef.current.startRun(
+        {
+          agentId: run.agentId,
+          taskId: run.taskId,
+          contextPackId: selectedPack?.contextPackId ?? null,
+          contextPackRevision: selectedPack?.revision ?? null
+        },
+        key,
+        controller.signal
+      );
+      const data = await apiRef.current.load(controller.signal);
+      setPendingLaunchKey(null);
+      setState({ kind: "ready", data, notice: "run_started" });
+    } catch (error: unknown) {
+      const problem = error instanceof ApiProblem ? error : null;
+      if (
+        profileId !== undefined
+        && ["provider_auth_required", "provider_auth_unknown", "credential_store_unavailable"].includes(
+          problem?.apiError?.code ?? ""
+        )
+      ) {
+        setPendingLaunchKey(key);
+        try {
+          replaceProviderStatus(
+            await apiRef.current.providerAuthStatus(profileId, controller.signal)
+          );
+        } catch {
+          // The inline unavailable state remains actionable through Check again.
+        }
+        focusAuthRecovery();
+      } else if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setState({ kind: "failure", failure: failureFrom(error, text) });
+      }
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function runProviderAuthAction(
+    profileId: string,
+    action: "login" | "cancel" | "check"
+  ): Promise<void> {
+    setActiveAction(`provider-auth-${action}`);
+    const controller = new AbortController();
+    try {
+      const status = await apiRef.current.providerAuthAction(profileId, action, controller.signal);
+      replaceProviderStatus(status);
+      focusAuthRecovery();
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setState((current) => {
+          if (current.kind !== "ready") {
+            return { kind: "failure", failure: failureFrom(error, text) };
+          }
+          return {
+            ...current,
+            data: {
+              ...current.data,
+              providerAuthErrors: [...new Set([...current.data.providerAuthErrors, profileId])]
+            }
+          };
+        });
+        focusAuthRecovery();
+      }
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
   function submitRun(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const errors = [...(run.agentId ? [] : ["agent"]), ...(run.taskId ? [] : ["task"])];
+    const selectedRole = state.kind === "ready"
+      ? state.data.launch?.roles.find((option) => option.id === run.agentId)
+      : undefined;
+    const selectedPack = state.kind === "ready"
+      ? state.data.launch?.contextPacks.find(
+        (option) => contextPackKey(option) === run.contextPackKey
+      )
+      : undefined;
+    const selectedAvailability = state.kind === "ready"
+      ? state.data.providerAvailability.find(
+        (availability) => availability.profileId === selectedRole?.profileId
+      )
+      : undefined;
+    const errors = [
+      ...(run.agentId ? [] : ["agent"]),
+      ...(run.taskId ? [] : ["task"]),
+      ...(selectedRole?.contextMode === "accumulated" && selectedPack === undefined
+        ? ["context-pack"]
+        : []),
+      ...(selectedRole !== undefined && selectedAvailability?.launchable !== true
+        ? ["provider-availability"]
+        : [])
+    ];
     setRunErrors(new Set(errors));
     if (errors.length > 0) {
       return;
     }
-    void perform("start-run", (signal) => apiRef.current.startRun(run, signal), "run_started");
+    void launchSelectedRun();
   }
 
   if (state.kind === "checking") {
@@ -262,10 +534,28 @@ function WorkApp(): ReactElement {
   const profileOptions = catalog?.profiles ?? [];
   const roleOptions = launch?.roles ?? [];
   const taskOptions = launch?.tasks ?? [];
+  const contextPackOptions = launch?.contextPacks ?? [];
   const environmentReady = configured && Boolean(launch?.launchEnabled);
   const guidance = data.guidance?.blockerCode === null ? null : data.guidance;
   const canConfigureRuntime = data.setup.state === "setup_unconfigured"
     && guidance?.nextActionKey === "configure_runtime";
+  const selectedRole = roleOptions.find((option) => option.id === run.agentId);
+  const selectedProfileId = selectedRole?.profileId;
+  const selectedAvailability = data.providerAvailability.find(
+    (availability) => availability.profileId === selectedProfileId
+  );
+  const selectedAuth = data.providerAuth.find(
+    (status) => status.profileId === selectedProfileId
+  );
+  const visibleAuth = selectedProfileId === undefined
+    ? data.providerAuth.find((status) => status.blocksLaunch) ?? null
+    : selectedAuth ?? null;
+  const authStatusUnavailable = selectedProfileId !== undefined
+    && data.providerAuthErrors.includes(selectedProfileId);
+  const authActionProfileId = selectedProfileId ?? visibleAuth?.profileId;
+  const showAuthRecovery = visibleAuth?.blocksLaunch === true
+    || (pendingLaunchKey !== null && visibleAuth?.state === "ready")
+    || authStatusUnavailable;
 
   function confirmRuntimeConfiguration(): void {
     setConfigurationConfirmationOpen(false);
@@ -431,6 +721,102 @@ function WorkApp(): ReactElement {
           </WorkflowCard>
           <WorkflowCard ready={false} title={text("step_run")}>
             <p className="small-copy">{text("run_help")}</p>
+            <section aria-labelledby="provider-availability-title" className="provider-availability" role="status">
+              <h3 id="provider-availability-title">{text("provider_availability_title")}</h3>
+              {data.providerAvailability.length === 0 ? (
+                <p className="field-error">{text("provider_availability_unavailable")}</p>
+              ) : data.providerAvailability.map((availability) => (
+                <article className="provider-availability-item" key={availability.profileId}>
+                  <p>
+                    <strong>{availability.profileId}</strong> — {availability.provider}
+                    {availability.model === null ? "" : ` / ${availability.model}`}
+                  </p>
+                  <p className="small-copy">
+                    {text("provider_availability_install_label")}: {availability.installationState}. {text("provider_availability_init_label")}: {availability.initializationState}. {text("provider_availability_qualification_label")}: {availability.qualification.state}. {text("provider_availability_auth_label")}: {availability.authentication.state}.
+                  </p>
+                  <p className={availability.launchable ? "small-copy" : "field-error"}>
+                    {availability.launchable
+                      ? text("provider_availability_launchable")
+                      : text(availabilityRefusalMessage[availability.refusal?.code ?? "provider_authentication_unconfirmed"])}
+                  </p>
+                  <ul className="small-copy">
+                    {availability.capabilityRefusals.map((refusal) => (
+                      <li key={refusal.code}>{text(capabilityRefusalMessage[refusal.code])}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </section>
+            {showAuthRecovery ? (
+              <section
+                aria-labelledby="provider-auth-title"
+                aria-live="assertive"
+                className="provider-auth-critical"
+                ref={authPanelRef}
+                role={visibleAuth?.blocksLaunch === true || authStatusUnavailable ? "alert" : "status"}
+                tabIndex={-1}
+              >
+                <p className="provider-auth-severity">{text("provider_auth_critical")}</p>
+                <h3 id="provider-auth-title">{text("provider_auth_title")}</h3>
+                <p>
+                  {visibleAuth === null
+                    ? text("provider_auth_status_unavailable")
+                    : text(providerAuthStateMessage[visibleAuth.state])}
+                </p>
+                {visibleAuth !== null ? (
+                  <p className="small-copy">
+                    {text("provider_auth_profile")} <strong>{visibleAuth.profileId}</strong>. {text("provider_auth_checked_at")} {visibleAuth.checkedAt}
+                  </p>
+                ) : null}
+                <p className="small-copy">{text("provider_auth_secret_boundary")}</p>
+                {visibleAuth?.state === "credential_store_unavailable" ? (
+                  <p className="small-copy">{text("provider_auth_repair_host_help")}</p>
+                ) : null}
+                <div className="button-row">
+                  {visibleAuth?.actionIds.includes("authenticate") ? (
+                    <button
+                      className="button button-primary"
+                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      onClick={() => void runProviderAuthAction(visibleAuth.profileId, "login")}
+                      type="button"
+                    >
+                      {text(providerAuthActionMessage.authenticate)}
+                    </button>
+                  ) : null}
+                  {visibleAuth?.actionIds.includes("cancel_authentication") ? (
+                    <button
+                      className="button button-secondary button-inline"
+                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      onClick={() => void runProviderAuthAction(visibleAuth.profileId, "cancel")}
+                      type="button"
+                    >
+                      {text(providerAuthActionMessage.cancel_authentication)}
+                    </button>
+                  ) : null}
+                  {(visibleAuth?.actionIds.includes("check_again") || authStatusUnavailable) && authActionProfileId !== undefined ? (
+                    <button
+                      className="button button-secondary button-inline"
+                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      onClick={() => void runProviderAuthAction(authActionProfileId, "check")}
+                      type="button"
+                    >
+                      {text(providerAuthActionMessage.check_again)}
+                    </button>
+                  ) : null}
+                  {pendingLaunchKey !== null && visibleAuth?.state === "ready" ? (
+                    <button
+                      className="button button-primary"
+                      disabled={activeAction !== null}
+                      onClick={() => void launchSelectedRun()}
+                      type="button"
+                    >
+                      {text(providerAuthActionMessage.continue_launch)}
+                    </button>
+                  ) : null}
+                </div>
+                <p className="small-copy">{text("provider_auth_new_run_only")}</p>
+              </section>
+            ) : null}
             {notice === "run_started" ? (
               <div className="notice" role="status">
                 <p>{text("run_started_help")}</p>
@@ -438,9 +824,9 @@ function WorkApp(): ReactElement {
               </div>
             ) : null}
             <form noValidate onSubmit={submitRun}>
-              <fieldset disabled={!environmentReady || activeAction !== null}>
+              <fieldset disabled={!environmentReady || activeAction !== null || (selectedRole !== undefined && selectedAvailability?.launchable !== true)}>
                 <label htmlFor="run-role">{text("select_role")}</label>
-                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => setRun({ ...run, agentId: event.target.value })} value={run.agentId}>
+                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => setRun({ ...run, agentId: event.target.value, contextPackKey: "" })} value={run.agentId}>
                   <option value="">{text("select_role")}</option>
                   {roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
                 </select>
@@ -453,11 +839,48 @@ function WorkApp(): ReactElement {
                 </select>
                 {validation([...runErrors], "task") ? <p className="field-error">{text("form_error_run_task")}</p> : null}
                 {taskOptions.length === 0 && configured ? <p className="field-error">{text("no_tasks")}</p> : null}
+                {selectedRole?.contextMode === "accumulated" ? (
+                  <>
+                    <label htmlFor="run-context-pack">{text("select_context_pack")}</label>
+                    <select
+                      aria-describedby="run-context-pack-help"
+                      aria-invalid={validation([...runErrors], "context-pack")}
+                      id="run-context-pack"
+                      onChange={(event) => setRun({ ...run, contextPackKey: event.target.value })}
+                      value={run.contextPackKey}
+                    >
+                      <option value="">{text("select_context_pack")}</option>
+                      {contextPackOptions.map((option) => (
+                        <option key={contextPackKey(option)} value={contextPackKey(option)}>
+                          {option.summary} — {option.contextPackId} @ {option.revision}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="small-copy" id="run-context-pack-help">{text("context_pack_exact_help")}</p>
+                    {validation([...runErrors], "context-pack") ? <p className="field-error">{text("form_error_context_pack")}</p> : null}
+                    {contextPackOptions.length === 0 ? <p className="field-error">{text("no_context_packs")}</p> : null}
+                    {launch?.contextPackOptionsStatus.truncated ? (
+                      <p className="field-error" role="status">{text("context_pack_options_truncated")}</p>
+                    ) : null}
+                    <p className="small-copy">{text("context_resume_unavailable")}</p>
+                  </>
+                ) : selectedRole?.contextMode === "fresh" ? (
+                  <p className="small-copy">{text("context_fresh_run_help")}</p>
+                ) : null}
+                {validation([...runErrors], "provider-availability") ? <p className="field-error">{text("form_error_provider_availability")}</p> : null}
                 <button className="button button-primary" type="submit">{activeAction === "start-run" ? text("working") : text("start_run")}</button>
               </fieldset>
             </form>
           </WorkflowCard>
           <StarterPacksSection api={apiRef.current} text={text} />
+          {configured ? (
+            <ContextPacksSection
+              api={apiRef.current}
+              text={text}
+              writesEnabled={data.meta.writesEnabled}
+            />
+          ) : null}
+          {configured ? <TrackerSection api={apiRef.current} locale={locale} text={text} /> : null}
         </div>
       </div>
     </main>

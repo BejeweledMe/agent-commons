@@ -102,6 +102,33 @@ def test_the_ui_command_opens_and_owns_its_own_session_by_default(
     assert shown["status"] == "closed"
 
 
+def test_the_ui_command_explains_default_browser_consumption(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "ui", "--port", "0"])
+
+    assert result.exit_code == 0, result.output
+    assert "opened your default browser automatically" in result.output
+    assert "single-use" in result.output
+    assert "--no-browser" in result.output
+
+
+def test_the_ui_command_explains_manual_browser_selection(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "ui", "--port", "0", "--no-browser"])
+
+    assert result.exit_code == 0, result.output
+    assert "automatic open disabled (--no-browser)" in result.output
+    assert "open this Work URL once" in result.output
+
+
 def test_the_real_server_auto_opens_the_same_work_handoff_that_the_cli_emits(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

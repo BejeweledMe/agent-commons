@@ -90,6 +90,14 @@ def validate_transition(
             actor_session_id=actor_session_id,
             relations=relations,
         )
+        if event_type == "context_pack.created":
+            _validate_context_pack_bindings(snapshot, payload)
+        if event_type == "design_package.created":
+            _validate_design_package_bindings(
+                snapshot,
+                payload,
+                actor_session_id=actor_session_id,
+            )
         return
 
     # Kind and identity come from the event registry rather than from the text
@@ -107,6 +115,14 @@ def validate_transition(
     if transition is not None and not transition.allows(current.get("state")):
         raise LifecycleConflictError(
             f"{event_type} is not allowed from {family} state {current.get('state')}"
+        )
+    if event_type == "context_pack.revised":
+        _validate_context_pack_bindings(snapshot, payload)
+    if event_type == "design_package.revised":
+        _validate_design_package_bindings(
+            snapshot,
+            payload,
+            actor_session_id=actor_session_id,
         )
     if event_type == "review.completed" and current.get("independent"):
         bindings = session_agent_map(snapshot.delegations)
@@ -288,6 +304,21 @@ def validate_transition(
                 "acceptance review does not bind the current task revision"
             )
         review_actor_session = str((review.get("actor") or {}).get("session_id", ""))
+        delegated_reviews = [
+            delegation
+            for delegation in snapshot.delegations.values()
+            if delegation.get("purpose") == "independent_review"
+            and delegation.get("child_session_id") == review_actor_session
+            and _delegation_matches_review(delegation, review)
+        ]
+        if delegated_reviews and not any(
+            delegation.get("state") == "succeeded"
+            and delegation.get("result_refs") == [{"kind": "review", "id": str(review.get("id"))}]
+            for delegation in delegated_reviews
+        ):
+            raise LifecycleConflictError(
+                "task acceptance requires the delegated review terminal result"
+            )
         bindings = session_agent_map(snapshot.delegations)
         work_author_principals = principals(
             bindings,
@@ -362,8 +393,20 @@ def _validate_creation(
         "agent.created": "agent",
         "agent.link_opened": "agent_link",
     }.get(event_type)
+    # Every conventional ``*.created`` family already declares its canonical
+    # kind and identity field in EVENT_SPECS.  Derive that default here so a
+    # newly registered entity cannot bypass duplicate-identity protection just
+    # because this legacy compatibility map was not extended in lockstep.
+    spec = EVENT_SPECS.get(event_type)
+    if (
+        created_kind is None
+        and event_type.endswith(".created")
+        and spec is not None
+        and spec.entity_kind is not None
+        and spec.entity_id_field is not None
+    ):
+        created_kind = spec.entity_kind
     if created_kind:
-        spec = EVENT_SPECS.get(event_type)
         id_field = spec.entity_id_field if spec and spec.entity_id_field else f"{created_kind}_id"
         identifier = str(payload.get(id_field, ""))
         if entity(snapshot, created_kind, identifier) is not None:
@@ -427,6 +470,101 @@ def _current_ref_revision(snapshot: ProjectSnapshot, ref: Mapping[str, Any]) -> 
         return identifier if identifier in snapshot.known_manifest_ids else None
     current = require_entity(snapshot, kind, identifier)
     return str(current.get("effective_revision") or current.get("revision"))
+
+
+def _validate_context_pack_bindings(snapshot: ProjectSnapshot, payload: Mapping[str, Any]) -> None:
+    """Require every pack input to be exact, effective, and safe to reuse."""
+
+    bindings: list[Mapping[str, Any]] = []
+    for fact in payload.get("facts") or ():
+        if isinstance(fact, Mapping):
+            bindings.extend(
+                bound for bound in fact.get("source_refs") or () if isinstance(bound, Mapping)
+            )
+    bindings.extend(
+        bound for bound in payload.get("decision_refs") or () if isinstance(bound, Mapping)
+    )
+    for bound in bindings:
+        ref = bound.get("ref")
+        if not isinstance(ref, Mapping):
+            raise LifecycleConflictError("Context Pack reference is not canonical")
+        try:
+            current_revision = _current_ref_revision(snapshot, ref)
+        except (LifecycleConflictError, ValidationError) as exc:
+            raise LifecycleConflictError(
+                "Context Pack source does not exist or is not effective"
+            ) from exc
+        if current_revision != bound.get("revision"):
+            raise LifecycleConflictError("Context Pack source revision is stale")
+        if ref.get("kind") == "artifact":
+            artifact = require_entity(snapshot, "artifact", str(ref.get("id", "")))
+            if artifact.get("classification") == "restricted":
+                raise LifecycleConflictError(
+                    "restricted artifacts cannot be used as Context Pack sources"
+                )
+
+
+def _validate_design_package_bindings(
+    snapshot: ProjectSnapshot,
+    payload: Mapping[str, Any],
+    *,
+    actor_session_id: str,
+) -> None:
+    """Require exact current screen provenance and the real producing session."""
+
+    for screen in payload.get("screens") or ():
+        if not isinstance(screen, Mapping):
+            raise LifecycleConflictError("Design Package screen binding is not canonical")
+        artifact_binding = screen.get("artifact_binding")
+        task_binding = screen.get("producer_task_binding")
+        if not isinstance(artifact_binding, Mapping) or not isinstance(task_binding, Mapping):
+            raise LifecycleConflictError("Design Package provenance binding is not canonical")
+        artifact_ref = artifact_binding.get("ref")
+        task_ref = task_binding.get("ref")
+        if not isinstance(artifact_ref, Mapping) or artifact_ref.get("kind") != "artifact":
+            raise LifecycleConflictError("Design Package artifact binding is not canonical")
+        if not isinstance(task_ref, Mapping) or task_ref.get("kind") != "task":
+            raise LifecycleConflictError("Design Package task binding is not canonical")
+        artifact = require_entity(snapshot, "artifact", str(artifact_ref.get("id", "")))
+        task = require_entity(snapshot, "task", str(task_ref.get("id", "")))
+        artifact_revision = str(
+            artifact.get("effective_revision") or artifact.get("revision") or ""
+        )
+        task_revision = str(task.get("effective_revision") or task.get("revision") or "")
+        if artifact_binding.get("revision") != artifact_revision:
+            raise LifecycleConflictError("Design Package artifact revision is stale")
+        if task_binding.get("revision") != task_revision:
+            raise LifecycleConflictError("Design Package producer task revision is stale")
+        if artifact.get("content_revision") != screen.get("artifact_content_revision"):
+            raise LifecycleConflictError("Design Package artifact content hash is stale")
+        if artifact.get("classification") != screen.get("classification"):
+            raise LifecycleConflictError("Design Package artifact classification is stale")
+        if screen.get("classification") not in {"public", "internal"}:
+            raise LifecycleConflictError(
+                "Design Package artifact classification is not preview eligible"
+            )
+        if artifact.get("manifest_ref") not in snapshot.known_manifest_ids:
+            raise LifecycleConflictError(
+                "Design Package artifact has no effective authorized manifest"
+            )
+        artifact_actor = snapshot.entity_revision_actor(
+            "artifact",
+            str(artifact_ref.get("id", "")),
+            str(artifact_binding.get("revision", "")),
+        )
+        task_actor = snapshot.entity_revision_actor(
+            "task",
+            str(task_ref.get("id", "")),
+            str(task_binding.get("revision", "")),
+        )
+        if actor_session_id != artifact_actor or actor_session_id != task_actor:
+            raise LifecycleConflictError(
+                "Design Package publisher is not the actor of both exact bound revisions"
+            )
+        if artifact_binding not in tuple(task.get("artifact_bindings") or ()):
+            raise LifecycleConflictError(
+                "Design Package task does not bind the exact artifact revision"
+            )
 
 
 def _require_ref_exists(snapshot: ProjectSnapshot, ref: Mapping[str, Any]) -> None:

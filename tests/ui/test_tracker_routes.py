@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import asyncio
+import json
+from collections.abc import Iterator
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from agent_commons.ui.tracker_reads import loading_tracker_snapshot
+from agent_commons.ui.tracker_routes import (
+    MAX_TRACKER_FRAME_BYTES,
+    _parse_last_event_id,
+    register_tracker_routes,
+    tracker_events,
+)
+
+NOW = "2026-08-30T10:01:00Z"
+
+
+class Source:
+    def __init__(self, sequences: list[int]) -> None:
+        self._sequences: Iterator[int] = iter(sequences)
+        self.last = sequences[-1]
+        self.resume_values: list[int | None] = []
+
+    def __call__(self, *, resume_after: int | None = None):  # type: ignore[no-untyped-def]
+        self.resume_values.append(resume_after)
+        sequence = next(self._sequences, self.last)
+        return loading_tracker_snapshot(generated_at=NOW, sequence=sequence)
+
+
+class BrokenSource:
+    def __call__(self, *, resume_after: int | None = None):  # type: ignore[no-untyped-def]
+        raise RuntimeError("provider stderr and secret must not cross")
+
+
+class FlakySource:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, *, resume_after: int | None = None):  # type: ignore[no-untyped-def]
+        self.calls += 1
+        if self.calls == 1:
+            return loading_tracker_snapshot(generated_at=NOW, sequence=5)
+        raise RuntimeError("raw provider failure")
+
+
+def _drive(source: Source, count: int, *, resume_after: int | None = None) -> list[bytes]:
+    async def run() -> list[bytes]:
+        generator = tracker_events(
+            source,
+            resume_after=resume_after,
+            poll_seconds=0,
+            heartbeat_seconds=0,
+        )
+        frames = []
+        try:
+            for _ in range(count):
+                frames.append(await anext(generator))
+        finally:
+            await generator.aclose()
+        return frames
+
+    return asyncio.run(run())
+
+
+def test_snapshot_route_is_composable() -> None:
+    app = FastAPI()
+    source = Source([4, 4])
+    register_tracker_routes(app, dependencies=[], source=source)
+
+    with TestClient(app) as client:
+        response = client.get("/api/work/tracker")
+        assert response.status_code == 200
+        assert response.json()["schema"] == "agent-commons.tracker.v1"
+    assert {route.path for route in app.routes} >= {
+        "/api/work/tracker",
+        "/api/work/tracker/stream",
+    }
+
+
+def test_stream_emits_only_changes_and_bounded_keepalives() -> None:
+    source = Source([1, 1, 2])
+    frames = _drive(source, 3, resume_after=0)
+
+    assert frames[0].startswith(b"id: 1\nevent: snapshot")
+    assert frames[1] == b": keepalive\n\n"
+    assert frames[2].startswith(b"id: 2\nevent: snapshot")
+    payload = json.loads(frames[2].split(b"data: ", 1)[1])
+    assert payload["sequence"] == 2
+    assert all(len(frame) <= MAX_TRACKER_FRAME_BYTES for frame in frames)
+    assert source.resume_values[:2] == [0, 1]
+
+
+def test_stream_emits_first_failure_even_when_sequence_cannot_advance() -> None:
+    frames = _drive(FlakySource(), 2)  # type: ignore[arg-type]
+
+    assert frames[0].startswith(b"id: 5\nevent: snapshot")
+    assert frames[1].startswith(b"event: error")
+    assert b"id:" not in frames[1]
+    assert b'"state":"error"' in frames[1]
+    assert b"raw provider failure" not in frames[1]
+
+
+def test_stream_refuses_sequence_regression_without_replacing_last_event_id() -> None:
+    frames = _drive(Source([5, 4]), 2)
+
+    assert frames[0].startswith(b"id: 5\nevent: snapshot")
+    assert frames[1].startswith(b"event: error")
+    assert b"id:" not in frames[1]
+    assert b"tracker_sequence_regressed" in frames[1]
+
+
+def test_reconnect_refuses_initial_sequence_older_than_last_event_id() -> None:
+    frames = _drive(Source([5]), 1, resume_after=7)
+
+    assert frames[0].startswith(b"event: error")
+    assert b"id:" not in frames[0]
+    assert b'"sequence":7' in frames[0]
+    assert b"tracker_sequence_regressed" in frames[0]
+
+
+def test_invalid_last_event_id_does_not_guess_a_cursor() -> None:
+    assert _parse_last_event_id(None) is None
+    assert _parse_last_event_id("") is None
+    assert _parse_last_event_id("-1") is None
+    assert _parse_last_event_id("not-a-sequence") is None
+    assert _parse_last_event_id("7") == 7
+
+
+def test_source_exception_becomes_a_typed_redacted_error() -> None:
+    app = FastAPI()
+    register_tracker_routes(app, dependencies=[], source=BrokenSource())
+
+    with TestClient(app) as client:
+        response = client.get("/api/work/tracker")
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "error"
+    assert response.json()["gaps"] == ["projection_unavailable"]
+    assert "provider stderr" not in response.text

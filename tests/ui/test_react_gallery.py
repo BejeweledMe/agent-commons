@@ -42,8 +42,10 @@ def test_gallery_shell_and_static_assets_are_public_but_data_is_not(client) -> N
     refused = client.get("/api/gallery")
     assert refused.status_code == 401
     available = client.get("/api/gallery", headers=authorized())
-    assert available.status_code == 409
-    assert available.json()["error"]["code"] == "gallery_data_unavailable"
+    assert available.status_code == 200
+    assert available.json()["state"] == "empty"
+    assert available.json()["packages"] == []
+    assert available.json()["error"] is None
 
 
 def test_gallery_bootstrap_preserves_the_shared_first_run_refusal(tmp_path: Path) -> None:
@@ -101,17 +103,20 @@ def test_gallery_locale_source_is_paired_and_has_no_demo_copy() -> None:
     assert "демо" not in " ".join(messages["ru"].values()).lower()
 
 
-def test_gallery_source_uses_react_flow_and_a_cookie_session_typed_refusal() -> None:
+def test_gallery_source_uses_a_csp_safe_board_and_cookie_session_typed_refusal() -> None:
     source = (_GALLERY_SOURCE / "src" / "main.tsx").read_text("utf-8")
     package = json.loads((_GALLERY_SOURCE / "package.json").read_text("utf-8"))
 
-    assert 'from "@xyflow/react"' in source
-    assert "fetch(`${apiBase}/gallery`" in source
+    assert 'from "@xyflow/react"' not in source
+    assert 'className="gallery-board"' in source
+    assert "<ScreenCard" in source
+    assert "style={{" not in source
+    assert "fetch(`${currentApiBase}/gallery`" in source
     assert 'fetch("/api/auth/exchange"' in source
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
     assert "api_base" in source
-    assert "let apiBase = storedApiBase();" in source
+    assert "let currentApiBase = storedApiBase();" in source
     assert "window.sessionStorage.getItem(API_BASE_STORAGE_KEY)" in source
     assert "window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in source
     assert "clearStoredApiBase();" in source
@@ -120,5 +125,5 @@ def test_gallery_source_uses_react_flow_and_a_cookie_session_typed_refusal() -> 
     assert "Authorization" not in source
     assert "tokenFromFragment" not in source
     assert "gallery_data_unavailable" in source
-    assert "@xyflow/react" in package["dependencies"]
+    assert "@xyflow/react" not in package["dependencies"]
     assert package["scripts"]["build"] == "tsc -b && vite build"

@@ -18,7 +18,7 @@ import logging
 import secrets
 import socket
 import webbrowser
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,14 +26,20 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from agent_commons.core.canonical import loads_json_strict
+from agent_commons.core.ids import is_typed_id
+from agent_commons.domain.context_pack import ContextPackRefusal
 from agent_commons.errors import CommonsError
+from agent_commons.runtime import AttemptStore
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
+from agent_commons.services.design_authoring import publish_from_selection, revise_from_selection
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
 from agent_commons.ui.context import (
     LAUNCH_NOT_CONFIGURED,
     PANEL_ALREADY_OPEN_ACTIONS,
     UIContext,
 )
+from agent_commons.ui.gallery_routes import register_gallery_routes
 from agent_commons.ui.security import (
     AUTH_EXCHANGE_PATH,
     SECURITY_HEADERS,
@@ -56,6 +62,8 @@ from agent_commons.ui.setup import (
     missing_workspace_state,
 )
 from agent_commons.ui.starter_pack_routes import register_starter_pack_routes
+from agent_commons.ui.tracker_reads import build_tracker_snapshot
+from agent_commons.ui.tracker_routes import register_tracker_routes
 from agent_commons.ui.work_routes import register_work_routes
 
 
@@ -94,6 +102,13 @@ _ENTITY_KINDS = frozenset(
     }
 )
 
+# A consumed exchange code cannot be made valid again.  Keep the recovery
+# action truthful in both the middleware refusal and the exchange endpoint.
+BROWSER_SESSION_RECOVERY_ACTIONS = (
+    "stop the local panel, start it again, then open the newly printed "
+    "Work URL once in this browser",
+)
+
 #: The complete mutating surface, named once so a route cannot be added without
 #: the invariant test noticing.  Every one of these is a thin adapter over a
 #: `CommonsManager` method; the UI is a third adapter beside the CLI and MCP,
@@ -102,6 +117,9 @@ MUTATING_ROUTES = (
     ("POST", "/api/operations/{operation_id}/answer"),
     ("POST", "/api/chat"),
     ("POST", "/api/chat/{thread_id}/messages"),
+    ("POST", "/api/gallery/{design_package_id}/screens/{screen_id}/feedback"),
+    ("POST", "/api/gallery/packages"),
+    ("POST", "/api/gallery/{design_package_id}/revisions"),
     ("POST", "/api/agents"),
     ("POST", "/api/agents/proposals/{thread_id}/approve"),
     ("POST", "/api/agents/proposals/{thread_id}/decline"),
@@ -115,6 +133,8 @@ MUTATING_ROUTES = (
     ("POST", "/api/tasks/{task_id}/review-request"),
     ("POST", "/api/tasks/{task_id}/accept"),
     ("POST", "/api/tasks/{task_id}/reopen"),
+    ("POST", "/api/work/context-packs"),
+    ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
 )
 
 #: Catalogue editing keeps its own allowlist: adding a skill and adding a role
@@ -137,7 +157,12 @@ CATALOG_ROUTES = (
 #: Keeping it a separately declared tuple is the compensation for that: the
 #: mutating-surface test still names launching as its own privilege rather than
 #: folding it into the write allowlist.
-LAUNCH_ROUTES = (("POST", "/api/delegations"),)
+LAUNCH_ROUTES = (
+    ("POST", "/api/delegations"),
+    ("POST", "/api/provider-auth/{profile_id}/login"),
+    ("POST", "/api/provider-auth/{profile_id}/cancel"),
+    ("POST", "/api/provider-auth/{profile_id}/check"),
+)
 
 #: First run, declared apart from every other privilege because it is the only
 #: surface that writes outside the ledger: one route creates the workspace
@@ -381,7 +406,7 @@ def create_app(
                     401,
                     "unauthorized",
                     "an authenticated local browser session is required",
-                    ["reopen the URL printed by `agent-commons ui`"],
+                    list(BROWSER_SESSION_RECOVERY_ACTIONS),
                 )
             else:
                 response = await call_next(request)
@@ -419,7 +444,7 @@ def create_app(
                 401,
                 "unauthorized",
                 "the local browser session could not be established",
-                ["reopen the URL printed by `agent-commons ui`"],
+                list(BROWSER_SESSION_RECOVERY_ACTIONS),
             )
         response = JSONResponse({"api_base": browser_session.api_base})
         # The product deliberately binds HTTP loopback only. A Secure cookie
@@ -497,17 +522,35 @@ def create_app(
     async def meta() -> Response:
         return JSONResponse(await asyncio.to_thread(context.meta))
 
-    @api_routes.get("/api/gallery", dependencies=reads_workspace)
-    async def gallery_bootstrap() -> Response:
-        # This feature deliberately lands before preview and Design Package
-        # reads. Returning an authenticated, typed refusal gives the React
-        # screen a stable honest state without fabricating designs or growing
-        # UIContext with a temporary workflow.
-        return _error(
-            409,
-            "gallery_data_unavailable",
-            "published design packages are not available in this build",
+    register_gallery_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        manager_factory=context.manager,
+        authoring_session_factory=lambda: context.writer_session_id,
+    )
+
+    def tracker_source(*, resume_after: int | None = None):
+        # The cursor is enforced by the SSE route. This composition function
+        # returns only the latest disposable snapshot from canonical truth plus
+        # the existing operational attempt store.
+        del resume_after
+        context.refresh_if_changed()
+        sequence, graph = context.snapshot_frame()
+        manager = context.manager()
+        attempts = AttemptStore(manager.paths.state_root, read_only=True).list_attempts()
+        return build_tracker_snapshot(
+            manager.snapshot(),
+            attempts,
+            generated_at=str(graph["generated_at"]),
+            sequence=sequence,
+            graph=graph,
         )
+
+    register_tracker_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        source=tracker_source,
+    )
 
     @api_routes.get("/api/artifacts/{artifact_id}/preview", dependencies=reads_workspace)
     async def artifact_preview(artifact_id: str) -> Response:
@@ -595,6 +638,29 @@ def create_app(
         # launching is enabled at all. Readable in any mode; acting on it is not.
         return JSONResponse(await asyncio.to_thread(context.launch_options))
 
+    @api_routes.get("/api/provider-auth/{profile_id}", dependencies=reads_workspace)
+    async def provider_auth_status(profile_id: str) -> Response:
+        """Return only the closed availability DTO for one fixed profile."""
+
+        try:
+            return JSONResponse(
+                await asyncio.to_thread(
+                    context.provider_auth_status,
+                    profile_id=profile_id,
+                )
+            )
+        except CommonsError as exc:
+            return _error(409, getattr(exc, "code", type(exc).__name__), str(exc))
+
+    @api_routes.get("/api/work/provider-availability", dependencies=reads_workspace)
+    async def provider_availability() -> Response:
+        """Return the unified closed provider/profile availability projection."""
+
+        try:
+            return JSONResponse(await asyncio.to_thread(context.provider_availability))
+        except CommonsError as exc:
+            return _error(409, getattr(exc, "code", type(exc).__name__), str(exc))
+
     @api_routes.get("/api/runs", dependencies=reads_workspace)
     async def runs() -> Response:
         # Live and recent run phases, metadata only. Readable in any mode.
@@ -617,6 +683,29 @@ def create_app(
                 reveal_location_label=reveal_location,
             )
         )
+
+    @api_routes.get("/api/work/context-packs", dependencies=reads_workspace)
+    async def work_context_packs() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.work_context_packs))
+
+    @api_routes.get("/api/work/context-packs/{context_pack_id}", dependencies=reads_workspace)
+    async def work_context_pack(context_pack_id: str) -> Response:
+        if not is_typed_id(context_pack_id, "context_pack"):
+            return _error(400, "invalid_request", "context_pack_id must be exact")
+        try:
+            return JSONResponse(
+                await asyncio.to_thread(
+                    context.work_context_pack,
+                    context_pack_id=context_pack_id,
+                )
+            )
+        except ContextPackRefusal as exc:
+            return _error(
+                409,
+                str(exc.code),
+                str(exc),
+                [exc.remediation],
+            )
 
     # The bundled examples contain no workspace data, but the existing Work
     # contract reserves all data reads for initialized projects.  After first
@@ -650,6 +739,8 @@ def create_app(
         # exists -- it is what makes it exist -- so it is bound to nothing.
         _register_setup(_RouteGroup(api_routes), context)
 
+    app.router.add_event_handler("shutdown", context._launch_coordinator.shutdown)
+
     @api_routes.get("/api/stream", dependencies=reads_workspace)
     async def stream(request: Request) -> Response:
         last_event_id = request.headers.get("last-event-id")
@@ -670,6 +761,40 @@ async def _json_body(request: Request) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+_MAX_CONTEXT_PACK_REQUEST_BYTES = 72 * 1024
+_MAX_IDEMPOTENCY_KEY_CHARS = 256
+
+
+async def _context_pack_body(request: Request, *, required: frozenset[str]) -> dict[str, Any]:
+    """Own a small closed write envelope before canonical domain validation."""
+
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            parsed_content_length = int(content_length)
+            if parsed_content_length < 0:
+                raise ValueError("content-length must be a non-negative integer")
+            if parsed_content_length > _MAX_CONTEXT_PACK_REQUEST_BYTES:
+                raise ValueError("context pack request exceeds the 73728-byte limit")
+        except ValueError as exc:
+            if "exceeds" in str(exc):
+                raise
+            raise ValueError("content-length must be a non-negative integer") from exc
+    raw = await request.body()
+    if len(raw) > _MAX_CONTEXT_PACK_REQUEST_BYTES:
+        raise ValueError("context pack request exceeds the 73728-byte limit")
+    value = loads_json_strict(raw)
+    if not isinstance(value, Mapping) or set(value) != required:
+        raise ValueError("context pack request contains missing or unsupported fields")
+    draft = value.get("draft")
+    key = value.get("idempotency_key")
+    if not isinstance(draft, Mapping):
+        raise ValueError("draft must be an object")
+    if not isinstance(key, str) or not key.strip() or len(key) > _MAX_IDEMPOTENCY_KEY_CHARS:
+        raise ValueError("idempotency_key must be a non-empty string of at most 256 characters")
+    return dict(value)
+
+
 async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any) -> Response:
     """Run one write and surface the guard that refused it, if any."""
 
@@ -678,7 +803,16 @@ async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any
     except CommonsError as exc:
         # Refusals are the interesting output here: the guard that fired is
         # what the operator needs on the node, not a generic failure.
-        return _error(409, type(exc).__name__, str(exc))
+        actions = list(getattr(exc, "safe_next_actions", ()))
+        remediation = getattr(exc, "remediation", None)
+        if not actions and isinstance(remediation, str) and remediation:
+            actions = [remediation]
+        return _error(
+            409,
+            str(getattr(exc, "code", type(exc).__name__)),
+            str(exc),
+            actions,
+        )
     except (TypeError, ValueError, KeyError) as exc:
         return _error(400, "invalid_request", str(exc))
     context.invalidate()
@@ -693,6 +827,43 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
 
     async def _body(request: Request) -> dict[str, Any]:
         return await _json_body(request)
+
+    @router.post("/api/work/context-packs")
+    async def publish_context_pack(request: Request) -> Response:
+        try:
+            body = await _context_pack_body(
+                request,
+                required=frozenset({"draft", "idempotency_key"}),
+            )
+        except (CommonsError, TypeError, ValueError) as exc:
+            return _error(400, "invalid_request", str(exc))
+        return await _record(
+            context.publish_context_pack,
+            draft=body["draft"],
+            idempotency_key=body["idempotency_key"],
+        )
+
+    @router.post("/api/work/context-packs/{context_pack_id}/revisions")
+    async def revise_context_pack(context_pack_id: str, request: Request) -> Response:
+        try:
+            if not is_typed_id(context_pack_id, "context_pack"):
+                raise ValueError("context_pack_id must be exact")
+            body = await _context_pack_body(
+                request,
+                required=frozenset({"expected_revision", "draft", "idempotency_key"}),
+            )
+            expected_revision = body["expected_revision"]
+            if not is_typed_id(expected_revision, "evt"):
+                raise ValueError("expected_revision must be an exact evt identifier")
+        except (CommonsError, TypeError, ValueError) as exc:
+            return _error(400, "invalid_request", str(exc))
+        return await _record(
+            context.revise_context_pack,
+            context_pack_id=context_pack_id,
+            expected_revision=expected_revision,
+            draft=body["draft"],
+            idempotency_key=body["idempotency_key"],
+        )
 
     @router.post("/api/operations/{operation_id}/answer")
     async def answer_operation(operation_id: str, request: Request) -> Response:
@@ -724,6 +895,41 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             expected_revision=str(body.get("expected_revision", "")),
             body=str(body.get("message", "")),
             idempotency_key=body.get("idempotency_key"),
+        )
+
+    @router.post("/api/gallery/{design_package_id}/screens/{screen_id}/feedback")
+    async def open_gallery_feedback(
+        design_package_id: str, screen_id: str, request: Request
+    ) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.open_gallery_feedback,
+            design_package_id=design_package_id,
+            design_package_revision=str(body.get("design_package_revision", "")),
+            screen_id=screen_id,
+            artifact_revision=str(body.get("artifact_revision", "")),
+            producer_task_revision=str(body.get("producer_task_revision", "")),
+            body=str(body.get("message", "")),
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @router.post("/api/gallery/packages")
+    async def publish_design_package(request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            lambda *, body: publish_from_selection(context.writer(), body),
+            body=body,
+        )
+
+    @router.post("/api/gallery/{design_package_id}/revisions")
+    async def revise_design_package(design_package_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            lambda *, design_package_id, body: revise_from_selection(
+                context.writer(), design_package_id, body
+            ),
+            design_package_id=design_package_id,
+            body=body,
         )
 
     @router.post("/api/agents")
@@ -998,6 +1204,32 @@ def _register_launch(router: _RouteGroup, context: UIContext) -> None:
             task_id=str(body.get("task_id", "")),
             wall_time_seconds=body.get("wall_time_seconds"),
             idempotency_key=body.get("idempotency_key"),
+            context_pack_id=body.get("context_pack_id"),
+            context_pack_revision=body.get("context_pack_revision"),
+        )
+
+    @router.post("/api/provider-auth/{profile_id}/login")
+    async def start_provider_login(profile_id: str) -> Response:
+        return await _guarded(
+            context.start_provider_login,
+            context,
+            profile_id=profile_id,
+        )
+
+    @router.post("/api/provider-auth/{profile_id}/cancel")
+    async def cancel_provider_login(profile_id: str) -> Response:
+        return await _guarded(
+            context.cancel_provider_login,
+            context,
+            profile_id=profile_id,
+        )
+
+    @router.post("/api/provider-auth/{profile_id}/check")
+    async def check_provider_auth(profile_id: str) -> Response:
+        return await _guarded(
+            context.check_provider_auth,
+            context,
+            profile_id=profile_id,
         )
 
 

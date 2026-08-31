@@ -15,6 +15,8 @@ COLLECTIONS: dict[str, str] = {
     "delegation": "delegations",
     "agent": "agents",
     "agent_link": "agent_links",
+    "context_pack": "context_packs",
+    "design_package": "design_packages",
 }
 
 

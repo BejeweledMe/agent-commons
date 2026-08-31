@@ -153,6 +153,17 @@ def test_work_locales_are_paired_and_include_actionable_failure_guidance() -> No
     assert 'role="alert"' in panel
 
 
+def test_expired_work_session_guidance_requires_a_fresh_url(client) -> None:  # type: ignore[no-untyped-def]
+    response = client.get("/api/graph")
+
+    assert response.status_code == 401
+    actions = response.json()["error"]["safe_next_actions"]
+    assert actions
+    assert "stop the local panel" in actions[0]
+    assert "newly printed Work URL" in actions[0]
+    assert "reopen the URL printed" not in actions[0]
+
+
 def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
     source = _source("src/api.ts")
 

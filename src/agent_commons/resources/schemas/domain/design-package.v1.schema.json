@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:design-package:v1",
+  "x-schema-name": "commons.payload.design_package.v1",
+  "x-event-types": ["design_package.created", "design_package.revised"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["design_package_id", "title", "screens"],
+  "properties": {
+    "design_package_id": {
+      "type": "string",
+      "pattern": "^design_package\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "screens": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "screen_id",
+          "ordinal",
+          "title",
+          "artifact_binding",
+          "artifact_content_revision",
+          "producer_task_binding",
+          "classification",
+          "media_type",
+          "safe_preview_eligible"
+        ],
+        "properties": {
+          "screen_id": {
+            "type": "string",
+            "pattern": "^screen\\.[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "artifact_binding": {
+            "$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"
+          },
+          "artifact_content_revision": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "producer_task_binding": {
+            "$ref": "urn:agent-commons:schema:common:v1#/$defs/revisionBoundRef"
+          },
+          "classification": {
+            "enum": ["public", "internal"]
+          },
+          "media_type": {
+            "enum": ["image/png", "image/jpeg"]
+          },
+          "safe_preview_eligible": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

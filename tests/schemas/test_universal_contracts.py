@@ -39,6 +39,9 @@ DELEGATION_ID = f"delegation.{ULID_0}"
 AGENT_ID = f"agent.{ULID_0}"
 OTHER_AGENT_ID = f"agent.{ULID_1}"
 AGENT_LINK_ID = f"agent_link.{ULID_0}"
+CONTEXT_PACK_ID = f"context_pack.{ULID_0}"
+DESIGN_PACKAGE_ID = f"design_package.{ULID_0}"
+SCREEN_ID = f"screen.{ULID_0}"
 PARENT_SESSION_ID = "session." + "a" * 32
 CHILD_SESSION_ID = "session." + "b" * 32
 MANIFEST_REF = "mft.artifact.sha256." + "a" * 64
@@ -60,6 +63,72 @@ DELEGATION_LIMITS = {
 
 
 PAYLOADS: dict[str, dict[str, Any]] = {
+    "context_pack.created": {
+        "context_pack_id": CONTEXT_PACK_ID,
+        "summary": "The service boundary and accepted constraints.",
+        "facts": [
+            {
+                "statement": "The exact artifact revision passed verification.",
+                "source_refs": [BOUND_ARTIFACT_REF],
+            }
+        ],
+        "decision_refs": [],
+        "open_questions": ["Which rollout cohort should run first?"],
+    },
+    "context_pack.revised": {
+        "context_pack_id": CONTEXT_PACK_ID,
+        "expected_revision": EVENT_ID,
+        "summary": "The service boundary, accepted constraints, and rollout question.",
+        "facts": [
+            {
+                "statement": "The exact artifact revision passed verification.",
+                "source_refs": [BOUND_ARTIFACT_REF],
+            }
+        ],
+        "decision_refs": [],
+        "open_questions": ["Which rollout cohort should run first?"],
+    },
+    "design_package.created": {
+        "design_package_id": DESIGN_PACKAGE_ID,
+        "title": "Checkout flow",
+        "screens": [
+            {
+                "screen_id": SCREEN_ID,
+                "ordinal": 1,
+                "title": "Checkout",
+                "artifact_binding": BOUND_ARTIFACT_REF,
+                "artifact_content_revision": CONTENT_REVISION,
+                "producer_task_binding": {
+                    "ref": {"kind": "task", "id": TASK_ID},
+                    "revision": TARGET_REVISION,
+                },
+                "classification": "internal",
+                "media_type": "image/png",
+                "safe_preview_eligible": True,
+            }
+        ],
+    },
+    "design_package.revised": {
+        "design_package_id": DESIGN_PACKAGE_ID,
+        "expected_revision": EVENT_ID,
+        "title": "Checkout flow v2",
+        "screens": [
+            {
+                "screen_id": SCREEN_ID,
+                "ordinal": 1,
+                "title": "Checkout",
+                "artifact_binding": BOUND_ARTIFACT_REF,
+                "artifact_content_revision": CONTENT_REVISION,
+                "producer_task_binding": {
+                    "ref": {"kind": "task", "id": TASK_ID},
+                    "revision": TARGET_REVISION,
+                },
+                "classification": "internal",
+                "media_type": "image/png",
+                "safe_preview_eligible": True,
+            }
+        ],
+    },
     "objective.created": {
         "objective_id": OBJECTIVE_ID,
         "title": "Ship a reliable service",
@@ -441,6 +510,44 @@ def event_document(
 
 def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSnapshot:
     snapshot = ProjectSnapshot()
+    if event_type in {"context_pack.created", "context_pack.revised"}:
+        snapshot.artifacts[ARTIFACT_ID] = {
+            "id": ARTIFACT_ID,
+            "state": "registered",
+            "revision": TARGET_REVISION,
+            "effective_revision": TARGET_REVISION,
+            "classification": "internal",
+        }
+        if event_type == "context_pack.created":
+            return snapshot
+    if event_type in {"design_package.created", "design_package.revised"}:
+        snapshot.known_manifest_ids.add(MANIFEST_REF)
+        snapshot.artifacts[ARTIFACT_ID] = {
+            "id": ARTIFACT_ID,
+            "state": "registered",
+            "revision": TARGET_REVISION,
+            "effective_revision": TARGET_REVISION,
+            "content_revision": CONTENT_REVISION,
+            "classification": "internal",
+            "manifest_ref": MANIFEST_REF,
+            "evidence_author_session_ids": [PARENT_SESSION_ID],
+        }
+        snapshot.tasks[TASK_ID] = {
+            "id": TASK_ID,
+            "state": "completed",
+            "revision": TARGET_REVISION,
+            "effective_revision": TARGET_REVISION,
+            "work_author_session_ids": [PARENT_SESSION_ID],
+            "artifact_bindings": [BOUND_ARTIFACT_REF],
+        }
+        snapshot.entity_revision_actor_session_ids.update(
+            {
+                ("artifact", ARTIFACT_ID, TARGET_REVISION): PARENT_SESSION_ID,
+                ("task", TASK_ID, TARGET_REVISION): PARENT_SESSION_ID,
+            }
+        )
+        if event_type == "design_package.created":
+            return snapshot
     if event_type in {
         "review.requested",
         "verification.recorded",
@@ -500,6 +607,8 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "agent.reconfigured": "active",
         "agent.retired": "active",
         "agent.link_closed": "open",
+        "context_pack.revised": "published",
+        "design_package.revised": "published",
     }
     if event_type == "agent.link_opened":
         for identifier in (AGENT_ID, OTHER_AGENT_ID):
@@ -529,6 +638,8 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "delegation": "delegations",
         "agent": "agents",
         "agent_link": "agent_links",
+        "context_pack": "context_packs",
+        "design_package": "design_packages",
     }[family]
     identifier = str(payload[spec.entity_id_field or f"{family}_id"])
     current: dict[str, Any] = {
