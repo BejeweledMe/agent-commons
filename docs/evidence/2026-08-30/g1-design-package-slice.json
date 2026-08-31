@@ -1,0 +1,32 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.11Z0D8EAT78X6QM3Y152QV9E2X",
+  "slice": "G1 canonical Design Package domain",
+  "files": {
+    "docs/adr/0013-design-packages.md": {"sha256": "f5a84fa07a1509fcee988255da551aa0829f9216390cce059b5d63f618d28b91", "bytes": 4929},
+    "docs/adr/README.md": {"sha256": "5775f16b0ec2d001cf4d5397de4b8ba13333c3b757d0535528c5169295b9ae0a", "bytes": 3582},
+    "src/agent_commons/resources/schemas/domain/design-package.v1.schema.json": {"sha256": "c1280b990661adbd3774cbe0767a6df4e150f20de83f030426f66b976e4c1049", "bytes": 2209},
+    "src/agent_commons/domain/design_packages.py": {"sha256": "205d4a8abea6f70bbe5527f1b5cbd88c26fbb3d1a29ab3459254399b8cfcec3d", "bytes": 16579},
+    "src/agent_commons/domain/design_package_envelopes.py": {"sha256": "872615e8986832e68fd025d716be287af356fc9b55ea5867f3f7827067f91755", "bytes": 1943},
+    "src/agent_commons/domain/design_package_projection.py": {"sha256": "48060d11c6ea6678cc605403ce1e442a88bad93154987194ba127adca10999e3", "bytes": 2044},
+    "src/agent_commons/services/design_packages.py": {"sha256": "6c665f7dcb0a42818a277f128ecf1101cd9f20ab5a267d089552ebe2990516db", "bytes": 16822},
+    "src/agent_commons/domain/validation.py": {"sha256": "6c4579253ca003f3ba0e2d902cbb735ef4997ef287beea18ea99777b21f62364", "bytes": 23188},
+    "src/agent_commons/domain/collections.py": {"sha256": "0e1bc497b2f32b328d3374e2e411ee32354aeed31d8a7e6017b358b912b11323", "bytes": 725},
+    "src/agent_commons/domain/snapshot.py": {"sha256": "9d18710a25e9e49be530a80ca5ec6c2b686be5b323971c450926090ac11a91f4", "bytes": 6975},
+    "src/agent_commons/domain/projection.py": {"sha256": "4397ef1b247f6019588d8cd9311d2d75cb53f065f3a64fa4705a778af164a648", "bytes": 53376},
+    "src/agent_commons/domain/lifecycle.py": {"sha256": "f1413e76f3f1b2b7ff22b14395cf546de879fe0e66219a14d1715af3e576ed06", "bytes": 41174},
+    "src/agent_commons/services/manager.py": {"sha256": "11032e73423e1bc05bf50c4bcf855617df40d250957a004e62386cb26d170f85", "bytes": 58282},
+    "tests/domain/test_design_package_domain.py": {"sha256": "3a135e61485eff074a4bbd19200fe073176924201ec711c060eae396be6fdfe6", "bytes": 5319},
+    "tests/domain/test_design_package_projection.py": {"sha256": "232a71f49c9eac524e611aadc3b038ffbeabf9bfdcfbf64a0ccdbbb0edc6a730", "bytes": 7187},
+    "tests/schemas/test_design_package_schema.py": {"sha256": "69ef8ccfaf130f6ecf7da13c5daf21d8a8d8a78f02c83c3bb3d41e00e1a9f08b", "bytes": 2593},
+    "tests/services/test_design_packages.py": {"sha256": "bc3453d8d01c1b07929850b2199b3c539d0429466b31d61a2d1328665ea26562", "bytes": 19347},
+    "tests/fixtures/design_package/pre_g1_ledger.json": {"sha256": "7661cd214492a0847d1e354b426d0b0454d97b8d6c4f16fc18fa4667443bb385", "bytes": 2949},
+    "tests/services/test_context_packs.py": {"sha256": "5a3bced03640bc66f9c98e7db46ec2bcfa645ed805ae2cfc9fcf2f4706897ab4", "bytes": 19835},
+    "tests/schemas/test_universal_contracts.py": {"sha256": "269238b67ddc8f90ba42eda9f008db56e7c7321d16057031cb17309338b1ec09", "bytes": 33324}
+  },
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1527 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE after remediation; exact-revision provenance is enforced in narrow and universal under-lock paths, private actor index is not serialized, A-to-B-to-A bypass regressions fail before reservation without echo, ADR index and old-ledger replay are current"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.0RYHGFZJ4P0V4G3WBKEJPW3V4K",
+  "slice": "W1 provider-safe derived work views",
+  "files": {
+    "src/agent_commons/domain/work_state.py": {"sha256": "8cb14197105c3473994fd0f37f81da7c2aa629cdb9231283340b0718ed1164d6", "bytes": 20511},
+    "src/agent_commons/services/work_metrics.py": {"sha256": "943490d26595b7b6296690d0f7785b8010498476f6ef6318fae9ed155b646d7f", "bytes": 36399},
+    "tests/domain/test_work_state.py": {"sha256": "9eb6d44dc9d447362ecc72819b01a8cec04e67c65ebc72b54749f599e8f9558a", "bytes": 8368},
+    "tests/services/test_work_metrics.py": {"sha256": "805fadd0a3303870b98612135c7da018effef29a898bdd579f25adaf8884bac6", "bytes": 19626}
+  },
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1497 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE; canonical state dominates attempts, per-source freshness, bounded hostile inputs, typed partial gaps, no fake or raw provider metrics"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "schema": "agent_commons.release_provider_qualification_evidence.v1",
+  "recorded_at": "2026-08-31T07:00:00Z",
+  "source_sha256": "19f67d61d2a0a259a020ee16e4b6daed1319e0105cce8d5dbe906b0038e93417",
+  "full_gate": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID make check",
+    "passed": 1734,
+    "skipped": 13,
+    "warnings": 2
+  },
+  "profiles": [
+    {
+      "profile_id": "claude-builder",
+      "provider_version": "2.1.220 (Claude Code)",
+      "static_preflight": "passed",
+      "initialization_probe": "ready",
+      "behavioral_canary": {
+        "passed": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "process_canonical_mismatch": false,
+        "child_session_closed": true
+      }
+    },
+    {
+      "profile_id": "claude-independent-reviewer",
+      "provider_version": "2.1.220 (Claude Code)",
+      "static_preflight": "passed",
+      "initialization_probe": "ready",
+      "behavioral_canary": {
+        "passed": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "process_canonical_mismatch": false,
+        "child_session_closed": true
+      }
+    },
+    {
+      "profile_id": "codex-builder",
+      "provider_version": "codex-cli 0.145.0",
+      "static_preflight": "passed",
+      "initialization_probe": "ready",
+      "behavioral_canary": {
+        "passed": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "process_canonical_mismatch": false,
+        "child_session_closed": true
+      }
+    },
+    {
+      "profile_id": "codex-independent-reviewer",
+      "provider_version": "codex-cli 0.145.0",
+      "static_preflight": "passed",
+      "initialization_probe": "ready",
+      "behavioral_canary": {
+        "passed": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "process_canonical_mismatch": false,
+        "child_session_closed": true
+      }
+    }
+  ],
+  "reciprocal_claude_to_codex": {
+    "requester_client": "claude",
+    "target_profile_id": "codex-builder",
+    "passed": true,
+    "terminal_tool_calls": 1,
+    "terminal_tool_completions": 1,
+    "terminal_tool_rejections": 0,
+    "process_canonical_mismatch": false,
+    "child_session_closed": true
+  },
+  "remediation": {
+    "initial_observation": "An earlier behavioral run exposed one rejected terminal tool call before a later completion.",
+    "change": "Provider-visible terminal protocol now specifies the required evidence reads and the exact fresh-revision terminal call shape.",
+    "verification": "Focused runtime tests and the complete gate passed before every profile was re-qualified."
+  },
+  "privacy": "This evidence intentionally excludes provider output, prompts, tool arguments, transcripts, authentication data, and local paths."
+}

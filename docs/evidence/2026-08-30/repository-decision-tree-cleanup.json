@@ -1,0 +1,26 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.24D8SEHAVQAZAKVBZMEF83PZ43",
+  "slice": "repository decision-tree and legacy documentation cleanup",
+  "files": {
+    "docs/README.md": {"sha256": "62bbc4fcc4bf96ee1023acca9b18fc34fe12e9917e7cda3a3b4ef56fee610c5d", "bytes": 5458},
+    "docs/adr/README.md": {"sha256": "88a1edbf42fc7db358805ad46e55717c92ae03b10d6e146d4cbda018f0011bb1", "bytes": 3401},
+    "docs/architecture-improvement-implementation-plan.md": {"sha256": "b8d3a7db6aef3ebfb3840a73f095879904d646136013de730b3d082bf253a691", "bytes": 56828},
+    "docs/pivot-ui-only-plan.md": {"sha256": "e32b6ec56856a0e0d9e550541dced0490c8f883e3e90484eb9aa583eb7f0fc7f", "bytes": 84627},
+    "docs/visual_multi_agent_orchestrator_prd.md": {"sha256": "3beb7ea1aa78690adf3b88360a6d37a3703153390ab3e6eae6244e3048d545ca", "bytes": 5691},
+    "docs/visual_orchestrator_plan.md": {"sha256": "f72256052d721a189eff1cead1fef5b8ce57a8db83d200b8694984a487a4f736", "bytes": 5339},
+    "tests/contract/test_documentation_map.py": {"sha256": "fee05198afbdbdd4e16917cf662be6e08ad7420c644ec7d11a62516f0ec998b6", "bytes": 3587}
+  },
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1501 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE after remediation; current and historical documents are routed separately, volatile worktree wording removed, stable document categories are contract-tested, ADR status and links verified, no source compatibility path removed"
+  },
+  "remote_audit": {
+    "local_main": "dd65bdb",
+    "origin_main": "dd65bdb",
+    "latest_main_ci": "green",
+    "push_performed": false,
+    "reason": "No remote fast-forward exists; the shared dirty tree must be separated into reviewed concern commits before any push."
+  }
+}

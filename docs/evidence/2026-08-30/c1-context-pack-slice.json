@@ -1,0 +1,36 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.6GT6W0EKQVTDD5XDB7Q6R3XJBF",
+  "slice": "C1 canonical Context Pack and deterministic compiler",
+  "files": {
+    "docs/adr/0012-context-packs.md": {"sha256": "198bc870700713bc938c0505fc8b65b22169e4d581394d631880429b0461d3bf", "bytes": 6640},
+    "src/agent_commons/resources/schemas/domain/context-pack.v1.schema.json": {"sha256": "a419bc4a7d2d9b54f3b20a0edfe608b1f4b5710b9df816fa37c56b4d7ff00a70", "bytes": 1753},
+    "src/agent_commons/domain/context_pack.py": {"sha256": "e60b6f407a438f098bd1abaa2c989373f22c41472e8d24b94abfc2b834a14a9d", "bytes": 16135},
+    "src/agent_commons/domain/context_pack_envelopes.py": {"sha256": "1c7c993bd6c212f462763a4937497e3621586b310fac8821c2ce05b94068e4b9", "bytes": 2091},
+    "src/agent_commons/domain/context_pack_projection.py": {"sha256": "71aedfcbe6363b8d22a48185c78d98a89286c7a7b0fe42654f0ca84325a33669", "bytes": 1737},
+    "src/agent_commons/domain/__init__.py": {"sha256": "4da1d9c35a114072a50b7e782c38ac1bedbf6b6c4617e7b535917e9759d80dfe", "bytes": 666},
+    "src/agent_commons/domain/collections.py": {"sha256": "702ab0440965cdbfe3735df2efdc098d3dd3a1b0c11928adf580c99a5d60b3ba", "bytes": 684},
+    "src/agent_commons/domain/projection.py": {"sha256": "dac1f21cc29da6fcaeb57ddd75a0de06de5226d1b8af1bcc48b7e0ed8cbb79f2", "bytes": 51304},
+    "src/agent_commons/domain/snapshot.py": {"sha256": "bd3d4edc83c0ce4928eb8a12365523f51f1509356f2f420e4b11089c204a3743", "bytes": 5797},
+    "src/agent_commons/domain/validation.py": {"sha256": "3866cdab05db9dd0b3560301ccf54c64d926f32bc0725b5f01345cfd85f431a9", "bytes": 22681},
+    "src/agent_commons/domain/lifecycle.py": {"sha256": "5d13d8a6c1100f53d2cebebeb46389bafbe3ced31603b0e8f49981fb267c4d8d", "bytes": 37347},
+    "src/agent_commons/services/context_compiler.py": {"sha256": "4c650853145351140fe94870ca7a6c60720fecd804b4b1d699bf15392761a7ba", "bytes": 4070},
+    "src/agent_commons/services/context_packs.py": {"sha256": "c184314941dc188be344fb42b9addf267c6be0291968f87c535de121352388ec", "bytes": 13372},
+    "src/agent_commons/services/__init__.py": {"sha256": "992a046559a7f84f417c5afe4df82a180168eeef9cab4daa59613d399e1ab324", "bytes": 372},
+    "src/agent_commons/services/manager.py": {"sha256": "95d2bc0ddf7fedfa07c94127472bf2b6ad004875c4e15dafdc41e49cc2249e2e", "bytes": 55799},
+    "tests/domain/test_context_pack.py": {"sha256": "1759770a02f61149acf909c5faa8bfbac58314611522ad515f27ced6e07d1223", "bytes": 5516},
+    "tests/domain/test_context_pack_projection.py": {"sha256": "6b6e1b27e103d154bb3e76859381b99b74f93a38cfbc88de1cc36c4508eee8fc", "bytes": 7801},
+    "tests/domain/test_validation_lifecycle.py": {"sha256": "45ad656170579c5cf406878da1d6937e23782768a9206934d52d1b8ef9f3f529", "bytes": 14972},
+    "tests/schemas/test_context_pack_schema.py": {"sha256": "30a6ea3f058befe06bc9599c93ce9a3a99598f29b9ffdc3405fff105e64b2d2c", "bytes": 2343},
+    "tests/schemas/test_universal_contracts.py": {"sha256": "1dcc339496393094fa14a8ab8ebf633137ba0ac8ec5e89fcea3443ceea54c66f", "bytes": 30505},
+    "tests/services/test_context_compiler.py": {"sha256": "143c1dcf5e204c12c46377b87ffbc81ab2a09dbcbf0dbec45b7357734af50725", "bytes": 2314},
+    "tests/services/test_context_packs.py": {"sha256": "1794010f5ac6de0948e8dc7a0adaee1dbe117fadd0ed2478465071e4eb4001e6", "bytes": 19660},
+    "tests/services/test_manager.py": {"sha256": "24df3649ad1d7d05ecfecd8ffc8fceb714204cdc796b3b4eb62875cc88bbc03a", "bytes": 81130},
+    "tests/fixtures/context_pack/pre_c1_ledger.json": {"sha256": "19e294a78f9761f5f6399c13b66e798dc77fde00446a2d5bfd416c6c5982b318", "bytes": 2949}
+  },
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1497 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE; immutable provenance, v3 semantics floor, typed CAS races, hostile-container bounds, executable write-disable rollback, representative pre-C1 golden replay"
+  }
+}

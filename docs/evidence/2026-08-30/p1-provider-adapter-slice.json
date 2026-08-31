@@ -1,0 +1,16 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.3C3QAYWSS0WY8F9BE6GJEYNKRA",
+  "slice": "P1 provider adapter contract and registry",
+  "files": {
+    "src/agent_commons/runtime/capabilities.py": {"sha256": "221fe0e587d614e067b4c60032a56ad96fe1301e5362b296e2c70657f5ba1dd2", "bytes": 23815},
+    "src/agent_commons/runtime/adapters.py": {"sha256": "9bde49489eca6dbebe55e22d4a445245b72c1de502fee32d1c434a59caf0b4e0", "bytes": 16785},
+    "src/agent_commons/runtime/__init__.py": {"sha256": "8fb5153477446ad446d4086ee1c5fb335df9032f86ec41d33e5309b156918bc0", "bytes": 5484},
+    "tests/runtime/test_provider_adapters.py": {"sha256": "24c4ed3be3da003eade571bcaad6388cb6cceb1b8985bd8a3990555196ae4ba2", "bytes": 27479}
+  },
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1497 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE; hostile collections bounded at cap+1, no length trust, no serialization after overflow, no secret echo"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.4TS1R73QXYXBEAM9W5MN9B4PCH",
+  "slice": "P0 actionable provider authentication recovery",
+  "files": {
+    "frontend/work/src/api.ts": {"sha256": "835246a2380de13355d937d461a91a029df4c1d92c009ba936cb745229d0acb6", "bytes": 17863},
+    "frontend/work/src/contracts.ts": {"sha256": "dd0ffcd6da5faa07ed7151e619c9b30f892343b5c3b224197565b8f8ecac6daf", "bytes": 3316},
+    "frontend/work/src/i18n.json": {"sha256": "c3cff1329ecca46c3edc804c43fadaa672ccdb5c8f892201a9ca541cfc4eebc2", "bytes": 27194},
+    "frontend/work/src/main.tsx": {"sha256": "470cdfabc78c6400affc72f87bcdd9fbd14017a36c11c1b05cff0da8c04ba23d", "bytes": 32181},
+    "frontend/work/src/styles.css": {"sha256": "6787f6e66db55a95b8d7495b03d1102e98800f75446d4f50f5347d0c6b352e4e", "bytes": 7732},
+    "src/agent_commons/ui/actions.py": {"sha256": "6897ee28d92a2d9da503e74ac1ea47ebe33a90450f3cf0337765944bba296b4b", "bytes": 26543},
+    "src/agent_commons/ui/launch.py": {"sha256": "648672f4c220da81cb452fbf8a4de70f598012dda43c004a6f353bc324f31452", "bytes": 10983},
+    "src/agent_commons/ui/provider_auth.py": {"sha256": "5ba00ceb02c1ab991e06015fff7e3696f9cfc418b5e98f952276919273b817db", "bytes": 12794},
+    "src/agent_commons/ui/read_dtos.py": {"sha256": "93ff7e5037002b69109614315f0f4b6fa1506ae1fbf7eb88c58034682220c816", "bytes": 13066},
+    "src/agent_commons/ui/reads.py": {"sha256": "94dda9208d4c62c5c3d1c1c83f19b4a8c05ab40ed17bb5aefde311442085c2a0", "bytes": 24740},
+    "src/agent_commons/ui/server.py": {"sha256": "0564e70aa3ffbd2b5bf7a297fe6d7e5c233d93bfb90e95f3af8a062eb7d0b377", "bytes": 52860},
+    "src/agent_commons/ui/static/work/index.html": {"sha256": "38118f593e89f7552b760c6db49e2fd95e7cb5558b6c47e18f7e9e22388213e2", "bytes": 411},
+    "src/agent_commons/ui/static/work/assets/work-BN87ESlY.css": {"sha256": "f2bb93982196152893c83ea1582d2d335fdffbea44699b58db44a1c2c830f8c7", "bytes": 6211},
+    "src/agent_commons/ui/static/work/assets/work-D2jvHsNZ.js": {"sha256": "140cb70b3f05b034ff18a44a776d20784efa31b91efbbbbbfabb4c236febe755", "bytes": 247227},
+    "tests/ui/test_provider_auth_recovery.py": {"sha256": "2b2d3b1f16383565bc66cd04c37265f70c45da32d4abed0fa7e78566fa315fc1", "bytes": 19057},
+    "tests/ui/test_provider_auth_work_ui.py": {"sha256": "86144dd538e266476bc20781c5889c48e632c5c1e654ccd28b56b0ed59e4665a", "bytes": 3089}
+  },
+  "removed_paths": [
+    "src/agent_commons/ui/static/work/assets/work-CMUv1buo.css",
+    "src/agent_commons/ui/static/work/assets/work-DikNmlOV.js"
+  ],
+  "verification": {
+    "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "result": "1497 passed, 13 skipped, 2 warnings",
+    "technical_review": "APPROVE; secret-free pure refusal, complete auth-operation shutdown barrier, EN/RU Work recovery, byte-identical packaged build"
+  }
+}

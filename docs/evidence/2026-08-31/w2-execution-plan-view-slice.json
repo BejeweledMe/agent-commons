@@ -1,0 +1,49 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.4PNGRR0ATFEYTGNQ5CM15YWDHW",
+  "task_revision": "evt.01M19EMVAQ9PXRXHRVGHJK92ZH",
+  "slice": "W2 bounded ExecutionPlanView, readiness, and advisory critical path",
+  "repository": {
+    "base_commit": "dd65bdb813d8eb137f6836e4fb2fa5e215849d75",
+    "base_ref": "main and origin/main",
+    "working_tree": "dirty pre-existing shared checkout",
+    "scope": "Only the three exact W2 paths listed below are asserted by this evidence; no commit or push is claimed."
+  },
+  "files": {
+    "src/agent_commons/domain/execution_plan.py": {
+      "sha256": "789b25e3187c02b27056a3d9521201bb062f000ebf5399315980bd54db36a4b7",
+      "bytes": 15682
+    },
+    "src/agent_commons/services/execution_plan.py": {
+      "sha256": "3e9a8029d5a2e72ac77522a14205ca8aaf285d5cda0214acc2c079132f8ce8ab",
+      "bytes": 23395
+    },
+    "tests/services/test_execution_plan.py": {
+      "sha256": "eaef029e5af2b52b1b1f1689b302bf6e02f3523b71dca1f6438d7b01037001bc",
+      "bytes": 22685
+    }
+  },
+  "implementation_patch": {
+    "label": "W2 own-only implementation delta",
+    "origin": "isolated W2 implementation worktree output",
+    "sha256": "47485a27d599f5337e2cf079a49690ab89ddf6a378787ce24f2a134a8e16a1ed"
+  },
+  "verification": {
+    "focused_tests": "56 passed",
+    "integrated_command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+    "integrated_result": "1611 passed, 13 skipped, 2 warnings",
+    "technical_review": {
+      "reviewer_task": "/root/w2_patch_rereview",
+      "verdict": "APPROVE",
+      "subject_patch_sha256": "47485a27d599f5337e2cf079a49690ab89ddf6a378787ce24f2a134a8e16a1ed",
+      "focused_tests": "56 passed",
+      "scope": "Independent technical collaboration review of the exact patch; non-canonical.",
+      "canonical_review": "pending"
+    }
+  },
+  "delivery": {
+    "commit": null,
+    "push": null,
+    "note": "Evidence prepared from the dirty dd65bdb shared base; this manifest does not claim a clean tree, commit, or remote update."
+  }
+}

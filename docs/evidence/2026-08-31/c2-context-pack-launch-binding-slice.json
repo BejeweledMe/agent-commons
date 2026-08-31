@@ -1,0 +1,66 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.4J4RW685TP3M0NV57C0K7RQHXD",
+  "task_revision": "evt.01M19ER4DWYW4QM8RGN0Q1D9TH",
+  "slice": "C2 crash-safe exact per-run Context Pack binding",
+  "repository": {
+    "base_commit": "dd65bdb813d8eb137f6836e4fb2fa5e215849d75",
+    "base_ref": "main and origin/main",
+    "working_tree": "dirty pre-existing shared checkout",
+    "scope": "Only the six exact C2 paths listed below are asserted by this evidence; no commit or push is claimed."
+  },
+  "files": {
+    "src/agent_commons/runtime/__init__.py": {
+      "sha256": "e28c4d5c5bae8fdac95ed0a3f12b94fc67238b322bfa7c1f52a6d154e224b2e9",
+      "bytes": 7165
+    },
+    "src/agent_commons/runtime/context_binding.py": {
+      "sha256": "5570c4dc9f01726072ab8cd3188055a58842cd022f793586c9ad9ee9b5daa1cf",
+      "bytes": 23304
+    },
+    "src/agent_commons/services/delegation_runtime.py": {
+      "sha256": "d9d3f330f63c2a419454b22e0c8404796256059bdf518f4dde817b48c7a56e18",
+      "bytes": 73549
+    },
+    "src/agent_commons/storage/opstate.py": {
+      "sha256": "4974bce6271520df633ae8e95c63d424a149c7e2ff221635d15c33f35ebf4dc6",
+      "bytes": 8849
+    },
+    "tests/runtime/test_context_binding.py": {
+      "sha256": "0428db495090f2f4151f66c1ffbaa338d5bc97403c181811cf4ed9d6949788fb",
+      "bytes": 22580
+    },
+    "tests/services/test_delegation_launch_plan.py": {
+      "sha256": "20665c9ce11217dcd2afdc8e3e24acec0342422fe2e03cb1b2710a3ea033c155",
+      "bytes": 28253
+    }
+  },
+  "implementation_patch": {
+    "label": "C2 crash-safe exact-binding remediation",
+    "origin": "isolated implementation snapshot output",
+    "sha256": "90de631e9c826d6b4f47a8fcf0973db49486bbb20813d0b247f4d109ec257402"
+  },
+  "verification": {
+    "focused_tests": "113 passed",
+    "integrated_command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID make check",
+    "integrated_result": "pending final integrated gate",
+    "technical_review": {
+      "reviewer_task": "/root/c2_integration_review",
+      "verdict": "APPROVE",
+      "subject_patch_sha256": "90de631e9c826d6b4f47a8fcf0973db49486bbb20813d0b247f4d109ec257402",
+      "scope": "Independent technical collaboration review of the exact remediation patch; non-canonical.",
+      "canonical_review": "pending"
+    }
+  },
+  "safety": {
+    "canonical_truth": "Context Pack records and revisions remain in the immutable ledger.",
+    "operational_binding": "ContextBindingStore contains only secret-free, non-authoritative launch binding metadata.",
+    "fail_closed": "Compiler drift, stale exact revisions, unauthorized correction, and legacy ambiguous attempts refuse or reconcile without fresh fallback.",
+    "resume": "not implemented or advertised"
+  },
+  "delivery": {
+    "commit": null,
+    "push": null,
+    "note": "Evidence prepared from the dirty dd65bdb shared base; release evidence will replace the pending integrated result after make check."
+  }
+}

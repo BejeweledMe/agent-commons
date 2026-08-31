@@ -7,8 +7,12 @@
 # versions come from uv.lock — never from whatever happens to be on PATH.
 
 UV ?= uv
+PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE \
+	-u AGENT_COMMONS_SESSION_ID \
+	$(UV) run --locked python -m pytest
 
-.PHONY: check lint format-check format frontend-work-deps test sync
+.PHONY: check lint format-check format frontend-work-deps help test \
+	test-domain test-runtime test-ui test-contracts sync
 
 check: lint format-check frontend-work-deps test
 
@@ -26,7 +30,34 @@ frontend-work-deps:
 	npm ci --ignore-scripts --prefix frontend/work
 
 test:
-	$(UV) run --locked python -m pytest -q
+	$(PYTEST) -q
+
+# Fast feedback targets are advisory ownership shards. They partition today's
+# suite, but are not impact-complete and never replace the full `make check` gate.
+test-domain:
+	$(PYTEST) -q tests/core tests/domain tests/services tests/storage \
+		tests/coordination tests/index tests/integrations
+
+test-runtime:
+	$(PYTEST) -q tests/runtime tests/mcp
+
+test-ui: frontend-work-deps
+	$(PYTEST) -q tests/ui tests/cli
+
+test-contracts:
+	$(PYTEST) -q tests/contract tests/e2e tests/evals tests/evals_harness \
+		tests/benchmarks tests/schemas tests/security tests/test_ci_environment.py \
+		tests/test_platform_support.py tests/test_test_pipeline_contract.py \
+		tests/test_tutorial_contract.py
+
+help:
+	@printf '%s\n' \
+		'Fast targets are advisory ownership shards, not impact-complete gates.' \
+		'make test-domain     Domain, services, storage and coordination' \
+		'make test-runtime    Provider runtime and scoped MCP' \
+		'make test-ui         CLI and UI, including Node harnesses' \
+		'make test-contracts  Cross-boundary, security and release contracts' \
+		'make check           Authoritative full-tree green contract'
 
 sync:
 	$(UV) sync --locked --extra test

@@ -1,8 +1,14 @@
 # Техплан: управляемая петля работы поверх ledger
 
-**Статус:** decision-ready план. Он фиксирует порядок исследования и
-реализации, но не принимает новые продуктовые или data-semantics решения за
-владельца.
+**Document category:** `historical-plan`
+
+**Статус:** исторический predecessor programme на границе `4844fdb`, а не
+текущий execution graph. Он остаётся полезным обоснованием hierarchical closure,
+CLI migration и structural seams, но последовательность дальнейшей реализации
+теперь задаёт
+[`agent-platform-implementation-program.md`](agent-platform-implementation-program.md).
+Ни этот документ, ни новый programme не доказывают delivery без кода, тестов,
+evidence и exact-revision review.
 
 **Дата:** 2026-08-25.
 **Проверенная граница кода и операционного среза:**

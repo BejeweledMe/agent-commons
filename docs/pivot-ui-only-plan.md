@@ -1,7 +1,19 @@
 # Пивот на UI-only: сведённый технический план
 
-Статус документа: рабочий план, не принятое решение. Ни одно из решений пивота
-не записано в реестр Agent Commons — это первый пункт плана.
+**Document category:** `historical-analysis`
+
+**Статус:** исторический decision-intake snapshot на `1c4e570`, не текущий
+implementation contract. После этого снимка решения пивота были записаны в
+ledger, включая UI как primary surface
+(`decision.61BDS4NC4GVK9K50R09XK98A07`), поэтапную замену CLI
+(`decision.65J1MEQNYC1GNHJYK9KDBDK49S`) и инкрементальную frontend-миграцию
+(`decision.7ZTNWNZN480TKQFG2WNDNA5ZQF`). Поэтому утверждения ниже о том, что
+решения ещё не приняты, читаются только как исторический контекст.
+
+Текущий порядок реализации находится в
+[`agent-platform-implementation-program.md`](agent-platform-implementation-program.md),
+а статусы ADR и способ прочитать canonical decisions — в
+[`adr/README.md`](adr/README.md).
 
 Замер состояния: ветка `codex/code-quality-audit`, HEAD `1c4e570`, рабочее
 дерево чистое, `make check` 832 passed / 13 skipped.

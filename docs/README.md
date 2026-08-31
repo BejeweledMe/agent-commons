@@ -11,10 +11,11 @@ the current source code, tests, schemas, and canonical project state win.
 | Product purpose and boundaries | [Vision](VISION.md) | Product intent, not proof that a feature is shipped. |
 | What the current checkout actually does | Source code and tests at the current Git revision | This is the release truth; verify with `make check`. |
 | Human-readable product snapshot | [Current product and architecture](current-product-and-architecture.md) | Historical baseline at `f998e33`; it is not a live release dashboard. |
-| Protocol and promotion-to-truth rules | [Protocol](PROTOCOL.md), then accepted [ADRs](adr/) | Proposals and withdrawn ADRs do not authorize implementation. |
+| Protocol and promotion-to-truth rules | [Protocol](PROTOCOL.md), then the [ADR and decision index](adr/README.md) | The canonical decision registry resolves product choices; proposed and withdrawn ADRs do not authorize implementation. |
 | System boundaries and threat model | [Architecture](ARCHITECTURE.md), [Threat model](THREAT_MODEL.md), [Frontend contract](FRONTEND_CONTRACT.md) | Code and tests decide shipped behaviour; these documents explain invariants and boundaries. |
 | User-visible workflows | [English guide](user/en/README.md) or [Russian guide](user/ru/README.md) | Describe available UI behaviour only; link future work as future. |
-| Roadmap and approved direction | [Roadmap](ROADMAP.md), [implementation plan](architecture-improvement-implementation-plan.md) | Intent and sequencing, never evidence of delivery. |
+| Active implementation programme | [Agent platform implementation programme](agent-platform-implementation-program.md) | The programme records its own baseline and scope. Verify the current checkout; a plan remains intent until code, tests, evidence and review exist. |
+| Roadmap and longer-term direction | [Roadmap](ROADMAP.md) | Direction, never evidence of delivery. |
 
 ## Canonical data versus derived material
 
@@ -35,14 +36,38 @@ The repository follows this order of authority:
 
 ## Document collections
 
-- [ADRs](adr/) — decisions, including explicit withdrawals and superseded
-  alternatives; read the status at the top of each file.
+- [ADRs and canonical decision routing](adr/README.md) — the discoverable status
+  index for architecture records and the command that reads current product
+  decisions from the ledger.
 - [Reviews](reviews/) — revision-bound judgments and corrected assessments.
 - [Audits](audits/) — historical observations, characterization, and evidence.
 - [Proposals](proposals/) — product and technical options that still need the
   relevant owner gates.
 - [Evals](evals/) — reproducible evaluation contracts and measurements.
 - [Tutorials](tutorials/) — guided exercises, not implementation contracts.
+
+## Historical plans
+
+Historical plans remain in Git because they explain why the current system has
+its boundaries, but they are not competing execution graphs:
+
+- [UI pivot analysis](pivot-ui-only-plan.md) — the decision-intake snapshot that
+  preceded the accepted UI and CLI decisions;
+- [managed-loop implementation plan](architecture-improvement-implementation-plan.md)
+  — the predecessor programme for hierarchical closure and structural work.
+
+For implementation sequencing, always return to the
+[active programme](agent-platform-implementation-program.md).
+
+## Current direction summaries
+
+The [visual orchestrator PRD](visual_multi_agent_orchestrator_prd.md) and
+[visual orchestrator plan](visual_orchestrator_plan.md) were rewritten in place
+under `decision.55YN4B2W60Z8HD03WDD0T1V2A9`. They describe the current product
+direction and architecture path, but remain non-authoritative summaries: source,
+tests and canonical decisions determine behaviour and constraints, while the
+[active programme](agent-platform-implementation-program.md) determines
+implementation sequencing.
 
 The three architecture-review files currently at the repository root are
 tracked user-provided working materials and provenance evidence:

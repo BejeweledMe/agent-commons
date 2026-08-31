@@ -1,713 +1,120 @@
-# PRD: Visual Multi-Agent Orchestrator
+# PRD: Agent Commons as a visual heterogeneous-agent workspace
 
-## 1. Концепция
+**Document category:** `current-product-direction`
 
-Визуальная среда для создания, настройки, запуска и наблюдения за иерархическими multi-agent системами.
+**Status:** current product-direction summary, not a release specification.
+Rewritten in place under accepted
+`decision.55YN4B2W60Z8HD03WDD0T1V2A9` because the previous PRD contradicted the
+UI pivot and the canonical/derived boundary. Shipped behaviour is proved by the
+current source, schemas, tests and `make check`; implementation sequencing lives
+in the [agent platform programme](agent-platform-implementation-program.md).
 
-Пользователь собирает систему как организационную структуру на бесконечном canvas:
+## Product promise
 
-- создаёт агентов;
-- объединяет их в команды/отделы;
-- назначает роли и руководителей;
-- выдаёт MCP, tools и permissions;
-- определяет связи между агентами и командами;
-- создаёт shared workspaces для коммуникации;
-- запускает задачи;
-- в реальном времени наблюдает, кто с кем взаимодействует и что происходит.
+Agent Commons is a local workspace in which a person coordinates Codex and
+Claude roles over one repository without treating provider output as truth. It
+makes work, ownership, dependencies, evidence, review and decisions visible and
+recoverable across otherwise isolated agent windows.
 
-Главная UX-метафора:
+The product is not an agent chat transcript, a free-form process launcher, or an
+autonomous company. It is a control plane for bounded heterogeneous work with a
+human operator and explicit truth promotion.
 
-> **Miro/Figma для проектирования AI-организации + runtime/debugger для наблюдения за её работой.**
+## Users and jobs
 
----
+- An operator creates or selects a project, sees what is ready or blocked,
+  chooses a role/provider/profile and starts bounded work.
+- A coordinator decomposes work, records dependencies and prevents writable
+  path collisions with temporary claims.
+- A Codex or Claude builder receives one exact task and scoped tools in a fresh
+  child session; provider-specific argv and environment never become UI data.
+- An independent reviewer inspects the exact registered revision read-only.
+- A designer publishes revision-bound visual artifacts and, after the Gallery
+  vertical lands, an ordered Design Package with provenance and feedback.
 
-## 2. Основные сущности
+## Product surfaces
 
-### Agent
+### Work
 
-Автономный исполнитель.
+Work is the primary entry surface. It guides provider setup, role selection and
+bounded launch while returning actionable typed refusals for missing
+configuration, authentication, capability or operator action. The legacy panel
+remains a compatibility and recovery surface during screen-by-screen migration
+under `decision.7ZTNWNZN480TKQFG2WNDNA5ZQF`.
 
-Основные настройки:
+### Tracker
 
-```text
-Agent
-├── Name
-├── Role
-├── System prompt / Instructions
-├── Model
-├── Reports to
-├── Sub-agents
-├── MCP servers
-├── Tools
-├── Permissions
-├── Memory
-├── Context policy
-├── Budget / token limits
-└── Runtime limits
-```
+The tracker assembles existing task, dependency, delegation, attempt, attention
+and SSE data into an honest task DAG, readiness state, run timeline and human
+attention queue. It may show phases, timestamps, duration, snapshot freshness
+and advisory critical path. It must not invent percentage complete, ETA, token
+count or cost.
 
-Пример:
+### Context
 
-```text
-Backend Engineer
-────────────────────
+Fresh is the default: a new child session receives no previous transcript,
+hidden reasoning or provider resume state. Accumulated context means an exact,
+bounded, revisioned Context Pack containing summary, facts, decision references,
+source references and open questions. Two roles may receive the same frozen
+baseline without sharing mutable authority or working state. Canonical Context
+and Design Packages are authorized by
+`decision.2ASFCETB9SMAXTVQ5PXRFJYRXW`.
 
-Model:
-GPT-5.x
+### Design Gallery
 
-Role:
-Senior Backend Engineer
+Gallery is a separate React surface and the first accepted screen migration
+(`decision.0A252PQN9QH7HZCBF4ZDF8BR8X`). A real Design Package provides ordered
+screen bindings to exact artifact revisions, producer/task provenance and safe
+PNG/JPEG previews. Feedback uses the existing revision-bound discussion model.
+Mock frontend screens must never be presented as project data.
 
-Reports to:
-Tech Lead
-
-MCP:
-✓ GitHub
-✓ Linear
-✓ PostgreSQL
-✗ Production DB
-
-Filesystem:
-read/write
-
-Can communicate with:
-✓ Tech Lead
-✓ Reviewer
-
-Can delegate:
-✗
-```
-
-### Team
-
-Логическая группа агентов — аналог отдела или команды.
+## Trust and data model
 
 ```text
-Engineering
-├── Tech Lead
-├── Backend Engineer
-├── Frontend Engineer
-└── Reviewer
+immutable project truth     .agent-commons/events + manifests
+        ↓ replay
+typed domain projections and read DTOs
+        ↓
+Work / Tracker / Gallery
+
+private operational state   sessions, attempts, receipts and bounded telemetry
+provider process            untrusted output; never an acceptance authority
 ```
 
-Team имеет собственные:
-
-- agents;
-- supervisor;
-- shared workspace;
-- shared memory;
-- MCP/tools;
-- permissions;
-- communication policy.
-
-Например:
-
-```text
-Engineering Team
-
-Supervisor:
-Tech Lead
-
-Shared MCP:
-GitHub
-Linear
-CI
-
-Shared memory:
-architecture.md
-decisions.md
-
-Internal communication:
-unrestricted
-
-External communication:
-through Tech Lead
-```
-
-Команды могут быть вложенными.
-
-### Workspace
-
-Persistent communication/memory layer между агентами или командами.
-
-Это не просто edge графа, а отдельная сущность с историей.
-
-Например:
-
-```text
-#product-engineering
-
-Participants:
-Product Lead
-Tech Lead
-
-Messages:
-184
-
-Artifacts:
-PRD.md
-architecture.md
-api-contract.md
-
-Context policy:
-summary + last 30 messages
-
-Permissions:
-Product: read/write
-Engineering: read/write
-QA: read-only
-```
-
-Workspace используется одновременно как:
-
-1. communication channel;
-2. shared history;
-3. context buffer;
-4. место для shared artifacts.
-
-### Relationship
-
-Связь между сущностями на canvas.
-
-Минимально необходимо разделять два вида.
-
-#### Control relationship
-
-```text
-Tech Lead
-    │
-    │ delegates
-    ▼
-Backend Engineer
-```
-
-Определяет:
-
-- delegation;
-- supervision;
-- reporting;
-- возможность запускать sub-agent.
-
-#### Communication relationship
-
-```text
-Product Team
-      │
-      │ #product-engineering
-      ▼
-Engineering Team
-```
-
-Определяет доступ к Workspace и обмен информацией.
-
----
-
-## 3. Canvas
-
-Основной экран приложения — infinite canvas.
-
-Пример организации:
-
-```text
-┌──────────────── PRODUCT ─────────────────┐
-│                                          │
-│              Product Lead                │
-│               /        \                 │
-│             PM        Analyst            │
-│                                          │
-└──────────────────┬───────────────────────┘
-                   │
-          #product-engineering
-                   │
-                   ▼
-┌────────────── ENGINEERING ───────────────┐
-│                                          │
-│                Tech Lead                 │
-│          /         |          \          │
-│     Backend    Frontend      ML Eng      │
-│        │          │            │         │
-│        └──────────┼────────────┘         │
-│                   ▼                      │
-│                Reviewer                  │
-│                                          │
-└──────────────────┬───────────────────────┘
-                   │
-               #eng-qa
-                   │
-                   ▼
-┌────────────────── QA ────────────────────┐
-│                                          │
-│               QA Lead                    │
-│              /       \                   │
-│         QA Agent    Security             │
-│                                          │
-└──────────────────────────────────────────┘
-```
-
-Canvas является **source of truth**, а не просто визуализацией конфигурации.
-
-Создание/удаление node или edge изменяет runtime topology.
-
----
-
-## 4. Agent Inspector
-
-Клик по агенту открывает боковую панель.
-
-```text
-┌ Backend Engineer ──────────────────┐
-
-STATUS
-● Working
-
-Current task:
-Implement authentication API
-
-Reports to:
-Tech Lead
-
-MODEL
-GPT-5.x
-
-INSTRUCTIONS
-[ Edit ]
-
-TOOLS / MCP
-✓ GitHub
-✓ Linear
-✓ Filesystem
-✓ PostgreSQL
-
-PERMISSIONS
-GitHub: write
-Filesystem: write
-Production: none
-
-CONTEXT
-Private memory
-Engineering workspace
-Current task
-
-RUNTIME
-Tokens: 18,421
-Cost: $0.34
-Duration: 04:21
-
-[ View trace ]
-[ Stop agent ]
-
-└────────────────────────────────────┘
-```
-
----
-
-## 5. Communication Inspector
-
-Клик по communication edge открывает историю взаимодействия.
-
-Например:
-
-```text
-Backend ═══════════════► Reviewer
-```
-
-Inspector:
-
-```text
-Backend ↔ Reviewer
-──────────────────────────────
-
-14:32:07  Backend
-
-REQUEST
-
-Review PR #812.
-Focus on concurrency and database
-transaction handling.
-
-
-14:32:11  Reviewer
-
-TOOL CALL
-
-GitHub.get_pull_request(812)
-
-
-14:32:19  Reviewer
-
-RESPONSE
-
-Potential race condition found in
-UserRepository.create().
-
-
-14:32:21  Reviewer → Backend
-
-REQUEST
-
-Please fix before merge.
-
-
-14:38:04  Backend
-
-RESPONSE
-
-Fixed in commit 82ac31.
-```
-
-Filters:
-
-```text
-[ Messages ]
-[ Tool Calls ]
-[ Handoffs ]
-[ Artifacts ]
-[ Context ]
-[ Tokens ]
-[ Timing ]
-```
-
----
-
-## 6. Runtime visualization
-
-После запуска canvas переходит в live mode.
-
-Статусы:
-
-```text
-○ Idle
-● Working
-◐ Waiting
-✓ Completed
-✕ Failed
-```
-
-Активные связи подсвечиваются.
-
-Например:
-
-```text
-Backend
-● WORKING
-    │
-    │ PR #812
-    ▼
-GitHub MCP
-● CALLING
-```
-
-После этого:
-
-```text
-Backend
-◐ WAITING
-    │
-    │ review request
-    ▼
-Reviewer
-● WORKING
-```
-
-Таким образом пользователь визуально видит execution flow без чтения общего лога.
-
----
-
-## 7. Task execution
-
-Пользователь может запустить задачу на любом уровне.
-
-### Organization
-
-```text
-Build user authentication feature
-```
-
-### Team
-
-```text
-Engineering:
-Implement OAuth support
-```
-
-### Agent
-
-```text
-Backend Engineer:
-Investigate issue #481
-```
-
-Supervisor самостоятельно декомпозирует задачу и делегирует её доступным агентам.
-
----
-
-## 8. Пример полного взаимодействия
-
-Пользователь ставит Product Team задачу:
-
-```text
-Добавить возможность авторизации через Google.
-```
-
-### Step 1 — Product
-
-```text
-Product Lead
-     │
-     ▼
-PM
-```
-
-PM формирует требования:
-
-```text
-Google OAuth
-
-Requirements:
-- Login
-- Registration
-- Account linking
-- Existing email handling
-```
-
-Результат сохраняется:
-
-```text
-#product-engineering
-```
-
-### Step 2 — передача Engineering
-
-```text
-Product Lead
-      │
-      │ #product-engineering
-      ▼
-Tech Lead
-```
-
-Tech Lead читает workspace и декомпозирует работу:
-
-```text
-Backend:
-OAuth API + account linking
-
-Frontend:
-Google login UI
-
-Reviewer:
-Review implementation
-```
-
-### Step 3 — параллельная работа
-
-```text
-                    Tech Lead
-                  /           \
-                 ▼             ▼
-
-             Backend        Frontend
-             ● WORKING      ● WORKING
-
-                 │             │
-                 ▼             ▼
-
-              GitHub         Figma
-              DB MCP         GitHub
-```
-
-Backend создаёт PR #812.
-
-Frontend создаёт PR #813.
-
-### Step 4 — review
-
-```text
-Backend ─────┐
-             │
-             ▼
-          Reviewer
-             ▲
-             │
-Frontend ────┘
-```
-
-Reviewer обнаруживает ошибку.
-
-На canvas появляется активное взаимодействие:
-
-```text
-Reviewer ═══════════► Backend
-         fix request
-```
-
-Backend исправляет код.
-
-Reviewer подтверждает:
-
-```text
-✓ APPROVED
-```
-
-### Step 5 — завершение
-
-Tech Lead получает результаты:
-
-```text
-Backend ✓
-Frontend ✓
-Review ✓
-Tests ✓
-```
-
-И пишет в workspace:
-
-```text
-#product-engineering
-
-Engineering completed.
-
-Backend: PR #812
-Frontend: PR #813
-Tests: passed
-Review: approved
-```
-
-Product Lead получает итоговый отчёт.
-
----
-
-## 9. Context isolation
-
-Каждый агент получает только необходимый ему контекст.
-
-Например Backend Engineer видит:
-
-```text
-Private context
-      +
-Engineering workspace
-      +
-#product-engineering
-      +
-Current task
-```
-
-Но не получает автоматически:
-
-```text
-Product internal discussion
-Frontend private context
-QA internal discussion
-```
-
-Это необходимо для:
-
-- снижения token usage;
-- уменьшения context pollution;
-- безопасности;
-- предсказуемого поведения агентов.
-
----
-
-## 10. Runtime model
-
-UI не должен быть жёстко привязан к конкретному agent framework.
-
-Внутренняя модель:
-
-```text
-Organization
-├── Teams[]
-├── Agents[]
-├── Workspaces[]
-├── Relationships[]
-├── Resources[]
-├── Policies[]
-└── Runs[]
-```
-
-Runtime через adapters:
-
-```text
-                 Visual Canvas
-                       │
-                       ▼
-                Organization DSL
-                       │
-             ┌─────────┼─────────┐
-             ▼         ▼         ▼
-          AutoGen   Agents SDK  LangGraph
-             │         │         │
-             └─────────┼─────────┘
-                       ▼
-                      MCP
-                 /     |      \
-             GitHub  Linear   Files
-```
-
-Canvas и DSL являются source of truth.
-
----
-
-## 11. MVP
-
-В первую версию должны войти только ключевые возможности.
-
-### Authoring
-
-- infinite canvas;
-- Agent nodes;
-- Team containers;
-- создание control edges;
-- создание communication edges;
-- Agent Inspector;
-- настройка model/instructions;
-- MCP/tools configuration;
-- permissions;
-- сохранение organization graph.
-
-### Runtime
-
-- запуск задачи;
-- supervisor → agent delegation;
-- agent → agent messaging;
-- persistent workspaces;
-- MCP calls;
-- shared/team context;
-- agent statuses;
-- live graph updates.
-
-### Observability
-
-- история сообщений;
-- tool calls;
-- handoffs;
-- execution timeline;
-- token usage;
-- errors;
-- просмотр истории непосредственно через nodes/edges.
-
----
-
-## 12. Не входит в MVP
-
-Не делать на первой итерации:
-
-- marketplace агентов;
-- сложный RBAC пользователей самого продукта;
-- billing;
-- autonomous agent creation;
-- визуальный prompt builder;
-- сложную аналитику;
-- mobile UI;
-- десятки agent frameworks;
-- собственную LLM inference infrastructure.
-
-Цель MVP — проверить главный UX:
-
-> **Можно ли проектировать multi-agent систему как организацию и затем понимать её работу непосредственно через тот же визуальный граф.**
-
-Ключевая продуктовая дифференциация:
-
-> **Agents are nodes. Teams are containers. Communication is persistent edges/workspaces. The organization graph is both the configuration and the runtime debugger.**
+The immutable ledger is the sole canonical project record. UI reads typed DTOs
+and writes through the existing manager/service boundary. Provider adapters
+cannot write canonical events or complete delegations. Process exit is not
+canonical success: only the scoped terminal MCP path plus valid lifecycle
+transition can produce it. Prompts, transcripts, reasoning, raw tool arguments,
+raw stderr and credentials are excluded from canonical and UI persistence.
+
+Task completion, independent review, verification and owner acceptance remain
+different states. `task.accepted` requires a current independent approval under
+`decision.2FFQCGQKQ21VS1MQHNFCQEZWKJ`.
+
+## Current honest boundary
+
+Coordination core, roles, tasks, dependencies, claims, reviews, evidence,
+staleness, lifecycle, the local panel, a bounded Codex/Claude broker and safe
+image preview exist. Provider adapters, Context Pack C1 and tracker read models
+are active implementation slices in the current checkout.
+
+The complete tracker surface, exact launch binding for accumulated context,
+canonical Design Packages, data-backed Gallery and end-to-end heterogeneous
+journey are not release-complete until their code, tests, canaries, rollback
+evidence and exact independent review land. Resume remains unavailable until
+provider session, child session, attempt and checkpoint identities can be
+reconciled safely.
+
+## Non-goals
+
+- arbitrary argv, environment, workspace provider discovery or dynamic plugins;
+- a second authoritative RunEventStore or provider transcript archive;
+- hidden fallback between providers or capabilities;
+- unrestricted shared mutable memory between roles;
+- SVG/HTML preview, visual source editing or demo data presented as real;
+- automatic acceptance, self-review or authority expansion through context.
+
+See the [documentation map](README.md), [ADR/decision index](adr/README.md),
+[architecture](ARCHITECTURE.md), [threat model](THREAT_MODEL.md) and
+[frontend contract](FRONTEND_CONTRACT.md) for the governing boundaries.

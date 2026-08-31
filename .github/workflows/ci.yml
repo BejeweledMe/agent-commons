@@ -2,10 +2,19 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
   contents: read
+
+# A same-repository PR used to run the identical eight-job matrix once for the
+# branch push and again for the PR. Keep the full matrix on PRs and main while
+# cancelling only superseded executions of the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -38,6 +47,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".node-version"
+          cache: npm
+          cache-dependency-path: frontend/work/package-lock.json
       - run: uv sync --locked --extra test
       - run: make check
 
