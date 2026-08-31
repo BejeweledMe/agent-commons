@@ -89,11 +89,13 @@ class FakeRunner:
         *,
         outcome: RunOutcome = RunOutcome.SUCCEEDED,
         reason: RunReason = RunReason.COMPLETED,
+        stdout: bytes = b"provider content must remain ephemeral",
         after_start: Callable[[str], None] | None = None,
         crash_after_start: bool = False,
     ) -> None:
         self.outcome = outcome
         self.reason = reason
+        self.stdout = stdout
         self.after_start = after_start
         self.crash_after_start = crash_after_start
         self.calls = 0
@@ -113,9 +115,9 @@ class FakeRunner:
             exit_code=0 if self.outcome is RunOutcome.SUCCEEDED else 1,
             pid=None if self.reason is RunReason.START_FAILED else 7000 + self.calls,
             duration_seconds=0.25,
-            stdout=b"provider content must remain ephemeral",
+            stdout=self.stdout,
             stderr=b"",
-            stdout_bytes_seen=38,
+            stdout_bytes_seen=len(self.stdout),
             stderr_bytes_seen=0,
             output_truncated=False,
         )
@@ -128,6 +130,17 @@ def test_launch_pins_child_state_when_ambient_root_belongs_to_another_workspace(
     manager, task = _workspace(tmp_path)
     _, delegation = _delegation(manager, task)
     delegation_id = delegation["entity_ref"]["id"]
+    original_read_snapshot = manager._read_snapshot
+    prewarmed_states: list[str] = []
+
+    def observed_read_snapshot(*, fresh: bool = False) -> Any:
+        result = original_read_snapshot(fresh=fresh)
+        current = result[0].delegations.get(delegation_id)
+        if current is not None:
+            prewarmed_states.append(str(current.get("state")))
+        return result
+
+    monkeypatch.setattr(manager, "_read_snapshot", observed_read_snapshot)
 
     foreign_repo = tmp_path / "foreign-repo"
     foreign_repo.mkdir()
@@ -185,6 +198,7 @@ def test_launch_pins_child_state_when_ambient_root_belongs_to_another_workspace(
     assert result["attempt"]["state"] == "succeeded"
     assert runner.resolution_error is None
     assert runner.resolved_state_root == manager.paths.state_root
+    assert prewarmed_states == ["active"]
     notice = result["child_state_resolution"]
     assert notice.count("\n") == 0
     assert "launching workspace" in notice
@@ -286,7 +300,7 @@ def test_a_roles_tool_narrowing_reaches_the_launched_process(tmp_path: Path) -> 
         name="Scoped reviewer",
         profile_id="claude-independent-reviewer",
         rationale="reads the repository but does not grep it",
-        tool_allowlist=("commons_repo_read", "commons_complete_review"),
+        tool_allowlist=("commons_repo_read", "commons_finalize_review"),
         idempotency_key="runtime-role",
     )
     review = manager.request_review(
@@ -361,10 +375,11 @@ def test_a_roles_tool_narrowing_reaches_the_launched_process(tmp_path: Path) -> 
     allowed = set(argv[argv.index("--allowed-tools") + 1].split(","))
     assert "mcp__agent-commons__commons_repo_read" in allowed
     assert "mcp__agent-commons__commons_repo_search" not in allowed
-    assert "mcp__agent-commons__commons_succeed_delegation" in allowed
+    assert "mcp__agent-commons__commons_finalize_review" in allowed
+    assert "mcp__agent-commons__commons_succeed_delegation" not in allowed
 
 
-def test_a_required_skill_reaches_the_instruction_the_provider_receives(
+def test_a_packaged_required_skill_reaches_the_provider_without_catalog_text(
     tmp_path: Path,
 ) -> None:
     """A catalogue nothing reads would be a settings screen over nothing."""
@@ -373,8 +388,8 @@ def test_a_required_skill_reaches_the_instruction_the_provider_receives(
     role = manager.create_agent(
         name="Backend",
         profile_id="claude-independent-reviewer",
-        rationale="requires the house review checklist",
-        skills=("house-checklist",),
+        rationale="requires canonical project startup",
+        skills=("commons-start",),
         idempotency_key="skill-role",
     )
     review = manager.request_review(
@@ -452,9 +467,9 @@ def test_a_required_skill_reaches_the_instruction_the_provider_receives(
         {
             "skills": [
                 {
-                    "id": "house-checklist",
-                    "title": "House checklist",
-                    "instruction": "Check error handling before style.",
+                    "id": "commons-start",
+                    "title": "Start safely",
+                    "instruction": "UNTRUSTED CATALOG TEXT MUST NOT REACH PROVIDER",
                 }
             ],
             "tools": [],
@@ -463,8 +478,10 @@ def test_a_required_skill_reaches_the_instruction_the_provider_receives(
 
     assert result["delegation"]["state"] == "succeeded"
     instruction = seen[-1].decode("utf-8")
-    assert "Check error handling before style." in instruction
-    assert "house-checklist" in instruction
+    assert "UNTRUSTED CATALOG TEXT MUST NOT REACH PROVIDER" not in instruction
+    assert 'provider="claude" id="commons-start"' in instruction
+    assert ".claude/skills/commons-start/SKILL.md" in instruction
+    assert "name: commons-start" in instruction
 
 
 def test_the_model_a_role_was_hired_on_reaches_the_launched_process(tmp_path: Path) -> None:
@@ -716,7 +733,7 @@ def test_prestart_failure_can_retry_only_until_attempt_limit(tmp_path: Path) -> 
         )
 
 
-def test_independent_review_instruction_requires_both_canonical_terminal_calls(
+def test_independent_review_instruction_requires_one_canonical_terminal_operation(
     tmp_path: Path,
 ) -> None:
     manager, task = _workspace(tmp_path)
@@ -728,15 +745,15 @@ def test_independent_review_instruction_requires_both_canonical_terminal_calls(
         profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
     )
 
-    complete = instruction.index("commons_complete_review")
-    succeed = instruction.index("commons_succeed_delegation")
-    assert complete < succeed
-    assert "review:<id>" in instruction
+    assert "commons_finalize_review" in instruction
+    assert "do not call a\nseparate generic delegation-success tool" in instruction
+    assert "commons_complete_review" not in instruction
+    assert "commons_succeed_delegation" not in instruction
     assert "Delegation revision at launch" not in instruction
     compact_instruction = instruction.replace("\n", " ")
     assert "immediately before every delegation outcome call" in compact_instruction
     assert "fetch the delegation again with commons_show_delegation" in compact_instruction
-    assert "prose-only answer or successful process exit" in instruction
+    assert "prose-only answer or successful\nprocess exit" in instruction
     assert "commons_delegation_needs_operator" in instruction
     assert "commons_delegation_input_needed" in instruction
 
@@ -782,6 +799,34 @@ def test_successful_process_without_terminal_tool_gets_actionable_workflow_diagn
     assert diagnostic["diagnostic_code"] == "none"
     assert diagnostic["workflow_diagnostic_code"] == "terminal_tool_not_called"
     assert diagnostic["safe_next_actions"]
+
+
+def test_zero_exit_provider_auth_error_is_typed_before_terminal_gap(
+    tmp_path: Path,
+) -> None:
+    manager, task = _workspace(tmp_path)
+    _, delegation = _delegation(manager, task)
+    stdout = b'{"type":"result","is_error":true,"result":"Please run /login"}\n'
+    service = DelegationRuntimeService(
+        manager,
+        runner=FakeRunner(stdout=stdout),  # type: ignore[arg-type]
+        profiles=default_profile_registry(
+            claude_executable="/bin/echo", mcp_executable="/bin/echo"
+        ),
+    )
+
+    result = service.run(
+        delegation["entity_ref"]["id"],
+        delegation["revision"],
+        idempotency_key="runtime-zero-exit-auth-error",
+    )
+    diagnostic = service.list_attempts(diagnostic=True)[0]
+
+    assert result["process"]["outcome"] == "succeeded"
+    assert result["delegation"]["state"] == "needs_operator"
+    assert result["workflow_diagnostic_code"] == "provider_auth_failed"
+    assert diagnostic["diagnostic_code"] == "provider_auth_failed"
+    assert diagnostic["workflow_diagnostic_code"] == "provider_auth_failed"
 
 
 def test_reconcile_maps_ambiguous_running_attempt_to_canonical_needs_operator(

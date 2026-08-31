@@ -18,6 +18,9 @@ from agent_commons.runtime import (
     OperatorLimits,
     ProfileRegistry,
     Provider,
+    ProviderInitializationProbe,
+    ProviderInitializationStatus,
+    ProviderQualificationStore,
     RunnerInvocation,
     RunOutcome,
     SubprocessRunner,
@@ -103,19 +106,26 @@ def _run_compatibility_canary(
     profiles: ProfileRegistry,
     *,
     profile_id: BuiltinProfileId,
+    purpose: str = "independent_review",
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
+    requester_client: str = "agent-commons",
 ) -> dict[str, Any]:
-    """Run one fixed, isolated provider review and grade canonical terminal behavior."""
+    """Run one fixed, isolated provider flow and grade canonical terminal behavior."""
 
     if not 30 <= wall_time_seconds <= 1800:
         raise ConfigurationError("provider canary wall time must be between 30 and 1800 seconds")
+    if purpose not in {"implementation", "independent_review", "verification"}:
+        raise ConfigurationError("provider canary purpose is unsupported")
     profile = profiles.get(profile_id)
-    if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile)) or (
-        not profile_id.independent_reviewer
-    ):
-        raise ConfigurationError("provider canary requires an independent-review profile")
+    if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile)):
+        raise ConfigurationError("provider canary requires an allowlisted provider profile")
+    if profile_id.independent_reviewer != (purpose != "implementation"):
+        raise ConfigurationError("provider canary purpose does not match its profile")
+    if requester_client not in {"agent-commons", "claude", "codex"}:
+        raise ConfigurationError("provider canary requester client is unsupported")
 
     process_runner = runner or SubprocessRunner()
     with tempfile.TemporaryDirectory(prefix="agent-commons-provider-canary-") as temporary:
@@ -150,59 +160,123 @@ def _run_compatibility_canary(
             profile_id,
             workspace_root=repo,
             state_root=state_root,
-            purpose="independent_review",
+            purpose=purpose,
             runner=process_runner,
         )
         base_report: dict[str, Any] = {
             "schema": CANARY_SCHEMA,
             "agent_commons_version": __version__,
             "agent_commons_source_sha256": agent_commons_source_sha256(),
-            "provider": Provider.CLAUDE.value,
+            "provider": profile.provider.value,
             "profile_id": profile_id.value,
+            "purpose": purpose,
             "model": profile.model,
             "provider_version": provider_version,
+            "requester_client": requester_client,
             "preflight": preflight,
         }
         if not preflight["ok"]:
-            return {
+            report = {
                 **base_report,
                 "ok": False,
                 "provider_work_process_started": False,
                 "workflow_diagnostic_code": "preflight_failed",
             }
+            if qualification_state_root is not None:
+                ProviderQualificationStore(qualification_state_root).record(
+                    profile,
+                    workspace_root=repo,
+                    static_preflight=False,
+                    initialization_probe=False,
+                    behavioral_canary=False,
+                    provider_version=provider_version,
+                )
+            return report
+
+        initialization = ProviderInitializationProbe(runner=process_runner).probe(
+            profile,
+            workspace_root=repo,
+        )
+        base_report["initialization"] = {
+            "state": initialization.state.value,
+            "supported": initialization.supported,
+            "blocks_launch": initialization.blocks_launch,
+        }
+        if initialization.blocks_launch:
+            report = {
+                **base_report,
+                "ok": False,
+                "provider_work_process_started": False,
+                "workflow_diagnostic_code": "provider_initialization_failed",
+            }
+            if qualification_state_root is not None:
+                ProviderQualificationStore(qualification_state_root).record(
+                    profile,
+                    workspace_root=repo,
+                    static_preflight=True,
+                    initialization_probe=False,
+                    behavioral_canary=False,
+                    provider_version=provider_version,
+                )
+            return report
 
         manager = CommonsManager(repo, state_root=state_root)
         parent = manager.start_session(
-            stable_instance_id="provider-canary-parent-session",
+            stable_instance_id=f"provider-canary-{requester_client}-parent-session",
             principal="local-operator",
-            client="agent-commons",
-            software="provider-canary",
+            client=requester_client,
+            software=("claude-code" if requester_client == "claude" else "provider-canary"),
             role="compatibility-canary",
+            model_family=("anthropic" if requester_client == "claude" else None),
             ttl_seconds=wall_time_seconds + 300,
         )
         manager.session_id = parent["session_id"]
         task = manager.create_task(
-            title="Review the fixed provider compatibility canary",
+            title="Run the fixed provider compatibility canary",
             description=(
-                "Inspect src/canary.py through the scoped worker tools and record a bounded "
-                "independent review."
+                "Inspect src/canary.py through the scoped worker tools and record the "
+                "purpose-specific bounded terminal result."
             ),
             acceptance_criteria=("The source defines answer() and returns the integer 42.",),
             priority="normal",
             idempotency_key="provider-canary-task",
         )
-        review = manager.request_review(
-            target_ref=task["entity_ref"],
-            target_revision=task["revision"],
-            criteria=("Inspect the exact scoped source and record a bounded verdict.",),
-            independent=True,
-            idempotency_key="provider-canary-review",
+        artifact = manager.register_artifact(
+            source,
+            media_type="text/x-python",
+            classification="internal",
+            idempotency_key="provider-canary-artifact",
         )
+        task = manager.start_task(
+            task["entity_ref"]["id"],
+            task["revision"],
+            idempotency_key="provider-canary-task-start",
+        )
+        if purpose != "implementation":
+            task = manager.complete_task(
+                task["entity_ref"]["id"],
+                task["revision"],
+                summary="The fixed canary source is registered as immutable evidence.",
+                artifact_refs=(artifact["entity_ref"],),
+                idempotency_key="provider-canary-task-complete",
+            )
+        review = (
+            manager.request_review(
+                target_ref=task["entity_ref"],
+                target_revision=task["revision"],
+                criteria=("Inspect the exact scoped source and record a bounded verdict.",),
+                independent=True,
+                idempotency_key="provider-canary-review",
+            )
+            if purpose == "independent_review"
+            else None
+        )
+        target = review if review is not None else task
         delegation = manager.create_delegation(
-            target_ref=review["entity_ref"],
-            target_revision=review["revision"],
+            target_ref=target["entity_ref"],
+            target_revision=target["revision"],
             target_profile=profile_id.value,
-            purpose="independent_review",
+            purpose=purpose,
             limits={
                 "max_depth": 0,
                 "wall_time_seconds": wall_time_seconds,
@@ -217,12 +291,53 @@ def _run_compatibility_canary(
             profiles=profiles,
             operator_limits=operator_limits,
             runner=process_runner,
+            initialization_probe=_FixedInitialization(initialization),
+            qualification_required=False,
         )
-        result = service.run(
-            delegation["entity_ref"]["id"],
-            delegation["revision"],
-            idempotency_key="provider-canary-launch",
-        )
+        try:
+            result = service.run(
+                delegation["entity_ref"]["id"],
+                delegation["revision"],
+                idempotency_key="provider-canary-launch",
+            )
+        except ConfigurationError as exc:
+            auth_state = getattr(exc, "provider_auth_state", None)
+            if auth_state is None:
+                raise
+            attempts = service.attempts.list_attempts()
+            sessions = manager.sessions.list_sessions()
+            current = manager.get_delegation(delegation["entity_ref"]["id"])
+            manager.cancel_delegation(
+                current["id"],
+                current["revision"],
+                reason="Isolated provider canary cleanup after an auth refusal.",
+                idempotency_key="provider-canary-auth-cleanup",
+            )
+            manager.end_session(nonce=parent["nonce"])
+            report = {
+                **base_report,
+                "ok": False,
+                "provider_work_process_started": False,
+                "provider_auth_state": auth_state,
+                "workflow_diagnostic_code": getattr(
+                    exc,
+                    "code",
+                    "provider_auth_unknown",
+                ),
+                "canonical_state_before_cleanup": current["state"],
+                "attempt_reserved": bool(attempts),
+                "child_session_created": len(sessions) != 1,
+            }
+            if qualification_state_root is not None:
+                ProviderQualificationStore(qualification_state_root).record(
+                    profile,
+                    workspace_root=repo,
+                    static_preflight=True,
+                    initialization_probe=True,
+                    behavioral_canary=False,
+                    provider_version=provider_version,
+                )
+            return report
         joined = next(
             item
             for item in service.list_attempts(diagnostic=True)
@@ -230,7 +345,29 @@ def _run_compatibility_canary(
         )
         canonical = result["delegation"]
         child_session = manager.show_session(result["attempt"]["correlation"]["child_session_id"])
-        expected_result_refs = [review["entity_ref"]]
+        if review is not None:
+            expected_result_refs = [review["entity_ref"]]
+        elif purpose == "implementation":
+            expected_result_refs = [task["entity_ref"]]
+        else:
+            verifications = [
+                item
+                for item in manager.list_verifications()
+                if item.get("target_ref") == task["entity_ref"]
+                and item.get("target_revision") == task["revision"]
+                and (item.get("actor") or {}).get("session_id")
+                == result["attempt"]["correlation"]["child_session_id"]
+            ]
+            expected_result_refs = (
+                [
+                    {
+                        "kind": "verification",
+                        "id": str(verifications[0]["id"]),
+                    }
+                ]
+                if len(verifications) == 1
+                else []
+            )
         ok = (
             result["process"]["outcome"] == "succeeded"
             and canonical["state"] == "succeeded"
@@ -253,7 +390,7 @@ def _run_compatibility_canary(
         manager.end_session(nonce=parent["nonce"])
 
         process = result["process"]
-        return {
+        report = {
             **base_report,
             "ok": ok,
             "provider_work_process_started": True,
@@ -271,41 +408,118 @@ def _run_compatibility_canary(
             "terminal_tool_calls": joined["terminal_tool_calls"],
             "terminal_tool_completions": joined["terminal_tool_completions"],
             "terminal_tool_rejections": joined["terminal_tool_rejections"],
+            "terminal_tool_rejection_details": joined["terminal_tool_rejection_details"],
+            "terminal_tool_rejection_details_truncated": joined[
+                "terminal_tool_rejection_details_truncated"
+            ],
             "child_session_closed": child_session["effective_status"] == "closed",
         }
+        if qualification_state_root is not None:
+            ProviderQualificationStore(qualification_state_root).record(
+                profile,
+                workspace_root=repo,
+                static_preflight=True,
+                initialization_probe=True,
+                behavioral_canary=ok,
+                provider_version=provider_version,
+            )
+        return report
+
+
+class _FixedInitialization:
+    """Reuse the separately reported probe instead of running it twice."""
+
+    def __init__(self, status: ProviderInitializationStatus) -> None:
+        self.status = status
+
+    def probe(self, profile: Any, *, workspace_root: Path) -> ProviderInitializationStatus:
+        del profile, workspace_root
+        return self.status
 
 
 def run_claude_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    purpose: str = "independent_review",
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
 ) -> dict[str, Any]:
     """Run one fixed, isolated Claude review and grade canonical terminal behavior."""
 
     return _run_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        purpose=purpose,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
+        qualification_state_root=qualification_state_root,
     )
 
 
 def run_codex_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    purpose: str = "independent_review",
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
 ) -> dict[str, Any]:
     """Run one fixed, isolated Codex review and grade canonical terminal behavior."""
 
     return _run_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        purpose=purpose,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
+        qualification_state_root=qualification_state_root,
+    )
+
+
+def run_claude_builder_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
+) -> dict[str, Any]:
+    """Run the fixed scoped terminal flow for the advertised Claude builder."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.CLAUDE_BUILDER,
+        purpose="implementation",
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+        qualification_state_root=qualification_state_root,
+    )
+
+
+def run_codex_builder_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
+    requester_client: str = "agent-commons",
+) -> dict[str, Any]:
+    """Run the fixed scoped terminal flow for the advertised Codex builder."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+        purpose="implementation",
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+        qualification_state_root=qualification_state_root,
+        requester_client=requester_client,
     )

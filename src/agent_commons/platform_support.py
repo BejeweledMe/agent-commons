@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import sys
 
@@ -32,6 +33,20 @@ def lock_exclusive(descriptor: int) -> None:
     require_supported_platform()
     assert _fcntl is not None
     _fcntl.flock(descriptor, _fcntl.LOCK_EX)
+
+
+def try_lock_exclusive(descriptor: int) -> bool:
+    """Try to acquire the supported exclusive lock without waiting."""
+
+    require_supported_platform()
+    assert _fcntl is not None
+    try:
+        _fcntl.flock(descriptor, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+    except OSError as exc:
+        if exc.errno in {errno.EACCES, errno.EAGAIN}:
+            return False
+        raise
+    return True
 
 
 def unlock(descriptor: int) -> None:

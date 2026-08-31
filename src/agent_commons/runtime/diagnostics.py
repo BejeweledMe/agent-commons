@@ -8,6 +8,7 @@ or persisted.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -45,6 +46,8 @@ class DiagnosticCode(StrEnum):
     LEGACY_UNCLASSIFIED = "legacy_unclassified"
     PROVIDER_START_FAILED = "provider_start_failed"
     PROVIDER_AUTH_FAILED = "provider_auth_failed"
+    PROVIDER_AUTH_REQUIRED = "provider_auth_required"
+    PROVIDER_AUTH_UNKNOWN = "provider_auth_unknown"
     PROVIDER_BUDGET_EXHAUSTED = "provider_budget_exhausted"
     UNSUPPORTED_PROVIDER_FLAG = "unsupported_provider_flag"
     MCP_CONFIG_INVALID = "mcp_config_invalid"
@@ -56,6 +59,7 @@ class DiagnosticCode(StrEnum):
     MCP_TOOL_CONTRACT_FAILED = "mcp_tool_contract_failed"
     BROKER_CONTROL_ERROR = "broker_control_error"
     PROVIDER_NONZERO_UNKNOWN = "provider_nonzero_unknown"
+    PROVIDER_REPORTED_ERROR = "provider_reported_error"
     TERMINAL_TOOL_NOT_CALLED = "terminal_tool_not_called"
     TERMINAL_TOOL_REJECTED = "terminal_tool_rejected"
     PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
@@ -114,6 +118,12 @@ _HINTS = {
     DiagnosticCode.LEGACY_UNCLASSIFIED: "This attempt predates sanitized diagnostics.",
     DiagnosticCode.PROVIDER_START_FAILED: "The configured provider executable did not start.",
     DiagnosticCode.PROVIDER_AUTH_FAILED: "The provider reported an authentication failure.",
+    DiagnosticCode.PROVIDER_AUTH_REQUIRED: (
+        "The provider CLI reported that this host is signed out, so no work was started."
+    ),
+    DiagnosticCode.PROVIDER_AUTH_UNKNOWN: (
+        "The provider authentication state could not be determined safely."
+    ),
     DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED: (
         "The provider reported that its budget was exhausted."
     ),
@@ -136,6 +146,9 @@ _HINTS = {
     DiagnosticCode.BROKER_CONTROL_ERROR: "Broker lifecycle control failed after process start.",
     DiagnosticCode.PROVIDER_NONZERO_UNKNOWN: (
         "The provider exited nonzero without a recognized safe classification."
+    ),
+    DiagnosticCode.PROVIDER_REPORTED_ERROR: (
+        "The provider reported a structured error even though its process exited successfully."
     ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
         "The provider exited without calling a bounded terminal outcome tool."
@@ -175,6 +188,17 @@ _SAFE_NEXT_ACTIONS = {
     DiagnosticCode.PROVIDER_AUTH_FAILED: (
         "Authenticate with the provider outside Agent Commons, then rerun preflight.",
     ),
+    DiagnosticCode.PROVIDER_AUTH_REQUIRED: (
+        "Sign in to the provider CLI directly, in the same host account Agent Commons runs as.",
+        "Rerun broker preflight afterwards; preflight does not consume a delegation attempt.",
+        "Agent Commons never supplies, stores, or switches a provider credential.",
+    ),
+    DiagnosticCode.PROVIDER_AUTH_UNKNOWN: (
+        "Confirm the provider CLI is installed and its fixed auth status operation works "
+        "in this host account.",
+        "An undetermined state blocks launch before a child session or attempt exists; "
+        "resolve the provider condition, then check authentication again.",
+    ),
     DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED: (
         "Inspect the operator and delegation budget before authorizing new work.",
     ),
@@ -213,6 +237,11 @@ _SAFE_NEXT_ACTIONS = {
     DiagnosticCode.PROVIDER_NONZERO_UNKNOWN: (
         "Inspect provider-local logs outside Agent Commons without copying secrets into state.",
         "Mark the delegation needs_operator if process identity or outcome is ambiguous.",
+    ),
+    DiagnosticCode.PROVIDER_REPORTED_ERROR: (
+        "Inspect provider-local logs outside Agent Commons without copying secrets into state.",
+        "Resolve the provider condition, then create a new explicit delegation instead of "
+        "blindly retrying this run.",
     ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
         "Inspect the exact delegation and worker tool catalog before creating new work.",
@@ -277,24 +306,48 @@ def _contains_any(value: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in value for pattern in patterns)
 
 
-def classify_process_result(result: ProcessResult) -> SafeDiagnostic:
-    """Classify one result without returning any provider-controlled content."""
+def _structured_provider_error(stdout: bytes) -> str | None:
+    """Return bounded text only for a known top-level provider error event.
 
-    if result.outcome is not RunOutcome.FAILED:
-        return SafeDiagnostic.create(DiagnosticCode.NONE)
-    if result.reason is RunReason.START_FAILED:
-        return SafeDiagnostic.create(DiagnosticCode.PROVIDER_START_FAILED)
-    if result.reason is RunReason.CONTROL_ERROR:
-        return SafeDiagnostic.create(DiagnosticCode.BROKER_CONTROL_ERROR)
+    Stream output is untrusted and ephemeral.  Ordinary model prose may contain
+    words such as "login" or "error", so it is never classified.  Only the
+    fixed JSONL envelopes advertised by the bundled providers opt into the
+    diagnostic classifier.
+    """
 
-    # Decode only the already bounded buffers.  Replacement characters keep the
-    # classifier total while the original bytes remain ephemeral.
-    value = (result.stderr + b"\n" + result.stdout).decode("utf-8", "replace").casefold()
+    for raw_line in stdout.splitlines():
+        if not raw_line.strip() or len(raw_line) > 64 * 1024:
+            continue
+        try:
+            value = json.loads(raw_line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(value, Mapping):
+            continue
+        event_type = value.get("type")
+        is_error = (event_type == "result" and value.get("is_error") is True) or event_type in {
+            "error",
+            "turn.failed",
+        }
+        if not is_error:
+            continue
+        fields: list[str] = []
+        for key in ("subtype", "result", "message", "error"):
+            field = value.get(key)
+            if isinstance(field, str):
+                fields.append(field)
+            elif isinstance(field, Mapping):
+                fields.extend(nested for nested in field.values() if isinstance(nested, str))
+        return " ".join(fields)[:16_384].casefold()
+    return None
+
+
+def _classify_failure_text(value: str, *, structured_success: bool) -> DiagnosticCode:
     if "agent-commons-exec-gate: invalid control frame" in value:
-        code = DiagnosticCode.BROKER_CONTROL_ERROR
-    elif "agent-commons-exec-gate: provider exec failed" in value:
-        code = DiagnosticCode.PROVIDER_START_FAILED
-    elif _contains_any(
+        return DiagnosticCode.BROKER_CONTROL_ERROR
+    if "agent-commons-exec-gate: provider exec failed" in value:
+        return DiagnosticCode.PROVIDER_START_FAILED
+    if _contains_any(
         value,
         (
             "authentication failed",
@@ -306,44 +359,70 @@ def classify_process_result(result: ProcessResult) -> SafeDiagnostic:
             "oauth token",
         ),
     ):
-        code = DiagnosticCode.PROVIDER_AUTH_FAILED
-    elif _contains_any(
+        return DiagnosticCode.PROVIDER_AUTH_FAILED
+    if _contains_any(
         value,
         (
             "max budget",
+            "max_budget_usd",
+            "error_max_budget_usd",
             "budget exceeded",
             "budget exhausted",
             "cost limit",
             "spending limit",
         ),
     ):
-        code = DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED
-    elif _contains_any(value, ("unknown option", "unknown argument", "unrecognized option")):
-        code = DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG
-    elif _contains_any(value, ("invalid mcp config", "mcp config is invalid", "parse mcp config")):
-        code = DiagnosticCode.MCP_CONFIG_INVALID
-    elif _contains_any(
+        return DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED
+    if _contains_any(value, ("unknown option", "unknown argument", "unrecognized option")):
+        return DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG
+    if _contains_any(value, ("invalid mcp config", "mcp config is invalid", "parse mcp config")):
+        return DiagnosticCode.MCP_CONFIG_INVALID
+    if _contains_any(
         value,
         ("failed to spawn mcp", "could not start mcp", "mcp server failed to start"),
     ):
-        code = DiagnosticCode.MCP_SPAWN_FAILED
-    elif _contains_any(
+        return DiagnosticCode.MCP_SPAWN_FAILED
+    if _contains_any(
         value,
         ("mcp handshake", "mcp initialize", "mcp initialization", "protocol version mismatch"),
     ):
-        code = DiagnosticCode.MCP_HANDSHAKE_FAILED
-    elif _contains_any(
+        return DiagnosticCode.MCP_HANDSHAKE_FAILED
+    if _contains_any(
         value,
         ("binding was not canonically started", "mcp binding timeout", "binding deadline"),
     ):
-        code = DiagnosticCode.MCP_BINDING_TIMEOUT
-    elif _contains_any(
+        return DiagnosticCode.MCP_BINDING_TIMEOUT
+    if _contains_any(
         value,
         ("mcp tool not found", "unknown mcp tool", "tool is not allowed", "missing mcp tool"),
     ):
-        code = DiagnosticCode.MCP_TOOL_CONTRACT_FAILED
-    else:
-        code = DiagnosticCode.PROVIDER_NONZERO_UNKNOWN
+        return DiagnosticCode.MCP_TOOL_CONTRACT_FAILED
+    return (
+        DiagnosticCode.PROVIDER_REPORTED_ERROR
+        if structured_success
+        else DiagnosticCode.PROVIDER_NONZERO_UNKNOWN
+    )
+
+
+def classify_process_result(result: ProcessResult) -> SafeDiagnostic:
+    """Classify one result without returning any provider-controlled content."""
+
+    structured_error = _structured_provider_error(result.stdout)
+    if result.outcome is not RunOutcome.FAILED and structured_error is None:
+        return SafeDiagnostic.create(DiagnosticCode.NONE)
+    if result.reason is RunReason.START_FAILED:
+        return SafeDiagnostic.create(DiagnosticCode.PROVIDER_START_FAILED)
+    if result.reason is RunReason.CONTROL_ERROR:
+        return SafeDiagnostic.create(DiagnosticCode.BROKER_CONTROL_ERROR)
+
+    # Decode only the already bounded buffers. Replacement characters keep the
+    # classifier total while the original bytes remain ephemeral.
+    stderr = result.stderr_tail or result.stderr
+    value = structured_error or stderr.decode("utf-8", "replace").casefold()
+    code = _classify_failure_text(
+        value,
+        structured_success=structured_error is not None,
+    )
     return SafeDiagnostic.create(code)
 
 

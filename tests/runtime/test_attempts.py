@@ -452,6 +452,149 @@ def test_provider_failure_corpus_maps_only_to_closed_codes(
     assert "sk-secret" not in diagnostic.hint
 
 
+def test_failure_classifier_uses_retained_stderr_tail_after_stdout_flood() -> None:
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=b"noisy provider output",
+            stderr=b"",
+            stdout_bytes_seen=1_000_000,
+            stderr_bytes_seen=31,
+            output_truncated=True,
+            stderr_tail=b"Authentication failed: /login\n",
+        )
+    )
+
+    assert diagnostic.code is DiagnosticCode.PROVIDER_AUTH_FAILED
+
+
+@pytest.mark.parametrize(
+    ("event", "expected"),
+    (
+        (
+            {"type": "result", "is_error": True, "result": "Please run /login"},
+            DiagnosticCode.PROVIDER_AUTH_FAILED,
+        ),
+        (
+            {"type": "turn.failed", "error": {"message": "Maximum budget exceeded"}},
+            DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED,
+        ),
+        (
+            {"type": "error", "message": "provider-specific failure"},
+            DiagnosticCode.PROVIDER_REPORTED_ERROR,
+        ),
+    ),
+)
+def test_zero_exit_structured_provider_error_gets_closed_diagnostic(
+    event: dict[str, object],
+    expected: DiagnosticCode,
+) -> None:
+    stdout = (json.dumps(event) + "\n").encode()
+
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.SUCCEEDED,
+            reason=RunReason.COMPLETED,
+            exit_code=0,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=stdout,
+            stderr=b"",
+            stdout_bytes_seen=len(stdout),
+            stderr_bytes_seen=0,
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is expected
+
+
+def test_nonzero_claude_budget_event_is_typed_without_trusting_assistant_prose() -> None:
+    stdout = b"\n".join(
+        (
+            json.dumps(
+                {"type": "assistant", "message": "Please run /login is untrusted prose"}
+            ).encode(),
+            json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "error_max_budget_usd",
+                    "is_error": True,
+                }
+            ).encode(),
+        )
+    )
+
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=stdout,
+            stderr=b"",
+            stdout_bytes_seen=len(stdout),
+            stderr_bytes_seen=0,
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED
+
+
+def test_nonzero_assistant_prose_does_not_impersonate_provider_diagnostic() -> None:
+    stdout = b'{"type":"assistant","message":"Please run /login is only prose"}\n'
+
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=stdout,
+            stderr=b"",
+            stdout_bytes_seen=len(stdout),
+            stderr_bytes_seen=0,
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is DiagnosticCode.PROVIDER_NONZERO_UNKNOWN
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    (
+        b'{"type":"assistant","message":"Please run /login in the example"}\n',
+        b'{"type":"result","is_error":false,"result":"not authenticated is prose"}\n',
+        b"{not-json}\n",
+    ),
+)
+def test_zero_exit_prose_does_not_impersonate_provider_error(stdout: bytes) -> None:
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.SUCCEEDED,
+            reason=RunReason.COMPLETED,
+            exit_code=0,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=stdout,
+            stderr=b"",
+            stdout_bytes_seen=len(stdout),
+            stderr_bytes_seen=0,
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is DiagnosticCode.NONE
+
+
 def test_state_written_before_the_tree_was_recorded_still_reads(tmp_path: Path) -> None:
     """Forward compatibility: a v3 document has no root_delegation_id, so every
     delegation reads back as its own tree -- which is what a root carried anyway.

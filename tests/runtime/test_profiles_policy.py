@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 import random
 import tomllib
@@ -118,6 +119,8 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     assert "--strict-mcp-config" in invocation.argv
     assert "--setting-sources" in invocation.argv
     mcp_config = invocation.argv[invocation.argv.index("--mcp-config") + 1]
+    parsed_mcp_config = json.loads(mcp_config)
+    assert parsed_mcp_config["mcpServers"]["agent-commons"]["alwaysLoad"] is True
     assert f'"command":"{Path("/bin/echo").resolve()}"' in mcp_config
     assert '"--git-executable","/usr/bin/true"' in mcp_config
     assert '"--state-root"' in mcp_config
@@ -310,6 +313,27 @@ def test_operator_limits_apply_partial_overrides_without_dropping_safe_defaults(
         OperatorLimits.from_mapping({"shell_command": 1})
 
 
+@pytest.mark.parametrize(
+    "values",
+    (
+        {"global_concurrency": 0},
+        {"queue_wait_seconds": 0},
+        {"parent_provider_units": 0},
+        {"global_concurrency": 2**60},
+        {"queue_capacity": 2**60},
+    ),
+)
+def test_operator_limits_are_positive_or_explicitly_zero_and_javascript_safe(
+    values: dict[str, int],
+) -> None:
+    with pytest.raises(PolicyViolationError, match="JavaScript-safe"):
+        OperatorLimits(**values)
+
+
+def test_zero_queue_capacity_is_the_only_zero_operator_availability_limit() -> None:
+    assert OperatorLimits(queue_capacity=0).queue_capacity == 0
+
+
 def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
     tmp_path,
 ) -> None:
@@ -344,10 +368,9 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_repo_read",
         "mcp__agent-commons__commons_repo_search",
         "mcp__agent-commons__commons_check_input",
-        "mcp__agent-commons__commons_complete_review",
+        "mcp__agent-commons__commons_finalize_review",
         "mcp__agent-commons__commons_record_verification",
         "mcp__agent-commons__commons_delegation_input_needed",
-        "mcp__agent-commons__commons_succeed_delegation",
         "mcp__agent-commons__commons_delegation_needs_operator",
         "mcp__agent-commons__commons_request_input",
         "mcp__agent-commons__commons_share_progress",
@@ -360,7 +383,7 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
     assert "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch" in (
         invocation.argv
     )
-    assert invocation.argv[invocation.argv.index("--tools") + 1] == ""
+    assert invocation.argv[invocation.argv.index("--tools") + 1] == "ToolSearch"
     assert "mcp__agent-commons__commons_request_delegation" not in allowed
     assert "mcp__agent-commons__commons_cancel_delegation" not in allowed
 
@@ -405,6 +428,7 @@ def test_claude_verifier_receives_only_the_verification_write_tool(tmp_path: Pat
 
     assert "mcp__agent-commons__commons_record_verification" in allowed
     assert "mcp__agent-commons__commons_complete_review" not in allowed
+    assert "mcp__agent-commons__commons_finalize_review" not in allowed
 
 
 def test_codex_reviewer_matches_the_claude_worker_scope(tmp_path: Path) -> None:
@@ -468,15 +492,15 @@ def test_a_role_tool_selection_narrows_the_launched_argv(tmp_path: Path) -> None
         "Review the exact target",
         workspace_root=tmp_path,
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
-        role_tools=("commons_repo_read", "commons_complete_review"),
+        role_tools=("commons_repo_read", "commons_finalize_review"),
     )
     allowed = set(invocation.argv[invocation.argv.index("--allowed-tools") + 1].split(","))
 
     assert "mcp__agent-commons__commons_repo_read" in allowed
-    assert "mcp__agent-commons__commons_complete_review" in allowed
+    assert "mcp__agent-commons__commons_finalize_review" in allowed
     assert "mcp__agent-commons__commons_repo_search" not in allowed
     # A role that cannot report a terminal outcome is broken, not narrower.
-    assert "mcp__agent-commons__commons_succeed_delegation" in allowed
+    assert "mcp__agent-commons__commons_succeed_delegation" not in allowed
 
 
 def test_a_role_cannot_select_a_tool_the_profile_never_had(tmp_path: Path) -> None:
@@ -508,13 +532,14 @@ def test_a_codex_role_selection_narrows_the_enabled_mcp_tools(tmp_path: Path) ->
         "Review the exact target",
         workspace_root=tmp_path,
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
-        role_tools=("commons_repo_read", "commons_complete_review"),
+        role_tools=("commons_repo_read", "commons_finalize_review"),
     )
     enabled = set(_codex_overrides(invocation.argv)["enabled_tools"])
 
     assert enabled < INDEPENDENT_REVIEW_WORKER_TOOL_NAMES
     assert "commons_repo_search" not in enabled
-    assert "commons_succeed_delegation" in enabled
+    assert "commons_finalize_review" in enabled
+    assert "commons_succeed_delegation" not in enabled
 
 
 def test_runtime_policy_can_only_shrink_and_consumes_depth() -> None:

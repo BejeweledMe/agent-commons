@@ -19,6 +19,7 @@ from agent_commons.runtime import resolve_trusted_executable
 from agent_commons.services import CommonsManager
 
 _SENSITIVE_NAMES = {".env", ".env.local", "credentials", "credentials.json"}
+_INTERNAL_REVIEW_PATHS = frozenset({".agent-commons", ".git"})
 
 
 class _OversizedScopedFile(ConfigurationError):
@@ -29,6 +30,7 @@ def _is_outside_review_scope(path: Path) -> bool:
     return (
         path.is_absolute()
         or ".." in path.parts
+        or any(part in _INTERNAL_REVIEW_PATHS for part in path.parts)
         or path.name in _SENSITIVE_NAMES
         or path.name.startswith(".env.")
         or path.suffix.lower() in {".key", ".pem", ".p12", ".pfx"}

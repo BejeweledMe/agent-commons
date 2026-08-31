@@ -16,7 +16,17 @@ from typing import TYPE_CHECKING, Final, TypedDict, cast
 
 from agent_commons.domain.envelopes import DelegationBudget, DelegationLimits
 from agent_commons.errors import CommonsError, ConfigurationError, ValidationError
+from agent_commons.runtime import (
+    ContextBindingMode,
+    ContextBindingRequest,
+)
+from agent_commons.runtime.model import BuiltinProfileId
 from agent_commons.services.manager import CommonsManager
+from agent_commons.ui.provider_auth import (
+    UIProviderAuthCoordinator,
+    provider_auth_launch_refusal,
+)
+from agent_commons.ui.read_dtos import ProviderAuthPayload
 
 if TYPE_CHECKING:
     from agent_commons.services.delegation_runtime import DelegationRuntimeService
@@ -32,6 +42,27 @@ LAUNCH_NOT_CONFIGURED = (
     "needs an operator session and an operator profile config"
 )
 
+_GENERIC_LAUNCH_FAILURE_SUMMARY = (
+    "the panel could not start this run because runtime configuration or process "
+    "startup failed; provider details were suppressed"
+)
+_KNOWN_PROFILE_FAILURE_SUMMARIES = {
+    f"runner profile is not configured: {profile_id.value}": (
+        f"the panel could not start this run: runner profile is not configured: {profile_id.value}"
+    )
+    for profile_id in BuiltinProfileId
+}
+
+
+def _safe_launch_failure_summary(exc: Exception) -> str:
+    """Map an exception to fixed text without returning its arbitrary detail."""
+
+    try:
+        key = str(exc)
+    except Exception:  # pragma: no cover - hostile exception defensive boundary
+        return _GENERIC_LAUNCH_FAILURE_SUMMARY
+    return _KNOWN_PROFILE_FAILURE_SUMMARIES.get(key, _GENERIC_LAUNCH_FAILURE_SUMMARY)
+
 
 @dataclass(frozen=True, slots=True)
 class LaunchRequest:
@@ -42,6 +73,7 @@ class LaunchRequest:
     wall_time_seconds: int | None = None
     idempotency_key: str | None = None
     background: bool = True
+    context: ContextBindingRequest = ContextBindingRequest.fresh()
 
 
 class LaunchResult(TypedDict):
@@ -68,12 +100,47 @@ class UILaunchCoordinator:
     def __init__(self, context: UIContext) -> None:
         self._context = context
         self._launch_threads: list[threading.Thread] = []
+        # A test/embedder runtime factory is a construction-time dependency.
+        # Capturing it prevents later mutable context state from swapping the
+        # auth probe independently of the coordinator that owns its flights.
+        auth_runtime_factory = context._runtime_factory
+        if auth_runtime_factory is not None:
+
+            def build_auth_runtime() -> DelegationRuntimeService:
+                return cast(
+                    "DelegationRuntimeService",
+                    auth_runtime_factory(self._context.manager()),
+                )
+
+        else:
+
+            def build_auth_runtime() -> DelegationRuntimeService:
+                return self._runtime_service(self._context.manager())
+
+        self._provider_auth = UIProviderAuthCoordinator(build_auth_runtime)
 
     def await_launches(self, timeout: float = 30.0) -> None:
         """Join any background launch threads. For tests and clean shutdown."""
 
         for thread in list(self._launch_threads):
             thread.join(timeout=timeout)
+
+    def provider_auth_status(self, profile_id: str) -> ProviderAuthPayload:
+        return self._provider_auth.status(profile_id)
+
+    def check_provider_auth(self, profile_id: str) -> ProviderAuthPayload:
+        return self._provider_auth.check_again(profile_id)
+
+    def start_provider_login(self, profile_id: str) -> ProviderAuthPayload:
+        return self._provider_auth.start_login(profile_id)
+
+    def cancel_provider_login(self, profile_id: str) -> ProviderAuthPayload:
+        return self._provider_auth.cancel_login(profile_id)
+
+    def shutdown(self) -> None:
+        """Stop provider-auth processes owned by this panel."""
+
+        self._provider_auth.shutdown()
 
     def _runtime_service(self, manager: CommonsManager) -> DelegationRuntimeService:
         """Build the same runtime service the CLI uses, under the writer session."""
@@ -121,6 +188,17 @@ class UILaunchCoordinator:
             raise ValidationError("only an active role can be given work")
         if role.get("template"):
             raise ValidationError("a role preset is a template and is never employed")
+        try:
+            role_context_mode = ContextBindingMode(str(role.get("context_mode", "fresh")))
+        except ValueError as exc:
+            raise ValidationError("the selected role has an invalid context mode") from exc
+        if role_context_mode is ContextBindingMode.ACCUMULATED:
+            if request.context.mode is not ContextBindingMode.ACCUMULATED:
+                raise ValidationError(
+                    "an accumulated role requires one exact published Context Pack revision"
+                )
+        elif request.context.mode is not ContextBindingMode.FRESH:
+            raise ValidationError("a fresh role cannot receive a Context Pack")
         task = writer.snapshot().tasks.get(request.task_id)
         if task is None:
             raise ValidationError(f"no such task: {request.task_id}")
@@ -128,6 +206,20 @@ class UILaunchCoordinator:
         purpose = "implementation"
         if profile_id.endswith("independent-reviewer"):
             purpose = "independent_review"
+        # Probe the exact configured profile before creating a canonical
+        # delegation.  Authentication refusal is therefore pure: no child,
+        # attempt, receipt, or requested delegation exists yet.
+        auth_status = self.provider_auth_status(profile_id)
+        if auth_status["blocks_launch"]:
+            raise provider_auth_launch_refusal(auth_status)
+        runtime: DelegationRuntimeService | None = None
+        if request.context.mode is ContextBindingMode.ACCUMULATED:
+            runtime = self._runtime_service(writer)
+            # Refuse a stale, missing, unauthorized, or oversized pack while
+            # the HTTP action is still synchronous and before a canonical
+            # delegation, child session, or attempt exists.  The runtime
+            # repeats this exact validation under the per-delegation lock.
+            runtime.validate_context_selection(request.context)
         delegation = writer.create_delegation(
             target_ref={"kind": "task", "id": request.task_id},
             target_revision=str(task.get("effective_revision") or task["revision"]),
@@ -142,25 +234,50 @@ class UILaunchCoordinator:
 
         def launch() -> None:
             try:
-                self._runtime_service(context.writer()).run(
-                    delegation_id, delegation["revision"], idempotency_key=launch_key
+                launch_runtime = runtime or self._runtime_service(context.writer())
+                launch_runtime.run(
+                    delegation_id,
+                    delegation["revision"],
+                    idempotency_key=launch_key,
+                    context=request.context,
                 )
             except Exception as exc:  # a launch failure is reported, never silent
-                _LOG.warning("UI launch of %s failed: %s", delegation_id, exc)
+                # The runtime repeats the auth gate immediately before opening
+                # the child.  If credentials changed after the UI precheck,
+                # leave this exact delegation requested and retryable; calling
+                # it terminal `launch_failed` would make the visible recovery
+                # action a lie.
+                if getattr(exc, "code", None) in {
+                    "provider_auth_required",
+                    "provider_auth_unknown",
+                    "credential_store_unavailable",
+                }:
+                    _LOG.warning(
+                        "UI launch of %s stopped at the provider-auth gate; "
+                        "provider details were suppressed",
+                        delegation_id,
+                    )
+                    context.invalidate()
+                    return
+                safe_summary = _safe_launch_failure_summary(exc)
+                _LOG.warning(
+                    "UI launch of %s failed before canonical finalization; "
+                    "provider details were suppressed",
+                    delegation_id,
+                )
                 try:
                     context.writer().mark_delegation_needs_operator(
                         delegation_id,
                         str(delegation["revision"]),
                         reason_code="launch_failed",
-                        summary=f"the panel could not start this run: {exc}",
+                        summary=safe_summary,
                         idempotency_key=f"{launch_key}:launch-failed",
                     )
                     context.invalidate()
-                except CommonsError as write_failure:  # pragma: no cover - defence
+                except CommonsError:  # pragma: no cover - defence
                     _LOG.warning(
-                        "UI launch failure of %s could not be recorded: %s",
+                        "UI launch failure of %s could not be recorded; details suppressed",
                         delegation_id,
-                        write_failure,
                     )
             finally:
                 context.invalidate()

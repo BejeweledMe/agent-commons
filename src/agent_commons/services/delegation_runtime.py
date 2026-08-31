@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
-import threading
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -24,6 +23,11 @@ import yaml
 
 from agent_commons.catalog import empty_catalog, load_role_catalog, skill_instructions
 from agent_commons.core.ids import stable_id
+from agent_commons.domain.context_pack import (
+    ContextPackRecord,
+    ContextPackRefusal,
+    ContextPackRefusalCode,
+)
 from agent_commons.errors import (
     ConfigurationError,
     IdempotencyConflictError,
@@ -31,7 +35,6 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
-from agent_commons.platform_support import lock_exclusive, unlock
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -39,16 +42,41 @@ from agent_commons.runtime import (
     BrokerLifecycleHook,
     BrokerRequest,
     BrokerResult,
+    BudgetUnit,
     BuiltinProfileId,
+    CancellationToken,
+    ContextBinding,
+    ContextBindingMetadata,
+    ContextBindingMode,
+    ContextBindingRefusal,
+    ContextBindingRefusalCode,
+    ContextBindingRequest,
+    ContextBindingResolver,
+    ContextBindingStore,
     CorrelationIds,
     DiagnosticCode,
+    InitializationProbe,
     JsonlTelemetrySink,
+    LaunchPlan,
+    LaunchPlanner,
+    LaunchPurpose,
     LocalBroker,
     NoopTelemetrySink,
     OpenTelemetrySink,
     OperatorLimits,
     ProfileRegistry,
     Provider,
+    ProviderAuthController,
+    ProviderAuthOperation,
+    ProviderAuthState,
+    ProviderAuthStatus,
+    ProviderCapability,
+    ProviderInitializationProbe,
+    ProviderInitializationState,
+    ProviderInitializationStatus,
+    ProviderQualification,
+    ProviderQualificationStore,
+    ProviderRefusalCode,
     RunnerProfile,
     RuntimePolicy,
     SafeDiagnostic,
@@ -57,9 +85,12 @@ from agent_commons.runtime import (
     TelemetryKind,
     TelemetrySink,
     TerminalToolAuditStore,
+    TypedRefusal,
+    context_binding_refusal_error,
     default_profile_registry,
     diagnostic_hint,
     diagnostic_safe_next_actions,
+    launch_refusal_error,
     terminate_process_group,
     validate_model_name,
 )
@@ -70,6 +101,8 @@ from agent_commons.runtime.diagnostics import (
     sanitized_configuration_failure,
     workflow_diagnostic_code,
 )
+from agent_commons.runtime.provider_auth import provider_auth_refusal
+from agent_commons.storage.opstate import DELEGATION_STORAGE, exclusive_lock
 
 from ..domain.agents import effective_grants
 from .delegation_instruction import DelegationInstructionInput, compose_delegation_instruction
@@ -83,9 +116,6 @@ _TERMINAL_DELEGATION_STATES = {
     "timed_out",
     "needs_operator",
 }
-
-_PROCESS_LOCKS_GUARD = threading.Lock()
-_PROCESS_DELEGATION_LOCKS: dict[str, threading.Lock] = {}
 
 
 def _operation_key(base: str, suffix: str) -> str:
@@ -105,30 +135,12 @@ def _request_key(delegation_id: str) -> str:
 def _delegation_lock(state_root: Path, delegation_id: str) -> Iterator[None]:
     """Serialize the complete reserve/start/observe/finalize sequence per delegation."""
 
-    lock_identity = f"{state_root.resolve()}\0{delegation_id}"
-    with _PROCESS_LOCKS_GUARD:
-        process_lock = _PROCESS_DELEGATION_LOCKS.setdefault(lock_identity, threading.Lock())
-    # POSIX flock semantics are process-oriented on some supported hosts, so a
-    # second thread in this interpreter also needs an ordinary mutex.  The file
-    # lock remains the cross-process authority.
-    with process_lock:
-        root = state_root / "runtime" / "delegation-locks"
-        if root.is_symlink():
-            raise ConfigurationError("runtime delegation-lock directory must not be a symlink")
-        root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        digest = hashlib.sha256(delegation_id.encode()).hexdigest()
-        descriptor = os.open(
-            root / f"{digest}.lock",
-            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
-        )
-        try:
-            os.fchmod(descriptor, 0o600)
-            lock_exclusive(descriptor)
-            yield
-        finally:
-            unlock(descriptor)
-            os.close(descriptor)
+    root = state_root / "runtime" / "delegation-locks"
+    if root.is_symlink():
+        raise ConfigurationError("runtime delegation-lock directory must not be a symlink")
+    digest = hashlib.sha256(delegation_id.encode()).hexdigest()
+    with exclusive_lock(root / f"{digest}.lock", policy=DELEGATION_STORAGE):
+        yield
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,9 +154,11 @@ class _RoleScope:
 
     tools: tuple[str, ...] = ()
     grants: Mapping[str, str] = field(default_factory=dict)
-    skills: tuple[tuple[str, str], ...] = ()
+    skills: tuple[str, ...] = ()
     #: The model this role was hired on, or None to keep the profile's own.
     model: str | None = None
+    #: None is reserved for delegations not acting on behalf of a standing role.
+    context_mode: ContextBindingMode | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +283,9 @@ def telemetry_sink(name: str, manager: CommonsManager) -> TelemetrySink:
 def profile_summaries(
     profiles: ProfileRegistry,
     limits: OperatorLimits | None = None,
+    *,
+    qualifications: ProviderQualificationStore | None = None,
+    workspace_root: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Describe launch capabilities without constructing writable runtime state."""
 
@@ -280,12 +297,35 @@ def profile_summaries(
         scoped_reviewer = (
             profile_id is BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER and not trusted_workspace
         )
+        qualification = (
+            qualifications.status(profile, workspace_root=workspace_root)
+            if qualifications is not None and workspace_root is not None
+            else TypedRefusal.create(
+                ProviderRefusalCode.PROVIDER_QUALIFICATION_REQUIRED,
+                provider=profile.provider,
+                profile_id=profile.profile_id,
+            )
+        )
+        if isinstance(qualification, ProviderQualification):
+            qualification_summary: dict[str, Any] = {
+                "state": "qualified",
+                "launchable": True,
+                "checked_at": qualification.checked_at,
+                "fingerprint": qualification.fingerprint,
+            }
+        else:
+            qualification_summary = {
+                "state": qualification.code.value,
+                "launchable": False,
+                "refusal": qualification.as_dict(),
+            }
         values.append(
             {
                 "profile_id": profile_id.value,
                 "provider": profile.provider.value,
                 "release_stage": "experimental_manual_opt_in",
                 "independent_reviewer": profile_id.independent_reviewer,
+                "qualification": qualification_summary,
                 "launch_mode": (
                     "scoped-reviewer"
                     if scoped_reviewer
@@ -364,6 +404,12 @@ class _CanonicalStartHook(BrokerLifecycleHook):
             idempotency_key=_operation_key(self.idempotency_key, "started"),
         )
         self.started_revision = str(started["revision"])
+        # The provider is still held behind the inert exec gate here. Sync the
+        # disposable projection through delegation.started before its MCP
+        # startup clock begins, so a cold/stale index cannot consume Claude's
+        # connection window. Failure propagates and the gate is terminated;
+        # canonical state is never inferred from this operational prewarm.
+        self.manager._read_snapshot(fresh=False)
 
 
 class DelegationRuntimeService:
@@ -380,6 +426,12 @@ class DelegationRuntimeService:
         runner: SubprocessRunner | None = None,
         telemetry: TelemetrySink | None = None,
         tool_audit: TerminalToolAuditStore | None = None,
+        provider_auth: ProviderAuthController | None = None,
+        launch_planner: LaunchPlanner | None = None,
+        initialization_probe: InitializationProbe | None = None,
+        context_bindings: ContextBindingStore | None = None,
+        qualifications: ProviderQualificationStore | None = None,
+        qualification_required: bool | None = None,
     ) -> None:
         self.manager = manager
         self.profiles = profiles or default_profile_registry()
@@ -399,6 +451,15 @@ class DelegationRuntimeService:
             read_only=manager.read_only,
         )
         self.runner = runner or SubprocessRunner()
+        self.qualifications = qualifications or ProviderQualificationStore(
+            manager.paths.state_root,
+            read_only=manager.read_only,
+        )
+        self.qualification_required = (
+            type(self.runner) is SubprocessRunner
+            if qualification_required is None
+            else qualification_required
+        )
         if isinstance(self.runner, DemoRunner):
             # Demo mode: the bound runner never launches the invocation it is
             # handed, so pre-start validation must not veto the run over the
@@ -408,6 +469,37 @@ class DelegationRuntimeService:
             # runner keeps the strict registry, and every non-resolution
             # refusal still applies inside the wrapped profiles.
             self.profiles = demo_tolerant_profiles(self.profiles)
+        # The auth controller gets its own process runner, never the injected
+        # provider runner: an auth probe is not delegated work, and a fake or
+        # demo provider runner models a bound child launch rather than a
+        # credential lookup.  A demo build owns no host credential context at
+        # all, so it is given no controller and keeps its current behaviour.
+        self.provider_auth = (
+            provider_auth
+            if provider_auth is not None
+            else (
+                None
+                if isinstance(self.runner, DemoRunner)
+                else (
+                    ProviderAuthController(lock_root=manager.paths.state_root)
+                    if isinstance(self.runner, SubprocessRunner)
+                    else None
+                )
+            )
+        )
+        self.launch_planner = launch_planner or LaunchPlanner.default()
+        self._context_binding_resolver = ContextBindingResolver()
+        self.context_bindings = context_bindings or ContextBindingStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=manager.read_only,
+        )
+        self.initialization_probe = (
+            initialization_probe
+            if initialization_probe is not None
+            else (ProviderInitializationProbe() if type(self.runner) is SubprocessRunner else None)
+        )
+        self._persistent_initialization_refusals: dict[Provider, ProviderInitializationStatus] = {}
         self.telemetry = telemetry or NoopTelemetrySink()
         self.tool_audit = tool_audit or TerminalToolAuditStore(
             manager.paths.state_root,
@@ -418,7 +510,107 @@ class DelegationRuntimeService:
     def profile_summaries(self) -> list[dict[str, Any]]:
         """Expose capabilities, never executable argv or hidden provider configuration."""
 
-        return profile_summaries(self.profiles, self.operator_limits)
+        return profile_summaries(
+            self.profiles,
+            self.operator_limits,
+            qualifications=self.qualifications,
+            workspace_root=self.manager.repo_root,
+        )
+
+    def provider_auth_status(self, profile_id: str | BuiltinProfileId) -> dict[str, Any]:
+        """Read the current provider auth state without launching any work.
+
+        The read projection of one bounded probe: a closed state, a fixed hint,
+        and fixed next actions.  No account, credential, OAuth URL, or provider
+        output crosses this seam.
+        """
+
+        profile = self.profiles.get(BuiltinProfileId(profile_id))
+        return self._provider_auth_status(profile).as_dict()
+
+    def provider_auth_login(
+        self,
+        profile_id: str | BuiltinProfileId,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> dict[str, Any]:
+        """Run the provider-owned fixed browser sign-in flow.
+
+        The provider process owns every URL, code, and credential interaction.
+        Only the closed, maintainer-authored status projection returns here.
+        """
+
+        profile = self.profiles.get(BuiltinProfileId(profile_id))
+        if self.provider_auth is None:
+            return ProviderAuthStatus.create(
+                provider=Provider(profile.provider),
+                operation=ProviderAuthOperation.LOGIN,
+                state=ProviderAuthState.UNSUPPORTED,
+            ).as_dict()
+        return self.provider_auth.login(
+            profile,
+            workspace_root=self.manager.repo_root,
+            cancellation=cancellation,
+        ).as_dict()
+
+    def _provider_auth_status(self, profile: RunnerProfile) -> ProviderAuthStatus:
+        if self.provider_auth is None:
+            return ProviderAuthStatus.create(
+                provider=Provider(profile.provider),
+                operation=ProviderAuthOperation.STATUS,
+                state=ProviderAuthState.UNSUPPORTED,
+            )
+        return self.provider_auth.status(profile, workspace_root=self.manager.repo_root)
+
+    def _assert_provider_authenticated(self, profile: RunnerProfile) -> ProviderAuthStatus:
+        """Require READY whenever this provider advertises an auth adapter.
+
+        Called before a child session, an operational attempt, or any provider
+        process exists, so a signed-out host costs nothing durable.
+        Indeterminate advertised states fail closed before durable launch state.
+        UNSUPPORTED is explicit capability information, not a guessed verdict.
+        """
+
+        status = self._provider_auth_status(profile)
+        if status.blocks_launch:
+            raise provider_auth_refusal(status)
+        return status
+
+    def _provider_initialization_status(
+        self, profile: RunnerProfile
+    ) -> ProviderInitializationStatus:
+        provider = Provider(profile.provider)
+        persistent = self._persistent_initialization_refusals.get(provider)
+        if persistent is not None:
+            return persistent
+        if self.initialization_probe is None:
+            return ProviderInitializationStatus(
+                provider=provider,
+                state=ProviderInitializationState.WARNING,
+            )
+        status = self.initialization_probe.probe(
+            profile,
+            workspace_root=self.manager.repo_root,
+        )
+        if status.state is ProviderInitializationState.HOST_SANDBOX_REFUSED:
+            self._persistent_initialization_refusals[provider] = status
+        return status
+
+    def _assert_provider_initialized(self, profile: RunnerProfile) -> ProviderInitializationStatus:
+        status = self._provider_initialization_status(profile)
+        if status.blocks_launch:
+            raise launch_refusal_error(status.refusal(profile_id=profile.profile_id))
+        return status
+
+    def _assert_provider_qualified(self, profile: RunnerProfile) -> ProviderQualification | None:
+        """Require all three P3 probes before any durable launch mutation."""
+
+        if not self.qualification_required:
+            return None
+        status = self.qualifications.status(profile, workspace_root=self.manager.repo_root)
+        if isinstance(status, TypedRefusal):
+            raise launch_refusal_error(status)
+        return status
 
     def stop_provider(self, delegation_id: str, *, force: bool = False) -> dict[str, Any]:
         """Terminate a live provider process group for one delegation.
@@ -748,11 +940,32 @@ class DelegationRuntimeService:
         return _RoleScope(
             tools=tuple(str(name) for name in role.get("tool_allowlist") or ()),
             grants=effective_grants(snapshot.agents, agent_id),
-            skills=skill_instructions(
-                self.catalog, tuple(str(name) for name in role.get("skills") or ())
+            # The operator catalogue authorizes selection, but its arbitrary
+            # instruction text never enters a provider launch.  The adapter
+            # resolves these identities against its fixed packaged allowlist.
+            skills=tuple(
+                identifier
+                for identifier, _instruction in skill_instructions(
+                    self.catalog, tuple(str(name) for name in role.get("skills") or ())
+                )
             ),
             model=role_model(role),
+            context_mode=ContextBindingMode(str(role.get("context_mode", "fresh"))),
         )
+
+    @staticmethod
+    def _require_role_context_selection(
+        scope: _RoleScope, request: ContextBindingRequest | None
+    ) -> None:
+        """Fail closed when a standing role's canonical context contract is violated."""
+
+        if scope.context_mode is None:
+            return
+        selected_mode = request.mode if request is not None else ContextBindingMode.FRESH
+        if selected_mode is not scope.context_mode:
+            raise context_binding_refusal_error(
+                ContextBindingRefusal.create(ContextBindingRefusalCode.ROLE_CONTEXT_MISMATCH)
+            )
 
     def _profile_for(self, profile_id: BuiltinProfileId, model: str | None) -> RunnerProfile:
         """The operator's profile, with the role's model standing in for its own.
@@ -798,7 +1011,6 @@ class DelegationRuntimeService:
         delegation: Mapping[str, Any],
         *,
         profile_id: BuiltinProfileId,
-        skills: tuple[tuple[str, str], ...] = (),
     ) -> str:
         """Adapt a projected delegation to the typed instruction-composition seam."""
 
@@ -821,7 +1033,6 @@ class DelegationRuntimeService:
                 budget_unit=str(budget["unit"]),
             ),
             profile_id=profile_id,
-            skills=skills,
         )
 
     def _broker(
@@ -875,6 +1086,31 @@ class DelegationRuntimeService:
             return current
 
         expected = str(current["revision"])
+        if (
+            attempt.state.terminal
+            and attempt.diagnostic_code is DiagnosticCode.PROVIDER_AUTH_FAILED
+            and state != "requested"
+        ):
+            # The provider started, so a unit was spent, but it never reached a
+            # position to do the work.  This is an operator credential condition
+            # rather than a delegation outcome: it may never be promoted to
+            # success, and this runtime cannot resume the exited attempt, so it
+            # takes precedence over both the input_needed and the exited-
+            # successfully readings below.  A zero-exit provider that reported a
+            # structured auth error lands here too.
+            self.manager.mark_delegation_needs_operator(
+                str(current["id"]),
+                expected,
+                reason_code="provider_auth",
+                summary=(
+                    "The provider reported an authentication failure after start. "
+                    "Sign in to the provider CLI directly, then create new work; "
+                    "this attempt cannot be resumed or treated as a result."
+                ),
+                idempotency_key=_operation_key(attempt.attempt_id, "provider-auth"),
+            )
+            return self.manager.get_delegation(str(current["id"]))
+
         if state == "input_needed":
             self.manager.mark_delegation_needs_operator(
                 str(current["id"]),
@@ -1020,6 +1256,146 @@ class DelegationRuntimeService:
             ),
         }
 
+    def _resolve_context_binding(self, request: ContextBindingRequest) -> ContextBinding:
+        """Resolve one exact Context Pack before any launch side effect.
+
+        Fresh stays isolated and touches no pack state.  Accumulated resolves,
+        authorizes, and compiles exactly once; every unusable selection raises
+        the typed refusal before probes, child session, request, or attempt.
+        """
+
+        if request.mode is ContextBindingMode.FRESH:
+            return ContextBinding.fresh()
+        if not self.manager.context_pack_writes_enabled:
+            # The ADR rollback gate: accumulated launches become a typed
+            # unavailable refusal while fresh launches continue unchanged.
+            raise context_binding_refusal_error(
+                ContextBindingRefusal.create(ContextBindingRefusalCode.UNAVAILABLE)
+            )
+
+        def load_exact(pack_id: str, revision: str) -> ContextPackRecord | None:
+            try:
+                return self.manager.context_packs.get(pack_id, revision=revision)
+            except ContextPackRefusal as refusal:
+                if refusal.code is ContextPackRefusalCode.MISSING:
+                    return None
+                if refusal.code is ContextPackRefusalCode.STALE:
+                    # Surface the pack's current record so the resolver refuses
+                    # the mismatched revision as stale rather than missing.
+                    return self.manager.context_packs.get(pack_id)
+                raise
+
+        resolved = self._context_binding_resolver.resolve(
+            request,
+            load_exact=load_exact,
+            authorize_exact=self._authorize_exact_context_pack,
+        )
+        if isinstance(resolved, ContextBindingRefusal):
+            raise context_binding_refusal_error(resolved)
+        return resolved
+
+    def validate_context_selection(self, request: ContextBindingRequest) -> ContextBindingMetadata:
+        """Validate one UI/CLI selection without child, attempt, or persistence.
+
+        The returned value contains identity, fingerprint, and size only.  The
+        compiled baseline remains ephemeral and the launch resolves the same
+        exact revision again inside its serialized delegation lock.
+        """
+
+        return ContextBindingMetadata.from_binding(self._resolve_context_binding(request))
+
+    def _authorize_exact_context_pack(self, record: ContextPackRecord) -> bool:
+        """Prove the exact record belongs to this active session's workspace ledger."""
+
+        try:
+            active = self.manager.sessions.require_active(self.manager.session_id)
+            if active.session_id != self.manager.session_id:
+                return False
+            snapshot = self.manager.snapshot()
+            exact = snapshot.context_pack_revisions.get((record.context_pack_id, record.revision))
+            if exact != record:
+                return False
+            source = self.manager.events.get(record.source_event_id).event
+            payload = source.get("payload")
+            return bool(
+                source.get("workspace_id") == self.manager.workspace_id
+                and source.get("event_id") == record.source_event_id
+                and source.get("event_type") in {"context_pack.created", "context_pack.revised"}
+                and isinstance(payload, Mapping)
+                and payload.get("context_pack_id") == record.context_pack_id
+            )
+        except Exception:
+            return False
+
+    @staticmethod
+    def _binding_request_matches_metadata(
+        request: ContextBindingRequest | None,
+        metadata: ContextBindingMetadata,
+    ) -> bool:
+        if request is None:
+            return metadata.mode is ContextBindingMode.FRESH
+        if request.mode is not metadata.mode:
+            return False
+        if request.mode is ContextBindingMode.FRESH:
+            return True
+        return (
+            request.context_pack_id == metadata.context_pack_id
+            and request.context_pack_revision == metadata.context_pack_revision
+        )
+
+    def _bind_context_for_launch(
+        self,
+        *,
+        delegation_id: str,
+        launch_key_sha256: str,
+        request: ContextBindingRequest | None,
+        existing_attempt: Attempt | None,
+        retry: bool,
+    ) -> ContextBinding | None:
+        """Resolve and durably freeze context before any crashable launch action.
+
+        ``None`` is returned only for a legacy attempt that is being reconciled
+        without relaunch.  Its historical context cannot be reconstructed, so a
+        retry fails closed rather than silently treating it as fresh.
+        """
+
+        stored = self.context_bindings.get(delegation_id)
+        if stored is not None and stored.launch_key_sha256 != launch_key_sha256:
+            raise IdempotencyConflictError(
+                "delegation context binding belongs to a different runtime launch key"
+            )
+        if stored is None and existing_attempt is not None:
+            if retry:
+                raise context_binding_refusal_error(
+                    ContextBindingRefusal.create(ContextBindingRefusalCode.UNAVAILABLE)
+                )
+            # Backward-compatible reconciliation only: no provider is rebuilt or
+            # relaunched, and no context mode is guessed or newly persisted.
+            return None
+        if stored is not None and not self._binding_request_matches_metadata(
+            request, stored.metadata
+        ):
+            raise context_binding_refusal_error(
+                ContextBindingRefusal.create(ContextBindingRefusalCode.STALE)
+            )
+
+        effective_request = request or ContextBindingRequest.fresh()
+        resolved = self._resolve_context_binding(effective_request)
+        metadata = ContextBindingMetadata.from_binding(resolved)
+        if stored is not None:
+            if stored.metadata != metadata:
+                raise context_binding_refusal_error(
+                    ContextBindingRefusal.create(ContextBindingRefusalCode.STALE)
+                )
+            return resolved
+        try:
+            self.context_bindings.bind(delegation_id, launch_key_sha256, metadata)
+        except IdempotencyConflictError as exc:
+            raise context_binding_refusal_error(
+                ContextBindingRefusal.create(ContextBindingRefusalCode.STALE)
+            ) from exc
+        return resolved
+
     def run(
         self,
         delegation_id: str,
@@ -1027,6 +1403,7 @@ class DelegationRuntimeService:
         *,
         idempotency_key: str,
         retry: bool = False,
+        context: ContextBindingRequest | None = None,
     ) -> dict[str, Any]:
         with _delegation_lock(self.manager.paths.state_root, delegation_id):
             delegation = self.manager.get_delegation(delegation_id)
@@ -1055,6 +1432,18 @@ class DelegationRuntimeService:
                     raise IdempotencyConflictError(
                         "delegation already belongs to a different runtime launch key"
                     )
+                if retry:
+                    self._require_role_context_selection(self._role_scope(delegation), context)
+                # A post-attempt crash from an older runtime may have no binding
+                # record. Reconciliation remains safe because it never rebuilds
+                # an invocation; retry is refused by the binding gate below.
+                context_binding = self._bind_context_for_launch(
+                    delegation_id=delegation_id,
+                    launch_key_sha256=launch_key_sha256,
+                    request=context,
+                    existing_attempt=existing,
+                    retry=retry,
+                )
                 if not retry:
                     if not existing.state.terminal and self.attempts.process_is_live(existing.pid):
                         raise LifecycleConflictError(
@@ -1099,33 +1488,59 @@ class DelegationRuntimeService:
             # ago applies to this run.  It comes first because the profile this
             # launch uses is derived from it.
             scope = self._role_scope(delegation)
+            # This is the canonical launch seam shared by UI, CLI, and root MCP.
+            # Enforce the role contract before provider probes, child creation,
+            # immutable binding persistence, or attempt reservation.
+            self._require_role_context_selection(scope, context)
             try:
                 profile = self._profile_for(profile_id, scope.model)
             except (ConfigurationError, ValidationError) as exc:
                 raise sanitized_configuration_failure(exc) from exc
             budget_unit = str(delegation["limits"]["budget"]["unit"])
-            if budget_unit == "micro_usd" and not profile.supports_budget:
-                raise ConfigurationError(
-                    f"profile {profile_id.value} cannot enforce the delegation's micro_usd budget"
-                )
             parent_policy, child_policy = self._policies(delegation)
             role_tools, role_grants = scope.tools, scope.grants
-            # Validate executable, trust mode, argv, and budget support before
-            # allocating a child session or durable operational reservation.
-            instruction = self._instruction(delegation, profile_id=profile_id, skills=scope.skills)
-            try:
-                profile.build_invocation(
-                    instruction,
-                    workspace_root=self.manager.repo_root,
-                    state_root=self.manager.paths.state_root,
+            instruction = self._instruction(delegation, profile_id=profile_id)
+            launch_plan = LaunchPlan(
+                profile_id=profile_id,
+                purpose=LaunchPurpose(str(delegation["purpose"])),
+                instruction=instruction,
+                skill_refs=scope.skills,
+                required_capabilities=(ProviderCapability.MCP,),
+                budget_unit=BudgetUnit(budget_unit),
+                budget_limit=int(delegation["limits"]["budget"]["limit"]),
+            )
+            static_validation = self.launch_planner.validate_static(
+                launch_plan,
+                profile,
+                workspace_root=self.manager.repo_root,
+                resolve_executables=not isinstance(self.runner, DemoRunner),
+                role_tools=role_tools,
+                role_grants=role_grants,
+            )
+            if isinstance(static_validation, TypedRefusal):
+                raise launch_refusal_error(static_validation)
+            skill_refusal = self.launch_planner.validate_skill_projection(static_validation)
+            if skill_refusal is not None:
+                raise launch_refusal_error(skill_refusal)
+            self._assert_provider_qualified(profile)
+            # Context resolution and immutable operational binding happen after
+            # pure static validation but before crashable probes, child session,
+            # launch-plan build, or attempt reservation.
+            if existing is None:
+                context_binding = self._bind_context_for_launch(
                     delegation_id=delegation_id,
-                    max_budget_microusd=child_policy.max_budget_microusd,
-                    worker_purpose=str(delegation["purpose"]),
-                    role_tools=role_tools,
-                    role_grants=role_grants,
+                    launch_key_sha256=launch_key_sha256,
+                    request=context,
+                    existing_attempt=None,
+                    retry=retry,
                 )
-            except ConfigurationError as exc:
-                raise sanitized_configuration_failure(exc) from exc
+            assert context_binding is not None
+            # Both host probes are pre-child and pre-attempt.  Initialization
+            # establishes that the fixed provider operation is viable first;
+            # auth is intentionally last so its READY result is adjacent to
+            # child creation rather than stale behind another process probe.
+            self._assert_provider_initialized(profile)
+            self._assert_provider_authenticated(profile)
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
             nonce = str(child["nonce"])
@@ -1137,6 +1552,22 @@ class DelegationRuntimeService:
                 state_root=self.manager.paths.state_root,
             )
             child_manager.sessions.require_active(child_session_id)
+            try:
+                validated_launch_plan = self.launch_planner.build(
+                    static_validation,
+                    workspace_root=self.manager.repo_root,
+                    state_root=self.manager.paths.state_root,
+                    delegation_id=delegation_id,
+                    child_session_id=child_session_id,
+                    max_budget_microusd=child_policy.max_budget_microusd,
+                    worker_purpose=str(delegation["purpose"]),
+                    role_tools=role_tools,
+                    role_grants=role_grants,
+                    context=context_binding,
+                )
+            except (ConfigurationError, ValidationError) as exc:
+                child_manager.end_session(nonce=nonce)
+                raise sanitized_configuration_failure(exc) from exc
             target = delegation["target_ref"]
             trace_id = hashlib.sha256(
                 (
@@ -1184,6 +1615,7 @@ class DelegationRuntimeService:
                         retry=retry,
                         role_tools=role_tools,
                         role_grants=role_grants,
+                        validated_launch_plan=validated_launch_plan,
                     )
                 )
                 canonical, finalization_failures = self._finalize_attempt(result.attempt)

@@ -16,10 +16,15 @@ from agent_commons.ui.security import (
     bearer_token,
     token_matches,
 )
-from agent_commons.ui.server import create_app
+from agent_commons.ui.server import BROWSER_SESSION_RECOVERY_ACTIONS, create_app
 from tests.ui.conftest import PORT, authorized
 
-_API_PATHS = ("/api/meta", "/api/graph", "/api/entities/task/task.01K00000000000000000000000")
+_API_PATHS = (
+    "/api/meta",
+    "/api/graph",
+    "/api/work/tracker",
+    "/api/entities/task/task.01K00000000000000000000000",
+)
 
 
 @pytest.mark.parametrize("path", _API_PATHS)
@@ -27,6 +32,7 @@ def test_api_without_a_local_session_is_unauthorized(client, path: str) -> None:
     response = client.get(path)
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"].startswith("Session")
+    assert response.json()["error"]["safe_next_actions"] == list(BROWSER_SESSION_RECOVERY_ACTIONS)
     body = response.text
     assert "test-token" not in body
     assert "workspace." not in body
@@ -80,6 +86,7 @@ def test_exchange_code_creates_an_http_only_same_site_session_once(client) -> No
     )
     assert repeated.status_code == 401
     assert repeated.json()["error"]["code"] == "unauthorized"
+    assert repeated.json()["error"]["safe_next_actions"] == list(BROWSER_SESSION_RECOVERY_ACTIONS)
 
 
 def test_exchange_requires_an_exact_same_origin_without_consuming_the_code(client) -> None:  # type: ignore[no-untyped-def]

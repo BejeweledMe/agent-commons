@@ -18,13 +18,41 @@ state root:
 6. the final delegation state and result references, not provider prose, satisfy
    the grader.
 
-For an independent review, the worker must call `commons_complete_review` and
-then `commons_succeed_delegation` with the resulting `review:<id>`. A prose-only
-answer, a completed review without the delegation result, or process exit zero
-is not canonical completion.
+For an independent review, the worker must call `commons_finalize_review` once.
+That retry-convergent terminal operation records the existing `review.completed`
+event and then `delegation.succeeded` with the bound `review:<id>`; a prose-only
+answer, a partial first event, or process exit zero is not canonical completion.
+The provider supplies only `verdict` and bounded `summary`; the server derives the
+operation identity, review/delegation identities, exact revisions, result reference,
+and immutable manifest evidence. Approval requires successful scoped reads of every
+artifact bound to the exact task revision. If the process loses the response between
+the two events, the server-bound operation converges the missing delegation result.
+Task acceptance refuses an orphan delegated approval unless the matching delegation
+also reached `succeeded` with exactly that review result.
 
-CI runs this contract without credentials or network access. Static preflight
-and the behavioral canary are intentionally separate signals.
+CI runs this contract without credentials or network access. Static preflight,
+the adapter-owned provider initialization probe, and the behavioral canary are
+three intentionally separate signals. Claude initialization uses the fixed
+no-model `mcp list` operation; Codex uses the fixed `app-server --stdio`
+operation. Neither operation accepts workspace argv or counts as a delegation
+attempt.
+
+## Packaged skill projection
+
+A role may select a skill identity from the operator catalogue, but a provider
+launch accepts only the packaged `commons-*` allowlist. The catalogue's
+instruction text is never copied into provider stdin. Codex and Claude adapters
+project the packaged `SKILL.md` bytes into their own `.agents/skills` and
+`.claude/skills` envelopes and bind source, projection, and installer-contract
+SHA-256 digests into the exact fingerprinted invocation.
+
+An unknown, missing, oversized, stale, or altered projection fails with
+`skill_projection_unavailable` before initialization/auth probing, child-session
+creation, or attempt reservation. There is no workspace skill discovery and no
+fallback that silently drops a requested skill. Empty skill selection preserves
+the existing invocation bytes. Only digests may appear in operational metadata;
+skill source/text remains ephemeral and never enters canonical events, attempts,
+telemetry, or UI DTOs.
 
 Before calling one real provider build compatible, run the explicit canary from
 the exact installed Agent Commons source:
@@ -51,7 +79,13 @@ counters. Exit status 0 requires exactly one completed terminal tool, zero
 rejected terminal calls, a typed review result, and canonical `succeeded`.
 Preflight failure or prose-only provider exit returns status 2. Use separate
 operator-owned profile files to qualify Fable, Opus, or another explicit model;
-one model's pass is not evidence for another.
+one model's pass is not evidence for another. Builder and independent-reviewer
+profiles are qualified separately. A passing canary writes a private
+operational receipt under the selected state root, bound to the exact profile,
+model, adapter capabilities, Agent Commons source, and provider executable
+bytes. The receipt is derived host state, never a canonical event. A missing,
+failed, or stale receipt makes the profile non-launchable and returns a typed
+remediation before a child session or attempt is created.
 
 ## Operator caps and backpressure
 

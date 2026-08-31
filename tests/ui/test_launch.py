@@ -12,6 +12,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -31,6 +32,7 @@ from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 from agent_commons.ui import read_spa
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.reads import UIReads
 from agent_commons.ui.server import LAUNCH_ROUTES, MUTATING_ROUTES, create_app
 from tests.ui.conftest import (
     OPERATOR_SURFACE,
@@ -69,16 +71,43 @@ _RUN_FIELDS = {
 }
 
 
+def test_launch_context_pack_options_are_server_bounded_with_explicit_status() -> None:
+    reads = UIReads()
+    reads.launch_enabled = True  # type: ignore[attr-defined]
+    records = {
+        f"pack-{index:03d}": SimpleNamespace(
+            context_pack_id=f"context_pack.{index:026d}",
+            revision=f"evt.{index:026d}",
+            state="published",
+            draft=SimpleNamespace(summary=f"Pack {index}", facts=(), open_questions=()),
+        )
+        for index in range(257)
+    }
+    reads.manager = lambda: SimpleNamespace(  # type: ignore[method-assign]
+        snapshot=lambda: SimpleNamespace(agents={}, tasks={}, context_packs=records)
+    )
+
+    options = reads.launch_options()
+
+    assert len(options["context_packs"]) == 256
+    assert options["context_pack_options_status"] == {
+        "freshness": "current",
+        "truncated": True,
+        "refusal": "context_pack_options_truncated",
+    }
+
+
 class FakeRunner:
     """Stands in for the provider CLI: starts, lets the child act, then exits."""
 
     def __init__(self, after_start: Callable[[str], None]) -> None:
         self.after_start = after_start
         self.calls = 0
+        self.invocations: list[Any] = []
 
     def run(self, invocation: Any, **values: Any) -> ProcessResult:
-        del invocation
         self.calls += 1
+        self.invocations.append(invocation)
         pid = _dead_pid()
         values["on_started"](pid)
         self.after_start(values["child_session_id"])
@@ -163,6 +192,34 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         )
 
     runner = FakeRunner(after_start=complete_as_child)
+    profile_config = workspace["state_root"] / "ui-test-runtime.yaml"
+    profile_config.write_text(
+        "profiles:\n"
+        "  codex-builder:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    sandbox: workspace-write\n"
+        "    trusted_workspace: true\n"
+        "  codex-independent-reviewer:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    sandbox: read-only\n"
+        "    trusted_workspace: true\n"
+        "  claude-builder:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: acceptEdits\n"
+        "    trusted_workspace: true\n"
+        "  claude-independent-reviewer:\n"
+        "    executable: /bin/echo\n"
+        "    mcp_executable: /bin/echo\n"
+        "    git_executable: /usr/bin/git\n"
+        "    permission_mode: dontAsk\n",
+        encoding="utf-8",
+    )
 
     def runtime_factory(bound_manager: CommonsManager) -> DelegationRuntimeService:
         return DelegationRuntimeService(
@@ -179,6 +236,7 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         workspace["repo"],
         state_root=workspace["state_root"],
         writer_session_id=str(session["session_id"]),
+        profile_config=profile_config,
         runtime_factory=runtime_factory,
     )
     return {
@@ -222,6 +280,36 @@ def test_the_launch_route_is_declared_apart_from_the_write_surface(
     # Present, because the runtime config can be written into a panel that is
     # already serving and the route table is built once.
     assert set(LAUNCH_ROUTES) <= found
+
+
+def test_work_provider_availability_is_one_closed_redacted_projection(
+    workspace: dict[str, Any],
+) -> None:
+    fixture = _launch_workspace(workspace)
+
+    with _client(fixture["context"]) as client:
+        response = client.get(
+            "/api/work/provider-availability",
+            headers=authorized(),
+        )
+
+    assert response.status_code == 200
+    values = response.json()
+    assert {item["profile_id"] for item in values} == {
+        "codex-builder",
+        "codex-independent-reviewer",
+        "claude-builder",
+        "claude-independent-reviewer",
+    }
+    claude = next(item for item in values if item["profile_id"] == "claude-builder")
+    assert claude["qualification"]["state"] == "required"
+    assert claude["initialization_state"] == "not_checked"
+    assert claude["authentication"]["state"] == "unsupported"
+    assert claude["launchable"] is False
+    assert claude["refusal"]["code"] == "provider_qualification_required"
+    rendered = str(values).lower()
+    for forbidden in ("argv", "executable", "stderr", "environment", "mcp_json"):
+        assert forbidden not in rendered
 
 
 def test_the_launch_handler_refuses_without_a_configured_runtime(
@@ -277,6 +365,109 @@ def test_the_panel_launches_a_role_on_a_task_end_to_end(
     delegation = fixture["manager"].get_delegation(delegation_id)
     assert delegation["state"] == "succeeded"
     assert delegation["agent_id"] == fixture["role_id"]
+
+
+def test_accumulated_work_launch_requires_and_binds_one_exact_pack_before_delegation(
+    workspace: dict[str, Any],
+) -> None:
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    manager: CommonsManager = fixture["manager"]
+    accumulated = manager.create_agent(
+        name="Context-bound backend owner",
+        profile_id="claude-builder",
+        rationale="starts each run from one exact published baseline",
+        context_mode="accumulated",
+        idempotency_key="launch-accumulated-role",
+    )
+    source = manager.repo_root / "launch-context-source.txt"
+    source.write_text("verified UI launch source", encoding="utf-8")
+    artifact = manager.register_artifact(
+        source,
+        media_type="text/plain",
+        classification="internal",
+        idempotency_key="launch-context-source",
+    )
+    pack = manager.context_packs.publish(
+        {
+            "summary": "Frozen UI baseline",
+            "facts": [
+                {
+                    "statement": "The launch source is revision-bound.",
+                    "source_refs": [
+                        {"ref": artifact["entity_ref"], "revision": artifact["revision"]}
+                    ],
+                }
+            ],
+            "decision_refs": [],
+            "open_questions": ["Which role-specific action comes next?"],
+        },
+        idempotency_key="launch-context-pack",
+    )
+
+    with _client(context) as client:
+        options = client.get("/api/launch", headers=authorized()).json()
+        role_option = next(
+            item for item in options["roles"] if item["id"] == accumulated["entity_ref"]["id"]
+        )
+        assert role_option["context_mode"] == "accumulated"
+        assert options["context_packs"] == [
+            {
+                "context_pack_id": pack.context_pack_id,
+                "revision": pack.revision,
+                "summary": "Frozen UI baseline",
+                "fact_count": 1,
+                "open_question_count": 1,
+            }
+        ]
+        assert options["context_pack_options_status"] == {
+            "freshness": "current",
+            "truncated": False,
+            "refusal": None,
+        }
+        assert "source_refs" not in str(options["context_packs"])
+
+        refused = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": accumulated["entity_ref"]["id"],
+                "task_id": fixture["task_id"],
+            },
+            headers=authorized(),
+        )
+        assert refused.status_code == 409
+        assert "requires one exact published Context Pack revision" in refused.text
+        assert manager.list_delegations() == []
+
+        stale = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": accumulated["entity_ref"]["id"],
+                "task_id": fixture["task_id"],
+                "context_pack_id": pack.context_pack_id,
+                "context_pack_revision": "evt." + "0" * 25 + "9",
+            },
+            headers=authorized(),
+        )
+        assert stale.status_code == 409
+        assert stale.json()["error"]["code"] == "context_binding_stale"
+        assert manager.list_delegations() == []
+
+        launched = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": accumulated["entity_ref"]["id"],
+                "task_id": fixture["task_id"],
+                "context_pack_id": pack.context_pack_id,
+                "context_pack_revision": pack.revision,
+            },
+            headers=authorized(),
+        )
+    assert launched.status_code == 200, launched.text
+    context.await_launches()
+    compiled = manager.context_packs.compile(pack.context_pack_id, pack.revision)
+    assert fixture["runner"].invocations[-1].stdin.endswith(compiled.text.encode("utf-8"))
+    assert manager.get_delegation(launched.json()["delegation_id"])["state"] == "succeeded"
 
 
 def test_launch_is_in_its_own_declared_surface_not_the_write_allowlist() -> None:

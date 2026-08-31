@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +17,7 @@ from .attempts import (
     AttemptStore,
     checkout_fingerprint,
 )
+from .launch import ValidatedLaunchPlan, invocation_fingerprint
 from .model import BuiltinProfileId, CorrelationIds, ProfileRegistry
 from .policy import RuntimePolicy
 from .subprocess_runner import CancellationToken, ProcessResult, SubprocessRunner
@@ -51,6 +50,9 @@ class BrokerRequest:
     #: Standing permissions of that role.  A staff-changing tool reaches argv
     #: only when its grant is above `deny`, so a run with no role gets none.
     role_grants: Mapping[str, str] = field(default_factory=dict)
+    #: Exact one-build production plan.  Legacy direct broker callers may omit
+    #: it and retain the existing profile-build compatibility path.
+    validated_launch_plan: ValidatedLaunchPlan | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile_id", BuiltinProfileId(self.profile_id))
@@ -60,6 +62,14 @@ class BrokerRequest:
         object.__setattr__(self, "state_root", Path(self.state_root).expanduser().resolve())
         if self.purpose not in {"implementation", "independent_review", "verification"}:
             raise ConfigurationError("broker request purpose is unsupported")
+        if self.validated_launch_plan is not None:
+            validated = self.validated_launch_plan
+            if (
+                validated.plan.profile_id is not self.profile_id
+                or validated.plan.purpose.value != self.purpose
+                or validated.invocation.profile_id is not self.profile_id
+            ):
+                raise ConfigurationError("broker request does not match its validated launch plan")
         self.child_policy.assert_reduction_of(self.parent_policy)
         if len(self.launch_key_sha256) != 64 or any(
             character not in "0123456789abcdef" for character in self.launch_key_sha256
@@ -158,29 +168,26 @@ class LocalBroker:
             raise ConfigurationError(
                 f"profile {request.profile_id.value} cannot enforce a monetary budget"
             )
-        # Build before reserving so malformed ephemeral content creates no durable attempt.
-        invocation = profile.build_invocation(
-            request.instruction,
-            workspace_root=request.cwd,
-            state_root=request.state_root,
-            delegation_id=request.correlation.delegation_id,
-            child_session_id=request.correlation.child_session_id,
-            max_budget_microusd=request.child_policy.max_budget_microusd,
-            worker_purpose=request.purpose,
-            role_tools=request.role_tools,
-            role_grants=request.role_grants,
-        )
-        launch_plan_sha256 = hashlib.sha256(
-            json.dumps(
-                {
-                    "provider": invocation.provider.value,
-                    "profile_id": invocation.profile_id.value,
-                    "argv": list(invocation.argv),
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        ).hexdigest()
+        if request.validated_launch_plan is not None:
+            # Production passes the exact immutable object built once by the
+            # adapter.  Do not reconstruct or normalize any invocation byte.
+            invocation = request.validated_launch_plan.invocation
+            launch_plan_sha256 = request.validated_launch_plan.invocation_fingerprint
+        else:
+            # Compatibility for direct broker tests/callers.  Service-owned
+            # production launches always use ``validated_launch_plan``.
+            invocation = profile.build_invocation(
+                request.instruction,
+                workspace_root=request.cwd,
+                state_root=request.state_root,
+                delegation_id=request.correlation.delegation_id,
+                child_session_id=request.correlation.child_session_id,
+                max_budget_microusd=request.child_policy.max_budget_microusd,
+                worker_purpose=request.purpose,
+                role_tools=request.role_tools,
+                role_grants=request.role_grants,
+            )
+            launch_plan_sha256 = invocation_fingerprint(invocation)
         spec = AttemptSpec(
             idempotency_key=request.idempotency_key,
             profile_id=request.profile_id,

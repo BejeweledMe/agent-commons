@@ -75,7 +75,11 @@ class FakeCommunication:
         return ({"operation_id": "operation.01K00000000000000000000000"},)
 
 
-def _workspace(tmp_path: Path) -> dict[str, Any]:
+def _workspace(
+    tmp_path: Path,
+    *,
+    reviewer_profile: str = "claude-independent-reviewer",
+) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(
@@ -114,11 +118,12 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
         role="builder",
     )
     parent.session_id = parent_session["session_id"]
+    reviewer_provider = reviewer_profile.split("-", 1)[0]
     child_session = parent.start_session(
         stable_instance_id="worker-scope-child-12345678",
         principal="operator",
-        client="claude",
-        software="claude-code",
+        client=reviewer_provider,
+        software=f"{reviewer_provider}-cli",
         role="independent-reviewer",
     )
 
@@ -194,28 +199,36 @@ def _workspace(tmp_path: Path) -> dict[str, Any]:
     delegation = parent.create_delegation(
         target_ref=review["entity_ref"],
         target_revision=review["revision"],
-        target_profile="claude-independent-reviewer",
+        target_profile=reviewer_profile,
         purpose="independent_review",
         limits={
             "max_depth": 0,
             "wall_time_seconds": 300,
             "max_attempts": 1,
             "max_concurrency": 1,
-            "budget": {"unit": "micro_usd", "limit": 50_000},
+            "budget": (
+                {"unit": "provider_units", "limit": 1}
+                if reviewer_provider == "codex"
+                else {"unit": "micro_usd", "limit": 50_000}
+            ),
         },
         idempotency_key="worker-scope-delegation",
     )
     requested_only = parent.create_delegation(
         target_ref=unrelated_review["entity_ref"],
         target_revision=unrelated_review["revision"],
-        target_profile="claude-independent-reviewer",
+        target_profile=reviewer_profile,
         purpose="independent_review",
         limits={
             "max_depth": 0,
             "wall_time_seconds": 300,
             "max_attempts": 1,
             "max_concurrency": 1,
-            "budget": {"unit": "micro_usd", "limit": 50_000},
+            "budget": (
+                {"unit": "provider_units", "limit": 1}
+                if reviewer_provider == "codex"
+                else {"unit": "micro_usd", "limit": 50_000}
+            ),
         },
         idempotency_key="worker-scope-requested-only-delegation",
     )
@@ -446,10 +459,9 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_show_verification",
         "commons_show_artifact",
         "commons_read_artifact",
-        "commons_complete_review",
+        "commons_finalize_review",
         "commons_record_verification",
         "commons_delegation_input_needed",
-        "commons_succeed_delegation",
         "commons_delegation_needs_operator",
         "commons_repo_files",
         "commons_repo_read",
@@ -582,16 +594,10 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
             summary="This delegated child must not be able to approve unrelated work.",
             idempotency_key="worker-scope-illegal-direct-review",
         )
-    with pytest.raises(LifecycleConflictError, match="outside its delegation scope"):
-        server.tools["commons_complete_review"](
-            unrelated_review["entity_ref"]["id"],
-            unrelated_review["revision"],
-            workspace["unrelated_task"]["revision"],
-            "approved",
-            "This MCP write must remain scoped.",
-            "worker-scope-illegal-mcp-review",
-            None,
-        )
+    assert tuple(inspect.signature(server.tools["commons_finalize_review"]).parameters) == (
+        "verdict",
+        "summary",
+    )
     with pytest.raises(LifecycleConflictError, match="outside its delegation scope"):
         server.tools["commons_delegation_needs_operator"](
             workspace["requested_only"]["entity_ref"]["id"],
@@ -600,15 +606,6 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
             "A worker cannot classify an unrelated delegation.",
             "worker-scope-illegal-outcome",
         )
-    with pytest.raises(LifecycleConflictError, match="exact completed review"):
-        server.tools["commons_succeed_delegation"](
-            workspace["delegation"]["entity_ref"]["id"],
-            workspace["started"]["revision"],
-            "An unrelated review cannot satisfy this delegation.",
-            [f"review:{unrelated_review['entity_ref']['id']}"],
-            "worker-scope-illegal-result",
-        )
-
     assert child.get_delegation(workspace["delegation"]["entity_ref"]["id"])["state"] == "active"
     assert (
         next(
@@ -618,6 +615,211 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
         )["state"]
         == "requested"
     )
+
+
+def test_canonical_ledger_writes_do_not_invalidate_reviewer_snapshot(tmp_path: Path) -> None:
+    """Lifecycle events are not review subject bytes.
+
+    A real project can track ``.agent-commons/events``.  Completing a review
+    necessarily appends canonical state, then the worker must record its
+    delegation outcome.  The snapshot must reject a changed subject file while
+    ignoring only this system-owned ledger.
+    """
+
+    workspace = _workspace(tmp_path)
+    ledger_event = workspace["repo"] / ".agent-commons" / "events" / "lifecycle.json"
+    ledger_event.parent.mkdir(parents=True, exist_ok=True)
+    ledger_event.write_text("review.requested\n", encoding="utf-8")
+    subprocess.run(
+        (
+            "/usr/bin/git",
+            "-C",
+            str(workspace["repo"]),
+            "add",
+            "--",
+            ".agent-commons/events/lifecycle.json",
+        ),
+        check=True,
+        capture_output=True,
+    )
+    server = _worker_server(workspace)
+    visible_paths = {item["path"] for item in server.tools["commons_repo_files"]("", 500)}
+    assert not any(
+        path == ".agent-commons" or path.startswith(".agent-commons/") for path in visible_paths
+    )
+
+    ledger_event.write_text("review.completed\n", encoding="utf-8")
+    server.tools["commons_read_artifact"](workspace["artifact"]["entity_ref"]["id"])
+    completed = server.tools["commons_finalize_review"](
+        "approved",
+        "The immutable review subject is approved.",
+    )
+    assert completed["event_type"] == "review.completed"
+
+    assert completed["delegation_outcome"]["event_type"] == "delegation.succeeded"
+    assert (
+        workspace["parent"].get_delegation(workspace["delegation"]["entity_ref"]["id"])["state"]
+        == "succeeded"
+    )
+    audit = TerminalToolAuditStore(workspace["parent"].paths.state_root).get(
+        workspace["delegation"]["entity_ref"]["id"]
+    )
+    assert (audit.terminal_tool_calls, audit.terminal_tool_completions) == (1, 1)
+    assert audit.terminal_tool_rejections == 0
+
+
+def test_review_finalizer_converges_after_review_was_already_recorded(tmp_path: Path) -> None:
+    """A lost response between the two canonical appends must not duplicate the review."""
+
+    workspace = _workspace(tmp_path)
+    server = _worker_server(workspace)
+    child: CommonsManager = workspace["child"]
+    review_id = workspace["review"]["entity_ref"]["id"]
+    operation_key = f"review-finalizer:{workspace['delegation']['entity_ref']['id']}"
+    first = child.complete_review(
+        review_id,
+        workspace["review"]["revision"],
+        target_revision=workspace["task"]["revision"],
+        verdict="approved",
+        summary="The exact review was recorded before the response was lost.",
+        idempotency_key=f"{operation_key}:review",
+    )
+
+    converged = server.tools["commons_finalize_review"](
+        "approved",
+        "The exact review was recorded before the response was lost.",
+    )
+
+    assert converged["event_id"] == first["event_id"]
+    assert converged["delegation_outcome"]["event_type"] == "delegation.succeeded"
+    delegation_id = workspace["delegation"]["entity_ref"]["id"]
+    assert workspace["parent"].get_delegation(delegation_id)["state"] == "succeeded"
+
+
+@pytest.mark.parametrize(
+    "reviewer_profile",
+    ("claude-independent-reviewer", "codex-independent-reviewer"),
+)
+def test_returned_work_completes_a_second_review_and_delegation(
+    tmp_path: Path,
+    reviewer_profile: str,
+) -> None:
+    """Both reviewer profiles survive the complete-return-revise-review loop."""
+
+    workspace = _workspace(tmp_path, reviewer_profile=reviewer_profile)
+    first_server = _worker_server(workspace)
+    task_id = workspace["task"]["entity_ref"]["id"]
+    first_server.tools["commons_read_artifact"](workspace["artifact"]["entity_ref"]["id"])
+    first_server.tools["commons_finalize_review"](
+        "approved",
+        "The first exact revision is approved.",
+    )
+
+    parent = workspace["parent"]
+    reopened = parent.reopen_task(
+        task_id,
+        workspace["task"]["revision"],
+        reason="Return the work for a real builder revision.",
+        idempotency_key=f"worker-scope-{reviewer_profile}-reopen",
+    )
+    revised = parent.revise_task(
+        task_id,
+        reopened["revision"],
+        changes={"description": "The returned work now carries its corrected revision."},
+        idempotency_key=f"worker-scope-{reviewer_profile}-revise",
+    )
+    started_task = parent.start_task(
+        task_id,
+        revised["revision"],
+        idempotency_key=f"worker-scope-{reviewer_profile}-restart-task",
+    )
+    workspace["source"].write_text(
+        "def answer() -> int:\n    return 43\n",
+        encoding="utf-8",
+    )
+    completed_task = parent.complete_task(
+        task_id,
+        started_task["revision"],
+        summary="The returned work was revised against the same registered evidence.",
+        artifact_refs=(workspace["artifact"]["entity_ref"],),
+        idempotency_key=f"worker-scope-{reviewer_profile}-recomplete",
+    )
+    submitted_task = parent.submit_task(
+        task_id,
+        completed_task["revision"],
+        summary="The corrected revision is ready for a second independent review.",
+        artifact_refs=(workspace["artifact"]["entity_ref"],),
+        idempotency_key=f"worker-scope-{reviewer_profile}-resubmit",
+    )
+    second_review = parent.request_review(
+        target_ref={"kind": "task", "id": task_id},
+        target_revision=submitted_task["revision"],
+        criteria=("Inspect the corrected exact revision",),
+        idempotency_key=f"worker-scope-{reviewer_profile}-second-review-request",
+    )
+    provider = reviewer_profile.split("-", 1)[0]
+    second_child_session = parent.start_session(
+        stable_instance_id=f"worker-scope-{provider}-second-reviewer-12345678",
+        principal="operator",
+        client=provider,
+        software=f"{provider}-cli",
+        role="independent-reviewer",
+    )
+    second_delegation = parent.create_delegation(
+        target_ref=second_review["entity_ref"],
+        target_revision=second_review["revision"],
+        target_profile=reviewer_profile,
+        purpose="independent_review",
+        limits={
+            "max_depth": 0,
+            "wall_time_seconds": 300,
+            "max_attempts": 1,
+            "max_concurrency": 1,
+            "budget": (
+                {"unit": "provider_units", "limit": 1}
+                if provider == "codex"
+                else {"unit": "micro_usd", "limit": 50_000}
+            ),
+        },
+        idempotency_key=f"worker-scope-{reviewer_profile}-second-delegation",
+    )
+    second_started = parent.start_delegation(
+        second_delegation["entity_ref"]["id"],
+        second_delegation["revision"],
+        child_session_id=second_child_session["session_id"],
+        attempt=1,
+        idempotency_key=f"worker-scope-{reviewer_profile}-second-start",
+    )
+    second_workspace = {
+        **workspace,
+        "child": CommonsManager(
+            workspace["repo"],
+            session_id=second_child_session["session_id"],
+            state_root=parent.paths.state_root,
+        ),
+        "task": {"entity_ref": {"kind": "task", "id": task_id}, **submitted_task},
+        "review": second_review,
+        "delegation": second_delegation,
+        "started": second_started,
+    }
+    second_server = _worker_server(second_workspace)
+    second_server.tools["commons_read_artifact"](workspace["artifact"]["entity_ref"]["id"])
+    second_completed = second_server.tools["commons_finalize_review"](
+        "approved",
+        "The corrected exact revision is approved.",
+    )
+    accepted = parent.accept_task(
+        task_id,
+        submitted_task["revision"],
+        summary="The corrected work passed its fresh independent review.",
+        idempotency_key=f"worker-scope-{reviewer_profile}-accept",
+    )
+
+    assert second_completed["event_type"] == "review.completed"
+    assert second_completed["delegation_outcome"]["event_type"] == "delegation.succeeded"
+    assert parent.get_delegation(second_delegation["entity_ref"]["id"])["state"] == "succeeded"
+    assert parent.snapshot().tasks[task_id]["state"] == "accepted"
+    assert accepted["event_type"] == "task.accepted"
 
 
 def test_registered_artifact_is_manifest_bound_scoped_and_quiescent(tmp_path: Path) -> None:
@@ -646,14 +848,9 @@ def test_registered_artifact_is_manifest_bound_scoped_and_quiescent(tmp_path: Pa
 
     workspace["evidence"].write_text("tampered review evidence\n", encoding="utf-8")
     with pytest.raises(LifecycleConflictError, match="registered review artifact changed"):
-        server.tools["commons_complete_review"](
-            workspace["review"]["entity_ref"]["id"],
-            workspace["review"]["revision"],
-            workspace["task"]["revision"],
+        server.tools["commons_finalize_review"](
             "approved",
             "Tampered evidence must not receive a canonical verdict.",
-            "worker-scope-tampered-artifact-review",
-            None,
         )
 
     assert (
@@ -664,6 +861,99 @@ def test_registered_artifact_is_manifest_bound_scoped_and_quiescent(tmp_path: Pa
         )["state"]
         == "requested"
     )
+
+
+def test_bound_artifact_reads_replay_only_the_live_delegation_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Artifact count must not multiply full-ledger replays inside one worker run."""
+
+    workspace = _workspace(tmp_path)
+    server = _worker_server(workspace)
+    artifact_id = workspace["artifact"]["entity_ref"]["id"]
+    child = workspace["child"]
+    original_read_snapshot = child._read_snapshot
+    read_snapshot_calls = 0
+
+    def counted_read_snapshot(*, fresh: bool = False) -> Any:
+        nonlocal read_snapshot_calls
+        read_snapshot_calls += 1
+        return original_read_snapshot(fresh=fresh)
+
+    monkeypatch.setattr(child, "_read_snapshot", counted_read_snapshot)
+
+    server.tools["commons_show_artifact"](artifact_id)
+    server.tools["commons_read_artifact"](artifact_id)
+
+    # Each guarded call still refreshes canonical delegation authority. The
+    # exact artifact authorization and manifest come from the launch snapshot,
+    # so neither call performs the former three additional ledger replays.
+    assert read_snapshot_calls == 2
+
+
+def test_bound_review_evidence_reads_use_the_frozen_launch_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exact review evidence must not replay the ledger once per verification."""
+
+    workspace = _workspace(tmp_path)
+    server = _worker_server(workspace)
+    child = workspace["child"]
+    original_read_snapshot = child._read_snapshot
+    read_snapshot_calls = 0
+
+    def counted_read_snapshot(*, fresh: bool = False) -> Any:
+        nonlocal read_snapshot_calls
+        read_snapshot_calls += 1
+        return original_read_snapshot(fresh=fresh)
+
+    def unexpected_full_snapshot() -> Any:
+        raise AssertionError("worker evidence readers must not replay the full ledger")
+
+    monkeypatch.setattr(child, "_read_snapshot", counted_read_snapshot)
+    monkeypatch.setattr(child, "snapshot", unexpected_full_snapshot)
+
+    review_id = workspace["review"]["entity_ref"]["id"]
+    verification_id = workspace["verification"]["entity_ref"]["id"]
+    server.tools["commons_orient"]()
+    server.tools["commons_list_tasks"](None)
+    server.tools["commons_list_reviews"](None)
+    server.tools["commons_show_review"](review_id)
+    server.tools["commons_list_verifications"]()
+    server.tools["commons_show_verification"](verification_id)
+
+    # Each guarded call refreshes only current delegation authority. The exact
+    # review, task, and verification evidence is immutable launch context.
+    assert read_snapshot_calls == 6
+
+
+def test_worker_server_freezes_binding_from_one_canonical_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MCP initialization must not multiply replay cost before its handshake."""
+
+    workspace = _workspace(tmp_path)
+    child = workspace["child"]
+    original_read_snapshot = child._read_snapshot
+    read_snapshot_calls = 0
+
+    def counted_read_snapshot(*, fresh: bool = False) -> Any:
+        nonlocal read_snapshot_calls
+        read_snapshot_calls += 1
+        return original_read_snapshot(fresh=fresh)
+
+    def unexpected_full_snapshot() -> Any:
+        raise AssertionError("full replay is not the startup path")
+
+    monkeypatch.setattr(child, "_read_snapshot", counted_read_snapshot)
+    monkeypatch.setattr(child, "snapshot", unexpected_full_snapshot)
+
+    _worker_server(workspace)
+
+    assert read_snapshot_calls == 1
 
 
 def test_snapshot_mutation_and_active_cancel_both_fail_closed(tmp_path: Path) -> None:
@@ -682,14 +972,9 @@ def test_snapshot_mutation_and_active_cancel_both_fail_closed(tmp_path: Path) ->
     with pytest.raises(LifecycleConflictError, match="changed after reviewer snapshot"):
         worker_server.tools["commons_repo_read"]("src/app.py", source_item["sha256"])
     with pytest.raises(LifecycleConflictError, match="workspace changed"):
-        worker_server.tools["commons_complete_review"](
-            workspace["review"]["entity_ref"]["id"],
-            workspace["review"]["revision"],
-            workspace["task"]["revision"],
+        worker_server.tools["commons_finalize_review"](
             "approved",
             "A changed snapshot must not receive a canonical verdict.",
-            "worker-scope-mutated-review",
-            None,
         )
 
     root_server = build_server(
@@ -756,14 +1041,9 @@ def test_terminal_delegation_revokes_the_captured_worker_catalog(tmp_path: Path)
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
         server.tools["commons_repo_read"]("src/app.py", None)
     with pytest.raises(LifecycleConflictError, match="worker MCP authority ended"):
-        server.tools["commons_complete_review"](
-            workspace["review"]["entity_ref"]["id"],
-            workspace["review"]["revision"],
-            workspace["task"]["revision"],
+        server.tools["commons_finalize_review"](
             "approved",
             "A terminal worker must not retain review authority.",
-            "worker-scope-review-after-terminal",
-            None,
         )
 
 
@@ -781,15 +1061,11 @@ def test_a_rejected_terminal_call_never_persists_argument_content(tmp_path: Path
     server = _worker_server(workspace)
     delegation_id = workspace["delegation"]["entity_ref"]["id"]
     marker = "PRIVATETASKCONTENT"
-    oversized = (marker + " ") * 500  # far past the schema's 8192-character cap
 
-    with pytest.raises(ValidationError, match="summary"):
-        server.tools["commons_succeed_delegation"](
-            delegation_id,
-            workspace["started"]["revision"],
-            oversized,
-            [f"task:{workspace['task']['entity_ref']['id']}"],
-            "worker-scope-oversized-summary",
+    with pytest.raises(ValidationError, match="verdict"):
+        server.tools["commons_finalize_review"](
+            marker,
+            "This bounded summary must not authorize an invalid verdict.",
         )
 
     store = TerminalToolAuditStore(workspace["parent"].paths.state_root, read_only=True)
@@ -797,7 +1073,7 @@ def test_a_rejected_terminal_call_never_persists_argument_content(tmp_path: Path
     assert audit.terminal_tool_calls == 1
     assert audit.terminal_tool_rejections == 1
     detail = audit.rejection_details[0]
-    assert detail.tool == "commons_succeed_delegation"
+    assert detail.tool == "commons_finalize_review"
     assert detail.error_type == "ValidationError"
     assert marker not in detail.message
     # The panel reads exactly this store, but check the persisted bytes too:

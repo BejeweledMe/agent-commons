@@ -60,8 +60,32 @@ ATTEMPT_STORAGE = OperationalStoragePolicy(
     nofollow_lock=True,
     enforce_lock_mode=True,
 )
+DELEGATION_STORAGE = OperationalStoragePolicy(
+    label="runtime delegation",
+    reject_directory_symlinks=True,
+    process_lock_namespace="operational",
+    lock_identity="resolved",
+    nofollow_lock=True,
+    enforce_lock_mode=True,
+)
 COMMUNICATION_STORAGE = OperationalStoragePolicy(
     label="communication",
+    reject_directory_symlinks=True,
+    process_lock_namespace="operational",
+    lock_identity="resolved",
+    nofollow_lock=True,
+    enforce_lock_mode=True,
+)
+CONTEXT_BINDING_STORAGE = OperationalStoragePolicy(
+    label="runtime context binding",
+    reject_directory_symlinks=True,
+    process_lock_namespace="operational",
+    lock_identity="resolved",
+    nofollow_lock=True,
+    enforce_lock_mode=True,
+)
+PROVIDER_QUALIFICATION_STORAGE = OperationalStoragePolicy(
+    label="provider qualification",
     reject_directory_symlinks=True,
     process_lock_namespace="operational",
     lock_identity="resolved",

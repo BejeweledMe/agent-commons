@@ -96,6 +96,7 @@ _CLAUDE_COMMONS_READ_TOOLS = (
 )
 _CLAUDE_COMMONS_OUTCOME_TOOLS = (
     "mcp__agent-commons__commons_delegation_input_needed",
+    "mcp__agent-commons__commons_finalize_review",
     "mcp__agent-commons__commons_succeed_delegation",
     "mcp__agent-commons__commons_delegation_needs_operator",
     "mcp__agent-commons__commons_request_input",
@@ -111,10 +112,7 @@ _CLAUDE_COMMONS_CHAT_TOOLS = (
     "mcp__agent-commons__commons_list_my_threads",
     "mcp__agent-commons__commons_reply_thread",
 )
-_CLAUDE_COMMONS_REVIEW_TOOLS = (
-    "mcp__agent-commons__commons_complete_review",
-    "mcp__agent-commons__commons_record_verification",
-)
+_CLAUDE_COMMONS_REVIEW_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 #: Staff-changing tools, keyed by the standing grant *and its level*.  A run
 #: acting for no role, or for a role at `deny`, receives none of them: the grant
@@ -170,7 +168,19 @@ def _worker_tools(
     narrower one.
     """
 
-    tools = _CLAUDE_COMMONS_READ_TOOLS + _CLAUDE_COMMONS_OUTCOME_TOOLS
+    generic_success = "mcp__agent-commons__commons_succeed_delegation"
+    review_finalizer = "mcp__agent-commons__commons_finalize_review"
+    outcome_tools = tuple(
+        tool
+        for tool in _CLAUDE_COMMONS_OUTCOME_TOOLS
+        if tool not in {generic_success, review_finalizer}
+    )
+    outcome_tools += (
+        (review_finalizer,)
+        if profile_id.independent_reviewer and purpose == "independent_review"
+        else (generic_success,)
+    )
+    tools = _CLAUDE_COMMONS_READ_TOOLS + outcome_tools
     tools += _CLAUDE_COMMONS_CHAT_TOOLS
     if profile_id.independent_reviewer:
         tools += (
@@ -194,8 +204,20 @@ def _worker_tools(
     return tuple(
         tool
         for tool in tools
-        if tool in _CLAUDE_COMMONS_OUTCOME_TOOLS or tool.removeprefix(_MCP_TOOL_PREFIX) in allowed
+        if tool in outcome_tools or tool.removeprefix(_MCP_TOOL_PREFIX) in allowed
     )
+
+
+def validate_worker_scope(
+    profile_id: BuiltinProfileId,
+    worker_purpose: str,
+    role_tools: Sequence[str] | None = None,
+    role_grants: Mapping[str, str] | None = None,
+) -> None:
+    """Purely validate purpose and role scope before a child is allocated."""
+
+    purpose = _profile_worker_purpose(profile_id, worker_purpose)
+    _worker_tools(profile_id, purpose, role_tools, role_grants)
 
 
 def profile_tool_summary() -> dict[str, dict[str, Any]]:
@@ -495,6 +517,7 @@ class RunnerInvocation:
 class RunnerProfile(Protocol):
     profile_id: BuiltinProfileId
     provider: Provider
+    trusted_workspace: bool
 
     @property
     def supports_budget(self) -> bool: ...
@@ -512,6 +535,28 @@ class RunnerProfile(Protocol):
         role_tools: Sequence[str] | None = None,
         role_grants: Mapping[str, str] | None = None,
     ) -> RunnerInvocation: ...
+
+
+def validate_profile_launch_boundary(profile: RunnerProfile) -> None:
+    """Validate the provider profile's fixed host-isolation requirement.
+
+    This check is intentionally reusable by static launch planning and final
+    invocation construction.  The former keeps an invalid host boundary ahead
+    of auth/initialization probes and durable launch state; the latter remains
+    the fail-closed last line of defence for direct profile callers.
+    """
+
+    if profile.trusted_workspace:
+        return
+    if profile.provider is Provider.CODEX:
+        raise ConfigurationError(
+            "Codex runtime requires explicit trusted_workspace opt-in or external isolation"
+        )
+    if not profile.profile_id.independent_reviewer:
+        raise ConfigurationError(
+            "writable Claude runtime requires explicit trusted_workspace opt-in or "
+            "external isolation"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -564,10 +609,7 @@ class CodexRunnerProfile:
         role_grants: Mapping[str, str] | None = None,
         demo_unresolved_placeholder: bool = False,
     ) -> RunnerInvocation:
-        if not self.trusted_workspace:
-            raise ConfigurationError(
-                "Codex runtime requires explicit trusted_workspace opt-in or external isolation"
-            )
+        validate_profile_launch_boundary(self)
         if delegation_id is None:
             raise ConfigurationError("Codex runtime requires an exact delegation binding")
         _safe_identifier("delegation_id", delegation_id)
@@ -689,11 +731,7 @@ class ClaudeRunnerProfile:
             raise ConfigurationError("Claude runtime requires an exact delegation binding")
         _safe_identifier("delegation_id", delegation_id)
         purpose = _profile_worker_purpose(self.profile_id, worker_purpose)
-        if not self.profile_id.independent_reviewer and not self.trusted_workspace:
-            raise ConfigurationError(
-                "writable Claude runtime requires explicit trusted_workspace opt-in or "
-                "external isolation"
-            )
+        validate_profile_launch_boundary(self)
         effective_budget = self.max_budget_microusd
         if max_budget_microusd is not None:
             effective_budget = (
@@ -727,6 +765,12 @@ class ClaudeRunnerProfile:
                         "type": "stdio",
                         "command": mcp_executable,
                         "args": list(mcp_args),
+                        # Claude Code otherwise starts non-interactive model
+                        # work while a local stdio server is still pending.
+                        # This sole fixed server is mandatory for canonical
+                        # completion, so its tools must be present in the first
+                        # prompt rather than discovered after a prose-only exit.
+                        "alwaysLoad": True,
                     }
                 }
             },
@@ -762,7 +806,14 @@ class ClaudeRunnerProfile:
             argv.extend(
                 (
                     "--tools",
-                    "",
+                    # Claude Code 2.1.220 treats an empty built-in tool pool as
+                    # disabling MCP discovery too, even when the exact MCP
+                    # tools are present in --allowed-tools.  ToolSearch is the
+                    # narrow discovery gateway: the allowlist below still
+                    # decides which worker-scoped MCP tools can be called, and
+                    # the native read/write/shell/web/subagent tools remain
+                    # explicitly denied.
+                    "ToolSearch",
                     "--disallowed-tools",
                     "Bash,Read,Glob,Grep,Edit,Write,NotebookEdit,Agent,WebFetch,WebSearch",
                 )

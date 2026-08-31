@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from agent_commons.mcp.server import build_server
+from agent_commons.runtime import ContextBindingRequest
 
 
 class FakeServer:
@@ -151,13 +152,17 @@ class FakeRuntime:
         *,
         idempotency_key: str,
         retry: bool = False,
+        context: ContextBindingRequest | None = None,
     ) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "delegation_id": delegation_id,
             "expected_revision": expected_revision,
             "idempotency_key": idempotency_key,
             "retry": retry,
         }
+        if context is not None:
+            result["context"] = context
+        return result
 
     def reconcile(self) -> list[dict[str, Any]]:
         return [{"state": "needs_operator"}]
@@ -443,3 +448,15 @@ def test_runtime_tools_are_explicitly_feature_gated_and_bounded() -> None:
     }
     assert "command" not in server.tools["commons_run_delegation"].__annotations__
     assert "prompt" not in server.tools["commons_run_delegation"].__annotations__
+    exact = server.tools["commons_run_delegation"](
+        "delegation.01K00000000000000000000000",
+        "evt.01K00000000000000000000000",
+        "launch-review-02",
+        False,
+        "context_pack.01K00000000000000000000000",
+        "evt.01K00000000000000000000001",
+    )
+    assert exact["context"] == ContextBindingRequest.accumulated(
+        context_pack_id="context_pack.01K00000000000000000000000",
+        context_pack_revision="evt.01K00000000000000000000001",
+    )

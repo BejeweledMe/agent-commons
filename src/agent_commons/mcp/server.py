@@ -22,7 +22,9 @@ from agent_commons.domain.states import (
 )
 from agent_commons.errors import (
     ConfigurationError,
+    IntegrityError,
     LifecycleConflictError,
+    ValidationError,
 )
 
 # Compatibility re-exports: the console script and existing imports keep this facade.
@@ -31,6 +33,7 @@ from agent_commons.mcp.entrypoint import main as main
 from agent_commons.mcp.scoped_repo import ScopedRepoReader
 from agent_commons.runtime import (
     TERMINAL_TOOL_NAMES,
+    ContextBindingRequest,
     TerminalToolAuditStore,
 )
 from agent_commons.services import CommonsManager
@@ -57,6 +60,7 @@ class RuntimeService(Protocol):
         *,
         idempotency_key: str,
         retry: bool = False,
+        context: ContextBindingRequest | None = None,
     ) -> dict[str, Any]: ...
 
     def reconcile(self) -> list[dict[str, Any]]: ...
@@ -129,6 +133,9 @@ _FIXED_REJECTION_DETAILS = frozenset(
         "worker outcome is outside its delegation scope",
         "delegated workspace changed after reviewer snapshot creation",
         "registered review artifact changed after it was inspected",
+        "bound artifact revision is stale for review",
+        "review evidence is incomplete for the bound subject",
+        "partial review finalization does not match the bound operation",
         "result_refs must contain at least one reference",
     }
 )
@@ -149,7 +156,6 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_show_artifact",
         "commons_read_artifact",
         "commons_delegation_input_needed",
-        "commons_succeed_delegation",
         "commons_delegation_needs_operator",
         "commons_repo_files",
         "commons_repo_read",
@@ -166,9 +172,12 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_reply_thread",
     }
 )
-IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES
-VERIFICATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_record_verification"}
-INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = VERIFICATION_WORKER_TOOL_NAMES | {"commons_complete_review"}
+IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_succeed_delegation"}
+VERIFICATION_WORKER_TOOL_NAMES = IMPLEMENTATION_WORKER_TOOL_NAMES | {"commons_record_verification"}
+INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
+    "commons_record_verification",
+    "commons_finalize_review",
+}
 
 
 def _fastmcp_factory(name: str) -> MCPServer:
@@ -179,6 +188,84 @@ def _fastmcp_factory(name: str) -> MCPServer:
             "MCP support is not installed; install agent-commons[mcp]"
         ) from exc
     return FastMCP(name, instructions=MCP_INSTRUCTIONS)
+
+
+def _review_matches_worker(review: dict[str, Any], worker: dict[str, Any]) -> bool:
+    """Match a review without reading mutable operational state."""
+
+    target = worker.get("target_ref") or {}
+    if target == {"kind": "review", "id": review.get("id")}:
+        return worker.get("target_revision") in {
+            review.get("revision"),
+            review.get("effective_revision", review.get("revision")),
+            review.get("expected_revision"),
+        }
+    return target == review.get("target_ref") and worker.get("target_revision") == review.get(
+        "target_revision"
+    )
+
+
+def _freeze_worker_artifact_bundles(
+    commons: CommonsManager,
+    worker: dict[str, Any],
+    *,
+    snapshot: Any | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Bind the exact worker artifact set from one canonical snapshot.
+
+    Artifact authorization and manifests are immutable inputs to the launch.
+    Freezing them here prevents every artifact read from replaying the entire
+    ledger several times. The per-tool live-delegation guard remains fresh,
+    and ``ScopedRepoReader`` still hashes the actual file before returning it.
+    """
+
+    snapshot = snapshot or commons.snapshot()
+    allowed: set[str] = set()
+    relevant_task_ids: set[str] = set()
+    target = worker.get("target_ref") or {}
+    if target.get("kind") == "artifact":
+        allowed.add(str(target.get("id")))
+    if target.get("kind") == "task":
+        relevant_task_ids.add(str(target.get("id")))
+
+    for review_record in snapshot.reviews.values():
+        review = dict(review_record)
+        if not _review_matches_worker(review, worker):
+            continue
+        review_target = review.get("target_ref") or {}
+        if review_target.get("kind") == "artifact":
+            allowed.add(str(review_target.get("id")))
+        if review_target.get("kind") == "task":
+            relevant_task_ids.add(str(review_target.get("id")))
+        for ref in review.get("evidence_refs") or ():
+            if ref.get("kind") == "artifact":
+                allowed.add(str(ref.get("id")))
+
+    for task_id in relevant_task_ids:
+        task_record = snapshot.tasks.get(task_id)
+        if task_record is None:
+            continue
+        for ref in task_record.get("artifact_refs") or ():
+            if ref.get("kind") == "artifact":
+                allowed.add(str(ref.get("id")))
+
+    bundles: dict[str, dict[str, Any]] = {}
+    for artifact_id in sorted(allowed):
+        current = snapshot.artifacts.get(artifact_id)
+        if current is None:
+            raise LifecycleConflictError(f"artifact does not exist: {artifact_id}")
+        manifest_ref = str(current.get("manifest_ref", ""))
+        try:
+            manifest = commons.manifests.get(manifest_ref).manifest
+        except FileNotFoundError as exc:
+            raise IntegrityError(f"artifact {artifact_id} references a missing manifest") from exc
+        if manifest.get("artifact_id") != artifact_id:
+            raise IntegrityError("artifact manifest identity does not match its projection")
+        bundles[artifact_id] = {
+            "artifact": dict(current),
+            "manifest": dict(manifest),
+        }
+    return bundles
 
 
 def build_server(
@@ -213,6 +300,18 @@ def build_server(
     server = factory("agent-commons")
     active_session_id = getattr(commons, "session_id", None)
     requested_binding = delegation_id or os.environ.get("AGENT_COMMONS_DELEGATION_ID")
+    binding_snapshot: Any | None = None
+
+    def live_snapshot() -> Any:
+        # The synchronized SQLite projection is disposable operational state:
+        # `_read_snapshot` verifies/syncs it against immutable events and
+        # rebuilds or falls back when it is stale or missing. This keeps MCP
+        # initialization below provider handshake bounds without making the
+        # projection authoritative.
+        if isinstance(commons, CommonsManager):
+            return commons._read_snapshot(fresh=False)[0]
+        return commons.snapshot()
+
     worker: dict[str, Any] | None = (
         {
             "id": "delegation.preflight",
@@ -230,7 +329,11 @@ def build_server(
             raise ConfigurationError("delegated MCP binding wait must be between 0 and 30 seconds")
         deadline = time.monotonic() + binding_wait_seconds
         while True:
-            candidate = commons.get_delegation(requested_binding)
+            binding_snapshot = live_snapshot()
+            candidate_record = binding_snapshot.delegations.get(requested_binding)
+            if candidate_record is None:
+                raise LifecycleConflictError(f"delegation does not exist: {requested_binding}")
+            candidate = dict(candidate_record)
             state = candidate.get("state")
             child_session_id = candidate.get("child_session_id")
             if state in LIVE_WORKER_DELEGATION_STATES and child_session_id == active_session_id:
@@ -249,9 +352,15 @@ def build_server(
                 )
             time.sleep(0.01)
     elif catalog_only_purpose is None:
+        binding_snapshot = live_snapshot() if isinstance(commons, CommonsManager) else None
+        candidates = (
+            binding_snapshot.delegations.values()
+            if binding_snapshot is not None
+            else commons.list_delegations(state=None)
+        )
         worker_matches = [
-            candidate
-            for candidate in commons.list_delegations(state=None)
+            dict(candidate)
+            for candidate in candidates
             if active_session_id is not None
             and candidate.get("child_session_id") == active_session_id
             and candidate.get("state") in LIVE_WORKER_DELEGATION_STATES
@@ -264,6 +373,64 @@ def build_server(
         if worker is not None and catalog_only_purpose is None
         else None
     )
+    worker_artifact_bundles = (
+        _freeze_worker_artifact_bundles(commons, worker, snapshot=binding_snapshot)
+        if worker is not None and catalog_only_purpose is None
+        else None
+    )
+    worker_read_artifact_manifests: dict[str, str] = {}
+    worker_reviews: tuple[dict[str, Any], ...] = ()
+    worker_tasks: tuple[dict[str, Any], ...] = ()
+    worker_verifications: tuple[dict[str, Any], ...] = ()
+    worker_verification_binding: tuple[dict[str, Any], str] | None = None
+    if worker is not None and catalog_only_purpose is None:
+        evidence_snapshot = binding_snapshot or live_snapshot()
+        worker_reviews = tuple(
+            dict(review)
+            for review in evidence_snapshot.reviews.values()
+            if _review_matches_worker(dict(review), worker)
+        )
+        purpose = worker.get("purpose")
+        if purpose == "verification":
+            worker_verification_binding = (
+                dict(worker.get("target_ref") or {}),
+                str(worker.get("target_revision")),
+            )
+        elif purpose == "independent_review":
+            direct_target = dict(worker.get("target_ref") or {})
+            if direct_target.get("kind") != "review":
+                worker_verification_binding = (
+                    direct_target,
+                    str(worker.get("target_revision")),
+                )
+            elif worker_reviews:
+                review = worker_reviews[0]
+                worker_verification_binding = (
+                    dict(review.get("target_ref") or {}),
+                    str(review.get("target_revision")),
+                )
+
+        task_ids: set[str] = set()
+        direct_target = worker.get("target_ref") or {}
+        if direct_target.get("kind") == "task":
+            task_ids.add(str(direct_target.get("id")))
+        for review in worker_reviews:
+            review_target = review.get("target_ref") or {}
+            if review_target.get("kind") == "task":
+                task_ids.add(str(review_target.get("id")))
+        worker_tasks = tuple(
+            dict(task)
+            for task_id in sorted(task_ids)
+            if (task := evidence_snapshot.tasks.get(task_id)) is not None
+        )
+        if worker_verification_binding is not None:
+            verification_target, verification_revision = worker_verification_binding
+            worker_verifications = tuple(
+                dict(verification)
+                for verification in evidence_snapshot.verifications.values()
+                if verification.get("target_ref") == verification_target
+                and verification.get("target_revision") == verification_revision
+            )
     terminal_audit = (
         TerminalToolAuditStore(
             commons.paths.state_root,
@@ -278,7 +445,12 @@ def build_server(
     # Effective, so a level lowered on any creator above this role also removes
     # the tool from this session rather than only failing when it is called.
     acting_grants = (
-        effective_grants(commons.snapshot().agents, acting_agent_id) if acting_agent_id else {}
+        effective_grants(
+            (binding_snapshot or commons.snapshot()).agents,
+            acting_agent_id,
+        )
+        if acting_agent_id
+        else {}
     )
 
     def acting_grant(name: str, level: str) -> bool:
@@ -294,7 +466,10 @@ def build_server(
     def require_live_worker() -> dict[str, Any] | None:
         if worker is None:
             return None
-        current = commons.get_delegation(str(worker.get("id")))
+        current_record = live_snapshot().delegations.get(str(worker.get("id")))
+        if current_record is None:
+            raise LifecycleConflictError("worker MCP authority ended with its canonical delegation")
+        current = dict(current_record)
         if (
             current.get("state") not in LIVE_WORKER_DELEGATION_STATES
             or current.get("child_session_id") != active_session_id
@@ -372,20 +547,13 @@ def build_server(
     def relevant_review(review: dict[str, Any]) -> bool:
         if worker is None:
             return True
-        target = worker.get("target_ref") or {}
-        if target == {"kind": "review", "id": review.get("id")}:
-            return worker.get("target_revision") in {
-                review.get("revision"),
-                review.get("effective_revision", review.get("revision")),
-                review.get("expected_revision"),
-            }
-        return target == review.get("target_ref") and worker.get("target_revision") == review.get(
-            "target_revision"
-        )
+        return _review_matches_worker(review, worker)
 
     def relevant_artifact_ids() -> set[str]:
         if worker is None:
             return {str(item.get("id")) for item in commons.list_artifacts()}
+        if worker_artifact_bundles is not None:
+            return set(worker_artifact_bundles)
         allowed: set[str] = set()
         target = worker.get("target_ref") or {}
         if target.get("kind") == "artifact":
@@ -411,16 +579,7 @@ def build_server(
         return allowed
 
     def worker_verification_target() -> tuple[dict[str, Any], str] | None:
-        if worker is None:
-            return None
-        purpose = worker.get("purpose")
-        if purpose == "verification":
-            return dict(worker.get("target_ref") or {}), str(worker.get("target_revision"))
-        if purpose == "independent_review":
-            for review in commons.list_reviews(state=None):
-                if relevant_review(review):
-                    return dict(review.get("target_ref") or {}), str(review.get("target_revision"))
-        return None
+        return worker_verification_binding
 
     def relevant_verification(verification: dict[str, Any]) -> bool:
         if worker is None:
@@ -440,14 +599,8 @@ def build_server(
         return {
             "session_id": active_session_id,
             "delegation": worker,
-            "reviews": [
-                review for review in commons.list_reviews(state=None) if relevant_review(review)
-            ][:max_items],
-            "verifications": [
-                verification
-                for verification in commons.list_verifications()
-                if relevant_verification(verification)
-            ][:max_items],
+            "reviews": list(worker_reviews[:max_items]),
+            "verifications": list(worker_verifications[:max_items]),
         }
 
     @register(_READ_ONLY)
@@ -668,15 +821,9 @@ def build_server(
     def commons_list_tasks(state: str | None = None) -> list[dict[str, Any]]:
         """List projected tasks, optionally filtered by lifecycle state."""
 
-        tasks = commons.list_tasks(state=state)
         if worker is None:
-            return tasks
-        target = worker.get("target_ref") or {}
-        allowed_ids = {str(target.get("id"))} if target.get("kind") == "task" else set()
-        for review in commons.list_reviews(state=None):
-            if relevant_review(review) and (review.get("target_ref") or {}).get("kind") == "task":
-                allowed_ids.add(str((review.get("target_ref") or {}).get("id")))
-        return [task for task in tasks if task.get("id") in allowed_ids]
+            return commons.list_tasks(state=state)
+        return [task for task in worker_tasks if state is None or task.get("state") == state]
 
     @register(_READ_ONLY)
     def commons_list_delegations(state: str | None = None) -> list[dict[str, Any]]:
@@ -692,24 +839,32 @@ def build_server(
 
         if worker is not None and delegation_id != worker.get("id"):
             raise LifecycleConflictError("worker may inspect only its bound delegation")
+        if worker is not None:
+            current = live_snapshot().delegations.get(delegation_id)
+            if current is None:
+                raise LifecycleConflictError(f"delegation does not exist: {delegation_id}")
+            return dict(current)
         return commons.get_delegation(delegation_id)
 
     @register(_READ_ONLY)
     def commons_list_reviews(state: str | None = None) -> list[dict[str, Any]]:
         """List revision-bound reviews, optionally filtered by lifecycle state."""
 
-        reviews = commons.list_reviews(state=state)
-        return [review for review in reviews if relevant_review(review)]
+        if worker is None:
+            return commons.list_reviews(state=state)
+        return [
+            review for review in worker_reviews if state is None or review.get("state") == state
+        ]
 
     @register(_READ_ONLY)
     def commons_show_review(review_id: str) -> dict[str, Any]:
         """Return one projected review without exposing an unbounded query surface."""
 
-        review = next(
-            (item for item in commons.list_reviews(state=None) if item.get("id") == review_id),
-            None,
-        )
+        reviews = commons.list_reviews(state=None) if worker is None else worker_reviews
+        review = next((item for item in reviews if item.get("id") == review_id), None)
         if review is None:
+            if worker is not None:
+                raise LifecycleConflictError("worker may inspect only its bound review")
             raise LifecycleConflictError(f"review does not exist: {review_id}")
         if not relevant_review(review):
             raise LifecycleConflictError("worker may inspect only its bound review")
@@ -719,19 +874,14 @@ def build_server(
     def commons_list_verifications() -> list[dict[str, Any]]:
         """List reproducible checks relevant to the exact worker target."""
 
-        return [
-            verification
-            for verification in commons.list_verifications()
-            if relevant_verification(verification)
-        ]
+        return list(worker_verifications)
 
     @register(_READ_ONLY, worker_only=True)
     def commons_show_verification(verification_id: str) -> dict[str, Any]:
         """Return one target-scoped verification without widening worker access."""
 
         verification = next(
-            (item for item in commons.list_verifications() if item.get("id") == verification_id),
-            None,
+            (item for item in worker_verifications if item.get("id") == verification_id), None
         )
         if verification is None:
             raise LifecycleConflictError(f"verification does not exist: {verification_id}")
@@ -747,6 +897,8 @@ def build_server(
 
         if artifact_id not in relevant_artifact_ids():
             raise LifecycleConflictError("worker may inspect only a bound task artifact")
+        if worker_artifact_bundles is not None:
+            return worker_artifact_bundles[artifact_id]
         return commons.get_artifact_bundle(artifact_id)
 
     @register(_READ_ONLY, worker_only=True)
@@ -757,14 +909,20 @@ def build_server(
             raise LifecycleConflictError("workspace snapshot is unavailable")
         if artifact_id not in relevant_artifact_ids():
             raise LifecycleConflictError("worker may read only a bound task artifact")
-        bundle = commons.get_artifact_bundle(artifact_id)
+        bundle = (
+            worker_artifact_bundles[artifact_id]
+            if worker_artifact_bundles is not None
+            else commons.get_artifact_bundle(artifact_id)
+        )
         manifest = bundle["manifest"]
         source = manifest.get("source") or {}
-        return workspace.read_registered_artifact(
+        result = workspace.read_registered_artifact(
             source_path=str(source.get("path", "")),
             expected_revision=str(manifest.get("revision", "")),
             expected_size=int(manifest.get("size_bytes", -1)),
         )
+        worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
+        return result
 
     # -- staff changes ------------------------------------------------------
     # Each of the three tools below is registered only when the standing role
@@ -974,7 +1132,7 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
-    @register(_IDEMPOTENT_WRITE, worker_purposes=("independent_review",))
+    @register(_IDEMPOTENT_WRITE, root_only=True)
     def commons_complete_review(
         review_id: str,
         expected_revision: str,
@@ -984,7 +1142,7 @@ def build_server(
         idempotency_key: str,
         evidence_refs: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Complete one exact-revision review; then finish its delegation separately."""
+        """Complete one exact-revision review from a root/manual recovery client."""
 
         if worker is not None:
             if workspace is None:  # pragma: no cover - worker construction guarantees it
@@ -1009,6 +1167,117 @@ def build_server(
             evidence_refs=tuple(parse_ref(value).as_dict() for value in evidence_refs or ()),
             idempotency_key=idempotency_key,
         )
+
+    @register(
+        _IDEMPOTENT_WRITE,
+        worker_only=True,
+        worker_purposes=("independent_review",),
+    )
+    def commons_finalize_review(
+        verdict: str,
+        summary: str,
+    ) -> dict[str, Any]:
+        """Convergently record a review and its terminal delegation result.
+
+        Review identity, both exact revisions, and evidence are derived from
+        the immutable worker binding. The model supplies no canonical identity
+        or authority-bearing reference. The operation identity is derived from
+        the bound delegation. Stop after its successful response.
+        """
+
+        if worker is None:  # pragma: no cover - registration guarantees worker scope
+            raise LifecycleConflictError("review finalization requires a bound worker")
+        if workspace is None:  # pragma: no cover - worker construction guarantees it
+            raise LifecycleConflictError("workspace snapshot is unavailable")
+        workspace.assert_unchanged()
+        bound_review = worker_reviews[0] if len(worker_reviews) == 1 else None
+        if bound_review is None or worker.get("purpose") != "independent_review":
+            raise LifecycleConflictError("worker review write is outside its delegation scope")
+        review_id = str(bound_review.get("id"))
+        current_review = live_snapshot().reviews.get(review_id)
+        if current_review is None or not _review_matches_worker(dict(current_review), worker):
+            raise LifecycleConflictError("worker review write is outside its delegation scope")
+        review = dict(current_review)
+        expected_revision = str(worker.get("target_revision"))
+        target_revision = str(bound_review.get("target_revision"))
+        required_artifact_ids: list[str] = []
+        review_target = dict(bound_review.get("target_ref") or {})
+        if review_target.get("kind") == "artifact":
+            required_artifact_ids.append(str(review_target.get("id")))
+        for task in worker_tasks:
+            for binding in task.get("artifact_bindings") or ():
+                ref = binding.get("ref") or {}
+                artifact_id = str(ref.get("id"))
+                if ref.get("kind") != "artifact" or not artifact_id:
+                    continue
+                bundle = (worker_artifact_bundles or {}).get(artifact_id)
+                artifact = (bundle or {}).get("artifact") or {}
+                if str(artifact.get("effective_revision") or artifact.get("revision")) != str(
+                    binding.get("revision")
+                ):
+                    raise LifecycleConflictError("bound artifact revision is stale for review")
+                if artifact_id not in required_artifact_ids:
+                    required_artifact_ids.append(artifact_id)
+        delegation_id = str(worker.get("id"))
+        operation_key = f"review-finalizer:{delegation_id}"
+        if review.get("state") == "requested":
+            missing = [
+                artifact_id
+                for artifact_id in required_artifact_ids
+                if artifact_id not in worker_read_artifact_manifests
+            ]
+            if verdict == "approved" and missing:
+                raise LifecycleConflictError("review evidence is incomplete for the bound subject")
+            parsed_evidence = tuple(
+                {
+                    "kind": "manifest",
+                    "id": worker_read_artifact_manifests[artifact_id],
+                }
+                for artifact_id in required_artifact_ids
+                if artifact_id in worker_read_artifact_manifests
+            )
+            completed = commons.complete_review(
+                review_id,
+                expected_revision,
+                target_revision=target_revision,
+                verdict=verdict,
+                summary=summary,
+                evidence_refs=parsed_evidence,
+                idempotency_key=f"{operation_key}:review",
+            )
+        else:
+            if (
+                review.get("state") != verdict
+                or review.get("expected_revision") != expected_revision
+                or review.get("target_revision") != target_revision
+                or review.get("summary") != summary
+                or (review.get("actor") or {}).get("session_id") != active_session_id
+            ):
+                raise LifecycleConflictError(
+                    "partial review finalization does not match the bound operation"
+                )
+            completed = {
+                "event_id": str(review.get("revision")),
+                "event_type": "review.completed",
+                "entity_ref": {"kind": "review", "id": review_id},
+                "revision": str(review.get("effective_revision") or review.get("revision")),
+            }
+
+        # Canonical ledger churn from the review is excluded from the subject
+        # snapshot, but a real subject/artifact mutation in the gap must leave
+        # an honest partial result rather than a false delegation success.
+        workspace.assert_unchanged()
+        current = live_snapshot().delegations.get(delegation_id)
+        if current is None:
+            raise LifecycleConflictError(f"delegation does not exist: {delegation_id}")
+        outcome = commons.succeed_delegation(
+            delegation_id,
+            str(current.get("effective_revision") or current.get("revision")),
+            summary="Independent review completed through its bounded terminal operation.",
+            result_refs=({"kind": "review", "id": review_id},),
+            idempotency_key=f"{operation_key}:delegation",
+        )
+        return {**completed, "delegation_outcome": outcome}
 
     @register(
         _IDEMPOTENT_WRITE,
@@ -1078,7 +1347,7 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
-    @register(_IDEMPOTENT_WRITE)
+    @register(_IDEMPOTENT_WRITE, worker_purposes=("implementation", "verification"))
     def commons_succeed_delegation(
         delegation_id: str,
         expected_revision: str,
@@ -1180,15 +1449,34 @@ def build_server(
             expected_revision: str,
             idempotency_key: str,
             retry: bool = False,
+            context_pack_id: str | None = None,
+            context_pack_revision: str | None = None,
         ) -> dict[str, Any]:
             """Launch one exact requested delegation through its selected fixed profile."""
 
-            return runtime.run(
-                delegation_id,
-                expected_revision,
-                idempotency_key=idempotency_key,
-                retry=retry,
-            )
+            if (context_pack_id is None) != (context_pack_revision is None):
+                raise ValidationError(
+                    "context_pack_id and context_pack_revision must be supplied together"
+                )
+            try:
+                context = (
+                    ContextBindingRequest.accumulated(
+                        context_pack_id=context_pack_id,
+                        context_pack_revision=context_pack_revision,
+                    )
+                    if context_pack_id is not None and context_pack_revision is not None
+                    else None
+                )
+            except ValueError as exc:
+                raise ValidationError(str(exc)) from exc
+
+            values: dict[str, Any] = {
+                "idempotency_key": idempotency_key,
+                "retry": retry,
+            }
+            if context is not None:
+                values["context"] = context
+            return runtime.run(delegation_id, expected_revision, **values)
 
         @register(_DESTRUCTIVE_WRITE, root_only=True)
         def commons_reconcile_runtime() -> list[dict[str, Any]]:

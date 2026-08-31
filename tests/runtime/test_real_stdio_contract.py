@@ -157,7 +157,15 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
     profiles = ProfileRegistry({profile_id: profile})
 
     telemetry = CollectingTelemetry()
-    service = DelegationRuntimeService(manager, profiles=profiles, telemetry=telemetry)
+    # This is the qualification canary itself: a pre-existing qualification
+    # receipt would make the hermetic proof circular. Production launch paths
+    # keep the default fail-closed qualification gate.
+    service = DelegationRuntimeService(
+        manager,
+        profiles=profiles,
+        telemetry=telemetry,
+        qualification_required=False,
+    )
     result = service.run(
         delegation["entity_ref"]["id"],
         delegation["revision"],

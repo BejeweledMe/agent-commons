@@ -107,6 +107,7 @@ class ProbeRunner:
         mcp_body: object = _DEFAULT_MCP_BODY,
         handshake_exit_code: int = 0,
         handshake_result: ProcessResult | None = None,
+        handshake_tool_names: frozenset[str] = INDEPENDENT_REVIEW_WORKER_TOOL_NAMES,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.call_kwargs: list[dict] = []
@@ -115,6 +116,7 @@ class ProbeRunner:
         self.mcp_body = mcp_body
         self.handshake_exit_code = handshake_exit_code
         self.handshake_result = handshake_result
+        self.handshake_tool_names = handshake_tool_names
 
     def run(self, invocation, **kwargs) -> ProcessResult:
         self.calls.append(invocation.argv)
@@ -128,7 +130,7 @@ class ProbeRunner:
             if self.handshake_result is not None:
                 return self.handshake_result
             return _result(
-                output=_mcp_handshake_output(INDEPENDENT_REVIEW_WORKER_TOOL_NAMES),
+                output=_mcp_handshake_output(self.handshake_tool_names),
                 exit_code=self.handshake_exit_code,
             )
         if self.mcp_body is not _DEFAULT_MCP_BODY:
@@ -448,7 +450,7 @@ def test_preflight_rejects_a_stale_worker_mcp_contract(tmp_path: Path) -> None:
 
 
 def test_preflight_uses_the_exact_verification_worker_catalog(tmp_path: Path) -> None:
-    runner = ProbeRunner()
+    runner = ProbeRunner(handshake_tool_names=VERIFICATION_WORKER_TOOL_NAMES)
 
     result = preflight_profile(
         _profiles(),

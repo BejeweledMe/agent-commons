@@ -366,11 +366,30 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
     assert run_help.exit_code == 0
     assert "--idempotency-key" in run_help.output
     assert "--retry" in run_help.output
+    assert "--context-pack-id" in run_help.output
+    assert "--context-pack-revision" in run_help.output
     # One catalogue path shared with the panel: the launcher names the same file
     # the UI edits, with the same flag (M8).
     assert "--role-catalog" in run_help.output
     for forbidden in ("--command", "--prompt", "--environment", "--executable"):
         assert forbidden not in run_help.output
+    incomplete_context = runner.invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "broker",
+            "run",
+            "delegation.01K00000000000000000000000",
+            "evt.01K00000000000000000000000",
+            "--idempotency-key",
+            "bounded-context-selection",
+            "--context-pack-id",
+            "context_pack.01K00000000000000000000000",
+        ],
+    )
+    assert incomplete_context.exit_code == 2
+    assert "must be supplied together" in incomplete_context.output
 
     canary_help = runner.invoke(cli, ["broker", "canary", "--help"])
     assert canary_help.exit_code == 0

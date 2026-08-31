@@ -14,15 +14,28 @@ class PolicyViolationError(ValidationError):
     """A delegation exceeds authority inherited from its parent."""
 
 
+MAX_SAFE_INTEGER = (1 << 53) - 1
+
+
 def _positive(name: str, value: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise PolicyViolationError(f"{name} must be a positive integer")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 1
+        or value > MAX_SAFE_INTEGER
+    ):
+        raise PolicyViolationError(f"{name} must be a positive JavaScript-safe integer")
     return value
 
 
 def _nonnegative(name: str, value: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise PolicyViolationError(f"{name} must be a non-negative integer")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > MAX_SAFE_INTEGER
+    ):
+        raise PolicyViolationError(f"{name} must be a non-negative JavaScript-safe integer")
     return value
 
 

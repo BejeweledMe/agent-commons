@@ -16,19 +16,22 @@ from agent_commons.platform_support import require_supported_platform
 from agent_commons.runtime import (
     AttemptStore,
     BuiltinProfileId,
+    ContextBindingRequest,
+    ProviderQualificationStore,
     TerminalToolAuditStore,
     preflight_profile,
 )
-from agent_commons.services import CommonsManager
+from agent_commons.services import CommonsManager, ProviderAvailabilityService
 from agent_commons.services.delegation_runtime import (
     DelegationRuntimeService,
     load_profile_registry,
     load_runtime_configuration,
-    profile_summaries,
     telemetry_sink,
 )
 from agent_commons.services.provider_canary import (
+    run_claude_builder_compatibility_canary,
     run_claude_compatibility_canary,
+    run_codex_builder_compatibility_canary,
     run_codex_compatibility_canary,
 )
 from agent_commons.ui import STARTED_SCHEMA
@@ -318,6 +321,13 @@ def ui_command(
             return
         click.echo("Agent Commons UI — read-only" if read_only else "Agent Commons UI — writable")
         click.echo(f"  url     {url}")
+        if no_browser:
+            click.echo("  browser automatic open disabled (--no-browser)")
+            click.echo("          open this Work URL once in the browser you chose")
+        else:
+            click.echo("  browser opened your default browser automatically")
+            click.echo("          this Work sign-in URL is single-use; open it only once")
+            click.echo("          use --no-browser when you want to choose the browser yourself")
         click.echo(f"  bind    127.0.0.1:{bound_port} — loopback only; there is no --host flag")
         if not read_only and writer_session_id is not None:
             click.echo(f"  writes  enabled as {writer_session_id} through CommonsManager")
@@ -1742,7 +1752,24 @@ def broker_profiles(state: CLIState, profile_config: Path | None) -> None:
     """List configured profile capabilities without exposing executable argv."""
 
     config = load_runtime_configuration(profile_config, workspace_root=state.repo)
-    state.emit(profile_summaries(config.profiles, config.limits))
+    manager = CommonsManager(
+        state.repo,
+        state_root=state.state_root,
+        state_base=state.state_base,
+        state_source=state.state_source,
+        read_only=True,
+    )
+    state.emit(
+        ProviderAvailabilityService(
+            config.profiles,
+            workspace_root=state.repo,
+            qualifications=ProviderQualificationStore(
+                manager.paths.state_root,
+                read_only=True,
+            ),
+            limits=config.limits,
+        ).list()
+    )
 
 
 @broker_group.command("preflight")
@@ -1786,12 +1813,7 @@ def broker_preflight(
 @click.option(
     "--profile",
     "profile_id",
-    type=click.Choice(
-        [
-            BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value,
-            BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value,
-        ]
-    ),
+    type=click.Choice(tuple(item.value for item in BuiltinProfileId)),
     default=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value,
     show_default=True,
 )
@@ -1821,15 +1843,23 @@ def broker_canary(
     if not confirm_provider_run:  # pragma: no cover - Click enforces the required flag.
         raise ValidationError("provider canary requires explicit provider-run confirmation")
     config = load_runtime_configuration(profile_config, workspace_root=state.repo)
-    canary = (
-        run_codex_compatibility_canary
-        if profile_id == BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value
-        else run_claude_compatibility_canary
+    canary = {
+        BuiltinProfileId.CLAUDE_BUILDER.value: run_claude_builder_compatibility_canary,
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value: (run_claude_compatibility_canary),
+        BuiltinProfileId.CODEX_BUILDER.value: run_codex_builder_compatibility_canary,
+        BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value: run_codex_compatibility_canary,
+    }[profile_id]
+    manager = CommonsManager(
+        state.repo,
+        state_root=state.state_root,
+        state_base=state.state_base,
+        state_source=state.state_source,
     )
     result = canary(
         config.profiles,
         operator_limits=config.limits,
         wall_time_seconds=wall_time_seconds,
+        qualification_state_root=manager.paths.state_root,
     )
     state.emit(result)
     if not result["ok"]:
@@ -1881,6 +1911,10 @@ def broker_attempts(
 @click.argument("expected_revision")
 @click.option("--idempotency-key", required=True, help="Stable launch-specific retry identity.")
 @click.option("--retry", is_flag=True, help="Retry only a proven pre-start failed attempt.")
+@click.option("--context-pack-id", help="Exact Context Pack id for an accumulated role.")
+@click.option(
+    "--context-pack-revision", help="Exact Context Pack event revision for an accumulated role."
+)
 @click.option(
     "--telemetry",
     type=click.Choice(("none", "local", "otel")),
@@ -1896,17 +1930,35 @@ def broker_run(
     expected_revision: str,
     idempotency_key: str,
     retry: bool,
+    context_pack_id: str | None,
+    context_pack_revision: str | None,
     telemetry: str,
     profile_config: Path | None,
     role_catalog: Path | None,
 ) -> None:
     """Launch one requested delegation; no arbitrary command or prompt is accepted."""
 
+    if (context_pack_id is None) != (context_pack_revision is None):
+        raise click.UsageError(
+            "--context-pack-id and --context-pack-revision must be supplied together"
+        )
+    try:
+        context = (
+            ContextBindingRequest.accumulated(
+                context_pack_id=context_pack_id,
+                context_pack_revision=context_pack_revision,
+            )
+            if context_pack_id is not None and context_pack_revision is not None
+            else None
+        )
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
     result = _runtime_service(state, profile_config, telemetry, role_catalog).run(
         delegation_id,
         expected_revision,
         idempotency_key=idempotency_key,
         retry=retry,
+        context=context,
     )
     _emit_broker_run_result(state, result)
 

@@ -43,6 +43,7 @@ _WINDOWS_ABSOLUTE_PATH = re.compile(
 TERMINAL_TOOL_NAMES = frozenset(
     {
         "commons_delegation_input_needed",
+        "commons_finalize_review",
         "commons_succeed_delegation",
         "commons_delegation_needs_operator",
     }
