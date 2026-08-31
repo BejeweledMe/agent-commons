@@ -1,0 +1,37 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.7AB20VK2RZD6B5EM7SRRJRR7W1",
+  "task_revision": "evt.01M1ADCG6WM28DFGNASQWYNMX7",
+  "slice": "G2 typed safe Gallery read API over canonical Design Packages",
+  "repository": {
+    "source_commit_for_release_gate": "3a747114fcc33f1dba70bd1c85ad49384536a758",
+    "working_tree_before_focused_gate": "clean",
+    "scope": "The G2 implementation already exists on main (landed with commit f2a5074); this artifact records its acceptance evidence. Every G2 file below is hash-pinned at the release-gate commit, and this evidence document is the only source-tree change on top of it."
+  },
+  "files": {
+    "src/agent_commons/services/design_gallery.py": {"sha256": "6c53fd21356be56e6f5a7e4b8bf1b2e6a2e9aae7a7966bad13c7ebce066c78fa", "bytes": 12898},
+    "src/agent_commons/ui/gallery_dtos.py": {"sha256": "bf966f9107fe3d138185ef2c095a0b7ffc6ce4daecf1eaaa16e9bff9015b4be2", "bytes": 7253},
+    "src/agent_commons/ui/gallery_routes.py": {"sha256": "45437ad71082aacbf41eff35a8d87ddd64111fcc17d85176e33b584fa1c9861e", "bytes": 4979},
+    "src/agent_commons/services/artifact_content.py": {"sha256": "2f6ee582af20cb4888d281827d856f7878cf1535ba079537bfbc7c31f1014f2e", "bytes": 16429},
+    "src/agent_commons/ui/server.py": {"sha256": "0780be7acd728cf6821c5c55a2b052b5eddada34b5fa529496030c85f471d498", "bytes": 60556},
+    "frontend/gallery/src/main.tsx": {"sha256": "f3ac951440a931546684e62792f6c385ffb544fb7f42fcd665c187b4a4249e99", "bytes": 24458},
+    "frontend/gallery/src/i18n.json": {"sha256": "4eeb141f09fc1a904d713f9b9a3141140403b3c996332b99e1e0de8cf677aa0f", "bytes": 15828},
+    "tests/ui/test_gallery_read.py": {"sha256": "ac33a5eebb8f1720b68383c75ba3a23f17411c9da9431923bb1933a52fd352d1", "bytes": 10581},
+    "tests/ui/test_react_gallery.py": {"sha256": "20a2ca6e72fda009c44e95d4a7f949c773d7d06a40acfb8a3c41c665323ab45c", "bytes": 5448},
+    "tests/ui/test_artifact_preview.py": {"sha256": "6fdc1c28286ba3548ce43679091cfd4b3404d52fbfdba8c2635f1caa3a607ba4", "bytes": 3151},
+    "tests/services/test_artifact_content.py": {"sha256": "cec6b093497f27d3e8c17c0cf6db9935e89ccd4e7b90bbf0a9bdddae92fcbcea", "bytes": 8023}
+  },
+  "verification": {
+    "release_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check", "result": "1734 passed, 13 skipped, 2 warnings", "duration_seconds": 495.61, "outcome": "passed"},
+    "focused_gate": {"command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/ui/test_gallery_read.py tests/ui/test_react_gallery.py tests/ui/test_artifact_preview.py tests/services/test_artifact_content.py tests/services/test_design_packages.py", "result": "43 passed", "duration_seconds": 29.37, "outcome": "passed"}
+  },
+  "assertions": [
+    "GET /api/gallery and /api/gallery/{design_package_id} return only the typed agent_commons.gallery.v1 wire DTO built from canonical Design Package records; screens are deterministically ordered with exact artifact/task revisions, sha256 content revisions and enforced producer provenance.",
+    "Empty, loading, ready, stale and error states are explicit typed states; projection, reader and route failures collapse to closed refusal codes without exception text, raw filesystem paths, manifest bodies or provider data.",
+    "Preview eligibility is re-verified per screen through the existing hardened ArtifactPreviewReader: manifest-authorized descriptor-relative O_NOFOLLOW access, exact SHA-256 and size proof, PNG/JPEG only, 10 MiB byte and 16 MP pixel caps; changed, symlinked, unauthorized or unverifiable sources fail closed to stale/unavailable.",
+    "Every response carries Cache-Control: no-store and X-Content-Type-Options: nosniff via route headers plus the global security-header middleware; /api/gallery data routes stay behind the browser-session dependency while only the shell and hashed assets are public.",
+    "Bounded reads refuse instead of silently truncating (64 packages / 64 screens); malformed identifiers and unpublished packages receive typed 400/404 refusals.",
+    "The React Gallery consumes only the typed DTO over the cookie-session API base; its EN/RU string table is paired with identical key sets and contains no demo copy; no demo data, arbitrary artifact paths or SVG/HTML previews exist in the G2 surface."
+  ],
+  "safety": {"provider_data": "No prompt, transcript, raw provider output, credentials or environment values are recorded.", "canonical_truth": "This artifact is evidence only; Design Package, task and review truth remains in the immutable ledger."}
+}
