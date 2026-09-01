@@ -193,6 +193,7 @@ def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: 
     assert invocation.argv[-2:] == ("-p", "Implement the exact submitted task")
     assert invocation.stdin == b""
     assert invocation.extra_env is not None
+    assert invocation.extra_env["GROK_FOLDER_TRUST"] == "0"
     assert invocation.extra_env["AGENT_COMMONS_GROK_MCP_COMMAND"] == str(
         Path("/bin/echo").resolve()
     )

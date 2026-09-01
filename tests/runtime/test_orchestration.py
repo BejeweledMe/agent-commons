@@ -777,6 +777,38 @@ def test_missing_terminal_audit_does_not_claim_no_tool_was_called() -> None:
     assert code is DiagnosticCode.PROCESS_CANONICAL_MISMATCH
 
 
+def test_terminal_timeout_without_tool_call_gets_closed_workflow_diagnostic() -> None:
+    code = workflow_diagnostic_code(
+        {
+            "state": "timed_out",
+            "diagnostic_code": "none",
+            "process_canonical_mismatch": False,
+            "terminal_tool_calls": 0,
+            "terminal_tool_rejections": 0,
+            "terminal_tool_completions": 0,
+            "terminal_tool_audit_available": True,
+        }
+    )
+
+    assert code is DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
+
+
+def test_running_attempt_does_not_report_a_terminal_tool_gap() -> None:
+    code = workflow_diagnostic_code(
+        {
+            "state": "running",
+            "diagnostic_code": "none",
+            "process_canonical_mismatch": None,
+            "terminal_tool_calls": 0,
+            "terminal_tool_rejections": 0,
+            "terminal_tool_completions": 0,
+            "terminal_tool_audit_available": True,
+        }
+    )
+
+    assert code is DiagnosticCode.NONE
+
+
 def test_successful_process_without_terminal_tool_gets_actionable_workflow_diagnostic(
     tmp_path: Path,
 ) -> None:

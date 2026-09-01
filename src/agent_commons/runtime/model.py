@@ -160,6 +160,13 @@ _GROK_EXTRA_ENVIRONMENT = MappingProxyType(
         # Grok 1.0.13 accepts --no-auto-update, but the environment backstop
         # also covers builds where that documented flag is hidden or drifts.
         "GROK_DISABLE_AUTOUPDATER": "1",
+        # Agent Commons performs a stricter pre-launch discovery check than
+        # Grok's interactive folder-trust prompt: exactly one broker-owned MCP
+        # server, no hooks/plugins/LSP servers, and no invalid MCP entries.
+        # Disable the native prompt/gate only for this sanitized child process
+        # so a fresh isolated canary can load the project-scoped managed MCP
+        # block without persisting a broad trust grant in Grok's user store.
+        "GROK_FOLDER_TRUST": "0",
         "GROK_MEMORY": "0",
         "GROK_WORKFLOWS": "0",
         # Provider-compat discovery is ambient host configuration.  Native

@@ -384,9 +384,12 @@ def test_codex_probe_uses_only_fixed_no_model_argv_eof_and_bounds(tmp_path: Path
 def test_grok_probe_default_bound_covers_bounded_inspect_metadata(tmp_path: Path) -> None:
     payload = json.dumps(
         {
+            "projectTrusted": True,
             "mcpServers": [{"name": "agent-commons"}],
             "hooks": [],
             "plugins": [],
+            "lspServers": [],
+            "mcpConfigProblems": [],
             "boundedMetadata": "x" * (32 * 1024),
         }
     ).encode()

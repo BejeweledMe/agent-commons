@@ -75,15 +75,22 @@ def workflow_diagnostic_code(value: Mapping[str, Any]) -> DiagnosticCode:
     stored = DiagnosticCode(str(value["diagnostic_code"]))
     if stored not in {DiagnosticCode.NONE, DiagnosticCode.LEGACY_UNCLASSIFIED}:
         return stored
+    terminal_process = str(value.get("state")) in {
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+        "needs_operator",
+    }
+    if terminal_process and value.get("terminal_tool_audit_available") is True:
+        if int(value.get("terminal_tool_calls", 0)) == 0:
+            return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
+        if (
+            int(value.get("terminal_tool_rejections", 0)) > 0
+            and int(value.get("terminal_tool_completions", 0)) == 0
+        ):
+            return DiagnosticCode.TERMINAL_TOOL_REJECTED
     if value.get("process_canonical_mismatch") is True:
-        if value.get("terminal_tool_audit_available") is True:
-            if int(value.get("terminal_tool_calls", 0)) == 0:
-                return DiagnosticCode.TERMINAL_TOOL_NOT_CALLED
-            if (
-                int(value.get("terminal_tool_rejections", 0)) > 0
-                and int(value.get("terminal_tool_completions", 0)) == 0
-            ):
-                return DiagnosticCode.TERMINAL_TOOL_REJECTED
         return DiagnosticCode.PROCESS_CANONICAL_MISMATCH
     return stored
 
@@ -151,7 +158,7 @@ _HINTS = {
         "The provider reported a structured error even though its process exited successfully."
     ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
-        "The provider exited without calling a bounded terminal outcome tool."
+        "The provider terminated without calling a bounded terminal outcome tool."
     ),
     DiagnosticCode.TERMINAL_TOOL_REJECTED: (
         "A bounded terminal outcome tool call was rejected before canonical completion."
@@ -245,7 +252,7 @@ _SAFE_NEXT_ACTIONS = {
     ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
         "Inspect the exact delegation and worker tool catalog before creating new work.",
-        "Do not treat the successful provider exit as a successful workflow.",
+        "Do not treat provider-process termination as a successful workflow.",
     ),
     DiagnosticCode.TERMINAL_TOOL_REJECTED: (
         "Refresh the canonical delegation revision and inspect terminal-tool audit counters.",

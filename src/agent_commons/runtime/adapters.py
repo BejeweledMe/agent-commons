@@ -612,6 +612,8 @@ class GrokProviderAdapter:
                 servers = value["mcpServers"]
                 hooks = value["hooks"]
                 plugins = value["plugins"]
+                lsp_servers = value["lspServers"]
+                mcp_config_problems = value.get("mcpConfigProblems", [])
                 if not isinstance(servers, list):
                     raise TypeError("Grok inspect MCP servers must be a list")
                 # Grok may report compatibility discoveries that the fixed
@@ -627,12 +629,17 @@ class GrokProviderAdapter:
                 ]
                 server_names = tuple(item.get("name") for item in active_servers)
                 isolated = (
-                    len(server_names) == len(active_servers)
+                    value.get("projectTrusted") is True
+                    and len(server_names) == len(active_servers)
                     and server_names == (_GROK_MCP_SERVER,)
                     and isinstance(hooks, list)
                     and not hooks
                     and isinstance(plugins, list)
                     and not plugins
+                    and isinstance(lsp_servers, list)
+                    and not lsp_servers
+                    and isinstance(mcp_config_problems, list)
+                    and not mcp_config_problems
                 )
             except (
                 UnicodeDecodeError,

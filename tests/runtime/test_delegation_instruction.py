@@ -156,3 +156,13 @@ def test_grok_instructions_use_provider_native_terminal_tool_names() -> None:
     assert "agent-commons__commons_succeed_delegation" in implementation
     assert "mcp__agent-commons__commons_finalize_review" not in review
     assert "mcp__agent-commons__commons_succeed_delegation" not in implementation
+    for instruction in (review, implementation):
+        assert "Grok exposes MCP integrations through its native search_tool and\nuse_tool" in (
+            instruction
+        )
+        assert "invoke that fully-qualified name through use_tool" in instruction
+        assert "Never attempt to call an agent-commons__commons_* name as a\ndirect" in (
+            instruction
+        )
+        assert "do not widen the worker tool catalog" in instruction
+    assert "sole exception to the native-tool restriction" in review

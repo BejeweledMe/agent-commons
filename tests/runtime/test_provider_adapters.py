@@ -230,9 +230,12 @@ def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
         _initialization_result(
             stdout=json.dumps(
                 {
+                    "projectTrusted": True,
                     "mcpServers": [{"name": "agent-commons"}],
                     "hooks": [],
                     "plugins": [],
+                    "lspServers": [],
+                    "mcpConfigProblems": [],
                 }
             ).encode()
         ),
@@ -242,9 +245,12 @@ def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
         _initialization_result(
             stdout=json.dumps(
                 {
+                    "projectTrusted": True,
                     "mcpServers": [{"name": "agent-commons"}, {"name": "ambient"}],
                     "hooks": [],
                     "plugins": [],
+                    "lspServers": [],
+                    "mcpConfigProblems": [],
                 }
             ).encode()
         ),
@@ -254,6 +260,7 @@ def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
         _initialization_result(
             stdout=json.dumps(
                 {
+                    "projectTrusted": True,
                     "mcpServers": [
                         {
                             "name": "ambient-claude-compat",
@@ -264,6 +271,8 @@ def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
                     ],
                     "hooks": [],
                     "plugins": [],
+                    "lspServers": [],
+                    "mcpConfigProblems": [],
                 }
             ).encode()
         ),
@@ -271,6 +280,38 @@ def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
     assert ready.state is ProviderInitializationState.READY
     assert ambient.state is ProviderInitializationState.UNAVAILABLE
     assert disabled_compatibility.state is ProviderInitializationState.READY
+
+
+@pytest.mark.parametrize(
+    "unsafe_surface",
+    (
+        {"projectTrusted": False},
+        {"lspServers": [{"name": "ambient-lsp"}]},
+        {"mcpConfigProblems": [{"name": "agent-commons"}]},
+    ),
+)
+def test_grok_adapter_rejects_untrusted_or_extra_execution_surfaces(
+    unsafe_surface: dict[str, object],
+) -> None:
+    profile = next(
+        profile for profile in _profiles() if profile.profile_id is BuiltinProfileId.GROK_BUILDER
+    )
+    value: dict[str, object] = {
+        "projectTrusted": True,
+        "mcpServers": [{"name": "agent-commons"}],
+        "hooks": [],
+        "plugins": [],
+        "lspServers": [],
+        "mcpConfigProblems": [],
+    }
+    value.update(unsafe_surface)
+
+    status = _adapter(profile).classify_initialization(
+        profile,
+        _initialization_result(stdout=json.dumps(value).encode()),
+    )
+
+    assert status.state is ProviderInitializationState.UNAVAILABLE
 
 
 @pytest.mark.parametrize("profile", _profiles(), ids=lambda profile: profile.profile_id.value)
