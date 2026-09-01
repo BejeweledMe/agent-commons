@@ -1,0 +1,36 @@
+{
+  "schema": "agent_commons.safe_evidence.v1",
+  "task_id": "task.5FR2V9CWSC3AKX1F1Z6VDD0E4J",
+  "commit": "355ee13",
+  "scope": [
+    "src/agent_commons/runtime/execution_host.py",
+    "src/agent_commons/runtime/__init__.py",
+    "tests/runtime/test_execution_host.py"
+  ],
+  "closed_assertions": [
+    "IPC request wire schema is exact, bounded, newline-delimited, and contains identities and digests only.",
+    "Owner-only Unix listener permissions and authenticated same-UID peer checks pass on macOS.",
+    "Linux peer authentication is implemented with SO_PEERCRED but is not claimed as live-qualified by this artifact.",
+    "Workspace, state-root, broker-instance, delegation revision, profile, and launch-plan mismatches have closed typed refusals.",
+    "Immutable operational receipts are mode 0600 below mode 0700 directories and recover without becoming canonical lifecycle state.",
+    "Thirty-two concurrent admissions produce exactly one creation and one identical durable admission identity.",
+    "Provider argv, environment, prompt, credentials, output, process launch, qualification, and canonical success are outside this component."
+  ],
+  "verification": [
+    {
+      "command": "uv run --locked python -m pytest -q tests/runtime/test_execution_host.py",
+      "result": "21 passed",
+      "duration_seconds": 0.26
+    },
+    {
+      "command": "uv run --locked python -m pytest -q tests/runtime",
+      "result": "407 passed",
+      "duration_seconds": 109.47
+    },
+    {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1799 passed, 13 skipped, 2 warnings",
+      "duration_seconds": 515.86
+    }
+  ]
+}
