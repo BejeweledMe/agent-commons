@@ -13,6 +13,16 @@ from types import SimpleNamespace
 import pytest
 
 from agent_commons.core.ids import stable_id
+from agent_commons.errors import ValidationError
+from agent_commons.runtime import (
+    BudgetUnit,
+    LaunchPlan,
+    LaunchPlanner,
+    LaunchPurpose,
+    TypedRefusal,
+    ValidatedLaunchPlan,
+    default_profile_registry,
+)
 from agent_commons.runtime.execution_host import (
     MAX_EXECUTION_HOST_REQUEST_BYTES,
     ExecutionHostAdmissionStore,
@@ -31,6 +41,41 @@ from agent_commons.runtime.model import BuiltinProfileId
 
 def _id(prefix: str, name: str) -> str:
     return stable_id(prefix, name)
+
+
+def _validated_launch_plan(tmp_path: Path) -> ValidatedLaunchPlan:
+    planner = LaunchPlanner.default()
+    profile = default_profile_registry(
+        codex_executable="/bin/echo",
+        claude_executable="/bin/echo",
+        grok_executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        trusted_workspace=True,
+    ).get(BuiltinProfileId.CODEX_BUILDER)
+    validation = planner.validate_static(
+        LaunchPlan(
+            profile_id=profile.profile_id,
+            purpose=LaunchPurpose.IMPLEMENTATION,
+            instruction="exact execution host test instruction",
+            budget_unit=BudgetUnit.PROVIDER_UNITS,
+            budget_limit=1,
+        ),
+        profile,
+        workspace_root=tmp_path,
+    )
+    assert not isinstance(validation, TypedRefusal)
+    return planner.build(
+        validation,
+        workspace_root=tmp_path,
+        state_root=tmp_path / "state",
+        delegation_id=_id("delegation", "validated-host-plan"),
+        child_session_id=_id("session", "validated-host-child"),
+        max_budget_microusd=None,
+        worker_purpose="implementation",
+        role_tools=(),
+        role_grants={},
+    )
 
 
 @pytest.fixture
@@ -193,27 +238,44 @@ def test_binding_from_validated_plan_keeps_only_fingerprints(tmp_path: Path) -> 
     state_root = tmp_path / "state"
     workspace.mkdir()
     state_root.mkdir()
-    plan = SimpleNamespace(
-        plan=SimpleNamespace(profile_id=BuiltinProfileId.CLAUDE_BUILDER),
-        invocation_fingerprint="f" * 64,
-        invocation=SimpleNamespace(argv=("secret-prompt",), env={"TOKEN": "secret"}),
-    )
+    plan = _validated_launch_plan(workspace)
     binding = ExecutionHostBinding.from_validated_plan(
         workspace_root=workspace,
         state_root=state_root,
         delegation_id=_id("delegation", "bound-delegation"),
         delegation_revision=_id("evt", "bound-revision"),
-        profile_id=BuiltinProfileId.CLAUDE_BUILDER,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
         broker_instance_id=_id("broker_instance", "bound-broker"),
-        validated_launch_plan=plan,  # type: ignore[arg-type]
+        validated_launch_plan=plan,
     )
     request = ExecutionHostRequest.from_binding(_id("request", "bound-request"), binding)
     serialized = json.dumps(request.to_wire(), sort_keys=True)
     assert binding.workspace_sha256 == path_identity_sha256(workspace)
     assert binding.state_root_sha256 == path_identity_sha256(state_root)
-    assert binding.launch_plan_sha256 == "f" * 64
-    assert "secret-prompt" not in serialized
-    assert "TOKEN" not in serialized
+    assert binding.launch_plan_sha256 == plan.invocation_fingerprint
+    assert "exact execution host test instruction" not in serialized
+    assert plan.invocation.argv[0] not in serialized
+
+
+def test_binding_rejects_duck_typed_mutable_plan(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    state_root = tmp_path / "state"
+    workspace.mkdir()
+    state_root.mkdir()
+    mutable_substitute = SimpleNamespace(
+        plan=SimpleNamespace(profile_id=BuiltinProfileId.CODEX_BUILDER),
+        invocation_fingerprint="f" * 64,
+    )
+    with pytest.raises(ValidationError, match="exact ValidatedLaunchPlan"):
+        ExecutionHostBinding.from_validated_plan(
+            workspace_root=workspace,
+            state_root=state_root,
+            delegation_id=_id("delegation", "mutable-delegation"),
+            delegation_revision=_id("evt", "mutable-revision"),
+            profile_id=BuiltinProfileId.CODEX_BUILDER,
+            broker_instance_id=_id("broker_instance", "mutable-broker"),
+            validated_launch_plan=mutable_substitute,  # type: ignore[arg-type]
+        )
 
 
 def test_admission_is_durable_exactly_once_and_private_data_free(

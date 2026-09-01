@@ -150,6 +150,8 @@ class ExecutionHostBinding:
     ) -> ExecutionHostBinding:
         """Bind P2's immutable plan without copying its invocation material."""
 
+        if type(validated_launch_plan) is not ValidatedLaunchPlan:
+            raise ValidationError("validated_launch_plan must be an exact ValidatedLaunchPlan")
         try:
             profile = BuiltinProfileId(profile_id)
         except ValueError as exc:
