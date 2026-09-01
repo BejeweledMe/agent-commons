@@ -229,7 +229,12 @@ class TaskReadiness:
             )
         if set(gaps) & {PlanGap.TASK_MALFORMED, PlanGap.DEPENDENCIES_TRUNCATED}:
             if (
-                readiness not in {ReadinessState.UNKNOWN, ReadinessState.POLICY_UNKNOWN}
+                readiness
+                not in {
+                    ReadinessState.UNKNOWN,
+                    ReadinessState.POLICY_UNKNOWN,
+                    ReadinessState.TERMINAL_DEPENDENCY_FAILURE,
+                }
                 or not self.awaits_human
                 or next_action is not NextAction.INSPECT_MISSING_EVIDENCE
             ):

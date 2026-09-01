@@ -434,7 +434,15 @@ def _task_readiness(
         action = run.next_action
         awaits_human = run.awaits_human or action in _HUMAN_ACTIONS
     dependency_input_invalid = bool(gaps & {PlanGap.TASK_MALFORMED, PlanGap.DEPENDENCIES_TRUNCATED})
-    if dependency_input_invalid:
+    if terminal_failures:
+        readiness = ReadinessState.TERMINAL_DEPENDENCY_FAILURE
+        awaits_human = True
+        action = NextAction.INSPECT_MISSING_EVIDENCE
+    elif policy_unknown:
+        readiness = ReadinessState.POLICY_UNKNOWN
+        awaits_human = True
+        action = NextAction.INSPECT_MISSING_EVIDENCE
+    elif dependency_input_invalid:
         readiness = ReadinessState.UNKNOWN
         awaits_human = True
         action = NextAction.INSPECT_MISSING_EVIDENCE
@@ -446,14 +454,6 @@ def _task_readiness(
         readiness = ReadinessState.CANCELLED
         awaits_human = False
         action = NextAction.NONE
-    elif terminal_failures:
-        readiness = ReadinessState.TERMINAL_DEPENDENCY_FAILURE
-        awaits_human = True
-        action = NextAction.INSPECT_MISSING_EVIDENCE
-    elif policy_unknown:
-        readiness = ReadinessState.POLICY_UNKNOWN
-        awaits_human = True
-        action = NextAction.INSPECT_MISSING_EVIDENCE
     elif awaits_human:
         readiness = ReadinessState.HUMAN_ATTENTION
     elif blockers:

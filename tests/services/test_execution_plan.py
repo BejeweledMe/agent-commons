@@ -395,6 +395,57 @@ def test_missing_dependency_stays_an_exact_blocker_and_partial_edge() -> None:
         replace(plan.nodes[0], awaits_human=False)
 
 
+def test_duplicate_missing_dependency_preserves_typed_policy_unknown_state() -> None:
+    snapshot = ProjectSnapshot(workspace_id="workspace.1")
+    snapshot.tasks["task.a"] = _task(  # type: ignore[assignment]
+        "task.a", dependencies=["task.absent", "task.absent"]
+    )
+
+    plan = build_execution_plan(
+        snapshot,
+        [],
+        generated_at=NOW,
+        focus_task_ids=["task.a"],
+        capacity=CAPACITY,
+    )
+
+    assert plan.state is PlanState.ERROR
+    assert {PlanGap.TASK_MALFORMED, PlanGap.DEPENDENCY_POLICY_UNKNOWN} <= set(plan.gaps)
+    node = plan.nodes[0]
+    assert node.readiness is ReadinessState.POLICY_UNKNOWN
+    assert node.dependency_task_ids == ("task.absent",)
+    assert node.blocking_dependency_ids == ("task.absent",)
+    assert node.policy_unknown_dependency_ids == ("task.absent",)
+    assert node.awaits_human is True
+    assert node.next_action is NextAction.INSPECT_MISSING_EVIDENCE
+
+
+def test_duplicate_cancelled_dependency_preserves_typed_terminal_failure() -> None:
+    snapshot = ProjectSnapshot(workspace_id="workspace.1")
+    snapshot.tasks["task.dep"] = _task("task.dep", state="cancelled")  # type: ignore[assignment]
+    snapshot.tasks["task.a"] = _task(  # type: ignore[assignment]
+        "task.a", dependencies=["task.dep", "task.dep"]
+    )
+
+    plan = build_execution_plan(
+        snapshot,
+        [],
+        generated_at=NOW,
+        focus_task_ids=["task.a"],
+        capacity=CAPACITY,
+    )
+
+    assert plan.state is PlanState.ERROR
+    assert {PlanGap.TASK_MALFORMED, PlanGap.TERMINAL_DEPENDENCY_FAILURE} <= set(plan.gaps)
+    node = next(value for value in plan.nodes if value.task_id == "task.a")
+    assert node.readiness is ReadinessState.TERMINAL_DEPENDENCY_FAILURE
+    assert node.dependency_task_ids == ("task.dep",)
+    assert node.blocking_dependency_ids == ("task.dep",)
+    assert node.terminal_dependency_failure_ids == ("task.dep",)
+    assert node.awaits_human is True
+    assert node.next_action is NextAction.INSPECT_MISSING_EVIDENCE
+
+
 @pytest.mark.parametrize(
     "dependencies",
     [

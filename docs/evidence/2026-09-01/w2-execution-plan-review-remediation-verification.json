@@ -1,0 +1,52 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.4PNGRR0ATFEYTGNQ5CM15YWDHW",
+  "task_revision": "evt.01M1DWWTFW1CRC49KBV23W9KM6",
+  "review_id": "review.4CK3M1SPSWJN1P1VXV4D7PCN9R",
+  "slice": "W2 malformed dependency readiness review remediation",
+  "repository": {
+    "base_commit": "acc6c7a658cfa79de83820c1df91b329e433f3e9",
+    "scope": "The exact blocking review gap and its two regression cases only."
+  },
+  "files": {
+    "src/agent_commons/domain/execution_plan.py": {
+      "sha256": "d34b622cff53bd591a5464b37655d91b8f8088004c66601f33cf7711618f20ed",
+      "bytes": 15821
+    },
+    "src/agent_commons/services/execution_plan.py": {
+      "sha256": "8f7b6a1bd71e3d713d01e8854dee391e9fbdc60faae11b2ef0efd8763f0e9873",
+      "bytes": 23395
+    },
+    "tests/services/test_execution_plan.py": {
+      "sha256": "3a249ed9edefcc5c9b830f62b48fd9834812e673ba2cf7607b06c1bd0276e81b",
+      "bytes": 24714
+    }
+  },
+  "verification": {
+    "focused_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked pytest tests/services/test_execution_plan.py -q",
+      "result": "26 passed in 0.28s",
+      "outcome": "passed"
+    },
+    "release_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1736 passed, 13 skipped, 2 warnings in 515.13s",
+      "outcome": "passed"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "no findings",
+      "outcome": "passed"
+    }
+  },
+  "assertions": [
+    "Duplicate missing dependencies return an error plan with task_malformed and dependency_policy_unknown gaps instead of raising an exception.",
+    "Duplicate cancelled dependencies return an error plan with task_malformed and terminal_dependency_failure gaps instead of raising an exception.",
+    "Malformed dependency evidence remains fail-closed and requires human inspection.",
+    "No ETA, progress percentage, cost, token usage, provider payload or new authoritative store was introduced."
+  ],
+  "safety": {
+    "canonical_truth": "This file is task-bound implementation evidence, not an authoritative execution record.",
+    "provider_data": "No provider output, transcript, prompt, reasoning, credentials or raw diagnostics are recorded."
+  }
+}
