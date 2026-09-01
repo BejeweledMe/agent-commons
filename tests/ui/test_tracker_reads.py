@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+import pytest
+
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.ui.tracker_reads import build_tracker_snapshot, loading_tracker_snapshot
 
 NOW = "2026-08-30T10:01:00Z"
 CAPACITY = {"active": 1, "limit": 4, "queued": 0, "queue_capacity": 8}
+SOURCE_REVISION = "sha256:" + "a" * 64
+
+
+def _graph(*, truncated: bool = False) -> dict[str, object]:
+    return {
+        "generated_at": NOW,
+        "ledger_fingerprint": SOURCE_REVISION,
+        "limits": {"truncated": truncated},
+    }
 
 
 def _snapshot(*, delegation_state: str = "active") -> ProjectSnapshot:
@@ -107,11 +118,14 @@ def test_tracker_composes_focused_dag_run_timeline_and_observed_capacity() -> No
         sequence=7,
         focus_task_ids=["task.next"],
         capacity=CAPACITY,
+        graph=_graph(),
     )
     wire = dto.to_wire()
 
     assert dto.state == "ready"
     assert wire["sequence"] == 7
+    assert wire["source_revision"] == SOURCE_REVISION
+    assert wire["truncated"] is False
     assert [task["task_id"] for task in wire["tasks"]] == [
         "task.build",
         "task.dep",
@@ -142,6 +156,7 @@ def test_tracker_has_no_raw_provider_or_fake_metric_fields() -> None:
         generated_at=NOW,
         sequence=1,
         capacity=CAPACITY,
+        graph=_graph(),
     ).to_wire()
     rendered = repr(wire)
 
@@ -168,6 +183,7 @@ def test_human_attention_is_closed_vocabulary_not_provider_summary() -> None:
         generated_at=NOW,
         sequence=2,
         capacity=CAPACITY,
+        graph=_graph(),
     )
 
     assert dto.attention[0].kind == "run"
@@ -177,10 +193,15 @@ def test_human_attention_is_closed_vocabulary_not_provider_summary() -> None:
 
 def test_empty_loading_error_and_stale_states_are_explicit() -> None:
     empty = build_tracker_snapshot(
-        ProjectSnapshot(), [], generated_at=NOW, sequence=0, capacity=CAPACITY
+        ProjectSnapshot(),
+        [],
+        generated_at=NOW,
+        sequence=0,
+        capacity=CAPACITY,
+        graph=_graph(),
     )
     loading = loading_tracker_snapshot(generated_at=NOW)
-    error = build_tracker_snapshot(None, None, generated_at=NOW, sequence=3)
+    error = build_tracker_snapshot(None, None, generated_at=NOW, sequence=3, graph=_graph())
     stale = build_tracker_snapshot(
         _snapshot(),
         [_attempt()],
@@ -188,6 +209,7 @@ def test_empty_loading_error_and_stale_states_are_explicit() -> None:
         sequence=4,
         resume_gap=True,
         capacity=CAPACITY,
+        graph=_graph(),
     )
 
     assert empty.state == "empty"
@@ -199,9 +221,56 @@ def test_empty_loading_error_and_stale_states_are_explicit() -> None:
     assert "resume_gap" in stale.gaps
 
 
+def test_missing_source_revision_fails_closed_and_truncation_is_explicit() -> None:
+    missing = build_tracker_snapshot(
+        _snapshot(), [_attempt()], generated_at=NOW, sequence=5, capacity=CAPACITY
+    )
+    truncated = build_tracker_snapshot(
+        _snapshot(),
+        [_attempt()],
+        generated_at=NOW,
+        sequence=6,
+        capacity=CAPACITY,
+        graph=_graph(truncated=True),
+    )
+
+    assert missing.state == "error"
+    assert missing.source_revision is None
+    assert missing.gaps == ("source_revision_unavailable",)
+    assert truncated.state == "partial"
+    assert truncated.source_revision == SOURCE_REVISION
+    assert truncated.truncated is True
+    assert "graph_truncated" in truncated.gaps
+
+    malformed_graph = _graph()
+    malformed_graph["ledger_fingerprint"] = "sha256:not-a-digest"
+    malformed = build_tracker_snapshot(
+        _snapshot(),
+        [_attempt()],
+        generated_at=NOW,
+        sequence=7,
+        capacity=CAPACITY,
+        graph=malformed_graph,
+    )
+    assert malformed.state == "error"
+    assert malformed.source_revision is None
+    assert "not-a-digest" not in repr(malformed)
+
+    with pytest.raises(ValueError, match="exact sha256 fingerprint"):
+        loading_tracker_snapshot(
+            generated_at=NOW,
+            source_revision="sha256:provider-controlled-text",
+        )
+
+
 def test_dto_returns_fresh_wire_containers() -> None:
     dto = build_tracker_snapshot(
-        _snapshot(), [_attempt()], generated_at=NOW, sequence=1, capacity=CAPACITY
+        _snapshot(),
+        [_attempt()],
+        generated_at=NOW,
+        sequence=1,
+        capacity=CAPACITY,
+        graph=_graph(),
     )
     first = dto.to_wire()
     first["tasks"].clear()

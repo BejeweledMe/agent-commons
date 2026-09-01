@@ -1,0 +1,69 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.0NE2MXJBHM1W1TYDN1E2BYJHP7",
+  "task_revision": "evt.01M1DZBW3TANTA34VK3RRWZNSD",
+  "slice": "W3 bounded tracker backend DTO, authenticated API and SSE contract",
+  "repository": {
+    "base_commit": "75d4a6eaf7872e68385963f83827824c0d3c5945",
+    "scope": "Tracker backend DTO/read/route contract and its direct regressions only."
+  },
+  "files": {
+    "src/agent_commons/ui/tracker_dtos.py": {
+      "sha256": "9b0a2f236ccf0e31c6626ca55c3b53b1c0c981e513714123bce874d664508fd4",
+      "bytes": 8837
+    },
+    "src/agent_commons/ui/tracker_reads.py": {
+      "sha256": "b1f03358380edd6bea6b073bf5906b8451858806beb7f6b0bbb3067be0c6743e",
+      "bytes": 10576
+    },
+    "src/agent_commons/ui/tracker_routes.py": {
+      "sha256": "d711d68bcaef67c5613e55f04d2bbfa13c707fe1892500c6783c477d16425844",
+      "bytes": 7585
+    },
+    "tests/ui/test_tracker_reads.py": {
+      "sha256": "4b32a2ab1e5b6e80a30ba9f4c274b8ed9e8f97f938a4e81d8389c5e378811e81",
+      "bytes": 9130
+    },
+    "tests/ui/test_tracker_routes.py": {
+      "sha256": "7d5650087a4fb47a1ccc4b5a394fd07c770fcfed829b08e3c3368b40ab1398a8",
+      "bytes": 6560
+    }
+  },
+  "verification": {
+    "focused_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID PYTHONPATH=. uv run --locked python -m pytest -q tests/ui/test_tracker_reads.py tests/ui/test_tracker_routes.py tests/ui/test_auth.py tests/ui/test_readonly_invariant.py tests/services/test_execution_plan.py",
+      "result": "84 passed, 1 warning in 15.52s",
+      "outcome": "passed"
+    },
+    "browser_contract_gate": {
+      "command": "cd frontend/work && node --test tests/tracker-parser.test.mjs tests/tracker-contract.test.mjs",
+      "result": "6 passed in 410.69ms",
+      "outcome": "passed"
+    },
+    "live_read_smoke": {
+      "result": "schema bound; source bound; 207 task nodes; 79 run records; truncated false; zero forbidden keys",
+      "outcome": "passed"
+    },
+    "release_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1738 passed, 13 skipped, 2 warnings in 527.95s",
+      "outcome": "passed"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "no findings",
+      "outcome": "passed"
+    }
+  },
+  "assertions": [
+    "The authenticated read route exposes one frozen provider-safe DTO derived from canonical snapshot, existing work views and the operational AttemptStore.",
+    "The wire contract carries an exact sha256 source revision and an explicit truncation boolean; missing or malformed source revisions fail closed without echo.",
+    "SSE reconnect regression sets resume_gap, sequence reuse or regression never invents progress, and oversized frames become bounded explicit truncation errors.",
+    "DTO serialization returns fresh JSON containers and exposes no argv, env, stdout, stderr, prompt, transcript, tool arguments, credentials, ETA, percentage, cost or token fields.",
+    "No canonical entity, second RunEventStore, provider payload surface or frontend behavior was introduced."
+  ],
+  "safety": {
+    "canonical_truth": "This file is task-bound implementation evidence, not an authoritative execution record.",
+    "provider_data": "No provider output, transcript, prompt, reasoning, credentials or raw diagnostics are recorded."
+  }
+}

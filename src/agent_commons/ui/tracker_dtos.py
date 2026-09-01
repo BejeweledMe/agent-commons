@@ -7,10 +7,12 @@ percentages, or estimated completion times.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
 TrackerSurfaceState = Literal["loading", "empty", "ready", "partial", "stale", "error"]
+_SOURCE_REVISION = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 class TrackerTaskPayload(TypedDict):
@@ -84,6 +86,8 @@ class TrackerFreshnessPayload(TypedDict):
 class TrackerSnapshotPayload(TypedDict):
     schema: Literal["agent-commons.tracker.v1"]
     sequence: int
+    source_revision: str | None
+    truncated: bool
     state: TrackerSurfaceState
     tasks: list[TrackerTaskPayload]
     edges: list[TrackerEdgePayload]
@@ -249,6 +253,8 @@ class TrackerFreshnessDTO:
 @dataclass(frozen=True, slots=True)
 class TrackerSnapshotDTO:
     sequence: int
+    source_revision: str | None
+    truncated: bool
     state: TrackerSurfaceState
     tasks: tuple[TrackerTaskDTO, ...]
     edges: tuple[TrackerEdgeDTO, ...]
@@ -260,10 +266,23 @@ class TrackerSnapshotDTO:
     critical_path_task_ids: tuple[str, ...]
     gaps: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        if type(self.sequence) is not int or self.sequence < 0:
+            raise ValueError("tracker sequence must be a non-negative integer")
+        if (
+            self.source_revision is not None
+            and _SOURCE_REVISION.fullmatch(self.source_revision) is None
+        ):
+            raise ValueError("tracker source revision must be an exact sha256 fingerprint")
+        if type(self.truncated) is not bool:
+            raise TypeError("tracker truncated must be a boolean")
+
     def to_wire(self) -> TrackerSnapshotPayload:
         return {
             "schema": "agent-commons.tracker.v1",
             "sequence": self.sequence,
+            "source_revision": self.source_revision,
+            "truncated": self.truncated,
             "state": self.state,
             "tasks": [item.to_wire() for item in self.tasks],
             "edges": [item.to_wire() for item in self.edges],

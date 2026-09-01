@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from itertools import islice
 from typing import Any
 
 from agent_commons.core.bounded import truncate_utf8
-from agent_commons.domain.execution_plan import PlanState
+from agent_commons.domain.execution_plan import PlanGap, PlanState
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.work_state import FreshnessState
 from agent_commons.services.execution_plan import MAX_ATTEMPT_INPUTS, build_execution_plan
@@ -38,9 +39,17 @@ def build_tracker_snapshot(
 ) -> TrackerSnapshotDTO:
     """Return one bounded snapshot without exposing provider-controlled text."""
 
+    source_revision = _source_revision(graph)
+    if source_revision is None:
+        return unavailable_tracker_snapshot(
+            generated_at=generated_at,
+            sequence=sequence,
+            gap="source_revision_unavailable",
+        )
     attempt_values = (
         None if attempts is None else tuple(islice(iter(attempts), MAX_ATTEMPT_INPUTS + 1))
     )
+    attempts_truncated = attempt_values is not None and len(attempt_values) > MAX_ATTEMPT_INPUTS
     plan = build_execution_plan(
         snapshot,
         attempt_values,
@@ -52,7 +61,14 @@ def build_tracker_snapshot(
         capacity=capacity,
     )
     if snapshot is None or plan.state is PlanState.ERROR:
-        return _error_snapshot(generated_at, sequence, plan, resume_gap=resume_gap)
+        return _error_snapshot(
+            generated_at,
+            sequence,
+            plan,
+            source_revision=source_revision,
+            attempts_truncated=attempts_truncated,
+            resume_gap=resume_gap,
+        )
     try:
         health = build_work_health(
             snapshot,
@@ -62,7 +78,14 @@ def build_tracker_snapshot(
             graph=graph,
         )
     except (OverflowError, TypeError, ValueError):
-        return _error_snapshot(generated_at, sequence, plan, resume_gap=resume_gap)
+        return _error_snapshot(
+            generated_at,
+            sequence,
+            plan,
+            source_revision=source_revision,
+            attempts_truncated=attempts_truncated,
+            resume_gap=resume_gap,
+        )
 
     tasks = tuple(
         TrackerTaskDTO(
@@ -144,8 +167,19 @@ def build_tracker_snapshot(
         stale=plan.freshness is FreshnessState.STALE or resume_gap,
     )
     gaps = tuple(sorted({gap.value for gap in plan.gaps}))
+    truncated = attempts_truncated or bool(
+        set(plan.gaps)
+        & {
+            PlanGap.DEPENDENCIES_TRUNCATED,
+            PlanGap.PLAN_TRUNCATED,
+            PlanGap.EDGE_LIMIT_EXCEEDED,
+            PlanGap.GRAPH_TRUNCATED,
+        }
+    )
     return TrackerSnapshotDTO(
         sequence=_sequence(sequence),
+        source_revision=source_revision,
+        truncated=truncated,
         state=state,
         tasks=tasks,
         edges=edges,
@@ -170,22 +204,39 @@ def build_tracker_snapshot(
     )
 
 
-def loading_tracker_snapshot(*, generated_at: str, sequence: int = 0) -> TrackerSnapshotDTO:
+def loading_tracker_snapshot(
+    *, generated_at: str, sequence: int = 0, source_revision: str | None = None
+) -> TrackerSnapshotDTO:
     """Typed initial state used while the first derived read is assembled."""
 
-    return _blank_snapshot(generated_at, sequence, state="loading", freshness="unknown")
+    return _blank_snapshot(
+        generated_at,
+        sequence,
+        source_revision=source_revision,
+        state="loading",
+        freshness="unknown",
+    )
 
 
 def unavailable_tracker_snapshot(
-    *, generated_at: str, sequence: int = 0, gap: str = "projection_unavailable"
+    *,
+    generated_at: str,
+    sequence: int = 0,
+    source_revision: str | None = None,
+    truncated: bool = False,
+    resume_gap: bool = False,
+    gap: str = "projection_unavailable",
 ) -> TrackerSnapshotDTO:
     """Return a fixed-shape error without propagating an internal exception."""
 
     return _blank_snapshot(
         generated_at,
         sequence,
+        source_revision=source_revision,
+        truncated=truncated,
         state="error",
         freshness="unknown",
+        resume_gap=resume_gap,
         gaps=(gap,),
     )
 
@@ -195,12 +246,25 @@ def _error_snapshot(
     sequence: int,
     plan: Any,
     *,
+    source_revision: str,
+    attempts_truncated: bool,
     resume_gap: bool,
 ) -> TrackerSnapshotDTO:
     gaps = tuple(sorted({gap.value for gap in plan.gaps} | {"projection_unavailable"}))
     return _blank_snapshot(
         generated_at,
         sequence,
+        source_revision=source_revision,
+        truncated=attempts_truncated
+        or bool(
+            set(plan.gaps)
+            & {
+                PlanGap.DEPENDENCIES_TRUNCATED,
+                PlanGap.PLAN_TRUNCATED,
+                PlanGap.EDGE_LIMIT_EXCEEDED,
+                PlanGap.GRAPH_TRUNCATED,
+            }
+        ),
         state="error",
         freshness="unknown",
         resume_gap=resume_gap,
@@ -212,6 +276,8 @@ def _blank_snapshot(
     generated_at: str,
     sequence: int,
     *,
+    source_revision: str | None,
+    truncated: bool = False,
     state: TrackerSurfaceState,
     freshness: str,
     resume_gap: bool = False,
@@ -219,6 +285,8 @@ def _blank_snapshot(
 ) -> TrackerSnapshotDTO:
     return TrackerSnapshotDTO(
         sequence=_sequence(sequence),
+        source_revision=source_revision,
+        truncated=truncated,
         state=state,
         tasks=(),
         edges=(),
@@ -230,6 +298,21 @@ def _blank_snapshot(
         critical_path_task_ids=(),
         gaps=gaps,
     )
+
+
+_SOURCE_REVISION = re.compile(r"sha256:[0-9a-f]{64}\Z")
+
+
+def _source_revision(graph: Mapping[str, Any] | None) -> str | None:
+    """Return the exact stable read fingerprint or fail closed on a moving source."""
+
+    if not isinstance(graph, Mapping):
+        return None
+    try:
+        value = graph.get("ledger_fingerprint")
+    except Exception:
+        return None
+    return value if isinstance(value, str) and _SOURCE_REVISION.fullmatch(value) else None
 
 
 def _sequence(value: int) -> int:

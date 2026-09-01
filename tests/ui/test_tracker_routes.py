@@ -3,19 +3,23 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Iterator
+from dataclasses import replace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from agent_commons.ui.tracker_dtos import TrackerTaskDTO
 from agent_commons.ui.tracker_reads import loading_tracker_snapshot
 from agent_commons.ui.tracker_routes import (
     MAX_TRACKER_FRAME_BYTES,
     _parse_last_event_id,
+    _sse,
     register_tracker_routes,
     tracker_events,
 )
 
 NOW = "2026-08-30T10:01:00Z"
+SOURCE_REVISION = "sha256:" + "b" * 64
 
 
 class Source:
@@ -27,7 +31,11 @@ class Source:
     def __call__(self, *, resume_after: int | None = None):  # type: ignore[no-untyped-def]
         self.resume_values.append(resume_after)
         sequence = next(self._sequences, self.last)
-        return loading_tracker_snapshot(generated_at=NOW, sequence=sequence)
+        return loading_tracker_snapshot(
+            generated_at=NOW,
+            sequence=sequence,
+            source_revision=SOURCE_REVISION,
+        )
 
 
 class BrokenSource:
@@ -42,7 +50,11 @@ class FlakySource:
     def __call__(self, *, resume_after: int | None = None):  # type: ignore[no-untyped-def]
         self.calls += 1
         if self.calls == 1:
-            return loading_tracker_snapshot(generated_at=NOW, sequence=5)
+            return loading_tracker_snapshot(
+                generated_at=NOW,
+                sequence=5,
+                source_revision=SOURCE_REVISION,
+            )
         raise RuntimeError("raw provider failure")
 
 
@@ -74,6 +86,8 @@ def test_snapshot_route_is_composable() -> None:
         response = client.get("/api/work/tracker")
         assert response.status_code == 200
         assert response.json()["schema"] == "agent-commons.tracker.v1"
+        assert response.json()["source_revision"] == SOURCE_REVISION
+        assert response.json()["truncated"] is False
     assert {route.path for route in app.routes} >= {
         "/api/work/tracker",
         "/api/work/tracker/stream",
@@ -110,6 +124,7 @@ def test_stream_refuses_sequence_regression_without_replacing_last_event_id() ->
     assert frames[1].startswith(b"event: error")
     assert b"id:" not in frames[1]
     assert b"tracker_sequence_regressed" in frames[1]
+    assert b'"resume_gap":true' in frames[1]
 
 
 def test_reconnect_refuses_initial_sequence_older_than_last_event_id() -> None:
@@ -118,7 +133,9 @@ def test_reconnect_refuses_initial_sequence_older_than_last_event_id() -> None:
     assert frames[0].startswith(b"event: error")
     assert b"id:" not in frames[0]
     assert b'"sequence":7' in frames[0]
+    assert SOURCE_REVISION.encode() in frames[0]
     assert b"tracker_sequence_regressed" in frames[0]
+    assert b'"resume_gap":true' in frames[0]
 
 
 def test_invalid_last_event_id_does_not_guess_a_cursor() -> None:
@@ -139,4 +156,44 @@ def test_source_exception_becomes_a_typed_redacted_error() -> None:
     assert response.status_code == 200
     assert response.json()["state"] == "error"
     assert response.json()["gaps"] == ["projection_unavailable"]
+    assert response.json()["source_revision"] is None
+    assert response.json()["truncated"] is False
     assert "provider stderr" not in response.text
+
+
+def test_oversized_snapshot_falls_back_to_bounded_explicit_truncation() -> None:
+    task = TrackerTaskDTO(
+        task_id="task.oversized",
+        title="x" * MAX_TRACKER_FRAME_BYTES,
+        task_state="active",
+        readiness="ready",
+        dependency_task_ids=(),
+        blocking_dependency_ids=(),
+        owner_session_id=None,
+        role_name=None,
+        provider=None,
+        profile_id=None,
+        phase=None,
+        awaits_human=False,
+        next_action="none",
+        freshness="fresh",
+        evidence_state="complete",
+        gaps=(),
+    )
+    snapshot = replace(
+        loading_tracker_snapshot(
+            generated_at=NOW,
+            sequence=9,
+            source_revision=SOURCE_REVISION,
+        ),
+        tasks=(task,),
+    )
+
+    frame = _sse("error", snapshot, event_id=None)
+    payload = json.loads(frame.split(b"data: ", 1)[1])
+
+    assert len(frame) <= MAX_TRACKER_FRAME_BYTES
+    assert payload["sequence"] == 9
+    assert payload["truncated"] is True
+    assert payload["source_revision"] == SOURCE_REVISION
+    assert payload["gaps"] == ["tracker_snapshot_too_large"]

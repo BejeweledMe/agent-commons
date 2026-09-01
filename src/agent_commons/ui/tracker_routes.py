@@ -67,6 +67,8 @@ async def tracker_events(
         snapshot = unavailable_tracker_snapshot(
             generated_at=snapshot.freshness.generated_at,
             sequence=resume_after,
+            source_revision=snapshot.source_revision,
+            resume_gap=True,
             gap="tracker_sequence_regressed",
         )
         yield _sse("error", snapshot, event_id=None)
@@ -92,6 +94,8 @@ async def tracker_events(
             regression = unavailable_tracker_snapshot(
                 generated_at=current.freshness.generated_at,
                 sequence=last_sent,
+                source_revision=current.source_revision,
+                resume_gap=True,
                 gap="tracker_sequence_regressed",
             )
             signature = _snapshot_signature(regression)
@@ -108,6 +112,7 @@ async def tracker_events(
                 reused = unavailable_tracker_snapshot(
                     generated_at=current.freshness.generated_at,
                     sequence=last_sent,
+                    source_revision=current.source_revision,
                     gap="tracker_sequence_reused",
                 )
                 signature = _snapshot_signature(reused)
@@ -129,7 +134,9 @@ def _sse(event: str, snapshot: TrackerSnapshotDTO, *, event_id: int | None) -> b
         body = json.dumps(
             {
                 "schema": "agent-commons.tracker.v1",
-                "sequence": event_id,
+                "sequence": snapshot.sequence,
+                "source_revision": snapshot.source_revision,
+                "truncated": True,
                 "state": "error",
                 "tasks": [],
                 "edges": [],
