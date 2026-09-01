@@ -76,6 +76,25 @@ def test_safe_environment_cannot_be_constructed_with_arbitrary_keys() -> None:
         SafeEnvironment((("ANTHROPIC_API_KEY", "secret"),))
 
 
+def test_xai_api_key_is_passed_only_to_grok_and_extra_env_is_closed() -> None:
+    environment = SafeEnvironment.from_host(
+        {"PATH": "/usr/bin", "HOME": "/safe/home", "XAI_API_KEY": "xai-secret"}
+    )
+    codex = environment.for_child_session("session.codex", provider=Provider.CODEX)
+    grok = environment.for_child_session("session.grok", provider=Provider.GROK)
+
+    assert "XAI_API_KEY" not in codex
+    assert grok["XAI_API_KEY"] == "xai-secret"
+    with pytest.raises(ValidationError, match="unsupported key"):
+        RunnerInvocation(
+            provider=Provider.GROK,
+            profile_id=BuiltinProfileId.GROK_BUILDER,
+            argv=("/bin/echo",),
+            stdin=b"",
+            extra_env={"XAI_API_KEY": "must-not-be-invocation"},
+        )
+
+
 def test_runner_uses_explicit_cwd_sanitized_child_identity_and_bounded_output(
     tmp_path: Path,
 ) -> None:

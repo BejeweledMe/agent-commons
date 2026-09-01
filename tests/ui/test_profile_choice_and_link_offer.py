@@ -312,7 +312,7 @@ def test_a_model_is_chosen_only_at_hire_and_no_reasoning_control_exists() -> Non
     assert "ризонинга не предлагается" in _value(russian, "guide_ag_profile_p")
 
 
-def test_the_guide_says_a_variant_is_a_profile_and_the_set_is_fixed_at_four() -> None:
+def test_the_guide_says_a_variant_is_a_profile_and_the_set_is_fixed_at_six() -> None:
     """Item 12 (5).  The set is closed because the narrowing rule that keeps a
     role from creating a wider role is keyed by exactly these ids; the page says
     so, and says where new variants would be described instead."""
@@ -334,8 +334,8 @@ def test_the_guide_says_a_variant_is_a_profile_and_the_set_is_fixed_at_four() ->
         # The example names a real id rather than a shape, so the reader can
         # match what the page says to what the picker offered.
         assert "claude-builder" in _value(block, "guide_ag_profile_ex")
-    assert "четырьмя" in _value(russian, "guide_ag_profile_p")
-    assert "four" in _value(english, "guide_ag_profile_p")
+    assert "шестью" in _value(russian, "guide_ag_profile_p")
+    assert "six" in _value(english, "guide_ag_profile_p")
     # The Russian page keeps the panel's one word per concept.
     for suffix in ("h", "p", "ex"):
         line = _value(russian, f"guide_ag_profile_{suffix}").lower()

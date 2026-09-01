@@ -200,7 +200,7 @@ class ProviderAvailabilityService:
         codes = [CapabilityRefusalCode.RESUME_UNAVAILABLE]
         if not skills:
             codes.append(CapabilityRefusalCode.SKILL_PROJECTION_UNAVAILABLE)
-        if provider is Provider.CODEX:
+        if provider in {Provider.CODEX, Provider.GROK}:
             codes.append(CapabilityRefusalCode.MONETARY_BUDGET_UNAVAILABLE)
         return tuple(ProviderCapabilityRefusal.create(code) for code in codes)
 

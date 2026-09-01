@@ -203,7 +203,7 @@ def test_the_unconfigured_state_on_a_watching_panel_loses_every_write_control() 
         "operator_panel": False,
         "providers": {},
         "providers_found": ["claude"],
-        "providers_missing": ["codex"],
+        "providers_missing": ["codex", "grok"],
         "support_missing": [],
         "config_path": "/home/x/.config/agent-commons/runtime.yaml",
     }
@@ -227,7 +227,7 @@ def test_no_provider_screen_keeps_rescan_and_guide_but_offers_no_write() -> None
             "operator_panel": True,
             "providers": {},
             "providers_found": [],
-            "providers_missing": ["claude", "codex"],
+            "providers_missing": ["claude", "codex", "grok"],
             "support_missing": [],
             "blocking_refusal": "setup_no_provider_found",
             "config_path": "/home/x/.config/agent-commons/runtime.yaml",

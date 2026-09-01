@@ -22,6 +22,8 @@ from agent_commons.runtime import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     CodexSandbox,
+    GrokRunnerProfile,
+    GrokSandbox,
     OperatorLimits,
     PolicyViolationError,
     ProfileRegistry,
@@ -30,6 +32,7 @@ from agent_commons.runtime import (
     default_profile_registry,
     validate_model_name,
 )
+from agent_commons.runtime.model import _provider_from_profile_value
 
 
 def _codex_overrides(argv: tuple[str, ...]) -> dict[str, object]:
@@ -44,9 +47,24 @@ def _codex_overrides(argv: tuple[str, ...]) -> dict[str, object]:
     return values
 
 
+def test_builtin_profile_provider_mapping_is_explicit_for_every_profile() -> None:
+    expected = {
+        BuiltinProfileId.CODEX_BUILDER: "codex",
+        BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER: "codex",
+        BuiltinProfileId.CLAUDE_BUILDER: "claude",
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER: "claude",
+        BuiltinProfileId.GROK_BUILDER: "grok",
+        BuiltinProfileId.GROK_INDEPENDENT_REVIEWER: "grok",
+    }
+    assert {profile_id: profile_id.provider.value for profile_id in BuiltinProfileId} == expected
+    with pytest.raises(ConfigurationError, match="unsupported provider prefix"):
+        _provider_from_profile_value("future-builder")
+
+
 def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> None:
     registry = default_profile_registry()
     assert registry.profile_ids == tuple(sorted(BuiltinProfileId, key=lambda item: item.value))
+    assert len(registry.profile_ids) == 6
 
     codex = registry.get(BuiltinProfileId.CODEX_BUILDER)
     with pytest.raises(ConfigurationError, match="trusted_workspace"):
@@ -137,6 +155,122 @@ def test_profiles_build_fixed_argv_and_keep_instruction_on_stdin(tmp_path) -> No
     assert "Bash" not in allowed
 
 
+def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: Path) -> None:
+    builder = GrokRunnerProfile(
+        profile_id=BuiltinProfileId.GROK_BUILDER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        trusted_workspace=True,
+    )
+    with pytest.raises(ConfigurationError, match="delegation binding"):
+        builder.build_invocation("Implement", workspace_root=tmp_path)
+
+    invocation = builder.build_invocation(
+        "Implement the exact submitted task",
+        workspace_root=tmp_path,
+        state_root=tmp_path / "external-state",
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        child_session_id="session.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+    )
+    assert invocation.argv[0] == str(Path("/bin/echo").resolve())
+    for flag in (
+        "--no-auto-update",
+        "--no-alt-screen",
+        "--always-approve",
+        "--sandbox",
+        "--cwd",
+        "--no-plan",
+        "--no-subagents",
+        "--disable-web-search",
+    ):
+        assert flag in invocation.argv
+    assert "--worktree" not in invocation.argv
+    assert "--resume" not in invocation.argv
+    assert "--continue" not in invocation.argv
+    assert invocation.argv[invocation.argv.index("--sandbox") + 1] == "workspace"
+    assert invocation.argv[invocation.argv.index("--cwd") + 1] == str(tmp_path.resolve())
+    assert invocation.argv[-2:] == ("-p", "Implement the exact submitted task")
+    assert invocation.stdin == b""
+    assert invocation.extra_env is not None
+    assert invocation.extra_env["AGENT_COMMONS_GROK_MCP_COMMAND"] == str(
+        Path("/bin/echo").resolve()
+    )
+    assert "XAI_API_KEY" not in invocation.extra_env
+
+    narrowed = builder.build_invocation(
+        "Implement narrowly",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        role_tools=("commons_orient",),
+    )
+    full_rules = {
+        value
+        for index, value in enumerate(invocation.argv)
+        if index > 0 and invocation.argv[index - 1] == "--allow"
+    }
+    narrow_rules = {
+        value
+        for index, value in enumerate(narrowed.argv)
+        if index > 0 and narrowed.argv[index - 1] == "--allow"
+    }
+    assert narrow_rules < full_rules
+    with pytest.raises(ConfigurationError, match="not part of this profile"):
+        builder.build_invocation(
+            "Do not widen",
+            workspace_root=tmp_path,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+            role_tools=("unknown_tool",),
+        )
+
+
+def test_grok_profile_validation_keeps_builder_trusted_and_reviewer_read_only(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ConfigurationError, match="Grok profile"):
+        GrokRunnerProfile(profile_id=BuiltinProfileId.CLAUDE_BUILDER)
+    with pytest.raises(ConfigurationError, match="Grok profile"):
+        GrokRunnerProfile(profile_id=BuiltinProfileId.CODEX_BUILDER)
+    with pytest.raises(ConfigurationError, match="read-only"):
+        GrokRunnerProfile(
+            profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+            sandbox=GrokSandbox.WORKSPACE,
+        )
+    with pytest.raises(ConfigurationError, match="trusted_workspace"):
+        GrokRunnerProfile(
+            profile_id=BuiltinProfileId.GROK_BUILDER,
+            executable="/bin/echo",
+            mcp_executable="/bin/echo",
+        ).build_invocation(
+            "Implement",
+            workspace_root=tmp_path,
+            delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+        )
+
+    reviewer = GrokRunnerProfile(
+        profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+        executable="/bin/echo",
+        mcp_executable="/bin/echo",
+        git_executable="/usr/bin/true",
+        sandbox=GrokSandbox.READ_ONLY,
+    )
+    invocation = reviewer.build_invocation(
+        "Review",
+        workspace_root=tmp_path,
+        delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
+    )
+    assert invocation.argv[invocation.argv.index("--sandbox") + 1] == "read-only"
+    native = invocation.argv[invocation.argv.index("--tools") + 1].split(",")
+    denied = invocation.argv[invocation.argv.index("--disallowed-tools") + 1].split(",")
+    assert not {"run_terminal_cmd", "search_replace", "write_file"} & set(native)
+    assert {"run_terminal_cmd", "search_replace", "write_file", "task", "web_search"} <= set(denied)
+
+    with pytest.raises(ValidationError, match="model"):
+        dataclasses.replace(reviewer, model="--hostile")
+    with pytest.raises(ConfigurationError, match="basename or an absolute path"):
+        dataclasses.replace(reviewer, executable="../grok")
+
+
 def test_profile_config_rejects_arbitrary_command_environment_and_unsafe_reviewers() -> None:
     with pytest.raises(ConfigurationError, match="unsupported fields: argv"):
         ProfileRegistry.from_mapping(
@@ -144,6 +278,8 @@ def test_profile_config_rejects_arbitrary_command_environment_and_unsafe_reviewe
         )
     with pytest.raises(ConfigurationError, match="unsupported fields: env"):
         ProfileRegistry.from_mapping({"profiles": {"claude-builder": {"env": {"TOKEN": "secret"}}}})
+    with pytest.raises(ConfigurationError, match="grok-builder has unsupported fields: env"):
+        ProfileRegistry.from_mapping({"profiles": {"grok-builder": {"env": {"TOKEN": "secret"}}}})
     with pytest.raises(ConfigurationError, match="read-only"):
         CodexRunnerProfile(
             profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,

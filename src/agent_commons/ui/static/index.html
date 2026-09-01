@@ -1122,7 +1122,7 @@ button[aria-pressed="true"]{border-color:var(--info); color:var(--info)}
           <h3 id="g-ag-role" data-i18n="guide_ag_role_h"></h3>
           <p data-i18n="guide_ag_role_p"></p>
           <p class="mono dim" data-i18n="guide_ag_role_ex"></p>
-          <!-- Round 4, finding 4, in full: the picker's four ids are the whole
+          <!-- Round 4, finding 4, in full: the picker's profile ids are the whole
                choice, and this says what each one decides, why there are four
                and not a list the operator can extend, and why no reasoning
                level appears anywhere.  It sits right after "a role is a record"
@@ -2263,7 +2263,7 @@ const STRINGS = {
     guide_map_back: "sent back",
     gref_grants: "deny, ask, auto — what the three permission levels actually do. The full account is in the Overview.",
     gref_context: "context_mode — what a role’s memory really is. The full account is in the Overview.",
-    gref_profile: "profile_id — what the four profiles decide, why the model is chosen once at hire in the field below, and why a reasoning level is not chosen at all. The full account is in the Overview.",
+    gref_profile: "profile_id — what the six profiles decide, why the model is chosen once at hire in the field below, and why a reasoning level is not chosen at all. The full account is in the Overview.",
     gref_turnover: "turnover_budget — what it counts, and why a role that hires needs one. The full account is in the Overview.",
     gref_accept: "Why a finished run has not finished the task. The full account is in the Overview.",
     gref_link_type: "ask and handoff_work — what a link actually records. The full account is in the Overview.",
@@ -2310,7 +2310,7 @@ const STRINGS = {
     guide_ag_role_p: "Hiring writes one agent.created event into the ledger — the shared history every page here reads from: name, profile_id (which fixes the provider, model and sandbox), grants, context_mode, lifetime. There is no staff list stored beside that history — the current team is rebuilt by re-reading it, so history and state cannot disagree.",
     guide_ag_role_ex: "hire → agent.created lands in the ledger; a preset is the same record with template: true and is never employed",
     guide_ag_profile_h: "A variant is a profile",
-    guide_ag_profile_p: "There is no separate choice of sandbox or spend: one profile_id fixes them at once, and the picker names the profile’s default model beside each id when the operator’s config is readable. The model is the one choice made apart, in the hire form’s model field — once, at hire, never afterwards, because everything the role remembers is built for the model that built it; an empty field runs the profile’s own. Today the set is fixed at four — two providers × builder or independent reviewer — because the narrowing rule that lets a role create only a narrower role is keyed by exactly those ids; new variants are described by the operator in runtime.yaml, and widening the set is a change to that rule rather than to this panel. A reasoning level is not offered because no runner profile carries such a field: a control for it would set nothing.",
+    guide_ag_profile_p: "There is no separate choice of sandbox or spend: one profile_id in runtime.yaml fixes them at once, and the picker names the profile’s default model beside each id when the operator’s config is readable. The model is the one choice made apart, in the hire form’s model field — once, at hire, never afterwards, because everything the role remembers is built for the model that built it; an empty field runs the profile’s own. Today the set is fixed at six — three providers × builder or independent reviewer — because the narrowing rule that lets a role create only a narrower role is keyed by exactly those ids; widening the set is a product change to that rule rather than a panel-only option. A reasoning level is not offered because no runner profile carries such a field: a control for it would set nothing.",
     guide_ag_profile_ex: "hire → profile_id: claude-builder; the model shown beside it is what runtime.yaml names — with no such config the picker says the model is fixed in the profile rather than naming one",
     guide_ag_grants_h: "Permissions are derived, never propagated",
     guide_ag_grants_p: "Three grants — create_roles, retire_roles, open_links — each deny, ask or auto, deny by default. What a role may actually do is effective_grants: the minimum across the role and every creator above it, recomputed on every call, so a downgrade binds work already running; a retired ancestor collapses the whole line to deny. The auto level is deliberately withheld: it is stored as written but takes effect as ask, so every automatic action still asks a person.",
@@ -2621,7 +2621,7 @@ const STRINGS = {
     setup_all_set: "This project is set up. Roles can be hired and runs can be started; there is nothing left to do here.",
     setup_found_title: "What was found on this machine",
     setup_binary_missing: "not found",
-    setup_found_none: "Run functionality is unavailable: neither claude nor codex was found. Install the CLI for one of them with your subscription, then press “Look again”.",
+    setup_found_none: "Run functionality is unavailable: none of claude, codex, or grok was found. Install one of those CLIs, then press “Look again”.",
     setup_found_partial: "Only {found} resolved. Profiles are written for it and for nothing else — the roles offered when you hire will be its roles, and {missing} will simply not appear until it is installed and you look again.",
     setup_support_missing: "A provider was found, but a program every written profile names did not resolve:",
     setup_support_missing_after: "Nothing can be written until it does: a profile naming a program this panel cannot resolve would fail at the first run instead of failing here. Install it and press “Look again”.",
@@ -2966,7 +2966,7 @@ const STRINGS = {
     guide_map_back: "назад в работу",
     gref_grants: "deny, ask, auto — что на самом деле делают три уровня прав. Полный разбор — в «Обзоре».",
     gref_context: "context_mode — что такое «память» роли на самом деле. Полный разбор — в «Обзоре».",
-    gref_profile: "profile_id — что решают четыре профиля, почему модель выбирается один раз при найме в поле ниже и почему уровень ризонинга не выбирается вовсе. Полный разбор — в «Обзоре».",
+    gref_profile: "profile_id — что решают шесть профилей, почему модель выбирается один раз при найме в поле ниже и почему уровень ризонинга не выбирается вовсе. Полный разбор — в «Обзоре».",
     gref_turnover: "turnover_budget — что он считает и зачем нужен роли, которая нанимает. Полный разбор — в «Обзоре».",
     gref_accept: "Почему закончившийся прогон не завершает задачу. Полный разбор — в «Обзоре».",
     gref_link_type: "ask и handoff_work — что связь записывает на самом деле. Полный разбор — в «Обзоре».",
@@ -3004,7 +3004,7 @@ const STRINGS = {
     guide_ag_role_p: "Найм записывает в леджер — общую историю, из которой читает каждая страница здесь, — одно событие agent.created: имя, profile_id (он фиксирует провайдера, модель и песочницу), grants, context_mode, lifetime. Отдельного списка штата рядом с этой историей нет — текущая команда собирается её перечитыванием, поэтому история и состояние не могут разойтись.",
     guide_ag_role_ex: "найм → agent.created ложится в леджер; шаблон — та же запись с template: true, и работать её никогда не ставят",
     guide_ag_profile_h: "Вариант — это профиль",
-    guide_ag_profile_p: "Отдельного выбора песочницы или потолка трат нет: один profile_id закрепляет их сразу, а рядом с каждым id в списке стоит модель профиля — если операторский конфиг читается. Модель — единственный выбор в стороне: поле модели формы найма, один раз, при найме и никогда после, потому что всё, что роль помнит, собрано под ту модель, которая это накопила; пустое поле оставляет модель профиля. Сегодня набор фиксирован четырьмя — два провайдера × исполнитель или независимый проверяющий, — потому что правило сужения (роль может создать только более узкую роль) устроено именно по этим id; новые варианты описывает оператор в runtime.yaml, и расширение набора — правка того правила, а не панели. Уровень ризонинга не предлагается, потому что такого поля нет ни в одном профиле процесса: он бы ничего не задавал.",
+    guide_ag_profile_p: "Отдельного выбора песочницы или потолка трат нет: один profile_id в runtime.yaml закрепляет их сразу, а рядом с каждым id в списке стоит модель профиля — если операторский конфиг читается. Модель — единственный выбор в стороне: поле модели формы найма, один раз, при найме и никогда после, потому что всё, что роль помнит, собрано под ту модель, которая это накопила; пустое поле оставляет модель профиля. Сегодня набор фиксирован шестью — три провайдера × исполнитель или независимый проверяющий, — потому что правило сужения (роль может создать только более узкую роль) устроено именно по этим id; расширение набора — продуктовая правка этого правила, а не отдельная опция панели. Уровень ризонинга не предлагается, потому что такого поля нет ни в одном профиле процесса: он бы ничего не задавал.",
     guide_ag_profile_ex: "найм → profile_id: claude-builder; модель рядом — та, что названа в runtime.yaml, а без такого конфига список говорит, что модель закреплена в профиле, и не называет её",
     guide_ag_grants_h: "Права выводятся, а не хранятся",
     guide_ag_grants_p: "Три гранта — create_roles, retire_roles, open_links — каждый deny, ask или auto, по умолчанию deny. Реальные права — effective_grants: минимум по роли и всем её создателям вверх по цепочке, пересчитывается на каждом вызове, поэтому понижение действует и на уже идущую работу; уволенный предок схлопывает всю линию до deny. Уровень auto сознательно удержан: он записывается как есть, но действует как ask — каждое автоматическое действие всё равно спрашивает человека.",
@@ -3308,7 +3308,7 @@ const STRINGS = {
     setup_all_set: "Проект настроен. Роли можно нанимать, прогоны — вести; здесь больше нечего делать.",
     setup_found_title: "Что нашлось на этой машине",
     setup_binary_missing: "не найдена",
-    setup_found_none: "Функционал недоступен: не найдены ни claude, ни codex. Установите CLI одного из них с вашей подпиской и нажмите «Посмотреть снова».",
+    setup_found_none: "Функционал недоступен: не найдены claude, codex и grok. Установите один из этих CLI и нажмите «Посмотреть снова».",
     setup_found_partial: "Разрешилась только {found}. Профили пишутся для неё и больше ни для кого — при найме будут предложены её роли, а {missing} просто не появится, пока вы её не установите и не посмотрите снова.",
     setup_support_missing: "Провайдер нашёлся, но программа, которую называет каждый записываемый профиль, не разрешилась:",
     setup_support_missing_after: "Пока это не исправлено, писать нечего: профиль с программой, которую панель не может разрешить, упал бы на первом прогоне вместо того, чтобы отказать здесь. Установите её и нажмите «Посмотреть снова».",
@@ -3753,9 +3753,10 @@ const VALUE_GLOSS = {
   human: "gl_origin_human", agent: "gl_origin_agent",
   implementation: "gl_implementation", independent_review: "gl_independent_review",
   verification: "gl_verification",
-  "claude-builder": "gl_builder", "codex-builder": "gl_builder",
+  "claude-builder": "gl_builder", "codex-builder": "gl_builder", "grok-builder": "gl_builder",
   "claude-independent-reviewer": "gl_reviewer",
   "codex-independent-reviewer": "gl_reviewer",
+  "grok-independent-reviewer": "gl_reviewer",
 };
 
 // The same gloss, cut to what a closed <select> can actually show.  A picker is
@@ -3795,7 +3796,7 @@ function glossedOptions(values, table) {
   return values.map((value) => ({ id: value, title: glossed(value, table[value]) }));
 }
 
-// Round 4, finding 4: the profile picker offered four ids and said nothing
+// Round 4, finding 4: the profile picker offered provider profile ids and said nothing
 // about what any of them would start, so "who is going to run this" had no
 // answer in the panel at all.  `/api/catalog` answers it now — `profile_info`
 // carries the provider and the model the operator's config actually names — and
@@ -3805,7 +3806,7 @@ function glossedOptions(values, table) {
 // human words follow the dash, and the option's VALUE stays the bare id, since
 // that id is what goes to POST /api/agents.
 //
-// The role-shape gloss for the same four ids (`gl_builder` / `gl_reviewer`)
+// The role-shape gloss for the same ids (`gl_builder` / `gl_reviewer`)
 // deliberately does NOT join this line.  It is the PICKER_GLOSS decision again:
 // a closed select is one line wide, and "claude-builder — claude · делает
 // работу · модель: …" arrives clipped where the meaning turns.  The picker
@@ -3819,6 +3820,7 @@ function glossedOptions(values, table) {
 const PROFILE_PROVIDER = {
   "claude-builder": "claude", "claude-independent-reviewer": "claude",
   "codex-builder": "codex", "codex-independent-reviewer": "codex",
+  "grok-builder": "grok", "grok-independent-reviewer": "grok",
 };
 
 // The model a role was hired with, or nothing.  It lives under
@@ -3844,7 +3846,7 @@ function boardRoleModel(node) {
 }
 
 function profileOptions(profiles, info) {
-  // The four ids are the domain's whole menu; which of them can actually START
+  // The six ids are the domain's whole menu; which of them can actually START
   // is the operator's runtime.yaml, and that is what `profile_info` reports.
   // An empty info means the config was unreadable — then the panel knows
   // nothing about any profile and marks none, rather than marking all four.
@@ -8118,9 +8120,9 @@ const SETUP_REJECTED = "setup_config_rejected_by_loader";
 const SETUP_NO_PROVIDER = "setup_no_provider_found";
 const SETUP_SUPPORT_MISSING = "setup_support_binary_unresolved";
 // Every executable the generated profiles name, in the order the screen lists
-// them: the two providers first, because choosing to trust them is the decision
+// them: the providers first, because choosing to trust them is the decision
 // being asked, then the two this project needs beside them.
-const SETUP_BINARIES = ["claude", "codex", "agent-commons-mcp", "git"];
+const SETUP_BINARIES = ["claude", "codex", "grok", "agent-commons-mcp", "git"];
 
 let setupInfo = null;
 let setupSetAside = false;

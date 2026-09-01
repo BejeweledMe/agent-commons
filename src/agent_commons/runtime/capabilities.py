@@ -27,6 +27,9 @@ LAUNCH_PLAN_SKILL_REF_LIMIT = 8
 _SAFE_CAPABILITY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$")
 _CODEX_PERMISSION_MODES = frozenset({"workspace-write:never", "read-only:never"})
 _CLAUDE_PERMISSION_MODES = frozenset({"acceptEdits", "dontAsk", "plan"})
+_GROK_PERMISSION_MODES = frozenset(
+    {"workspace:always-approve", "read-only:always-approve", "strict:always-approve"}
+)
 
 
 def _normalized_enum(value: object, enum_type: type[StrEnum], *, label: str) -> StrEnum:
@@ -178,7 +181,7 @@ class LaunchPurpose(StrEnum):
 _REFUSAL_COPY: dict[ProviderRefusalCode, tuple[str, tuple[str, ...]]] = {
     ProviderRefusalCode.PROVIDER_UNAVAILABLE: (
         "The requested provider has no allowlisted runtime adapter.",
-        ("Select an operator-configured Codex or Claude profile.",),
+        ("Select an operator-configured Codex, Claude, or Grok profile.",),
     ),
     **{
         ProviderRefusalCode(code.value): (
@@ -245,7 +248,7 @@ class ProviderDescriptor:
     sandbox_boundary: SandboxBoundary
     permission_mode: str
     budget_units: tuple[BudgetUnit, ...]
-    instruction_transport: Literal["stdin"] = "stdin"
+    instruction_transport: Literal["stdin", "prompt_argument"] = "stdin"
 
     def __post_init__(self) -> None:
         provider = Provider(_normalized_enum(self.provider, Provider, label="provider descriptor"))
@@ -274,7 +277,7 @@ class ProviderDescriptor:
             or any(ord(character) < 32 for character in self.permission_mode)
         ):
             raise ValidationError("provider descriptor permission mode is invalid")
-        if self.instruction_transport != "stdin":
+        if self.instruction_transport not in {"stdin", "prompt_argument"}:
             raise ValidationError("provider descriptor instruction transport is unsupported")
         if self.model is not None and not isinstance(self.model, str):
             raise ValidationError("provider descriptor model is invalid")
@@ -283,9 +286,14 @@ class ProviderDescriptor:
             self.budget_units,
             label="provider descriptor budget units",
         )
-        permission_modes = (
-            _CODEX_PERMISSION_MODES if provider is Provider.CODEX else _CLAUDE_PERMISSION_MODES
-        )
+        if provider is Provider.CODEX:
+            permission_modes = _CODEX_PERMISSION_MODES
+        elif provider is Provider.CLAUDE:
+            permission_modes = _CLAUDE_PERMISSION_MODES
+        elif provider is Provider.GROK:
+            permission_modes = _GROK_PERMISSION_MODES
+        else:  # pragma: no cover - Provider is a closed enum
+            raise ValidationError("provider descriptor provider is unsupported")
         if self.permission_mode not in permission_modes:
             raise ValidationError("provider descriptor permission mode is unsupported")
         if provider is Provider.CODEX and (
@@ -298,6 +306,12 @@ class ProviderDescriptor:
             or budget_units != (BudgetUnit.MICRO_USD, BudgetUnit.PROVIDER_UNITS)
         ):
             raise ValidationError("Claude provider descriptor capabilities are inconsistent")
+        if provider is Provider.GROK and (
+            sandbox_boundary is not SandboxBoundary.OS_ENFORCED
+            or budget_units != (BudgetUnit.PROVIDER_UNITS,)
+            or self.instruction_transport != "prompt_argument"
+        ):
+            raise ValidationError("Grok provider descriptor capabilities are inconsistent")
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "profile_id", profile_id)
         object.__setattr__(self, "model", model)
@@ -391,7 +405,8 @@ class CapabilitySet:
             allow_empty=False,
             max_count=PROVIDER_CAPABILITY_COLLECTION_LIMIT,
         )
-        if input_modes != ("stdin",):
+        expected_input_modes = ("prompt_argument",) if provider is Provider.GROK else ("stdin",)
+        if input_modes != expected_input_modes:
             raise ValidationError("input-mode capabilities are unsupported")
         budget_units = _normalized_budget_units(
             self.budget_units,
@@ -407,6 +422,11 @@ class CapabilitySet:
             or budget_units != (BudgetUnit.MICRO_USD, BudgetUnit.PROVIDER_UNITS)
         ):
             raise ValidationError("Claude capability set is inconsistent")
+        if provider is Provider.GROK and (
+            sandbox_boundary is not SandboxBoundary.OS_ENFORCED
+            or budget_units != (BudgetUnit.PROVIDER_UNITS,)
+        ):
+            raise ValidationError("Grok capability set is inconsistent")
         serialized_size = _capability_serialized_size(
             provider=provider,
             profile_id=profile_id,

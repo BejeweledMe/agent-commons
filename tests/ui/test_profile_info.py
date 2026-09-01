@@ -133,6 +133,8 @@ def test_without_an_operator_config_every_profile_admits_it_names_no_model(
         "claude-independent-reviewer": "claude",
         "codex-builder": "codex",
         "codex-independent-reviewer": "codex",
+        "grok-builder": "grok",
+        "grok-independent-reviewer": "grok",
     }
 
 
@@ -231,7 +233,7 @@ def test_the_offer_list_comes_from_the_two_honest_sources_and_no_others(
 
     options = _context(workspace, _configured(workspace, CONFIG)).catalog()["model_options"]
 
-    assert sorted(options) == ["claude", "codex"]
+    assert sorted(options) == ["claude", "codex", "grok"]
     # claude-sonnet-4-5 is the configured profile's; gpt-5.2-codex is a role's.
     assert options["claude"] == ["claude-sonnet-4-5"]
     assert options["codex"] == ["gpt-5.2-codex"]
@@ -246,7 +248,7 @@ def test_a_provider_with_nothing_to_offer_still_gets_its_key(
 
     options = _context(workspace, None).catalog()["model_options"]
 
-    assert options == {"claude": [], "codex": []}
+    assert options == {"claude": [], "codex": [], "grok": []}
 
 
 def test_a_retired_role_stops_offering_its_model(workspace: dict[str, Any]) -> None:
@@ -323,7 +325,7 @@ def test_a_name_no_launch_would_accept_is_never_offered(
     snapshot.agents[agent_id] = AgentRecord.from_projected_data(malformed)
     options = _context(workspace, None).model_options(snapshot)
 
-    assert options == {"claude": [], "codex": []}
+    assert options == {"claude": [], "codex": [], "grok": []}
 
 
 def test_the_offer_list_survives_an_unreadable_operator_config(
@@ -341,4 +343,8 @@ def test_the_offer_list_survives_an_unreadable_operator_config(
 
     assert response.status_code == 200
     assert response.json()["profile_info"] == {}
-    assert response.json()["model_options"] == {"claude": ["claude-opus-4-6"], "codex": []}
+    assert response.json()["model_options"] == {
+        "claude": ["claude-opus-4-6"],
+        "codex": [],
+        "grok": [],
+    }

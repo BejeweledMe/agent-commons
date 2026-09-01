@@ -108,14 +108,51 @@ def test_cli_exposes_complete_manager_surface() -> None:
         assert "--fresh" in help_result.output
 
 
+def test_cli_init_accepts_grok_and_repeats_idempotently(tmp_path: Path) -> None:
+    runner = CliRunner()
+    repo = tmp_path / "grok-project"
+    repo.mkdir()
+
+    first = _json(_invoke(runner, repo, "init", "--integration", "grok"))
+    second = _json(_invoke(runner, repo, "init", "--integration", "grok"))
+
+    assert first["integrations"] == ["grok"]  # type: ignore[index]
+    assert second["integrations"] == ["grok"]  # type: ignore[index]
+    assert second["changed"] is False  # type: ignore[index]
+    assert (repo / "AGENTS.md").is_file()
+    assert (repo / ".grok" / "config.toml").is_file()
+    session = _json(
+        _invoke(
+            runner,
+            repo,
+            "session",
+            "start",
+            "--stable-instance-id",
+            "grok-build-window-12345678",
+            "--principal",
+            "operator",
+            "--client",
+            "grok",
+            "--software",
+            "grok-build",
+            "--role",
+            "builder",
+        )
+    )
+    assert session["client"] == "grok"  # type: ignore[index]
+    assert session["software"] == "grok-build"  # type: ignore[index]
+
+
 def test_cli_init_session_objective_heartbeat_and_read_flow(tmp_path: Path) -> None:
     runner = CliRunner()
     repo = tmp_path / "project"
     repo.mkdir()
     initialized = _json(_invoke(runner, repo, "init"))
-    assert initialized["integrations"] == ["codex", "claude"]  # type: ignore[index]
+    assert initialized["integrations"] == ["codex", "claude", "grok"]  # type: ignore[index]
     assert (repo / ".agents" / "skills" / "commons-start" / "SKILL.md").is_file()
     assert (repo / ".claude" / "skills" / "commons-start" / "SKILL.md").is_file()
+    assert (repo / ".grok" / "skills" / "commons-start" / "SKILL.md").is_file()
+    assert (repo / ".grok" / "config.toml").is_file()
 
     started = _json(
         _invoke(

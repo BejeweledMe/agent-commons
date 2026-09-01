@@ -143,7 +143,7 @@ export type ProviderAuthAction =
 
 export type ProviderAuthStatus = {
   profileId: string;
-  provider: "claude" | "codex";
+  provider: "claude" | "codex" | "grok";
   operation: "status" | "login";
   state: ProviderAuthState;
   supported: boolean;
@@ -170,7 +170,7 @@ export type ProviderCapabilityRefusalCode =
 
 export type ProviderAvailability = {
   profileId: string;
-  provider: "claude" | "codex";
+  provider: "claude" | "codex" | "grok";
   model: string | null;
   capabilities: {
     mcp: boolean;

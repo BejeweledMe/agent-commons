@@ -102,19 +102,25 @@ const PROVIDER_AVAILABILITY_PROFILES = new Set([
   "codex-builder",
   "codex-independent-reviewer",
   "claude-builder",
-  "claude-independent-reviewer"
+  "claude-independent-reviewer",
+  "grok-builder",
+  "grok-independent-reviewer"
 ]);
-const PROVIDER_BY_PROFILE: Readonly<Record<string, "codex" | "claude">> = {
+const PROVIDER_BY_PROFILE: Readonly<Record<string, "codex" | "claude" | "grok">> = {
   "codex-builder": "codex",
   "codex-independent-reviewer": "codex",
   "claude-builder": "claude",
-  "claude-independent-reviewer": "claude"
+  "claude-independent-reviewer": "claude",
+  "grok-builder": "grok",
+  "grok-independent-reviewer": "grok"
 };
 const SANDBOXES_BY_PROFILE: Readonly<Record<string, ReadonlySet<string>>> = {
   "codex-builder": new Set(["os_enforced"]),
   "codex-independent-reviewer": new Set(["os_enforced"]),
   "claude-builder": new Set(["trusted_workspace", "none"]),
-  "claude-independent-reviewer": new Set(["trusted_workspace", "none"])
+  "claude-independent-reviewer": new Set(["trusted_workspace", "none"]),
+  "grok-builder": new Set(["os_enforced"]),
+  "grok-independent-reviewer": new Set(["os_enforced"])
 };
 const PROVIDER_CANCELLATION_MODES = new Set(["broker"]);
 const PROVIDER_USAGE_REPORTING = new Set(["none"]);
@@ -171,9 +177,10 @@ const TRACKER_NEXT_ACTIONS = new Set([
 const TRACKER_FRESHNESS_STATES = new Set(["fresh", "stale", "unknown"]);
 const TRACKER_EVIDENCE_STATES = new Set(["complete", "partial", "missing", "stale"]);
 const TRACKER_CAPACITY_STATES = new Set(["available", "saturated", "backpressure", "unknown"]);
-const TRACKER_PROVIDERS = new Set(["codex", "claude"]);
+const TRACKER_PROVIDERS = new Set(["codex", "claude", "grok"]);
 const TRACKER_PROFILES = new Set([
-  "codex-builder", "codex-independent-reviewer", "claude-builder", "claude-independent-reviewer"
+  "codex-builder", "codex-independent-reviewer", "claude-builder", "claude-independent-reviewer",
+  "grok-builder", "grok-independent-reviewer"
 ]);
 const TRACKER_ATTENTION_REASONS = new Set([
   ...TRACKER_RUN_PHASES,
@@ -616,7 +623,7 @@ function parseProviderAuth(value: unknown): ProviderAuthStatus {
   const actionIds = stringsAt(value, "action_ids");
   if (
     !PROVIDER_AUTH_STATES.has(state)
-    || (provider !== "claude" && provider !== "codex")
+    || (provider !== "claude" && provider !== "codex" && provider !== "grok")
     || (operation !== "status" && operation !== "login")
     || (freshness !== "fresh" && freshness !== "stale")
     || postStartRecovery !== "new_run_only"
@@ -680,7 +687,7 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
   const operatorLimits = value.operator_limits;
   if (
     !PROVIDER_AVAILABILITY_PROFILES.has(profileId)
-    || (provider !== "claude" && provider !== "codex")
+    || (provider !== "claude" && provider !== "codex" && provider !== "grok")
     || provider !== PROVIDER_BY_PROFILE[profileId]
     || (model !== null && (typeof model !== "string" || !SAFE_MODEL.test(model)))
     || (installationState !== "installed" && installationState !== "unavailable")
@@ -720,9 +727,9 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
   ) {
     throw new ApiProblem(502, null);
   }
-  const expectedBudgetUnits = provider === "codex"
-    ? ["provider_units"]
-    : ["micro_usd", "provider_units"];
+  const expectedBudgetUnits = provider === "claude"
+    ? ["micro_usd", "provider_units"]
+    : ["provider_units"];
   if (!sameStrings(budgetUnits as string[], expectedBudgetUnits)) {
     throw new ApiProblem(502, null);
   }
@@ -749,7 +756,7 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
     new Set(capabilityRefusalCodes).size !== capabilityRefusalCodes.length
     || capabilityRefusalCodes.filter((code) => code === "provider_resume_unavailable").length !== 1
     || capabilityRefusalCodes.includes("provider_skill_projection_unavailable") === capabilities.skills
-    || capabilityRefusalCodes.includes("provider_monetary_budget_unavailable") !== (provider === "codex")
+    || capabilityRefusalCodes.includes("provider_monetary_budget_unavailable") !== (provider !== "claude")
   ) {
     throw new ApiProblem(502, null);
   }
@@ -883,7 +890,7 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
 }
 
 export function parseProviderAvailabilityList(value: unknown): readonly ProviderAvailability[] {
-  if (!Array.isArray(value) || value.length > 4) {
+  if (!Array.isArray(value) || value.length > 6) {
     throw new ApiProblem(502, null);
   }
   const parsed = value.map(parseProviderAvailability);

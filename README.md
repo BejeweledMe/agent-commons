@@ -35,8 +35,8 @@ yourself, use `uv run agent-commons ui --no-browser`, then open the newly
 printed address once in that browser.
 
 The UI can initialize an empty Git repository and look for a locally installed
-Claude or Codex provider. Starting a run uses your own provider CLI and its
-account or subscription; it is not a simulation.
+Claude, Codex, or Grok Build provider. Starting a run uses your own provider
+CLI and its account or subscription; it is not a simulation.
 
 ## The working model
 
@@ -80,8 +80,8 @@ product, rather than for ordinary UI use:
 
 ## Configure a provider before running work
 
-The UI can use a locally installed Claude or Codex provider. Configure and
-authenticate that provider under your own account before starting a real run;
+The UI can use a locally installed Claude, Codex, or Grok Build provider.
+Configure and authenticate that provider under your own account before starting a real run;
 Agent Commons does not supply credentials or turn provider output into
 acceptance. See the [technical quickstart](docs/QUICKSTART.md) and
 [troubleshooting guide](docs/TROUBLESHOOTING.md).

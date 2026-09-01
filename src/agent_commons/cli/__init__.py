@@ -33,6 +33,8 @@ from agent_commons.services.provider_canary import (
     run_claude_compatibility_canary,
     run_codex_builder_compatibility_canary,
     run_codex_compatibility_canary,
+    run_grok_builder_compatibility_canary,
+    run_grok_compatibility_canary,
 )
 from agent_commons.ui import STARTED_SCHEMA
 
@@ -938,6 +940,8 @@ _DELEGATION_PROFILES = (
     "codex-independent-reviewer",
     "claude-builder",
     "claude-independent-reviewer",
+    "grok-builder",
+    "grok-independent-reviewer",
 )
 _DELEGATION_PURPOSES = ("implementation", "independent_review", "verification")
 _DELEGATION_REASON_CODES = (
@@ -1848,6 +1852,8 @@ def broker_canary(
         BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER.value: (run_claude_compatibility_canary),
         BuiltinProfileId.CODEX_BUILDER.value: run_codex_builder_compatibility_canary,
         BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER.value: run_codex_compatibility_canary,
+        BuiltinProfileId.GROK_BUILDER.value: run_grok_builder_compatibility_canary,
+        BuiltinProfileId.GROK_INDEPENDENT_REVIEWER.value: run_grok_compatibility_canary,
     }[profile_id]
     manager = CommonsManager(
         state.repo,

@@ -169,7 +169,7 @@ def test_an_empty_offer_list_is_shown_as_an_empty_offer_list() -> None:
 
     catalog = {
         "profile_info": {"claude-builder": {"provider": "claude", "model": None}},
-        "model_options": {"claude": [], "codex": []},
+        "model_options": {"claude": [], "codex": [], "grok": []},
     }
     english = _offers("en", catalog, "claude-builder")
     assert english["offers"] == []

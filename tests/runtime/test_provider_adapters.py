@@ -22,6 +22,7 @@ from agent_commons.runtime import (
     CodexProviderAdapter,
     DiagnosticCode,
     EphemeralSkillBundle,
+    GrokProviderAdapter,
     LaunchPlan,
     LaunchPurpose,
     ProcessResult,
@@ -80,6 +81,7 @@ def _profiles() -> tuple[RunnerProfile, ...]:
     registry = default_profile_registry(
         codex_executable="/bin/echo",
         claude_executable="/bin/echo",
+        grok_executable="/bin/echo",
         mcp_executable="/bin/echo",
         git_executable="/usr/bin/true",
         trusted_workspace=True,
@@ -98,6 +100,7 @@ def _initialization_result(
     outcome: RunOutcome = RunOutcome.SUCCEEDED,
     reason: RunReason = RunReason.COMPLETED,
     stderr: bytes = b"",
+    stdout: bytes = b"",
 ) -> ProcessResult:
     return ProcessResult(
         outcome=outcome,
@@ -105,9 +108,9 @@ def _initialization_result(
         exit_code=0 if outcome is RunOutcome.SUCCEEDED else 1,
         pid=4242,
         duration_seconds=0.01,
-        stdout=b"",
+        stdout=stdout,
         stderr=stderr,
-        stdout_bytes_seen=0,
+        stdout_bytes_seen=len(stdout),
         stderr_bytes_seen=len(stderr),
         output_truncated=False,
     )
@@ -122,9 +125,12 @@ def test_each_adapter_owns_an_explicit_initialization_probe_contract(
     assert isinstance(operation, ProviderInitializationProbeSpec)
     assert operation.provider is profile.provider
     assert operation.profile_id is profile.profile_id
-    assert operation.arguments == (
-        ("app-server", "--stdio") if profile.provider is Provider.CODEX else ("mcp", "list")
-    )
+    expected = {
+        Provider.CODEX: ("app-server", "--stdio"),
+        Provider.CLAUDE: ("mcp", "list"),
+        Provider.GROK: ("inspect", "--json"),
+    }
+    assert operation.arguments == expected[profile.provider]
 
 
 @pytest.mark.parametrize(
@@ -214,6 +220,59 @@ def test_claude_adapter_classifies_real_initialization_probe() -> None:
     assert ready.state is ProviderInitializationState.READY
 
 
+def test_grok_adapter_requires_exact_isolated_discovery_surface() -> None:
+    profile = next(
+        profile for profile in _profiles() if profile.profile_id is BuiltinProfileId.GROK_BUILDER
+    )
+    adapter = _adapter(profile)
+    ready = adapter.classify_initialization(
+        profile,
+        _initialization_result(
+            stdout=json.dumps(
+                {
+                    "mcpServers": [{"name": "agent-commons"}],
+                    "hooks": [],
+                    "plugins": [],
+                }
+            ).encode()
+        ),
+    )
+    ambient = adapter.classify_initialization(
+        profile,
+        _initialization_result(
+            stdout=json.dumps(
+                {
+                    "mcpServers": [{"name": "agent-commons"}, {"name": "ambient"}],
+                    "hooks": [],
+                    "plugins": [],
+                }
+            ).encode()
+        ),
+    )
+    disabled_compatibility = adapter.classify_initialization(
+        profile,
+        _initialization_result(
+            stdout=json.dumps(
+                {
+                    "mcpServers": [
+                        {
+                            "name": "ambient-claude-compat",
+                            "disabled": True,
+                            "compatibilityStatus": "disabled",
+                        },
+                        {"name": "agent-commons"},
+                    ],
+                    "hooks": [],
+                    "plugins": [],
+                }
+            ).encode()
+        ),
+    )
+    assert ready.state is ProviderInitializationState.READY
+    assert ambient.state is ProviderInitializationState.UNAVAILABLE
+    assert disabled_compatibility.state is ProviderInitializationState.READY
+
+
 @pytest.mark.parametrize("profile", _profiles(), ids=lambda profile: profile.profile_id.value)
 def test_adapter_invocation_is_exactly_the_wrapped_profile_invocation(
     profile: RunnerProfile,
@@ -256,13 +315,14 @@ def test_descriptors_and_capabilities_expose_only_bounded_neutral_fields() -> No
 
         assert descriptor.provider is profile.provider
         assert descriptor.profile_id is profile_id
-        assert descriptor.instruction_transport == "stdin"
+        expected_transport = "prompt_argument" if profile.provider is Provider.GROK else "stdin"
+        assert descriptor.instruction_transport == expected_transport
         assert capabilities.provider is profile.provider
         assert capabilities.profile_id is profile_id
         assert capabilities.mcp is True
         assert capabilities.mcp_tool_names
         assert capabilities.skills == BUILTIN_SKILL_IDS
-        assert capabilities.input_modes == ("stdin",)
+        assert capabilities.input_modes == (expected_transport,)
         assert capabilities.resume_mode is ResumeMode.NONE
         assert capabilities.usage_reporting is UsageReporting.NONE
         assert "/bin/echo" not in serialized
@@ -278,6 +338,8 @@ def test_descriptors_and_capabilities_expose_only_bounded_neutral_fields() -> No
     for profile_id in (
         BuiltinProfileId.CODEX_BUILDER,
         BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
+        BuiltinProfileId.GROK_BUILDER,
+        BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
     ):
         profile = by_id[profile_id]
         descriptor = _adapter(profile).describe(profile)
@@ -302,7 +364,9 @@ def test_descriptors_and_capabilities_expose_only_bounded_neutral_fields() -> No
         )
 
 
-@pytest.mark.parametrize("adapter", (CodexProviderAdapter(), ClaudeProviderAdapter()))
+@pytest.mark.parametrize(
+    "adapter", (CodexProviderAdapter(), ClaudeProviderAdapter(), GrokProviderAdapter())
+)
 def test_skill_projection_is_allowlisted_and_refuses_unknown_without_leaking_refs(
     adapter: ProviderAdapter,
 ) -> None:
@@ -329,9 +393,10 @@ def test_skill_projection_is_allowlisted_and_refuses_unknown_without_leaking_ref
 def test_registry_is_closed_allowlisted_and_returns_typed_unavailability() -> None:
     registry = default_adapter_registry()
 
-    assert registry.providers == (Provider.CLAUDE, Provider.CODEX)
+    assert registry.providers == (Provider.CLAUDE, Provider.CODEX, Provider.GROK)
     assert isinstance(registry.get(Provider.CODEX), CodexProviderAdapter)
     assert isinstance(registry.get(Provider.CLAUDE), ClaudeProviderAdapter)
+    assert isinstance(registry.get(Provider.GROK), GrokProviderAdapter)
 
     unknown = registry.get("other-provider")
     assert isinstance(unknown, TypedRefusal)
@@ -362,6 +427,8 @@ def test_adapter_rejects_a_profile_from_the_other_provider() -> None:
         CodexProviderAdapter().describe(profiles[Provider.CLAUDE])
     with pytest.raises(ConfigurationError, match="Claude adapter requires"):
         ClaudeProviderAdapter().capabilities(profiles[Provider.CODEX])
+    with pytest.raises(ConfigurationError, match="Grok adapter requires"):
+        GrokProviderAdapter().describe(profiles[Provider.CLAUDE])
 
 
 def test_provider_records_and_adapters_are_immutable() -> None:
@@ -561,6 +628,21 @@ def test_decode_result_returns_bounded_diagnostics_without_success_or_raw_output
     assert "raw stderr" not in serialized
     with pytest.raises(FrozenInstanceError):
         outcome.event_shape_tags = ()  # type: ignore[misc]
+
+
+def test_grok_decode_maps_auth_markers_without_echoing_key_material() -> None:
+    raw = b'Unauthorized: set XAI_API_KEY="xai-secret-do-not-log" and login\n'
+    process = _initialization_result(
+        outcome=RunOutcome.SUCCEEDED,
+        stdout=raw,
+    )
+
+    outcome = GrokProviderAdapter().decode_result(process)
+    rendered = json.dumps(outcome.as_dict())
+
+    assert outcome.diagnostic_code is DiagnosticCode.PROVIDER_AUTH_FAILED
+    assert "xai-secret" not in rendered
+    assert "XAI_API_KEY" not in rendered
 
 
 def _mutable_capability_inputs() -> dict[str, object]:

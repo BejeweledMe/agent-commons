@@ -413,6 +413,8 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
         "codex-independent-reviewer",
         "claude-builder",
         "claude-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
     }
     assert all("executable" not in item and "argv" not in item for item in values)
     assert not (CommonsManager(repo).paths.state_root / "runtime").exists()
@@ -663,6 +665,48 @@ def test_broker_canary_selects_the_codex_compatibility_path(
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["profile_id"] == "codex-independent-reviewer"
+
+
+def test_broker_canary_selects_the_grok_compatibility_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-grok-canary")
+    monkeypatch.setattr(
+        "agent_commons.cli.run_claude_compatibility_canary",
+        lambda *_args, **_kwargs: pytest.fail("Claude canary should not run"),
+    )
+    monkeypatch.setattr(
+        "agent_commons.cli.run_codex_compatibility_canary",
+        lambda *_args, **_kwargs: pytest.fail("Codex canary should not run"),
+    )
+    monkeypatch.setattr(
+        "agent_commons.cli.run_grok_compatibility_canary",
+        lambda *_args, **_kwargs: {
+            "schema": "agent_commons.provider_compatibility_canary.v1",
+            "ok": True,
+            "profile_id": "grok-independent-reviewer",
+        },
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "canary",
+            "--profile",
+            "grok-independent-reviewer",
+            "--confirm-provider-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["profile_id"] == "grok-independent-reviewer"
 
 
 def test_broker_profile_config_rejects_unknown_authority_fields(tmp_path: Path) -> None:

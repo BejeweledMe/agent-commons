@@ -15,6 +15,7 @@ from agent_commons.runtime import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     ExecutableRole,
+    GrokRunnerProfile,
     OperatorLimits,
     ProfileRegistry,
     Provider,
@@ -27,6 +28,7 @@ from agent_commons.runtime import (
     preflight_profile,
     resolve_trusted_executable,
 )
+from agent_commons.runtime.model import fixed_profile_environment
 from agent_commons.runtime.source_contract import agent_commons_source_sha256
 
 from .delegation_runtime import DelegationRuntimeService
@@ -43,6 +45,11 @@ _CODEX_CLI_VERSION = re.compile(
     rf"^codex-cli (?P<major>{_NUMERIC_VERSION_COMPONENT})"
     rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
     rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT})$"
+)
+_GROK_BUILD_VERSION = re.compile(
+    rf"^grok (?P<major>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
+    rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT})(?: \([^\r\n]+\) \[[^\r\n]+\])?$"
 )
 
 
@@ -64,7 +71,7 @@ def _run_git(git_executable: str, *args: str, cwd: Path | None = None) -> None:
 
 
 def _provider_version(
-    profile: ClaudeRunnerProfile | CodexRunnerProfile,
+    profile: ClaudeRunnerProfile | CodexRunnerProfile | GrokRunnerProfile,
     *,
     workspace_root: Path,
     runner: SubprocessRunner,
@@ -80,6 +87,7 @@ def _provider_version(
             profile_id=profile.profile_id,
             argv=(executable, "--version"),
             stdin=b"",
+            extra_env=fixed_profile_environment(profile),
         ),
         cwd=workspace_root,
         child_session_id="session.provider-canary-version",
@@ -90,16 +98,25 @@ def _provider_version(
         return None
     value = (result.stdout + b"\n" + result.stderr).decode("utf-8", "replace").strip()
     first_line = value.splitlines()[0].strip() if value else ""
-    pattern = _CLAUDE_CODE_VERSION if profile.provider is Provider.CLAUDE else _CODEX_CLI_VERSION
+    if profile.provider is Provider.CLAUDE:
+        pattern = _CLAUDE_CODE_VERSION
+    elif profile.provider is Provider.CODEX:
+        pattern = _CODEX_CLI_VERSION
+    elif profile.provider is Provider.GROK:
+        pattern = _GROK_BUILD_VERSION
+    else:  # pragma: no cover - Provider is an exhaustive allowlist
+        raise ConfigurationError("provider canary has no version parser")
     match = pattern.fullmatch(first_line)
     if match is None:
         return None
     version = f"{match.group('major')}.{match.group('minor')}.{match.group('patch')}"
-    return (
-        f"{version} (Claude Code)"
-        if profile.provider is Provider.CLAUDE
-        else f"codex-cli {version}"
-    )
+    if profile.provider is Provider.CLAUDE:
+        return f"{version} (Claude Code)"
+    if profile.provider is Provider.CODEX:
+        return f"codex-cli {version}"
+    if profile.provider is Provider.GROK:
+        return f"grok {version}"
+    raise ConfigurationError("provider canary has no version renderer")  # pragma: no cover
 
 
 def _run_compatibility_canary(
@@ -120,11 +137,11 @@ def _run_compatibility_canary(
     if purpose not in {"implementation", "independent_review", "verification"}:
         raise ConfigurationError("provider canary purpose is unsupported")
     profile = profiles.get(profile_id)
-    if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile)):
+    if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile, GrokRunnerProfile)):
         raise ConfigurationError("provider canary requires an allowlisted provider profile")
     if profile_id.independent_reviewer != (purpose != "implementation"):
         raise ConfigurationError("provider canary purpose does not match its profile")
-    if requester_client not in {"agent-commons", "claude", "codex"}:
+    if requester_client not in {"agent-commons", "claude", "codex", "grok"}:
         raise ConfigurationError("provider canary requester client is unsupported")
 
     process_runner = runner or SubprocessRunner()
@@ -148,7 +165,11 @@ def _run_compatibility_canary(
             encoding="utf-8",
         )
         _run_git(git_executable, "add", ".gitignore", "src/canary.py", cwd=repo)
-        CommonsManager.initialize(repo, integrations=(), workspace_name="provider-canary")
+        CommonsManager.initialize(
+            repo,
+            integrations=("grok",) if profile.provider is Provider.GROK else (),
+            workspace_name="provider-canary",
+        )
 
         provider_version = _provider_version(
             profile,
@@ -225,7 +246,13 @@ def _run_compatibility_canary(
             stable_instance_id=f"provider-canary-{requester_client}-parent-session",
             principal="local-operator",
             client=requester_client,
-            software=("claude-code" if requester_client == "claude" else "provider-canary"),
+            software=(
+                "claude-code"
+                if requester_client == "claude"
+                else "grok-build"
+                if requester_client == "grok"
+                else "provider-canary"
+            ),
             role="compatibility-canary",
             model_family=("anthropic" if requester_client == "claude" else None),
             ttl_seconds=wall_time_seconds + 300,
@@ -481,6 +508,28 @@ def run_codex_compatibility_canary(
     )
 
 
+def run_grok_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    purpose: str = "independent_review",
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
+) -> dict[str, Any]:
+    """Run one fixed, isolated Grok review and grade canonical terminal behavior."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+        purpose=purpose,
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+        qualification_state_root=qualification_state_root,
+    )
+
+
 def run_claude_builder_compatibility_canary(
     profiles: ProfileRegistry,
     *,
@@ -516,6 +565,29 @@ def run_codex_builder_compatibility_canary(
     return _run_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CODEX_BUILDER,
+        purpose="implementation",
+        operator_limits=operator_limits,
+        wall_time_seconds=wall_time_seconds,
+        runner=runner,
+        qualification_state_root=qualification_state_root,
+        requester_client=requester_client,
+    )
+
+
+def run_grok_builder_compatibility_canary(
+    profiles: ProfileRegistry,
+    *,
+    operator_limits: OperatorLimits | None = None,
+    wall_time_seconds: int = 300,
+    runner: SubprocessRunner | None = None,
+    qualification_state_root: Path | None = None,
+    requester_client: str = "agent-commons",
+) -> dict[str, Any]:
+    """Run the fixed scoped terminal flow for the advertised Grok builder."""
+
+    return _run_compatibility_canary(
+        profiles,
+        profile_id=BuiltinProfileId.GROK_BUILDER,
         purpose="implementation",
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,

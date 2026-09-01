@@ -82,9 +82,11 @@ without making operational state authoritative. The complete contract is in
 flowchart LR
     C[Codex] --> CLI[Agent Commons CLI]
     H[Claude Code] --> CLI
+    G[Grok Build] --> CLI
     O[Other clients] --> CLI
     C -. optional .-> MCP[Shared MCP adapter]
     H -. optional .-> MCP
+    G -. optional .-> MCP
     CLI --> B[CommonsManager validation and lifecycle]
     MCP --> B
     MCP -. authenticated launch request .-> R[Local delegation broker]

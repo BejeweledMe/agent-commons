@@ -1,0 +1,15 @@
+[mcp_servers.agent-commons]
+command = "${AGENT_COMMONS_GROK_MCP_COMMAND:-agent-commons-mcp}"
+args = [
+  "--repo",
+  "${AGENT_COMMONS_REPO_ROOT:-.}",
+  "--state-root",
+  "${AGENT_COMMONS_STATE_ROOT:-.agent-commons}",
+  "--delegation-id",
+  "${AGENT_COMMONS_DELEGATION_ID:-delegation.initialization-probe}",
+  "--git-executable",
+  "${AGENT_COMMONS_GIT_EXECUTABLE:-/usr/bin/git}",
+  "--session-id",
+  "${AGENT_COMMONS_SESSION_ID:-session.initialization-probe}",
+]
+enabled = true

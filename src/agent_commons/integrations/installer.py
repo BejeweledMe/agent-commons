@@ -27,15 +27,19 @@ from agent_commons.platform_support import lock_exclusive, unlock
 
 MANAGED_BLOCK_START = "<!-- agent-commons:managed:start -->"
 MANAGED_BLOCK_END = "<!-- agent-commons:managed:end -->"
-SUPPORTED_INTEGRATIONS = ("codex", "claude")
+GROK_CONFIG_BLOCK_START = "# agent-commons:managed:start"
+GROK_CONFIG_BLOCK_END = "# agent-commons:managed:end"
+SUPPORTED_INTEGRATIONS = ("codex", "claude", "grok")
 
 _INTEGRATION_TARGETS = {
     "codex": ("AGENTS.md", "AGENTS_BLOCK.md"),
     "claude": ("CLAUDE.md", "CLAUDE_BLOCK.md"),
+    "grok": ("AGENTS.md", "AGENTS_BLOCK.md"),
 }
 _INTEGRATION_SKILL_ROOTS = {
     "codex": Path(".agents") / "skills",
     "claude": Path(".claude") / "skills",
+    "grok": Path(".grok") / "skills",
 }
 _COMMON_SKILLS = (
     "commons-start",
@@ -196,27 +200,46 @@ def _read_utf8(path: Path) -> str:
         raise ConfigurationError(f"managed instruction file is not UTF-8: {path.name}") from exc
 
 
-def _managed_block(body: str) -> str:
-    return f"{MANAGED_BLOCK_START}\n{body.rstrip()}\n{MANAGED_BLOCK_END}"
+def _managed_block(
+    body: str,
+    *,
+    start_marker: str = MANAGED_BLOCK_START,
+    end_marker: str = MANAGED_BLOCK_END,
+) -> str:
+    return f"{start_marker}\n{body.rstrip()}\n{end_marker}"
 
 
-def _merge_managed_block(original: str, body: str, *, filename: str) -> str:
-    start_count = original.count(MANAGED_BLOCK_START)
-    end_count = original.count(MANAGED_BLOCK_END)
+def _merge_managed_block(
+    original: str,
+    body: str,
+    *,
+    filename: str,
+    start_marker: str = MANAGED_BLOCK_START,
+    end_marker: str = MANAGED_BLOCK_END,
+) -> str:
+    start_count = original.count(start_marker)
+    end_count = original.count(end_marker)
     if start_count == 0 and end_count == 0:
         separator = "" if not original else ("\n" if original.endswith("\n") else "\n\n")
-        return f"{original}{separator}{_managed_block(body)}\n"
+        return (
+            f"{original}{separator}"
+            f"{_managed_block(body, start_marker=start_marker, end_marker=end_marker)}\n"
+        )
     if start_count != 1 or end_count != 1:
         raise ConfigurationError(
             f"{filename} contains malformed or duplicate Agent Commons managed markers"
         )
 
-    start = original.index(MANAGED_BLOCK_START)
-    end = original.index(MANAGED_BLOCK_END)
+    start = original.index(start_marker)
+    end = original.index(end_marker)
     if end < start:
         raise ConfigurationError(f"{filename} has Agent Commons managed markers in reverse order")
-    end += len(MANAGED_BLOCK_END)
-    return f"{original[:start]}{_managed_block(body)}{original[end:]}"
+    end += len(end_marker)
+    return (
+        f"{original[:start]}"
+        f"{_managed_block(body, start_marker=start_marker, end_marker=end_marker)}"
+        f"{original[end:]}"
+    )
 
 
 def _plan_owned_file(
@@ -280,6 +303,32 @@ def _plan_integration_file(
         status = "updated"
     expected = original if target_exists else None
     return _PlannedWrite(target, merged, target_name, status, expected)
+
+
+def _plan_grok_config(root: Path) -> _PlannedWrite:
+    target_name = ".grok/config.toml"
+    target = root / target_name
+    _validate_directory_chain(root, target.parent)
+    _validate_regular_or_missing(target, label=target_name)
+    target_exists = target.exists()
+    original = _read_utf8(target) if target_exists else ""
+    merged = _merge_managed_block(
+        original,
+        _template_text("GROK_CONFIG.toml"),
+        filename=target_name,
+        start_marker=GROK_CONFIG_BLOCK_START,
+        end_marker=GROK_CONFIG_BLOCK_END,
+    )
+    status: Literal["created", "updated", "unchanged"] = (
+        "created" if not target_exists else "unchanged" if merged == original else "updated"
+    )
+    return _PlannedWrite(
+        target,
+        merged,
+        target_name,
+        status,
+        original if target_exists else None,
+    )
 
 
 def _validate_existing_workspace_config(content: str) -> str:
@@ -533,16 +582,21 @@ def _initialize_workspace_locked(
             )
         )
 
+    planned_instruction_files: set[str] = set()
     for integration in selected:
         target_name, template_name = _INTEGRATION_TARGETS[integration]
-        planned.append(
-            _plan_integration_file(
-                root,
-                integration=integration,
-                target_name=target_name,
-                template_name=template_name,
+        if target_name not in planned_instruction_files:
+            planned.append(
+                _plan_integration_file(
+                    root,
+                    integration=integration,
+                    target_name=target_name,
+                    template_name=template_name,
+                )
             )
-        )
+            planned_instruction_files.add(target_name)
+        if integration == "grok":
+            planned.append(_plan_grok_config(root))
         skill_root = _INTEGRATION_SKILL_ROOTS[integration]
         for skill_name in _COMMON_SKILLS:
             for skill_file in _SKILL_FILES:

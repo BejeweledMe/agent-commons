@@ -24,6 +24,7 @@ from .model import (
     CodexRunnerProfile,
     ExecutableResolutionError,
     ExecutableRole,
+    GrokRunnerProfile,
     ProfileRegistry,
     RunnerInvocation,
 )
@@ -68,6 +69,22 @@ _HELP_FLAGS = {
 # in root help.
 _CODEX_ROOT_HELP_FLAGS = ("--ask-for-approval", "--sandbox")
 _CODEX_EXEC_HELP_FLAGS = ("--config", "--ignore-user-config", "--strict-config", "--json")
+_GROK_HELP_FLAGS = (
+    "--single",
+    "--cwd",
+    "--output-format",
+    "--always-approve",
+    "--no-alt-screen",
+    "--max-turns",
+    "--model",
+    "--sandbox",
+    "--allow",
+    "--tools",
+    "--disallowed-tools",
+    "--no-plan",
+    "--no-subagents",
+    "--disable-web-search",
+)
 
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_PREFIX = "mcp_servers.agent-commons."
@@ -227,6 +244,34 @@ def _codex_mcp_config(invocation: RunnerInvocation) -> tuple[str, list[str], set
     return command, _without_delegation_binding(list(args)), set(enabled_tools)
 
 
+def _grok_mcp_config(
+    invocation: RunnerInvocation, *, state_root: Path
+) -> tuple[str, list[str], set[str]]:
+    environment = dict(invocation.extra_env or {})
+    command = environment["AGENT_COMMONS_GROK_MCP_COMMAND"]
+    arguments = [
+        "--repo",
+        environment["AGENT_COMMONS_REPO_ROOT"],
+        "--state-root",
+        str(state_root),
+        "--git-executable",
+        environment["AGENT_COMMONS_GIT_EXECUTABLE"],
+        "--session-id",
+        "session.preflight",
+    ]
+    allowed = {
+        value.removeprefix("MCPTool(agent-commons__").removesuffix(")")
+        for index, value in enumerate(invocation.argv)
+        if index > 0
+        and invocation.argv[index - 1] == "--allow"
+        and value.startswith("MCPTool(agent-commons__")
+        and value.endswith(")")
+    }
+    if not command or not allowed:
+        raise TypeError("Grok MCP launch contract is invalid")
+    return command, arguments, allowed
+
+
 def preflight_profile(
     profiles: ProfileRegistry,
     profile_id: str | BuiltinProfileId,
@@ -299,6 +344,8 @@ def preflight_profile(
             ((invocation.argv[0], "--help"), _CODEX_ROOT_HELP_FLAGS),
             ((invocation.argv[0], "exec", "--help"), _CODEX_EXEC_HELP_FLAGS),
         )
+    elif isinstance(profile, GrokRunnerProfile):
+        scoped_probes = (((invocation.argv[0], "--help"), _GROK_HELP_FLAGS),)
     else:
         scoped_probes = (((invocation.argv[0], "--help"), _HELP_FLAGS[normalized]),)
     help_process_started = False
@@ -346,8 +393,14 @@ def preflight_profile(
                 for name in allowed.split(",")
                 if name.startswith(_MCP_TOOL_PREFIX)
             }
-        else:
+        elif isinstance(profile, CodexRunnerProfile):
             mcp_command, mcp_args, expected_tools = _codex_mcp_config(invocation)
+        elif isinstance(profile, GrokRunnerProfile):
+            mcp_command, mcp_args, expected_tools = _grok_mcp_config(
+                invocation, state_root=effective_state_root
+            )
+        else:  # pragma: no cover - the profile registry is an exhaustive allowlist
+            raise TypeError("unsupported provider profile")
     except (
         json.JSONDecodeError,
         KeyError,

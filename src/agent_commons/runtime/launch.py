@@ -34,6 +34,8 @@ from .model import (
     Provider,
     RunnerInvocation,
     RunnerProfile,
+    fixed_profile_environment,
+    invocation_instruction_bytes,
     resolve_trusted_executable,
     validate_profile_launch_boundary,
     validate_worker_scope,
@@ -85,9 +87,11 @@ def _validate_invocation_composition(
     instruction = compile_skill_bundle(validation.plan.instruction, bundle)
     if instruction != validation.instruction:
         raise ConfigurationError("launch instruction does not match its exact skill projection")
-    expected_stdin = launch_instruction_with_context(instruction, context).encode("utf-8")
-    if invocation.stdin != expected_stdin:
-        raise ConfigurationError("launch stdin does not match its exact skill/context composition")
+    expected_instruction = launch_instruction_with_context(instruction, context).encode("utf-8")
+    if invocation_instruction_bytes(invocation) != expected_instruction:
+        raise ConfigurationError(
+            "launch instruction does not match its exact skill/context composition"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,12 +120,12 @@ class ValidatedLaunchPlan:
         if skill_bundle.skill_ids != self.plan.skill_refs or not verify_skill_bundle(skill_bundle):
             raise ConfigurationError("validated launch skill projection is missing or stale")
         expected_instruction = compile_skill_bundle(self.plan.instruction, skill_bundle)
-        expected_stdin = launch_instruction_with_context(expected_instruction, self.context).encode(
+        expected_bytes = launch_instruction_with_context(expected_instruction, self.context).encode(
             "utf-8"
         )
-        if self.invocation.stdin != expected_stdin:
+        if invocation_instruction_bytes(self.invocation) != expected_bytes:
             raise ConfigurationError(
-                "validated launch stdin does not match its exact skill/context composition"
+                "validated launch instruction does not match its exact skill/context composition"
             )
         if self.invocation_fingerprint != invocation_fingerprint(self.invocation):
             raise ConfigurationError("validated launch invocation fingerprint is invalid")
@@ -198,19 +202,26 @@ class LaunchPlanner:
                 # Preserve the established profile build order.  Operators
                 # and tests depend on the first typed failure remaining stable
                 # when more than one configured executable is unavailable.
-                fields = (
-                    (
+                if plan.provider is Provider.CODEX:
+                    fields = (
                         ("mcp_executable", ExecutableRole.MCP),
                         ("git_executable", ExecutableRole.GIT),
                         ("executable", ExecutableRole.PROVIDER),
                     )
-                    if plan.provider is Provider.CODEX
-                    else (
+                elif plan.provider is Provider.CLAUDE:
+                    fields = (
                         ("executable", ExecutableRole.PROVIDER),
                         ("mcp_executable", ExecutableRole.MCP),
                         ("git_executable", ExecutableRole.GIT),
                     )
-                )
+                elif plan.provider is Provider.GROK:
+                    fields = (
+                        ("executable", ExecutableRole.PROVIDER),
+                        ("mcp_executable", ExecutableRole.MCP),
+                        ("git_executable", ExecutableRole.GIT),
+                    )
+                else:  # pragma: no cover - Provider is a closed enum
+                    raise ConfigurationError("launch provider is unsupported")
                 for field, role in fields:
                     resolve_trusted_executable(
                         str(getattr(profile, field, "")),
@@ -378,6 +389,7 @@ class ProviderInitializationProbe:
             profile_id=operation.profile_id,
             argv=(executable, *operation.arguments),
             stdin=b"",
+            extra_env=fixed_profile_environment(profile),
         )
         try:
             result = self.runner.run(

@@ -155,7 +155,7 @@ class RuntimePolicy:
             raise PolicyViolationError("runtime concurrency limit is exhausted")
 
 
-_PROVIDERS = frozenset({"codex", "claude"})
+_PROVIDERS = frozenset({"codex", "claude", "grok"})
 _INDEPENDENT_REVIEWER_SUFFIX = "-independent-reviewer"
 _PROFILES = frozenset(
     {
@@ -163,6 +163,8 @@ _PROFILES = frozenset(
         "codex-independent-reviewer",
         "claude-builder",
         "claude-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
     }
 )
 
@@ -197,7 +199,7 @@ class OperatorLimits:
     # bound amplification -- it would forbid delegation trees outright.
     max_delegations_total: int = 16
     provider_concurrency: Mapping[str, int] = field(
-        default_factory=lambda: {"codex": 2, "claude": 2}
+        default_factory=lambda: {"codex": 2, "claude": 2, "grok": 2}
     )
     profile_concurrency: Mapping[str, int] = field(
         default_factory=lambda: {
@@ -205,6 +207,8 @@ class OperatorLimits:
             "codex-independent-reviewer": 1,
             "claude-builder": 1,
             "claude-independent-reviewer": 1,
+            "grok-builder": 1,
+            "grok-independent-reviewer": 1,
         }
     )
     provider_parent_provider_units: Mapping[str, int] = field(default_factory=dict)

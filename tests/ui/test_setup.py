@@ -82,6 +82,7 @@ def test_discovery_calls_only_the_trusted_resolver_and_believes_its_answers(
     assert resolver.calls == [
         ("claude", ExecutableRole.PROVIDER),
         ("codex", ExecutableRole.PROVIDER),
+        ("grok", ExecutableRole.PROVIDER),
         (str(Path(sys.executable).parent / "agent-commons-mcp"), ExecutableRole.MCP),
         ("/usr/bin/git", ExecutableRole.GIT),
     ]
@@ -90,7 +91,7 @@ def test_discovery_calls_only_the_trusted_resolver_and_believes_its_answers(
     assert discovery.mcp.path == "/nowhere/resolved/agent-commons-mcp"
     assert discovery.git.path == "/nowhere/resolved/git"
     assert not Path("/nowhere/resolved/claude").exists()
-    assert discovery.providers_found == ("claude", "codex")
+    assert discovery.providers_found == ("claude", "codex", "grok")
 
 
 def test_mcp_prefers_the_interpreter_sibling_and_falls_back_to_path(
@@ -183,7 +184,7 @@ def test_total_absence_is_named_setup_no_provider_found_with_full_detail(
 
     discovery = setup.discover_providers(workspace["repo"])
     assert discovery.providers_found == ()
-    assert discovery.providers_missing == ("claude", "codex")
+    assert discovery.providers_missing == ("claude", "codex", "grok")
 
     with pytest.raises(setup.SetupError) as captured:
         setup.generate_runtime_config(
@@ -204,7 +205,7 @@ def test_total_absence_is_named_setup_no_provider_found_with_full_detail(
 @pytest.fixture
 def provider_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     bindir = tmp_path / "bin"
-    for name in ("claude", "codex", "agent-commons-mcp", "git"):
+    for name in ("claude", "codex", "grok", "agent-commons-mcp", "git"):
         _install(bindir, name)
     monkeypatch.setenv("PATH", str(bindir))
     return bindir
@@ -228,8 +229,10 @@ def test_generated_config_is_accepted_by_the_same_loader_with_private_modes(
         "claude-independent-reviewer",
         "codex-builder",
         "codex-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
     ]
-    assert result["providers_found"] == ["claude", "codex"]
+    assert result["providers_found"] == ["claude", "codex", "grok"]
     assert result["providers_missing"] == []
     assert _mode(config_dir) == 0o700
     assert _mode(target) == 0o600
@@ -249,6 +252,10 @@ def test_generated_config_is_accepted_by_the_same_loader_with_private_modes(
     assert document["profiles"]["codex-independent-reviewer"]["sandbox"] == "read-only"
     assert document["profiles"]["claude-builder"]["permission_mode"] == "acceptEdits"
     assert document["profiles"]["claude-independent-reviewer"]["permission_mode"] == "dontAsk"
+    assert document["profiles"]["grok-builder"]["sandbox"] == "workspace"
+    assert document["profiles"]["grok-independent-reviewer"]["sandbox"] == "read-only"
+    assert document["profiles"]["grok-builder"]["permission_mode"] == "always-approve"
+    assert "trusted_workspace" not in document["profiles"]["grok-independent-reviewer"]
     assert "trusted_workspace" not in document["profiles"]["claude-independent-reviewer"]
 
 
@@ -264,7 +271,7 @@ def test_partial_discovery_writes_exactly_the_found_providers_profiles(
     result = setup.generate_runtime_config(workspace["repo"], config_directory=config_dir)
 
     assert result["profiles"] == ["claude-builder", "claude-independent-reviewer"]
-    assert result["providers_missing"] == ["codex"]
+    assert result["providers_missing"] == ["codex", "grok"]
     document = yaml.safe_load((config_dir / "runtime.yaml").read_text(encoding="utf-8"))
     assert sorted(document["profiles"]) == ["claude-builder", "claude-independent-reviewer"]
 

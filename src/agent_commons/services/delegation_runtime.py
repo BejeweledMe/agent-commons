@@ -294,9 +294,7 @@ def profile_summaries(
     for profile_id in profiles.profile_ids:
         profile = profiles.get(profile_id)
         trusted_workspace = bool(getattr(profile, "trusted_workspace", False))
-        scoped_reviewer = (
-            profile_id is BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER and not trusted_workspace
-        )
+        scoped_reviewer = profile_id.independent_reviewer and not trusted_workspace
         qualification = (
             qualifications.status(profile, workspace_root=workspace_root)
             if qualifications is not None and workspace_root is not None
@@ -336,14 +334,15 @@ def profile_summaries(
                     )
                 ),
                 # One `trusted_workspace` opt-in means different things per
-                # provider: Codex runs under an OS sandbox, Claude has no
-                # OS-enforced boundary and keeps shell and file-write tools.
+                # provider: Codex and Grok run under an OS sandbox, while
+                # Claude has no OS-enforced boundary and keeps shell and
+                # file-write tools.
                 # An operator deciding who gets a writable profile needs to see
                 # that at the point of choosing, not in a threat model.
-                "os_enforced_sandbox": profile.provider is Provider.CODEX,
+                "os_enforced_sandbox": profile.provider in {Provider.CODEX, Provider.GROK},
                 "isolation_note": (
                     "operating-system sandbox enforced by the provider"
-                    if profile.provider is Provider.CODEX
+                    if profile.provider in {Provider.CODEX, Provider.GROK}
                     else "no operating-system boundary; external isolation is the only one"
                 ),
                 "supported_budget_units": (
@@ -891,6 +890,14 @@ class DelegationRuntimeService:
         stable_digest = hashlib.sha256(str(delegation["id"]).encode()).hexdigest()[:24]
         role = "independent-reviewer" if profile_id.independent_reviewer else "builder"
         provider = profile_id.provider
+        if provider is Provider.CODEX:
+            software = "codex-cli"
+        elif provider is Provider.CLAUDE:
+            software = "claude-code"
+        elif provider is Provider.GROK:
+            software = "grok-build"
+        else:  # pragma: no cover - Provider is an exhaustive allowlist
+            raise ConfigurationError("provider has no session software binding")
         limits = delegation["limits"]
         try:
             parent_expiry = datetime.fromisoformat(parent.expires_at.replace("Z", "+00:00"))
@@ -907,7 +914,7 @@ class DelegationRuntimeService:
             stable_instance_id=f"agent-commons-{provider.value}-{stable_digest}",
             principal=parent.principal,
             client=provider.value,
-            software="codex-cli" if provider is Provider.CODEX else "claude-code",
+            software=software,
             role=role,
             model_family=provider.value,
             ttl_seconds=min(int(limits["wall_time_seconds"]) + 300, 86_400),
