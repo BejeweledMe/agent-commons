@@ -9,6 +9,7 @@ import pytest
 
 import agent_commons.runtime.capabilities as capability_contracts
 from agent_commons.errors import ConfigurationError, ValidationError
+from agent_commons.integrations import initialize_workspace
 from agent_commons.runtime import (
     BUILTIN_SKILL_IDS,
     CODEX_HOST_SANDBOX_MARKER,
@@ -319,6 +320,8 @@ def test_adapter_invocation_is_exactly_the_wrapped_profile_invocation(
     profile: RunnerProfile,
     tmp_path: Path,
 ) -> None:
+    if profile.profile_id is BuiltinProfileId.GROK_INDEPENDENT_REVIEWER:
+        initialize_workspace(tmp_path, integrations=("grok",))
     purpose = "independent_review" if profile.profile_id.independent_reviewer else "implementation"
     values = {
         "workspace_root": tmp_path,

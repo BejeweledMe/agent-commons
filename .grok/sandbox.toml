@@ -1,0 +1,5 @@
+# agent-commons:managed:sandbox:start
+[profiles.agent-commons-read-only-macos-v1]
+extends = "read-only"
+restrict_network = false
+# agent-commons:managed:sandbox:end

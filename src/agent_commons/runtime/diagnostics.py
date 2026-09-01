@@ -60,6 +60,7 @@ class DiagnosticCode(StrEnum):
     BROKER_CONTROL_ERROR = "broker_control_error"
     PROVIDER_NONZERO_UNKNOWN = "provider_nonzero_unknown"
     PROVIDER_REPORTED_ERROR = "provider_reported_error"
+    PROVIDER_SANDBOX_FAILED = "provider_sandbox_failed"
     TERMINAL_TOOL_NOT_CALLED = "terminal_tool_not_called"
     TERMINAL_TOOL_REJECTED = "terminal_tool_rejected"
     PROCESS_CANONICAL_MISMATCH = "process_canonical_mismatch"
@@ -157,6 +158,9 @@ _HINTS = {
     DiagnosticCode.PROVIDER_REPORTED_ERROR: (
         "The provider reported a structured error even though its process exited successfully."
     ),
+    DiagnosticCode.PROVIDER_SANDBOX_FAILED: (
+        "The provider could not establish its configured filesystem sandbox."
+    ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
         "The provider terminated without calling a bounded terminal outcome tool."
     ),
@@ -249,6 +253,10 @@ _SAFE_NEXT_ACTIONS = {
         "Inspect provider-local logs outside Agent Commons without copying secrets into state.",
         "Resolve the provider condition, then create a new explicit delegation instead of "
         "blindly retrying this run.",
+    ),
+    DiagnosticCode.PROVIDER_SANDBOX_FAILED: (
+        "Verify the selected provider sandbox is supported on this host.",
+        "Keep the reviewer read-only; do not weaken isolation to make the run pass.",
     ),
     DiagnosticCode.TERMINAL_TOOL_NOT_CALLED: (
         "Inspect the exact delegation and worker tool catalog before creating new work.",
@@ -385,6 +393,17 @@ def _classify_failure_text(value: str, *, structured_success: bool) -> Diagnosti
         return DiagnosticCode.PROVIDER_BUDGET_EXHAUSTED
     if _contains_any(value, ("unknown option", "unknown argument", "unrecognized option")):
         return DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG
+    if ("runtime-socket deny path" in value and "endpoint is a symlink" in value) or _contains_any(
+        value,
+        (
+            "sandbox profile resolve failed",
+            "failed to resolve sandbox",
+            "sandbox apply failed",
+            "failed to apply sandbox",
+            "sandbox initialization failed",
+        ),
+    ):
+        return DiagnosticCode.PROVIDER_SANDBOX_FAILED
     if _contains_any(value, ("invalid mcp config", "mcp config is invalid", "parse mcp config")):
         return DiagnosticCode.MCP_CONFIG_INVALID
     if _contains_any(

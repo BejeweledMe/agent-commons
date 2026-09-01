@@ -473,6 +473,34 @@ def test_failure_classifier_uses_retained_stderr_tail_after_stdout_flood() -> No
 
 
 @pytest.mark.parametrize(
+    "message",
+    (
+        "error: sandbox profile resolve failed: unsupported host profile",
+        "failed to apply sandbox before provider startup",
+        "could not resolve runtime-socket deny path [redacted]: endpoint is a symlink",
+    ),
+)
+def test_provider_sandbox_startup_failure_gets_closed_diagnostic(message: str) -> None:
+    diagnostic = classify_process_result(
+        ProcessResult(
+            outcome=RunOutcome.FAILED,
+            reason=RunReason.NONZERO_EXIT,
+            exit_code=1,
+            pid=123,
+            duration_seconds=0.1,
+            stdout=b"",
+            stderr=message.encode(),
+            stdout_bytes_seen=0,
+            stderr_bytes_seen=len(message.encode()),
+            output_truncated=False,
+        )
+    )
+
+    assert diagnostic.code is DiagnosticCode.PROVIDER_SANDBOX_FAILED
+    assert "unsupported host profile" not in diagnostic.hint
+
+
+@pytest.mark.parametrize(
     ("event", "expected"),
     (
         (

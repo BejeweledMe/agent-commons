@@ -11,6 +11,7 @@ import json
 import os
 import re
 import stat
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -155,6 +156,11 @@ _WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verificat
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_SERVER = "agent-commons"
 _GROK_MCP_SERVER = "agent-commons"
+_GROK_MACOS_READ_ONLY_SANDBOX = "agent-commons-read-only-macos-v1"
+_GROK_MACOS_READ_ONLY_POLICY = {
+    "extends": "read-only",
+    "restrict_network": False,
+}
 _GROK_EXTRA_ENVIRONMENT = MappingProxyType(
     {
         # Grok 1.0.13 accepts --no-auto-update, but the environment backstop
@@ -1046,6 +1052,9 @@ class GrokRunnerProfile:
             role_tools,
             role_grants,
         )
+        sandbox = _grok_launch_sandbox(self)
+        if sandbox == _GROK_MACOS_READ_ONLY_SANDBOX:
+            _validate_grok_macos_read_only_profile(workspace_root)
         argv = [
             provider_executable,
             "--no-auto-update",
@@ -1054,7 +1063,7 @@ class GrokRunnerProfile:
             "json",
             "--always-approve",
             "--sandbox",
-            self.sandbox.value,
+            sandbox,
             "--cwd",
             str(workspace_root.resolve()),
             "--no-plan",
@@ -1103,6 +1112,67 @@ class GrokRunnerProfile:
             stdin=b"",
             extra_env=extra_env,
         )
+
+
+def _grok_launch_sandbox(
+    profile: GrokRunnerProfile,
+    *,
+    platform_name: str | None = None,
+) -> str:
+    """Project Grok's read-only policy around a macOS 1.0.x startup defect.
+
+    Grok's child-network restriction is documented as a no-op on macOS, but
+    1.0.x still resolves container-runtime socket denies when the flag is set.
+    A symlinked system socket then aborts before the model or MCP transport can
+    start.  The managed custom profile inherits every filesystem grant and
+    deny from ``read-only`` and disables only that unavailable macOS network
+    mechanism.  Linux keeps the built-in profile and its seccomp restriction.
+    """
+
+    host = os.sys.platform if platform_name is None else platform_name
+    if (
+        host == "darwin"
+        and profile.profile_id.independent_reviewer
+        and profile.sandbox is GrokSandbox.READ_ONLY
+    ):
+        return _GROK_MACOS_READ_ONLY_SANDBOX
+    return profile.sandbox.value
+
+
+def _sandbox_profile(path: Path, name: str) -> object:
+    if not path.exists():
+        return None
+    if path.is_symlink() or not path.is_file():
+        raise ConfigurationError("Grok sandbox policy must be a regular file")
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ConfigurationError("Grok sandbox policy is unreadable or invalid") from exc
+    profiles = value.get("profiles")
+    if not isinstance(profiles, dict):
+        return None
+    return profiles.get(name)
+
+
+def _validate_grok_macos_read_only_profile(workspace_root: Path) -> None:
+    project_policy = _sandbox_profile(
+        workspace_root / ".grok" / "sandbox.toml",
+        _GROK_MACOS_READ_ONLY_SANDBOX,
+    )
+    if project_policy != _GROK_MACOS_READ_ONLY_POLICY:
+        raise ConfigurationError(
+            "managed Grok macOS read-only sandbox policy is missing or invalid"
+        )
+
+    # Grok gives a same-named user profile precedence over the project profile.
+    # Reject a conflicting definition before launch rather than trusting the
+    # provider's startup warning or silently accepting a broader policy.
+    user_policy = _sandbox_profile(
+        Path.home() / ".grok" / "sandbox.toml",
+        _GROK_MACOS_READ_ONLY_SANDBOX,
+    )
+    if user_policy is not None and user_policy != _GROK_MACOS_READ_ONLY_POLICY:
+        raise ConfigurationError("user Grok sandbox policy conflicts with managed reviewer policy")
 
 
 _CODEX_FIELDS = frozenset(

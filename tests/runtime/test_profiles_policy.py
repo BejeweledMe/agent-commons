@@ -32,7 +32,7 @@ from agent_commons.runtime import (
     default_profile_registry,
     validate_model_name,
 )
-from agent_commons.runtime.model import _provider_from_profile_value
+from agent_commons.runtime.model import _grok_launch_sandbox, _provider_from_profile_value
 
 
 def _codex_overrides(argv: tuple[str, ...]) -> dict[str, object]:
@@ -227,6 +227,7 @@ def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: 
 
 def test_grok_profile_validation_keeps_builder_trusted_and_reviewer_read_only(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with pytest.raises(ConfigurationError, match="Grok profile"):
         GrokRunnerProfile(profile_id=BuiltinProfileId.CLAUDE_BUILDER)
@@ -255,12 +256,25 @@ def test_grok_profile_validation_keeps_builder_trusted_and_reviewer_read_only(
         git_executable="/usr/bin/true",
         sandbox=GrokSandbox.READ_ONLY,
     )
+    if os.sys.platform == "darwin":
+        sandbox = tmp_path / ".grok" / "sandbox.toml"
+        sandbox.parent.mkdir()
+        sandbox.write_text(
+            "[profiles.agent-commons-read-only-macos-v1]\n"
+            'extends = "read-only"\n'
+            "restrict_network = false\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
     invocation = reviewer.build_invocation(
         "Review",
         workspace_root=tmp_path,
         delegation_id="delegation.01KXZZZZZZZZZZZZZZZZZZZZZZ",
     )
-    assert invocation.argv[invocation.argv.index("--sandbox") + 1] == "read-only"
+    expected_sandbox = (
+        "agent-commons-read-only-macos-v1" if os.sys.platform == "darwin" else "read-only"
+    )
+    assert invocation.argv[invocation.argv.index("--sandbox") + 1] == expected_sandbox
     native = invocation.argv[invocation.argv.index("--tools") + 1].split(",")
     denied = invocation.argv[invocation.argv.index("--disallowed-tools") + 1].split(",")
     assert not {"run_terminal_cmd", "search_replace", "write_file"} & set(native)
@@ -270,6 +284,58 @@ def test_grok_profile_validation_keeps_builder_trusted_and_reviewer_read_only(
         dataclasses.replace(reviewer, model="--hostile")
     with pytest.raises(ConfigurationError, match="basename or an absolute path"):
         dataclasses.replace(reviewer, executable="../grok")
+
+
+def test_grok_reviewer_projects_read_only_around_macos_network_noop() -> None:
+    reviewer = GrokRunnerProfile(
+        profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+        sandbox=GrokSandbox.READ_ONLY,
+    )
+    builder = GrokRunnerProfile(
+        profile_id=BuiltinProfileId.GROK_BUILDER,
+        sandbox=GrokSandbox.WORKSPACE,
+        trusted_workspace=True,
+    )
+
+    assert _grok_launch_sandbox(reviewer, platform_name="darwin") == (
+        "agent-commons-read-only-macos-v1"
+    )
+    assert _grok_launch_sandbox(reviewer, platform_name="linux") == "read-only"
+    assert _grok_launch_sandbox(builder, platform_name="darwin") == "workspace"
+
+
+def test_grok_macos_reviewer_requires_exact_unshadowed_managed_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from agent_commons.runtime.model import _validate_grok_macos_read_only_profile
+
+    user_home = tmp_path / "home"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: user_home))
+    project_policy = tmp_path / ".grok" / "sandbox.toml"
+    project_policy.parent.mkdir()
+    expected = (
+        "[profiles.agent-commons-read-only-macos-v1]\n"
+        'extends = "read-only"\n'
+        "restrict_network = false\n"
+    )
+
+    with pytest.raises(ConfigurationError, match="missing or invalid"):
+        _validate_grok_macos_read_only_profile(tmp_path)
+
+    project_policy.write_text(expected, encoding="utf-8")
+    _validate_grok_macos_read_only_profile(tmp_path)
+
+    user_policy = user_home / ".grok" / "sandbox.toml"
+    user_policy.parent.mkdir(parents=True)
+    user_policy.write_text(
+        "[profiles.agent-commons-read-only-macos-v1]\n"
+        'extends = "workspace"\n'
+        "restrict_network = false\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigurationError, match="conflicts"):
+        _validate_grok_macos_read_only_profile(tmp_path)
 
 
 def test_profile_config_rejects_arbitrary_command_environment_and_unsafe_reviewers() -> None:

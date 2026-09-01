@@ -12,6 +12,8 @@ from agent_commons.errors import ConfigurationError
 from agent_commons.integrations import (
     GROK_CONFIG_BLOCK_END,
     GROK_CONFIG_BLOCK_START,
+    GROK_SANDBOX_BLOCK_END,
+    GROK_SANDBOX_BLOCK_START,
     MANAGED_BLOCK_END,
     MANAGED_BLOCK_START,
     initialize_workspace,
@@ -62,6 +64,12 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
     assert grok_config.count(GROK_CONFIG_BLOCK_END) == 1
     assert "[mcp_servers.agent-commons]" in grok_config
     assert "${AGENT_COMMONS_DELEGATION_ID:-delegation.initialization-probe}" in grok_config
+    grok_sandbox = (tmp_path / ".grok" / "sandbox.toml").read_text(encoding="utf-8")
+    assert grok_sandbox.count(GROK_SANDBOX_BLOCK_START) == 1
+    assert grok_sandbox.count(GROK_SANDBOX_BLOCK_END) == 1
+    assert "[profiles.agent-commons-read-only-macos-v1]" in grok_sandbox
+    assert 'extends = "read-only"' in grok_sandbox
+    assert "restrict_network = false" in grok_sandbox
 
     config = yaml.safe_load((tmp_path / ".agent-commons" / "workspace.yaml").read_text())
     assert config["schema"] == "agent-commons.workspace.v1"
@@ -111,6 +119,7 @@ def test_second_install_is_idempotent(tmp_path: Path) -> None:
             "AGENTS.md",
             "CLAUDE.md",
             ".grok/config.toml",
+            ".grok/sandbox.toml",
             ".agent-commons/ONBOARDING.md",
             ".agent-commons/.gitignore",
             ".agent-commons/workspace.yaml",

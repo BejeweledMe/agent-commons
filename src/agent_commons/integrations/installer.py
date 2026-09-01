@@ -35,6 +35,8 @@ MANAGED_BLOCK_START = "<!-- agent-commons:managed:start -->"
 MANAGED_BLOCK_END = "<!-- agent-commons:managed:end -->"
 GROK_CONFIG_BLOCK_START = "# agent-commons:managed:start"
 GROK_CONFIG_BLOCK_END = "# agent-commons:managed:end"
+GROK_SANDBOX_BLOCK_START = "# agent-commons:managed:sandbox:start"
+GROK_SANDBOX_BLOCK_END = "# agent-commons:managed:sandbox:end"
 _SKILL_MANIFEST = load_skill_manifest()
 SUPPORTED_INTEGRATIONS = tuple(provider for provider, _ in _SKILL_MANIFEST.provider_roots)
 
@@ -328,6 +330,32 @@ def _plan_grok_config(root: Path) -> _PlannedWrite:
     )
 
 
+def _plan_grok_sandbox(root: Path) -> _PlannedWrite:
+    target_name = ".grok/sandbox.toml"
+    target = root / target_name
+    _validate_directory_chain(root, target.parent)
+    _validate_regular_or_missing(target, label=target_name)
+    target_exists = target.exists()
+    original = _read_utf8(target) if target_exists else ""
+    merged = _merge_managed_block(
+        original,
+        _template_text("GROK_SANDBOX.toml"),
+        filename=target_name,
+        start_marker=GROK_SANDBOX_BLOCK_START,
+        end_marker=GROK_SANDBOX_BLOCK_END,
+    )
+    status: Literal["created", "updated", "unchanged"] = (
+        "created" if not target_exists else "unchanged" if merged == original else "updated"
+    )
+    return _PlannedWrite(
+        target,
+        merged,
+        target_name,
+        status,
+        original if target_exists else None,
+    )
+
+
 def _validate_existing_workspace_config(content: str) -> str:
     try:
         value = yaml.safe_load(content)
@@ -597,6 +625,7 @@ def _initialize_workspace_locked(
             planned_instruction_files.add(target_name)
         if integration == "grok":
             planned.append(_plan_grok_config(root))
+            planned.append(_plan_grok_sandbox(root))
         skill_root = _INTEGRATION_SKILL_ROOTS[integration]
         for skill_name in _COMMON_SKILLS:
             for skill_file in _SKILL_FILES:
