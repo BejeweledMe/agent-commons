@@ -1,0 +1,105 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.5GMM9MKQS4PN32CNQ2DFF9JF0T",
+  "task_revision": "evt.01M1EDVK665FNDN4PR04ANJN5C",
+  "slice": "R1 typed Context Pack authoring and revision in Work",
+  "repository": {
+    "verified_commit": "c72812e32381b12be74490571c42a0614cac7b2b",
+    "branch": "main",
+    "working_tree_before_evidence": "clean",
+    "implementation_result": "The bounded builder found the requested slice already implemented at the exact target revision and made no repository changes."
+  },
+  "delegated_verification": {
+    "delegation_id": "delegation.2MSP7W9ZG337TS1H40C2ZXJ4MZ",
+    "attempt_id": "attempt.2NJGBYQ0QBNK93BR9DJF2ACMM6",
+    "profile": "claude-builder",
+    "canonical_state": "succeeded",
+    "terminal_tool_calls": 1,
+    "terminal_tool_completions": 1,
+    "terminal_tool_rejections": 0,
+    "process_canonical_mismatch": false,
+    "output_truncated": false
+  },
+  "files": {
+    "src/agent_commons/services/context_packs.py": {
+      "sha256": "c184314941dc188be344fb42b9addf267c6be0291968f87c535de121352388ec",
+      "bytes": 13372
+    },
+    "src/agent_commons/ui/actions.py": {
+      "sha256": "575c4444abed2f1c932de5c86f800a22fb15fd1bfb34ce2f4d04b6d7f76321d3",
+      "bytes": 28355
+    },
+    "src/agent_commons/ui/context_pack_dtos.py": {
+      "sha256": "3cbd778c90493385f37f04beacb8aa8de3e76853676d1b5dc19c248fc9f8a560",
+      "bytes": 1699
+    },
+    "src/agent_commons/ui/reads.py": {
+      "sha256": "61a455ef3f13ab1cc81ba7187624f3ba43fcd106edaaf92f81bfb87633d25559",
+      "bytes": 27880
+    },
+    "src/agent_commons/ui/server.py": {
+      "sha256": "0780be7acd728cf6821c5c55a2b052b5eddada34b5fa529496030c85f471d498",
+      "bytes": 60556
+    },
+    "frontend/work/src/api.ts": {
+      "sha256": "77e7734c3ae2119181ea227af920a54fa322de862c432bf39a7f28163553973e",
+      "bytes": 54382
+    },
+    "frontend/work/src/contracts.ts": {
+      "sha256": "aec23d837ed61c6ab33552a2cc21a558e3057de810291efbcd86c4e5da74c1ea",
+      "bytes": 8318
+    },
+    "frontend/work/src/contextPackEditorState.ts": {
+      "sha256": "3eac7610a90b94f258da656ed1917809c25c09ef0c3e6e547e6130e83117361a",
+      "bytes": 487
+    },
+    "frontend/work/src/components/ContextPacksSection.tsx": {
+      "sha256": "0651921be63206c643bbdf667855d20718da46c56395e38bc14253a166b8be9b",
+      "bytes": 10794
+    },
+    "frontend/work/src/i18n.json": {
+      "sha256": "61e42f0cedaae2d1e1bd2429b338e919d50ab45ac9103e0f4a4cc02837de5e23",
+      "bytes": 56753
+    },
+    "tests/ui/test_context_pack_workflow.py": {
+      "sha256": "21c93d7de74a67af605460d95dd68e9bea8b98d2085e91af4104fac75730d52e",
+      "bytes": 5473
+    },
+    "frontend/work/tests/context-pack-editor.test.mjs": {
+      "sha256": "494e9a2ee1cf17e1cc2be34b6b311c31cd72d0448bad6690ccf3d796f823faa1",
+      "bytes": 6128
+    },
+    "frontend/work/tests/context-pack-launch.test.mjs": {
+      "sha256": "71cc087d30a8cae8930fdabab8cc2f74309aec648a8065567267dfe84c2ec7b0",
+      "bytes": 4740
+    }
+  },
+  "verification": {
+    "focused_python": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/ui/test_context_pack_workflow.py tests/services/test_context_packs.py tests/domain/test_context_pack.py tests/domain/test_context_pack_projection.py tests/schemas/test_context_pack_schema.py",
+      "result": "31 passed, 1 warning"
+    },
+    "frontend_behavior": {
+      "command": "npm --prefix frontend/work test",
+      "result": "23 passed"
+    },
+    "frontend_build": {
+      "command": "npm --prefix frontend/work run build",
+      "result": "successful"
+    },
+    "integrated": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1778 passed, 13 skipped, 2 warnings",
+      "duration_seconds": 399.92
+    },
+    "canonical_review": "pending exact independent review of the submitted task revision"
+  },
+  "closed_assertions": {
+    "typed_boundary": "Work reads and writes Context Packs only through bounded typed DTOs and canonical services.",
+    "revision_cas": "Revise requires the exact expected canonical Context Pack revision and stale writes return typed remediation.",
+    "idempotency": "Identical retries retain the operation key; explicit new operations and changed inputs rotate it.",
+    "locales": "The Work authoring surface is present in paired English and Russian strings.",
+    "privacy": "No provider output, prompt, reasoning, transcript, credentials, or shared authority is recorded in this artifact.",
+    "resume": "Resume remains unavailable and is not advertised."
+  }
+}
