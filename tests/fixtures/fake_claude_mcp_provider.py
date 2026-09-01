@@ -19,6 +19,11 @@ _HELP_FLAGS = (
 )
 
 
+def _assert_commons_start_projection(prompt: str) -> None:
+    if "Provider-projected packaged skills" not in prompt or "name: commons-start" not in prompt:
+        raise RuntimeError("commons-start skill projection did not reach Claude stdin")
+
+
 def _value(result: Any) -> Any:
     if getattr(result, "isError", False):
         details = " ".join(
@@ -36,6 +41,7 @@ def _value(result: Any) -> Any:
 
 
 async def _run() -> None:
+    _assert_commons_start_projection(sys.stdin.read())
     arguments = sys.argv[1:]
     if "--tools" in arguments and arguments[arguments.index("--tools") + 1] != "ToolSearch":
         raise RuntimeError("reviewer tool discovery is disabled or over-broad")

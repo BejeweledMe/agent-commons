@@ -25,6 +25,8 @@ from agent_commons.services.provider_canary import (
     run_claude_compatibility_canary,
     run_codex_builder_compatibility_canary,
     run_codex_compatibility_canary,
+    run_grok_builder_compatibility_canary,
+    run_grok_compatibility_canary,
 )
 
 
@@ -132,6 +134,7 @@ def test_provider_canary_proves_one_real_terminal_mcp_completion(tmp_path: Path)
     assert report["provider"] == "claude"
     assert report["provider_version"] == "0.0.0 (Claude Code)"
     assert report["model"] == "canary-model"
+    assert report["skill_refs"] == ["commons-start"]
     assert report["preflight"]["ok"] is True
     assert report["provider_work_process_started"] is True
     assert report["canonical_state"] == "succeeded"
@@ -163,6 +166,37 @@ def test_codex_provider_canary_proves_one_real_terminal_mcp_completion(
     assert report["provider"] == "codex"
     assert report["provider_version"] == "codex-cli 0.0.0"
     assert report["model"] == "canary-model"
+    assert report["skill_refs"] == ["commons-start"]
+    assert report["preflight"]["ok"] is True
+    assert report["provider_work_process_started"] is True
+    assert report["canonical_state"] == "succeeded"
+    assert report["workflow_diagnostic_code"] == "none"
+    assert report["process_canonical_mismatch"] is False
+    assert report["terminal_tool_calls"] == 1
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+    assert report["child_session_closed"] is True
+
+
+def test_grok_provider_canary_proves_skill_aware_real_terminal_mcp_completion(
+    tmp_path: Path,
+) -> None:
+    provider_source = (
+        Path(__file__).parents[1] / "fixtures" / "fake_grok_mcp_provider.py"
+    ).read_text(encoding="utf-8")
+    provider = _executable(tmp_path / "fake-grok", provider_source)
+
+    report = run_grok_compatibility_canary(
+        _grok_profiles(provider, _mcp_executable(tmp_path)),
+        wall_time_seconds=60,
+    )
+
+    assert report["schema"] == CANARY_SCHEMA
+    assert report["ok"] is True, report
+    assert report["provider"] == "grok"
+    assert report["provider_version"] == "grok 0.0.0"
+    assert report["model"] == "canary-model"
+    assert report["skill_refs"] == ["commons-start"]
     assert report["preflight"]["ok"] is True
     assert report["provider_work_process_started"] is True
     assert report["canonical_state"] == "succeeded"
@@ -201,6 +235,7 @@ def test_builder_canary_proves_scoped_terminal_flow_and_records_receipt(
 
     assert report["ok"] is True, report
     assert report["purpose"] == "implementation"
+    assert report["skill_refs"] == ["commons-start"]
     assert report["initialization"] == {
         "state": "ready",
         "supported": True,
@@ -262,6 +297,42 @@ def test_provider_verification_canary_records_exact_verification(
     assert report["ok"] is True, report
     assert report["provider"] == provider
     assert report["purpose"] == "verification"
+    assert report["canonical_state"] == "succeeded"
+    assert report["process_canonical_mismatch"] is False
+    assert report["terminal_tool_calls"] == 1
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+
+
+def test_grok_builder_canary_proves_skill_aware_scoped_terminal_flow(
+    tmp_path: Path,
+) -> None:
+    provider_source = (
+        Path(__file__).parents[1] / "fixtures" / "fake_grok_mcp_provider.py"
+    ).read_text(encoding="utf-8")
+    executable = _executable(tmp_path / "fake-grok", provider_source)
+
+    report = run_grok_builder_compatibility_canary(
+        ProfileRegistry(
+            {
+                BuiltinProfileId.GROK_BUILDER: GrokRunnerProfile(
+                    profile_id=BuiltinProfileId.GROK_BUILDER,
+                    executable=str(executable),
+                    mcp_executable=str(_mcp_executable(tmp_path)),
+                    git_executable="/usr/bin/git",
+                    model="canary-model",
+                    sandbox=GrokSandbox.WORKSPACE,
+                    trusted_workspace=True,
+                )
+            }
+        ),
+        wall_time_seconds=60,
+    )
+
+    assert report["ok"] is True, report
+    assert report["provider"] == "grok"
+    assert report["purpose"] == "implementation"
+    assert report["skill_refs"] == ["commons-start"]
     assert report["canonical_state"] == "succeeded"
     assert report["process_canonical_mismatch"] is False
     assert report["terminal_tool_calls"] == 1

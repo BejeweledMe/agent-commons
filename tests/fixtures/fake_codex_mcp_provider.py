@@ -17,6 +17,11 @@ _EXEC_HELP_FLAGS = "--config --ignore-user-config --strict-config --json"
 _CONFIG_PREFIX = "mcp_servers.agent-commons."
 
 
+def _assert_commons_start_projection(prompt: str) -> None:
+    if "Provider-projected packaged skills" not in prompt or "name: commons-start" not in prompt:
+        raise RuntimeError("commons-start skill projection did not reach Codex stdin")
+
+
 def _value(result: Any) -> Any:
     if getattr(result, "isError", False):
         details = " ".join(
@@ -47,6 +52,7 @@ def _config(arguments: list[str]) -> dict[str, Any]:
 
 
 async def _run() -> None:
+    _assert_commons_start_projection(sys.stdin.read())
     body = _config(sys.argv[1:])
     if body.get("required") is not True:
         raise RuntimeError("agent-commons MCP server is not required")

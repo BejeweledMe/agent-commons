@@ -1833,6 +1833,12 @@ def broker_preflight(
     default=300,
     show_default=True,
 )
+@click.option(
+    "--skill-ref",
+    "skill_refs",
+    multiple=True,
+    help=("Packaged skill id to require in the isolated canary role. Defaults to commons-start."),
+)
 @_profile_config
 @click.pass_obj
 def broker_canary(
@@ -1840,6 +1846,7 @@ def broker_canary(
     profile_id: str,
     confirm_provider_run: bool,
     wall_time_seconds: int,
+    skill_refs: tuple[str, ...],
     profile_config: Path | None,
 ) -> None:
     """Run one isolated real-provider terminal-tool compatibility canary."""
@@ -1865,6 +1872,7 @@ def broker_canary(
         config.profiles,
         operator_limits=config.limits,
         wall_time_seconds=wall_time_seconds,
+        skill_refs=skill_refs or ("commons-start",),
         qualification_state_root=manager.paths.state_root,
     )
     state.emit(result)

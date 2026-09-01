@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_commons import __version__
+from agent_commons.catalog import empty_catalog
 from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
     BuiltinProfileId,
@@ -35,6 +36,7 @@ from .delegation_runtime import DelegationRuntimeService
 from .manager import CommonsManager
 
 CANARY_SCHEMA = "agent_commons.provider_compatibility_canary.v1"
+DEFAULT_CANARY_SKILL_REFS = ("commons-start",)
 _NUMERIC_VERSION_COMPONENT = r"(?:0|[1-9][0-9]{0,5})"
 _CLAUDE_CODE_VERSION = re.compile(
     rf"^(?P<major>{_NUMERIC_VERSION_COMPONENT})"
@@ -124,6 +126,7 @@ def _run_compatibility_canary(
     *,
     profile_id: BuiltinProfileId,
     purpose: str = "independent_review",
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -136,6 +139,8 @@ def _run_compatibility_canary(
         raise ConfigurationError("provider canary wall time must be between 30 and 1800 seconds")
     if purpose not in {"implementation", "independent_review", "verification"}:
         raise ConfigurationError("provider canary purpose is unsupported")
+    if any(not isinstance(item, str) or not item for item in skill_refs):
+        raise ConfigurationError("provider canary skill_refs must be non-empty strings")
     profile = profiles.get(profile_id)
     if not isinstance(profile, (ClaudeRunnerProfile, CodexRunnerProfile, GrokRunnerProfile)):
         raise ConfigurationError("provider canary requires an allowlisted provider profile")
@@ -194,6 +199,7 @@ def _run_compatibility_canary(
             "model": profile.model,
             "provider_version": provider_version,
             "requester_client": requester_client,
+            "skill_refs": list(skill_refs),
             "preflight": preflight,
         }
         if not preflight["ok"]:
@@ -298,6 +304,17 @@ def _run_compatibility_canary(
             if purpose == "independent_review"
             else None
         )
+        role = (
+            manager.create_agent(
+                name=f"Provider canary {profile_id.value}",
+                profile_id=profile_id.value,
+                rationale="Bind packaged skill projection to the compatibility canary.",
+                skills=skill_refs,
+                idempotency_key="provider-canary-skilled-role",
+            )
+            if skill_refs
+            else None
+        )
         target = review if review is not None else task
         delegation = manager.create_delegation(
             target_ref=target["entity_ref"],
@@ -311,6 +328,7 @@ def _run_compatibility_canary(
                 "max_concurrency": 1,
                 "budget": {"unit": "provider_units", "limit": 1},
             },
+            on_behalf_of_agent_id=(str(role["entity_ref"]["id"]) if role is not None else None),
             idempotency_key="provider-canary-delegation",
         )
         service = DelegationRuntimeService(
@@ -320,6 +338,7 @@ def _run_compatibility_canary(
             runner=process_runner,
             initialization_probe=_FixedInitialization(initialization),
             qualification_required=False,
+            catalog=_skill_catalog(skill_refs),
         )
         try:
             result = service.run(
@@ -464,10 +483,25 @@ class _FixedInitialization:
         return self.status
 
 
+def _skill_catalog(skill_refs: tuple[str, ...]) -> dict[str, list[dict[str, str]]]:
+    catalog = empty_catalog()
+    catalog["skills"] = [
+        {
+            "id": skill_ref,
+            "title": skill_ref,
+            "description": "Provider canary packaged skill projection.",
+            "instruction": f"Use packaged skill {skill_ref}.",
+        }
+        for skill_ref in skill_refs
+    ]
+    return catalog
+
+
 def run_claude_compatibility_canary(
     profiles: ProfileRegistry,
     *,
     purpose: str = "independent_review",
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -479,6 +513,7 @@ def run_claude_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
         purpose=purpose,
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
@@ -490,6 +525,7 @@ def run_codex_compatibility_canary(
     profiles: ProfileRegistry,
     *,
     purpose: str = "independent_review",
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -501,6 +537,7 @@ def run_codex_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER,
         purpose=purpose,
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
@@ -512,6 +549,7 @@ def run_grok_compatibility_canary(
     profiles: ProfileRegistry,
     *,
     purpose: str = "independent_review",
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -523,6 +561,7 @@ def run_grok_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
         purpose=purpose,
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
@@ -533,6 +572,7 @@ def run_grok_compatibility_canary(
 def run_claude_builder_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -544,6 +584,7 @@ def run_claude_builder_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CLAUDE_BUILDER,
         purpose="implementation",
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
@@ -554,6 +595,7 @@ def run_claude_builder_compatibility_canary(
 def run_codex_builder_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -566,6 +608,7 @@ def run_codex_builder_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.CODEX_BUILDER,
         purpose="implementation",
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,
@@ -577,6 +620,7 @@ def run_codex_builder_compatibility_canary(
 def run_grok_builder_compatibility_canary(
     profiles: ProfileRegistry,
     *,
+    skill_refs: tuple[str, ...] = DEFAULT_CANARY_SKILL_REFS,
     operator_limits: OperatorLimits | None = None,
     wall_time_seconds: int = 300,
     runner: SubprocessRunner | None = None,
@@ -589,6 +633,7 @@ def run_grok_builder_compatibility_canary(
         profiles,
         profile_id=BuiltinProfileId.GROK_BUILDER,
         purpose="implementation",
+        skill_refs=skill_refs,
         operator_limits=operator_limits,
         wall_time_seconds=wall_time_seconds,
         runner=runner,

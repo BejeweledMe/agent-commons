@@ -13,6 +13,8 @@ from agent_commons.runtime import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     CodexSandbox,
+    GrokRunnerProfile,
+    GrokSandbox,
     ProfileRegistry,
     TelemetryEvent,
     TelemetryKind,
@@ -58,9 +60,15 @@ def _executable(path: Path, body: str) -> Path:
             "implementation",
             {"unit": "provider_units", "limit": 1},
         ),
+        (
+            BuiltinProfileId.GROK_BUILDER,
+            "fake_grok_mcp_provider.py",
+            "implementation",
+            {"unit": "provider_units", "limit": 1},
+        ),
     ),
 )
-def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canonically(
+def test_skill_aware_canary_crosses_generated_real_mcp_stdio_and_finalizes_canonically(
     tmp_path: Path,
     profile_id: BuiltinProfileId,
     provider_fixture: str,
@@ -117,6 +125,13 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
         else None
     )
     target = review if review is not None else task
+    role = manager.create_agent(
+        name=f"Skill-aware {profile_id.value}",
+        profile_id=profile_id.value,
+        rationale="Bind commons-start to the real stdio provider invocation.",
+        skills=("commons-start",),
+        idempotency_key="real-stdio-skilled-role",
+    )
     delegation = manager.create_delegation(
         target_ref=target["entity_ref"],
         target_revision=target["revision"],
@@ -129,10 +144,11 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
             "max_concurrency": 1,
             "budget": budget,
         },
+        on_behalf_of_agent_id=role["entity_ref"]["id"],
         idempotency_key="real-stdio-delegation",
     )
-    profile = (
-        ClaudeRunnerProfile(
+    if profile_id.provider.value == "claude":
+        profile = ClaudeRunnerProfile(
             profile_id=profile_id,
             executable=str(provider),
             mcp_executable=str(mcp),
@@ -140,8 +156,8 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
             permission_mode=ClaudePermissionMode.DONT_ASK,
             max_budget_microusd=1_000_000,
         )
-        if profile_id.provider.value == "claude"
-        else CodexRunnerProfile(
+    elif profile_id.provider.value == "codex":
+        profile = CodexRunnerProfile(
             profile_id=profile_id,
             executable=str(provider),
             mcp_executable=str(mcp),
@@ -153,7 +169,15 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
             ),
             trusted_workspace=True,
         )
-    )
+    else:
+        profile = GrokRunnerProfile(
+            profile_id=profile_id,
+            executable=str(provider),
+            mcp_executable=str(mcp),
+            git_executable="/usr/bin/git",
+            sandbox=GrokSandbox.WORKSPACE,
+            trusted_workspace=True,
+        )
     profiles = ProfileRegistry({profile_id: profile})
 
     telemetry = CollectingTelemetry()
@@ -165,6 +189,17 @@ def test_behavioral_canary_crosses_generated_real_mcp_stdio_and_finalizes_canoni
         profiles=profiles,
         telemetry=telemetry,
         qualification_required=False,
+        catalog={
+            "skills": [
+                {
+                    "id": "commons-start",
+                    "title": "commons-start",
+                    "description": "Packaged Agent Commons startup skill.",
+                    "instruction": "Use packaged skill commons-start.",
+                }
+            ],
+            "tools": [],
+        },
     )
     result = service.run(
         delegation["entity_ref"]["id"],

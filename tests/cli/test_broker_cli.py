@@ -396,6 +396,7 @@ def test_broker_cli_is_discoverable_bounded_and_feature_configurable(tmp_path: P
     assert "--confirm-provider-run" in canary_help.output
     assert "--profile" in canary_help.output
     assert "--wall-time-seconds" in canary_help.output
+    assert "--skill-ref" in canary_help.output
     for forbidden in ("--command", "--prompt", "--environment", "--executable", "--model"):
         assert forbidden not in canary_help.output
     unconfirmed_canary = runner.invoke(cli, ["broker", "canary"])
@@ -640,13 +641,19 @@ def test_broker_canary_selects_the_codex_compatibility_path(
         "agent_commons.cli.run_claude_compatibility_canary",
         lambda *_args, **_kwargs: pytest.fail("Claude canary should not run"),
     )
-    monkeypatch.setattr(
-        "agent_commons.cli.run_codex_compatibility_canary",
-        lambda *_args, **_kwargs: {
+    captured: dict[str, object] = {}
+
+    def capture_canary(*_args: object, **kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {
             "schema": "agent_commons.provider_compatibility_canary.v1",
             "ok": True,
             "profile_id": "codex-independent-reviewer",
-        },
+        }
+
+    monkeypatch.setattr(
+        "agent_commons.cli.run_codex_compatibility_canary",
+        capture_canary,
     )
 
     result = CliRunner().invoke(
@@ -665,6 +672,55 @@ def test_broker_canary_selects_the_codex_compatibility_path(
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["profile_id"] == "codex-independent-reviewer"
+    assert captured["skill_refs"] == ("commons-start",)
+
+
+def test_broker_canary_passes_explicit_skill_refs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=(), workspace_name="broker-skill-canary")
+    monkeypatch.setattr(
+        "agent_commons.cli.run_claude_compatibility_canary",
+        lambda *_args, **_kwargs: pytest.fail("Claude canary should not run"),
+    )
+    captured: dict[str, object] = {}
+
+    def capture_canary(*_args: object, **kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {
+            "schema": "agent_commons.provider_compatibility_canary.v1",
+            "ok": True,
+            "profile_id": "codex-independent-reviewer",
+        }
+
+    monkeypatch.setattr(
+        "agent_commons.cli.run_codex_compatibility_canary",
+        capture_canary,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--repo",
+            str(repo),
+            "--json",
+            "broker",
+            "canary",
+            "--profile",
+            "codex-independent-reviewer",
+            "--skill-ref",
+            "commons-start",
+            "--skill-ref",
+            "commons-review",
+            "--confirm-provider-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["skill_refs"] == ("commons-start", "commons-review")
 
 
 def test_broker_canary_selects_the_grok_compatibility_path(
