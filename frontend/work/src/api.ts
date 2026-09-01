@@ -658,19 +658,14 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
     || !hasExactKeys(value, [
       "profile_id", "provider", "model", "capabilities", "capability_refusals",
       "installation_state", "initialization_state", "qualification", "authentication",
-      "launchable", "refusal", "operator_limits"
+      "launchable", "refusal"
     ])
     || !hasExactKeys(value.capabilities, [
       "mcp", "skills", "resume", "cancellation", "usage_reporting", "sandbox_boundary",
       "budget_units", "context_modes"
     ])
     || !hasExactKeys(value.qualification, ["state", "freshness", "fingerprint", "checked_at"])
-    || !hasExactKeys(value.authentication, ["state", "freshness"])
-    || !isObject(value.operator_limits)
-    || !hasExactKeys(value.operator_limits, [
-      "global_concurrency", "provider_concurrency", "profile_concurrency",
-      "parent_provider_units", "queue_capacity", "queue_wait_seconds"
-    ])) {
+    || !hasExactKeys(value.authentication, ["state", "freshness"])) {
     throw new ApiProblem(502, null);
   }
   const profileId = requiredStringAt(value, "profile_id");
@@ -684,7 +679,6 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
   const contextModes = capabilities.context_modes;
   const rawCapabilityRefusals = value.capability_refusals;
   const refusal = value.refusal;
-  const operatorLimits = value.operator_limits;
   if (
     !PROVIDER_AVAILABILITY_PROFILES.has(profileId)
     || (provider !== "claude" && provider !== "codex" && provider !== "grok")
@@ -713,17 +707,6 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
     || contextModes[1] !== "accumulated"
     || !Array.isArray(rawCapabilityRefusals)
     || rawCapabilityRefusals.length > 3
-    || Object.values(operatorLimits).some((item) => !isSafeNonNegativeInteger(item))
-    || !isSafeNonNegativeInteger(operatorLimits.global_concurrency)
-    || operatorLimits.global_concurrency === 0
-    || !isSafeNonNegativeInteger(operatorLimits.provider_concurrency)
-    || operatorLimits.provider_concurrency === 0
-    || !isSafeNonNegativeInteger(operatorLimits.profile_concurrency)
-    || operatorLimits.profile_concurrency === 0
-    || !isSafeNonNegativeInteger(operatorLimits.parent_provider_units)
-    || operatorLimits.parent_provider_units === 0
-    || !isSafeNonNegativeInteger(operatorLimits.queue_wait_seconds)
-    || operatorLimits.queue_wait_seconds === 0
   ) {
     throw new ApiProblem(502, null);
   }
@@ -877,15 +860,7 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
       freshness: authFreshness as ProviderAvailability["authentication"]["freshness"]
     },
     launchable,
-    refusal: parsedRefusal,
-    operatorLimits: {
-      globalConcurrency: operatorLimits.global_concurrency as number,
-      providerConcurrency: operatorLimits.provider_concurrency as number,
-      profileConcurrency: operatorLimits.profile_concurrency as number,
-      parentProviderUnits: operatorLimits.parent_provider_units as number,
-      queueCapacity: operatorLimits.queue_capacity as number,
-      queueWaitSeconds: operatorLimits.queue_wait_seconds as number
-    }
+    refusal: parsedRefusal
   };
 }
 

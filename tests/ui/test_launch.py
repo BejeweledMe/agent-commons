@@ -308,7 +308,20 @@ def test_work_provider_availability_is_one_closed_redacted_projection(
     assert claude["launchable"] is False
     assert claude["refusal"]["code"] == "provider_qualification_required"
     rendered = str(values).lower()
-    for forbidden in ("argv", "executable", "stderr", "environment", "mcp_json"):
+    for forbidden in (
+        "argv",
+        "executable",
+        "stderr",
+        "environment",
+        "mcp_json",
+        "operator_limits",
+        "global_concurrency",
+        "provider_concurrency",
+        "profile_concurrency",
+        "parent_provider_units",
+        "queue_capacity",
+        "queue_wait_seconds",
+    ):
         assert forbidden not in rendered
 
 

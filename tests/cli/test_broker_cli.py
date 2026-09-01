@@ -743,7 +743,7 @@ def test_broker_profile_config_rejects_unknown_authority_fields(tmp_path: Path) 
     assert "SECRET" not in result.output
 
 
-def test_broker_profile_config_exposes_effective_operator_caps(tmp_path: Path) -> None:
+def test_broker_profile_config_keeps_effective_operator_caps_private(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     CommonsManager.initialize(repo, integrations=(), workspace_name="broker-limits")
@@ -777,10 +777,18 @@ def test_broker_profile_config_exposes_effective_operator_caps(tmp_path: Path) -
     )
 
     assert result.exit_code == 0, result.output
-    limits = json.loads(result.output)[0]["operator_limits"]
-    assert limits["global_concurrency"] == 1
-    assert limits["provider_concurrency"] == 1
-    assert limits["queue_capacity"] == 2
+    availability = json.loads(result.output)[0]
+    assert "operator_limits" not in availability
+    rendered = json.dumps(availability, sort_keys=True)
+    for forbidden in (
+        "global_concurrency",
+        "provider_concurrency",
+        "profile_concurrency",
+        "parent_provider_units",
+        "queue_capacity",
+        "queue_wait_seconds",
+    ):
+        assert forbidden not in rendered
 
     link = tmp_path / "profiles-link.yaml"
     link.symlink_to(config)

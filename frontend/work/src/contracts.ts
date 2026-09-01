@@ -203,14 +203,6 @@ export type ProviderAvailability = {
     code: ProviderAvailabilityRefusalCode;
     remediation: readonly string[];
   } | null;
-  operatorLimits: {
-    globalConcurrency: number;
-    providerConcurrency: number;
-    profileConcurrency: number;
-    parentProviderUnits: number;
-    queueCapacity: number;
-    queueWaitSeconds: number;
-  };
 };
 
 export type WorkspaceMeta = {

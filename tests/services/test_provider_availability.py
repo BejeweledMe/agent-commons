@@ -33,6 +33,7 @@ def _service(tmp_path: Path) -> tuple[ProviderAvailabilityService, ProviderQuali
     profiles = default_profile_registry(
         codex_executable=str(provider),
         claude_executable=str(provider),
+        grok_executable=str(provider),
         mcp_executable=str(mcp),
         git_executable=str(git),
         trusted_workspace=True,
@@ -83,7 +84,34 @@ def test_unified_availability_is_closed_honest_and_codex_has_no_money_claim(
     assert "provider_skill_projection_unavailable" not in refusal_codes
     assert "provider_monetary_budget_unavailable" in refusal_codes
     rendered = str(available).lower()
-    for forbidden in ("argv", "executable", "stderr", "environment", "mcp_json", "/bin/echo"):
+    assert set(available) == {
+        "profile_id",
+        "provider",
+        "model",
+        "capabilities",
+        "capability_refusals",
+        "installation_state",
+        "initialization_state",
+        "qualification",
+        "authentication",
+        "launchable",
+        "refusal",
+    }
+    for forbidden in (
+        "argv",
+        "executable",
+        "stderr",
+        "environment",
+        "mcp_json",
+        "/bin/echo",
+        "operator_limits",
+        "global_concurrency",
+        "provider_concurrency",
+        "profile_concurrency",
+        "parent_provider_units",
+        "queue_capacity",
+        "queue_wait_seconds",
+    ):
         assert forbidden not in rendered
 
 
@@ -250,6 +278,31 @@ def test_fresh_explicitly_unsupported_auth_is_nonblocking(tmp_path: Path) -> Non
 
     assert available["authentication"] == {"state": "unsupported", "freshness": "fresh"}
     assert available["launchable"] is True
+    assert available["refusal"] is None
+
+
+def test_grok_uses_the_existing_closed_provider_projection(tmp_path: Path) -> None:
+    service, store = _service(tmp_path)
+    profile = service.profiles.get("grok-builder")
+    store.record(
+        profile,
+        workspace_root=tmp_path,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version=None,
+    )
+
+    available = service.describe(
+        "grok-builder",
+        auth={"state": "unsupported", "freshness": "fresh"},
+    ).to_wire()
+
+    assert available["profile_id"] == "grok-builder"
+    assert available["provider"] == "grok"
+    assert available["launchable"] is True
+    assert available["capabilities"]["budget_units"] == ["provider_units"]  # type: ignore[index]
+    assert available["authentication"] == {"state": "unsupported", "freshness": "fresh"}
     assert available["refusal"] is None
 
 

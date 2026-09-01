@@ -51,15 +51,7 @@ function availability() {
     },
     authentication: { state: "ready", freshness: "fresh" },
     launchable: true,
-    refusal: null,
-    operator_limits: {
-      global_concurrency: 4,
-      provider_concurrency: 2,
-      profile_concurrency: 1,
-      parent_provider_units: 100,
-      queue_capacity: 16,
-      queue_wait_seconds: 30
-    }
+    refusal: null
   };
 }
 
@@ -115,22 +107,6 @@ test("provider availability enforces bounded scalar and exact capability invaria
     api.parseProviderAvailabilityList([preciseTime])[0].qualification.checkedAt,
     "2026-08-31T12:00:00.000001Z"
   );
-
-  const unsafeLimit = availability();
-  unsafeLimit.operator_limits.queue_capacity = 2 ** 60;
-  assert.throws(() => api.parseProviderAvailabilityList([unsafeLimit]));
-
-  for (const key of [
-    "global_concurrency", "provider_concurrency", "profile_concurrency",
-    "parent_provider_units", "queue_wait_seconds"
-  ]) {
-    const zeroLimit = availability();
-    zeroLimit.operator_limits[key] = 0;
-    assert.throws(() => api.parseProviderAvailabilityList([zeroLimit]));
-  }
-  const stoppedQueue = availability();
-  stoppedQueue.operator_limits.queue_capacity = 0;
-  assert.equal(api.parseProviderAvailabilityList([stoppedQueue])[0].operatorLimits.queueCapacity, 0);
 
   const duplicateBudget = availability();
   duplicateBudget.capabilities.budget_units = ["provider_units", "provider_units"];
@@ -256,6 +232,18 @@ test("Claude availability preserves actual safe sandbox policy and typed refusal
   contradictoryBuilder.launchable = true;
   contradictoryBuilder.refusal = null;
   assert.throws(() => api.parseProviderAvailabilityList([contradictoryBuilder]));
+});
+
+test("Grok availability remains provider-specific and never falls back to Claude", () => {
+  const grok = availability();
+  grok.profile_id = "grok-builder";
+  grok.provider = "grok";
+
+  const parsed = api.parseProviderAvailabilityList([grok])[0];
+
+  assert.equal(parsed.provider, "grok");
+  assert.equal(parsed.profileId, "grok-builder");
+  assert.deepEqual(parsed.capabilities.budgetUnits, ["provider_units"]);
 });
 
 test("skill projection refusal is present if and only if skills are unavailable", () => {

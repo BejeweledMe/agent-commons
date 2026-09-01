@@ -132,7 +132,6 @@ class ProviderAvailability:
     auth_freshness: Literal["fresh", "stale", "unknown"]
     launchable: bool
     refusal: ProviderAvailabilityRefusal | None
-    operator_limits: Mapping[str, int | float]
 
     def to_wire(self) -> dict[str, object]:
         return {
@@ -155,7 +154,6 @@ class ProviderAvailability:
             },
             "launchable": self.launchable,
             "refusal": self.refusal.to_wire() if self.refusal is not None else None,
-            "operator_limits": dict(self.operator_limits),
         }
 
 
@@ -174,7 +172,6 @@ class ProviderAvailabilityService:
         self.profiles = profiles
         self.workspace_root = Path(workspace_root).expanduser().resolve()
         self.qualifications = qualifications
-        self.limits = limits or OperatorLimits()
         self.adapters = adapters or default_adapter_registry()
 
     @staticmethod
@@ -366,16 +363,6 @@ class ProviderAvailabilityService:
             auth_freshness=auth_freshness,
             launchable=launchable,
             refusal=refusal,
-            operator_limits={
-                "global_concurrency": self.limits.global_concurrency,
-                "provider_concurrency": self.limits.provider_concurrency_cap(
-                    profile.provider.value
-                ),
-                "profile_concurrency": self.limits.profile_concurrency_cap(normalized.value),
-                "parent_provider_units": self.limits.provider_units_cap(profile.provider.value),
-                "queue_capacity": self.limits.queue_capacity,
-                "queue_wait_seconds": self.limits.queue_wait_seconds,
-            },
         )
 
     def list(
