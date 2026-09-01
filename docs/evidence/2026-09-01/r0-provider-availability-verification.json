@@ -1,0 +1,32 @@
+{
+  "schema": "agent_commons.r0_provider_availability_verification.v1",
+  "task_id": "task.3R42RHKBP0HJ7M2GCYTBTMP8D2",
+  "commit": "d2de6a8dee398108a373077cebe9d18cb4d7dd9e",
+  "scope": "bounded provider availability DTO projection",
+  "checks": [
+    {
+      "command": "node --test frontend/work/tests/provider-availability.test.mjs",
+      "result": "7 passed"
+    },
+    {
+      "command": "npm run build",
+      "working_directory": "frontend/work",
+      "result": "passed"
+    },
+    {
+      "command": "uv run pytest tests/services/test_provider_availability.py tests/cli/test_broker_cli.py -q",
+      "result": "37 passed"
+    },
+    {
+      "command": "make check",
+      "result": "1777 passed, 13 skipped, 2 warnings"
+    }
+  ],
+  "assertions": [
+    "The CLI, API parser, and Work types consume the same closed availability shape.",
+    "The projection excludes operator limits and raw provider output, prompts, transcripts, reasoning, credentials, and operator configuration.",
+    "Codex and Grok expose provider-units capability without a monetary budget claim.",
+    "The Work parser keeps Grok provider identity explicit and refuses inconsistent provider/profile pairs.",
+    "Malformed, stale, unqualified, or unauthenticated observations remain typed and non-launchable."
+  ]
+}
