@@ -16,6 +16,7 @@ from agent_commons.integrations import (
     MANAGED_BLOCK_START,
     initialize_workspace,
 )
+from agent_commons.runtime import Provider, project_builtin_skills
 
 
 def _concurrent_init_worker(root: str, start: object, results: object) -> None:
@@ -33,6 +34,12 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
     assert report.workspace == ".agent-commons"
     assert is_typed_id(report.workspace_id, "workspace")
     assert report.integrations == ("codex", "claude", "grok")
+    assert tuple(item.provider for item in report.skill_projections) == report.integrations
+    for item in report.skill_projections:
+        runtime = project_builtin_skills(Provider(item.provider), item.skill_ids)
+        assert item.source_digest == runtime.source_digest
+        assert item.projection_digest == runtime.projection_digest
+        assert item.installer_digest == runtime.installer_digest
     assert report.changed
     assert all(not Path(change.path).is_absolute() for change in report.changes)
     assert (tmp_path / ".agent-commons" / "ONBOARDING.md").is_file()

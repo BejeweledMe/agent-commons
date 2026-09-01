@@ -24,12 +24,19 @@ import yaml
 from agent_commons.core.ids import is_typed_id, new_sortable_id
 from agent_commons.errors import ConfigurationError
 from agent_commons.platform_support import lock_exclusive, unlock
+from agent_commons.skill_manifest import (
+    SkillProjectionDigests,
+    compute_skill_projection_digests,
+    load_skill_manifest,
+    read_skill_resource,
+)
 
 MANAGED_BLOCK_START = "<!-- agent-commons:managed:start -->"
 MANAGED_BLOCK_END = "<!-- agent-commons:managed:end -->"
 GROK_CONFIG_BLOCK_START = "# agent-commons:managed:start"
 GROK_CONFIG_BLOCK_END = "# agent-commons:managed:end"
-SUPPORTED_INTEGRATIONS = ("codex", "claude", "grok")
+_SKILL_MANIFEST = load_skill_manifest()
+SUPPORTED_INTEGRATIONS = tuple(provider for provider, _ in _SKILL_MANIFEST.provider_roots)
 
 _INTEGRATION_TARGETS = {
     "codex": ("AGENTS.md", "AGENTS_BLOCK.md"),
@@ -37,20 +44,10 @@ _INTEGRATION_TARGETS = {
     "grok": ("AGENTS.md", "AGENTS_BLOCK.md"),
 }
 _INTEGRATION_SKILL_ROOTS = {
-    "codex": Path(".agents") / "skills",
-    "claude": Path(".claude") / "skills",
-    "grok": Path(".grok") / "skills",
+    provider: Path(root) for provider, root in _SKILL_MANIFEST.provider_roots
 }
-_COMMON_SKILLS = (
-    "commons-start",
-    "commons-coordinate",
-    "commons-share",
-    "commons-review",
-    "commons-record",
-    "commons-handoff",
-    "commons-delegate",
-)
-_SKILL_FILES = (Path("SKILL.md"), Path("agents") / "openai.yaml")
+_COMMON_SKILLS = _SKILL_MANIFEST.skill_ids
+_SKILL_FILES = tuple(Path(value) for value in _SKILL_MANIFEST.skill_files)
 _WORKSPACE_DIRECTORIES = ("events", "manifests", "blobs", "cache")
 
 
@@ -70,6 +67,7 @@ class InstallationReport:
     workspace_id: str
     integrations: tuple[str, ...]
     changes: tuple[FileChange, ...]
+    skill_projections: tuple[SkillProjectionDigests, ...]
 
     @property
     def changed(self) -> bool:
@@ -95,12 +93,11 @@ def _template_text(name: str) -> str:
 
 
 def _skill_text(skill_name: str, relative_path: Path) -> str:
-    skill = resources.files("agent_commons").joinpath(
-        "resources", "skills", skill_name, *relative_path.parts
-    )
     try:
-        value = skill.read_text(encoding="utf-8")
-    except (FileNotFoundError, ModuleNotFoundError) as exc:
+        value = read_skill_resource(
+            load_skill_manifest(), skill_name, relative_path.as_posix()
+        ).decode("utf-8")
+    except ConfigurationError as exc:
         location = (Path("resources") / "skills" / skill_name / relative_path).as_posix()
         raise ConfigurationError(f"packaged integration skill is missing: {location}") from exc
     return value if value.endswith("\n") else value + "\n"
@@ -524,6 +521,9 @@ def _initialize_workspace_locked(
         raise ConfigurationError("project root is not a directory")
 
     selected = _normalize_integrations(integrations)
+    skill_projections = tuple(
+        compute_skill_projection_digests(integration, _COMMON_SKILLS) for integration in selected
+    )
     workspace = root / ".agent-commons"
     _validate_workspace_path(root, workspace)
     product_checkout = _looks_like_product_checkout(root)
@@ -649,6 +649,7 @@ def _initialize_workspace_locked(
         workspace_id=workspace_id,
         integrations=selected,
         changes=tuple(FileChange(item.relative_path, item.status) for item in planned),
+        skill_projections=skill_projections,
     )
 
 

@@ -7,35 +7,31 @@ to the provider in the already-fingerprinted invocation stdin.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
-from importlib import resources
 from itertools import islice
 
 from agent_commons.errors import ConfigurationError
+from agent_commons.skill_manifest import (
+    MAX_PROJECTED_SKILLS,
+    MAX_SKILL_BUNDLE_BYTES,
+    compute_skill_projection_digests,
+    load_skill_manifest,
+    project_skill_bytes,
+    read_skill_resource,
+)
+from agent_commons.skill_manifest import (
+    MAX_SKILL_SOURCE_BYTES as _MAX_SKILL_SOURCE_BYTES,
+)
+from agent_commons.skill_manifest import (
+    SKILL_PROJECTION_VERSION as _SKILL_PROJECTION_VERSION,
+)
 
 from .model import Provider
 
-BUILTIN_SKILL_IDS = (
-    "commons-coordinate",
-    "commons-delegate",
-    "commons-handoff",
-    "commons-record",
-    "commons-review",
-    "commons-share",
-    "commons-start",
-)
-MAX_PROJECTED_SKILLS = 8
-MAX_SKILL_SOURCE_BYTES = 64 * 1024
-MAX_SKILL_BUNDLE_BYTES = 256 * 1024
-SKILL_PROJECTION_VERSION = "agent-commons-skill-projection.v1"
-
-_INSTALLER_ROOT = {
-    Provider.CODEX: ".agents/skills",
-    Provider.CLAUDE: ".claude/skills",
-    Provider.GROK: ".grok/skills",
-}
+BUILTIN_SKILL_IDS = load_skill_manifest().skill_ids
+MAX_SKILL_SOURCE_BYTES = _MAX_SKILL_SOURCE_BYTES
+SKILL_PROJECTION_VERSION = _SKILL_PROJECTION_VERSION
 
 
 def _bounded_collection(value: object, *, label: str) -> tuple[object, ...]:
@@ -64,62 +60,13 @@ def _bounded_projected_instructions(value: object) -> tuple[bytes, ...]:
     return items  # type: ignore[return-value]
 
 
-def _hash_parts(*parts: bytes) -> str:
-    digest = hashlib.sha256()
-    for part in parts:
-        digest.update(len(part).to_bytes(8, "big"))
-        digest.update(part)
-    return digest.hexdigest()
-
-
-def _resource_bytes(skill_id: str, relative_path: str) -> bytes:
-    if skill_id not in BUILTIN_SKILL_IDS:
-        raise ConfigurationError("skill identity is not an allowlisted built-in")
-    resource = resources.files("agent_commons").joinpath(
-        "resources", "skills", skill_id, *relative_path.split("/")
-    )
-    try:
-        value = resource.read_bytes()
-    except (FileNotFoundError, ModuleNotFoundError, OSError) as exc:
-        raise ConfigurationError("packaged skill resource is unavailable") from exc
-    if not value or len(value) > MAX_SKILL_SOURCE_BYTES:
-        raise ConfigurationError("packaged skill source is empty or oversized")
-    try:
-        value.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ConfigurationError("packaged skill source is not UTF-8") from exc
-    return value
-
-
 def _source(skill_id: str) -> bytes:
-    return _resource_bytes(skill_id, "SKILL.md")
-
-
-def _installer_digest(provider: Provider, skill_ids: tuple[str, ...]) -> str:
-    parts = [SKILL_PROJECTION_VERSION.encode(), provider.value.encode()]
-    for skill_id in skill_ids:
-        for relative_path in ("SKILL.md", "agents/openai.yaml"):
-            target = f"{_INSTALLER_ROOT[provider]}/{skill_id}/{relative_path}"
-            parts.extend((target.encode(), _resource_bytes(skill_id, relative_path)))
-    return _hash_parts(*parts)
+    manifest = load_skill_manifest()
+    return read_skill_resource(manifest, skill_id, "SKILL.md")
 
 
 def _project_one(provider: Provider, skill_id: str, source: bytes) -> bytes:
-    target = f"{_INSTALLER_ROOT[provider]}/{skill_id}/SKILL.md"
-    if provider is Provider.CODEX:
-        provider_name = "codex"
-    elif provider is Provider.CLAUDE:
-        provider_name = "claude"
-    elif provider is Provider.GROK:
-        provider_name = "grok"
-    else:  # pragma: no cover - Provider is a closed enum
-        raise ConfigurationError("skill projection provider is unsupported")
-    opening = (
-        f'<agent-commons-skill provider="{provider_name}" '
-        f'id="{skill_id}" installed-as="{target}">\n'
-    )
-    closing = "\n</agent-commons-skill>"
-    return opening.encode() + source.rstrip(b"\n") + closing.encode()
+    return project_skill_bytes(load_skill_manifest(), provider.value, skill_id, source)
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,13 +124,14 @@ def project_builtin_skills(provider: Provider, skill_refs: Sequence[str]) -> Eph
     """Resolve only packaged identities and project exact provider-owned bytes."""
 
     provider = Provider(provider)
+    manifest = load_skill_manifest()
     skill_ids = _bounded_skill_ids(skill_refs)
     if not skill_ids:
         return EphemeralSkillBundle.empty(provider)
     if (
         len(skill_ids) > MAX_PROJECTED_SKILLS
         or len(set(skill_ids)) != len(skill_ids)
-        or any(skill_id not in BUILTIN_SKILL_IDS for skill_id in skill_ids)
+        or any(skill_id not in manifest.skill_ids for skill_id in skill_ids)
     ):
         raise ConfigurationError("requested skill projection is not allowlisted")
     sources = tuple(_source(skill_id) for skill_id in skill_ids)
@@ -193,21 +141,19 @@ def project_builtin_skills(provider: Provider, skill_refs: Sequence[str]) -> Eph
     )
     if sum(len(value) for value in projected) > MAX_SKILL_BUNDLE_BYTES:
         raise ConfigurationError("requested skill projection is oversized")
-    source_digest = _hash_parts(
-        *(
-            part
-            for pair in zip((item.encode() for item in skill_ids), sources, strict=True)
-            for part in pair
-        )
+    digests = compute_skill_projection_digests(provider.value, skill_ids)
+    expected_sources = tuple(
+        read_skill_resource(manifest, skill_id, "SKILL.md") for skill_id in skill_ids
     )
-    projection_digest = _hash_parts(*projected)
+    if sources != expected_sources:
+        raise ConfigurationError("requested skill source changed during projection")
     return EphemeralSkillBundle(
         provider=provider,
         skill_ids=skill_ids,
         projected_instructions=projected,
-        source_digest=source_digest,
-        projection_digest=projection_digest,
-        installer_digest=_installer_digest(provider, skill_ids),
+        source_digest=digests.source_digest,
+        projection_digest=digests.projection_digest,
+        installer_digest=digests.installer_digest,
     )
 
 

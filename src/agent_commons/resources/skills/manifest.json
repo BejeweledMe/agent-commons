@@ -1,0 +1,22 @@
+{
+  "schema": "agent-commons.skill-manifest.v1",
+  "projection_version": "agent-commons-skill-projection.v1",
+  "providers": {
+    "codex": ".agents/skills",
+    "claude": ".claude/skills",
+    "grok": ".grok/skills"
+  },
+  "skill_files": [
+    "SKILL.md",
+    "agents/openai.yaml"
+  ],
+  "skill_ids": [
+    "commons-coordinate",
+    "commons-delegate",
+    "commons-handoff",
+    "commons-record",
+    "commons-review",
+    "commons-share",
+    "commons-start"
+  ]
+}

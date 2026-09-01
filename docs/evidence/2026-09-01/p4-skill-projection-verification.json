@@ -1,0 +1,67 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.181493Y54PJDCNV9QGP4XAF4F2",
+  "task_revision": "evt.01M1E91SF58E4CAF5CMWNTZHX0",
+  "slice": "P4 provider-neutral skill manifest, exact projection and installer report digests",
+  "repository": {
+    "base_commit": "2a7da8d56991150ac6375f87a59ccbdbf7d2901e",
+    "branch": "main",
+    "prior_implementation_commits": [
+      "b1e217901df3032163e90f4f2c5f0f48e98a51ca",
+      "c3f10cf"
+    ]
+  },
+  "tested_tree_binding": {
+    "src/agent_commons/skill_manifest.py": {
+      "sha256": "3a8b3e53880a129ed831b66d4b40010256895d491e802c9a1c7c42b9762a94e0",
+      "bytes": 8314
+    },
+    "src/agent_commons/resources/skills/manifest.json": {
+      "sha256": "0ae35cccec977dd8e5bf4232a33ffcba06f26c38414577d5ed837daad8bb4935",
+      "bytes": 468
+    },
+    "src/agent_commons/runtime/skill_projection.py": {
+      "sha256": "60c147d8bcf769616cf6913c9ccfff2e42319210dc5c4f3f075a5e33c02f31ee",
+      "bytes": 7789
+    },
+    "src/agent_commons/integrations/installer.py": {
+      "sha256": "620748a3d824bc00aab0874e5bb385b29f86d414440434f3608de4de932e1dd0",
+      "bytes": 26478
+    },
+    "src/agent_commons/services/manager.py": {
+      "sha256": "37aa8753952052c320b25863d849703d5b3b052286908b8286803d41ef60e133",
+      "bytes": 58376
+    },
+    "tests/runtime/test_skill_projection.py": {
+      "sha256": "48e84d2d8b7d57fdf4105a964b72b22357599fcf1801b7cbf98a4a0c767961af",
+      "bytes": 10092
+    },
+    "tests/integrations/test_installer.py": {
+      "sha256": "a22f9158be154a964026a7ced3033ead5409f8e1984618df8b8a94cafc771755",
+      "bytes": 20636
+    },
+    "tests/services/test_manager.py": {
+      "sha256": "a2bda9d1e3a35c15086729a3a2e731bd46b37bbf8ba19453c35d9d3671b18030",
+      "bytes": 81800
+    }
+  },
+  "verification": {
+    "focused_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID PYTHONPATH=. uv run --locked python -m pytest -q tests/runtime/test_skill_projection.py tests/runtime/test_launch_plan.py tests/runtime/test_provider_adapters.py tests/integrations/test_installer.py tests/services/test_manager.py::test_initialize_reports_safe_exact_skill_projection_digests",
+      "result": "111 passed in 4.80s",
+      "outcome": "passed"
+    },
+    "release_gate": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1768 passed, 13 skipped, 2 warnings in 512.28s",
+      "outcome": "passed"
+    }
+  },
+  "assertions": [
+    "One packaged neutral manifest owns the projection version, bounded skill identities, exact skill files and provider installation roots for Codex, Claude and Grok.",
+    "Runtime projected bytes, source digest, projection digest and installer digest are deterministic and bind the immutable launched invocation fingerprint without appearing in safe launch metadata.",
+    "InstallationReport and CommonsManager.initialize expose only provider, skill identities and SHA-256 digests; skill text, prompts, credentials and provider output remain absent.",
+    "Missing, changed, symlinked, duplicate, unsupported and oversized projection inputs fail closed before provider initialization, authentication, context binding, child creation or attempt reservation.",
+    "Installer publication remains preflighted, atomic and rollback-safe; no canonical event vocabulary, second ledger or provider-output authority was introduced."
+  ]
+}

@@ -44,6 +44,24 @@ def _open(
     return manager, session
 
 
+def test_initialize_reports_safe_exact_skill_projection_digests(tmp_path: Path) -> None:
+    report = CommonsManager.initialize(
+        tmp_path,
+        integrations=("codex", "claude", "grok"),
+        workspace_name="digest-report",
+    )
+
+    projections = report["skill_projections"]
+    assert [item["provider"] for item in projections] == ["codex", "claude", "grok"]
+    assert all(len(item["skill_ids"]) == 7 for item in projections)
+    assert all(
+        len(item[field]) == 64
+        for item in projections
+        for field in ("source_digest", "projection_digest", "installer_digest")
+    )
+    assert "projected_instructions" not in str(projections)
+
+
 @pytest.fixture
 def workspace(tmp_path: Path) -> tuple[Path, Path, CommonsManager, CommonsManager]:
     repo = tmp_path / "repo"

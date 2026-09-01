@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import FrozenInstanceError, replace
+from pathlib import Path
 
 import pytest
 
 import agent_commons.runtime.skill_projection as projection_module
+import agent_commons.skill_manifest as manifest_module
 from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
     BudgetUnit,
@@ -24,6 +26,7 @@ from agent_commons.runtime import (
     default_profile_registry,
     project_builtin_skills,
 )
+from agent_commons.skill_manifest import load_skill_manifest
 
 
 class _CountingSequence(Sequence[object]):
@@ -40,6 +43,32 @@ class _CountingSequence(Sequence[object]):
 
     def __len__(self) -> int:
         return 1
+
+
+def test_neutral_manifest_is_the_single_provider_and_skill_inventory() -> None:
+    manifest = load_skill_manifest()
+
+    assert manifest.skill_ids == projection_module.BUILTIN_SKILL_IDS
+    assert manifest.skill_files == ("SKILL.md", "agents/openai.yaml")
+    assert dict(manifest.provider_roots) == {
+        "codex": ".agents/skills",
+        "claude": ".claude/skills",
+        "grok": ".grok/skills",
+    }
+
+
+def test_symlinked_packaged_manifest_is_rejected_without_reading_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    skill_root = tmp_path / "resources" / "skills"
+    skill_root.mkdir(parents=True)
+    outside = tmp_path / "outside.json"
+    outside.write_text('{"private":"value"}', encoding="utf-8")
+    (skill_root / "manifest.json").symlink_to(outside)
+    monkeypatch.setattr(manifest_module.resources, "files", lambda _package: tmp_path)
+
+    with pytest.raises(ConfigurationError, match="manifest is symlinked"):
+        load_skill_manifest()
 
 
 @pytest.mark.parametrize(
@@ -129,6 +158,30 @@ def test_source_drift_after_projection_is_typed_refusal(
     refusal = adapter.compile_instruction(plan, bundle)
     assert isinstance(refusal, TypedRefusal)
     assert refusal.code is ProviderRefusalCode.SKILL_PROJECTION_UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    (
+        ConfigurationError("packaged skill resource is unavailable"),
+        b"x" * (projection_module.MAX_SKILL_BUNDLE_BYTES + 1),
+    ),
+)
+def test_missing_or_oversized_source_is_typed_side_effect_free_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+    replacement: ConfigurationError | bytes,
+) -> None:
+    def unavailable_source(_skill_id: str) -> bytes:
+        if isinstance(replacement, ConfigurationError):
+            raise replacement
+        return replacement
+
+    monkeypatch.setattr(projection_module, "_source", unavailable_source)
+    refusal = ClaudeProviderAdapter().project_skills(("commons-start",))
+
+    assert isinstance(refusal, TypedRefusal)
+    assert refusal.code is ProviderRefusalCode.SKILL_PROJECTION_UNAVAILABLE
+    assert refusal.durable_effect == "none"
 
 
 def test_bundle_is_immutable_and_safe_metadata_never_contains_skill_text(tmp_path) -> None:

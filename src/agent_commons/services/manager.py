@@ -231,6 +231,7 @@ class CommonsManager(
             "workspace_id": report.workspace_id,
             "integrations": list(report.integrations),
             "changes": [asdict(change) for change in report.changes],
+            "skill_projections": [asdict(item) for item in report.skill_projections],
             "changed": report.changed,
         }
 
