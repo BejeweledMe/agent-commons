@@ -1,7 +1,7 @@
 """Typed, allowlisted provider launch profiles.
 
 Profiles are operator-owned configuration.  A delegation request selects one of
-four built-in profile identifiers; it never supplies argv fragments, environment
+six built-in profile identifiers; it never supplies argv fragments, environment
 variables, or provider configuration overrides.
 """
 
@@ -29,6 +29,7 @@ _TARGET_KIND = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 class Provider(StrEnum):
     CODEX = "codex"
     CLAUDE = "claude"
+    GROK = "grok"
 
 
 class ExecutableRole(StrEnum):
@@ -50,12 +51,12 @@ class BuiltinProfileId(StrEnum):
     CODEX_INDEPENDENT_REVIEWER = "codex-independent-reviewer"
     CLAUDE_BUILDER = "claude-builder"
     CLAUDE_INDEPENDENT_REVIEWER = "claude-independent-reviewer"
+    GROK_BUILDER = "grok-builder"
+    GROK_INDEPENDENT_REVIEWER = "grok-independent-reviewer"
 
     @property
     def provider(self) -> Provider:
-        if self.value.startswith("codex-"):
-            return Provider.CODEX
-        return Provider.CLAUDE
+        return _provider_from_profile_value(self.value)
 
     @property
     def independent_reviewer(self) -> bool:
@@ -75,6 +76,28 @@ class ClaudePermissionMode(StrEnum):
     ACCEPT_EDITS = "acceptEdits"
     DONT_ASK = "dontAsk"
     PLAN = "plan"
+
+
+class GrokSandbox(StrEnum):
+    WORKSPACE = "workspace"
+    READ_ONLY = "read-only"
+    STRICT = "strict"
+
+
+class GrokPermissionMode(StrEnum):
+    ALWAYS_APPROVE = "always-approve"
+
+
+def _provider_from_profile_value(value: str) -> Provider:
+    """Map every built-in prefix explicitly; a new prefix never becomes Claude."""
+
+    if value.startswith("codex-"):
+        return Provider.CODEX
+    if value.startswith("claude-"):
+        return Provider.CLAUDE
+    if value.startswith("grok-"):
+        return Provider.GROK
+    raise ConfigurationError(f"runner profile has an unsupported provider prefix: {value}")
 
 
 _CLAUDE_COMMONS_READ_TOOLS = (
@@ -131,6 +154,63 @@ _CLAUDE_COMMONS_GOVERNANCE_TOOLS: dict[tuple[str, str], str] = {
 _WORKER_PURPOSES = frozenset({"implementation", "independent_review", "verification"})
 _MCP_TOOL_PREFIX = "mcp__agent-commons__"
 _CODEX_MCP_SERVER = "agent-commons"
+_GROK_MCP_SERVER = "agent-commons"
+_GROK_EXTRA_ENVIRONMENT = MappingProxyType(
+    {
+        # Grok 1.0.13 accepts --no-auto-update, but the environment backstop
+        # also covers builds where that documented flag is hidden or drifts.
+        "GROK_DISABLE_AUTOUPDATER": "1",
+        "GROK_MEMORY": "0",
+        "GROK_WORKFLOWS": "0",
+        # Provider-compat discovery is ambient host configuration.  Native
+        # Grok MCP/hooks/plugins are checked by the fixed `inspect --json`
+        # initialization probe immediately before every launch.
+        "GROK_CLAUDE_AGENTS_ENABLED": "false",
+        "GROK_CLAUDE_HOOKS_ENABLED": "false",
+        "GROK_CLAUDE_MCPS_ENABLED": "false",
+        "GROK_CLAUDE_RULES_ENABLED": "false",
+        "GROK_CLAUDE_SKILLS_ENABLED": "false",
+        "GROK_CURSOR_AGENTS_ENABLED": "false",
+        "GROK_CURSOR_HOOKS_ENABLED": "false",
+        "GROK_CURSOR_MCPS_ENABLED": "false",
+        "GROK_CURSOR_RULES_ENABLED": "false",
+        "GROK_CURSOR_SKILLS_ENABLED": "false",
+        # The model-facing shell receives only broker-safe names.  In
+        # particular XAI_API_KEY remains usable by Grok itself but is not
+        # inherited by commands the model starts.
+        "GROK_CONFIG": json.dumps(
+            {
+                "shell_environment_policy": {
+                    "include_only": [
+                        "AGENT_COMMONS_DELEGATION_ID",
+                        "AGENT_COMMONS_SESSION_ID",
+                        "AGENT_COMMONS_STATE_ROOT",
+                        "HOME",
+                        "LANG",
+                        "LC_ALL",
+                        "LC_CTYPE",
+                        "PATH",
+                        "SHELL",
+                        "TEMP",
+                        "TMP",
+                        "TMPDIR",
+                        "USER",
+                    ]
+                }
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    }
+)
+_RUNNER_EXTRA_ENV_KEYS = frozenset(
+    {
+        *_GROK_EXTRA_ENVIRONMENT,
+        "AGENT_COMMONS_GIT_EXECUTABLE",
+        "AGENT_COMMONS_GROK_MCP_COMMAND",
+        "AGENT_COMMONS_REPO_ROOT",
+    }
+)
 
 
 def _profile_worker_purpose(
@@ -500,18 +580,49 @@ class CorrelationIds:
 
 @dataclass(frozen=True, slots=True)
 class RunnerInvocation:
-    """An argv-only process invocation; stdin is ephemeral task content."""
+    """A closed process invocation; prompt material remains ephemeral."""
 
     provider: Provider
     profile_id: BuiltinProfileId
     argv: tuple[str, ...]
     stdin: bytes
+    extra_env: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
         if not self.argv or any(not isinstance(item, str) or "\x00" in item for item in self.argv):
             raise ValidationError("runner argv is invalid")
         if not isinstance(self.stdin, bytes):
             raise TypeError("runner stdin must be bytes")
+        values = dict(self.extra_env or {})
+        unknown = sorted(set(values) - _RUNNER_EXTRA_ENV_KEYS)
+        if unknown:
+            raise ValidationError(
+                "runner environment contains unsupported keys: " + ", ".join(unknown)
+            )
+        if any(not isinstance(value, str) or "\x00" in value for value in values.values()):
+            raise ValidationError("runner environment contains an invalid value")
+        object.__setattr__(self, "extra_env", MappingProxyType(dict(sorted(values.items()))))
+
+
+def fixed_profile_environment(profile: RunnerProfile) -> Mapping[str, str]:
+    """Return provider-owned process settings, never caller-owned overrides."""
+
+    return _GROK_EXTRA_ENVIRONMENT if profile.provider is Provider.GROK else MappingProxyType({})
+
+
+def invocation_instruction_bytes(invocation: RunnerInvocation) -> bytes:
+    """Recover the exact prompt bytes from the provider's fixed transport."""
+
+    if invocation.provider is not Provider.GROK:
+        return invocation.stdin
+    try:
+        position = invocation.argv.index("-p")
+        prompt = invocation.argv[position + 1]
+    except (ValueError, IndexError) as exc:
+        raise ConfigurationError("Grok invocation has no fixed headless prompt") from exc
+    if invocation.argv.count("-p") != 1 or invocation.stdin:
+        raise ConfigurationError("Grok invocation has an ambiguous instruction transport")
+    return prompt.encode("utf-8")
 
 
 class RunnerProfile(Protocol):
@@ -552,11 +663,21 @@ def validate_profile_launch_boundary(profile: RunnerProfile) -> None:
         raise ConfigurationError(
             "Codex runtime requires explicit trusted_workspace opt-in or external isolation"
         )
-    if not profile.profile_id.independent_reviewer:
-        raise ConfigurationError(
-            "writable Claude runtime requires explicit trusted_workspace opt-in or "
-            "external isolation"
-        )
+    if profile.provider is Provider.GROK:
+        if not profile.profile_id.independent_reviewer:
+            raise ConfigurationError(
+                "writable Grok runtime requires explicit trusted_workspace opt-in or external "
+                "isolation"
+            )
+        return
+    if profile.provider is Provider.CLAUDE:
+        if not profile.profile_id.independent_reviewer:
+            raise ConfigurationError(
+                "writable Claude runtime requires explicit trusted_workspace opt-in or "
+                "external isolation"
+            )
+        return
+    raise ConfigurationError("runner profile provider is unsupported")  # pragma: no cover
 
 
 @dataclass(frozen=True, slots=True)
@@ -829,6 +950,154 @@ class ClaudeRunnerProfile:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class GrokRunnerProfile:
+    profile_id: BuiltinProfileId
+    executable: str = "grok"
+    mcp_executable: str = "agent-commons-mcp"
+    git_executable: str = "/usr/bin/git"
+    model: str | None = None
+    sandbox: GrokSandbox = GrokSandbox.WORKSPACE
+    permission_mode: GrokPermissionMode = GrokPermissionMode.ALWAYS_APPROVE
+    max_turns: int | None = None
+    trusted_workspace: bool = False
+
+    def __post_init__(self) -> None:
+        if self.profile_id.provider is not Provider.GROK:
+            raise ConfigurationError("Grok profile requires a Grok profile identifier")
+        object.__setattr__(self, "executable", _safe_executable(self.executable))
+        object.__setattr__(self, "mcp_executable", _safe_executable(self.mcp_executable))
+        object.__setattr__(self, "git_executable", _safe_executable(self.git_executable))
+        object.__setattr__(self, "model", validate_model_name(self.model))
+        try:
+            object.__setattr__(self, "sandbox", GrokSandbox(self.sandbox))
+            object.__setattr__(
+                self,
+                "permission_mode",
+                GrokPermissionMode(self.permission_mode),
+            )
+        except ValueError as exc:
+            raise ConfigurationError("Grok profile has an unsupported launch mode") from exc
+        if self.max_turns is not None and (
+            isinstance(self.max_turns, bool)
+            or not isinstance(self.max_turns, int)
+            or not 1 <= self.max_turns <= 10_000
+        ):
+            raise ConfigurationError("Grok max_turns must be an integer between 1 and 10000")
+        if not isinstance(self.trusted_workspace, bool):
+            raise ConfigurationError("trusted_workspace must be boolean")
+        if self.profile_id.independent_reviewer and self.sandbox is not GrokSandbox.READ_ONLY:
+            raise ConfigurationError("independent Grok reviewer must use read-only sandbox")
+
+    @property
+    def provider(self) -> Provider:
+        return Provider.GROK
+
+    @property
+    def supports_budget(self) -> bool:
+        return False
+
+    def build_invocation(
+        self,
+        instruction: str,
+        *,
+        workspace_root: Path,
+        state_root: Path | None = None,
+        delegation_id: str | None = None,
+        child_session_id: str | None = None,
+        max_budget_microusd: int | None = None,
+        worker_purpose: str | None = None,
+        role_tools: Sequence[str] | None = None,
+        role_grants: Mapping[str, str] | None = None,
+        demo_unresolved_placeholder: bool = False,
+    ) -> RunnerInvocation:
+        validate_profile_launch_boundary(self)
+        if delegation_id is None:
+            raise ConfigurationError("Grok runtime requires an exact delegation binding")
+        _safe_identifier("delegation_id", delegation_id)
+        purpose = _profile_worker_purpose(self.profile_id, worker_purpose)
+        if max_budget_microusd is not None:
+            raise ConfigurationError("Grok Build cannot enforce a monetary launch budget")
+        provider_executable = _resolve_or_demo_placeholder(
+            self.executable,
+            workspace_root=workspace_root,
+            role=ExecutableRole.PROVIDER,
+            demo_unresolved_placeholder=demo_unresolved_placeholder,
+        )
+        mcp_executable, mcp_args = _resolved_worker_mcp(
+            workspace_root=workspace_root,
+            state_root=state_root,
+            delegation_id=delegation_id,
+            child_session_id=child_session_id,
+            mcp_executable=self.mcp_executable,
+            git_executable=self.git_executable,
+            demo_unresolved_placeholder=demo_unresolved_placeholder,
+        )
+        allowed_tools = _worker_tools(
+            self.profile_id,
+            purpose,
+            role_tools,
+            role_grants,
+        )
+        argv = [
+            provider_executable,
+            "--no-auto-update",
+            "--no-alt-screen",
+            "--output-format",
+            "json",
+            "--always-approve",
+            "--sandbox",
+            self.sandbox.value,
+            "--cwd",
+            str(workspace_root.resolve()),
+            "--no-plan",
+            "--no-subagents",
+            "--disable-web-search",
+            "--verbatim",
+        ]
+        if self.model is not None:
+            argv.extend(("--model", self.model))
+        if self.max_turns is not None:
+            argv.extend(("--max-turns", str(self.max_turns)))
+        if self.profile_id.independent_reviewer:
+            native_tools = "read_file,grep,list_dir,search_tool,use_tool"
+            denied_tools = (
+                "run_terminal_cmd,search_replace,write_file,task,Agent,web_search,web_fetch"
+            )
+        else:
+            native_tools = (
+                "run_terminal_cmd,grep,read_file,search_replace,write_file,list_dir,"
+                "search_tool,use_tool"
+            )
+            denied_tools = "task,Agent,web_search,web_fetch"
+        argv.extend(("--tools", native_tools, "--disallowed-tools", denied_tools))
+        for tool in allowed_tools:
+            short_name = tool.removeprefix(_MCP_TOOL_PREFIX)
+            argv.extend(("--allow", f"MCPTool({_GROK_MCP_SERVER}__{short_name})"))
+
+        # Grok Build 1.0.13 explicitly does not read piped stdin as a prompt.
+        # Its documented --prompt-file cannot consume '-', and the broker has
+        # no pre-existing owned prompt-file lifecycle.  The fixed -p argument
+        # is therefore the only real headless transport.  The one-megabyte
+        # product limit still applies, though a host with a smaller ARG_MAX may
+        # refuse a very large prompt before Grok starts.
+        prompt = _instruction_bytes(instruction).decode("utf-8")
+        argv.extend(("-p", prompt))
+        extra_env = {
+            **_GROK_EXTRA_ENVIRONMENT,
+            "AGENT_COMMONS_GIT_EXECUTABLE": str(mcp_args[mcp_args.index("--git-executable") + 1]),
+            "AGENT_COMMONS_GROK_MCP_COMMAND": mcp_executable,
+            "AGENT_COMMONS_REPO_ROOT": str(workspace_root.resolve()),
+        }
+        return RunnerInvocation(
+            provider=self.provider,
+            profile_id=self.profile_id,
+            argv=tuple(argv),
+            stdin=b"",
+            extra_env=extra_env,
+        )
+
+
 _CODEX_FIELDS = frozenset(
     {
         "executable",
@@ -848,6 +1117,18 @@ _CLAUDE_FIELDS = frozenset(
         "model",
         "permission_mode",
         "max_budget_microusd",
+        "trusted_workspace",
+    }
+)
+_GROK_FIELDS = frozenset(
+    {
+        "executable",
+        "mcp_executable",
+        "git_executable",
+        "model",
+        "sandbox",
+        "permission_mode",
+        "max_turns",
         "trusted_workspace",
     }
 )
@@ -906,9 +1187,14 @@ class ProfileRegistry:
             if profile_id.provider is Provider.CODEX:
                 _reject_unknown_fields(profile_value, _CODEX_FIELDS, profile_id.value)
                 profiles[profile_id] = CodexRunnerProfile(profile_id=profile_id, **profile_value)
-            else:
+            elif profile_id.provider is Provider.CLAUDE:
                 _reject_unknown_fields(profile_value, _CLAUDE_FIELDS, profile_id.value)
                 profiles[profile_id] = ClaudeRunnerProfile(profile_id=profile_id, **profile_value)
+            elif profile_id.provider is Provider.GROK:
+                _reject_unknown_fields(profile_value, _GROK_FIELDS, profile_id.value)
+                profiles[profile_id] = GrokRunnerProfile(profile_id=profile_id, **profile_value)
+            else:  # pragma: no cover - Provider is a closed enum
+                raise ConfigurationError("runner profile provider is unsupported")
         return cls(profiles)
 
 
@@ -916,6 +1202,7 @@ def default_profile_registry(
     *,
     codex_executable: str = "codex",
     claude_executable: str = "claude",
+    grok_executable: str = "grok",
     mcp_executable: str = "agent-commons-mcp",
     git_executable: str = "/usr/bin/git",
     trusted_workspace: bool = False,
@@ -954,6 +1241,21 @@ def default_profile_registry(
                 mcp_executable=mcp_executable,
                 git_executable=git_executable,
                 permission_mode=ClaudePermissionMode.DONT_ASK,
+            ),
+            BuiltinProfileId.GROK_BUILDER: GrokRunnerProfile(
+                profile_id=BuiltinProfileId.GROK_BUILDER,
+                executable=grok_executable,
+                mcp_executable=mcp_executable,
+                git_executable=git_executable,
+                sandbox=GrokSandbox.WORKSPACE,
+                trusted_workspace=trusted_workspace,
+            ),
+            BuiltinProfileId.GROK_INDEPENDENT_REVIEWER: GrokRunnerProfile(
+                profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+                executable=grok_executable,
+                mcp_executable=mcp_executable,
+                git_executable=git_executable,
+                sandbox=GrokSandbox.READ_ONLY,
             ),
         }
     )

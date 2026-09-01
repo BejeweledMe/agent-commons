@@ -30,6 +30,7 @@ def _discovery(
     *,
     claude: bool,
     codex: bool,
+    grok: bool = False,
     mcp: bool,
     git: bool,
 ) -> setup.ProviderDiscovery:
@@ -51,6 +52,7 @@ def _discovery(
     return setup.ProviderDiscovery(
         claude=probe("claude", claude),
         codex=probe("codex", codex),
+        grok=probe("grok", grok),
         mcp=probe("agent-commons-mcp", mcp),
         git=probe("git", git),
     )
@@ -80,7 +82,7 @@ def _guidance_client(tmp_path: Path) -> TestClient:
             _discovery(claude=False, codex=False, mcp=False, git=False),
             {
                 "blocker_code": setup.SETUP_NO_PROVIDER_FOUND,
-                "tools": ["Claude", "Codex"],
+                "tools": ["Claude", "Codex", "Grok"],
                 "next_action_key": "install_provider_and_check_again",
                 "location_label": None,
             },

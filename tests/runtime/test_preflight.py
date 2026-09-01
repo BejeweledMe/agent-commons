@@ -18,6 +18,8 @@ from agent_commons.runtime import (
     CodexRunnerProfile,
     CodexSandbox,
     DiagnosticCode,
+    GrokRunnerProfile,
+    GrokSandbox,
     ProcessResult,
     ProfileRegistry,
     RunOutcome,
@@ -56,6 +58,22 @@ _CLAUDE_HELP_FLAGS = (
     "--disallowed-tools",
     "--tools",
     "--max-budget-usd",
+)
+_GROK_HELP_FLAGS = (
+    "--single",
+    "--cwd",
+    "--output-format",
+    "--always-approve",
+    "--no-alt-screen",
+    "--max-turns",
+    "--model",
+    "--sandbox",
+    "--allow",
+    "--tools",
+    "--disallowed-tools",
+    "--no-plan",
+    "--no-subagents",
+    "--disable-web-search",
 )
 _DEFAULT_MCP_BODY = object()
 
@@ -659,5 +677,62 @@ def test_codex_preflight_fails_closed_when_exec_scope_lacks_json(tmp_path: Path)
         runner=runner,  # type: ignore[arg-type]
     )
 
+    assert result["ok"] is False
+    assert result["checks"]["provider_help"]["missing_flag_count"] == 1
+
+
+class GrokProbeRunner:
+    def __init__(self, *, missing_flag: str | None = None) -> None:
+        self.calls: list[tuple[str, ...]] = []
+        self.missing_flag = missing_flag
+
+    def run(self, invocation, **_kwargs) -> ProcessResult:
+        self.calls.append(invocation.argv)
+        if "--help" in invocation.argv:
+            flags = " ".join(flag for flag in _GROK_HELP_FLAGS if flag != self.missing_flag)
+            return _result(output=flags.encode())
+        if invocation.stdin:
+            return _result(output=_mcp_handshake_output(IMPLEMENTATION_WORKER_TOOL_NAMES))
+        return _result(output=json.dumps(_mcp_preflight_body()).encode())
+
+
+def _grok_profiles() -> ProfileRegistry:
+    profile_id = BuiltinProfileId.GROK_BUILDER
+    return ProfileRegistry(
+        {
+            profile_id: GrokRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                git_executable="/usr/bin/git",
+                sandbox=GrokSandbox.WORKSPACE,
+                trusted_workspace=True,
+            )
+        }
+    )
+
+
+def test_grok_preflight_validates_real_help_and_shared_mcp_contract(tmp_path: Path) -> None:
+    runner = GrokProbeRunner()
+    result = preflight_profile(
+        _grok_profiles(),
+        BuiltinProfileId.GROK_BUILDER,
+        workspace_root=tmp_path,
+        runner=runner,  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is True
+    assert result["checks"]["provider_help"] == {"ok": True, "required_flags": "present"}
+    assert "--preflight" in runner.calls[1]
+    assert "--delegation-id" not in runner.calls[1]
+
+
+def test_grok_preflight_fails_closed_when_installed_help_drifted(tmp_path: Path) -> None:
+    result = preflight_profile(
+        _grok_profiles(),
+        BuiltinProfileId.GROK_BUILDER,
+        workspace_root=tmp_path,
+        runner=GrokProbeRunner(missing_flag="--sandbox"),  # type: ignore[arg-type]
+    )
     assert result["ok"] is False
     assert result["checks"]["provider_help"]["missing_flag_count"] == 1

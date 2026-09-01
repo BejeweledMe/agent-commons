@@ -16,7 +16,7 @@ from typing import BinaryIO, Protocol
 from agent_commons.errors import ValidationError
 
 from .exec_gate import gated_argv, gated_stdin
-from .model import RunnerInvocation, _safe_identifier
+from .model import Provider, RunnerInvocation, _safe_identifier
 
 _SAFE_HOST_ENVIRONMENT = frozenset(
     {
@@ -35,6 +35,9 @@ _SAFE_HOST_ENVIRONMENT = frozenset(
         "TMPDIR",
         "USER",
         "WINDIR",
+        # Retained only for Grok child processes below.  It is never copied
+        # into an invocation, fingerprint, diagnostic, or provider output.
+        "XAI_API_KEY",
     }
 )
 
@@ -99,13 +102,18 @@ class SafeEnvironment:
         self,
         child_session_id: str,
         *,
+        provider: Provider = Provider.CODEX,
         delegation_id: str | None = None,
         state_root: str | Path | None = None,
+        extra_env: Mapping[str, str] | None = None,
     ) -> dict[str, str]:
         _safe_identifier("child_session_id", child_session_id)
         if delegation_id is not None:
             _safe_identifier("delegation_id", delegation_id)
         result = dict(self._values)
+        if provider is not Provider.GROK:
+            result.pop("XAI_API_KEY", None)
+        result.update(extra_env or {})
         # Parent identity is never inherited; these are broker-derived bindings,
         # never caller-controlled environment overrides.
         result["AGENT_COMMONS_SESSION_ID"] = child_session_id
@@ -398,8 +406,10 @@ class SubprocessRunner:
             )
         environment = self.environment.for_child_session(
             child_session_id,
+            provider=invocation.provider,
             delegation_id=delegation_id,
             state_root=state_root,
+            extra_env=invocation.extra_env,
         )
         try:
             # Spawn only the inert gate before canonical delegation.started.

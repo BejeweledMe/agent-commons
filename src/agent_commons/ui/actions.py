@@ -113,7 +113,7 @@ class UIActions:
                 "this directory is not a git repository, so there is nothing for "
                 "a workspace to attach to",
             )
-        report = CommonsManager.initialize(self.repo, integrations=("codex", "claude"))
+        report = CommonsManager.initialize(self.repo, integrations=("codex", "claude", "grok"))
         self.invalidate()
         return {
             "workspace_id": report["workspace_id"],

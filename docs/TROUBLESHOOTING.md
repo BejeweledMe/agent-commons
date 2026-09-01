@@ -48,7 +48,7 @@ required.
 
 ## Provider/MCP preflight
 
-After upgrading Claude Code, Codex, Agent Commons, or MCP dependencies, run:
+After upgrading Claude Code, Codex, Grok Build, Agent Commons, or MCP dependencies, run:
 
 ```bash
 agent-commons broker preflight claude-independent-reviewer \
@@ -65,6 +65,17 @@ Python source in the CLI and separately installed MCP runtime. A mismatched buil
 therefore fails before reservation even when its tool names happen to match.
 Reinstall it from the same Agent Commons build and repeat preflight instead of
 spending the one real provider attempt. A failed preflight exits with status 2.
+
+For Grok, `init --integration grok` must already have published the managed
+`.grok/config.toml` block. Grok 1.0.13 has no strict inline MCP-config flag, so
+the broker runs `grok inspect --json` before every launch and requires exactly
+one discovered MCP server named `agent-commons`, with no discovered hooks or
+plugins. If initialization is refused, run `grok inspect --json` yourself and
+remove or disable ambient user/compat MCP servers, hooks, or plugins; the broker
+will not silently inherit them. Re-run `agent-commons init --integration grok`
+to repair only its managed project block. Authenticate separately with
+`grok login`, `grok login --device-auth`, or an operator-owned `XAI_API_KEY`.
+Never paste the key into runtime YAML or `.grok/config.toml`.
 
 Static success does not prove model tool use. The explicit paid-provider canary
 in [Broker operations](BROKER_OPERATIONS.md) records provider/model/version and

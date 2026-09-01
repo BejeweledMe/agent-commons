@@ -11,7 +11,7 @@ answers three questions and does nothing else -- no routes, no context, no CLI:
   ``load_runtime_configuration`` on every call, never inferred from the file's
   existence.
 - *Which executables exist here?*  ``discover_providers`` probes ``claude``,
-  ``codex``, ``agent-commons-mcp``, and ``git``.  It performs **no checks of
+  ``codex``, ``grok``, ``agent-commons-mcp``, and ``git``.  It performs **no checks of
   its own**: the single call per candidate is ``resolve_trusted_executable``,
   which already carries PATH resolution, the workspace ban, the regular-file
   and executability requirements, the group/world-writable ban, and the owner
@@ -59,6 +59,8 @@ from agent_commons.runtime.model import (
     CodexSandbox,
     ExecutableResolutionError,
     ExecutableRole,
+    GrokPermissionMode,
+    GrokSandbox,
     resolve_trusted_executable,
 )
 from agent_commons.services.delegation_runtime import load_runtime_configuration
@@ -223,20 +225,24 @@ class ProviderDiscovery:
 
     claude: ExecutableProbe
     codex: ExecutableProbe
+    grok: ExecutableProbe
     mcp: ExecutableProbe
     git: ExecutableProbe
 
     @property
     def providers_found(self) -> tuple[str, ...]:
-        return tuple(probe.name for probe in (self.claude, self.codex) if probe.found)
+        return tuple(probe.name for probe in (self.claude, self.codex, self.grok) if probe.found)
 
     @property
     def providers_missing(self) -> tuple[str, ...]:
-        return tuple(probe.name for probe in (self.claude, self.codex) if not probe.found)
+        return tuple(
+            probe.name for probe in (self.claude, self.codex, self.grok) if not probe.found
+        )
 
     def describe(self) -> dict[str, Any]:
         return {
-            probe.name: probe.describe() for probe in (self.claude, self.codex, self.mcp, self.git)
+            probe.name: probe.describe()
+            for probe in (self.claude, self.codex, self.grok, self.mcp, self.git)
         }
 
 
@@ -295,6 +301,10 @@ def discover_providers(workspace_root: str | Path) -> ProviderDiscovery:
     return ProviderDiscovery(
         claude=_probe("claude", ("claude",), workspace_root=root, role=ExecutableRole.PROVIDER),
         codex=_probe("codex", ("codex",), workspace_root=root, role=ExecutableRole.PROVIDER),
+        # The `agent` compatibility symlink is intentionally not treated as a
+        # second provider.  Discovery is the canonical `grok` basename on the
+        # operator's PATH, commonly added there from ~/.grok/bin by install.
+        grok=_probe("grok", ("grok",), workspace_root=root, role=ExecutableRole.PROVIDER),
         mcp=_probe(
             "agent-commons-mcp",
             (interpreter_sibling, "agent-commons-mcp"),
@@ -381,9 +391,9 @@ def _profile_bodies(
     """Fixed launch modes per profile; only found providers are written at all.
 
     The modes are the security-bearing half of the config and are not
-    UI-selectable: a Codex profile always requires the trusted-workspace
-    opt-in, the independent Codex reviewer is pinned read-only, and the
-    independent Claude reviewer runs ``dontAsk`` without workspace trust.
+    UI-selectable: writable Codex and Grok profiles always require the
+    trusted-workspace opt-in, both OS-sandboxed reviewers are pinned read-only,
+    and the independent Claude reviewer runs ``dontAsk`` without workspace trust.
     """
 
     assert discovery.mcp.path is not None and discovery.git.path is not None
@@ -418,6 +428,20 @@ def _profile_bodies(
             "executable": discovery.claude.path,
             **shared,
             "permission_mode": ClaudePermissionMode.DONT_ASK.value,
+        }
+    if discovery.grok.found and (providers is None or "grok" in providers):
+        profiles["grok-builder"] = {
+            "executable": discovery.grok.path,
+            **shared,
+            "sandbox": GrokSandbox.WORKSPACE.value,
+            "permission_mode": GrokPermissionMode.ALWAYS_APPROVE.value,
+            "trusted_workspace": True,
+        }
+        profiles["grok-independent-reviewer"] = {
+            "executable": discovery.grok.path,
+            **shared,
+            "sandbox": GrokSandbox.READ_ONLY.value,
+            "permission_mode": GrokPermissionMode.ALWAYS_APPROVE.value,
         }
     return profiles
 
@@ -475,7 +499,7 @@ def generate_runtime_config(
     if not found.providers_found:
         raise SetupError(
             SETUP_NO_PROVIDER_FOUND,
-            "neither claude nor codex could be resolved on this machine",
+            "none of claude, codex, or grok could be resolved on this machine",
             details={"discovery": found.describe()},
         )
     for required in (found.mcp, found.git):
@@ -536,12 +560,12 @@ def add_discovered_provider_profiles(
     existing = frozenset(
         profile_id.value.split("-", 1)[0]
         for profile_id in configuration.profiles.profile_ids
-        if profile_id.value.split("-", 1)[0] in {"claude", "codex"}
+        if profile_id.value.split("-", 1)[0] in {"claude", "codex", "grok"}
     )
     if not existing:
         raise SetupError(
             SETUP_CONFIGURED,
-            "the working runtime config does not name generated claude or codex profiles; "
+            "the working runtime config does not name generated claude, codex, or grok profiles; "
             "add profiles by editing the file manually",
         )
 

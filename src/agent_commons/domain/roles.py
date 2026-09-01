@@ -44,6 +44,8 @@ PROFILE_NARROWING: dict[str, frozenset[str]] = {
     "codex-independent-reviewer": frozenset({"codex-independent-reviewer"}),
     "claude-builder": frozenset({"claude-builder", "claude-independent-reviewer"}),
     "claude-independent-reviewer": frozenset({"claude-independent-reviewer"}),
+    "grok-builder": frozenset({"grok-builder", "grok-independent-reviewer"}),
+    "grok-independent-reviewer": frozenset({"grok-independent-reviewer"}),
 }
 
 #: Isolation is ordered too: `fresh` is stronger, and moving down it is the only

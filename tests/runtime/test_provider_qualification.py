@@ -36,6 +36,7 @@ def _profile(tmp_path: Path, profile_id: BuiltinProfileId = BuiltinProfileId.COD
     profiles = default_profile_registry(
         codex_executable=str(provider),
         claude_executable=str(provider),
+        grok_executable=str(provider),
         mcp_executable="/bin/echo",
         git_executable="/usr/bin/git",
         trusted_workspace=True,
@@ -131,6 +132,14 @@ def test_qualification_fingerprint_binds_safe_launch_policy(tmp_path: Path) -> N
     with pytest.raises(ConfigurationError, match="trusted_workspace"):
         qualification_fingerprint(untrusted_builder, workspace_root=workspace)
 
+    _third, grok = _profile(tmp_path, BuiltinProfileId.GROK_BUILDER)
+    grok_before = qualification_fingerprint(grok, workspace_root=workspace)
+    assert qualification_fingerprint(replace(grok, max_turns=7), workspace_root=workspace) != (
+        grok_before
+    )
+    with pytest.raises(ConfigurationError, match="trusted_workspace"):
+        qualification_fingerprint(replace(grok, trusted_workspace=False), workspace_root=workspace)
+
 
 @pytest.mark.parametrize("component", ("provider", "mcp", "git"))
 def test_qualification_fingerprint_binds_every_allowlisted_executable(
@@ -143,6 +152,7 @@ def test_qualification_fingerprint_binds_every_allowlisted_executable(
     profile = default_profile_registry(
         codex_executable=str(executables["provider"]),
         claude_executable=str(executables["provider"]),
+        grok_executable=str(executables["provider"]),
         mcp_executable=str(executables["mcp"]),
         git_executable=str(executables["git"]),
         trusted_workspace=True,

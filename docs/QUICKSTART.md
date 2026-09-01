@@ -35,7 +35,7 @@ Then move to the project the agents will share:
 cd /path/to/your-project
 unset AGENT_COMMONS_STATE_ROOT
 export AGENT_COMMONS_STATE_BASE=/absolute/operator-owned/path/agent-commons-state
-agent-commons init --integration codex --integration claude
+agent-commons init --integration codex --integration claude --integration grok
 agent-commons --read-only --json support
 ```
 
@@ -60,9 +60,48 @@ on `PATH` in every terminal.
 
 `init` publishes the canonical onboarding contract, workspace configuration,
 small managed blocks in `AGENTS.md`/`CLAUDE.md`, and matching workflow skills.
-It never commits or stages files. If a late publication fails, it rolls back
+The Grok integration also owns one comment-delimited block in
+`.grok/config.toml`; it contains only the `agent-commons` MCP server and expands
+the per-run session, delegation, repository, and state bindings from the
+broker-owned environment. It is never rewritten as a side effect of a run.
+`init` never commits or stages files. If a late publication fails, it rolls back
 only bytes it published; a structured partial report names anything that could
 not be restored safely.
+
+### Grok Build provider setup
+
+Install and authenticate the official Grok Build CLI before selecting either
+Grok profile:
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+grok --version
+grok login                       # browser login in the operator's terminal
+# Or, for an API-key account:
+export XAI_API_KEY='xai-...'
+agent-commons init --integration grok
+```
+
+For a headless login flow use `grok login --device-auth`. Agent Commons uses
+that device flow for its login action and uses the non-interactive `grok models`
+command for status; it never starts the interactive Grok TUI. Start a Commons
+session for a Grok coordinator with the exact client/software identity:
+
+```bash
+agent-commons --json session start \
+  --stable-instance-id quickstart-grok-builder-01 \
+  --principal local-operator \
+  --client grok \
+  --software grok-build \
+  --role implementation-author
+```
+
+The runtime profile picker exposes `grok-builder` and
+`grok-independent-reviewer`. The builder is a trusted-workspace opt-in with the
+Grok `workspace` sandbox; the reviewer is fixed to `read-only`. Both launch as
+headless `grok -p`, disable auto-update, web search, subagents, plan mode,
+memory, and workflows, and use the same `agent-commons-mcp` tool taxonomy as
+Claude and Codex.
 
 ## 2. Start the author window
 

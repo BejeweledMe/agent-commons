@@ -12,6 +12,8 @@ from agent_commons.runtime import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     CodexSandbox,
+    GrokRunnerProfile,
+    GrokSandbox,
     ProfileRegistry,
     ProviderQualificationStore,
     SubprocessRunner,
@@ -67,6 +69,22 @@ def _codex_profiles(provider: Path, mcp: Path) -> ProfileRegistry:
                 model="canary-model",
                 sandbox=CodexSandbox.READ_ONLY,
                 trusted_workspace=True,
+            )
+        }
+    )
+
+
+def _grok_profiles(provider: Path, mcp: Path) -> ProfileRegistry:
+    profile_id = BuiltinProfileId.GROK_INDEPENDENT_REVIEWER
+    return ProfileRegistry(
+        {
+            profile_id: GrokRunnerProfile(
+                profile_id=profile_id,
+                executable=str(provider),
+                mcp_executable=str(mcp),
+                git_executable="/usr/bin/git",
+                model="canary-model",
+                sandbox=GrokSandbox.READ_ONLY,
             )
         }
     )
@@ -362,4 +380,23 @@ def test_provider_version_drops_noncanonical_provider_content(
             runner=SubprocessRunner(),
         )
         is None
+    )
+
+
+def test_grok_provider_version_accepts_only_the_canonical_shape(tmp_path: Path) -> None:
+    provider = _executable(tmp_path / "fake-grok-version", 'print("grok 1.2.3")\n')
+    profile = _grok_profiles(provider, _mcp_executable(tmp_path)).get(
+        BuiltinProfileId.GROK_INDEPENDENT_REVIEWER
+    )
+    assert isinstance(profile, GrokRunnerProfile)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    assert (
+        _provider_version(
+            profile,
+            workspace_root=workspace,
+            runner=SubprocessRunner(),
+        )
+        == "grok 1.2.3"
     )

@@ -34,6 +34,7 @@ SKILL_PROJECTION_VERSION = "agent-commons-skill-projection.v1"
 _INSTALLER_ROOT = {
     Provider.CODEX: ".agents/skills",
     Provider.CLAUDE: ".claude/skills",
+    Provider.GROK: ".grok/skills",
 }
 
 
@@ -106,15 +107,18 @@ def _installer_digest(provider: Provider, skill_ids: tuple[str, ...]) -> str:
 def _project_one(provider: Provider, skill_id: str, source: bytes) -> bytes:
     target = f"{_INSTALLER_ROOT[provider]}/{skill_id}/SKILL.md"
     if provider is Provider.CODEX:
-        opening = (
-            f'<agent-commons-skill provider="codex" id="{skill_id}" installed-as="{target}">\n'
-        )
-        closing = "\n</agent-commons-skill>"
-    else:
-        opening = (
-            f'<agent-commons-skill provider="claude" id="{skill_id}" installed-as="{target}">\n'
-        )
-        closing = "\n</agent-commons-skill>"
+        provider_name = "codex"
+    elif provider is Provider.CLAUDE:
+        provider_name = "claude"
+    elif provider is Provider.GROK:
+        provider_name = "grok"
+    else:  # pragma: no cover - Provider is a closed enum
+        raise ConfigurationError("skill projection provider is unsupported")
+    opening = (
+        f'<agent-commons-skill provider="{provider_name}" '
+        f'id="{skill_id}" installed-as="{target}">\n'
+    )
+    closing = "\n</agent-commons-skill>"
     return opening.encode() + source.rstrip(b"\n") + closing.encode()
 
 

@@ -213,7 +213,7 @@ class CommonsManager(
     def initialize(
         repo_root: str | Path,
         *,
-        integrations: Iterable[str] | str = ("codex", "claude"),
+        integrations: Iterable[str] | str = ("codex", "claude", "grok"),
         workspace_name: str | None = None,
         replace_onboarding: bool = False,
         replace_skills: bool = False,

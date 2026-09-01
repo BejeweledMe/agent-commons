@@ -36,7 +36,7 @@ def _module_available(module: str) -> bool:
 
 
 @click.command("init")
-@click.option("--integration", multiple=True, type=click.Choice(("codex", "claude")))
+@click.option("--integration", multiple=True, type=click.Choice(("codex", "claude", "grok")))
 @click.option("--workspace-name")
 @click.option("--replace-onboarding", is_flag=True)
 @click.option("--replace-skills", is_flag=True)
@@ -54,7 +54,7 @@ def init_command(
         from agent_commons.errors import ValidationError
 
         raise ValidationError("init is unavailable in read-only mode")
-    selected = integration or ("codex", "claude")
+    selected = integration or ("codex", "claude", "grok")
     state.emit(
         CommonsManager.initialize(
             state.repo,

@@ -34,6 +34,7 @@ from .model import (
     ClaudeRunnerProfile,
     CodexRunnerProfile,
     ExecutableRole,
+    GrokRunnerProfile,
     RunnerProfile,
     resolve_trusted_executable,
     validate_profile_launch_boundary,
@@ -101,6 +102,13 @@ def _launch_policy(profile: RunnerProfile) -> dict[str, object]:
         return {
             "max_budget_microusd": profile.max_budget_microusd,
             "permission_mode": profile.permission_mode.value,
+            "trusted_workspace": profile.trusted_workspace,
+        }
+    if isinstance(profile, GrokRunnerProfile):
+        return {
+            "max_turns": profile.max_turns,
+            "permission_mode": profile.permission_mode.value,
+            "sandbox": profile.sandbox.value,
             "trusted_workspace": profile.trusted_workspace,
         }
     raise ConfigurationError("provider profile has no fixed launch policy")

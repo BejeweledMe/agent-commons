@@ -30,6 +30,9 @@ from agent_commons.runtime import (
     CodexRunnerProfile,
     CodexSandbox,
     DiagnosticCode,
+    GrokAuthAdapter,
+    GrokRunnerProfile,
+    GrokSandbox,
     ProcessResult,
     ProviderAuthController,
     ProviderAuthOperation,
@@ -43,6 +46,7 @@ from agent_commons.services import CommonsManager
 from agent_commons.services.delegation_runtime import DelegationRuntimeService
 
 _SECRET = "sk-ant-oat01-do-not-persist-this"
+_XAI_SECRET = "xai-do-not-persist-this"
 
 
 def _result(
@@ -106,6 +110,15 @@ def _claude_profile(executable: str = "/bin/echo") -> ClaudeRunnerProfile:
         executable=executable,
         mcp_executable="/bin/echo",
         permission_mode=ClaudePermissionMode.DONT_ASK,
+    )
+
+
+def _grok_profile(executable: str = "/bin/echo") -> GrokRunnerProfile:
+    return GrokRunnerProfile(
+        profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+        executable=executable,
+        mcp_executable="/bin/echo",
+        sandbox=GrokSandbox.READ_ONLY,
     )
 
 
@@ -489,6 +502,76 @@ def test_codex_adapter_operations_are_a_closed_set() -> None:
 
     assert adapter.arguments(ProviderAuthOperation.STATUS) == ("login", "status")
     assert adapter.arguments(ProviderAuthOperation.LOGIN) == ("login",)
+
+
+def test_grok_fixed_status_device_login_and_post_login_proof(tmp_path: Path) -> None:
+    runner = FakeAuthRunner(
+        _result(stdout=b"You are logged in with grok.com.\nAvailable models:\nmodel-1\n"),
+        _result(stdout=b"Device authorization completed\n"),
+        _result(stdout=b"You are logged in with grok.com.\nAvailable models:\nmodel-1\n"),
+    )
+    controller = _controller(runner)
+
+    status = controller.status(_grok_profile(), workspace_root=tmp_path)
+    login = controller.login(_grok_profile(), workspace_root=tmp_path)
+
+    assert status.state is ProviderAuthState.READY
+    assert login.state is ProviderAuthState.READY
+    resolved = str(Path("/bin/echo").resolve())
+    assert runner.invocations == [
+        (resolved, "models"),
+        (resolved, "login", "--device-auth"),
+        (resolved, "models"),
+    ]
+
+
+def test_grok_auth_classifier_is_closed_and_never_retains_secret() -> None:
+    adapter = GrokAuthAdapter(api_key_present=False)
+    assert adapter.arguments(ProviderAuthOperation.STATUS) == ("models",)
+    assert adapter.arguments(ProviderAuthOperation.LOGIN) == ("login", "--device-auth")
+    assert (
+        adapter.classify(
+            _result(
+                stderr=f"Unauthorized: set XAI_API_KEY={_XAI_SECRET} or log in\n".encode(),
+                outcome=RunOutcome.FAILED,
+                reason=RunReason.NONZERO_EXIT,
+            ),
+            ProviderAuthOperation.STATUS,
+        )
+        is ProviderAuthState.AUTHENTICATION_REQUIRED
+    )
+    assert (
+        adapter.classify(
+            _result(outcome=RunOutcome.TIMED_OUT, reason=RunReason.TIMEOUT),
+            ProviderAuthOperation.STATUS,
+        )
+        is ProviderAuthState.TIMED_OUT
+    )
+    assert (
+        adapter.classify(
+            _result(
+                stderr=b"unexpected provider failure",
+                outcome=RunOutcome.FAILED,
+                reason=RunReason.NONZERO_EXIT,
+            ),
+            ProviderAuthOperation.STATUS,
+        )
+        is ProviderAuthState.FAILED
+    )
+    rendered = repr(adapter)
+    assert _XAI_SECRET not in rendered
+
+
+def test_grok_api_key_presence_requires_successful_catalog_without_reading_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("XAI_API_KEY", _XAI_SECRET)
+    controller = _controller(FakeAuthRunner(_result(stdout=b"Available models:\nmodel-1\n")))
+    status = controller.status(_grok_profile(), workspace_root=tmp_path)
+
+    assert status.state is ProviderAuthState.READY
+    assert _XAI_SECRET not in repr(status)
+    assert _XAI_SECRET not in repr(status.as_dict())
 
 
 def test_unresolvable_executable_does_not_become_an_auth_verdict(tmp_path: Path) -> None:

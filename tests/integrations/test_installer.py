@@ -10,6 +10,8 @@ import agent_commons.integrations.installer as installer_module
 from agent_commons.core.ids import is_typed_id
 from agent_commons.errors import ConfigurationError
 from agent_commons.integrations import (
+    GROK_CONFIG_BLOCK_END,
+    GROK_CONFIG_BLOCK_START,
     MANAGED_BLOCK_END,
     MANAGED_BLOCK_START,
     initialize_workspace,
@@ -30,7 +32,7 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
 
     assert report.workspace == ".agent-commons"
     assert is_typed_id(report.workspace_id, "workspace")
-    assert report.integrations == ("codex", "claude")
+    assert report.integrations == ("codex", "claude", "grok")
     assert report.changed
     assert all(not Path(change.path).is_absolute() for change in report.changes)
     assert (tmp_path / ".agent-commons" / "ONBOARDING.md").is_file()
@@ -48,6 +50,11 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
     assert agents.count(MANAGED_BLOCK_START) == 1
     assert agents.count(MANAGED_BLOCK_END) == 1
     assert ".agent-commons/ONBOARDING.md" in agents
+    grok_config = (tmp_path / ".grok" / "config.toml").read_text(encoding="utf-8")
+    assert grok_config.count(GROK_CONFIG_BLOCK_START) == 1
+    assert grok_config.count(GROK_CONFIG_BLOCK_END) == 1
+    assert "[mcp_servers.agent-commons]" in grok_config
+    assert "${AGENT_COMMONS_DELEGATION_ID:-delegation.initialization-probe}" in grok_config
 
     config = yaml.safe_load((tmp_path / ".agent-commons" / "workspace.yaml").read_text())
     assert config["schema"] == "agent-commons.workspace.v1"
@@ -70,8 +77,10 @@ def test_fresh_install_creates_shared_workspace_and_both_integrations(tmp_path: 
     for skill_name in skill_names:
         codex_skill = tmp_path / ".agents" / "skills" / skill_name / "SKILL.md"
         claude_skill = tmp_path / ".claude" / "skills" / skill_name / "SKILL.md"
+        grok_skill = tmp_path / ".grok" / "skills" / skill_name / "SKILL.md"
         assert codex_skill.is_file()
         assert codex_skill.read_bytes() == claude_skill.read_bytes()
+        assert codex_skill.read_bytes() == grok_skill.read_bytes()
         assert (codex_skill.parent / "agents" / "openai.yaml").is_file()
 
 
@@ -94,6 +103,7 @@ def test_second_install_is_idempotent(tmp_path: Path) -> None:
         for path in (
             "AGENTS.md",
             "CLAUDE.md",
+            ".grok/config.toml",
             ".agent-commons/ONBOARDING.md",
             ".agent-commons/.gitignore",
             ".agent-commons/workspace.yaml",
@@ -107,6 +117,40 @@ def test_second_install_is_idempotent(tmp_path: Path) -> None:
     assert all(change.status == "unchanged" for change in second.changes)
     assert snapshots == {path: (tmp_path / path).read_bytes() for path in snapshots}
     assert (tmp_path / "AGENTS.md").read_text().count(MANAGED_BLOCK_START) == 1
+
+
+def test_grok_integration_preserves_toml_and_is_idempotent(tmp_path: Path) -> None:
+    config = tmp_path / ".grok" / "config.toml"
+    config.parent.mkdir()
+    prefix = '[permission]\ndefault = "ask"\n'
+    config.write_text(prefix, encoding="utf-8")
+
+    first = initialize_workspace(tmp_path, integrations=("grok",))
+    first_bytes = config.read_bytes()
+    second = initialize_workspace(tmp_path, integrations=("grok",))
+
+    assert first.integrations == ("grok",)
+    assert first.changed is True
+    assert second.changed is False
+    assert config.read_bytes() == first_bytes
+    assert config.read_text(encoding="utf-8").startswith(prefix)
+    assert config.read_text(encoding="utf-8").count(GROK_CONFIG_BLOCK_START) == 1
+    assert (tmp_path / "AGENTS.md").read_text().count(MANAGED_BLOCK_START) == 1
+    assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_grok_malformed_managed_config_fails_before_publication(tmp_path: Path) -> None:
+    config = tmp_path / ".grok" / "config.toml"
+    config.parent.mkdir()
+    malformed = f"{GROK_CONFIG_BLOCK_START}\n[mcp_servers.bad]\n"
+    config.write_text(malformed, encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="marker"):
+        initialize_workspace(tmp_path, integrations=("grok",))
+
+    assert config.read_text(encoding="utf-8") == malformed
+    assert not (tmp_path / "AGENTS.md").exists()
+    assert not (tmp_path / ".agent-commons").exists()
 
 
 def test_existing_managed_block_is_replaced_without_touching_surrounding_text(
@@ -413,6 +457,7 @@ def test_parallel_initializers_serialize_and_converge_idempotently(tmp_path: Pat
     assert sorted(outcomes) == [("ok", False), ("ok", True)]
     assert (tmp_path / "AGENTS.md").read_text().count(MANAGED_BLOCK_START) == 1
     assert (tmp_path / "CLAUDE.md").read_text().count(MANAGED_BLOCK_START) == 1
+    assert (tmp_path / ".grok" / "config.toml").read_text().count(GROK_CONFIG_BLOCK_START) == 1
 
 
 def test_templates_are_portable_and_use_one_client_guidance_contract() -> None:

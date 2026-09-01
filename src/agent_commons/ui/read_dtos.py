@@ -34,7 +34,7 @@ SetupGuidanceBlockerCode: TypeAlias = Literal[
     "setup_support_binary_unresolved",
     "setup_config_rejected_by_loader",
 ]
-SetupGuidanceTool: TypeAlias = Literal["Claude", "Codex", "git", "agent-commons-mcp"]
+SetupGuidanceTool: TypeAlias = Literal["Claude", "Codex", "Grok", "git", "agent-commons-mcp"]
 SetupGuidanceNextActionKey: TypeAlias = Literal[
     "choose_git_repository",
     "initialize_workspace",
@@ -114,7 +114,7 @@ class ProviderAuthPayload(TypedDict):
     """The complete secret-free provider availability contract for Work."""
 
     profile_id: str
-    provider: Literal["claude", "codex"]
+    provider: Literal["claude", "codex", "grok"]
     operation: ProviderAuthOperationKey
     state: ProviderAuthStateKey
     supported: bool
@@ -137,7 +137,7 @@ class ProviderAuthDTO:
     """
 
     profile_id: str
-    provider: Literal["claude", "codex"]
+    provider: Literal["claude", "codex", "grok"]
     operation: ProviderAuthOperationKey
     state: ProviderAuthStateKey
     supported: bool

@@ -181,14 +181,14 @@ def test_no_provider_at_all_is_an_honest_refusal_with_the_guide_and_rescan() -> 
         "state": SETUP_UNCONFIGURED,
         "blocking_refusal": SETUP_NO_PROVIDER_FOUND,
         "providers_found": [],
-        "providers_missing": ["claude", "codex"],
+        "providers_missing": ["claude", "codex", "grok"],
         "support_missing": [],
         "operator_panel": True,
     }
     for lang, table in (("en", 0), ("ru", 1)):
         note = _decide(lang, "setupBlockingNote(argument)", absent)
         assert note == _value(_language_tables()[table], "setup_found_none")
-        assert "claude" in note and "codex" in note
+        assert "claude" in note and "codex" in note and "grok" in note
 
     body = read_spa()
     assert "demo_available" not in body
@@ -199,7 +199,7 @@ def test_no_provider_at_all_is_an_honest_refusal_with_the_guide_and_rescan() -> 
     assert "write.hidden = observing || !configurable || noProvider;" in body
     for block in _language_tables():
         sentence = _value(block, "setup_found_none")
-        assert "claude" in sentence and "codex" in sentence
+        assert "claude" in sentence and "codex" in sentence and "grok" in sentence
         assert _value(block, "setup_no_provider_guide")
 
 
@@ -209,12 +209,12 @@ def test_one_provider_of_two_names_the_missing_one_and_what_its_absence_costs() 
         "state": SETUP_UNCONFIGURED,
         "blocking_refusal": None,
         "providers_found": ["claude"],
-        "providers_missing": ["codex"],
+        "providers_missing": ["codex", "grok"],
         "support_missing": [],
     }
     for lang in ("en", "ru"):
         note = _decide(lang, "setupBlockingNote(argument)", partial)
-        assert "claude" in note and "codex" in note
+        assert "claude" in note and "codex" in note and "grok" in note
         # Both names reach the sentence through one substitution each, so a
         # provider name never lands mid-clause in a language whose word order
         # differs from English.
@@ -234,7 +234,7 @@ def test_a_provider_without_its_support_binaries_names_the_program_before_the_cl
     unresolved = {
         "state": SETUP_UNCONFIGURED,
         "blocking_refusal": "setup_support_binary_unresolved",
-        "providers_found": ["claude", "codex"],
+        "providers_found": ["claude", "codex", "grok"],
         "providers_missing": [],
         "support_missing": ["agent-commons-mcp"],
     }

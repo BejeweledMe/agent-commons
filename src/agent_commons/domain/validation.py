@@ -371,6 +371,8 @@ _DELEGATION_TARGET_PROFILES = {
     "codex-independent-reviewer",
     "claude-builder",
     "claude-independent-reviewer",
+    "grok-builder",
+    "grok-independent-reviewer",
 }
 _DELEGATION_PURPOSES = {"implementation", "independent_review", "verification"}
 _DELEGATION_REASON_CODES = {

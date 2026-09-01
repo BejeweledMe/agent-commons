@@ -8,6 +8,7 @@ second profile/configuration model or changing one launch byte.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,11 +36,13 @@ from .capabilities import (
     TypedRefusal,
     UsageReporting,
 )
-from .diagnostics import classify_process_result
+from .diagnostics import DiagnosticCode, classify_process_result
 from .model import (
+    _GROK_MCP_SERVER,
     BuiltinProfileId,
     ClaudeRunnerProfile,
     CodexRunnerProfile,
+    GrokRunnerProfile,
     Provider,
     RunnerInvocation,
     RunnerProfile,
@@ -115,7 +118,7 @@ def _budget_units(profile: RunnerProfile) -> tuple[BudgetUnit, ...]:
 
 
 def _sandbox_boundary(profile: RunnerProfile) -> SandboxBoundary:
-    if profile.provider is Provider.CODEX:
+    if profile.provider in {Provider.CODEX, Provider.GROK}:
         return SandboxBoundary.OS_ENFORCED
     if bool(getattr(profile, "trusted_workspace", False)):
         return SandboxBoundary.TRUSTED_WORKSPACE
@@ -127,6 +130,8 @@ def _permission_mode(profile: RunnerProfile) -> str:
         return f"{profile.sandbox.value}:{profile.approval_policy.value}"
     if isinstance(profile, ClaudeRunnerProfile):
         return profile.permission_mode.value
+    if isinstance(profile, GrokRunnerProfile):
+        return f"{profile.sandbox.value}:{profile.permission_mode.value}"
     raise ConfigurationError("provider adapter received an unsupported profile type")
 
 
@@ -149,6 +154,7 @@ def _descriptor(profile: RunnerProfile) -> ProviderDescriptor:
         sandbox_boundary=_sandbox_boundary(profile),
         permission_mode=_permission_mode(profile),
         budget_units=_budget_units(profile),
+        instruction_transport=("prompt_argument" if profile.provider is Provider.GROK else "stdin"),
     )
 
 
@@ -160,7 +166,7 @@ def _capabilities(profile: RunnerProfile) -> CapabilitySet:
         mcp=True,
         mcp_tool_names=_mcp_tools(profile.profile_id),
         skills=BUILTIN_SKILL_IDS,
-        input_modes=("stdin",),
+        input_modes=("prompt_argument",) if profile.provider is Provider.GROK else ("stdin",),
         resume_mode=ResumeMode.NONE,
         cancellation_mode=CancellationMode.BROKER,
         # Existing diagnostics are bounded, but provider-reported usage totals
@@ -489,9 +495,164 @@ class ClaudeProviderAdapter:
         return ProviderInitializationStatus(provider=self.provider, state=state)
 
 
+@dataclass(frozen=True, slots=True)
+class GrokProviderAdapter:
+    provider: Provider = field(default=Provider.GROK, init=False)
+    adapter_version: str = field(default=PROVIDER_ADAPTER_VERSION, init=False)
+
+    @staticmethod
+    def _require_profile(profile: RunnerProfile) -> GrokRunnerProfile:
+        if not isinstance(profile, GrokRunnerProfile):
+            raise ConfigurationError("Grok adapter requires a Grok runner profile")
+        return profile
+
+    def describe(self, profile: RunnerProfile) -> ProviderDescriptor:
+        return _descriptor(self._require_profile(profile))
+
+    def capabilities(self, profile: RunnerProfile) -> CapabilitySet:
+        return _capabilities(self._require_profile(profile))
+
+    def validate(self, plan: LaunchPlan, capabilities: CapabilitySet) -> LaunchPlan | TypedRefusal:
+        return _validate_plan(self.provider, plan, capabilities)
+
+    def project_skills(self, skill_refs: Sequence[str]) -> EphemeralSkillBundle | TypedRefusal:
+        return _skill_projection(self.provider, skill_refs)
+
+    def compile_instruction(
+        self, plan: LaunchPlan, skill_bundle: EphemeralSkillBundle
+    ) -> str | TypedRefusal:
+        return _compile_instruction(self.provider, plan, skill_bundle)
+
+    def build_invocation(
+        self,
+        profile: RunnerProfile,
+        instruction: str,
+        *,
+        workspace_root: Path,
+        state_root: Path | None = None,
+        delegation_id: str | None = None,
+        child_session_id: str | None = None,
+        max_budget_microusd: int | None = None,
+        worker_purpose: str | None = None,
+        role_tools: Sequence[str] | None = None,
+        role_grants: Mapping[str, str] | None = None,
+    ) -> RunnerInvocation:
+        return _build_invocation(
+            self._require_profile(profile),
+            instruction,
+            workspace_root=workspace_root,
+            state_root=state_root,
+            delegation_id=delegation_id,
+            child_session_id=child_session_id,
+            max_budget_microusd=max_budget_microusd,
+            worker_purpose=worker_purpose,
+            role_tools=role_tools,
+            role_grants=role_grants,
+        )
+
+    def decode_result(self, bounded_process_output: ProcessResult) -> ProviderOutcome:
+        outcome = _decode_result(self.provider, bounded_process_output)
+        if outcome.diagnostic_code is not DiagnosticCode.NONE:
+            return outcome
+        # A zero-exit Grok JSON result can still carry a provider-owned error.
+        # Inspect only bounded marker text and return a maintainer-owned code;
+        # no provider bytes cross this adapter boundary.
+        value = (
+            (bounded_process_output.stdout + b"\n" + bounded_process_output.stderr)
+            .decode("utf-8", "replace")
+            .casefold()
+        )
+        if any(
+            marker in value
+            for marker in (
+                "authenticate",
+                "login",
+                "not authenticated",
+                "unauthorized",
+                "xai_api_key",
+            )
+        ):
+            return ProviderOutcome(
+                provider=self.provider,
+                diagnostic_code=DiagnosticCode.PROVIDER_AUTH_FAILED,
+                event_shape_tags=(*outcome.event_shape_tags, "provider.auth_failed"),
+            )
+        return outcome
+
+    def initialization_probe_spec(self, profile: RunnerProfile) -> ProviderInitializationProbeSpec:
+        profile = self._require_profile(profile)
+        # Literal, non-interactive, and no-model.  The classification below
+        # also proves that the effective MCP/hook/plugin discovery surface is
+        # the one managed Agent Commons server and nothing ambient.
+        return ProviderInitializationProbeSpec(
+            provider=self.provider,
+            profile_id=profile.profile_id,
+            arguments=("inspect", "--json"),
+        )
+
+    def classify_initialization(
+        self,
+        profile: RunnerProfile,
+        result: ProcessResult,
+    ) -> ProviderInitializationStatus:
+        self._require_profile(profile)
+        if result.outcome is RunOutcome.TIMED_OUT:
+            state = ProviderInitializationState.TIMED_OUT
+        elif (
+            result.outcome is not RunOutcome.SUCCEEDED
+            or result.exit_code != 0
+            or result.output_truncated
+        ):
+            state = ProviderInitializationState.UNAVAILABLE
+        else:
+            try:
+                value = json.loads(result.stdout.decode("utf-8", "strict"))
+                if not isinstance(value, Mapping):
+                    raise TypeError("Grok inspect result must be an object")
+                servers = value["mcpServers"]
+                hooks = value["hooks"]
+                plugins = value["plugins"]
+                if not isinstance(servers, list):
+                    raise TypeError("Grok inspect MCP servers must be a list")
+                # Grok may report compatibility discoveries that the fixed
+                # environment has already disabled.  They are not launchable
+                # MCP servers and therefore do not widen the worker surface.
+                # Any other ambient server remains a fail-closed refusal.
+                active_servers = [
+                    item
+                    for item in servers
+                    if isinstance(item, Mapping)
+                    and item.get("disabled") is not True
+                    and item.get("compatibilityStatus") != "disabled"
+                ]
+                server_names = tuple(item.get("name") for item in active_servers)
+                isolated = (
+                    len(server_names) == len(active_servers)
+                    and server_names == (_GROK_MCP_SERVER,)
+                    and isinstance(hooks, list)
+                    and not hooks
+                    and isinstance(plugins, list)
+                    and not plugins
+                )
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                KeyError,
+                TypeError,
+            ):
+                isolated = False
+            state = (
+                ProviderInitializationState.READY
+                if isolated
+                else ProviderInitializationState.UNAVAILABLE
+            )
+        return ProviderInitializationStatus(provider=self.provider, state=state)
+
+
 _ALLOWLISTED_ADAPTER_TYPES: dict[Provider, type[object]] = {
     Provider.CODEX: CodexProviderAdapter,
     Provider.CLAUDE: ClaudeProviderAdapter,
+    Provider.GROK: GrokProviderAdapter,
 }
 
 
@@ -546,5 +707,6 @@ def default_adapter_registry() -> AdapterRegistry:
         {
             Provider.CODEX: CodexProviderAdapter(),
             Provider.CLAUDE: ClaudeProviderAdapter(),
+            Provider.GROK: GrokProviderAdapter(),
         }
     )

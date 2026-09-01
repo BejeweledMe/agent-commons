@@ -53,6 +53,7 @@ def _profile(profile_id: BuiltinProfileId):
     return default_profile_registry(
         codex_executable="/bin/echo",
         claude_executable="/bin/echo",
+        grok_executable="/bin/echo",
         mcp_executable="/bin/echo",
         git_executable="/usr/bin/true",
         trusted_workspace=True,
@@ -138,6 +139,33 @@ def test_fingerprint_covers_actual_stdin_bytes(tmp_path: Path) -> None:
     assert invocation_fingerprint(changed_invocation) != first.invocation_fingerprint
     with pytest.raises(ConfigurationError, match="skill/context composition"):
         ValidatedLaunchPlan.create(validation=validation, invocation=changed_invocation)
+
+
+def test_grok_plan_proves_prompt_argument_and_fingerprints_it(tmp_path: Path) -> None:
+    planner = LaunchPlanner.default()
+    profile = _profile(BuiltinProfileId.GROK_BUILDER)
+    validation = _static(planner, profile, tmp_path)
+    built = planner.build(
+        validation,
+        workspace_root=tmp_path,
+        state_root=tmp_path / "state",
+        delegation_id="delegation.01M19P2GROKFINGERPRINT00",
+        child_session_id="session.01M19P2GROKFINGERPRINT000",
+        max_budget_microusd=None,
+        worker_purpose="implementation",
+        role_tools=(),
+        role_grants={},
+    )
+    prompt_index = built.invocation.argv.index("-p") + 1
+    assert built.invocation.stdin == b""
+    assert built.invocation.argv[prompt_index] == "bound instruction"
+
+    changed_argv = list(built.invocation.argv)
+    changed_argv[prompt_index] = "different instruction"
+    changed = replace(built.invocation, argv=tuple(changed_argv))
+    assert invocation_fingerprint(changed) != built.invocation_fingerprint
+    with pytest.raises(ConfigurationError, match="skill/context composition"):
+        ValidatedLaunchPlan.create(validation=validation, invocation=changed)
 
 
 def test_skill_and_context_composition_is_proven_before_fingerprinting(

@@ -62,6 +62,8 @@ _KNOWN_PROFILES = {
     "codex-independent-reviewer": "codex",
     "claude-builder": "claude",
     "claude-independent-reviewer": "claude",
+    "grok-builder": "grok",
+    "grok-independent-reviewer": "grok",
 }
 MAX_ATTEMPT_INPUTS = MAX_RUNS * 4
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$")

@@ -53,6 +53,7 @@ from .model import (
     Provider,
     RunnerInvocation,
     RunnerProfile,
+    fixed_profile_environment,
     resolve_trusted_executable,
 )
 from .subprocess_runner import (
@@ -312,16 +313,85 @@ class CodexAuthAdapter:
         return ProviderAuthState.FAILED
 
 
+@dataclass(frozen=True, slots=True)
+class GrokAuthAdapter:
+    """Fixed Grok Build model-catalog status and device-code login.
+
+    Grok 1.0.13 exposes no ``login status`` command.  ``models`` is its
+    documented non-interactive authenticated catalog operation; signed-out
+    responses carry one of the closed login markers below.  API-key readiness
+    records presence only, never the key value.
+    """
+
+    provider: Provider = Provider.GROK
+    api_key_present: bool = field(default_factory=lambda: bool(os.environ.get("XAI_API_KEY")))
+
+    def arguments(self, operation: ProviderAuthOperation) -> tuple[str, ...]:
+        return {
+            ProviderAuthOperation.STATUS: ("models",),
+            ProviderAuthOperation.LOGIN: ("login", "--device-auth"),
+        }[ProviderAuthOperation(operation)]
+
+    def classify(
+        self,
+        result: ProcessResult,
+        operation: ProviderAuthOperation,
+    ) -> ProviderAuthState:
+        if result.outcome is RunOutcome.TIMED_OUT:
+            return ProviderAuthState.TIMED_OUT
+        if result.outcome is RunOutcome.CANCELLED:
+            return ProviderAuthState.CANCELLED
+        if operation is ProviderAuthOperation.LOGIN:
+            return (
+                ProviderAuthState.READY
+                if result.outcome is RunOutcome.SUCCEEDED
+                else ProviderAuthState.FAILED
+            )
+        if result.output_truncated:
+            return ProviderAuthState.FAILED
+        if len(result.stdout) + len(result.stderr) > PROVIDER_AUTH_MAX_OUTPUT_BYTES:
+            return ProviderAuthState.FAILED
+        try:
+            stdout = result.stdout.decode("utf-8", "strict").strip()
+            stderr = result.stderr.decode("utf-8", "strict").strip()
+        except UnicodeDecodeError:
+            return ProviderAuthState.FAILED
+        combined = f"{stdout}\n{stderr}".casefold()
+        needs_login = any(
+            marker in combined
+            for marker in (
+                "authenticate",
+                "log in",
+                "login",
+                "not authenticated",
+                "unauthorized",
+                "xai_api_key",
+            )
+        )
+        ready_marker = any(
+            line.startswith("You are logged in with ") for line in stdout.splitlines()
+        )
+        api_key_ready = self.api_key_present and "available models:" in combined
+        if (ready_marker or api_key_ready) and needs_login:
+            return ProviderAuthState.FAILED
+        if result.outcome is RunOutcome.SUCCEEDED and (ready_marker or api_key_ready):
+            return ProviderAuthState.READY
+        if result.outcome is RunOutcome.FAILED and needs_login:
+            return ProviderAuthState.AUTHENTICATION_REQUIRED
+        return ProviderAuthState.FAILED
+
+
 def default_auth_adapters() -> dict[Provider, ProviderAuthAdapter]:
     """Return the operator-allowlisted adapters.
 
-    Both adapters expose only fixed, locally qualified CLI operations.  They do
+    All adapters expose only fixed, locally qualified CLI operations.  They do
     not accept workspace-supplied argv, credentials, or provider output.
     """
 
     return {
         Provider.CLAUDE: ClaudeAuthAdapter(),
         Provider.CODEX: CodexAuthAdapter(),
+        Provider.GROK: GrokAuthAdapter(),
     }
 
 
@@ -624,6 +694,7 @@ class ProviderAuthController:
             profile_id=BuiltinProfileId(profile.profile_id),
             argv=(executable, *adapter.arguments(operation)),
             stdin=b"",
+            extra_env=fixed_profile_environment(profile),
         )
         timeout = (
             self.login_timeout_seconds

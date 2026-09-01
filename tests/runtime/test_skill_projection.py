@@ -14,6 +14,7 @@ from agent_commons.runtime import (
     ClaudeProviderAdapter,
     CodexProviderAdapter,
     EphemeralSkillBundle,
+    GrokProviderAdapter,
     LaunchPlan,
     LaunchPlanner,
     LaunchPurpose,
@@ -46,10 +47,11 @@ class _CountingSequence(Sequence[object]):
     (
         (CodexProviderAdapter(), BuiltinProfileId.CODEX_BUILDER, ".agents/skills"),
         (ClaudeProviderAdapter(), BuiltinProfileId.CLAUDE_BUILDER, ".claude/skills"),
+        (GrokProviderAdapter(), BuiltinProfileId.GROK_BUILDER, ".grok/skills"),
     ),
 )
 def test_each_provider_projects_allowlisted_source_deterministically(
-    adapter: CodexProviderAdapter | ClaudeProviderAdapter,
+    adapter: CodexProviderAdapter | ClaudeProviderAdapter | GrokProviderAdapter,
     profile_id: BuiltinProfileId,
     installed_root: str,
 ) -> None:
@@ -78,10 +80,13 @@ def test_each_provider_projects_allowlisted_source_deterministically(
 def test_provider_projection_and_installer_digests_are_provider_specific() -> None:
     codex = project_builtin_skills(Provider.CODEX, ("commons-start",))
     claude = project_builtin_skills(Provider.CLAUDE, ("commons-start",))
+    grok = project_builtin_skills(Provider.GROK, ("commons-start",))
 
     assert codex.source_digest == claude.source_digest
     assert codex.projection_digest != claude.projection_digest
     assert codex.installer_digest != claude.installer_digest
+    assert len({codex.projection_digest, claude.projection_digest, grok.projection_digest}) == 3
+    assert len({codex.installer_digest, claude.installer_digest, grok.installer_digest}) == 3
 
 
 @pytest.mark.parametrize("field", ("projection_digest", "installer_digest", "source_digest"))

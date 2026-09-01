@@ -195,7 +195,7 @@ class UIReads:
             discovery = setup.discover_providers(self.repo)
             if not discovery.providers_found:
                 blocker_code = "setup_no_provider_found"
-                tools = ("Claude", "Codex")
+                tools = ("Claude", "Codex", "Grok")
                 next_action_key = "install_provider_and_check_again"
             else:
                 missing = self._unresolved_support_binaries(discovery)

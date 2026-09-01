@@ -88,7 +88,7 @@ def provider_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A machine where every executable first run needs is resolvable."""
 
     bindir = tmp_path / "bin"
-    for name in ("claude", "codex", "agent-commons-mcp", "git"):
+    for name in ("claude", "codex", "grok", "agent-commons-mcp", "git"):
         _install(bindir, name)
     monkeypatch.setenv("PATH", str(bindir))
     return bindir
@@ -460,7 +460,7 @@ def test_an_unconfigured_panel_names_the_state_the_binaries_and_the_target(
     assert body["operator_panel"] is True
     assert body["launch_enabled"] is False
     assert body["blocking_refusal"] is None
-    assert body["providers_found"] == ["claude", "codex"]
+    assert body["providers_found"] == ["claude", "codex", "grok"]
     assert body["providers_missing"] == []
     # The narrow exception: absolute paths, because choosing to trust them is
     # the decision the screen is asking the operator to make.
@@ -654,7 +654,7 @@ def test_a_found_provider_without_its_support_binaries_carries_the_new_code(
         body = client.get("/api/setup", headers=authorized()).json()
         refused = client.post("/api/setup/runtime-config", headers=authorized())
 
-    assert body["providers_found"] == ["claude", "codex"]
+    assert body["providers_found"] == ["claude", "codex", "grok"]
     assert body["support_missing"] == ["agent-commons-mcp"]
     assert body["blocking_refusal"] == SETUP_SUPPORT_BINARY_UNRESOLVED
     assert refused.status_code == 409
@@ -694,12 +694,14 @@ def test_the_panel_configures_itself_and_launches_without_a_restart(
         body = written.json()
         assert body["state"] == setup.SETUP_CONFIGURED
         assert body["launch_enabled"] is True
-        assert body["providers_found"] == ["claude", "codex"]
+        assert body["providers_found"] == ["claude", "codex", "grok"]
         assert body["profiles"] == [
             "claude-builder",
             "claude-independent-reviewer",
             "codex-builder",
             "codex-independent-reviewer",
+            "grok-builder",
+            "grok-independent-reviewer",
         ]
 
         # Same app, same route table, no restart.
@@ -741,6 +743,8 @@ def test_adoption_drops_the_profile_summary_cached_before_the_config_existed(
         "claude-independent-reviewer",
         "codex-builder",
         "codex-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
     ]
 
     context.configure_runtime()
@@ -849,7 +853,7 @@ def test_the_panel_creates_the_workspace_through_the_initializer_init_uses(
 
     assert created.status_code == 200, created.text
     assert created.json()["state"] == setup.SETUP_UNCONFIGURED
-    assert created.json()["integrations"] == ["codex", "claude"]
+    assert created.json()["integrations"] == ["codex", "claude", "grok"]
     assert (repo / ".agent-commons" / "workspace.yaml").is_file()
     assert after["state"] == setup.SETUP_UNCONFIGURED
 
@@ -918,4 +922,6 @@ def test_preflight_runs_the_configured_profiles_and_says_what_it_cannot_know(
         "claude-independent-reviewer",
         "codex-builder",
         "codex-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
     ]

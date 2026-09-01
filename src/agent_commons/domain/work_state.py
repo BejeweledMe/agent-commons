@@ -288,14 +288,16 @@ class RunView:
         _bounded_text(self.role_name, field="role_name", maximum=MAX_ROLE_NAME_BYTES)
         _identifier(self.provider, "provider")
         _identifier(self.profile_id, "profile_id")
-        if self.provider not in {None, "codex", "claude"}:
-            raise ValueError("provider must be codex, claude, or None")
+        if self.provider not in {None, "codex", "claude", "grok"}:
+            raise ValueError("provider must be codex, claude, grok, or None")
         if self.profile_id not in {
             None,
             "codex-builder",
             "codex-independent-reviewer",
             "claude-builder",
             "claude-independent-reviewer",
+            "grok-builder",
+            "grok-independent-reviewer",
         }:
             raise ValueError("profile_id is not a built-in provider profile")
         if self.profile_id is not None and self.provider != self.profile_id.split("-", 1)[0]:

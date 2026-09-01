@@ -46,7 +46,7 @@ and for a lead to review.
 ### Run
 
 A **run** is one bounded attempt by a role to work on one task. Starting a run
-uses the local Claude or Codex provider configured on your computer. It can
+uses the local Claude, Codex, or Grok Build provider configured on your computer. It can
 consume your provider account or subscription just as running that provider
 directly would.
 
@@ -111,7 +111,7 @@ initialize or choose a Git repository first, then start the UI again.
 
 To start a role, the product needs a local provider runtime. Choose **Configure
 runtime** when the screen offers it. The setup checks for locally installed
-Claude or Codex tools and writes only generated configuration.
+Claude, Codex, or Grok Build tools and writes only generated configuration.
 
 If no provider is available, install and authenticate either provider CLI using
 your own account, then return to the panel and refresh its status. The current
@@ -216,7 +216,7 @@ updated task again.
 | --- | --- | --- |
 | **This browser session is no longer active** | The one-time local sign-in link was used or expired. | Restart the UI and open the new printed URL once in the intended browser. |
 | **Workspace files have not been created** | This repository has not been initialized for Agent Commons. | Confirm the terminal is in the right Git repository, then select **Initialize workspace**. |
-| **Runtime configuration has not been created** or **The runtime is not ready to start work** | No usable local provider runtime is available. | Configure the runtime; if it remains blocked, install/authenticate Claude or Codex and refresh status. |
+| **Runtime configuration has not been created** or **The runtime is not ready to start work** | No usable local provider runtime is available. | Configure the runtime; if it remains blocked, install/authenticate Claude, Codex, or Grok Build and refresh status. |
 | **No runtime profiles are available yet** | A configured runtime has no selectable profile. | Use the full panel or technical operator guide to check the runtime configuration. |
 | **waiting on you** | A run, task, review, or question needs a human decision. | Open the linked item and take the next action shown. |
 | `input_needed` | A live run is waiting for an answer from a person. | Open **Attention** and answer it if this panel offers an answer action. If it cannot be answered or the provider has exited, inspect the resulting `needs_operator` item. |
