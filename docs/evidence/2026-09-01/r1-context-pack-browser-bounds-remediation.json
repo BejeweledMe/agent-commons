@@ -1,0 +1,82 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.5GMM9MKQS4PN32CNQ2DFF9JF0T",
+  "task_revision": "evt.01M1EKBDHQQV72S2QEEB7TX6J3",
+  "slice": "R1 browser-side canonical Context Pack bounds remediation",
+  "trigger": {
+    "review_id": "review.4WEBHJHZ6F7QQZMMN0AERNHNP0",
+    "verdict": "changes_requested",
+    "review_revision": "evt.01M1EK73H836SPN1BMVZ6C848V",
+    "closed_gap": "Outgoing Work authoring drafts now enforce the canonical per-field, count, exact-reference, Unicode, and aggregate UTF-8 byte limits before any request is sent."
+  },
+  "repository": {
+    "commit": "2d6396b68d40fe0fbe8a570c1bf23d5f711bc98d",
+    "parent_commit": "c2e73e50b36dae422ea6df7f40e0a3dc75c69aa5",
+    "branch": "main",
+    "working_tree_after_commit": "clean"
+  },
+  "files": {
+    "frontend/work/src/api.ts": {
+      "sha256": "425d46adb9ef344a7d6e15f86e29289e3bc89e66290137622d8488653c46137d",
+      "bytes": 54527
+    },
+    "frontend/work/src/components/ContextPacksSection.tsx": {
+      "sha256": "7fe1f4b0e95d19cd04df4f2048367008136a4d81e84f92fb7afb65943257365a",
+      "bytes": 11446
+    },
+    "frontend/work/src/contextPackDraftValidation.ts": {
+      "sha256": "9a5d879b73e10d80d0253a2a4d9d5a35e3e121c9c02b1ef6ae9d9203f88bd55d",
+      "bytes": 5980
+    },
+    "frontend/work/src/i18n.json": {
+      "sha256": "f7f8300b7b768d6430d501577edc426ec73cbe8b92465d7fa0304fa4edac6761",
+      "bytes": 60830
+    },
+    "frontend/work/tests/context-pack-editor.test.mjs": {
+      "sha256": "08ae2cb01b97d3e0ccb51198f8765ae9cec3fb006a1b935abac5ed04b69d6191",
+      "bytes": 10227
+    },
+    "src/agent_commons/ui/static/work/index.html": {
+      "sha256": "6fe6ad624f3ef8cdb06a2c1a74fe4702afbf752581cf9b451dc4c3d17c4e4e4d",
+      "bytes": 411
+    },
+    "src/agent_commons/ui/static/work/assets/work-BnrMzLpX.css": {
+      "sha256": "157f9d5217bcdd58abf833afd14f80808605ea125898c73b004d3d4417cae396",
+      "bytes": 9998
+    },
+    "src/agent_commons/ui/static/work/assets/work-7bq8hzFb.js": {
+      "sha256": "c0e6ef4492b12acd5a216b5847598dcdd64004621c9a0274536307627254754f",
+      "bytes": 326271
+    }
+  },
+  "closed_assertions": {
+    "code_points": "Summary, fact statements, and questions use Unicode code-point counts matching Python len on valid Unicode scalar text, rather than UTF-16 code units.",
+    "counts": "The browser enforces at most 64 facts, 8 exact sources per fact, 32 decisions, and 32 open questions.",
+    "references": "Source and decision references retain the closed kind and typed-ID grammar and reject duplicates before submission.",
+    "canonical_bytes": "The browser sorts the fixed semantic JSON keys and applies compact UTF-8 encoding equivalent to canonical_json_bytes before enforcing the 65,536-byte ceiling.",
+    "network_boundary": "An oversized outgoing draft raises a typed local validation result and does not call fetch.",
+    "feedback": "Every local refusal has paired actionable English and Russian copy; the form also states all canonical limits.",
+    "privacy": "No provider output, prompt, reasoning, transcript, credentials, or shared authority is recorded or exposed."
+  },
+  "verification": {
+    "canonical_byte_parity": "Browser byte counts 261 and 248 match Python canonical_json_bytes for fixed ASCII and escaped/multibyte fixtures.",
+    "frontend_behavior": {
+      "command": "npm --prefix frontend/work test",
+      "result": "24 passed"
+    },
+    "frontend_build": {
+      "command": "npm --prefix frontend/work run build",
+      "result": "successful"
+    },
+    "focused_python": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked python -m pytest -q tests/ui/test_context_pack_workflow.py tests/services/test_context_packs.py tests/domain/test_context_pack.py tests/domain/test_context_pack_projection.py tests/schemas/test_context_pack_schema.py",
+      "result": "31 passed, 1 warning"
+    },
+    "integrated": {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "result": "1778 passed, 13 skipped, 2 warnings",
+      "duration_seconds": 398.85
+    },
+    "canonical_review": "pending a new independent exact review of the remediated submitted revision"
+  }
+}
