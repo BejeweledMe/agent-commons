@@ -47,8 +47,15 @@ def test_component_targets_are_hermetic_and_partition_every_test_module() -> Non
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert "PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE" in makefile
     assert "-u AGENT_COMMONS_SESSION_ID" in makefile
+    assert "check: lint format-check frontend-work-test frontend-gallery-test test" in makefile
     assert "test:\n\t$(PYTEST) -q" in makefile
     assert "test-contracts: frontend-work-deps" not in makefile
+    assert "frontend-work-test: frontend-work-deps" in makefile
+    assert "frontend-gallery-test: frontend-gallery-deps" in makefile
+    assert "npm ci --ignore-scripts --prefix frontend/work" in makefile
+    assert "npm ci --ignore-scripts --prefix frontend/gallery" in makefile
+    assert "npm test --prefix frontend/work" in makefile
+    assert "npm test --prefix frontend/gallery" in makefile
 
     covered: list[Path] = []
     for target, entries in COMPONENT_PATHS.items():
@@ -82,4 +89,6 @@ def test_ci_keeps_full_matrix_but_deduplicates_equivalent_runs() -> None:
     assert "os: [ubuntu-latest, macos-latest]" in workflow
     assert 'python: ["3.11", "3.12", "3.13", "3.14"]' in workflow
     assert workflow.count("- run: make check") == 1
-    assert "cache-dependency-path: frontend/work/package-lock.json" in workflow
+    assert "cache-dependency-path: |" in workflow
+    assert "frontend/work/package-lock.json" in workflow
+    assert "frontend/gallery/package-lock.json" in workflow

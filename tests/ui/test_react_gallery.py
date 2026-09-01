@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -17,6 +18,14 @@ from tests.ui.conftest import authorized
 
 _REPOSITORY_ROOT = Path(__file__).parents[2]
 _GALLERY_SOURCE = _REPOSITORY_ROOT / "frontend" / "gallery"
+
+
+def _bundle_tree(root: Path) -> dict[str, bytes]:
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
 
 
 def test_gallery_bundle_is_packaged_beside_the_legacy_panel() -> None:
@@ -127,3 +136,21 @@ def test_gallery_source_uses_a_csp_safe_board_and_cookie_session_typed_refusal()
     assert "gallery_data_unavailable" in source
     assert "@xyflow/react" not in package["dependencies"]
     assert package["scripts"]["build"] == "tsc -b && vite build"
+
+
+def test_gallery_checked_in_bundle_is_fresh_from_its_pinned_frontend_source(
+    tmp_path: Path,
+) -> None:
+    """Rebuilding elsewhere must reproduce the exact packaged Gallery tree."""
+
+    rebuilt = tmp_path / "rebuilt-gallery"
+    result = subprocess.run(
+        ["npm", "run", "build", "--", "--outDir", str(rebuilt)],
+        cwd=_GALLERY_SOURCE,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _bundle_tree(rebuilt) == _bundle_tree(gallery_static_directory())

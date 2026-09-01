@@ -48,7 +48,9 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: npm
-          cache-dependency-path: frontend/work/package-lock.json
+          cache-dependency-path: |
+            frontend/work/package-lock.json
+            frontend/gallery/package-lock.json
       - run: uv sync --locked --extra test
       - run: make check
 

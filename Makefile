@@ -11,10 +11,11 @@ PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE \
 	-u AGENT_COMMONS_SESSION_ID \
 	$(UV) run --locked python -m pytest
 
-.PHONY: check lint format-check format frontend-work-deps help test \
-	test-domain test-runtime test-ui test-contracts sync
+.PHONY: check lint format-check format frontend-work-deps frontend-gallery-deps \
+	frontend-work-test frontend-gallery-test help test test-domain test-runtime \
+	test-ui test-contracts sync
 
-check: lint format-check frontend-work-deps test
+check: lint format-check frontend-work-test frontend-gallery-test test
 
 lint:
 	$(UV) run --locked ruff check .
@@ -29,6 +30,15 @@ format:
 frontend-work-deps:
 	npm ci --ignore-scripts --prefix frontend/work
 
+frontend-gallery-deps:
+	npm ci --ignore-scripts --prefix frontend/gallery
+
+frontend-work-test: frontend-work-deps
+	npm test --prefix frontend/work
+
+frontend-gallery-test: frontend-gallery-deps
+	npm test --prefix frontend/gallery
+
 test:
 	$(PYTEST) -q
 
@@ -41,7 +51,7 @@ test-domain:
 test-runtime:
 	$(PYTEST) -q tests/runtime tests/mcp
 
-test-ui: frontend-work-deps
+test-ui: frontend-work-test frontend-gallery-test
 	$(PYTEST) -q tests/ui tests/cli
 
 test-contracts:
