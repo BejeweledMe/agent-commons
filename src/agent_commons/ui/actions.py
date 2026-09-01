@@ -86,6 +86,27 @@ class UIActions:
         )
         return context_pack_detail_payload(record)
 
+    def apply_starter_pack_blueprint(
+        self,
+        *,
+        pack_id: str,
+        blueprint_id: str,
+        confirmed: bool,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Materialize one bundled blueprint as ordinary role templates."""
+
+        from agent_commons.ui.starter_packs import apply_starter_pack_blueprint
+
+        result = apply_starter_pack_blueprint(
+            self.writer(),
+            pack_id=pack_id,
+            blueprint_id=blueprint_id,
+            confirmed=confirmed,
+            idempotency_key=idempotency_key,
+        )
+        return result.to_wire()
+
     def cancel_provider_login(self, *, profile_id: str) -> dict[str, Any]:
         """Cancel the panel-owned login flow for one configured profile."""
 

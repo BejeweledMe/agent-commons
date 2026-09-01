@@ -1,9 +1,8 @@
-"""Typed browser-safe read DTOs for bundled Starter Pack examples.
+"""Typed browser-safe DTOs for bundled Starter Pack examples.
 
-The first Starter Pack surface is intentionally descriptive.  It lets Work
-show example packs, blueprints, and role cards without exposing a runtime
-instruction, selecting a profile, or providing data that could create a role.
-Those capabilities have their own future confirmation and policy boundaries.
+The catalogue remains descriptive and does not expose runtime instructions.
+The apply response exposes only the canonical role records that were created
+through the ordinary ``agent.created`` path after explicit confirmation.
 """
 
 from __future__ import annotations
@@ -14,6 +13,11 @@ from typing import Literal, TypedDict
 StarterPackSourceKind = Literal["bundled"]
 StarterPackContextMode = Literal["fresh"]
 StarterPackCatalogErrorCode = Literal["starter_pack_catalog_unavailable"]
+StarterPackApplyErrorCode = Literal[
+    "starter_pack_apply_confirmation_required",
+    "starter_pack_apply_not_found",
+    "starter_pack_apply_unavailable",
+]
 
 
 class StarterPackRolePayload(TypedDict):
@@ -22,6 +26,7 @@ class StarterPackRolePayload(TypedDict):
     id: str
     name: str
     purpose: str
+    profile_id: str
     context_mode: StarterPackContextMode
     skills: list[str]
 
@@ -66,6 +71,29 @@ class StarterPackCatalogRefusalPayload(TypedDict):
     error: StarterPackErrorPayload
 
 
+class AppliedStarterPackRolePayload(TypedDict):
+    """One materialized role template created from a bundled blueprint role."""
+
+    source_role_id: str
+    agent_id: str
+    revision: str
+    name: str
+    profile_id: str
+    context_mode: StarterPackContextMode
+    template: Literal[True]
+    grants: dict[str, str]
+    skills: list[str]
+
+
+class StarterPackApplyPayload(TypedDict):
+    """The complete apply result for one bundled blueprint."""
+
+    pack_id: str
+    blueprint_id: str
+    applied: Literal[True]
+    roles: list[AppliedStarterPackRolePayload]
+
+
 @dataclass(frozen=True, slots=True)
 class StarterPackRoleDTO:
     """An immutable browser-safe projection of one blueprint role."""
@@ -73,6 +101,7 @@ class StarterPackRoleDTO:
     id: str
     name: str
     purpose: str
+    profile_id: str
     skills: tuple[str, ...]
 
     def to_wire(self) -> StarterPackRolePayload:
@@ -82,6 +111,7 @@ class StarterPackRoleDTO:
             "id": self.id,
             "name": self.name,
             "purpose": self.purpose,
+            "profile_id": self.profile_id,
             "context_mode": "fresh",
             "skills": list(self.skills),
         }
@@ -155,4 +185,51 @@ class StarterPackCatalogRefusalDTO:
                 "code": "starter_pack_catalog_unavailable",
                 "message": "bundled Starter Pack examples could not be verified",
             }
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AppliedStarterPackRoleDTO:
+    """An immutable safe projection of one created role template."""
+
+    source_role_id: str
+    agent_id: str
+    revision: str
+    name: str
+    profile_id: str
+    grants: dict[str, str]
+    skills: tuple[str, ...]
+
+    def to_wire(self) -> AppliedStarterPackRolePayload:
+        """Return fresh standard containers for JSON serialization."""
+
+        return {
+            "source_role_id": self.source_role_id,
+            "agent_id": self.agent_id,
+            "revision": self.revision,
+            "name": self.name,
+            "profile_id": self.profile_id,
+            "context_mode": "fresh",
+            "template": True,
+            "grants": dict(self.grants),
+            "skills": list(self.skills),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StarterPackApplyDTO:
+    """The immutable result of applying one blueprint."""
+
+    pack_id: str
+    blueprint_id: str
+    roles: tuple[AppliedStarterPackRoleDTO, ...]
+
+    def to_wire(self) -> StarterPackApplyPayload:
+        """Return a fresh browser payload for one apply action."""
+
+        return {
+            "pack_id": self.pack_id,
+            "blueprint_id": self.blueprint_id,
+            "applied": True,
+            "roles": [role.to_wire() for role in self.roles],
         }

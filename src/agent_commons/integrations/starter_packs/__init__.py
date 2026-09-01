@@ -1,12 +1,14 @@
-"""Read-only validation for bundled Starter Pack examples.
+"""Validation for bundled Starter Pack examples.
 
-The package deliberately exposes metadata only.  Applying a pack, copying it
-into a project, resolving remote releases, or creating roles belongs to later
-explicitly-confirmed product slices.
+The package validates the packaged manifests and their payload digests.  The
+UI layer owns any explicitly-confirmed materialization into ordinary canonical
+roles.
 """
 
 from .bundled import get_bundled_pack, list_bundled_packs
 from .manifest import (
+    STARTER_PACK_ALLOWED_PROFILE_IDS,
+    STARTER_PACK_ALLOWED_SKILL_REFS,
     Blueprint,
     BlueprintRole,
     StarterPackFile,
@@ -18,6 +20,8 @@ from .manifest import (
 __all__ = [
     "Blueprint",
     "BlueprintRole",
+    "STARTER_PACK_ALLOWED_PROFILE_IDS",
+    "STARTER_PACK_ALLOWED_SKILL_REFS",
     "StarterPackFile",
     "StarterPackManifest",
     "StarterPackValidationError",

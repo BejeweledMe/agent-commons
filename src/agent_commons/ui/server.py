@@ -133,6 +133,7 @@ MUTATING_ROUTES = (
     ("POST", "/api/tasks/{task_id}/review-request"),
     ("POST", "/api/tasks/{task_id}/accept"),
     ("POST", "/api/tasks/{task_id}/reopen"),
+    ("POST", "/api/work/starter-packs/{pack_id}/blueprints/{blueprint_id}/apply"),
     ("POST", "/api/work/context-packs"),
     ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
 )
@@ -863,6 +864,19 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             expected_revision=expected_revision,
             draft=body["draft"],
             idempotency_key=body["idempotency_key"],
+        )
+
+    @router.post("/api/work/starter-packs/{pack_id}/blueprints/{blueprint_id}/apply")
+    async def apply_starter_pack_blueprint(
+        pack_id: str, blueprint_id: str, request: Request
+    ) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.apply_starter_pack_blueprint,
+            pack_id=pack_id,
+            blueprint_id=blueprint_id,
+            confirmed=body.get("confirmed") is True,
+            idempotency_key=body.get("idempotency_key"),
         )
 
     @router.post("/api/operations/{operation_id}/answer")

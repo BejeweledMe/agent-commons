@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 
 from agent_commons.errors import ConfigurationError
+from agent_commons.integrations.starter_packs import STARTER_PACK_ALLOWED_SKILL_REFS
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -230,6 +231,18 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
                 mcp_executable="/bin/echo",
                 trusted_workspace=True,
             ),
+            catalog={
+                "skills": [
+                    {
+                        "id": skill_id,
+                        "title": skill_id,
+                        "description": "packaged Agent Commons test skill",
+                        "instruction": f"Use packaged skill {skill_id}.",
+                    }
+                    for skill_id in sorted(STARTER_PACK_ALLOWED_SKILL_REFS)
+                ],
+                "tools": [],
+            },
         )
 
     context = UIContext(
@@ -378,6 +391,51 @@ def test_the_panel_launches_a_role_on_a_task_end_to_end(
     delegation = fixture["manager"].get_delegation(delegation_id)
     assert delegation["state"] == "succeeded"
     assert delegation["agent_id"] == fixture["role_id"]
+
+
+def test_applied_starter_pack_template_can_be_hired_and_launched(
+    workspace: dict[str, Any],
+) -> None:
+    """A Starter Pack role is a canonical preset, not a launch-only shortcut."""
+
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+
+    with _client(context) as client:
+        applied = client.post(
+            "/api/work/starter-packs/starter.feature-delivery.mock/blueprints/"
+            "feature-delivery/apply",
+            json={"confirmed": True, "idempotency_key": "launch-starter-pack-apply"},
+            headers=authorized(),
+        )
+        assert applied.status_code == 200, applied.text
+        template = next(
+            role for role in applied.json()["roles"] if role["source_role_id"] == "implementer"
+        )
+        hired = client.post(
+            "/api/agents",
+            json={
+                "name": "Feature implementer",
+                "rationale": "hire the Starter Pack preset for this task",
+                "from_preset_id": template["agent_id"],
+                "idempotency_key": "launch-starter-pack-hire",
+            },
+            headers=authorized(),
+        )
+        assert hired.status_code == 200, hired.text
+        agent_id = hired.json()["entity_ref"]["id"]
+        launched = client.post(
+            "/api/delegations",
+            json={"agent_id": agent_id, "task_id": fixture["task_id"]},
+            headers=authorized(),
+        )
+    assert launched.status_code == 200, launched.text
+    context.await_launches()
+    assert fixture["runner"].calls == 1
+    delegation = fixture["manager"].get_delegation(launched.json()["delegation_id"])
+    assert delegation["state"] == "succeeded"
+    assert delegation["agent_id"] == agent_id
+    assert delegation["target_profile"] == "claude-builder"
 
 
 def test_accumulated_work_launch_requires_and_binds_one_exact_pack_before_delegation(

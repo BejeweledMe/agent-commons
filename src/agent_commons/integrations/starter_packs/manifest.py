@@ -12,6 +12,27 @@ from agent_commons.errors import ValidationError
 
 PACK_FORMAT: Final = "agent-commons.starter-pack.v1"
 REGISTRY_FORMAT: Final = "agent-commons.starter-pack-registry.v1"
+STARTER_PACK_ALLOWED_PROFILE_IDS: Final = frozenset(
+    {
+        "codex-builder",
+        "codex-independent-reviewer",
+        "claude-builder",
+        "claude-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer",
+    }
+)
+STARTER_PACK_ALLOWED_SKILL_REFS: Final = frozenset(
+    {
+        "commons-start",
+        "commons-coordinate",
+        "commons-delegate",
+        "commons-review",
+        "commons-record",
+        "commons-handoff",
+        "commons-share",
+    }
+)
 MAX_MANIFEST_BYTES: Final = 64 * 1024
 MAX_PACK_BYTES: Final = 64 * 1024
 MAX_RUNTIME_INSTRUCTION_BYTES: Final = 4 * 1024
@@ -53,6 +74,7 @@ class BlueprintRole:
     id: str
     name: str
     purpose: str
+    profile_id: str
     fresh_context: bool
     skill_refs: tuple[str, ...]
     runtime_instruction: str
@@ -210,7 +232,15 @@ def _parse_roles(value: object, pack_role_identifiers: set[str]) -> tuple[Bluepr
         _closed_keys(
             mapping,
             frozenset(
-                {"id", "name", "purpose", "fresh_context", "skill_refs", "runtime_instruction"}
+                {
+                    "id",
+                    "name",
+                    "purpose",
+                    "profile_id",
+                    "fresh_context",
+                    "skill_refs",
+                    "runtime_instruction",
+                }
             ),
             unknown_code="starter_pack_manifest_unknown_field",
         )
@@ -220,6 +250,11 @@ def _parse_roles(value: object, pack_role_identifiers: set[str]) -> tuple[Bluepr
         fresh_context = mapping.get("fresh_context")
         if fresh_context is not True:
             _reject("starter_pack_manifest_invalid")
+        profile_id = _required_string(
+            mapping.get("profile_id"), 64, "starter_pack_manifest_invalid"
+        )
+        if profile_id not in STARTER_PACK_ALLOWED_PROFILE_IDS:
+            _reject("starter_pack_profile_not_allowed")
         skill_refs = _parse_skill_refs(mapping.get("skill_refs"))
         instruction = _required_plain_text(mapping.get("runtime_instruction"), 8_192)
         if len(instruction.encode("utf-8")) > MAX_RUNTIME_INSTRUCTION_BYTES:
@@ -229,6 +264,7 @@ def _parse_roles(value: object, pack_role_identifiers: set[str]) -> tuple[Bluepr
                 id=identifier,
                 name=_required_plain_text(mapping.get("name"), 160),
                 purpose=_required_plain_text(mapping.get("purpose"), 1_000),
+                profile_id=profile_id,
                 fresh_context=True,
                 skill_refs=skill_refs,
                 runtime_instruction=instruction,
@@ -244,6 +280,9 @@ def _parse_skill_refs(value: object) -> tuple[str, ...]:
     skills = tuple(_required_id(item) for item in items)
     if len(set(skills)) != len(skills):
         _reject("starter_pack_duplicate_id")
+    outside = sorted(set(skills) - STARTER_PACK_ALLOWED_SKILL_REFS)
+    if outside:
+        _reject("starter_pack_skill_ref_not_allowed")
     return skills
 
 

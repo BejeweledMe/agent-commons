@@ -310,6 +310,11 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
             f"/api/tasks/{task['id']}/reopen",
             {"expected_revision": chain["task_revision"], "reason": "one more pass"},
         ),
+        (
+            "/api/work/starter-packs/starter.feature-delivery.mock/blueprints/"
+            "feature-delivery/apply",
+            {"confirmed": True, "idempotency_key": "readonly-invariant-starter-pack-apply"},
+        ),
     )
     # Three route families refuse on a missing subject before they reach any write, so
     # driving them here would prove nothing about the write path; they are
@@ -341,6 +346,7 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/tasks/{task_id}/review-request"),
         ("POST", "/api/tasks/{task_id}/accept"),
         ("POST", "/api/tasks/{task_id}/reopen"),
+        ("POST", "/api/work/starter-packs/{pack_id}/blueprints/{blueprint_id}/apply"),
     }
     assert covered | exempt == set(MUTATING_ROUTES)
     assert len(calls) == len(covered)

@@ -34,6 +34,19 @@ def test_bundled_registry_exposes_exactly_two_verified_mock_metadata_entries() -
         for blueprint in pack.blueprints
         for role in blueprint.roles
     )
+    assert all(
+        role.profile_id in {"claude-builder", "claude-independent-reviewer"}
+        for pack in packs
+        for blueprint in pack.blueprints
+        for role in blueprint.roles
+    )
+    assert all(
+        skill.startswith("commons-")
+        for pack in packs
+        for blueprint in pack.blueprints
+        for role in blueprint.roles
+        for skill in role.skill_refs
+    )
     assert get_bundled_pack("starter.feature-delivery.mock") == packs[0]
     with pytest.raises(StarterPackValidationError, match="starter_pack_not_found"):
         get_bundled_pack("starter.unknown.mock")
@@ -55,6 +68,18 @@ def test_bundled_registry_exposes_exactly_two_verified_mock_metadata_entries() -
                 "runtime_instruction", "x" * (MAX_RUNTIME_INSTRUCTION_BYTES + 1)
             ),
             "starter_pack_instruction_too_large",
+        ),
+        (
+            lambda document: document["blueprints"][0]["roles"][0].__setitem__(
+                "profile_id", "custom-builder"
+            ),
+            "starter_pack_profile_not_allowed",
+        ),
+        (
+            lambda document: document["blueprints"][0]["roles"][0].__setitem__(
+                "skill_refs", ["software-engineering"]
+            ),
+            "starter_pack_skill_ref_not_allowed",
         ),
     ],
 )
@@ -206,8 +231,9 @@ def _manifest(pack_id: str, payload_path: str, payload: bytes) -> dict[str, obje
                         "id": "implementer",
                         "name": "Implementer",
                         "purpose": "Build the bounded change.",
+                        "profile_id": "claude-builder",
                         "fresh_context": True,
-                        "skill_refs": ["software-engineering"],
+                        "skill_refs": ["commons-start"],
                         "runtime_instruction": "Implement the approved scope.",
                     }
                 ],

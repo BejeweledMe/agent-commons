@@ -14,16 +14,18 @@
           "id": "researcher",
           "name": "Researcher",
           "purpose": "Collect bounded evidence and state assumptions and open questions.",
+          "profile_id": "claude-builder",
           "fresh_context": true,
-          "skill_refs": ["business-product-consulting"],
+          "skill_refs": ["commons-start", "commons-share", "commons-record"],
           "runtime_instruction": "Research the assigned question. Separate facts, assumptions, risks, and unresolved decisions."
         },
         {
           "id": "product-reviewer",
           "name": "Product reviewer",
           "purpose": "Check whether evidence supports the recommendation without making the owner's decision.",
+          "profile_id": "claude-independent-reviewer",
           "fresh_context": true,
-          "skill_refs": ["business-product-consulting"],
+          "skill_refs": ["commons-start", "commons-review", "commons-record"],
           "runtime_instruction": "Review the recommendation against its evidence. Escalate product decisions that require an owner."
         }
       ]

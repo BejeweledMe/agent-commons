@@ -14,16 +14,18 @@
           "id": "implementer",
           "name": "Implementer",
           "purpose": "Build the scoped change and report verifiable evidence.",
+          "profile_id": "claude-builder",
           "fresh_context": true,
-          "skill_refs": ["software-engineering", "qa-testing"],
+          "skill_refs": ["commons-start", "commons-coordinate", "commons-record"],
           "runtime_instruction": "Implement only the approved scope. Run relevant checks and report evidence."
         },
         {
           "id": "independent-reviewer",
           "name": "Independent reviewer",
           "purpose": "Assess the submitted work without inheriting the implementer's context.",
+          "profile_id": "claude-independent-reviewer",
           "fresh_context": true,
-          "skill_refs": ["qa-testing"],
+          "skill_refs": ["commons-start", "commons-review", "commons-record"],
           "runtime_instruction": "Review the exact submitted revision. Record evidence-backed approval or requested changes."
         }
       ]
