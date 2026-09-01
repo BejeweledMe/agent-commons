@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agent_commons.runtime import BuiltinProfileId
+from agent_commons.runtime import BuiltinProfileId, Provider
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +38,12 @@ def compose_delegation_instruction(
     """Compose the provider-only instruction for one already-validated delegation."""
 
     terminal_start_seconds = max(15, instruction.wall_time_seconds * 2 // 3)
+    terminal_prefix = (
+        "agent-commons__" if profile_id.provider is Provider.GROK else "mcp__agent-commons__"
+    )
+    finalize_review_tool = f"{terminal_prefix}commons_finalize_review"
+    record_verification_tool = f"{terminal_prefix}commons_record_verification"
+    succeed_delegation_tool = f"{terminal_prefix}commons_succeed_delegation"
 
     if profile_id.independent_reviewer:
         target_reader = (
@@ -71,12 +77,12 @@ def compose_delegation_instruction(
         result_protocol = (
             "For independent_review, do not edit source. Find the existing review "
             "request for\n"
-            """the exact target. Before the terminal call, satisfy every evidence
+            f"""the exact target. Before the terminal call, satisfy every evidence
 precondition: inspect the review, locate its exact task once, and call
 commons_read_artifact exactly once for every artifact required by that task. Do
 not attempt finalization first and repair a rejected call afterward. After
 analysis, call the injected
-mcp__agent-commons__commons_finalize_review tool exactly once with the bounded
+{finalize_review_tool} tool exactly once with the bounded
 verdict. That retry-convergent terminal operation records review.completed and then
 delegation.succeeded with the bound review as its fixed result; do not call a
 separate generic delegation-success tool. This exact tool call is the required
@@ -96,11 +102,11 @@ target acceptance criteria and normal task/artifact/review workflow."""
         result_protocol = (
             "For verification, do not edit source. Inspect only the exact target "
             "and revision\n"
-            """named above. First call mcp__agent-commons__commons_record_verification with that
+            f"""named above. First call {record_verification_tool} with that
 exact target, revision, a bounded reproducible claim and method, the honest
 outcome, and only existing canonical evidence references. Then fetch the
 delegation again with commons_show_delegation and call
-mcp__agent-commons__commons_succeed_delegation exactly once with the new
+{succeed_delegation_tool} exactly once with the new
 verification as its sole typed result reference (verification:<id>). These exact
 tool calls are the required result protocol, not optional suggestions. A
 prose-only answer or successful process exit without both canonical calls is
@@ -112,7 +118,7 @@ typed needs-operator or input-needed outcome instead."""
 task/artifact/review workflow. Do not claim success until the required typed
 result reference already exists and the exact delegated work is complete.
 The only successful terminal sequence is: first call commons_show_delegation;
-then call mcp__agent-commons__commons_succeed_delegation exactly once with
+then call {succeed_delegation_tool} exactly once with
 delegation_id=\"{instruction.delegation_id}\", expected_revision set to the current
 revision returned by that immediately preceding read, a bounded summary,
 result_refs=[\"{instruction.target_kind}:{instruction.target_id}\"], and one stable

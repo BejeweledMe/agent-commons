@@ -44,7 +44,7 @@ from .skill_projection import EphemeralSkillBundle, compile_skill_bundle, verify
 from .subprocess_runner import SubprocessRunner
 
 PROVIDER_INITIALIZATION_TIMEOUT_SECONDS = 5
-PROVIDER_INITIALIZATION_MAX_OUTPUT_BYTES = 16 * 1024
+PROVIDER_INITIALIZATION_MAX_OUTPUT_BYTES = 64 * 1024
 _INITIALIZATION_SESSION_ID = "provider-initialization-probe"
 
 

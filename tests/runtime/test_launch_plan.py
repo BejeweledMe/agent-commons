@@ -381,6 +381,37 @@ def test_codex_probe_uses_only_fixed_no_model_argv_eof_and_bounds(tmp_path: Path
     assert runner.values["max_output_bytes"] == 4096
 
 
+def test_grok_probe_default_bound_covers_bounded_inspect_metadata(tmp_path: Path) -> None:
+    payload = json.dumps(
+        {
+            "mcpServers": [{"name": "agent-commons"}],
+            "hooks": [],
+            "plugins": [],
+            "boundedMetadata": "x" * (32 * 1024),
+        }
+    ).encode()
+
+    class CapturingRunner:
+        values: dict[str, Any] = {}
+
+        def run(self, invocation: RunnerInvocation, **values: Any) -> ProcessResult:
+            self.values = values
+            return replace(
+                _result(),
+                stdout=payload,
+                stdout_bytes_seen=len(payload),
+            )
+
+    runner = CapturingRunner()
+    status = ProviderInitializationProbe(runner=runner).probe(  # type: ignore[arg-type]
+        _profile(BuiltinProfileId.GROK_BUILDER),
+        workspace_root=tmp_path,
+    )
+
+    assert status.state is ProviderInitializationState.READY
+    assert runner.values["max_output_bytes"] == 64 * 1024
+
+
 def _context_binding(summary: str = "Stable baseline") -> ContextBinding:
     record = ContextPackRecord.create(
         context_pack_id="context_pack." + "0" * 25 + "7",

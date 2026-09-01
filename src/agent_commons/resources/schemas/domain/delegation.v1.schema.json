@@ -38,7 +38,9 @@
         "codex-builder",
         "codex-independent-reviewer",
         "claude-builder",
-        "claude-independent-reviewer"
+        "claude-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer"
       ]
     },
     "purpose": {

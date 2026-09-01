@@ -12,6 +12,16 @@ DELEGATION_ID = "delegation.00000000000000000000000001"
 TASK_ID = "task.00000000000000000000000001"
 REVISION = "evt.00000000000000000000000001"
 SESSION_ID = "session." + "a" * 32
+AGENT_ID = "agent.00000000000000000000000001"
+
+BUILTIN_PROFILES = (
+    "codex-builder",
+    "codex-independent-reviewer",
+    "claude-builder",
+    "claude-independent-reviewer",
+    "grok-builder",
+    "grok-independent-reviewer",
+)
 
 
 def _request() -> dict:
@@ -54,6 +64,31 @@ def test_delegation_payload_schema_is_closed_and_allowlisted() -> None:
     extra = {**payload, "command": "claude --dangerously-skip-permissions"}
     with pytest.raises(ValidationError, match="Additional properties"):
         registry.validate("commons.payload.delegation.v1", extra)
+
+
+@pytest.mark.parametrize("profile", BUILTIN_PROFILES)
+def test_canonical_schemas_accept_every_builtin_provider_profile(profile: str) -> None:
+    registry = SchemaRegistry()
+    purpose = (
+        "independent_review" if profile.endswith("-independent-reviewer") else "implementation"
+    )
+    delegation = {**_request(), "target_profile": profile, "purpose": purpose}
+    agent = {
+        "agent_id": AGENT_ID,
+        "name": "Bounded provider role",
+        "profile_id": profile,
+        "grants": {"create_roles": "deny", "retire_roles": "deny", "open_links": "deny"},
+        "context_mode": "fresh",
+        "origin": "human",
+        "approval": "human",
+        "rationale": "The role uses one closed built-in provider profile.",
+        "lifetime": {"kind": "persistent"},
+    }
+
+    registry.validate("commons.payload.delegation.v1", delegation)
+    validate_payload("delegation.requested", delegation)
+    registry.validate("commons.payload.agent.v1", agent)
+    validate_payload("agent.created", agent)
 
 
 def test_delegation_limits_are_exact_positive_and_bounded() -> None:

@@ -114,3 +114,45 @@ def test_implementation_instruction_gives_one_exact_terminal_sequence() -> None:
     assert 'result_refs=["task:task.implementation"]' in instruction
     assert "immediately preceding read" in instruction
     assert "Do not try a stale revision or incomplete argument set" in instruction
+
+
+def test_grok_instructions_use_provider_native_terminal_tool_names() -> None:
+    review = compose_delegation_instruction(
+        DelegationInstructionInput(
+            delegation_id="delegation.grok-review",
+            target_kind="review",
+            target_id="review.grok",
+            target_revision="evt.grok-review",
+            purpose="independent_review",
+            target_profile="grok-independent-reviewer",
+            max_depth=0,
+            wall_time_seconds=60,
+            max_attempts=1,
+            max_concurrency=1,
+            budget_limit=1,
+            budget_unit="provider_units",
+        ),
+        profile_id=BuiltinProfileId.GROK_INDEPENDENT_REVIEWER,
+    )
+    implementation = compose_delegation_instruction(
+        DelegationInstructionInput(
+            delegation_id="delegation.grok-builder",
+            target_kind="task",
+            target_id="task.grok",
+            target_revision="evt.grok-builder",
+            purpose="implementation",
+            target_profile="grok-builder",
+            max_depth=0,
+            wall_time_seconds=60,
+            max_attempts=1,
+            max_concurrency=1,
+            budget_limit=1,
+            budget_unit="provider_units",
+        ),
+        profile_id=BuiltinProfileId.GROK_BUILDER,
+    )
+
+    assert "agent-commons__commons_finalize_review" in review
+    assert "agent-commons__commons_succeed_delegation" in implementation
+    assert "mcp__agent-commons__commons_finalize_review" not in review
+    assert "mcp__agent-commons__commons_succeed_delegation" not in implementation
