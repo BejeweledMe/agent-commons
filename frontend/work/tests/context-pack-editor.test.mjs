@@ -20,6 +20,9 @@ execFileSync(
 );
 const apiModule = await import(pathToFileURL(resolve(compiled, "api.js")).href);
 const editorStateModule = await import(pathToFileURL(resolve(compiled, "contextPackEditorState.js")).href);
+const validationModule = await import(
+  pathToFileURL(resolve(compiled, "contextPackDraftValidation.js")).href
+);
 const id = (kind, suffix) => `${kind}.${"0".repeat(25)}${suffix}`;
 
 function detail() {
@@ -101,6 +104,77 @@ test("Context Pack parser refuses hostile arrays, strings, refs, and state", () 
   assert.throws(() => apiModule.parseContextPackCatalog(inconsistent));
 });
 
+test("outgoing drafts enforce canonical character, count, reference, and UTF-8 byte limits", () => {
+  const baseline = apiModule.parseContextPackDetail(detail());
+  const expectCode = (draft, code) => assert.throws(
+    () => validationModule.validateContextPackDraft(draft),
+    (error) => error instanceof validationModule.ContextPackDraftValidationError
+      && error.code === code
+  );
+
+  assert.equal(validationModule.contextPackDraftCanonicalBytes(baseline), 261);
+  const escapedMultibyte = structuredClone(baseline);
+  escapedMultibyte.summary = "Привет 🧭\n";
+  escapedMultibyte.facts[0].statement = "é/\"\\\t";
+  escapedMultibyte.openQuestions = ["¿Qué?"];
+  assert.equal(validationModule.contextPackDraftCanonicalBytes(escapedMultibyte), 248);
+
+  const multibyteSummary = structuredClone(baseline);
+  multibyteSummary.summary = "🧭".repeat(4096);
+  assert.equal(validationModule.validateContextPackDraft(multibyteSummary), multibyteSummary);
+
+  const longSummary = structuredClone(baseline);
+  longSummary.summary = "🧭".repeat(4097);
+  expectCode(longSummary, "context_packs_validation_summary_limit");
+
+  const tooManyFacts = structuredClone(baseline);
+  tooManyFacts.facts = Array.from({ length: 65 }, () => structuredClone(baseline.facts[0]));
+  expectCode(tooManyFacts, "context_packs_validation_facts_limit");
+
+  const longFact = structuredClone(baseline);
+  longFact.facts[0].statement = "x".repeat(1025);
+  expectCode(longFact, "context_packs_validation_fact_limit");
+
+  const tooManySources = structuredClone(baseline);
+  tooManySources.facts[0].sourceRefs = Array.from({ length: 9 }, (_, index) => ({
+    ...baseline.facts[0].sourceRefs[0],
+    id: id("artifact", String(index + 1))
+  }));
+  expectCode(tooManySources, "context_packs_validation_sources_limit");
+
+  const tooManyDecisions = structuredClone(baseline);
+  tooManyDecisions.decisionRefs = Array.from({ length: 33 }, (_, index) => ({
+    kind: "decision",
+    id: id("decision", String.fromCharCode(65 + index)),
+    revision: id("evt", "5")
+  }));
+  expectCode(tooManyDecisions, "context_packs_validation_decisions_limit");
+
+  const tooManyQuestions = structuredClone(baseline);
+  tooManyQuestions.openQuestions = Array.from({ length: 33 }, () => "Question");
+  expectCode(tooManyQuestions, "context_packs_validation_questions_limit");
+
+  const longQuestion = structuredClone(baseline);
+  longQuestion.openQuestions = ["🧭".repeat(1025)];
+  expectCode(longQuestion, "context_packs_validation_question_limit");
+
+  const duplicateSource = structuredClone(baseline);
+  duplicateSource.facts[0].sourceRefs.push(structuredClone(baseline.facts[0].sourceRefs[0]));
+  expectCode(duplicateSource, "context_packs_validation_duplicate_reference");
+
+  const invalidUnicode = structuredClone(baseline);
+  invalidUnicode.summary = "invalid \ud800";
+  expectCode(invalidUnicode, "context_packs_validation_invalid_text");
+
+  const aggregate = structuredClone(baseline);
+  aggregate.summary = "s".repeat(4096);
+  aggregate.facts = Array.from({ length: 64 }, (_, index) => ({
+    statement: `${index}:` + "🧭".repeat(511),
+    sourceRefs: [structuredClone(baseline.facts[0].sourceRefs[0])]
+  }));
+  expectCode(aggregate, "context_packs_validation_oversized");
+});
+
 test("failed retry retains identity while explicit New rotates it", () => {
   const generated = ["create-1", "create-2"];
   const identity = new editorStateModule.ContextPackRetryIdentity(() => generated.shift());
@@ -129,6 +203,18 @@ test("publish and revise preserve caller idempotency and exact expected revision
   assert.equal(calls[1].body.idempotency_key, "stable-revise");
   assert.equal(calls[1].body.expected_revision, draft.revision);
   assert.equal("transcript" in calls[0].body.draft, false);
+
+  const oversized = structuredClone(draft);
+  oversized.facts = Array.from({ length: 64 }, (_, index) => ({
+    statement: `${index}:` + "🧭".repeat(511),
+    sourceRefs: [structuredClone(draft.facts[0].sourceRefs[0])]
+  }));
+  await assert.rejects(
+    () => api.publishContextPack(oversized, "must-not-send", signal),
+    (error) => error instanceof validationModule.ContextPackDraftValidationError
+      && error.code === "context_packs_validation_oversized"
+  );
+  assert.equal(calls.length, 2);
 });
 
 test("editor keeps paired locale, semantic form, and honest context modes", () => {
@@ -137,6 +223,9 @@ test("editor keeps paired locale, semantic form, and honest context modes", () =
   assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages.ru).sort());
   assert.match(component, /aria-live/);
   assert.match(component, /<fieldset/);
+  assert.match(component, /validateContextPackDraft/);
+  assert.match(messages.en.context_packs_validation_oversized, /65,536 UTF-8 bytes/);
+  assert.match(messages.ru.context_packs_validation_oversized, /65 536 байт UTF-8/);
   assert.match(messages.en.context_packs_context_notice, /fresh.*accumulated.*resume unavailable/);
   assert.match(messages.ru.context_packs_context_notice, /fresh.*accumulated.*resume unavailable/);
   assert.doesNotMatch(component, /demo|mock|dangerouslySetInnerHTML|style=|provider output.*value/i);

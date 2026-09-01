@@ -39,6 +39,7 @@ import type {
   WorkspaceData,
   WorkspaceMeta
 } from "./contracts";
+import { validateContextPackDraft } from "./contextPackDraftValidation.js";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
 const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
@@ -558,18 +559,19 @@ export function parseContextPackCatalog(value: unknown): ContextPackCatalog {
 }
 
 function contextPackDraftWire(draft: ContextPackDraft): JsonObject {
+  const validated = validateContextPackDraft(draft);
   const refWire = (ref: RevisionBoundRef): JsonObject => ({
     ref: { kind: ref.kind, id: ref.id },
     revision: ref.revision
   });
   return {
-    summary: draft.summary,
-    facts: draft.facts.map((fact) => ({
+    summary: validated.summary,
+    facts: validated.facts.map((fact) => ({
       statement: fact.statement,
       source_refs: fact.sourceRefs.map(refWire)
     })),
-    decision_refs: draft.decisionRefs.map(refWire),
-    open_questions: [...draft.openQuestions]
+    decision_refs: validated.decisionRefs.map(refWire),
+    open_questions: [...validated.openQuestions]
   };
 }
 

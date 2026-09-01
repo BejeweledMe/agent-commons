@@ -2,6 +2,11 @@ import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "
 
 import { ApiProblem, type WorkApi } from "../api";
 import { ContextPackRetryIdentity } from "../contextPackEditorState";
+import {
+  ContextPackDraftValidationError,
+  type ContextPackDraftValidationCode,
+  validateContextPackDraft
+} from "../contextPackDraftValidation.js";
 import type {
   ContextPackCatalog,
   ContextPackDetail,
@@ -27,6 +32,7 @@ type SaveState =
   | { kind: "saving" }
   | { kind: "success"; revision: string }
   | { kind: "stale" }
+  | { kind: "validation"; code: ContextPackDraftValidationCode | "context_packs_validation_format" }
   | { kind: "error"; code: string };
 
 type Editor = {
@@ -87,7 +93,7 @@ function parseDraft(editor: Editor): ContextPackDraft {
     return { kind: "decision" as const, id: `decision.${match[1]}`, revision: `evt.${match[2]}` };
   });
   const openQuestions = editor.questions.split("\n").map((line) => line.trim()).filter(Boolean);
-  return { summary, facts, decisionRefs, openQuestions };
+  return validateContextPackDraft({ summary, facts, decisionRefs, openQuestions });
 }
 
 function referenceText(ref: RevisionBoundRef): string {
@@ -149,8 +155,13 @@ export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactE
     let draft: ContextPackDraft;
     try {
       draft = parseDraft(editor);
-    } catch {
-      setSave({ kind: "error", code: "context_pack_editor_invalid" });
+    } catch (error: unknown) {
+      setSave({
+        kind: "validation",
+        code: error instanceof ContextPackDraftValidationError
+          ? error.code
+          : "context_packs_validation_format"
+      });
       return;
     }
     const signature = JSON.stringify({ draft, id: editor.contextPackId, revision: editor.expectedRevision });
@@ -222,7 +233,8 @@ export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactE
           <legend>{editor.contextPackId === null ? text("context_packs_publish_title") : text("context_packs_revise_title")}</legend>
           {editor.expectedRevision !== null ? <p className="small-copy">{text("context_packs_expected_revision")}: <code>{editor.expectedRevision}</code></p> : null}
           <label htmlFor="context-pack-summary">{text("context_packs_summary")}</label>
-          <textarea id="context-pack-summary" maxLength={4096} onChange={(event) => setEditor({ ...editor, summary: event.target.value })} required rows={4} value={editor.summary} />
+          <textarea aria-describedby="context-packs-bounds-help" id="context-pack-summary" onChange={(event) => setEditor({ ...editor, summary: event.target.value })} required rows={4} value={editor.summary} />
+          <p className="small-copy" id="context-packs-bounds-help">{text("context_packs_bounds_help")}</p>
           <label htmlFor="context-pack-facts">{text("context_packs_facts")}</label>
           <textarea aria-describedby="context-pack-facts-help" id="context-pack-facts" onChange={(event) => setEditor({ ...editor, facts: event.target.value })} rows={5} value={editor.facts} />
           <p className="small-copy" id="context-pack-facts-help">{text("context_packs_facts_help")}</p>
@@ -245,6 +257,7 @@ export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactE
             ) : null}
           </div>
         ) : null}
+        {save.kind === "validation" ? <p className="notice notice-warning">{text(save.code)}</p> : null}
         {save.kind === "error" ? <p className="notice">{text("context_packs_save_error")} <code>{save.code}</code></p> : null}
       </div>
     </section>
