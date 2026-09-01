@@ -72,12 +72,13 @@ async def tracker_events(
             gap="tracker_sequence_regressed",
         )
         yield _sse("error", snapshot, event_id=None)
-        last_sent = resume_after
+        last_sent: int | None = resume_after
     else:
         event = "error" if snapshot.state == "error" else "snapshot"
         event_id = None if event == "error" else snapshot.sequence
-        yield _sse(event, snapshot, event_id=event_id)
-        last_sent = snapshot.sequence
+        frame, advances_cursor = _sse_frame(event, snapshot, event_id=event_id)
+        yield frame
+        last_sent = snapshot.sequence if advances_cursor else resume_after
     last_signature = _snapshot_signature(snapshot)
     since_heartbeat = 0.0
     while True:
@@ -85,11 +86,17 @@ async def tracker_events(
         since_heartbeat += poll_seconds
         current = await _safe_snapshot(source, resume_after=last_sent)
         current_signature = _snapshot_signature(current)
-        if current.sequence > last_sent:
-            yield _sse("snapshot", current, event_id=current.sequence)
-            last_sent = current.sequence
-            last_signature = current_signature
-            since_heartbeat = 0.0
+        emitted = False
+        if last_sent is None or current.sequence > last_sent:
+            event = "error" if current.state == "error" else "snapshot"
+            event_id = None if event == "error" else current.sequence
+            frame, advances_cursor = _sse_frame(event, current, event_id=event_id)
+            if current_signature != last_signature:
+                yield frame
+                emitted = True
+                last_signature = current_signature
+                if advances_cursor:
+                    last_sent = current.sequence
         elif current.sequence < last_sent:
             regression = unavailable_tracker_snapshot(
                 generated_at=current.freshness.generated_at,
@@ -101,13 +108,13 @@ async def tracker_events(
             signature = _snapshot_signature(regression)
             if signature != last_signature:
                 yield _sse("error", regression, event_id=None)
+                emitted = True
                 last_signature = signature
-                since_heartbeat = 0.0
         elif current_signature != last_signature:
             if current.state == "error":
                 yield _sse("error", current, event_id=None)
+                emitted = True
                 last_signature = current_signature
-                since_heartbeat = 0.0
             else:
                 reused = unavailable_tracker_snapshot(
                     generated_at=current.freshness.generated_at,
@@ -118,14 +125,24 @@ async def tracker_events(
                 signature = _snapshot_signature(reused)
                 if signature != last_signature:
                     yield _sse("error", reused, event_id=None)
+                    emitted = True
                     last_signature = signature
-                    since_heartbeat = 0.0
+        if emitted:
+            since_heartbeat = 0.0
         elif since_heartbeat >= heartbeat_seconds:
             yield b": keepalive\n\n"
             since_heartbeat = 0.0
 
 
 def _sse(event: str, snapshot: TrackerSnapshotDTO, *, event_id: int | None) -> bytes:
+    return _sse_frame(event, snapshot, event_id=event_id)[0]
+
+
+def _sse_frame(
+    event: str, snapshot: TrackerSnapshotDTO, *, event_id: int | None
+) -> tuple[bytes, bool]:
+    """Serialize one frame and report whether it may advance Last-Event-ID."""
+
     body = json.dumps(snapshot.to_wire(), separators=(",", ":"), ensure_ascii=False).encode()
     prefix = (b"" if event_id is None else b"id: " + str(event_id).encode() + b"\n") + (
         b"event: " + event.encode() + b"\ndata: "
@@ -163,7 +180,11 @@ def _sse(event: str, snapshot: TrackerSnapshotDTO, *, event_id: int | None) -> b
             },
             separators=(",", ":"),
         ).encode()
-    return prefix + body + b"\n\n"
+        event = "error"
+        event_id = None
+        prefix = b"event: error\ndata: "
+    frame = prefix + body + b"\n\n"
+    return frame, event == "snapshot" and event_id is not None
 
 
 def _parse_last_event_id(value: str | None) -> int | None:
