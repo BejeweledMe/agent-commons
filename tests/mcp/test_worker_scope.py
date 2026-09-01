@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
 import pytest
 
@@ -540,6 +541,30 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         server.tools["commons_show_review"](workspace["unrelated_review"]["entity_ref"]["id"])
 
 
+def test_fastmcp_worker_schema_bounds_review_verdict(tmp_path: Path) -> None:
+    pytest.importorskip("mcp.server.fastmcp")
+    workspace = _workspace(tmp_path)
+    server = build_server(
+        workspace["repo"],
+        manager=workspace["child"],
+        runtime=FakeRuntime(),
+        delegation_id=workspace["delegation"]["entity_ref"]["id"],
+        binding_wait_seconds=0,
+    )
+
+    tools = asyncio.run(server.list_tools())  # type: ignore[attr-defined]
+    finalizer = next(tool for tool in tools if tool.name == "commons_finalize_review")
+    schema = finalizer.model_dump()["inputSchema"]
+
+    assert set(schema["required"]) == {"verdict", "summary"}
+    assert schema["properties"]["verdict"]["enum"] == [
+        "approved",
+        "changes_requested",
+        "rejected",
+        "abstained",
+    ]
+
+
 def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
     tmp_path: Path,
 ) -> None:
@@ -597,6 +622,13 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
     assert tuple(inspect.signature(server.tools["commons_finalize_review"]).parameters) == (
         "verdict",
         "summary",
+    )
+    verdict_annotation = get_type_hints(server.tools["commons_finalize_review"])["verdict"]
+    assert get_args(verdict_annotation) == (
+        "approved",
+        "changes_requested",
+        "rejected",
+        "abstained",
     )
     with pytest.raises(LifecycleConflictError, match="outside its delegation scope"):
         server.tools["commons_delegation_needs_operator"](

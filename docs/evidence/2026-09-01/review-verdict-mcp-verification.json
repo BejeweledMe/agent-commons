@@ -1,0 +1,46 @@
+{
+  "schema": "agent_commons.safe_verification_evidence.v1",
+  "task_id": "task.78K5CB9FF8EZH5QSG9F6XY695K",
+  "subject": "bounded independent-review verdict contract",
+  "files": {
+    "src/agent_commons/mcp/server.py": "sha256:4ea5d2841aeccb5430ce3a89dbd560b496f640df03b6ac998d05cdb8b4aa6c4d",
+    "src/agent_commons/services/delegation_instruction.py": "sha256:7ec53172866a2a63ee7c03888588e5cd9ac1e863ad439d66379abb5c83c2ec3b",
+    "tests/mcp/test_worker_scope.py": "sha256:9c966b9a29b42524c0cf30ebac400cd9845579f13a008cf4e994d75307e4999a",
+    "tests/runtime/test_delegation_instruction.py": "sha256:8554fd24cf159b1b0620ec8e08fb1387825f64bbd0ec15afd253a57d7c011313"
+  },
+  "checks": [
+    {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked pytest -q tests/mcp/test_worker_scope.py tests/runtime/test_delegation_instruction.py",
+      "outcome": "passed",
+      "passed": 22,
+      "duration_seconds": 71.04,
+      "note": "Run before the final focused FastMCP schema case was added; the final full gate below includes that case."
+    },
+    {
+      "command": "env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_SESSION_ID make check",
+      "outcome": "passed",
+      "passed": 1769,
+      "skipped": 13,
+      "warnings": 2,
+      "duration_seconds": 529.94
+    }
+  ],
+  "behavioral_canary": {
+    "profile": "claude-independent-reviewer",
+    "agent_commons_source_sha256": "888badf38e7dcb0bfdf6e0c4ad4bf0f6860cf1943786f76675b4369791ca27b3",
+    "outcome": "passed",
+    "canonical_state": "succeeded",
+    "terminal_tool_calls": 1,
+    "terminal_tool_completions": 1,
+    "terminal_tool_rejections": 0,
+    "process_canonical_mismatch": false,
+    "duration_seconds": 26.008009500335902
+  },
+  "closed_assertions": [
+    "commons_finalize_review exposes exactly approved, changes_requested, rejected, and abstained in the FastMCP input schema.",
+    "The independent-review instruction names the same four canonical verdict values and rejects synonyms.",
+    "The terminal operation still accepts only verdict and summary; review identity, revisions, evidence, and delegation outcome remain server-derived.",
+    "The real provider canary completed its canonical terminal flow without a rejected tool call or process/canonical mismatch.",
+    "No provider prompt, transcript, reasoning, credentials, raw output, cost, or token claim is retained in this evidence."
+  ]
+}

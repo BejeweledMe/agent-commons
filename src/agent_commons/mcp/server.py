@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from agent_commons.core.refs import parse_ref
 from agent_commons.domain.agents import effective_grants
@@ -46,6 +46,9 @@ class MCPServer(Protocol):
     def tool(self, *args: Any, **kwargs: Any) -> Callable[[Callable[..., Any]], Any]: ...
 
     def run(self, *, transport: str) -> None: ...
+
+
+ReviewVerdict = Literal["approved", "changes_requested", "rejected", "abstained"]
 
 
 class RuntimeService(Protocol):
@@ -1174,7 +1177,7 @@ def build_server(
         worker_purposes=("independent_review",),
     )
     def commons_finalize_review(
-        verdict: str,
+        verdict: ReviewVerdict,
         summary: str,
     ) -> dict[str, Any]:
         """Convergently record a review and its terminal delegation result.

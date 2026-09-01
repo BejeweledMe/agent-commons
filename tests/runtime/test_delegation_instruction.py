@@ -48,9 +48,14 @@ def test_independent_review_instruction_is_byte_stable() -> None:
     assert "satisfy every evidence\nprecondition" in instruction
     assert "attempt finalization first" in instruction
     assert "server derives the operation identity" in instruction
+    assert (
+        "Set verdict to exactly one of approved, changes_requested, rejected, or abstained"
+        in instruction
+    )
+    assert "do not invent a synonym such as approve, accept, pass, or needs_changes" in instruction
     assert "If the call succeeds, stop immediately" in instruction
     assert hashlib.sha256(instruction.encode()).hexdigest() == (
-        "a537244dcdd118cb9e9ada2a3eba78276443d4872236d2b1b2eb75531df7adb0"
+        "b65147b589a3ea32bbbf739c4521c1300aaf61f408e7916eda5d0592ed11a497"
     )
 
 

@@ -84,6 +84,8 @@ result protocol, not an optional suggestion. Supply only verdict and summary. Th
 server derives the operation identity, the bound
 review identity, exact revisions, and deterministic canonical evidence; do not
 supply or transform IDs, revisions, evidence_refs, delegation IDs, or result_refs.
+Set verdict to exactly one of approved, changes_requested, rejected, or abstained;
+do not invent a synonym such as approve, accept, pass, or needs_changes.
 If the call succeeds, stop immediately and call no further tool. A prose-only answer or successful
 process exit without its completed canonical outcome is invalid. Record verification
 only for facts you genuinely
