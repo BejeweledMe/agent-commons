@@ -1,0 +1,99 @@
+{
+  "schema": "agent_commons.wave1_provider_canary_evidence.v1",
+  "recorded_at": "2026-09-02T15:04:00Z",
+  "operator_session_id": "session.298dd76f8c8346b9a4f4d72446364ff3",
+  "source_revision": "e4d03c3",
+  "safe_evidence_policy": {
+    "raw_provider_stdout_stored": false,
+    "raw_provider_stderr_stored": false,
+    "skill_text_stored": false,
+    "operator_runtime_config_stored": false,
+    "credentials_stored": false
+  },
+  "operator_limit": {
+    "parent_provider_units": 8,
+    "scope": "current Wave 1 operator qualification run",
+    "authority": "explicit user authorization in the current Codex task"
+  },
+  "canaries": [
+    {
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "purpose": "implementation",
+      "skill_refs": [
+        "commons-start"
+      ],
+      "command": "agent-commons --json broker canary --profile codex-builder --confirm-provider-run --wall-time-seconds 300 --skill-ref commons-start --profile-config /private/tmp/agent-commons-codex-canary-profiles.yaml",
+      "profile_config_path": "/private/tmp/agent-commons-codex-canary-profiles.yaml",
+      "agent_commons_version": "0.1.0",
+      "agent_commons_source_sha256": "60407819bd9cae7083cc4dada6b4683fb01880eef552d8e51f4c8e8ccd3e37ca",
+      "provider_version": "codex-cli 0.145.0",
+      "model": null,
+      "ok": true,
+      "preflight_ok": true,
+      "initialization": {
+        "state": "ready",
+        "supported": true,
+        "blocks_launch": false
+      },
+      "provider_work_process_started": true,
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 47.16627554176375,
+        "stdout_bytes_seen": 33591,
+        "stderr_bytes_seen": 438,
+        "output_truncated": false
+      },
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "terminal_tool_rejection_details": [],
+      "terminal_tool_rejection_details_truncated": false,
+      "child_session_closed": true
+    },
+    {
+      "profile_id": "grok-builder",
+      "provider": "grok",
+      "purpose": "implementation",
+      "skill_refs": [
+        "commons-start"
+      ],
+      "command": "agent-commons --json broker canary --profile grok-builder --confirm-provider-run --wall-time-seconds 30 --skill-ref commons-start",
+      "ok": false,
+      "provider_work_process_started": false,
+      "workflow_diagnostic_code": "profile_executable_unavailable",
+      "error_type": "ExecutableResolutionError",
+      "error_message": "profile executable is unavailable: grok",
+      "safe_next_actions": [
+        "Inspect the operator-owned configuration and run the support command."
+      ]
+    },
+    {
+      "profile_id": "grok-independent-reviewer",
+      "provider": "grok",
+      "purpose": "independent_review",
+      "skill_refs": [
+        "commons-start"
+      ],
+      "command": "agent-commons --json broker canary --profile grok-independent-reviewer --confirm-provider-run --wall-time-seconds 30 --skill-ref commons-start",
+      "ok": false,
+      "provider_work_process_started": false,
+      "workflow_diagnostic_code": "profile_executable_unavailable",
+      "error_type": "ExecutableResolutionError",
+      "error_message": "profile executable is unavailable: grok",
+      "safe_next_actions": [
+        "Inspect the operator-owned configuration and run the support command."
+      ]
+    }
+  ],
+  "conclusion": {
+    "codex_builder_live_skill_aware_canary": "passed",
+    "grok_builder_live_skill_aware_canary": "blocked_by_missing_executable",
+    "grok_independent_reviewer_live_skill_aware_canary": "blocked_by_missing_executable",
+    "release_gate_status": "macOS Codex proof is present; Grok live proof remains not proven on this host."
+  }
+}
