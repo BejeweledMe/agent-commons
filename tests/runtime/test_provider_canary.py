@@ -454,8 +454,19 @@ def test_provider_version_drops_noncanonical_provider_content(
     )
 
 
-def test_grok_provider_version_accepts_only_the_canonical_shape(tmp_path: Path) -> None:
-    provider = _executable(tmp_path / "fake-grok-version", 'print("grok 1.2.3")\n')
+@pytest.mark.parametrize(
+    "reported",
+    (
+        "grok 1.2.3",
+        "grok 1.0.13 (5e9a58528b76)",
+        "grok 1.0.13 (5e9a58528b76) [linux-x64]",
+    ),
+)
+def test_grok_provider_version_accepts_canonical_shapes(
+    tmp_path: Path,
+    reported: str,
+) -> None:
+    provider = _executable(tmp_path / "fake-grok-version", f"print({reported!r})\n")
     profile = _grok_profiles(provider, _mcp_executable(tmp_path)).get(
         BuiltinProfileId.GROK_INDEPENDENT_REVIEWER
     )
@@ -469,5 +480,38 @@ def test_grok_provider_version_accepts_only_the_canonical_shape(tmp_path: Path) 
             workspace_root=workspace,
             runner=SubprocessRunner(),
         )
-        == "grok 1.2.3"
+        == "grok " + reported.split()[1]
+    )
+
+
+@pytest.mark.parametrize(
+    "reported",
+    (
+        "grok 1.2.3 /Users/example/project",
+        "grok 1.2.3 token-shaped-placeholder",
+        "grok 01.2.3",
+        "grok 1000000.2.3",
+        "grok 1.2.3 (unterminated",
+        "provider diagnostics are not a version",
+    ),
+)
+def test_grok_provider_version_drops_noncanonical_provider_content(
+    tmp_path: Path,
+    reported: str,
+) -> None:
+    provider = _executable(tmp_path / "fake-grok-version", f"print({reported!r})\n")
+    profile = _grok_profiles(provider, _mcp_executable(tmp_path)).get(
+        BuiltinProfileId.GROK_INDEPENDENT_REVIEWER
+    )
+    assert isinstance(profile, GrokRunnerProfile)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    assert (
+        _provider_version(
+            profile,
+            workspace_root=workspace,
+            runner=SubprocessRunner(),
+        )
+        is None
     )

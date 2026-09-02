@@ -188,16 +188,15 @@ _GROK_EXTRA_ENVIRONMENT = MappingProxyType(
         "GROK_CURSOR_MCPS_ENABLED": "false",
         "GROK_CURSOR_RULES_ENABLED": "false",
         "GROK_CURSOR_SKILLS_ENABLED": "false",
-        # The model-facing shell receives only broker-safe names.  In
-        # particular XAI_API_KEY remains usable by Grok itself but is not
-        # inherited by commands the model starts.
+        # The model-facing shell receives only broker-safe host names.  Broker
+        # control-plane bindings intentionally stay out of native shell
+        # commands: worker outcomes must travel through the audited MCP
+        # terminal tools, never through an agent-commons CLI write from a
+        # model-started process.
         "GROK_CONFIG": json.dumps(
             {
                 "shell_environment_policy": {
                     "include_only": [
-                        "AGENT_COMMONS_DELEGATION_ID",
-                        "AGENT_COMMONS_SESSION_ID",
-                        "AGENT_COMMONS_STATE_ROOT",
                         "HOME",
                         "LANG",
                         "LC_ALL",
@@ -1081,11 +1080,8 @@ class GrokRunnerProfile:
                 "run_terminal_cmd,search_replace,write_file,task,Agent,web_search,web_fetch"
             )
         else:
-            native_tools = (
-                "run_terminal_cmd,grep,read_file,search_replace,write_file,list_dir,"
-                "search_tool,use_tool"
-            )
-            denied_tools = "task,Agent,web_search,web_fetch"
+            native_tools = "grep,read_file,search_replace,write_file,list_dir,search_tool,use_tool"
+            denied_tools = "run_terminal_cmd,task,Agent,web_search,web_fetch"
         argv.extend(("--tools", native_tools, "--disallowed-tools", denied_tools))
         for tool in allowed_tools:
             short_name = tool.removeprefix(_MCP_TOOL_PREFIX)

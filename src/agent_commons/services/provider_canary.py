@@ -51,7 +51,8 @@ _CODEX_CLI_VERSION = re.compile(
 _GROK_BUILD_VERSION = re.compile(
     rf"^grok (?P<major>{_NUMERIC_VERSION_COMPONENT})"
     rf"\.(?P<minor>{_NUMERIC_VERSION_COMPONENT})"
-    rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT})(?: \([^\r\n]+\) \[[^\r\n]+\])?$"
+    rf"\.(?P<patch>{_NUMERIC_VERSION_COMPONENT})"
+    rf"(?: \([^\r\n]+\)(?: \[[^\r\n]+\])?)?$"
 )
 
 

@@ -198,6 +198,21 @@ def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: 
         Path("/bin/echo").resolve()
     )
     assert "XAI_API_KEY" not in invocation.extra_env
+    grok_config = json.loads(invocation.extra_env["GROK_CONFIG"])
+    shell_env = set(grok_config["shell_environment_policy"]["include_only"])
+    assert (
+        not {
+            "AGENT_COMMONS_DELEGATION_ID",
+            "AGENT_COMMONS_SESSION_ID",
+            "AGENT_COMMONS_STATE_ROOT",
+        }
+        & shell_env
+    )
+    builder_native = invocation.argv[invocation.argv.index("--tools") + 1].split(",")
+    builder_denied = invocation.argv[invocation.argv.index("--disallowed-tools") + 1].split(",")
+    assert "run_terminal_cmd" not in builder_native
+    assert "run_terminal_cmd" in builder_denied
+    assert {"search_tool", "use_tool"} <= set(builder_native)
 
     narrowed = builder.build_invocation(
         "Implement narrowly",
