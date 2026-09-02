@@ -46,12 +46,28 @@ def compose_delegation_instruction(
     succeed_delegation_tool = f"{terminal_prefix}commons_succeed_delegation"
     if profile_id.provider is Provider.GROK:
         tool_transport = """Grok exposes MCP integrations through its native search_tool and
-use_tool transport tools, not as directly callable model tools. The unqualified
-commons_* names below are logical Agent Commons operations. Before an operation,
-discover its exact fully-qualified agent-commons__commons_* name with search_tool
-when needed, then invoke that fully-qualified name through use_tool with the
-specified arguments. Never attempt to call an agent-commons__commons_* name as a
-direct model tool. search_tool and use_tool are permitted only as this bounded MCP
+use_tool transport tools, not as directly callable model tools. Agent Commons is
+configured as the MCP server named exactly agent-commons, so its model-facing
+MCP tools are fully-qualified as agent-commons__commons_*. The unqualified
+commons_* names below are logical Agent Commons operations.
+
+For Grok, every Agent Commons MCP operation is a two-step native transport
+operation:
+1. Call search_tool with a query equal to the exact fully-qualified tool name
+   you need, such as agent-commons__commons_show_delegation,
+   agent-commons__commons_succeed_delegation, or
+   agent-commons__commons_finalize_review.
+2. Call use_tool with tool_name equal to that exact fully-qualified name and
+   tool_input matching the schema returned by search_tool.
+
+Do this even if you think you remember the schema. Your first Agent Commons
+action must be search_tool for agent-commons__commons_show_delegation, followed
+by use_tool for agent-commons__commons_show_delegation. Before any terminal
+outcome, search again for the exact terminal tool name and then use_tool it.
+Never attempt to call an agent-commons__commons_* name as a direct model tool.
+A prose-only answer, a skipped search_tool/use_tool transport step, or a
+successful process exit without the required terminal use_tool completion is
+invalid. search_tool and use_tool are permitted only as this bounded MCP
 transport and do not widen the worker tool catalog."""
         tool_transport_section = f"\n\n{tool_transport}"
         reviewer_transport_exception = (

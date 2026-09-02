@@ -160,8 +160,18 @@ def test_grok_instructions_use_provider_native_terminal_tool_names() -> None:
         assert "Grok exposes MCP integrations through its native search_tool and\nuse_tool" in (
             instruction
         )
-        assert "invoke that fully-qualified name through use_tool" in instruction
-        assert "Never attempt to call an agent-commons__commons_* name as a\ndirect" in (
+        assert "Agent Commons is\nconfigured as the MCP server named exactly agent-commons" in (
+            instruction
+        )
+        assert "Call search_tool with a query equal to the exact fully-qualified tool name" in (
+            instruction
+        )
+        assert "Call use_tool with tool_name equal to that exact fully-qualified name" in (
+            instruction
+        )
+        assert "agent-commons__commons_show_delegation" in instruction
+        assert "Never attempt to call an agent-commons__commons_* name as a direct" in instruction
+        assert "successful process exit without the required terminal use_tool completion" in (
             instruction
         )
         assert "do not widen the worker tool catalog" in instruction

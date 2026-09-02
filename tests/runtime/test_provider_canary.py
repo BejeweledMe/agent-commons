@@ -379,6 +379,66 @@ else:
     assert report["child_session_closed"] is True
 
 
+def test_grok_canary_reports_transport_failure_without_provider_output(
+    tmp_path: Path,
+) -> None:
+    provider = _executable(
+        tmp_path / "fake-grok-no-tool",
+        """
+import json
+import sys
+
+if "--version" in sys.argv:
+    print("grok 0.0.0")
+elif sys.argv[1:] == ["models"]:
+    print("You are logged in with hermetic-test-account")
+    print("Available models:")
+    print("- canary-model")
+elif sys.argv[1:] == ["inspect", "--json"]:
+    print(json.dumps({
+        "projectTrusted": True,
+        "mcpServers": [{"name": "agent-commons"}],
+        "hooks": [],
+        "plugins": [],
+        "lspServers": [],
+        "mcpConfigProblems": [],
+    }))
+elif "--help" in sys.argv:
+    print(
+        "--single --cwd --output-format --always-approve --no-alt-screen "
+        "--max-turns --model --sandbox --allow --tools --disallowed-tools "
+        "--no-plan --no-subagents --disable-web-search"
+    )
+else:
+    print(json.dumps({"type": "turn.completed", "message": "prose only"}))
+""".lstrip(),
+    )
+
+    report = run_grok_compatibility_canary(
+        _grok_profiles(provider, _mcp_executable(tmp_path)),
+        wall_time_seconds=60,
+    )
+
+    assert report["ok"] is False
+    assert report["provider"] == "grok"
+    assert report["provider_version"] == "grok 0.0.0"
+    assert report["process"]["outcome"] == "succeeded", report
+    assert report["canonical_state"] == "needs_operator"
+    assert report["workflow_diagnostic_code"] == "terminal_tool_not_called"
+    assert report["terminal_tool_calls"] == 0
+    assert report["safe_failure_class"] == "grok_mcp_terminal_tool_not_called"
+    assert report["grok_mcp_transport"] == {
+        "server_name": "agent-commons",
+        "transport_tools": ["search_tool", "use_tool"],
+        "required_terminal_tools": [
+            "agent-commons__commons_finalize_review",
+            "agent-commons__commons_succeed_delegation",
+            "agent-commons__commons_record_verification",
+        ],
+    }
+    assert "prose only" not in str(report)
+
+
 def test_provider_canary_reports_auth_refusal_without_child_or_attempt(tmp_path: Path) -> None:
     provider = _executable(
         tmp_path / "fake-claude-signed-out",

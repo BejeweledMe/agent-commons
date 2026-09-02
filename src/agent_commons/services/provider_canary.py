@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -461,6 +462,7 @@ def _run_compatibility_canary(
             ],
             "child_session_closed": child_session["effective_status"] == "closed",
         }
+        report.update(_transport_failure_metadata(profile, joined))
         if qualification_state_root is not None:
             ProviderQualificationStore(qualification_state_root).record(
                 profile,
@@ -471,6 +473,45 @@ def _run_compatibility_canary(
                 provider_version=provider_version,
             )
         return report
+
+
+def _transport_failure_metadata(
+    profile: ClaudeRunnerProfile | CodexRunnerProfile | GrokRunnerProfile,
+    joined: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return safe failure detail for a provider process that skipped terminal MCP.
+
+    The live Grok canary can prove three facts without persisting prompts,
+    transcripts, credentials, auth paths, or provider output: initialization
+    succeeded before launch, the provider process started, and the worker MCP
+    terminal audit never observed the required bounded outcome tool.  Keep that
+    as a distinct transport diagnostic so L1 evidence does not collapse a real
+    Grok MCP/tool-use failure into a generic invalid result.
+    """
+
+    if (
+        profile.provider is Provider.GROK
+        and joined.get("terminal_tool_audit_available") is True
+        and int(joined.get("terminal_tool_calls", 0)) == 0
+    ):
+        return {
+            "safe_failure_class": "grok_mcp_terminal_tool_not_called",
+            "safe_failure_reason": (
+                "The Grok process started after successful initialization and MCP "
+                "preflight, but the worker MCP terminal audit observed no completed "
+                "bounded outcome tool call."
+            ),
+            "grok_mcp_transport": {
+                "server_name": "agent-commons",
+                "transport_tools": ["search_tool", "use_tool"],
+                "required_terminal_tools": [
+                    "agent-commons__commons_finalize_review",
+                    "agent-commons__commons_succeed_delegation",
+                    "agent-commons__commons_record_verification",
+                ],
+            },
+        }
+    return {}
 
 
 class _FixedInitialization:
