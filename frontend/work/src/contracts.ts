@@ -341,6 +341,8 @@ export type TrackerFreshness = {
 export type TrackerSnapshot = {
   schema: "agent-commons.tracker.v1";
   sequence: number;
+  sourceRevision: string | null;
+  truncated: boolean;
   state: TrackerSurfaceState;
   tasks: readonly TrackerTask[];
   edges: readonly TrackerEdge[];

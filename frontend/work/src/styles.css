@@ -720,6 +720,49 @@ fieldset .button {
   margin-bottom: 10px;
 }
 
+.tracker-actions {
+  border-top: 1px solid #33486c;
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.tracker-actions h4 {
+  margin: 0;
+}
+
+.tracker-action-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.tracker-action-panel label,
+.tracker-confirm {
+  color: #d7e4fb;
+  font-weight: 700;
+}
+
+.tracker-action-panel textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.tracker-confirm {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+}
+
+.tracker-action-status {
+  background: #143220;
+  border: 1px solid #72ca8a;
+  border-radius: 8px;
+  color: #d9ffe5;
+  margin: 0;
+  padding: 10px 12px;
+}
+
 .context-packs-section {
   background: #101b30;
   border: 1px solid #33486c;

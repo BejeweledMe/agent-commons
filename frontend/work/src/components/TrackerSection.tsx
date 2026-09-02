@@ -7,7 +7,7 @@ import {
   useState
 } from "react";
 
-import { type WorkApi } from "../api";
+import { ApiProblem, type WorkApi } from "../api";
 import { type TrackerSnapshot, type TrackerTask } from "../contracts";
 import { type Locale, type MessageKey } from "../i18n";
 import {
@@ -22,6 +22,14 @@ type Props = {
   locale: Locale;
   text: (key: MessageKey) => string;
 };
+
+type TrackerTaskActionName = "request_review" | "accept_task" | "reopen_task";
+
+type TrackerActionState =
+  | { kind: "idle" }
+  | { kind: "submitting"; action: TrackerTaskActionName }
+  | { kind: "success"; message: MessageKey }
+  | { kind: "error"; code: string; safeNextActions: readonly string[] };
 
 const stateGloss: Readonly<Record<string, MessageKey>> = {
   ready: "tracker_gloss_ready",
@@ -124,10 +132,33 @@ function taskPosition(tasks: readonly TrackerTask[], taskId: string): number {
   return Math.max(0, tasks.findIndex((task) => task.taskId === taskId));
 }
 
+function criteriaLines(value: string): readonly string[] {
+  return value.split("\n").map((item) => item.trim()).filter((item) => item.length > 0);
+}
+
+function trackerActionFailure(error: unknown): { code: string; safeNextActions: readonly string[] } {
+  if (error instanceof ApiProblem) {
+    return {
+      code: error.apiError?.code ?? (error.status === 401 ? "unauthorized" : "request_unavailable"),
+      safeNextActions: error.apiError?.safeNextActions ?? []
+    };
+  }
+  return {
+    code: "request_unavailable",
+    safeNextActions: []
+  };
+}
+
 export function TrackerSection({ api, locale, text }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [reviewCriteria, setReviewCriteria] = useState("");
+  const [acceptSummary, setAcceptSummary] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenConfirmed, setReopenConfirmed] = useState(false);
+  const [actionState, setActionState] = useState<TrackerActionState>({ kind: "idle" });
   const taskButtons = useRef(new Map<string, HTMLButtonElement>());
+  const actionKeys = useRef(new Map<TrackerTaskActionName, { signature: string; key: string }>());
 
   async function load(signal: AbortSignal): Promise<void> {
     setState({ kind: "loading" });
@@ -176,6 +207,11 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
   }, [selectedTaskId, state, tasks]);
   const selectedTask = tasks.find((task) => task.taskId === effectiveSelectedTaskId) ?? null;
 
+  function selectTask(taskId: string): void {
+    setSelectedTaskId(taskId);
+    setActionState({ kind: "idle" });
+  }
+
   function moveTaskFocus(event: KeyboardEvent<HTMLButtonElement>, taskId: string): void {
     const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
     if (!keys.includes(event.key) || tasks.length === 0) {
@@ -191,8 +227,166 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
           ? (current + 1) % tasks.length
           : (current - 1 + tasks.length) % tasks.length;
     const nextId = tasks[next].taskId;
-    setSelectedTaskId(nextId);
+    selectTask(nextId);
     taskButtons.current.get(nextId)?.focus();
+  }
+
+  function taskActionKey(action: TrackerTaskActionName, taskId: string, payload: unknown): string {
+    const signature = JSON.stringify([action, taskId, payload]);
+    const existing = actionKeys.current.get(action);
+    if (existing?.signature === signature) {
+      return existing.key;
+    }
+    const key = `tracker-${action}-${crypto.randomUUID()}`;
+    actionKeys.current.set(action, { signature, key });
+    return key;
+  }
+
+  async function performTaskAction(action: TrackerTaskActionName, task: TrackerTask): Promise<void> {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setActionState({ kind: "submitting", action });
+    try {
+      if (action === "request_review") {
+        const criteria = criteriaLines(reviewCriteria);
+        await api.requestTaskReview(
+          task.taskId,
+          criteria,
+          taskActionKey(action, task.taskId, criteria),
+          signal
+        );
+      } else if (action === "accept_task") {
+        const summary = acceptSummary.trim();
+        await api.acceptTask(
+          task.taskId,
+          summary,
+          taskActionKey(action, task.taskId, summary),
+          signal
+        );
+      } else {
+        const reason = reopenReason.trim();
+        await api.reopenTask(
+          task.taskId,
+          reason,
+          taskActionKey(action, task.taskId, reason),
+          signal
+        );
+      }
+      const snapshot = await api.loadTracker(signal);
+      setState((current) => trackerLoadSucceeded(current, snapshot));
+      actionKeys.current.delete(action);
+      setActionState({ kind: "success", message: "tracker_action_success" });
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setActionState({ kind: "error", ...trackerActionFailure(error) });
+      }
+    }
+  }
+
+  function trackerTaskActions(task: TrackerTask): ReactElement | null {
+    const hasCanonicalAction = task.nextAction === "request_review"
+      || task.nextAction === "accept_task"
+      || task.nextAction === "revise_work";
+    if (!hasCanonicalAction && actionState.kind === "idle") {
+      return null;
+    }
+    const busy = actionState.kind === "submitting";
+    const submitting = (action: TrackerTaskActionName): boolean => (
+      actionState.kind === "submitting" && actionState.action === action
+    );
+    return (
+      <div className="tracker-actions" aria-labelledby="tracker-actions-title">
+        <h4 id="tracker-actions-title">{text("tracker_actions_title")}</h4>
+        {task.nextAction === "request_review" ? (
+          <div className="tracker-action-panel">
+            <label htmlFor="tracker-review-criteria">{text("tracker_review_criteria_label")}</label>
+            <textarea
+              id="tracker-review-criteria"
+              onChange={(event) => setReviewCriteria(event.target.value)}
+              value={reviewCriteria}
+            />
+            <p className="small-copy">{text("tracker_review_criteria_help")}</p>
+            <button
+              className="button button-secondary"
+              disabled={busy}
+              onClick={() => void performTaskAction("request_review", task)}
+              type="button"
+            >
+              {submitting("request_review") ? text("working") : text("tracker_request_review_action")}
+            </button>
+          </div>
+        ) : null}
+        {task.nextAction === "accept_task" ? (
+          <div className="tracker-action-panel">
+            <label htmlFor="tracker-accept-summary">{text("tracker_accept_summary_label")}</label>
+            <textarea
+              aria-invalid={acceptSummary.trim().length === 0 ? "true" : undefined}
+              id="tracker-accept-summary"
+              onChange={(event) => setAcceptSummary(event.target.value)}
+              value={acceptSummary}
+            />
+            {acceptSummary.trim().length === 0 ? (
+              <p className="field-error">{text("tracker_action_required")}</p>
+            ) : null}
+            <button
+              className="button button-secondary"
+              disabled={busy || acceptSummary.trim().length === 0}
+              onClick={() => void performTaskAction("accept_task", task)}
+              type="button"
+            >
+              {submitting("accept_task") ? text("working") : text("tracker_accept_action")}
+            </button>
+          </div>
+        ) : null}
+        {task.nextAction === "revise_work" ? (
+          <div className="tracker-action-panel">
+            <label htmlFor="tracker-reopen-reason">{text("tracker_reopen_reason_label")}</label>
+            <textarea
+              aria-invalid={reopenReason.trim().length === 0 ? "true" : undefined}
+              id="tracker-reopen-reason"
+              onChange={(event) => setReopenReason(event.target.value)}
+              value={reopenReason}
+            />
+            {reopenReason.trim().length === 0 ? (
+              <p className="field-error">{text("tracker_action_required")}</p>
+            ) : null}
+            <label className="tracker-confirm">
+              <input
+                checked={reopenConfirmed}
+                onChange={(event) => setReopenConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{text("tracker_reopen_confirm_label")}</span>
+            </label>
+            <button
+              className="button button-secondary"
+              disabled={busy || reopenReason.trim().length === 0 || !reopenConfirmed}
+              onClick={() => void performTaskAction("reopen_task", task)}
+              type="button"
+            >
+              {submitting("reopen_task") ? text("working") : text("tracker_reopen_action")}
+            </button>
+          </div>
+        ) : null}
+        {actionState.kind === "success" ? (
+          <p className="tracker-action-status" role="status">{text(actionState.message)}</p>
+        ) : null}
+        {actionState.kind === "error" ? (
+          <div className="tracker-state tracker-state-error" role="alert">
+            <h4>{text("tracker_action_failed")}</h4>
+            <p><code>{actionState.code}</code></p>
+            {actionState.safeNextActions.length > 0 ? (
+              <>
+                <p>{text("tracker_action_safe_next")}</p>
+                <ul>
+                  {actionState.safeNextActions.map((next) => <li key={next}>{next}</li>)}
+                </ul>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   if (state.kind === "loading") {
@@ -293,6 +487,8 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
       <dl className="tracker-summary">
         <div><dt>{text("tracker_snapshot_time")}</dt><dd>{formatTimestamp(snapshot.freshness.generatedAt, dateLocale)}</dd></div>
         <div><dt>{text("tracker_source_time")}</dt><dd>{formatTimestamp(snapshot.freshness.sourceUpdatedAt, dateLocale)}</dd></div>
+        <div><dt>{text("tracker_source_revision")}</dt><dd><code>{snapshot.sourceRevision ?? "—"}</code></dd></div>
+        <div><dt>{text("tracker_truncated")}</dt><dd>{snapshot.truncated ? text("tracker_truncated_yes") : text("tracker_truncated_no")}</dd></div>
         <div><dt>{text("tracker_freshness")}</dt><dd><CanonicalState text={text} value={snapshot.freshness.state} /></dd></div>
         <div><dt>{text("tracker_capacity")}</dt><dd><CanonicalState text={text} value={snapshot.capacity.state} /></dd></div>
       </dl>
@@ -330,7 +526,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
                 <button
                   aria-pressed={task.taskId === effectiveSelectedTaskId}
                   className={`tracker-task${task.awaitsHuman ? " tracker-task-attention" : ""}`}
-                  onClick={() => setSelectedTaskId(task.taskId)}
+                  onClick={() => selectTask(task.taskId)}
                   onKeyDown={(event) => moveTaskFocus(event, task.taskId)}
                   ref={(element) => {
                     if (element === null) {
@@ -379,6 +575,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
               <div><dt>{text("tracker_gaps_label")}</dt><dd><CanonicalList text={text} values={selectedTask.gaps} /></dd></div>
             </dl>
           )}
+          {selectedTask === null ? null : trackerTaskActions(selectedTask)}
           <p className="small-copy">{text("tracker_critical_path_note")}</p>
           <p className="tracker-technical">{snapshot.criticalPathTaskIds.join(" → ") || "—"}</p>
         </section>

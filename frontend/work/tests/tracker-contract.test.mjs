@@ -11,6 +11,7 @@ test("tracker keeps a closed provider-safe browser contract", () => {
   assert.match(api, /parseTrackerSnapshot/);
   assert.match(api, /TRACKER_MAX_TASKS/);
   assert.match(api, /TRACKER_MAX_RUNS/);
+  assert.match(api, /TRACKER_SOURCE_REVISION/);
   assert.match(api, /openTrackerStream/);
   assert.match(api, /withCredentials: true/);
   for (const forbidden of ["stderr", "transcript", "tool_arguments", "token_count", "cost", "eta", "percentage"]) {
@@ -32,10 +33,33 @@ test("tracker renders honest states and keyboard navigation", () => {
   assert.match(trackerState, /current\.snapshot\.sequence >= snapshot\.sequence/);
   assert.match(trackerState, /current\.kind === "ready"/);
   assert.match(component, /tracker_critical_path_note/);
+  assert.match(component, /tracker_source_revision/);
+  assert.match(component, /tracker_truncated/);
   assert.match(source("src/contracts.ts"), /criticalPathPredictive: false/);
   for (const forbidden of ["percentage", "estimated cost", "token count", "live progress"] ) {
     assert.equal(component.toLowerCase().includes(forbidden), false, forbidden);
   }
+});
+
+test("tracker task actions use server revisions and canonical routes", () => {
+  const api = source("src/api.ts");
+  const component = source("src/components/TrackerSection.tsx");
+  assert.match(api, /currentTaskRevision/);
+  assert.match(api, /this\.get\("\/graph"/);
+  assert.match(api, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}\/review-request/);
+  assert.match(api, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}\/accept/);
+  assert.match(api, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}\/reopen/);
+  assert.match(api, /expected_revision: revision/);
+  assert.match(component, /api\.requestTaskReview/);
+  assert.match(component, /api\.acceptTask/);
+  assert.match(component, /api\.reopenTask/);
+  assert.match(component, /task\.nextAction === "request_review"/);
+  assert.match(component, /task\.nextAction === "accept_task"/);
+  assert.match(component, /task\.nextAction === "revise_work"/);
+  assert.match(component, /tracker_action_success/);
+  assert.match(component, /tracker_action_failed/);
+  assert.match(component, /api\.loadTracker\(signal\)/);
+  assert.doesNotMatch(component, /setSelectedTaskId\(.*nextAction/);
 });
 
 test("tracker locale keys stay paired and actionable", () => {
@@ -49,7 +73,11 @@ test("tracker locale keys stay paired and actionable", () => {
       "tracker_partial_next",
       "tracker_stale_next",
       "tracker_resume_gap",
-      "tracker_keyboard_help"
+      "tracker_keyboard_help",
+      "tracker_actions_title",
+      "tracker_request_review_action",
+      "tracker_accept_action",
+      "tracker_reopen_action"
     ]) {
       assert.equal(typeof messages[locale][key], "string");
       assert.notEqual(messages[locale][key].trim(), "");

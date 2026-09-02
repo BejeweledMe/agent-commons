@@ -29,6 +29,8 @@ function snapshot() {
   return {
     schema: "agent-commons.tracker.v1",
     sequence: 7,
+    source_revision: `sha256:${"0".repeat(64)}`,
+    truncated: false,
     state: "ready",
     tasks: [{
       task_id: "task.1",
@@ -93,6 +95,8 @@ test("tracker parser owns a safe exact projection", () => {
   input.gaps = ["review_evidence_missing"];
   const parsed = apiModule.parseTrackerSnapshot(input);
   assert.equal(parsed.sequence, 7);
+  assert.equal(parsed.sourceRevision, `sha256:${"0".repeat(64)}`);
+  assert.equal(parsed.truncated, false);
   assert.equal(parsed.tasks[0].provider, "claude");
   assert.equal(parsed.runs[0].durationSeconds, 10);
   assert.deepEqual(parsed.tasks[0].gaps, ["stale_review"]);
@@ -116,6 +120,14 @@ test("tracker parser refuses malformed and oversized snapshots", () => {
   const predictive = snapshot();
   predictive.critical_path_predictive = true;
   assert.throws(() => apiModule.parseTrackerSnapshot(predictive));
+
+  const malformedSourceRevision = snapshot();
+  malformedSourceRevision.source_revision = "evt.01M1";
+  assert.throws(() => apiModule.parseTrackerSnapshot(malformedSourceRevision));
+
+  const malformedTruncated = snapshot();
+  malformedTruncated.truncated = "false";
+  assert.throws(() => apiModule.parseTrackerSnapshot(malformedTruncated));
 
   const nonStrings = snapshot();
   nonStrings.focus_task_ids = Array.from({ length: 10_000 }, () => 1);

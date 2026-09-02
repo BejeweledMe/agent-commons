@@ -183,6 +183,7 @@ const TRACKER_PROFILES = new Set([
   "codex-builder", "codex-independent-reviewer", "claude-builder", "claude-independent-reviewer",
   "grok-builder", "grok-independent-reviewer"
 ]);
+const TRACKER_SOURCE_REVISION = /^sha256:[0-9a-f]{64}$/;
 const TRACKER_ATTENTION_REASONS = new Set([
   ...TRACKER_RUN_PHASES,
   "missing_review", "stale_review", "target_revision_mismatch", "non_independent_review",
@@ -1158,6 +1159,11 @@ export function parseTrackerSnapshot(value: unknown): TrackerSnapshot {
     || typeof value.sequence !== "number"
     || !Number.isSafeInteger(value.sequence)
     || value.sequence < 0
+    || (value.source_revision !== null && (
+      typeof value.source_revision !== "string"
+      || !TRACKER_SOURCE_REVISION.test(value.source_revision)
+    ))
+    || typeof value.truncated !== "boolean"
     || typeof value.state !== "string"
     || !TRACKER_SURFACE_STATES.has(value.state as TrackerSurfaceState)
     || value.critical_path_basis !== "dependency_depth_only"
@@ -1168,6 +1174,8 @@ export function parseTrackerSnapshot(value: unknown): TrackerSnapshot {
   return {
     schema: "agent-commons.tracker.v1",
     sequence: value.sequence,
+    sourceRevision: value.source_revision,
+    truncated: value.truncated,
     state: value.state as TrackerSurfaceState,
     tasks: boundedArray(value.tasks, TRACKER_MAX_TASKS).map(parseTrackerTask),
     edges: boundedArray(value.edges, TRACKER_MAX_EDGES).map(parseTrackerEdge),
@@ -1181,6 +1189,27 @@ export function parseTrackerSnapshot(value: unknown): TrackerSnapshot {
     criticalPathPredictive: false,
     gaps: trackerEnumsAt(value, "gaps", 24, TRACKER_GAPS)
   };
+}
+
+function parseTaskRevisionFromGraph(value: unknown, taskId: string): string {
+  if (!isObject(value)) {
+    throw new ApiProblem(502, null);
+  }
+  for (const node of boundedArray(value.nodes, TRACKER_MAX_TASKS + TRACKER_MAX_RUNS)) {
+    if (!isObject(node) || node.kind !== "task" || node.id !== taskId) {
+      continue;
+    }
+    const revision = node.effective_revision ?? node.revision;
+    if (typeof revision !== "string" || !EVENT_ID.test(revision)) {
+      throw new ApiProblem(502, null);
+    }
+    return revision;
+  }
+  throw new ApiProblem(409, {
+    code: "tracker_task_revision_unavailable",
+    message: "the selected task is no longer present in the current graph",
+    safeNextActions: ["Refresh the tracker and select the current task before retrying."]
+  });
 }
 
 function exchangeCodeFromFragment(): string | null {
@@ -1408,6 +1437,10 @@ export class WorkApi {
     return parseTrackerSnapshot(await this.get("/work/tracker", signal));
   }
 
+  async currentTaskRevision(taskId: string, signal: AbortSignal): Promise<string> {
+    return parseTaskRevisionFromGraph(await this.get("/graph", signal), taskId);
+  }
+
   openTrackerStream(
     onSnapshot: (snapshot: TrackerSnapshot) => void,
     onConnection: (state: "connected" | "disconnected") => void,
@@ -1523,6 +1556,60 @@ export class WorkApi {
           context_pack_id: input.contextPackId,
           context_pack_revision: input.contextPackRevision
         }),
+        idempotency_key: idempotencyKey
+      },
+      signal
+    );
+  }
+
+  async requestTaskReview(
+    taskId: string,
+    criteria: readonly string[],
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const revision = await this.currentTaskRevision(taskId, signal);
+    await this.post(
+      `/tasks/${encodeURIComponent(taskId)}/review-request`,
+      {
+        expected_revision: revision,
+        criteria: criteria.map((item) => item.trim()).filter((item) => item.length > 0),
+        idempotency_key: idempotencyKey
+      },
+      signal
+    );
+  }
+
+  async acceptTask(
+    taskId: string,
+    summary: string,
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const revision = await this.currentTaskRevision(taskId, signal);
+    await this.post(
+      `/tasks/${encodeURIComponent(taskId)}/accept`,
+      {
+        expected_revision: revision,
+        summary: summary.trim(),
+        idempotency_key: idempotencyKey
+      },
+      signal
+    );
+  }
+
+  async reopenTask(
+    taskId: string,
+    reason: string,
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const revision = await this.currentTaskRevision(taskId, signal);
+    await this.post(
+      `/tasks/${encodeURIComponent(taskId)}/reopen`,
+      {
+        expected_revision: revision,
+        reason: reason.trim(),
         idempotency_key: idempotencyKey
       },
       signal
