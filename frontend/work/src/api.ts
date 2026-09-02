@@ -23,6 +23,7 @@ import type {
   SetupGuidanceNextActionKey,
   SetupGuidanceTool,
   SetupStatus,
+  StarterPackApplyResult,
   StarterPack,
   StarterPackBlueprint,
   StarterPackCatalog,
@@ -107,6 +108,7 @@ const PROVIDER_AVAILABILITY_PROFILES = new Set([
   "grok-builder",
   "grok-independent-reviewer"
 ]);
+const STARTER_PACK_GRANTS = new Set(["create_roles", "retire_roles", "open_links"]);
 const PROVIDER_BY_PROFILE: Readonly<Record<string, "codex" | "claude" | "grok">> = {
   "codex-builder": "codex",
   "codex-independent-reviewer": "codex",
@@ -890,6 +892,8 @@ function parseStarterPackRole(value: unknown): StarterPackRole {
   if (
     !isObject(value)
     || value.context_mode !== "fresh"
+    || typeof value.profile_id !== "string"
+    || !PROVIDER_AVAILABILITY_PROFILES.has(value.profile_id)
     || !Array.isArray(value.skills)
     || value.skills.some((skill) => typeof skill !== "string" || skill === "")
   ) {
@@ -899,6 +903,7 @@ function parseStarterPackRole(value: unknown): StarterPackRole {
     id: requiredStringAt(value, "id"),
     name: requiredStringAt(value, "name"),
     purpose: requiredStringAt(value, "purpose"),
+    profileId: value.profile_id,
     contextMode: "fresh",
     skills: value.skills as string[]
   };
@@ -941,6 +946,70 @@ function parseStarterPackCatalog(value: unknown): StarterPackCatalog {
     throw new ApiProblem(502, null);
   }
   return { packs: value.packs.map(parseStarterPack) };
+}
+
+function parseDenyAllGrants(value: unknown): Readonly<Record<string, "deny">> {
+  if (!isObject(value)) {
+    throw new ApiProblem(502, null);
+  }
+  const entries = Object.entries(value);
+  if (
+    entries.length !== STARTER_PACK_GRANTS.size
+    || entries.some(([key, grant]) => !STARTER_PACK_GRANTS.has(key) || grant !== "deny")
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return Object.freeze(Object.fromEntries(entries) as Record<string, "deny">);
+}
+
+function parseAppliedStarterPackRole(value: unknown): StarterPackApplyResult["roles"][number] {
+  if (
+    !isObject(value)
+    || value.context_mode !== "fresh"
+    || value.template !== true
+    || typeof value.profile_id !== "string"
+    || !PROVIDER_AVAILABILITY_PROFILES.has(value.profile_id)
+    || !Array.isArray(value.skills)
+    || value.skills.some((skill) => typeof skill !== "string" || skill === "")
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  const revision = requiredStringAt(value, "revision");
+  if (!EVENT_ID.test(revision)) {
+    throw new ApiProblem(502, null);
+  }
+  const agentId = requiredStringAt(value, "agent_id");
+  if (!/^agent\.[0-9A-HJKMNP-TV-Z]{26}$/.test(agentId)) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    sourceRoleId: requiredStringAt(value, "source_role_id"),
+    agentId,
+    revision,
+    name: requiredStringAt(value, "name"),
+    profileId: value.profile_id,
+    contextMode: "fresh",
+    template: true,
+    grants: parseDenyAllGrants(value.grants),
+    skills: value.skills as string[]
+  };
+}
+
+function parseStarterPackApplyResult(value: unknown): StarterPackApplyResult {
+  if (
+    !isObject(value)
+    || value.applied !== true
+    || !Array.isArray(value.roles)
+    || value.roles.length === 0
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    packId: requiredStringAt(value, "pack_id"),
+    blueprintId: requiredStringAt(value, "blueprint_id"),
+    applied: true,
+    roles: value.roles.map(parseAppliedStarterPackRole)
+  };
 }
 
 function nullableNumberAt(value: JsonObject, key: string): number | null {
@@ -1391,6 +1460,19 @@ export class WorkApi {
 
   async loadStarterPacks(signal: AbortSignal): Promise<StarterPackCatalog> {
     return parseStarterPackCatalog(await this.get("/work/starter-packs", signal));
+  }
+
+  async applyStarterPackBlueprint(
+    packId: string,
+    blueprintId: string,
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<StarterPackApplyResult> {
+    return parseStarterPackApplyResult(await this.post(
+      `/work/starter-packs/${encodeURIComponent(packId)}/blueprints/${encodeURIComponent(blueprintId)}/apply`,
+      { confirmed: true, idempotency_key: idempotencyKey },
+      signal
+    ));
   }
 
   async loadContextPacks(signal: AbortSignal): Promise<ContextPackCatalog> {

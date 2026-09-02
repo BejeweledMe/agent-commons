@@ -497,6 +497,37 @@ fieldset .button {
   vertical-align: baseline;
 }
 
+.starter-pack-apply {
+  align-items: flex-start;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.starter-pack-confirm {
+  align-items: flex-start;
+  color: #c9d7ed;
+  display: flex;
+  gap: 9px;
+  line-height: 1.45;
+}
+
+.starter-pack-confirm input {
+  margin-top: 3px;
+}
+
+.starter-pack-result {
+  margin-top: 4px;
+}
+
+.starter-pack-applied-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
 .skill-chip {
   background: #1e304e;
   border: 1px solid #52698c;

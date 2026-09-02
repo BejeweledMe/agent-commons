@@ -229,6 +229,7 @@ export type StarterPackRole = {
   id: string;
   name: string;
   purpose: string;
+  profileId: string;
   contextMode: StarterPackContextMode;
   skills: readonly string[];
 };
@@ -252,6 +253,25 @@ export type StarterPack = {
 
 export type StarterPackCatalog = {
   packs: readonly StarterPack[];
+};
+
+export type AppliedStarterPackRole = {
+  sourceRoleId: string;
+  agentId: string;
+  revision: string;
+  name: string;
+  profileId: string;
+  contextMode: StarterPackContextMode;
+  template: true;
+  grants: Readonly<Record<string, "deny">>;
+  skills: readonly string[];
+};
+
+export type StarterPackApplyResult = {
+  packId: string;
+  blueprintId: string;
+  applied: true;
+  roles: readonly AppliedStarterPackRole[];
 };
 
 export type Failure = {

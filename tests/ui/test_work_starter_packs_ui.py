@@ -1,10 +1,11 @@
-"""Contracts for the read-only Starter Pack examples section of Work.
+"""Contracts for the Starter Pack examples section of Work.
 
 These checks pin the frontend slice of the bundled Starter Pack catalogue:
-the section reads only through the opaque authenticated api base, renders
-CSP-safe DOM, keeps both locales honest about the packs being uninstalled
-examples, and drives every refusal off typed codes instead of raw payload
-values.  The backend route contract lives in
+the section reads and explicitly applies only through the opaque authenticated
+api base, renders CSP-safe DOM, keeps both locales honest that viewing is
+non-mutating while applying creates ordinary role templates, and drives every
+refusal off typed codes instead of raw payload values.  The backend route
+contract lives in
 ``tests/ui/test_starter_pack_routes.py`` and is not duplicated here.
 """
 
@@ -63,29 +64,31 @@ def _run_node(script: str, compiled_api: Path) -> None:
     assert node.returncode == 0, node.stdout + node.stderr
 
 
-def test_starter_pack_locales_are_paired_and_say_examples_are_not_installed() -> None:
+def test_starter_pack_locales_are_paired_and_separate_viewing_from_applying() -> None:
     messages = json.loads(_source("src/i18n.json"))
     english_keys = {key for key in messages["en"] if key.startswith("starter_packs_")}
     russian_keys = {key for key in messages["ru"] if key.startswith("starter_packs_")}
 
     assert english_keys == russian_keys
     assert "starter_packs_intro" in english_keys
+    assert "starter_packs_apply_confirm" in english_keys
+    assert "starter_packs_apply_success" in english_keys
     assert "starter_packs_check_again" in english_keys
     for locale in ("en", "ru"):
         for key in sorted(english_keys):
             assert messages[locale][key].strip(), f"{locale}.{key} must not be blank"
 
     english_intro = messages["en"]["starter_packs_intro"]
-    assert "example" in english_intro.lower()
-    assert "not installed" in english_intro
-    assert "creates no roles" in english_intro
-    assert "changes nothing" in english_intro
+    assert "explicit confirmation" in english_intro
+    assert "Viewing them still changes nothing" in english_intro
+    assert "template roles" in english_intro
+    assert "deny-by-default" in english_intro
 
     russian_intro = messages["ru"]["starter_packs_intro"]
-    assert "ример" in russian_intro.lower()
-    assert "не установлены" in russian_intro
-    assert "не создаёт роли" in russian_intro
-    assert "ничего не меняет" in russian_intro
+    assert "явного подтверждения" in russian_intro
+    assert "Просмотр по-прежнему ничего не меняет" in russian_intro
+    assert "шаблоны ролей" in russian_intro
+    assert "deny — запрет" in russian_intro
 
     for key in sorted(russian_keys):
         value = messages["ru"][key].lower()
@@ -93,7 +96,7 @@ def test_starter_pack_locales_are_paired_and_say_examples_are_not_installed() ->
             assert fragment not in value, f"ru.{key} uses forbidden transliteration {fragment!r}"
 
 
-def test_starter_packs_read_only_through_the_opaque_api_base_with_safe_dom() -> None:
+def test_starter_packs_use_opaque_api_base_with_safe_dom_and_explicit_apply() -> None:
     api = _source("src/api.ts")
     contracts = _source("src/contracts.ts")
     component = _source("src/components/StarterPacksSection.tsx")
@@ -101,10 +104,14 @@ def test_starter_packs_read_only_through_the_opaque_api_base_with_safe_dom() -> 
 
     assert 'this.get("/work/starter-packs", signal)' in api
     assert "parseStarterPackCatalog" in api
+    assert "parseStarterPackApplyResult" in api
     assert "loadStarterPacks" in api
+    assert "applyStarterPackBlueprint" in api
     assert 'source_kind !== "bundled"' in api
     assert 'context_mode !== "fresh"' in api
     assert "value.example !== true" in api
+    assert "value.template !== true" in api
+    assert 'grant !== "deny"' in api
     for source in (api, component, entry):
         assert "/api/work/starter-packs" not in source
 
@@ -113,6 +120,8 @@ def test_starter_packs_read_only_through_the_opaque_api_base_with_safe_dom() -> 
         "StarterPackBlueprint",
         "StarterPackRole",
         "StarterPackCatalog",
+        "StarterPackApplyResult",
+        "AppliedStarterPackRole",
         "StarterPackSourceKind",
         "StarterPackContextMode",
     ):
@@ -125,11 +134,17 @@ def test_starter_packs_read_only_through_the_opaque_api_base_with_safe_dom() -> 
     assert "starter_pack_catalog_unavailable" in component
     assert 'code.startsWith("setup_")' in component
     assert "AbortController" in component
+    assert "applyStarterPackBlueprint" in component
+    assert "ContextPackRetryIdentity" in component
+    assert "confirmed: true" not in component
     assert '{text("starter_packs_check_again")}' in component
     assert "starter_packs_empty" in component
+    assert "starter_packs_apply_confirm" in component
+    assert "starter_packs_apply_success" in component
+    assert "starter_packs_apply_error" in component
     assert "error.message" not in component
     assert "WorkflowCard" not in component
-    for forbidden_action in ("apply", "install", "use as basis"):
+    for forbidden_action in ("install", "use as basis"):
         assert forbidden_action not in component.lower()
 
 
@@ -141,8 +156,8 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
 
         const apiBase = "/api/cccccccccccccccccccccccccccccccc";
         const storage = new Map([["agent_commons.ui.api_base", apiBase]]);
-        const role = (id, name, purpose, skills) => (
-          { id, name, purpose, context_mode: "fresh", skills }
+        const role = (id, name, purpose, profileId, skills) => (
+          { id, name, purpose, profile_id: profileId, context_mode: "fresh", skills }
         );
         const packs = [
           {
@@ -162,12 +177,14 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
                     "implementer",
                     "Implementer",
                     "Build the scoped change and report verifiable evidence.",
+                    "claude-builder",
                     ["software-engineering", "qa-testing"]
                   ),
                   role(
                     "independent-reviewer",
                     "Independent reviewer",
                     "Assess the submitted work without inheriting the implementer's context.",
+                    "claude-independent-reviewer",
                     ["qa-testing"]
                   )
                 ]
@@ -191,12 +208,14 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
                     "researcher",
                     "Researcher",
                     "Collect bounded evidence and state assumptions and open questions.",
+                    "codex-builder",
                     ["business-product-consulting"]
                   ),
                   role(
                     "product-reviewer",
                     "Product reviewer",
                     "Check the recommendation against evidence without deciding for the owner.",
+                    "codex-independent-reviewer",
                     ["business-product-consulting"]
                   )
                 ]
@@ -205,6 +224,25 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
           }
         ];
         let payload = { packs };
+        const applyPayload = {
+          pack_id: "starter.feature-delivery.mock",
+          blueprint_id: "feature-delivery",
+          applied: true,
+          roles: [
+            {
+              source_role_id: "implementer",
+              agent_id: "agent.01M1FPPEZHYF9C9QTR6PFKM2Q9",
+              revision: "evt.01M1FPPEZHYF9C9QTR6PFKM2Q8",
+              name: "Implementer",
+              profile_id: "claude-builder",
+              context_mode: "fresh",
+              template: true,
+              grants: { create_roles: "deny", retire_roles: "deny", open_links: "deny" },
+              skills: ["commons-start", "software-engineering"]
+            }
+          ]
+        };
+        const posts = [];
         globalThis.window = {
           location: { hash: "", pathname: "/work" },
           history: { replaceState: () => {} },
@@ -214,12 +252,22 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
             removeItem: (key) => storage.delete(key)
           }
         };
-        globalThis.fetch = async (url) => {
+        globalThis.fetch = async (url, init = {}) => {
           if (url === `${apiBase}/setup`) {
             return { ok: true, status: 200, json: async () => ({ state: "setup_configured" }) };
           }
-          assert.equal(url, `${apiBase}/work/starter-packs`);
-          return { ok: true, status: 200, json: async () => payload };
+          if (url === `${apiBase}/work/starter-packs`) {
+            assert.equal(init.credentials, "same-origin");
+            return { ok: true, status: 200, json: async () => payload };
+          }
+          assert.equal(
+            url,
+            `${apiBase}/work/starter-packs/starter.feature-delivery.mock/blueprints/feature-delivery/apply`
+          );
+          assert.equal(init.method, "POST");
+          assert.equal(init.credentials, "same-origin");
+          posts.push(JSON.parse(init.body));
+          return { ok: true, status: 200, json: async () => applyPayload };
         };
 
         const { WorkApi } = await import(pathToFileURL(process.argv[2]).href);
@@ -243,6 +291,7 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
                 id: entry.id,
                 name: entry.name,
                 purpose: entry.purpose,
+                profileId: entry.profile_id,
                 contextMode: "fresh",
                 skills: entry.skills
               }))
@@ -253,6 +302,32 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
         payload = { packs: [] };
         const empty = await api.loadStarterPacks(new AbortController().signal);
         assert.deepEqual(empty, { packs: [] });
+
+        const applied = await api.applyStarterPackBlueprint(
+          "starter.feature-delivery.mock",
+          "feature-delivery",
+          "apply-key",
+          new AbortController().signal
+        );
+        assert.deepEqual(posts, [{ confirmed: true, idempotency_key: "apply-key" }]);
+        assert.deepEqual(applied, {
+          packId: "starter.feature-delivery.mock",
+          blueprintId: "feature-delivery",
+          applied: true,
+          roles: [
+            {
+              sourceRoleId: "implementer",
+              agentId: "agent.01M1FPPEZHYF9C9QTR6PFKM2Q9",
+              revision: "evt.01M1FPPEZHYF9C9QTR6PFKM2Q8",
+              name: "Implementer",
+              profileId: "claude-builder",
+              contextMode: "fresh",
+              template: true,
+              grants: { create_roles: "deny", retire_roles: "deny", open_links: "deny" },
+              skills: ["commons-start", "software-engineering"]
+            }
+          ]
+        });
 
         const clone = () => JSON.parse(JSON.stringify({ packs }));
         const rejected = [];
@@ -270,6 +345,9 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
         const wrongSkill = clone();
         wrongSkill.packs[0].blueprints[0].roles[1].skills = ["qa-testing", 42];
         rejected.push(wrongSkill);
+        const wrongProfile = clone();
+        wrongProfile.packs[0].blueprints[0].roles[0].profile_id = "raw-detail-DO-NOT-RENDER";
+        rejected.push(wrongProfile);
         const blankName = clone();
         blankName.packs[1].blueprints[0].roles[0].name = "";
         rejected.push(blankName);
