@@ -71,6 +71,7 @@ _GROK_HELP_FLAGS = (
     "--allow",
     "--tools",
     "--disallowed-tools",
+    "--rules",
     "--no-plan",
     "--no-subagents",
     "--disable-web-search",

@@ -213,6 +213,10 @@ def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: 
     assert "run_terminal_cmd" not in builder_native
     assert "run_terminal_cmd" in builder_denied
     assert {"search_tool", "use_tool"} <= set(builder_native)
+    grok_rules = invocation.argv[invocation.argv.index("--rules") + 1]
+    assert "search_tool then use_tool" in grok_rules
+    assert "agent-commons__commons_show_delegation" in grok_rules
+    assert "completed terminal Agent Commons use_tool outcome" in grok_rules
 
     narrowed = builder.build_invocation(
         "Implement narrowly",
@@ -294,6 +298,9 @@ def test_grok_profile_validation_keeps_builder_trusted_and_reviewer_read_only(
     denied = invocation.argv[invocation.argv.index("--disallowed-tools") + 1].split(",")
     assert not {"run_terminal_cmd", "search_replace", "write_file"} & set(native)
     assert {"run_terminal_cmd", "search_replace", "write_file", "task", "web_search"} <= set(denied)
+    grok_rules = invocation.argv[invocation.argv.index("--rules") + 1]
+    assert "search_tool then use_tool" in grok_rules
+    assert "agent-commons__commons_show_delegation" in grok_rules
 
     with pytest.raises(ValidationError, match="model"):
         dataclasses.replace(reviewer, model="--hostile")

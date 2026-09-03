@@ -215,6 +215,16 @@ _GROK_EXTRA_ENVIRONMENT = MappingProxyType(
         ),
     }
 )
+_GROK_AGENT_COMMONS_RULES = (
+    "Agent Commons worker rule: use Grok MCP integrations only through the native "
+    "search_tool then use_tool transport. Before any Agent Commons MCP operation, "
+    "search for the exact fully-qualified agent-commons__commons_* tool name; then "
+    "call use_tool with that exact tool_name and schema-matching tool_input. Your "
+    "first Agent Commons action must be search_tool for "
+    "agent-commons__commons_show_delegation followed by use_tool for the same tool. "
+    "A prose answer or process exit without a completed terminal Agent Commons "
+    "use_tool outcome is invalid."
+)
 _RUNNER_EXTRA_ENV_KEYS = frozenset(
     {
         *_GROK_EXTRA_ENVIRONMENT,
@@ -1068,6 +1078,8 @@ class GrokRunnerProfile:
             "--no-plan",
             "--no-subagents",
             "--disable-web-search",
+            "--rules",
+            _GROK_AGENT_COMMONS_RULES,
             "--verbatim",
         ]
         if self.model is not None:

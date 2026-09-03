@@ -15,7 +15,7 @@ from mcp.client.stdio import stdio_client
 _HELP_FLAGS = (
     "--single --cwd --output-format --always-approve --no-alt-screen --max-turns "
     "--model --sandbox --allow --tools --disallowed-tools --no-plan --no-subagents "
-    "--disable-web-search"
+    "--disable-web-search --rules"
 )
 
 
