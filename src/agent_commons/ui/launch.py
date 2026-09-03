@@ -199,9 +199,20 @@ class UILaunchCoordinator:
                 )
         elif request.context.mode is not ContextBindingMode.FRESH:
             raise ValidationError("a fresh role cannot receive a Context Pack")
-        task = writer.snapshot().tasks.get(request.task_id)
+        snapshot = writer.snapshot()
+        task = snapshot.tasks.get(request.task_id)
         if task is None:
             raise ValidationError(f"no such task: {request.task_id}")
+        unresolved_dependencies = tuple(
+            dependency
+            for dependency in (str(item) for item in (task.get("dependencies") or ()))
+            if snapshot.tasks.get(dependency, {}).get("state") != "accepted"
+        )
+        if unresolved_dependencies:
+            raise ValidationError(
+                "this task is blocked by unresolved dependencies; accept prerequisite tasks "
+                "before launch"
+            )
         profile_id = str(role["profile_id"])
         purpose = "implementation"
         if profile_id.endswith("independent-reviewer"):

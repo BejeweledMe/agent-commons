@@ -1586,7 +1586,12 @@ export class WorkApi {
   }
 
   async createTask(
-    input: { title: string; description: string; criteria: readonly string[] },
+    input: {
+      title: string;
+      description: string;
+      criteria: readonly string[];
+      dependencyIds: readonly string[];
+    },
     signal: AbortSignal
   ): Promise<void> {
     await this.post(
@@ -1595,6 +1600,7 @@ export class WorkApi {
         title: input.title,
         description: input.description,
         acceptance_criteria: input.criteria,
+        dependencies: input.dependencyIds,
         idempotency_key: crypto.randomUUID()
       },
       signal

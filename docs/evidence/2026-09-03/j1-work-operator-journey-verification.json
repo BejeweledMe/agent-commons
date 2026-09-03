@@ -1,0 +1,104 @@
+{
+  "schema": "agent-commons.implementation-evidence.v1",
+  "task_id": "task.6GGRYSZFTXTG4GYZ1Q0EVQVXNR",
+  "task_revision": "evt.01M1K63YH6PKTGJJVG9RZAARXP",
+  "slice": "J1 integrated Work operator journey",
+  "repository": {
+    "base_commit": "dd9edab1fb9e6550b28be633ecdf57f2479b2faa",
+    "scope": "Work journey integration only: preset role application, task dependencies, tracker readiness, launch gating, bounded SSE, exact review, canonical acceptance, and direct failure variants."
+  },
+  "files": {
+    "frontend/work/src/api.ts": {
+      "sha256": "2de1b154bfdd1cc8f111289ca6c077c563fd84a403f276f28656692d09d1e782",
+      "bytes": 59930
+    },
+    "frontend/work/src/i18n.json": {
+      "sha256": "d15f13b0e5542afae037c3e69d9c8d1547affeb369613d5b3aca6d3b9a027c83",
+      "bytes": 66082
+    },
+    "frontend/work/src/main.tsx": {
+      "sha256": "3c248267f95e82a6b707add22c2b3e2cabe2a386e31aa2a6df44e06a111361c8",
+      "bytes": 42208
+    },
+    "frontend/work/src/styles.css": {
+      "sha256": "0bf1fd13a384982a8364626bf7154b2245d6413214cc31eb11461d6fdb9c0887",
+      "bytes": 14092
+    },
+    "frontend/work/tests/work-task-create.test.mjs": {
+      "sha256": "f2fe5aed6c34493b95efa8080c0875bba9cf6757089f04460578798f5e0e3dba",
+      "bytes": 2331
+    },
+    "src/agent_commons/ui/launch.py": {
+      "sha256": "619a2dfc58a6463f1d48f1367cd57f65b02f6f3c308f8ee39a8e8897b53ba2ac",
+      "bytes": 12965
+    },
+    "src/agent_commons/ui/server.py": {
+      "sha256": "4f8001aaca682b3c9489c8814a09c7467322d2ac4c54b145ba24fdda34d366f8",
+      "bytes": 61239
+    },
+    "src/agent_commons/ui/static/work/assets/work-D8jFfs6v.css": {
+      "sha256": "53c56052f593c970d282a5c5e7fda6ab47f5420e91c0e33ed12655b22997d621",
+      "bytes": 11396
+    },
+    "src/agent_commons/ui/static/work/assets/work-DDBpsSfi.js": {
+      "sha256": "6d222abb9cd01a6db94d4dd76083bbabbedbfecf26bf21f3355830eae06d8df0",
+      "bytes": 342398
+    },
+    "src/agent_commons/ui/static/work/index.html": {
+      "sha256": "3da3a055d1c2dcaa6eb647e43acddc3366fb511683b2737bde638e00807cf794",
+      "bytes": 411
+    },
+    "tests/ui/test_work_operator_journey.py": {
+      "sha256": "b2376a9b3f9c4e8cdcb76f9ecc4124322494b84cd0e6bb3cf2658cba4762de51",
+      "bytes": 23933
+    }
+  },
+  "verification": {
+    "focused_work_journey": {
+      "command": "uv run --locked pytest tests/ui/test_work_operator_journey.py",
+      "result": "1 passed, 1 warning in 23.31s",
+      "outcome": "passed"
+    },
+    "frontend_work_behavior": {
+      "command": "cd frontend/work && npm test",
+      "result": "29 passed",
+      "outcome": "passed"
+    },
+    "frontend_work_bundle": {
+      "command": "cd frontend/work && npm run build",
+      "result": "passed; Work static bundle rebuilt",
+      "outcome": "passed"
+    },
+    "adjacent_ui_contracts": {
+      "command": "PYTHONPATH=. uv run --locked pytest tests/ui/test_launch.py tests/ui/test_acceptance_chain.py tests/ui/test_starter_pack_routes.py tests/ui/test_work_operator_journey.py",
+      "result": "39 passed, 1 warning in 64.35s",
+      "outcome": "passed"
+    },
+    "release_gate": {
+      "command": "make check",
+      "result": "ruff check passed; ruff format check reported 454 files already formatted; frontend/work 29 passed; frontend/gallery 22 passed; pytest 1830 passed, 13 skipped, 2 warnings in 613.98s",
+      "outcome": "passed"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "no findings",
+      "outcome": "passed"
+    }
+  },
+  "assertions": [
+    "The hermetic fake-runner Work journey applies the starter feature-delivery role preset and validates a skill-aware launch invocation before execution.",
+    "Task creation carries dependency ids through the Work client and API route, and the tracker distinguishes ready tasks from tasks blocked by unresolved prerequisites.",
+    "Blocked dependencies and missing provider qualification fail closed before canonical progress is advanced.",
+    "The journey observes bounded SSE running and succeeded phases, detects reconnect gaps, and treats process exit without terminal MCP as operator attention rather than success.",
+    "Exact review and canonical acceptance are enforced across stale revision, premature accept, changes_requested, and approved review variants.",
+    "The verified Work surfaces expose no prompt, transcript, credentials, operator config, raw provider output, filesystem paths, ETA, progress percentage, cost, or token claims."
+  ],
+  "out_of_scope": [
+    "L1 Linux qualification",
+    "G6 Design Package linkage"
+  ],
+  "safety": {
+    "canonical_truth": "This file is task-bound implementation evidence, not an authoritative execution record.",
+    "provider_data": "No provider output, transcript, prompt, reasoning, credentials, raw diagnostics, filesystem paths, ETA, progress percentage, cost, or token claims are recorded."
+  }
+}

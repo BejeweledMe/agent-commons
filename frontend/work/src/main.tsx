@@ -38,13 +38,14 @@ type TaskDraft = {
   title: string;
   description: string;
   criteria: string;
+  dependencyIds: readonly string[];
 };
 
 type RunDraft = { agentId: string; taskId: string; contextPackKey: string };
 type FormErrors = ReadonlySet<string>;
 
 const emptyRole: RoleDraft = { name: "", profileId: "", rationale: "", contextMode: "fresh" };
-const emptyTask: TaskDraft = { title: "", description: "", criteria: "" };
+const emptyTask: TaskDraft = { title: "", description: "", criteria: "", dependencyIds: [] };
 const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "" };
 
 function contextPackKey(option: ContextPackOption): string {
@@ -318,7 +319,12 @@ function WorkApp(): ReactElement {
     void perform(
       "create-task",
       (signal) => apiRef.current.createTask(
-        { title: task.title.trim(), description: task.description.trim(), criteria },
+        {
+          title: task.title.trim(),
+          description: task.description.trim(),
+          criteria,
+          dependencyIds: task.dependencyIds
+        },
         signal
       ),
       "created_task"
@@ -326,6 +332,15 @@ function WorkApp(): ReactElement {
       if (succeeded) {
         setTask(emptyTask);
       }
+    });
+  }
+
+  function setTaskDependency(taskId: string, selected: boolean): void {
+    setTask((current) => {
+      const dependencyIds = selected
+        ? [...new Set([...current.dependencyIds, taskId])]
+        : current.dependencyIds.filter((candidate) => candidate !== taskId);
+      return { ...current, dependencyIds };
     });
   }
 
@@ -715,6 +730,26 @@ function WorkApp(): ReactElement {
                 <label htmlFor="task-criteria">{text("acceptance_criteria")}</label>
                 <textarea aria-invalid={validation([...taskErrors], "criteria")} id="task-criteria" onChange={(event) => setTask({ ...task, criteria: event.target.value })} placeholder={text("acceptance_criteria_placeholder")} rows={3} value={task.criteria} />
                 {validation([...taskErrors], "criteria") ? <p className="field-error">{text("form_error_task_criteria")}</p> : null}
+                {taskOptions.length > 0 ? (
+                  <fieldset className="dependency-picker">
+                    <legend>{text("task_dependencies")}</legend>
+                    <p className="small-copy">{text("task_dependencies_help")}</p>
+                    <div className="dependency-option-list">
+                      {taskOptions.map((option) => (
+                        <label className="dependency-option" htmlFor={`task-dependency-${option.id}`} key={option.id}>
+                          <input
+                            checked={task.dependencyIds.includes(option.id)}
+                            id={`task-dependency-${option.id}`}
+                            onChange={(event) => setTaskDependency(option.id, event.target.checked)}
+                            type="checkbox"
+                          />
+                          <span>{option.title}</span>
+                          <span className="dependency-option-state">{option.state}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
                 <button className="button button-primary" type="submit">{activeAction === "create-task" ? text("working") : text("create_task")}</button>
               </fieldset>
             </form>

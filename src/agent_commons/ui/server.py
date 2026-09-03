@@ -1012,6 +1012,7 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             acceptance_criteria=tuple(
                 str(item) for item in (body.get("acceptance_criteria") or ())
             ),
+            dependencies=tuple(str(item) for item in (body.get("dependencies") or ())),
             idempotency_key=body.get("idempotency_key"),
         )
 
