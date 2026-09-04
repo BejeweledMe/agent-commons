@@ -24,6 +24,7 @@ execFileSync(
 const apiModule = await import(pathToFileURL(resolve(compiled, "api.js")).href);
 
 const packId = `context_pack.${"0".repeat(25)}1`;
+const designPackageId = `design_package.${"0".repeat(25)}5`;
 const revision = `evt.${"0".repeat(25)}2`;
 
 function launchOptions() {
@@ -48,6 +49,18 @@ function launchOptions() {
       freshness: "current",
       truncated: false,
       refusal: null
+    },
+    design_packages: [{
+      design_package_id: designPackageId,
+      revision,
+      title: "Checkout reference",
+      screen_count: 1,
+      source_path: "/private/must-not-cross"
+    }],
+    design_package_options_status: {
+      freshness: "current",
+      truncated: false,
+      refusal: null
     }
   };
 }
@@ -62,7 +75,14 @@ test("launch parser owns the bounded exact Context Pack selection", () => {
     factCount: 1,
     openQuestionCount: 1
   }]);
+  assert.deepEqual(parsed.designPackages, [{
+    designPackageId,
+    revision,
+    title: "Checkout reference",
+    screenCount: 1
+  }]);
   assert.equal(JSON.stringify(parsed).includes("source_refs"), false);
+  assert.equal(JSON.stringify(parsed).includes("source_path"), false);
 });
 
 test("launch parser refuses arbitrary modes, identifiers, and oversized pack lists", () => {
@@ -81,6 +101,17 @@ test("launch parser refuses arbitrary modes, identifiers, and oversized pack lis
   const tooMany = launchOptions();
   tooMany.context_packs = Array.from({ length: 257 }, () => launchOptions().context_packs[0]);
   assert.throws(() => apiModule.parseLaunch(tooMany));
+
+  const unsafeDesignId = launchOptions();
+  unsafeDesignId.design_packages[0].design_package_id = "design_package.not-exact";
+  assert.throws(() => apiModule.parseLaunch(unsafeDesignId));
+
+  const tooManyDesignPackages = launchOptions();
+  tooManyDesignPackages.design_packages = Array.from(
+    { length: 257 },
+    () => launchOptions().design_packages[0]
+  );
+  assert.throws(() => apiModule.parseLaunch(tooManyDesignPackages));
 });
 
 test("launch parser counts summary code points and UTF-8 bytes like the canonical bounds", () => {
@@ -108,9 +139,21 @@ test("launch parser requires explicit and internally consistent option-set statu
   const contradictory = launchOptions();
   contradictory.context_pack_options_status.truncated = true;
   assert.throws(() => apiModule.parseLaunch(contradictory));
+
+  const designTruncated = launchOptions();
+  designTruncated.design_package_options_status = {
+    freshness: "current",
+    truncated: true,
+    refusal: "design_package_options_truncated"
+  };
+  assert.equal(apiModule.parseLaunch(designTruncated).designPackageOptionsStatus.truncated, true);
+
+  const designContradictory = launchOptions();
+  designContradictory.design_package_options_status.truncated = true;
+  assert.throws(() => apiModule.parseLaunch(designContradictory));
 });
 
-test("startRun sends an exact pair for accumulated and omits it for fresh", async () => {
+test("startRun sends exact launch selections and omits unset selections", async () => {
   const bodies = [];
   globalThis.fetch = async (_url, init) => {
     bodies.push(JSON.parse(init.body));
@@ -123,17 +166,25 @@ test("startRun sends an exact pair for accumulated and omits it for fresh", asyn
     agentId: "agent.1",
     taskId: "task.1",
     contextPackId: packId,
-    contextPackRevision: revision
+    contextPackRevision: revision,
+    designPackageId,
+    designPackageRevision: revision
   }, "launch-1", signal);
   await api.startRun({
     agentId: "agent.2",
     taskId: "task.2",
     contextPackId: null,
-    contextPackRevision: null
+    contextPackRevision: null,
+    designPackageId: null,
+    designPackageRevision: null
   }, "launch-2", signal);
 
   assert.equal(bodies[0].context_pack_id, packId);
   assert.equal(bodies[0].context_pack_revision, revision);
+  assert.equal(bodies[0].design_package_id, designPackageId);
+  assert.equal(bodies[0].design_package_revision, revision);
   assert.equal("context_pack_id" in bodies[1], false);
   assert.equal("context_pack_revision" in bodies[1], false);
+  assert.equal("design_package_id" in bodies[1], false);
+  assert.equal("design_package_revision" in bodies[1], false);
 });

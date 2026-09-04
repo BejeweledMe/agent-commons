@@ -1,0 +1,110 @@
+{
+  "schema": "agent-commons.g6_design_package_work_launch_evidence.v1",
+  "generated_at": "2026-09-04T00:00:00+03:00",
+  "task_id": "task.2DY7ATZMFXC2P3GRARY65YS1Z1",
+  "base_head": "1386cb2c160fef585ab71f5b330fa8b4bbd294f7",
+  "summary": {
+    "implemented": true,
+    "design_package_launch_selection": "Work launch accepts an optional exact current Design Package id and revision.",
+    "pre_launch_refusals": [
+      "missing Design Package selections return design_package_missing before delegation, child session, or attempt creation",
+      "stale or superseded Design Package selections return design_package_stale before delegation, child session, or attempt creation",
+      "unauthorized Design Package selections are refused by the runtime resolver before launch side effects"
+    ],
+    "privacy_boundary": "Runtime persists only exact Design Package provenance and safe preview metadata; design source bytes, preview paths, prompts, transcripts, provider output, credentials, and filesystem paths are not added to provider input or Work run DTOs."
+  },
+  "checks": {
+    "focused_backend": "uv run pytest tests/runtime/test_design_package_binding.py tests/ui/test_work_operator_journey.py -q :: 5 passed, 1 warning",
+    "focused_frontend": "npm test -- --runTestsByPath tests/context-pack-launch.test.mjs :: Work suite 29 passed",
+    "focused_regressions": "uv run python -m pytest tests/ui/test_launch.py::test_launch_context_pack_options_are_server_bounded_with_explicit_status tests/ui/test_provider_auth_recovery.py::test_signed_out_launch_is_pure_then_async_login_allows_explicit_retry tests/ui/test_provider_auth_recovery.py::test_late_pre_start_auth_refusal_keeps_requested_delegation_retryable tests/ui/test_work_app_contract.py::test_work_checked_in_bundle_is_fresh_from_its_pinned_frontend_source -q :: 4 passed, 1 warning",
+    "make_check": "passed: Ruff ok, format ok, frontend/work 29 passed, frontend/gallery 22 passed, pytest 1834 passed, 13 skipped, 2 warnings",
+    "doctor": "ok: true; issues: []"
+  },
+  "changed_files": [
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "9733036d64b6d9eddad1fccb2b0805b471223a2939cb4dc3ea3205a60c57d4be"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "bcf2b72a9127318c63c1e348dcc020e1c0ee1bd9f5ff393f017b8b5101bf1359"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "9ae66faba653b5ee80d27030424e49313853d6f0ab2c1627fa5557b4f5a45dcb"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "10b1ee2fa842d48fcd65cac92a3aa8c210487e7d11af8ede482a232616687f8a"
+    },
+    {
+      "path": "frontend/work/tests/context-pack-launch.test.mjs",
+      "sha256": "65846931140f66d6e9b2ab19d67bee35a907bd53c0f22ffbe55c8cb0fab4dc31"
+    },
+    {
+      "path": "src/agent_commons/runtime/__init__.py",
+      "sha256": "72dc7c2fda601cef3d4f2c064ed1affb27c446b2fac7f6639f57f55907ce5ebb"
+    },
+    {
+      "path": "src/agent_commons/runtime/design_package_binding.py",
+      "sha256": "91d0c66d021f3f8fbefc0ee36f0134e358afb405f5d9364f762660ae538a76fb"
+    },
+    {
+      "path": "src/agent_commons/runtime/launch.py",
+      "sha256": "4521240a6b4d9c3a8f22344ae9cee89844785c6edf712316b66e8aff8814375b"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_runtime.py",
+      "sha256": "c4866974b7ae7baaedd5b87b2a910ac3ae471ea0214009f947619cd9e64fa8b6"
+    },
+    {
+      "path": "src/agent_commons/ui/context.py",
+      "sha256": "3d121c406aaae49fd87ef75b46c074194bf3fa9a1d03b3e1b793344b632bfe54"
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "a2eedebbf6bde750d526306b622623f3205d8d6f585db8fb8b08e5c387faad80"
+    },
+    {
+      "path": "src/agent_commons/ui/read_dtos.py",
+      "sha256": "59c0a55a2310c81dd2bf357f2937c451f6453fc1907db7c8361059ad049ec841"
+    },
+    {
+      "path": "src/agent_commons/ui/reads.py",
+      "sha256": "659d3f8590fe843a1d71fcde313210697b4d1ee80980cb762f6e5e8af5ec7bef"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "36cee710b9645ca716aebc5559e9f3433ee136fe6b3c230702f42574dddf9b5e"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-C5iDpjsL.js",
+      "sha256": "8f9c7ad063dbca63a991ec0a155578709be500f013addae615818529adb0e27a"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "ad96624e313e8053bd74278aa466a51f55edce37144eb1b3ca693316bc7be20e"
+    },
+    {
+      "path": "tests/runtime/test_design_package_binding.py",
+      "sha256": "8c9e26aa0d8c39e8cdf6520e7d9f50ca0358350932111d70ad3782ebaa7cdd28"
+    },
+    {
+      "path": "tests/ui/test_work_operator_journey.py",
+      "sha256": "26bb71d41e5fce637670c6a319c7731f41d503102bbd0fe0bc76ade3b7bd4a2d"
+    }
+  ],
+  "removed_files": [
+    "src/agent_commons/ui/static/work/assets/work-DDBpsSfi.js"
+  ],
+  "evidence_policy": {
+    "credentials_persisted": false,
+    "auth_paths_persisted": false,
+    "raw_provider_output_persisted": false,
+    "prompts_or_transcripts_persisted": false,
+    "skill_text_persisted": false,
+    "operator_config_persisted": false,
+    "design_source_bytes_persisted_in_runtime_binding": false,
+    "filesystem_paths_persisted_in_work_run_dto": false
+  }
+}

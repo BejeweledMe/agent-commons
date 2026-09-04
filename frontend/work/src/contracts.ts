@@ -76,6 +76,19 @@ export type ContextPackOptionsStatus = {
   refusal: "context_pack_options_truncated" | null;
 };
 
+export type DesignPackageOption = {
+  designPackageId: string;
+  revision: string;
+  title: string;
+  screenCount: number;
+};
+
+export type DesignPackageOptionsStatus = {
+  freshness: "current";
+  truncated: boolean;
+  refusal: "design_package_options_truncated" | null;
+};
+
 export type ContextPackReferenceKind =
   | "artifact"
   | "finding"
@@ -123,6 +136,8 @@ export type LaunchOptions = {
   tasks: readonly TaskOption[];
   contextPacks: readonly ContextPackOption[];
   contextPackOptionsStatus: ContextPackOptionsStatus;
+  designPackages: readonly DesignPackageOption[];
+  designPackageOptionsStatus: DesignPackageOptionsStatus;
 };
 
 export type ProviderAuthState =

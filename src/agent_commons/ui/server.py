@@ -1221,6 +1221,8 @@ def _register_launch(router: _RouteGroup, context: UIContext) -> None:
             idempotency_key=body.get("idempotency_key"),
             context_pack_id=body.get("context_pack_id"),
             context_pack_revision=body.get("context_pack_revision"),
+            design_package_id=body.get("design_package_id"),
+            design_package_revision=body.get("design_package_revision"),
         )
 
     @router.post("/api/provider-auth/{profile_id}/login")

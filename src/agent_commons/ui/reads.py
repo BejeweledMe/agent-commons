@@ -39,6 +39,7 @@ from agent_commons.ui.read_dtos import (
     AttentionResponse,
     ConfigBrokenAttention,
     LaunchContextPackDTO,
+    LaunchDesignPackageDTO,
     ProposalAttention,
     RunBlockedAttention,
     SetupGuidanceBlockerCode,
@@ -597,6 +598,22 @@ class UIReads:
             for record in context_pack_records[:max_context_pack_options]
         ]
         context_packs_truncated = len(context_pack_records) > max_context_pack_options
+        design_package_records = [
+            record
+            for _, record in sorted(getattr(snapshot, "design_packages", {}).items())
+            if record.state == "published"
+        ]
+        max_design_package_options = 256
+        design_packages = [
+            LaunchDesignPackageDTO(
+                design_package_id=record.design_package_id,
+                revision=record.revision,
+                title=str(record.draft.title),
+                screen_count=len(record.draft.screens),
+            ).to_wire()
+            for record in design_package_records[:max_design_package_options]
+        ]
+        design_packages_truncated = len(design_package_records) > max_design_package_options
         return {
             "launch_enabled": self.launch_enabled,
             "roles": roles,
@@ -606,6 +623,14 @@ class UIReads:
                 "freshness": "current",
                 "truncated": context_packs_truncated,
                 "refusal": ("context_pack_options_truncated" if context_packs_truncated else None),
+            },
+            "design_packages": design_packages,
+            "design_package_options_status": {
+                "freshness": "current",
+                "truncated": design_packages_truncated,
+                "refusal": (
+                    "design_package_options_truncated" if design_packages_truncated else None
+                ),
             },
         }
 

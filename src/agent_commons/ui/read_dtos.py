@@ -84,6 +84,23 @@ class LaunchContextPackOptionsStatusPayload(TypedDict):
     refusal: Literal["context_pack_options_truncated"] | None
 
 
+class LaunchDesignPackagePayload(TypedDict):
+    """One exact current Design Package revision selectable by Work."""
+
+    design_package_id: str
+    revision: str
+    title: str
+    screen_count: int
+
+
+class LaunchDesignPackageOptionsStatusPayload(TypedDict):
+    """Freshness and fail-closed completeness state for the bounded option set."""
+
+    freshness: Literal["current"]
+    truncated: bool
+    refusal: Literal["design_package_options_truncated"] | None
+
+
 @dataclass(frozen=True, slots=True)
 class LaunchContextPackDTO:
     """Bounded, content-minimal Context Pack identity for a launch form.
@@ -107,6 +124,29 @@ class LaunchContextPackDTO:
             "summary": self.summary,
             "fact_count": self.fact_count,
             "open_question_count": self.open_question_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LaunchDesignPackageDTO:
+    """Bounded, content-free Design Package identity for a launch form.
+
+    Screen source bytes, preview paths, prompt text, transcripts, and provider
+    output deliberately stay out of this DTO.  The title and screen count are
+    canonical bounded preview metadata used only for operator selection.
+    """
+
+    design_package_id: str
+    revision: str
+    title: str
+    screen_count: int
+
+    def to_wire(self) -> LaunchDesignPackagePayload:
+        return {
+            "design_package_id": self.design_package_id,
+            "revision": self.revision,
+            "title": self.title,
+            "screen_count": self.screen_count,
         }
 
 

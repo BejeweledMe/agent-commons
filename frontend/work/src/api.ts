@@ -7,6 +7,7 @@ import type {
   ContextPackDraft,
   ContextPackFact,
   ContextPackReferenceKind,
+  DesignPackageOption,
   RevisionBoundRef,
   JsonObject,
   LaunchOptions,
@@ -192,9 +193,12 @@ const TRACKER_ATTENTION_REASONS = new Set([
   "changes_requested", "review_evidence_missing"
 ]);
 const MAX_LAUNCH_CONTEXT_PACKS = 256;
+const MAX_LAUNCH_DESIGN_PACKAGES = 256;
 const MAX_CONTEXT_PACK_SUMMARY_CODE_POINTS = 4096;
 const MAX_CONTEXT_PACK_SEMANTIC_BYTES = 65_536;
+const MAX_DESIGN_PACKAGE_TITLE_CODE_POINTS = 256;
 const CONTEXT_PACK_ID = /^context_pack\.[0-9A-HJKMNP-TV-Z]{26}$/;
+const DESIGN_PACKAGE_ID = /^design_package\.[0-9A-HJKMNP-TV-Z]{26}$/;
 const EVENT_ID = /^evt\.[0-9A-HJKMNP-TV-Z]{26}$/;
 const CONTEXT_PACK_REF_ID = /^(artifact|finding|task|thread|verification|decision)\.[0-9A-HJKMNP-TV-Z]{26}$/;
 const CONTEXT_PACK_SOURCE_KINDS = new Set<ContextPackReferenceKind>([
@@ -444,6 +448,29 @@ function parseContextPack(value: unknown): ContextPackOption {
   return { contextPackId, revision, summary, factCount, openQuestionCount };
 }
 
+function parseDesignPackage(value: unknown): DesignPackageOption {
+  if (!isObject(value)) {
+    throw new ApiProblem(502, null);
+  }
+  const designPackageId = requiredStringAt(value, "design_package_id");
+  const revision = requiredStringAt(value, "revision");
+  const title = requiredStringAt(value, "title");
+  const screenCount = value.screen_count;
+  if (
+    !DESIGN_PACKAGE_ID.test(designPackageId)
+    || !EVENT_ID.test(revision)
+    || Array.from(title).length > MAX_DESIGN_PACKAGE_TITLE_CODE_POINTS
+    || new TextEncoder().encode(title).byteLength > MAX_CONTEXT_PACK_SEMANTIC_BYTES
+    || typeof screenCount !== "number"
+    || !Number.isSafeInteger(screenCount)
+    || screenCount < 1
+    || screenCount > 64
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  return { designPackageId, revision, title, screenCount };
+}
+
 function boundedCodePointString(value: unknown, maximum: number): string {
   if (
     typeof value !== "string"
@@ -586,20 +613,35 @@ export function parseLaunch(value: unknown): LaunchOptions {
   const rawTasks = Array.isArray(value.tasks) ? value.tasks : [];
   const rawContextPacks = value.context_packs;
   const rawContextPackStatus = value.context_pack_options_status;
+  const rawDesignPackages = value.design_packages;
+  const rawDesignPackageStatus = value.design_package_options_status;
   if (!Array.isArray(rawContextPacks) || rawContextPacks.length > MAX_LAUNCH_CONTEXT_PACKS) {
     throw new ApiProblem(502, null);
   }
-  if (!isObject(rawContextPackStatus)) {
+  if (
+    !Array.isArray(rawDesignPackages)
+    || rawDesignPackages.length > MAX_LAUNCH_DESIGN_PACKAGES
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  if (!isObject(rawContextPackStatus) || !isObject(rawDesignPackageStatus)) {
     throw new ApiProblem(502, null);
   }
   const freshness = rawContextPackStatus.freshness;
   const truncated = rawContextPackStatus.truncated;
   const refusal = rawContextPackStatus.refusal;
+  const designFreshness = rawDesignPackageStatus.freshness;
+  const designTruncated = rawDesignPackageStatus.truncated;
+  const designRefusal = rawDesignPackageStatus.refusal;
   if (
     freshness !== "current"
     || typeof truncated !== "boolean"
     || (refusal !== null && refusal !== "context_pack_options_truncated")
     || (truncated !== (refusal === "context_pack_options_truncated"))
+    || designFreshness !== "current"
+    || typeof designTruncated !== "boolean"
+    || (designRefusal !== null && designRefusal !== "design_package_options_truncated")
+    || (designTruncated !== (designRefusal === "design_package_options_truncated"))
   ) {
     throw new ApiProblem(502, null);
   }
@@ -612,6 +654,12 @@ export function parseLaunch(value: unknown): LaunchOptions {
       freshness,
       truncated,
       refusal
+    },
+    designPackages: rawDesignPackages.map(parseDesignPackage),
+    designPackageOptionsStatus: {
+      freshness: designFreshness,
+      truncated: designTruncated,
+      refusal: designRefusal
     }
   };
 }
@@ -1631,6 +1679,8 @@ export class WorkApi {
       taskId: string;
       contextPackId: string | null;
       contextPackRevision: string | null;
+      designPackageId: string | null;
+      designPackageRevision: string | null;
     },
     idempotencyKey: string,
     signal: AbortSignal
@@ -1643,6 +1693,10 @@ export class WorkApi {
         ...(input.contextPackId === null ? {} : {
           context_pack_id: input.contextPackId,
           context_pack_revision: input.contextPackRevision
+        }),
+        ...(input.designPackageId === null ? {} : {
+          design_package_id: input.designPackageId,
+          design_package_revision: input.designPackageRevision
         }),
         idempotency_key: idempotencyKey
       },

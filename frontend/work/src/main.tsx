@@ -10,6 +10,7 @@ import { TrackerSection } from "./components/TrackerSection";
 import { WorkflowCard } from "./components/WorkflowCard";
 import type {
   ContextPackOption,
+  DesignPackageOption,
   Failure,
   ProviderAvailabilityRefusalCode,
   ProviderCapabilityRefusalCode,
@@ -41,15 +42,24 @@ type TaskDraft = {
   dependencyIds: readonly string[];
 };
 
-type RunDraft = { agentId: string; taskId: string; contextPackKey: string };
+type RunDraft = {
+  agentId: string;
+  taskId: string;
+  contextPackKey: string;
+  designPackageKey: string;
+};
 type FormErrors = ReadonlySet<string>;
 
 const emptyRole: RoleDraft = { name: "", profileId: "", rationale: "", contextMode: "fresh" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "", dependencyIds: [] };
-const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "" };
+const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "", designPackageKey: "" };
 
 function contextPackKey(option: ContextPackOption): string {
   return `${option.contextPackId}@${option.revision}`;
+}
+
+function designPackageKey(option: DesignPackageOption): string {
+  return `${option.designPackageId}@${option.revision}`;
 }
 
 const guidanceActionMessage: Readonly<Record<SetupGuidanceNextActionKey, MessageKey>> = {
@@ -409,6 +419,9 @@ function WorkApp(): ReactElement {
     const selectedPack = state.data.launch?.contextPacks.find(
       (option) => contextPackKey(option) === run.contextPackKey
     );
+    const selectedDesignPackage = state.data.launch?.designPackages.find(
+      (option) => designPackageKey(option) === run.designPackageKey
+    );
     const profileId = selectedRole?.profileId;
     const authStatus = state.data.providerAuth.find((status) => status.profileId === profileId);
     const key = pendingLaunchKey ?? crypto.randomUUID();
@@ -428,7 +441,9 @@ function WorkApp(): ReactElement {
           agentId: run.agentId,
           taskId: run.taskId,
           contextPackId: selectedPack?.contextPackId ?? null,
-          contextPackRevision: selectedPack?.revision ?? null
+          contextPackRevision: selectedPack?.revision ?? null,
+          designPackageId: selectedDesignPackage?.designPackageId ?? null,
+          designPackageRevision: selectedDesignPackage?.revision ?? null
         },
         key,
         controller.signal
@@ -502,6 +517,11 @@ function WorkApp(): ReactElement {
         (option) => contextPackKey(option) === run.contextPackKey
       )
       : undefined;
+    const selectedDesignPackage = state.kind === "ready" && run.designPackageKey !== ""
+      ? state.data.launch?.designPackages.find(
+        (option) => designPackageKey(option) === run.designPackageKey
+      )
+      : undefined;
     const selectedAvailability = state.kind === "ready"
       ? state.data.providerAvailability.find(
         (availability) => availability.profileId === selectedRole?.profileId
@@ -512,6 +532,9 @@ function WorkApp(): ReactElement {
       ...(run.taskId ? [] : ["task"]),
       ...(selectedRole?.contextMode === "accumulated" && selectedPack === undefined
         ? ["context-pack"]
+        : []),
+      ...(run.designPackageKey !== "" && selectedDesignPackage === undefined
+        ? ["design-package"]
         : []),
       ...(selectedRole !== undefined && selectedAvailability?.launchable !== true
         ? ["provider-availability"]
@@ -550,6 +573,7 @@ function WorkApp(): ReactElement {
   const roleOptions = launch?.roles ?? [];
   const taskOptions = launch?.tasks ?? [];
   const contextPackOptions = launch?.contextPacks ?? [];
+  const designPackageOptions = launch?.designPackages ?? [];
   const environmentReady = configured && Boolean(launch?.launchEnabled);
   const guidance = data.guidance?.blockerCode === null ? null : data.guidance;
   const canConfigureRuntime = data.setup.state === "setup_unconfigured"
@@ -861,19 +885,39 @@ function WorkApp(): ReactElement {
             <form noValidate onSubmit={submitRun}>
               <fieldset disabled={!environmentReady || activeAction !== null || (selectedRole !== undefined && selectedAvailability?.launchable !== true)}>
                 <label htmlFor="run-role">{text("select_role")}</label>
-                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => setRun({ ...run, agentId: event.target.value, contextPackKey: "" })} value={run.agentId}>
+                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => setRun({ ...run, agentId: event.target.value, contextPackKey: "", designPackageKey: "" })} value={run.agentId}>
                   <option value="">{text("select_role")}</option>
                   {roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
                 </select>
                 {validation([...runErrors], "agent") ? <p className="field-error">{text("form_error_run_role")}</p> : null}
                 {roleOptions.length === 0 && configured ? <p className="field-error">{text("no_roles")}</p> : null}
                 <label htmlFor="run-task">{text("select_task")}</label>
-                <select aria-invalid={validation([...runErrors], "task")} id="run-task" onChange={(event) => setRun({ ...run, taskId: event.target.value })} value={run.taskId}>
+                <select aria-invalid={validation([...runErrors], "task")} id="run-task" onChange={(event) => setRun({ ...run, taskId: event.target.value, designPackageKey: "" })} value={run.taskId}>
                   <option value="">{text("select_task")}</option>
                   {taskOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
                 </select>
                 {validation([...runErrors], "task") ? <p className="field-error">{text("form_error_run_task")}</p> : null}
                 {taskOptions.length === 0 && configured ? <p className="field-error">{text("no_tasks")}</p> : null}
+                <label htmlFor="run-design-package">{text("select_design_package")}</label>
+                <select
+                  aria-describedby="run-design-package-help"
+                  aria-invalid={validation([...runErrors], "design-package")}
+                  id="run-design-package"
+                  onChange={(event) => setRun({ ...run, designPackageKey: event.target.value })}
+                  value={run.designPackageKey}
+                >
+                  <option value="">{text("no_design_package")}</option>
+                  {designPackageOptions.map((option) => (
+                    <option key={designPackageKey(option)} value={designPackageKey(option)}>
+                      {option.title} — {option.screenCount} — {option.designPackageId} @ {option.revision}
+                    </option>
+                  ))}
+                </select>
+                <p className="small-copy" id="run-design-package-help">{text("design_package_exact_help")}</p>
+                {validation([...runErrors], "design-package") ? <p className="field-error">{text("form_error_design_package")}</p> : null}
+                {launch?.designPackageOptionsStatus.truncated ? (
+                  <p className="field-error" role="status">{text("design_package_options_truncated")}</p>
+                ) : null}
                 {selectedRole?.contextMode === "accumulated" ? (
                   <>
                     <label htmlFor="run-context-pack">{text("select_context_pack")}</label>

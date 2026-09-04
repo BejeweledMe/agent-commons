@@ -19,6 +19,7 @@ from agent_commons.errors import CommonsError, ConfigurationError, ValidationErr
 from agent_commons.runtime import (
     ContextBindingMode,
     ContextBindingRequest,
+    DesignPackageBindingRequest,
 )
 from agent_commons.runtime.model import BuiltinProfileId
 from agent_commons.services.manager import CommonsManager
@@ -74,6 +75,7 @@ class LaunchRequest:
     idempotency_key: str | None = None
     background: bool = True
     context: ContextBindingRequest = ContextBindingRequest.fresh()
+    design_package: DesignPackageBindingRequest | None = None
 
 
 class LaunchResult(TypedDict):
@@ -224,8 +226,18 @@ class UILaunchCoordinator:
         if auth_status["blocks_launch"]:
             raise provider_auth_launch_refusal(auth_status)
         runtime: DelegationRuntimeService | None = None
-        if request.context.mode is ContextBindingMode.ACCUMULATED:
+        if (
+            request.context.mode is ContextBindingMode.ACCUMULATED
+            or request.design_package is not None
+        ):
             runtime = self._runtime_service(writer)
+        if request.design_package is not None:
+            # Refuse stale, missing, unauthorized, or superseded Design
+            # Packages before a canonical delegation, child session, or attempt
+            # exists.  The runtime repeats this exact validation under the
+            # per-delegation lock and persists only safe provenance metadata.
+            runtime.validate_design_package_selection(request.design_package)
+        if request.context.mode is ContextBindingMode.ACCUMULATED:
             # Refuse a stale, missing, unauthorized, or oversized pack while
             # the HTTP action is still synchronous and before a canonical
             # delegation, child session, or attempt exists.  The runtime
@@ -246,12 +258,13 @@ class UILaunchCoordinator:
         def launch() -> None:
             try:
                 launch_runtime = runtime or self._runtime_service(context.writer())
-                launch_runtime.run(
-                    delegation_id,
-                    delegation["revision"],
-                    idempotency_key=launch_key,
-                    context=request.context,
-                )
+                launch_kwargs = {
+                    "idempotency_key": launch_key,
+                    "context": request.context,
+                }
+                if request.design_package is not None:
+                    launch_kwargs["design_package"] = request.design_package
+                launch_runtime.run(delegation_id, delegation["revision"], **launch_kwargs)
             except Exception as exc:  # a launch failure is reported, never silent
                 # The runtime repeats the auth gate immediately before opening
                 # the child.  If credentials changed after the UI precheck,

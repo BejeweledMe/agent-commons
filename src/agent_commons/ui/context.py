@@ -19,7 +19,7 @@ from typing import Any
 
 from agent_commons.config import CommonsPaths
 from agent_commons.errors import CommonsError, ConfigurationError
-from agent_commons.runtime import ContextBindingRequest
+from agent_commons.runtime import ContextBindingRequest, DesignPackageBindingRequest
 from agent_commons.services.manager import CommonsManager
 from agent_commons.ui.actions import (
     MODEL_NAME_REFUSED,
@@ -181,12 +181,18 @@ class UIContext(UIReads, UIActions):
         background: bool = True,
         context_pack_id: str | None = None,
         context_pack_revision: str | None = None,
+        design_package_id: str | None = None,
+        design_package_revision: str | None = None,
     ) -> LaunchResult:
         """Delegate the existing launch call to the dedicated coordinator."""
 
         if (context_pack_id is None) != (context_pack_revision is None):
             raise ConfigurationError(
                 "a Context Pack selection requires both its id and exact revision"
+            )
+        if (design_package_id is None) != (design_package_revision is None):
+            raise ConfigurationError(
+                "a Design Package selection requires both its id and exact revision"
             )
         try:
             context = (
@@ -201,6 +207,19 @@ class UIContext(UIReads, UIActions):
             raise ConfigurationError(
                 "the Context Pack selection must use typed exact identifiers"
             ) from exc
+        try:
+            design_package = (
+                None
+                if design_package_id is None
+                else DesignPackageBindingRequest(
+                    design_package_id=design_package_id,
+                    design_package_revision=design_package_revision,
+                )
+            )
+        except ValueError as exc:
+            raise ConfigurationError(
+                "the Design Package selection must use typed exact identifiers"
+            ) from exc
 
         return self._launch_coordinator.run(
             LaunchRequest(
@@ -210,6 +229,7 @@ class UIContext(UIReads, UIActions):
                 idempotency_key=idempotency_key,
                 background=background,
                 context=context,
+                design_package=design_package,
             )
         )
 

@@ -28,6 +28,7 @@ from agent_commons.domain.context_pack import (
     ContextPackRefusal,
     ContextPackRefusalCode,
 )
+from agent_commons.domain.design_packages import DesignPackageRecord, DesignPackageRefusal
 from agent_commons.errors import (
     ConfigurationError,
     IdempotencyConflictError,
@@ -54,6 +55,12 @@ from agent_commons.runtime import (
     ContextBindingResolver,
     ContextBindingStore,
     CorrelationIds,
+    DesignPackageBindingMetadata,
+    DesignPackageBindingRefusal,
+    DesignPackageBindingRefusalCode,
+    DesignPackageBindingRequest,
+    DesignPackageBindingResolver,
+    DesignPackageBindingStore,
     DiagnosticCode,
     InitializationProbe,
     JsonlTelemetrySink,
@@ -88,6 +95,7 @@ from agent_commons.runtime import (
     TypedRefusal,
     context_binding_refusal_error,
     default_profile_registry,
+    design_package_binding_refusal_error,
     diagnostic_hint,
     diagnostic_safe_next_actions,
     launch_refusal_error,
@@ -429,6 +437,7 @@ class DelegationRuntimeService:
         launch_planner: LaunchPlanner | None = None,
         initialization_probe: InitializationProbe | None = None,
         context_bindings: ContextBindingStore | None = None,
+        design_package_bindings: DesignPackageBindingStore | None = None,
         qualifications: ProviderQualificationStore | None = None,
         qualification_required: bool | None = None,
     ) -> None:
@@ -489,6 +498,12 @@ class DelegationRuntimeService:
         self.launch_planner = launch_planner or LaunchPlanner.default()
         self._context_binding_resolver = ContextBindingResolver()
         self.context_bindings = context_bindings or ContextBindingStore(
+            manager.paths.state_root,
+            security_policy=manager.policy,
+            read_only=manager.read_only,
+        )
+        self._design_package_binding_resolver = DesignPackageBindingResolver()
+        self.design_package_bindings = design_package_bindings or DesignPackageBindingStore(
             manager.paths.state_root,
             security_policy=manager.policy,
             read_only=manager.read_only,
@@ -1403,6 +1418,126 @@ class DelegationRuntimeService:
             ) from exc
         return resolved
 
+    def _resolve_design_package_binding(
+        self, request: DesignPackageBindingRequest
+    ) -> DesignPackageBindingMetadata:
+        def load_exact(package_id: str, revision: str) -> DesignPackageRecord | None:
+            try:
+                current = self.manager.design_packages.get(package_id)
+                if current.revision != revision:
+                    return current
+                return self.manager.design_packages.get(package_id, revision=revision)
+            except DesignPackageRefusal as refusal:
+                if refusal.code.value == DesignPackageBindingRefusalCode.MISSING.value:
+                    return None
+                if refusal.code.value == DesignPackageBindingRefusalCode.STALE.value:
+                    return self.manager.design_packages.get(package_id)
+                raise
+
+        resolved = self._design_package_binding_resolver.resolve(
+            request,
+            load_exact=load_exact,
+            authorize_exact=self._authorize_exact_design_package,
+        )
+        if isinstance(resolved, DesignPackageBindingRefusal):
+            raise design_package_binding_refusal_error(resolved)
+        return resolved
+
+    def validate_design_package_selection(
+        self, request: DesignPackageBindingRequest
+    ) -> DesignPackageBindingMetadata:
+        """Validate one Design Package selection without child, attempt, or persistence."""
+
+        return self._resolve_design_package_binding(request)
+
+    def _authorize_exact_design_package(self, record: DesignPackageRecord) -> bool:
+        """Prove the exact package belongs to this active session's workspace ledger."""
+
+        try:
+            active = self.manager.sessions.require_active(self.manager.session_id)
+            if active.session_id != self.manager.session_id:
+                return False
+            snapshot = self.manager.snapshot()
+            exact = snapshot.design_package_revisions.get(
+                (record.design_package_id, record.revision)
+            )
+            if exact != record:
+                return False
+            source = self.manager.events.get(record.source_event_id).event
+            payload = source.get("payload")
+            return bool(
+                source.get("workspace_id") == self.manager.workspace_id
+                and source.get("event_id") == record.source_event_id
+                and source.get("event_type") in {"design_package.created", "design_package.revised"}
+                and isinstance(payload, Mapping)
+                and payload.get("design_package_id") == record.design_package_id
+            )
+        except Exception:
+            return False
+
+    @staticmethod
+    def _design_package_request_matches_metadata(
+        request: DesignPackageBindingRequest | None,
+        metadata: DesignPackageBindingMetadata,
+    ) -> bool:
+        if request is None:
+            return False
+        return (
+            request.design_package_id == metadata.design_package_id
+            and request.design_package_revision == metadata.design_package_revision
+        )
+
+    def _bind_design_package_for_launch(
+        self,
+        *,
+        delegation_id: str,
+        launch_key_sha256: str,
+        request: DesignPackageBindingRequest | None,
+        existing_attempt: Attempt | None,
+        retry: bool,
+    ) -> DesignPackageBindingMetadata | None:
+        """Resolve and durably freeze Design Package identity before launch side effects."""
+
+        stored = self.design_package_bindings.get(delegation_id)
+        if stored is not None and stored.launch_key_sha256 != launch_key_sha256:
+            raise IdempotencyConflictError(
+                "delegation Design Package binding belongs to a different runtime launch key"
+            )
+        if stored is None and existing_attempt is not None:
+            if retry and request is not None:
+                raise design_package_binding_refusal_error(
+                    DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.UNAVAILABLE)
+                )
+            return None
+        if stored is not None:
+            if request is None:
+                if existing_attempt is not None and not retry:
+                    return stored.metadata
+                raise design_package_binding_refusal_error(
+                    DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.STALE)
+                )
+            if not self._design_package_request_matches_metadata(request, stored.metadata):
+                raise design_package_binding_refusal_error(
+                    DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.STALE)
+                )
+
+        if request is None:
+            return None
+        metadata = self._resolve_design_package_binding(request)
+        if stored is not None:
+            if stored.metadata != metadata:
+                raise design_package_binding_refusal_error(
+                    DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.STALE)
+                )
+            return metadata
+        try:
+            self.design_package_bindings.bind(delegation_id, launch_key_sha256, metadata)
+        except IdempotencyConflictError as exc:
+            raise design_package_binding_refusal_error(
+                DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.STALE)
+            ) from exc
+        return metadata
+
     def run(
         self,
         delegation_id: str,
@@ -1411,6 +1546,7 @@ class DelegationRuntimeService:
         idempotency_key: str,
         retry: bool = False,
         context: ContextBindingRequest | None = None,
+        design_package: DesignPackageBindingRequest | None = None,
     ) -> dict[str, Any]:
         with _delegation_lock(self.manager.paths.state_root, delegation_id):
             delegation = self.manager.get_delegation(delegation_id)
@@ -1448,6 +1584,13 @@ class DelegationRuntimeService:
                     delegation_id=delegation_id,
                     launch_key_sha256=launch_key_sha256,
                     request=context,
+                    existing_attempt=existing,
+                    retry=retry,
+                )
+                self._bind_design_package_for_launch(
+                    delegation_id=delegation_id,
+                    launch_key_sha256=launch_key_sha256,
+                    request=design_package,
                     existing_attempt=existing,
                     retry=retry,
                 )
@@ -1538,6 +1681,13 @@ class DelegationRuntimeService:
                     delegation_id=delegation_id,
                     launch_key_sha256=launch_key_sha256,
                     request=context,
+                    existing_attempt=None,
+                    retry=retry,
+                )
+                self._bind_design_package_for_launch(
+                    delegation_id=delegation_id,
+                    launch_key_sha256=launch_key_sha256,
+                    request=design_package,
                     existing_attempt=None,
                     retry=retry,
                 )

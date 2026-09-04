@@ -28,6 +28,7 @@ from .capabilities import (
     TypedRefusal,
 )
 from .context_binding import ContextBinding, ContextBindingRefusal
+from .design_package_binding import DesignPackageBindingRefusal
 from .diagnostics import configuration_failure_diagnostic
 from .model import (
     ExecutableRole,
@@ -427,6 +428,20 @@ def context_binding_refusal_error(refusal: ContextBindingRefusal) -> Configurati
     error = ConfigurationError(
         "Context binding was refused before any delegation attempt or child session existed. "
         + refusal.message
+    )
+    error.code = refusal.code.value  # type: ignore[attr-defined]
+    error.safe_next_actions = (refusal.remediation,)  # type: ignore[attr-defined]
+    return error
+
+
+def design_package_binding_refusal_error(
+    refusal: DesignPackageBindingRefusal,
+) -> ConfigurationError:
+    """Translate a pure Design Package refusal into the existing service surface."""
+
+    error = ConfigurationError(
+        "Design Package binding was refused before any delegation attempt or child "
+        "session existed. " + refusal.message
     )
     error.code = refusal.code.value  # type: ignore[attr-defined]
     error.safe_next_actions = (refusal.remediation,)  # type: ignore[attr-defined]

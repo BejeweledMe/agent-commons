@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from agent_commons.integrations.starter_packs import STARTER_PACK_ALLOWED_SKILL_REFS
 from agent_commons.runtime import (
     AttemptStore,
+    DesignPackageBindingStore,
     ProcessResult,
     ProviderQualificationStore,
     RunOutcome,
@@ -29,12 +30,24 @@ from agent_commons.ui.server import create_app
 from agent_commons.ui.tracker_reads import build_tracker_snapshot
 from agent_commons.ui.tracker_routes import MAX_TRACKER_FRAME_BYTES, tracker_events
 
+SCREEN_ID = "screen." + "0" * 25 + "1"
+
 
 def _dead_pid() -> int:
     process = subprocess.Popen([sys.executable, "-c", ""])
     pid = process.pid
     assert process.wait() == 0
     return pid
+
+
+def _png(width: int = 3, height: int = 2) -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + width.to_bytes(4, "big")
+        + height.to_bytes(4, "big")
+        + b"\x08\x02\x00\x00\x00\x00\x00\x00\x00"
+    )
 
 
 def _executable(path: Path, marker: str) -> Path:
@@ -309,6 +322,74 @@ def _tracker_task(snapshot: dict[str, Any], task_id: str) -> dict[str, Any]:
     return found[0]
 
 
+def _publish_design_package(
+    context: UIContext,
+    *,
+    suffix: str,
+    title: str = "Checkout reference",
+) -> Any:
+    manager = context.writer()
+    source = manager.repo_root / f"j1-g6-{suffix}.png"
+    source.write_bytes(_png())
+    artifact = manager.register_artifact(
+        source,
+        media_type="image/png",
+        classification="internal",
+        idempotency_key=f"j1-g6-artifact-{suffix}",
+    )
+    task = manager.create_task(
+        title=f"Design screen {suffix}",
+        description="Produce the exact screen artifact.",
+        acceptance_criteria=("The current PNG revision is bound.",),
+        idempotency_key=f"j1-g6-design-task-{suffix}",
+    )
+    task_id = str(task["entity_ref"]["id"])
+    taken = manager.take_task(
+        task_id,
+        str(task["revision"]),
+        idempotency_key=f"j1-g6-take-design-{suffix}",
+    )
+    started = manager.start_task(
+        task_id,
+        str(taken["revision"]),
+        idempotency_key=f"j1-g6-start-design-{suffix}",
+    )
+    completed = manager.complete_task(
+        task_id,
+        str(started["revision"]),
+        summary="The exact screen artifact is ready.",
+        artifact_refs=(artifact["entity_ref"],),
+        idempotency_key=f"j1-g6-complete-design-{suffix}",
+    )
+    artifact_id = str(artifact["entity_ref"]["id"])
+    projected = manager.snapshot().artifacts[artifact_id]
+    return manager.design_packages.publish(
+        {
+            "title": title,
+            "screens": [
+                {
+                    "screen_id": SCREEN_ID,
+                    "ordinal": 1,
+                    "title": "Checkout source title",
+                    "artifact_binding": {
+                        "ref": dict(artifact["entity_ref"]),
+                        "revision": artifact["revision"],
+                    },
+                    "artifact_content_revision": projected["content_revision"],
+                    "producer_task_binding": {
+                        "ref": dict(completed["entity_ref"]),
+                        "revision": completed["revision"],
+                    },
+                    "classification": projected["classification"],
+                    "media_type": "image/png",
+                    "safe_preview_eligible": True,
+                }
+            ],
+        },
+        idempotency_key=f"j1-g6-package-{suffix}",
+    )
+
+
 def _tracker_source(context: UIContext):
     def source(*, resume_after: int | None = None):
         del resume_after
@@ -479,6 +560,65 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
         assert "unresolved dependencies" in refused_launch.json()["error"]["message"]
         assert manager.list_delegations() == []
 
+        design_package = _publish_design_package(context, suffix="current")
+        launch_options = client.get("/api/launch", headers=authorized())
+        assert launch_options.status_code == 200, launch_options.text
+        launch_payload = launch_options.json()
+        package_option = next(
+            item
+            for item in launch_payload["design_packages"]
+            if item["design_package_id"] == design_package.design_package_id
+        )
+        assert package_option == {
+            "design_package_id": design_package.design_package_id,
+            "revision": design_package.revision,
+            "title": "Checkout reference",
+            "screen_count": 1,
+        }
+        assert launch_payload["design_package_options_status"] == {
+            "freshness": "current",
+            "truncated": False,
+            "refusal": None,
+        }
+
+        missing_package_launch = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": role_id,
+                "task_id": ready["id"],
+                "design_package_id": "design_package." + "0" * 25 + "9",
+                "design_package_revision": design_package.revision,
+                "idempotency_key": "g6-missing-package-launch",
+            },
+            headers=authorized(),
+        )
+        assert missing_package_launch.status_code == 409, missing_package_launch.text
+        assert missing_package_launch.json()["error"]["code"] == "design_package_missing"
+        assert manager.list_delegations() == []
+        assert AttemptStore(manager.paths.state_root, read_only=True).list_attempts() == ()
+
+        superseded_package = context.writer().design_packages.revise(
+            design_package.design_package_id,
+            design_package.revision,
+            design_package.draft.to_payload(),
+            idempotency_key="g6-supersede-package",
+        )
+        stale_package_launch = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": role_id,
+                "task_id": ready["id"],
+                "design_package_id": design_package.design_package_id,
+                "design_package_revision": design_package.revision,
+                "idempotency_key": "g6-stale-package-launch",
+            },
+            headers=authorized(),
+        )
+        assert stale_package_launch.status_code == 409, stale_package_launch.text
+        assert stale_package_launch.json()["error"]["code"] == "design_package_stale"
+        assert manager.list_delegations() == []
+        assert AttemptStore(manager.paths.state_root, read_only=True).list_attempts() == ()
+
         before_stale = _task_record(context, ready["id"])
         stale = client.post(
             f"/api/tasks/{ready['id']}/review-request",
@@ -499,12 +639,25 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
             json={
                 "agent_id": role_id,
                 "task_id": ready["id"],
+                "design_package_id": superseded_package.design_package_id,
+                "design_package_revision": superseded_package.revision,
                 "idempotency_key": "j1-ready-launch",
             },
             headers=authorized(),
         )
         assert launched.status_code == 200, launched.text
         assert runner.started.wait(timeout=10)
+        stored_design_binding = DesignPackageBindingStore(
+            manager.paths.state_root,
+            read_only=True,
+        ).get(launched.json()["delegation_id"])
+        assert stored_design_binding is not None
+        assert (
+            stored_design_binding.metadata.design_package_id == superseded_package.design_package_id
+        )
+        assert stored_design_binding.metadata.design_package_revision == superseded_package.revision
+        assert b"Checkout reference" not in runner.invocations[-1].stdin
+        assert b"Checkout source title" not in runner.invocations[-1].stdin
 
         source = _tracker_source(context)
         running_payload = _frame_payload(_drive_tracker_frame(source))
@@ -650,6 +803,9 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
             hired.json(),
             tracker,
             refused_launch.json(),
+            launch_payload,
+            missing_package_launch.json(),
+            stale_package_launch.json(),
             stale.json(),
             launched.json(),
             running_payload,
