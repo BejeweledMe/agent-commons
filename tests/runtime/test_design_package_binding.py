@@ -8,6 +8,8 @@ import pytest
 from agent_commons.domain.design_packages import (
     DesignPackageDraft,
     DesignPackageRecord,
+    DesignPackageRefusal,
+    DesignPackageRefusalCode,
 )
 from agent_commons.errors import IntegrityError
 from agent_commons.runtime.design_package_binding import (
@@ -136,6 +138,33 @@ def test_resolver_refuses_missing_stale_and_unauthorized_packages() -> None:
     assert stale.code is DesignPackageBindingRefusalCode.STALE
     assert isinstance(unauthorized, DesignPackageBindingRefusal)
     assert unauthorized.code is DesignPackageBindingRefusalCode.UNAUTHORIZED
+
+
+@pytest.mark.parametrize(
+    ("source_code", "binding_code"),
+    (
+        (DesignPackageRefusalCode.STALE, DesignPackageBindingRefusalCode.STALE),
+        (DesignPackageRefusalCode.MISSING, DesignPackageBindingRefusalCode.MISSING),
+        (DesignPackageRefusalCode.UNSAFE, DesignPackageBindingRefusalCode.UNAUTHORIZED),
+        (DesignPackageRefusalCode.UNAUTHORIZED, DesignPackageBindingRefusalCode.UNAUTHORIZED),
+        (DesignPackageRefusalCode.INVALID, DesignPackageBindingRefusalCode.UNAVAILABLE),
+    ),
+)
+def test_source_refusal_never_echoes_private_details(
+    source_code: DesignPackageRefusalCode,
+    binding_code: DesignPackageBindingRefusalCode,
+) -> None:
+    def refused(_record: DesignPackageRecord) -> bool:
+        raise DesignPackageRefusal(source_code, "private preview detail", "private remediation")
+
+    result = DesignPackageBindingResolver().resolve(
+        DesignPackageBindingRequest(PACKAGE_ID, REVISION_1),
+        load_exact=lambda _package_id, _revision: _record(),
+        authorize_exact=refused,
+    )
+    assert isinstance(result, DesignPackageBindingRefusal)
+    assert result.code is binding_code
+    assert "private" not in str(result.as_dict())
 
 
 def test_operational_binding_store_persists_no_design_source_or_titles(tmp_path: Path) -> None:

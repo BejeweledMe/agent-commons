@@ -3,18 +3,17 @@ import type { ReactElement } from "react";
 import type { Locale, MessageKey } from "../i18n";
 
 type AppHeaderProps = {
+  title: string;
   locale: Locale;
   text: (key: MessageKey) => string;
   onLocaleChange: (locale: Locale) => void;
 };
 
-export function AppHeader({ locale, text, onLocaleChange }: AppHeaderProps): ReactElement {
+export function AppHeader({ locale, text, title, onLocaleChange }: AppHeaderProps): ReactElement {
   return (
     <header className="app-header">
       <div>
-        <p className="eyebrow">Agent Commons</p>
-        <h1>{text("app_title")}</h1>
-        <p className="app-intro">{text("app_intro")}</p>
+        <h1>{title}</h1>
       </div>
       <div className="locale-switcher" aria-label={text("language")}>
         <button

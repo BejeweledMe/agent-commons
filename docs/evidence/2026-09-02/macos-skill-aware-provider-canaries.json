@@ -1,7 +1,6 @@
 {
   "schema": "agent_commons.wave1_provider_canary_evidence.v1",
   "recorded_at": "2026-09-02T15:04:00Z",
-  "operator_session_id": "session.298dd76f8c8346b9a4f4d72446364ff3",
   "source_revision": "e4d03c3",
   "safe_evidence_policy": {
     "raw_provider_stdout_stored": false,
@@ -23,8 +22,6 @@
       "skill_refs": [
         "commons-start"
       ],
-      "command": "agent-commons --json broker canary --profile codex-builder --confirm-provider-run --wall-time-seconds 300 --skill-ref commons-start --profile-config /private/tmp/agent-commons-codex-canary-profiles.yaml",
-      "profile_config_path": "/private/tmp/agent-commons-codex-canary-profiles.yaml",
       "agent_commons_version": "0.1.0",
       "agent_commons_source_sha256": "60407819bd9cae7083cc4dada6b4683fb01880eef552d8e51f4c8e8ccd3e37ca",
       "provider_version": "codex-cli 0.145.0",
@@ -62,7 +59,6 @@
       "skill_refs": [
         "commons-start"
       ],
-      "command": "agent-commons --json broker canary --profile grok-builder --confirm-provider-run --wall-time-seconds 30 --skill-ref commons-start",
       "ok": false,
       "provider_work_process_started": false,
       "workflow_diagnostic_code": "profile_executable_unavailable",
@@ -79,7 +75,6 @@
       "skill_refs": [
         "commons-start"
       ],
-      "command": "agent-commons --json broker canary --profile grok-independent-reviewer --confirm-provider-run --wall-time-seconds 30 --skill-ref commons-start",
       "ok": false,
       "provider_work_process_started": false,
       "workflow_diagnostic_code": "profile_executable_unavailable",
@@ -95,5 +90,12 @@
     "grok_builder_live_skill_aware_canary": "blocked_by_missing_executable",
     "grok_independent_reviewer_live_skill_aware_canary": "blocked_by_missing_executable",
     "release_gate_status": "macOS Codex proof is present; Grok live proof remains not proven on this host."
+  },
+  "evidence_redaction": {
+    "date": "2026-09-06",
+    "reason": "Removed operator session identity and command/profile-config metadata from public proof; measured outcomes are unchanged.",
+    "audit": "docs/audits/2026-09-06-total-plan-work-adr-prd-review.md",
+    "prior_revision": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+    "historical_binding_notice": "This redacted document has new bytes; earlier artifact digests and approvals still refer to the original revision."
   }
 }

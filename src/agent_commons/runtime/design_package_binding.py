@@ -20,7 +20,11 @@ from typing import Any
 
 from agent_commons.core.canonical import loads_json_strict, sha256_bytes
 from agent_commons.core.ids import is_typed_id
-from agent_commons.domain.design_packages import DesignPackageRecord
+from agent_commons.domain.design_packages import (
+    DesignPackageRecord,
+    DesignPackageRefusal,
+    DesignPackageRefusalCode,
+)
 from agent_commons.errors import (
     IdempotencyConflictError,
     IntegrityError,
@@ -423,6 +427,19 @@ class DesignPackageBindingResolver:
             return DesignPackageBindingRefusal.create(DesignPackageBindingRefusalCode.UNAVAILABLE)
         try:
             authorized = authorize_exact(record)
+        except DesignPackageRefusal as refusal:
+            try:
+                code = {
+                    DesignPackageRefusalCode.STALE: DesignPackageBindingRefusalCode.STALE,
+                    DesignPackageRefusalCode.MISSING: DesignPackageBindingRefusalCode.MISSING,
+                    DesignPackageRefusalCode.UNSAFE: DesignPackageBindingRefusalCode.UNAUTHORIZED,
+                    DesignPackageRefusalCode.UNAUTHORIZED: (
+                        DesignPackageBindingRefusalCode.UNAUTHORIZED
+                    ),
+                }.get(refusal.code, DesignPackageBindingRefusalCode.UNAVAILABLE)
+            except Exception:
+                code = DesignPackageBindingRefusalCode.UNAVAILABLE
+            return DesignPackageBindingRefusal.create(code)
         except Exception:
             authorized = False
         if authorized is not True:

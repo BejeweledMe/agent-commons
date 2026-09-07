@@ -191,7 +191,8 @@ def test_unexpected_compiler_exception_becomes_safe_unavailable_refusal() -> Non
     assert "secret compiler detail" not in str(result.as_dict())
 
 
-def test_hostile_context_pack_refusal_code_access_is_sanitized() -> None:
+@pytest.mark.parametrize("refusal_stage", ("compiler", "authorization"))
+def test_hostile_context_pack_refusal_code_access_is_sanitized(refusal_stage: str) -> None:
     class HostileRefusal(ContextPackRefusal):
         def __getattribute__(self, name: str) -> object:
             if name == "code":
@@ -208,7 +209,19 @@ def test_hostile_context_pack_refusal_code_access_is_sanitized() -> None:
         def compile(self, _record: ContextPackRecord) -> CompiledContext:
             raise refusal
 
-    result = _resolve(_record(), compiler=cast(ContextCompiler, RefusingCompiler()))
+    def refuse_authorization(_record: ContextPackRecord) -> bool:
+        raise refusal
+
+    result = ContextBindingResolver(compiler=cast(ContextCompiler, RefusingCompiler())).resolve(
+        ContextBindingRequest.accumulated(
+            context_pack_id=PACK_ID,
+            context_pack_revision=REVISION_1,
+        ),
+        load_exact=lambda _pack_id, _revision: _record(),
+        authorize_exact=(
+            refuse_authorization if refusal_stage == "authorization" else lambda _record: True
+        ),
+    )
 
     assert isinstance(result, ContextBindingRefusal)
     assert result.code is ContextBindingRefusalCode.UNAVAILABLE
@@ -505,6 +518,45 @@ def test_authorization_exception_fails_closed_without_compiling() -> None:
     assert isinstance(result, ContextBindingRefusal)
     assert result.code is ContextBindingRefusalCode.UNAUTHORIZED
     assert "secret-authorization-detail" not in str(result.as_dict())
+
+
+@pytest.mark.parametrize(
+    ("source_code", "binding_code"),
+    (
+        (ContextPackRefusalCode.MISSING, ContextBindingRefusalCode.MISSING),
+        (ContextPackRefusalCode.STALE, ContextBindingRefusalCode.STALE),
+        (ContextPackRefusalCode.UNSAFE, ContextBindingRefusalCode.UNAUTHORIZED),
+        (ContextPackRefusalCode.INVALID, ContextBindingRefusalCode.UNAVAILABLE),
+        (ContextPackRefusalCode.UNAVAILABLE, ContextBindingRefusalCode.UNAVAILABLE),
+    ),
+)
+def test_source_authorization_refusal_is_bounded_and_never_compiles(
+    source_code: ContextPackRefusalCode,
+    binding_code: ContextBindingRefusalCode,
+) -> None:
+    compiled_records: list[ContextPackRecord] = []
+
+    class RecordingCompiler(ContextCompiler):
+        def compile(self, record: ContextPackRecord) -> CompiledContext:
+            compiled_records.append(record)
+            return super().compile(record)
+
+    def refused(_record: ContextPackRecord) -> bool:
+        raise ContextPackRefusal(source_code, "private source detail", "private remediation")
+
+    result = ContextBindingResolver(compiler=RecordingCompiler()).resolve(
+        ContextBindingRequest.accumulated(
+            context_pack_id=PACK_ID,
+            context_pack_revision=REVISION_1,
+        ),
+        load_exact=lambda _pack_id, _revision: _record(),
+        authorize_exact=refused,
+    )
+
+    assert isinstance(result, ContextBindingRefusal)
+    assert result.code is binding_code
+    assert "private" not in str(result.as_dict())
+    assert compiled_records == []
 
 
 def test_lookup_exception_fails_closed_without_echoing_source_detail() -> None:

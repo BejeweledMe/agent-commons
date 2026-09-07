@@ -420,7 +420,11 @@ class ContextBindingStore:
 
 
 class ContextBindingResolver:
-    """Resolve, authorize, and compile exactly once without launch side effects."""
+    """Resolve, authorize, and compile exactly once without launch side effects.
+
+    The caller's authorizer must check both workspace membership and the pack's
+    sources against current canonical state on every resolution, including retry.
+    """
 
     def __init__(self, *, compiler: ContextCompiler | None = None) -> None:
         self._compiler = compiler or ContextCompiler()
@@ -466,6 +470,8 @@ class ContextBindingResolver:
             return ContextBindingRefusal.create(ContextBindingRefusalCode.STALE)
         try:
             authorized = authorize_exact(record)
+        except ContextPackRefusal as refusal:
+            return _source_refusal(refusal)
         except Exception:
             authorized = False
         if authorized is not True:
@@ -524,6 +530,20 @@ class ContextBindingResolver:
             return resolved
         except Exception:
             return ContextBindingRefusal.create(ContextBindingRefusalCode.UNAVAILABLE)
+
+
+def _source_refusal(refusal: ContextPackRefusal) -> ContextBindingRefusal:
+    """Translate source failures without exposing source content or exception text."""
+
+    try:
+        code = {
+            ContextPackRefusalCode.MISSING: ContextBindingRefusalCode.MISSING,
+            ContextPackRefusalCode.STALE: ContextBindingRefusalCode.STALE,
+            ContextPackRefusalCode.UNSAFE: ContextBindingRefusalCode.UNAUTHORIZED,
+        }.get(refusal.code, ContextBindingRefusalCode.UNAVAILABLE)
+    except Exception:
+        code = ContextBindingRefusalCode.UNAVAILABLE
+    return ContextBindingRefusal.create(code)
 
 
 def _own_and_validate_binding(

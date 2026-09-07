@@ -127,7 +127,9 @@ def test_starter_packs_use_opaque_api_base_with_safe_dom_and_explicit_apply() ->
     ):
         assert name in contracts
 
-    assert "StarterPacksSection" in entry
+    assert "LibrarySection" in entry
+    library = _source("src/components/LibrarySection.tsx")
+    assert "StarterPacksSection" in library
     for banned in ("innerHTML", "dangerouslySetInnerHTML", "style={{", "<style", "fetch("):
         assert banned not in component
 

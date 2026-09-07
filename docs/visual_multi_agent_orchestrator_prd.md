@@ -94,6 +94,15 @@ different states. `task.accepted` requires a current independent approval under
 
 ## Current honest boundary
 
+Checkpoint 2026-09-06 at `329d2f3`: the implementation inventory in the following
+paragraphs is the earlier baseline. Context Pack launch binding, data-backed
+Gallery, Work actions, J1 and G6 are now implemented; J1/G6 were accepted against
+exact review subjects. L1 and R2 remain open, and the new audit identifies runtime
+privacy/provenance and review-independence defects. The browser Starter Pack
+Apply→Hire step is not established by J1's direct API fixture. Use the
+[current audit and checklist](audits/2026-09-06-total-plan-work-adr-prd-review.md)
+for release claims; preserve the product outcomes and non-goals below.
+
 Coordination core, roles, tasks, dependencies, claims, reviews, evidence,
 staleness, lifecycle, the local panel, a bounded Codex/Claude broker and safe
 image preview exist. Provider adapters, Context Pack C1 and tracker read models

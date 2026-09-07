@@ -4,6 +4,48 @@ Agent Commons deliberately starts as a reliable shared-filesystem protocol. The
 first release proves the collaboration model before introducing a server or a
 public extension ABI.
 
+## Audited checkpoint — 2026-09-06
+
+**Active UX branch — 2026-09-07:** the Opus/Astra
+[task-first workspace plan](task-first-workspace-implementation-plan.md) and
+[ADR 0014](adr/0014-task-first-workspace-ux.md) define the next Work increment
+on `codex/task-first-ux-pivot`. The bounded implementation passed the full
+`make check` (Work85, Gallery22, Python1976); exact source and synthetic browser
+evidence are in the [verification report](audits/2026-09-07-task-first-pivot-verification.md).
+This does not close L1/R2 or declare task acceptance/release readiness.
+
+**Subsequent visual refinement:** [ADR 0015](adr/0015-browser-native-visual-refinement.md)
+implements the council-approved native filters, stable inspector disclosures and
+readable exact Context sources. The [new checkpoint](audits/2026-09-07-browser-visual-refinement.md)
+passed `make check` (Work94, Gallery22, Python1976) and records new source/image
+hashes. Earlier Work85 evidence remains historical; L1/R2 are unchanged.
+
+**Implementation follow-up:** the uncommitted [audit remediation](audits/2026-09-06-audit-remediation.md)
+fixes F01/F02/F03/F04/F06/F07/F12 and bounds oversized Grok input. The exact
+working-tree inventory passed `make check` and independent scoped review;
+L1/R2 and Grok transport privacy remain open. This does not change the historical
+base-SHA assessment below or imply task acceptance/release.
+
+At `329d2f3920753853ce265536d9d3ceb4e35f1f91`, Context Packs, Gallery
+authoring/feedback, Work task/dependency actions, Starter Pack Apply and G6 Design
+Package launch metadata are implemented. J1 and G6 have exact canonical acceptance
+records; this does not establish release readiness. Dependency/readiness views
+are delivered in part; automatic DAG scheduling remains deferred.
+
+**L1 is not proven; R2 release evidence remains open.** The latest retained Linux
+run reports receipt-scope bootstrap refusal, Claude provider errors and missing
+Grok terminal MCP outcomes. The six implemented profiles require qualification
+separately on the intended source/provider/host boundary. No live rerun is implied.
+
+The uncommitted remediation closes the scoped P1 review/source/stderr paths,
+applies fail-closed Gallery provenance, and verifies preset hire and response-loss
+recovery. The task-first pivot adds the verified Work/Library interaction layer.
+Before release, resolve the remaining Grok transport contract, receipt-scope and
+provider-host gates; obtain separately authorized Linux live qualification and
+refresh exact independent release evidence. Retention and stale coordination
+need explicit owner decisions.
+See the [risk register and actionable checklist](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+
 ## MVP-0 — local shared workspace
 
 - immutable, schema-validated events and artifact manifests;

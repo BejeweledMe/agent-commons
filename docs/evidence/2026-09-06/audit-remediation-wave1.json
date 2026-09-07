@@ -1,0 +1,87 @@
+{
+  "schema": "agent-commons-audit-remediation-evidence-v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "status": "implementation awaiting independent review and integrated gate",
+  "scopes": {
+    "F01": [
+      {
+        "path": "src/agent_commons/ui/actions.py",
+        "sha256": "55159a2486e165f2dd3583b7979503c049a058e8ea41911d467e8319ff7df37b"
+      },
+      {
+        "path": "src/agent_commons/services/tasks.py",
+        "sha256": "47eb6e5da6f80b01c46b0253ca6c7d59dc5261762151eb309134ca26ea8e1130"
+      },
+      {
+        "path": "tests/ui/test_review_evidence.py",
+        "sha256": "d586d7e8a7485bbbd10a2a00f10ddc394d0d55143f73d48804473942238745a7"
+      }
+    ],
+    "F02": [
+      {
+        "path": "src/agent_commons/services/context_packs.py",
+        "sha256": "39579dace231bf053ff5bd45fae6131ae212c3400f934e20de536709ec34f249"
+      },
+      {
+        "path": "src/agent_commons/runtime/context_binding.py",
+        "sha256": "571290c282d41fa71b205ba59036a78176e75028b24f5c8b0428a252dfdbb7dc"
+      },
+      {
+        "path": "src/agent_commons/services/delegation_runtime.py",
+        "sha256": "8e696e6e5d2967eaeb5c5a576901ae4be3757bc6a1eeaa410eab30d63d8f7808"
+      },
+      {
+        "path": "tests/services/test_delegation_launch_plan.py",
+        "sha256": "f43025820b0f7b5c31ec05c48639620599d5efb5994dc9aeab8b825dfe705b7b"
+      },
+      {
+        "path": "tests/runtime/test_context_binding.py",
+        "sha256": "ff02b24d3deb7c203d0156f7d642b5deea865d15fe6052310955f42fb398cc40"
+      }
+    ],
+    "F03": [
+      {
+        "path": "src/agent_commons/runtime/diagnostics.py",
+        "sha256": "91cc3894d5a3da402692e0efeed8c89bdd01ec362eb69d887aa730088aafdd19"
+      },
+      {
+        "path": "src/agent_commons/ui/reads.py",
+        "sha256": "c73613d0903768da77e4322e03747d54cf60f004ca7816157dd0d87f62adb234"
+      },
+      {
+        "path": "tests/runtime/test_attempts.py",
+        "sha256": "a114cb49b3dc635217e329bec73e57c7dbc6568d8f849a9985616fbbcedb23ee"
+      },
+      {
+        "path": "tests/ui/test_launch.py",
+        "sha256": "b76986aafe589fef9290e7c2fc06e6ed5405f927c9662e4517b938186c22b5f1"
+      }
+    ],
+    "F12": [
+      {
+        "path": "Makefile",
+        "sha256": "5cf3effabbef02960514a0e8e92a618e091e464f99a906a7b209605f61f03825"
+      },
+      {
+        "path": "tools/check_node_version.py",
+        "sha256": "5491460ada641705d583832803c01c2254887255293348d45a3e7724cf13c501"
+      },
+      {
+        "path": "tests/test_test_pipeline_contract.py",
+        "sha256": "82b9a2b2c4ee797472393d3a18a3d118841abe8c495d3270704ade658b34fa7f"
+      }
+    ]
+  },
+  "scoped_checks": {
+    "F01": "66 passed; Ruff check and format passed",
+    "F02": "91 focused passed; final negative matrix 16 passed; Ruff check and format passed",
+    "F03": "105 passed; Ruff check and format passed",
+    "F12": "9 passed; Node 23 refused and Node 24 accepted; Ruff check and format passed"
+  },
+  "limits": [
+    "No live provider canaries",
+    "No commit or CI run for these working-tree bytes",
+    "Full make check result must be supplied separately",
+    "This artifact is not task acceptance or release qualification"
+  ]
+}

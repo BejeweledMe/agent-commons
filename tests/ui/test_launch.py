@@ -596,7 +596,7 @@ def test_a_failed_run_surfaces_sanitized_stderr_and_each_terminal_rejection(
             replace(
                 attempt,
                 stderr_diagnostic_tail="ERROR MCP handshake closed",
-                stderr_diagnostic_tail_truncated=True,
+                stderr_diagnostic_tail_truncated=False,
                 stderr_diagnostic_tail_redacted=True,
             )
             for attempt in original(self, *args, **values)
@@ -617,7 +617,7 @@ def test_a_failed_run_surfaces_sanitized_stderr_and_each_terminal_rejection(
     run = fixture["context"].runs()[0]
 
     assert run["stderr_diagnostic_tail"] == "ERROR MCP handshake closed"
-    assert run["stderr_diagnostic_tail_truncated"] is True
+    assert run["stderr_diagnostic_tail_truncated"] is False
     assert run["stderr_diagnostic_tail_redacted"] is True
     assert run["terminal_tool_rejections"] == 1
     assert run["terminal_tool_rejection_details"] == [
@@ -629,6 +629,36 @@ def test_a_failed_run_surfaces_sanitized_stderr_and_each_terminal_rejection(
             "recorded_at": run["terminal_tool_rejection_details"][0]["recorded_at"],
         }
     ]
+
+
+@pytest.mark.parametrize("previously_redacted", [False, True])
+def test_runs_suppress_historical_truncated_stderr(
+    workspace: dict[str, Any], monkeypatch: pytest.MonkeyPatch, previously_redacted: bool
+) -> None:
+    fixture = _finished_run(workspace)
+    original = AttemptStore.list_attempts
+    marker = "SYNTHETIC_PRIVATE_BODY_FRAGMENT"
+
+    def historical(self: AttemptStore, *args: Any, **values: Any) -> tuple[Any, ...]:
+        return tuple(
+            replace(
+                attempt,
+                stderr_diagnostic_tail=marker,
+                stderr_diagnostic_tail_truncated=True,
+                stderr_diagnostic_tail_redacted=previously_redacted,
+            )
+            for attempt in original(self, *args, **values)
+        )
+
+    monkeypatch.setattr(AttemptStore, "list_attempts", historical)
+    with _client(fixture["context"]) as client:
+        response = client.get("/api/runs", headers=authorized())
+    assert response.status_code == 200
+    assert marker not in response.text
+    run = response.json()[0]
+    assert run["stderr_diagnostic_tail"] is None
+    assert run["stderr_diagnostic_tail_truncated"] is True
+    assert run["stderr_diagnostic_tail_redacted"] is True
 
 
 def test_the_run_card_renders_failure_diagnostics_as_untrusted_text() -> None:

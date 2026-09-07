@@ -11,11 +11,14 @@ PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE \
 	-u AGENT_COMMONS_SESSION_ID \
 	$(UV) run --locked python -m pytest
 
-.PHONY: check lint format-check format frontend-work-deps frontend-gallery-deps \
+.PHONY: check node-version-check lint format-check format frontend-work-deps frontend-gallery-deps \
 	frontend-work-test frontend-gallery-test help test test-domain test-runtime \
 	test-ui test-contracts sync
 
-check: lint format-check frontend-work-test frontend-gallery-test test
+check: node-version-check lint format-check frontend-work-test frontend-gallery-test test
+
+node-version-check:
+	$(UV) run --locked python tools/check_node_version.py
 
 lint:
 	$(UV) run --locked ruff check .
@@ -27,10 +30,10 @@ format-check:
 format:
 	$(UV) run --locked ruff format .
 
-frontend-work-deps:
+frontend-work-deps: node-version-check
 	npm ci --ignore-scripts --prefix frontend/work
 
-frontend-gallery-deps:
+frontend-gallery-deps: node-version-check
 	npm ci --ignore-scripts --prefix frontend/gallery
 
 frontend-work-test: frontend-work-deps

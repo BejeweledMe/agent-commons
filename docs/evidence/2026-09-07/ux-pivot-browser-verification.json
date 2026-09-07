@@ -1,0 +1,170 @@
+{
+  "schema": "agent-commons.audit.ux-browser-verification.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "branch": "codex/task-first-ux-pivot",
+  "fixture": {
+    "disposable": true,
+    "runner": "ControlledRunner",
+    "auth": "fixed synthetic ready response",
+    "live_provider_called": false,
+    "raw_provider_output_retained": false,
+    "canonical_operator_state_used": false
+  },
+  "images": [
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-recovery-target-en.jpg",
+      "sha256": "fb4eeb910077438ffeb8e067084a880cc92cdc541527395940c41f0be5b10463",
+      "stage": "final-behavior-before-CTA-spacing",
+      "source": "synthetic-workspace-browser",
+      "contains_real_operator_state": false,
+      "format": "image/jpeg",
+      "image_dimensions": {
+        "width": 1280,
+        "height": 720
+      }
+    },
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-work-ru.jpg",
+      "sha256": "0fcd8c5ccd662a2552f70e384865e7ea8e72224c02ed456e07a59f212d07cc4a",
+      "stage": "final",
+      "source": "synthetic-workspace-browser",
+      "contains_real_operator_state": false,
+      "format": "image/jpeg",
+      "image_dimensions": {
+        "width": 1440,
+        "height": 842
+      },
+      "css_viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-narrow-blocked-ru.jpg",
+      "sha256": "b0c1afa4dff883c43b91120d805a145593be8d7a742092c83cfb45ca1a53c91f",
+      "stage": "final",
+      "source": "synthetic-workspace-browser",
+      "contains_real_operator_state": false,
+      "format": "image/jpeg",
+      "image_dimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "css_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-library-ru.jpg",
+      "sha256": "c3d889aa1fc7a27a49516b17ba257c363315fc4d49ce80d4ebb9fda636b46878",
+      "stage": "final",
+      "source": "synthetic-workspace-browser",
+      "contains_real_operator_state": false,
+      "format": "image/jpeg",
+      "image_dimensions": {
+        "width": 1440,
+        "height": 842
+      },
+      "css_viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-context-source-ru.jpg",
+      "sha256": "982a6419ed9f134e2197108802d9b702d902e29f85870fe62d06799e614e5f3c",
+      "stage": "final",
+      "source": "synthetic-workspace-browser",
+      "contains_real_operator_state": false,
+      "format": "image/jpeg",
+      "image_dimensions": {
+        "width": 1440,
+        "height": 842
+      },
+      "css_viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  ],
+  "checks": [
+    {
+      "case": "task creation before any role exists",
+      "result": "pass",
+      "evidence": "Browser created exact new task, selected it automatically; Prepare run showed missing role and disabled Start."
+    },
+    {
+      "case": "unknown run result survives A to B navigation",
+      "result": "pass",
+      "evidence": "Synthetic middleware returned503 after successful delegation recording. Original launch panel continued to name A and Implementer after B was selected; B fresh launch disabled and only Restore original launch offered."
+    },
+    {
+      "case": "restore original A and retry",
+      "result": "pass",
+      "evidence": "Restore selected original A and original role; Retry original action resolved to Run recorded. View task returned A. A inspector showed one succeeded run, B inspector showed no runs."
+    },
+    {
+      "case": "accepted and completed prerequisites from actual Tracker",
+      "result": "pass",
+      "evidence": "Composer displayed accepted Verify task labels and completed Design screen preview choices; no launch-option inference."
+    },
+    {
+      "case": "quiet canonical observation",
+      "result": "pass",
+      "evidence": "Older unchanged ready task remained actionable after reread; deterministic backend tests independently cover2h observation and stale active attempt."
+    },
+    {
+      "case": "draft and editor continuity",
+      "result": "pass",
+      "evidence": "Context exact source and multiline fact including literal :: survived guided to JSON and Team to Library navigation. In-memory draft only."
+    },
+    {
+      "case": "source picker",
+      "result": "pass",
+      "evidence": "Final guided editor selected exact current task ref; publication not performed in browser."
+    },
+    {
+      "case": "narrow focus and reflow",
+      "result": "pass",
+      "evidence": "At390x844 selected inspector received SECTION focus via inspector-title, document width390; close details restored selected row focus. At1440x1000 inspector480px, CTA block with12px margin."
+    },
+    {
+      "case": "URL restoration and shortcuts",
+      "result": "partial browser coverage",
+      "evidence": "Browser reload restored selected task; N outside editable opened composer and n inside input remained text. Route back/forward contract is tested hermetically; browser automation shortcuts did not navigate, so no manual browser-Back proof claimed."
+    },
+    {
+      "case": "local validation",
+      "result": "pass",
+      "evidence": "Missing description and criteria produced local messages and retained entered title; shell and tracker remained visible."
+    },
+    {
+      "case": "Context Pack publication",
+      "result": "not exercised in browser",
+      "evidence": "Automatic approval review rejected the click as possible canonical write. Isolated publication and exact retry regressions provide write verification."
+    },
+    {
+      "case": "medium reflow",
+      "result": "pass",
+      "evidence": "DOM check at CSS viewport720x900: document width720 and inspector472px. This is a resized viewport, not proof of actual browser200% zoom."
+    }
+  ],
+  "remaining_polish": [
+    {
+      "priority": "P3",
+      "issue": "Existing provider-auth ready panel still uses Critical attention required heading",
+      "owner": "future provider-auth UX cleanup",
+      "blocking_this_increment": false
+    }
+  ],
+  "limitations": [
+    "Screenshots and synthetic runs do not prove live provider qualification, user research, full accessibility or release readiness.",
+    "The reviewer independently reviews saved evidence; only root operated the browser."
+  ],
+  "evidence_correction": {
+    "supersedes_revision": "evt.01M1WE4NB8J308W1GZXTREK38X",
+    "reason": "Independent review caught JPEG bytes parsed as PNG dimensions. Image bytes and hashes are unchanged; extensions and bitmap dimensions corrected. CSS viewport is a separate DOM observation, not inferred from screenshot size.",
+    "historical_baseline": "The two ux-pivot-before-*.png files are JPEG 1440x1000. Their historical paths remain unchanged to preserve the already hashed ADR references; the extension is not a format claim."
+  }
+}

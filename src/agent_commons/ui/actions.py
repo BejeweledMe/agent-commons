@@ -514,6 +514,49 @@ class UIActions:
             raise ValidationError(f"no such task: {task_id}")
         return record
 
+    def _review_walk_prefix(
+        self,
+        manager: CommonsManager,
+        record: Mapping[str, Any],
+        expected_revision: str,
+        idempotency_key: str | None,
+    ) -> list[str]:
+        """Resume only the bounded, uncorrected steps of this session's request."""
+
+        revision = str(record.get("effective_revision") or record.get("revision"))
+        if expected_revision in {str(record.get("revision")), revision}:
+            return []
+        snapshot = manager.snapshot()
+        reverse_steps: list[str] = []
+        event_steps = {
+            "task.started": "start_task",
+            "task.completed": "complete_task",
+            "task.submitted": "submit_task",
+        }
+        for _ in range(4):
+            if revision == expected_revision:
+                return list(reversed(reverse_steps))
+            if not idempotency_key or len(reverse_steps) == 3:
+                break
+            if snapshot.effective_event_revisions.get(revision) != revision:
+                break
+            event = manager.events.get(revision).event
+            step = event_steps.get(str(event.get("event_type")))
+            payload = event.get("payload") or {}
+            if (
+                step is None
+                or event.get("idempotency_key") != self._step_key(idempotency_key, step)
+                or (event.get("actor") or {}).get("session_id") != manager.session_id
+                or payload.get("task_id") != record.get("id")
+            ):
+                break
+            reverse_steps.append(step)
+            revision = str(payload.get("expected_revision"))
+        raise LifecycleConflictError(
+            f"stale expected revision {expected_revision}; "
+            f"current revision is {record.get('revision')}"
+        )
+
     def request_task_review(
         self,
         *,
@@ -537,15 +580,10 @@ class UIActions:
                 f"this task is {state or 'in an unknown state'}; "
                 "there is nothing to send for review"
             )
-        if not walk:
-            current = {str(record.get("revision")), str(record.get("effective_revision") or "")}
-            if str(expected_revision) not in current:
-                raise LifecycleConflictError(
-                    f"stale expected revision {expected_revision}; "
-                    f"current revision is {record.get('revision')}"
-                )
-        steps: list[str] = []
-        revision = str(expected_revision)
+        if record.get("artifact_stale"):
+            raise LifecycleConflictError("task has stale artifact evidence")
+        steps = self._review_walk_prefix(manager, record, expected_revision, idempotency_key)
+        revision = str(record.get("revision"))
         summary = (
             self._WALK_SUMMARY
             if self._task_has_finished_run(manager, task_id)
@@ -555,6 +593,7 @@ class UIActions:
             arguments: dict[str, Any] = {"idempotency_key": self._step_key(idempotency_key, step)}
             if step in {"complete_task", "submit_task"}:
                 arguments["summary"] = summary
+                arguments["artifact_refs"] = None
             getattr(manager, step)(task_id, revision, **arguments)
             steps.append(step)
             record = self._task_or_refuse(manager, task_id)

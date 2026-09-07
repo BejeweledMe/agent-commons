@@ -8,6 +8,24 @@ map of the laws, not their only copy: break one and the suite says so. Read the
 applicable section before editing a surface; otherwise the tests will teach it
 to you one failure at a time.
 
+## Task-first Work increment
+
+[ADR 0014](adr/0014-task-first-workspace-ux.md) defines the branch implementation
+contract for Work. Its evidence/checklist is tracked separately in the
+[implementation plan](task-first-workspace-implementation-plan.md).
+
+- State glossaries are domain-specific: evidence `complete` describes data
+  completeness, never task completion, run success, review approval or acceptance.
+- Navigation filters do not create canonical states. Task selection and
+  destination are allowlisted query state; drafts and exchange secrets never
+  enter URLs or localStorage. Auth fragment removal preserves safe navigation.
+- A local action refusal preserves shell, selection and draft. An uncertain
+  mutation retains its original body, revision and idempotency identity.
+- Task creation selects the exact returned task. Recipe application, role hire
+  and run launch remain separate, explicit operations.
+- The exact-source picker consumes a closed metadata DTO. Current catalog
+  eligibility never replaces source validation at publication and execution.
+
 ## One file, one writer, no toolchain
 
 - The whole panel is a single self-contained asset: one nonce'd `<style>`
@@ -140,12 +158,13 @@ generated config; it never receives a YAML fragment or a path from the browser.
   consumption, so nothing may display one.
   (`test_a_run_card_says_when_it_ran_and_never_invents_a_spend`)
 - Nothing here stores prompts or transcripts. The Runs surface may show the
-  private attempt store's sanitized final 4 KiB stderr tail for an unsuccessful
-  process and bounded terminal-tool rejection reasons drawn from a fixed
+  private attempt store's sanitized complete stderr diagnostic of at most 4 KiB
+  for an unsuccessful process and bounded terminal-tool rejection reasons drawn from a fixed
   allowlist of the backend's own refusal strings (anything else arrives as a
   fixed withheld-details notice). It never receives stdout, successful-run
-  stderr, or tool arguments; truncation and redaction must be visible beside
-  the diagnostic.
+  stderr, or tool arguments. Incomplete stderr is withheld, including historical
+  tails marked truncated; truncation and redaction remain visible. A fragment
+  without its original secret markers is not evidence that its content is safe.
 
 ## Testing the asset
 

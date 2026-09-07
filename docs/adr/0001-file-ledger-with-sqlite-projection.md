@@ -22,11 +22,16 @@ worktrees coordinate with each other without committing operational leases.
 
 All business writes use one supported service layer. SQLite can always be deleted
 and rebuilt from canonical files; it must never become the only copy of meaning.
-Normal reads currently replay the ledger rather than querying SQLite, so
-canonical writes do not synchronously maintain an index that cannot shorten
-their user journey. `doctor` verifies/synchronizes it and `index rebuild`
-reconstructs it explicitly. A future indexed read path must prove equivalent
-projection semantics before synchronous maintenance is reconsidered.
+Canonical writes do not synchronously maintain the disposable index. `doctor`
+verifies/synchronizes it and `index rebuild` reconstructs it explicitly.
+
+Implementation clarification, 2026-09-06, at `329d2f3`: normal `orient`/`inbox`
+reads now verify/synchronize SQLite and read its projection; `--fresh`,
+`--read-only` and integrity fallback replay canonical files. This supersedes the
+earlier implementation note that all normal reads replayed and indexed reads
+were future work; it does not change the immutable-ledger decision. The current
+boundary is `services/manager.py::_read_snapshot`. Workspace-namespaced state
+bases and explicit owned roots are governed by [ADR 0005](0005-state-root-isolation.md).
 
 ## Consequences
 

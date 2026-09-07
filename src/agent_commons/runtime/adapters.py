@@ -46,6 +46,7 @@ from .model import (
     Provider,
     RunnerInvocation,
     RunnerProfile,
+    grok_instruction_fits_argument,
     profile_tool_summary,
 )
 from .skill_projection import (
@@ -521,7 +522,14 @@ class GrokProviderAdapter:
     def compile_instruction(
         self, plan: LaunchPlan, skill_bundle: EphemeralSkillBundle
     ) -> str | TypedRefusal:
-        return _compile_instruction(self.provider, plan, skill_bundle)
+        compiled = _compile_instruction(self.provider, plan, skill_bundle)
+        if isinstance(compiled, str) and not grok_instruction_fits_argument(compiled):
+            return TypedRefusal.create(
+                ProviderRefusalCode.INSTRUCTION_TOO_LARGE,
+                provider=self.provider,
+                profile_id=plan.profile_id,
+            )
+        return compiled
 
     def build_invocation(
         self,

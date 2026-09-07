@@ -271,7 +271,9 @@ def test_work_reads_project_identity_only_through_the_authenticated_opaque_api_b
     assert "repositoryBasename" in entry
     assert "showFullProjectPath" in entry
     assert 'href="/"' in entry
-    assert "review_in_legacy" in entry
+    assert "shell_view_task" in entry
+    assert 'navigate({ view: "work", taskId: run.taskId })' in entry
+    assert "shell_diagnostics" in entry
 
 
 def test_work_setup_guidance_is_closed_typed_and_only_loaded_after_setup() -> None:
@@ -446,14 +448,17 @@ def test_work_run_handoff_waits_for_finished_work_before_prompting_for_review() 
     messages = json.loads(_source("src/i18n.json"))
 
     assert (
-        "When the run has finished and the work is ready, request Review in the legacy panel."
-        in messages["en"]["run_started_help"]
+        "When the run has finished and the work is ready, "
+        "request an independent review from the task." in messages["en"]["run_started_help"]
     )
     assert "Next, request Review" not in messages["en"]["run_started_help"]
     assert "when work is ready for Review" in messages["en"]["review_in_legacy"]
 
     russian_handoff = messages["ru"]["run_started_help"]
-    assert "Когда прогон завершится и работа будет готова, запросите Review" in russian_handoff
+    assert (
+        "Когда прогон завершится и работа будет готова, запросите независимую проверку"
+        in russian_handoff
+    )
     assert "Далее запросите Review" not in russian_handoff
     assert "когда работа готова к Review" in messages["ru"]["review_in_legacy"]
 

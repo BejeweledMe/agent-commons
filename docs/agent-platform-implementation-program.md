@@ -6,6 +6,50 @@
 **Владелец программы:** product-architecture lead / operator
 **Канонический scope:** provider adapters, Design Gallery, task execution tracker, context branching
 
+### Проверенный checkpoint — 2026-09-06
+
+**UX-продолжение 2026-09-07:** [ADR 0014](adr/0014-task-first-workspace-ux.md)
+и [план с графом владельцев](task-first-workspace-implementation-plan.md)
+задают Work/Team/Library/Settings, task-first создание, читаемый inspector и
+выбор точных источников контекста. Реализация на отдельной ветке прошла полный
+`make check`: Work85, Gallery22, Python1976. [Итоговая проверка](audits/2026-09-07-task-first-pivot-verification.md)
+связывает exact hashes, синтетические скриншоты и границы review. L1/R2, provider
+gates и отдельная приёмка сохраняются.
+
+Следующее [уточнение по консилиуму](adr/0015-browser-native-visual-refinement.md)
+реализовано тремя Astra-агентами и проверено полным `make check`: Work94,
+Gallery22, Python1976. [Отдельный отчёт](audits/2026-09-07-browser-visual-refinement.md)
+содержит новую точную границу исходников, браузерные проверки и Figma до/после;
+старые Work85 evidence не распространяются на новые изменения автоматически.
+
+**Последующий uncommitted repair:** [remediation report](audits/2026-09-06-audit-remediation.md)
+связывает исправления F01/F02/F03/F04/F06/F07/F12 и F08-size-only с exact hashes,
+полным green gate и независимым scoped review. L1/R2, Grok argv privacy и
+решения по retention остаются открыты. Таблица ниже описывает исходный SHA;
+исправления не объявляются shipped или accepted.
+
+Текущая проверенная граница — `329d2f3920753853ce265536d9d3ceb4e35f1f91`.
+Ниже сохранён исходный baseline 29 августа; его формулировки «отсутствует» и
+порядок волн не являются текущим backlog. Подробные доказательства, риски и
+следующие работы: [независимый аудит](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+
+| Область | Подтверждённая граница | Что остаётся открытым |
+| --- | --- | --- |
+| Provider adapters / skills | Реализованы adapter registry, validated launch plan, skill projection и шесть Codex/Claude/Grok profiles. | Реализация профиля не означает его live qualification; Grok argv transport расходится с stdin-only ADR 0004. |
+| Context Packs / Gallery | Canonical packs, compiler, launch binding, Gallery data/authoring/feedback реализованы. | Runtime повторно не проверяет актуальность/допустимость Context Pack sources; Design launch допускает stale screen provenance. |
+| J1 / Work | Task creation/dependencies, tracker actions и hermetic integrated journey реализованы; J1 принят по exact review. | Исторические J1 hashes частично заменены G6. Нужны browser Apply→Hire-from-preset, response-loss retry и сохранение evidence при review. |
+| G6 / Design → Work | G6 принят по exact review; все 18 implementation hashes совпадают с этой границей. | Acceptance остаётся историческим фактом; новый audit выявил незакрытый stale-provenance path. |
+| L1 / R2 | L1 и R2 в ledger имеют `ready`; release evidence ещё не принято. | **L1 not proven / release blocker**: Linux doctor bootstrap, Claude failure и Grok terminal MCP failures остаются отдельными gates. |
+
+Следующий порядок после проверенного uncommitted repair и UX-пивота:
+закрыть оставшийся Grok transport contract и решения retention →
+на Linux безопасно проверить receipt scope и добиться green doctor → только после
+отдельного разрешения оператора выполнить six-profile live matrix → независимый
+review и решение по R2. Старые успешные canaries не закрывают позднейшие failures.
+Claude quota exhaustion — гипотеза оператора, не доказанная причина. Broker остаётся
+experimental/manual; `implemented`, `tested`, `live-qualified`, `accepted` и
+`released` не взаимозаменяемы.
+
 Этот документ отвечает на практический вопрос: какие изменения нужны, чтобы
 текущая система перестала быть набором честных заглушек и стала рабочей
 agent-platform с единым provider-neutral runtime, визуальным пониманием работы
@@ -29,7 +73,7 @@ agent-platform с единым provider-neutral runtime, визуальным п
 
 ---
 
-## 1. Короткий ответ: что есть сейчас и что реально отсутствует
+## 1. Исходный baseline 2026-08-29: что было и что отсутствовало
 
 | Поверхность | Уже работает | Есть только foundation | Пока отсутствует | Вывод |
 |---|---|---|---|---|

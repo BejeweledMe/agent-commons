@@ -30,7 +30,6 @@ from agent_commons.core.canonical import loads_json_strict
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.context_pack import ContextPackRefusal
 from agent_commons.errors import CommonsError
-from agent_commons.runtime import AttemptStore
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
 from agent_commons.services.design_authoring import publish_from_selection, revise_from_selection
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
@@ -62,7 +61,7 @@ from agent_commons.ui.setup import (
     missing_workspace_state,
 )
 from agent_commons.ui.starter_pack_routes import register_starter_pack_routes
-from agent_commons.ui.tracker_reads import build_tracker_snapshot
+from agent_commons.ui.tracker_reads import ObservedTrackerSource
 from agent_commons.ui.tracker_routes import register_tracker_routes
 from agent_commons.ui.work_routes import register_work_routes
 
@@ -530,22 +529,7 @@ def create_app(
         authoring_session_factory=lambda: context.writer_session_id,
     )
 
-    def tracker_source(*, resume_after: int | None = None):
-        # The cursor is enforced by the SSE route. This composition function
-        # returns only the latest disposable snapshot from canonical truth plus
-        # the existing operational attempt store.
-        del resume_after
-        context.refresh_if_changed()
-        sequence, graph = context.snapshot_frame()
-        manager = context.manager()
-        attempts = AttemptStore(manager.paths.state_root, read_only=True).list_attempts()
-        return build_tracker_snapshot(
-            manager.snapshot(),
-            attempts,
-            generated_at=str(graph["generated_at"]),
-            sequence=sequence,
-            graph=graph,
-        )
+    tracker_source = ObservedTrackerSource(context)
 
     register_tracker_routes(
         api_routes,
@@ -684,6 +668,10 @@ def create_app(
                 reveal_location_label=reveal_location,
             )
         )
+
+    @api_routes.get("/api/work/context-sources", dependencies=reads_workspace)
+    async def work_context_sources() -> Response:
+        return JSONResponse(await asyncio.to_thread(context.work_context_sources))
 
     @api_routes.get("/api/work/context-packs", dependencies=reads_workspace)
     async def work_context_packs() -> Response:

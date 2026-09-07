@@ -1,284 +1,157 @@
-import {
-  type KeyboardEvent,
-  type ReactElement,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
-
+import { type KeyboardEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { ApiProblem, type WorkApi } from "../api";
-import { type TrackerSnapshot, type TrackerTask } from "../contracts";
-import { type Locale, type MessageKey } from "../i18n";
-import {
-  trackerLoadFailed,
-  trackerLoadSucceeded,
-  trackerStreamSucceeded,
-  type TrackerViewState
-} from "../trackerState";
+import type { TrackerTask } from "../contracts";
+import type { Locale, MessageKey } from "../i18n";
+import { filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, type TaskFilter } from "../taskPresentation.js";
+import { trackerLoadFailed, trackerLoadSucceeded, trackerStreamSucceeded, type TrackerViewState } from "../trackerState.js";
+import { TaskInspector, TaskState } from "./TaskInspector.js";
 
 type Props = {
   api: WorkApi;
+  writesEnabled?: boolean;
+  onObservation?: (state: TrackerViewState) => void;
   locale: Locale;
   text: (key: MessageKey) => string;
+  selectedTaskId: string | null;
+  onSelectTask: (id: string | null) => void;
+  onLaunchTask: (id: string) => void;
+  search: string;
+  filter: TaskFilter;
+  onSearchChange: (value: string) => void;
+  onFilterChange: (value: TaskFilter) => void;
 };
-
 type TrackerTaskActionName = "request_review" | "accept_task" | "reopen_task";
-
+type TaskActionIntent = Readonly<{ action: TrackerTaskActionName; taskId: string; value: string | readonly string[]; key: string }>;
 type TrackerActionState =
   | { kind: "idle" }
   | { kind: "submitting"; action: TrackerTaskActionName }
   | { kind: "success"; message: MessageKey }
-  | { kind: "error"; code: string; safeNextActions: readonly string[] };
-
-const stateGloss: Readonly<Record<string, MessageKey>> = {
-  ready: "tracker_gloss_ready",
-  blocked: "tracker_gloss_blocked",
-  terminal_dependency_failure: "tracker_gloss_dependency_failure",
-  policy_unknown: "tracker_gloss_policy_unknown",
-  in_progress: "tracker_gloss_in_progress",
-  human_attention: "tracker_gloss_human_attention",
-  complete: "tracker_gloss_complete",
-  completed: "tracker_gloss_complete",
-  cancelled: "tracker_gloss_cancelled",
-  assigned: "tracker_gloss_assigned",
-  active: "tracker_gloss_active",
-  review: "tracker_gloss_review",
-  accepted: "tracker_gloss_accepted",
-  unknown: "tracker_gloss_unknown",
-  requested: "tracker_gloss_requested",
-  reserved: "tracker_gloss_reserved",
-  launching: "tracker_gloss_launching",
-  running: "tracker_gloss_running",
-  cancellation_requested: "tracker_gloss_cancellation_requested",
-  input_needed: "tracker_gloss_input_needed",
-  succeeded: "tracker_gloss_succeeded",
-  failed: "tracker_gloss_failed",
-  timed_out: "tracker_gloss_timed_out",
-  needs_operator: "tracker_gloss_needs_operator",
-  available: "tracker_gloss_available",
-  saturated: "tracker_gloss_saturated",
-  backpressure: "tracker_gloss_backpressure",
-  fresh: "tracker_gloss_fresh",
-  stale: "tracker_gloss_stale",
-  partial: "tracker_gloss_partial",
-  missing: "tracker_gloss_missing",
-  wait_for_run: "tracker_gloss_wait_for_run",
-  start_ready_work: "tracker_gloss_start_ready_work",
-  resolve_dependencies: "tracker_gloss_resolve_dependencies",
-  answer_operator_request: "tracker_gloss_answer_operator_request",
-  inspect_failure: "tracker_gloss_inspect_failure",
-  retry_new_run: "tracker_gloss_retry_new_run",
-  request_review: "tracker_gloss_request_review",
-  wait_for_review: "tracker_gloss_wait_for_review",
-  revise_work: "tracker_gloss_revise_work",
-  accept_task: "tracker_gloss_accept_task",
-  inspect_missing_evidence: "tracker_gloss_inspect_missing_evidence",
-  none: "tracker_gloss_none"
-};
-
-const gapGloss: Readonly<Record<string, MessageKey>> = {
-  missing_review: "tracker_gap_missing_review",
-  stale_review: "tracker_gap_stale_review",
-  target_revision_mismatch: "tracker_gap_target_revision_mismatch",
-  non_independent_review: "tracker_gap_non_independent_review",
-  changes_requested: "tracker_gap_changes_requested",
-  review_evidence_missing: "tracker_gap_review_evidence_missing",
-  tracker_snapshot_too_large: "tracker_gap_stream",
-  tracker_sequence_regressed: "tracker_gap_stream",
-  tracker_sequence_reused: "tracker_gap_stream"
-};
-
-function CanonicalState({
-  text,
-  value
-}: {
-  text: (key: MessageKey) => string;
-  value: string;
-}): ReactElement {
-  return (
-    <span className="tracker-canonical">
-      <code>{value}</code> — {text(gapGloss[value] ?? stateGloss[value] ?? "tracker_gap_incomplete")}
-    </span>
-  );
-}
-
-function CanonicalList({
-  text,
-  values
-}: {
-  text: (key: MessageKey) => string;
-  values: readonly string[];
-}): ReactElement {
-  if (values.length === 0) {
-    return <span>—</span>;
-  }
-  return (
-    <ul className="tracker-code-list">
-      {values.map((value) => <li key={value}><CanonicalState text={text} value={value} /></li>)}
-    </ul>
-  );
-}
-
-function formatTimestamp(value: string | null, locale: string): string {
-  if (value === null) {
-    return "—";
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString(locale);
-}
-
-function taskPosition(tasks: readonly TrackerTask[], taskId: string): number {
-  return Math.max(0, tasks.findIndex((task) => task.taskId === taskId));
-}
-
+  | { kind: "error"; code: string; safeNextActions: readonly string[]; uncertain: boolean; intent: TaskActionIntent };
+type TaskActionDraft = { reviewCriteria: string; acceptSummary: string; reopenReason: string; reopenConfirmed: boolean };
+const PRIMARY_FILTERS: readonly TaskFilter[] = ["all", "attention", "active"];
+const MORE_FILTERS = TASK_FILTERS.filter((value) => !PRIMARY_FILTERS.includes(value));
+const emptyDraft: TaskActionDraft = { reviewCriteria: "", acceptSummary: "", reopenReason: "", reopenConfirmed: false };
 function criteriaLines(value: string): readonly string[] {
   return value.split("\n").map((item) => item.trim()).filter((item) => item.length > 0);
 }
 
-function trackerActionFailure(error: unknown): { code: string; safeNextActions: readonly string[] } {
+function trackerActionFailure(error: unknown): { code: string; safeNextActions: readonly string[]; uncertain: boolean } {
   if (error instanceof ApiProblem) {
     return {
       code: error.apiError?.code ?? (error.status === 401 ? "unauthorized" : "request_unavailable"),
-      safeNextActions: error.apiError?.safeNextActions ?? []
+      safeNextActions: error.apiError?.safeNextActions ?? [],
+      uncertain: !(error.status >= 400 && error.status < 500)
     };
   }
   return {
     code: "request_unavailable",
-    safeNextActions: []
+    safeNextActions: [],
+    uncertain: true
   };
 }
 
-export function TrackerSection({ api, locale, text }: Props): ReactElement {
+export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [reviewCriteria, setReviewCriteria] = useState("");
-  const [acceptSummary, setAcceptSummary] = useState("");
-  const [reopenReason, setReopenReason] = useState("");
-  const [reopenConfirmed, setReopenConfirmed] = useState(false);
-  const [actionState, setActionState] = useState<TrackerActionState>({ kind: "idle" });
+  const [drafts, setDrafts] = useState<Readonly<Record<string, TaskActionDraft>>>({});
+  const [actionStates, setActionStates] = useState<Readonly<Record<string, TrackerActionState>>>({});
+  const { reviewCriteria, acceptSummary, reopenReason, reopenConfirmed } = drafts[selectedTaskId ?? ""] ?? emptyDraft;
+  const actionState = actionStates[selectedTaskId ?? ""] ?? { kind: "idle" };
+  function updateDraft(changes: Partial<TaskActionDraft>): void {
+    if (selectedTaskId === null) return;
+    setDrafts((current) => ({ ...current, [selectedTaskId]: { ...(current[selectedTaskId] ?? emptyDraft), ...changes } }));
+  }
+  const setReviewCriteria = (value: string): void => updateDraft({ reviewCriteria: value });
+  const setAcceptSummary = (value: string): void => updateDraft({ acceptSummary: value });
+  const setReopenReason = (value: string): void => updateDraft({ reopenReason: value });
+  const setReopenConfirmed = (value: boolean): void => updateDraft({ reopenConfirmed: value });
+  function setTaskActionState(taskId: string, next: TrackerActionState): void {
+    setActionStates((current) => ({ ...current, [taskId]: next }));
+  }
   const taskButtons = useRef(new Map<string, HTMLButtonElement>());
-  const actionKeys = useRef(new Map<TrackerTaskActionName, { signature: string; key: string }>());
-
+  const searchField = useRef<HTMLInputElement>(null);
+  const actionKeys = useRef(new Map<string, string>());
   async function load(signal: AbortSignal): Promise<void> {
-    setState({ kind: "loading" });
     try {
       const snapshot = await api.loadTracker(signal);
-      setState((current) => trackerLoadSucceeded(current, snapshot));
-    } catch (error: unknown) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setState(trackerLoadFailed);
-      }
+      if (!signal.aborted) setState((current) => trackerLoadSucceeded(current, snapshot));
+    } catch {
+      if (!signal.aborted) setState(trackerLoadFailed);
     }
   }
-
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
     const close = api.openTrackerStream(
-      (snapshot) => setState((current) => trackerStreamSucceeded(current, snapshot)),
-      (connection) => setState((current) => (
-        current.kind === "ready" ? { ...current, connection } : current
-      )),
-      () => setState((current) => (
-        current.kind === "ready"
-          ? { ...current, connection: "disconnected" }
-          : { kind: "failure" }
-      ))
+      (snapshot) => { if (!controller.signal.aborted) setState((current) => trackerStreamSucceeded(current, snapshot)); },
+      (connection) => { if (!controller.signal.aborted) setState((current) => current.kind === "ready" ? { ...current, connection } : current); },
+      () => { if (!controller.signal.aborted) setState(trackerLoadFailed); }
     );
-    return () => {
-      controller.abort();
-      close();
-    };
+    return () => { controller.abort(); close(); };
   }, [api]);
-
+  useEffect(() => { onObservation?.(state); }, [state, onObservation]);
   const tasks = state.kind === "ready" ? state.snapshot.tasks : [];
-  const effectiveSelectedTaskId = useMemo(() => {
-    if (selectedTaskId !== null && tasks.some((task) => task.taskId === selectedTaskId)) {
-      return selectedTaskId;
+  const visibleTasks = state.kind === "ready" ? filterTrackerTasks(state.snapshot, filter, search) : [];
+  const selectedTask = tasks.find((task) => task.taskId === selectedTaskId) ?? null;
+  const actionsCurrent = writesEnabled && state.kind === "ready" && selectedTask !== null
+    && taskObservationCurrent(state.snapshot, selectedTask)
+    && state.connection !== "disconnected";
+  function selectTask(taskId: string | null): void {
+    onSelectTask(taskId);
+    if (taskId === null) {
+      const previousId = selectedTaskId;
+      requestAnimationFrame(() => {
+        const button = previousId === null ? undefined : taskButtons.current.get(previousId);
+        (button ?? searchField.current)?.focus();
+      });
     }
-    if (state.kind !== "ready") {
-      return null;
-    }
-    return state.snapshot.focusTaskIds.at(-1)
-      ?? state.snapshot.criticalPathTaskIds.at(-1)
-      ?? tasks[0]?.taskId
-      ?? null;
-  }, [selectedTaskId, state, tasks]);
-  const selectedTask = tasks.find((task) => task.taskId === effectiveSelectedTaskId) ?? null;
-
-  function selectTask(taskId: string): void {
-    setSelectedTaskId(taskId);
-    setActionState({ kind: "idle" });
   }
-
   function moveTaskFocus(event: KeyboardEvent<HTMLButtonElement>, taskId: string): void {
-    const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
-    if (!keys.includes(event.key) || tasks.length === 0) {
-      return;
-    }
+    if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key) || visibleTasks.length === 0) return;
     event.preventDefault();
-    const current = taskPosition(tasks, taskId);
-    const next = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? tasks.length - 1
-        : event.key === "ArrowDown" || event.key === "ArrowRight"
-          ? (current + 1) % tasks.length
-          : (current - 1 + tasks.length) % tasks.length;
-    const nextId = tasks[next].taskId;
+    const current = visibleTasks.findIndex((task) => task.taskId === taskId);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? visibleTasks.length - 1
+      : event.key === "ArrowDown" || event.key === "ArrowRight" ? (current + 1) % visibleTasks.length
+        : (current - 1 + visibleTasks.length) % visibleTasks.length;
+    const nextId = visibleTasks[next].taskId;
     selectTask(nextId);
     taskButtons.current.get(nextId)?.focus();
   }
-
-  function taskActionKey(action: TrackerTaskActionName, taskId: string, payload: unknown): string {
-    const signature = JSON.stringify([action, taskId, payload]);
-    const existing = actionKeys.current.get(action);
-    if (existing?.signature === signature) {
-      return existing.key;
+  function taskActionIntent(action: TrackerTaskActionName, task: TrackerTask): TaskActionIntent {
+    const value = action === "request_review" ? criteriaLines(reviewCriteria)
+      : action === "accept_task" ? acceptSummary.trim() : reopenReason.trim();
+    const signature = JSON.stringify([action, task.taskId, value]);
+    let key = actionKeys.current.get(signature);
+    if (!key) {
+      key = `tracker-${action}-${crypto.randomUUID()}`;
+      actionKeys.current.set(signature, key);
     }
-    const key = `tracker-${action}-${crypto.randomUUID()}`;
-    actionKeys.current.set(action, { signature, key });
-    return key;
+    return { action, taskId: task.taskId, value, key };
   }
 
   async function performTaskAction(action: TrackerTaskActionName, task: TrackerTask): Promise<void> {
-    const controller = new AbortController();
-    const signal = controller.signal;
-    setActionState({ kind: "submitting", action });
+    await performTaskIntent(taskActionIntent(action, task));
+  }
+
+  async function performTaskIntent(intent: TaskActionIntent): Promise<void> {
+    const signal = new AbortController().signal;
+    const { action, taskId, value, key } = intent;
+    setTaskActionState(taskId, { kind: "submitting", action });
     try {
       if (action === "request_review") {
-        const criteria = criteriaLines(reviewCriteria);
-        await api.requestTaskReview(
-          task.taskId,
-          criteria,
-          taskActionKey(action, task.taskId, criteria),
-          signal
-        );
+        await api.requestTaskReview(taskId, value as readonly string[], key, signal);
       } else if (action === "accept_task") {
-        const summary = acceptSummary.trim();
-        await api.acceptTask(
-          task.taskId,
-          summary,
-          taskActionKey(action, task.taskId, summary),
-          signal
-        );
+        await api.acceptTask(taskId, value as string, key, signal);
       } else {
-        const reason = reopenReason.trim();
-        await api.reopenTask(
-          task.taskId,
-          reason,
-          taskActionKey(action, task.taskId, reason),
-          signal
-        );
+        await api.reopenTask(taskId, value as string, key, signal);
       }
       const snapshot = await api.loadTracker(signal);
       setState((current) => trackerLoadSucceeded(current, snapshot));
-      actionKeys.current.delete(action);
-      setActionState({ kind: "success", message: "tracker_action_success" });
+      actionKeys.current.delete(JSON.stringify([action, taskId, value]));
+      api.forgetTaskWrite(key);
+      setTaskActionState(taskId, { kind: "success", message: "tracker_action_success" });
     } catch (error: unknown) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setActionState({ kind: "error", ...trackerActionFailure(error) });
+        setTaskActionState(taskId, { kind: "error", intent, ...trackerActionFailure(error) });
       }
     }
   }
@@ -290,7 +163,8 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
     if (!hasCanonicalAction && actionState.kind === "idle") {
       return null;
     }
-    const busy = actionState.kind === "submitting";
+    const busy = actionState.kind === "submitting" || !actionsCurrent
+      || (actionState.kind === "error" && actionState.uncertain);
     const submitting = (action: TrackerTaskActionName): boolean => (
       actionState.kind === "submitting" && actionState.action === action
     );
@@ -301,13 +175,14 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
           <div className="tracker-action-panel">
             <label htmlFor="tracker-review-criteria">{text("tracker_review_criteria_label")}</label>
             <textarea
+              disabled={busy}
               id="tracker-review-criteria"
               onChange={(event) => setReviewCriteria(event.target.value)}
               value={reviewCriteria}
             />
             <p className="small-copy">{text("tracker_review_criteria_help")}</p>
             <button
-              className="button button-secondary"
+              className="button button-primary"
               disabled={busy}
               onClick={() => void performTaskAction("request_review", task)}
               type="button"
@@ -320,6 +195,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
           <div className="tracker-action-panel">
             <label htmlFor="tracker-accept-summary">{text("tracker_accept_summary_label")}</label>
             <textarea
+              disabled={busy}
               aria-invalid={acceptSummary.trim().length === 0 ? "true" : undefined}
               id="tracker-accept-summary"
               onChange={(event) => setAcceptSummary(event.target.value)}
@@ -329,7 +205,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
               <p className="field-error">{text("tracker_action_required")}</p>
             ) : null}
             <button
-              className="button button-secondary"
+              className="button button-primary"
               disabled={busy || acceptSummary.trim().length === 0}
               onClick={() => void performTaskAction("accept_task", task)}
               type="button"
@@ -342,6 +218,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
           <div className="tracker-action-panel">
             <label htmlFor="tracker-reopen-reason">{text("tracker_reopen_reason_label")}</label>
             <textarea
+              disabled={busy}
               aria-invalid={reopenReason.trim().length === 0 ? "true" : undefined}
               id="tracker-reopen-reason"
               onChange={(event) => setReopenReason(event.target.value)}
@@ -352,6 +229,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
             ) : null}
             <label className="tracker-confirm">
               <input
+                disabled={busy}
                 checked={reopenConfirmed}
                 onChange={(event) => setReopenConfirmed(event.target.checked)}
                 type="checkbox"
@@ -359,7 +237,7 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
               <span>{text("tracker_reopen_confirm_label")}</span>
             </label>
             <button
-              className="button button-secondary"
+              className="button button-primary"
               disabled={busy || reopenReason.trim().length === 0 || !reopenConfirmed}
               onClick={() => void performTaskAction("reopen_task", task)}
               type="button"
@@ -371,9 +249,20 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
         {actionState.kind === "success" ? (
           <p className="tracker-action-status" role="status">{text(actionState.message)}</p>
         ) : null}
-        {actionState.kind === "error" ? (
+        {actionState.kind === "error" && actionState.intent.taskId === task.taskId ? (
           <div className="tracker-state tracker-state-error" role="alert">
             <h4>{text("tracker_action_failed")}</h4>
+            <p>{text(actionState.uncertain ? "tracker_retry_previous_help" : "inspector_known_refusal")}</p>
+            <button className="button button-secondary" type="button"
+              onClick={() => void performTaskIntent(actionState.intent)}>
+              {text("tracker_retry_previous_action")}
+            </button>
+            {!actionState.uncertain ? <button className="button button-secondary" type="button" disabled={!actionsCurrent} onClick={() => {
+              const { action, taskId, value, key } = actionState.intent;
+              actionKeys.current.delete(JSON.stringify([action, taskId, value]));
+              api.forgetTaskWrite(key);
+              setTaskActionState(taskId, { kind: "idle" });
+            }}>{text("inspector_new_attempt")}</button> : null}
             <p><code>{actionState.code}</code></p>
             {actionState.safeNextActions.length > 0 ? (
               <>
@@ -389,226 +278,67 @@ export function TrackerSection({ api, locale, text }: Props): ReactElement {
     );
   }
 
-  if (state.kind === "loading") {
-    return (
-      <section aria-labelledby="tracker-title" className="tracker-section">
-        <h2 id="tracker-title">{text("tracker_title")}</h2>
-        <p aria-live="polite" role="status">{text("tracker_loading")}</p>
-      </section>
-    );
-  }
-
-  if (state.kind === "failure") {
-    return (
-      <section aria-labelledby="tracker-title" className="tracker-section">
-        <h2 id="tracker-title">{text("tracker_title")}</h2>
-        <div className="tracker-state tracker-state-error" role="alert">
-          <h3>{text("tracker_error_title")}</h3>
-          <p>{text("tracker_error_next")}</p>
-          <button
-            className="button button-secondary button-inline"
-            onClick={() => void load(new AbortController().signal)}
-            type="button"
-          >
-            {text("tracker_retry")}
-          </button>
-        </div>
-      </section>
-    );
-  }
-
+  if (state.kind === "loading") return <section className="tracker-section work-tracker" aria-label={text("tracker_title")}><p role="status" aria-live="polite">{text("tracker_loading")}</p></section>;
+  if (state.kind === "failure") return <section className="tracker-section work-tracker" aria-label={text("tracker_title")}><div className="tracker-state tracker-state-error" role="alert"><h2>{text("tracker_error_title")}</h2><p>{text("tracker_error_next")}</p><button type="button" className="button button-secondary" onClick={() => void load(new AbortController().signal)}>{text("tracker_retry")}</button></div></section>;
   const { snapshot } = state;
-  if (snapshot.state === "loading") {
-    return (
-      <section aria-labelledby="tracker-title" className="tracker-section">
-        <h2 id="tracker-title">{text("tracker_title")}</h2>
-        <p aria-live="polite" role="status">{text("tracker_loading")}</p>
+  const stale = snapshot.state === "stale" || snapshot.freshness.state === "stale" || snapshot.freshness.resumeGap || state.connection === "disconnected";
+  return <section className="tracker-section work-tracker" aria-label={text("tracker_title")}>
+    <div className="task-view-toolbar">
+      <div className="task-search-field"><label htmlFor="task-view-search">{text("task_view_search")}</label>
+      <input id="task-view-search" ref={searchField} type="search" value={search} maxLength={200} onChange={(event) => onSearchChange(event.target.value)} /></div>
+      <div className="tracker-connection" role="status">{text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}</div>
+      <button type="button" className="button button-secondary button-inline" onClick={() => void load(new AbortController().signal)}>{text("task_view_refresh")}</button>
+    </div>
+    <div className="task-view-filters" role="group" aria-label={text("task_view_filter")}>
+      {PRIMARY_FILTERS.map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => onFilterChange(value)}>{text(taskFilterLabel[value])}</button>)}
+      <label className="task-more-filter" htmlFor="task-more-filter">
+        <span className="visually-hidden">{text("task_view_more_status")}</span>
+        <select id="task-more-filter" value={MORE_FILTERS.includes(filter) ? filter : ""}
+          onChange={(event) => { const next = event.target.value; if (MORE_FILTERS.some((value) => value === next)) onFilterChange(next as TaskFilter); }}>
+          <option value="" disabled>{text("task_view_more_status")}</option>
+          {MORE_FILTERS.map((value) => <option key={value} value={value}>{text(taskFilterLabel[value])}</option>)}
+        </select>
+      </label>
+    </div>
+    {stale ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_stale_title")}</strong><p>{text(snapshot.freshness.resumeGap ? "tracker_resume_gap" : "tracker_stale_next")}</p></div> : null}
+    {snapshot.state === "partial" || snapshot.truncated ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_partial_title")}</strong><p>{text("tracker_partial_next")}</p></div> : null}
+    {snapshot.state === "error" ? <div className="tracker-state tracker-state-error" role="alert"><strong>{text("tracker_projection_error_title")}</strong><p>{text("tracker_projection_error_next")}</p></div> : null}
+    {snapshot.state === "loading" ? <p role="status">{text("tracker_loading")}</p> : null}
+    <div className={`task-workspace${selectedTaskId !== null ? " task-workspace-selected" : ""}`}>
+      <section className="task-list-pane" aria-labelledby="task-list-title">
+        <h2 id="task-list-title">{text("tracker_title")} <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${visibleTasks.length}/${tasks.length}`}>{visibleTasks.length}/{tasks.length}</span></h2>
+        <p className="visually-hidden" id="tracker-keyboard-help">{text("tracker_keyboard_help")}</p>
+        {snapshot.state === "empty" ? <p>{text("tracker_empty")}</p> : visibleTasks.length === 0 && tasks.length > 0 ? <div><p>{text("task_view_empty_filter")}</p><button className="button button-secondary" type="button" onClick={() => { onSearchChange(""); onFilterChange("all"); }}>{text("task_view_clear_filter")}</button></div> : null}
+        <ul className="task-list" aria-describedby="tracker-keyboard-help">
+          {visibleTasks.map((task) => <li key={task.taskId}>
+            <button className={`task-row-button${task.taskId === selectedTaskId ? " selected" : ""}${task.awaitsHuman ? " attention" : ""}`}
+              aria-pressed={task.taskId === selectedTaskId} type="button" onClick={() => selectTask(task.taskId)} onKeyDown={(event) => moveTaskFocus(event, task.taskId)}
+              ref={(element) => { if (element) taskButtons.current.set(task.taskId, element); else taskButtons.current.delete(task.taskId); }}>
+              <span className="task-row-title">{task.title || task.taskId}</span>
+              <span className="task-row-meta"><span><span className="task-domain-label">{text("tracker_task_label")}: </span><TaskState domain="task" value={task.taskState} text={text} /></span><span className="task-row-role">{task.roleName ?? text("inspector_unassigned")}</span></span>
+              <span className="task-row-readiness"><span className="task-domain-label">{text("tracker_readiness_label")}: </span><TaskState domain="readiness" value={task.readiness} text={text} /></span>
+            </button>
+          </li>)}
+        </ul>
       </section>
-    );
-  }
-  if (snapshot.state === "error") {
-    return (
-      <section aria-labelledby="tracker-title" className="tracker-section">
-        <h2 id="tracker-title">{text("tracker_title")}</h2>
-        <div className="tracker-state tracker-state-error" role="alert">
-          <h3>{text("tracker_projection_error_title")}</h3>
-          <p>{text("tracker_projection_error_next")}</p>
-          <CanonicalList text={text} values={snapshot.gaps} />
-        </div>
-      </section>
-    );
-  }
-
-  if (snapshot.state === "empty") {
-    return (
-      <section aria-labelledby="tracker-title" className="tracker-section">
-        <h2 id="tracker-title">{text("tracker_title")}</h2>
-        <p>{text("tracker_empty")}</p>
-      </section>
-    );
-  }
-
-  const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
-  const stale = snapshot.state === "stale"
-    || snapshot.freshness.state === "stale"
-    || snapshot.freshness.resumeGap;
-
-  return (
-    <section aria-labelledby="tracker-title" className="tracker-section">
-      <div className="tracker-header">
-        <div>
-          <p className="eyebrow">{text("tracker_eyebrow")}</p>
-          <h2 id="tracker-title">{text("tracker_title")}</h2>
-          <p className="small-copy">{text("tracker_intro")}</p>
-        </div>
-        <div className="tracker-connection" role="status">
-          {text(state.connection === "connected"
-            ? "tracker_updates_connected"
-            : state.connection === "connecting"
-              ? "tracker_updates_connecting"
-              : "tracker_updates_disconnected")}
-        </div>
-      </div>
-
-      {stale ? (
-        <div className="tracker-state tracker-state-warning" role="status">
-          <strong>{text("tracker_stale_title")}</strong>
-          <p>{text(snapshot.freshness.resumeGap ? "tracker_resume_gap" : "tracker_stale_next")}</p>
-        </div>
-      ) : null}
-      {snapshot.state === "partial" ? (
-        <div className="tracker-state tracker-state-warning" role="status">
-          <strong>{text("tracker_partial_title")}</strong>
-          <p>{text("tracker_partial_next")}</p>
-          <CanonicalList text={text} values={snapshot.gaps} />
-        </div>
-      ) : null}
-
-      <dl className="tracker-summary">
-        <div><dt>{text("tracker_snapshot_time")}</dt><dd>{formatTimestamp(snapshot.freshness.generatedAt, dateLocale)}</dd></div>
-        <div><dt>{text("tracker_source_time")}</dt><dd>{formatTimestamp(snapshot.freshness.sourceUpdatedAt, dateLocale)}</dd></div>
-        <div><dt>{text("tracker_source_revision")}</dt><dd><code>{snapshot.sourceRevision ?? "—"}</code></dd></div>
-        <div><dt>{text("tracker_truncated")}</dt><dd>{snapshot.truncated ? text("tracker_truncated_yes") : text("tracker_truncated_no")}</dd></div>
-        <div><dt>{text("tracker_freshness")}</dt><dd><CanonicalState text={text} value={snapshot.freshness.state} /></dd></div>
-        <div><dt>{text("tracker_capacity")}</dt><dd><CanonicalState text={text} value={snapshot.capacity.state} /></dd></div>
+      {selectedTaskId === null ? <div className="task-inspector task-inspector-empty"><p>{text("task_view_no_selection")}</p></div>
+        : <div onKeyDown={(event) => {
+          if (event.key === "Escape" && !(event.target instanceof HTMLSelectElement)) { event.preventDefault(); selectTask(null); }
+        }}>
+          {selectedTask === null ? <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-missing-title"><header className="inspector-header"><h2 id="inspector-missing-title">{text("inspector_missing")}</h2><button type="button" className="button button-secondary" onClick={() => selectTask(null)}>{text("inspector_close")}</button></header><p>{text("inspector_missing_help")}</p><details className="inspector-technical"><summary>{text("inspector_technical")}</summary><code>{selectedTaskId}</code></details></section>
+            : <TaskInspector api={api} task={selectedTask} tasks={tasks} runs={snapshot.runs} sourceRevision={snapshot.sourceRevision} locale={locale} text={text} actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={selectTask} onLaunchTask={onLaunchTask}>
+              {trackerTaskActions(selectedTask)}
+            </TaskInspector>}
+        </div>}
+    </div>
+    <details className="tracker-diagnostics inspector-technical"><summary>{text("task_view_diagnostics")}</summary>
+      <dl className="tracker-summary"><div><dt>{text("tracker_source_revision")}</dt><dd><code>{snapshot.sourceRevision ?? "—"}</code></dd></div>
+        <div><dt>{text("tracker_truncated")}</dt><dd>{text(snapshot.truncated ? "tracker_truncated_yes" : "tracker_truncated_no")}</dd></div>
+        <div><dt>{text("tracker_freshness")}</dt><dd><TaskState domain="freshness" value={snapshot.freshness.state} text={text} /></dd></div>
+        <div><dt>{text("tracker_capacity")}</dt><dd><TaskState domain="capacity" value={snapshot.capacity.state} text={text} /></dd></div>
+        <div><dt>{text("tracker_gaps_label")}</dt><dd>{snapshot.gaps.length > 0 ? snapshot.gaps.map((gap) => <code key={gap}>{gap} </code>) : "—"}</dd></div>
       </dl>
-      {snapshot.capacity.active !== null ? (
-        <p className="small-copy">
-          {text("tracker_capacity_detail")}
-          {` ${snapshot.capacity.active}/${snapshot.capacity.limit ?? "—"}; `}
-          {text("tracker_queue_detail")}
-          {` ${snapshot.capacity.queued ?? "—"}/${snapshot.capacity.queueCapacity ?? "—"}.`}
-        </p>
-      ) : null}
-
-      {snapshot.attention.length > 0 ? (
-        <aside aria-labelledby="tracker-attention-title" className="tracker-attention">
-          <h3 id="tracker-attention-title">{text("tracker_attention_title")}</h3>
-          <ul>
-            {snapshot.attention.map((item) => (
-              <li key={`${item.kind}:${item.itemId}`}>
-                <strong>{item.taskId ?? item.itemId}</strong>
-                <CanonicalState text={text} value={item.reasonCode} />
-                <CanonicalState text={text} value={item.nextAction} />
-              </li>
-            ))}
-          </ul>
-        </aside>
-      ) : null}
-
-      <div className="tracker-grid">
-        <section aria-labelledby="tracker-dag-title" className="tracker-panel">
-          <h3 id="tracker-dag-title">{text("tracker_dag_title")}</h3>
-          <p className="small-copy" id="tracker-keyboard-help">{text("tracker_keyboard_help")}</p>
-          <ul aria-describedby="tracker-keyboard-help" className="tracker-task-list">
-            {tasks.map((task) => (
-              <li key={task.taskId}>
-                <button
-                  aria-pressed={task.taskId === effectiveSelectedTaskId}
-                  className={`tracker-task${task.awaitsHuman ? " tracker-task-attention" : ""}`}
-                  onClick={() => selectTask(task.taskId)}
-                  onKeyDown={(event) => moveTaskFocus(event, task.taskId)}
-                  ref={(element) => {
-                    if (element === null) {
-                      taskButtons.current.delete(task.taskId);
-                    } else {
-                      taskButtons.current.set(task.taskId, element);
-                    }
-                  }}
-                  type="button"
-                >
-                  <span className="tracker-task-title">{task.title || task.taskId}</span>
-                  <CanonicalState text={text} value={task.readiness} />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <h4>{text("tracker_dependencies_title")}</h4>
-          {snapshot.edges.length === 0 ? <p className="small-copy">{text("tracker_no_dependencies")}</p> : (
-            <ul className="tracker-edge-list">
-              {snapshot.edges.map((edge) => (
-                <li key={`${edge.prerequisiteTaskId}:${edge.dependentTaskId}`}>
-                  <code>{edge.prerequisiteTaskId}</code>
-                  <span aria-hidden="true"> → </span>
-                  <code>{edge.dependentTaskId}</code>
-                  {edge.prerequisiteMissing ? ` — ${text("tracker_dependency_missing")}` : ""}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section aria-labelledby="tracker-task-detail-title" className="tracker-panel">
-          <h3 id="tracker-task-detail-title">{text("tracker_task_detail_title")}</h3>
-          {selectedTask === null ? <p>{text("tracker_select_task")}</p> : (
-            <dl className="tracker-detail-list">
-              <div><dt>{text("tracker_task_label")}</dt><dd>{selectedTask.title || selectedTask.taskId}</dd></div>
-              <div><dt>{text("tracker_task_state_label")}</dt><dd><CanonicalState text={text} value={selectedTask.taskState} /></dd></div>
-              <div><dt>{text("tracker_readiness_label")}</dt><dd><CanonicalState text={text} value={selectedTask.readiness} /></dd></div>
-              <div><dt>{text("tracker_phase_label")}</dt><dd>{selectedTask.phase === null ? "—" : <CanonicalState text={text} value={selectedTask.phase} />}</dd></div>
-              <div><dt>{text("tracker_role_label")}</dt><dd>{selectedTask.roleName ?? "—"}</dd></div>
-              <div><dt>{text("tracker_provider_label")}</dt><dd><code>{selectedTask.provider ?? "—"}</code></dd></div>
-              <div><dt>{text("tracker_profile_label")}</dt><dd><code>{selectedTask.profileId ?? "—"}</code></dd></div>
-              <div><dt>{text("tracker_blocked_by_label")}</dt><dd>{selectedTask.blockingDependencyIds.length > 0 ? selectedTask.blockingDependencyIds.join(", ") : text("tracker_not_blocked")}</dd></div>
-              <div><dt>{text("tracker_next_action_label")}</dt><dd><CanonicalState text={text} value={selectedTask.nextAction} /></dd></div>
-              <div><dt>{text("tracker_evidence_label")}</dt><dd><CanonicalState text={text} value={selectedTask.evidenceState} /></dd></div>
-              <div><dt>{text("tracker_gaps_label")}</dt><dd><CanonicalList text={text} values={selectedTask.gaps} /></dd></div>
-            </dl>
-          )}
-          {selectedTask === null ? null : trackerTaskActions(selectedTask)}
-          <p className="small-copy">{text("tracker_critical_path_note")}</p>
-          <p className="tracker-technical">{snapshot.criticalPathTaskIds.join(" → ") || "—"}</p>
-        </section>
-      </div>
-
-      <section aria-labelledby="tracker-runs-title" className="tracker-panel tracker-runs">
-        <h3 id="tracker-runs-title">{text("tracker_runs_title")}</h3>
-        {snapshot.runs.length === 0 ? <p>{text("tracker_runs_empty")}</p> : (
-          <ol className="tracker-run-list">
-            {snapshot.runs.map((run) => (
-              <li key={run.delegationId}>
-                <div className="tracker-run-heading">
-                  <strong>{run.roleName ?? run.agentId ?? run.delegationId}</strong>
-                  <CanonicalState text={text} value={run.phase} />
-                </div>
-                <dl className="tracker-run-meta">
-                  <div><dt>{text("tracker_task_label")}</dt><dd>{run.taskId ?? "—"}</dd></div>
-                  <div><dt>{text("tracker_provider_label")}</dt><dd><code>{run.provider ?? "—"}</code></dd></div>
-                  <div><dt>{text("tracker_profile_label")}</dt><dd><code>{run.profileId ?? "—"}</code></dd></div>
-                  <div><dt>{text("tracker_attempt_label")}</dt><dd><code>{run.attemptId ?? "—"}</code>{run.attemptNumber === null ? "" : ` #${run.attemptNumber}`}</dd></div>
-                  <div><dt>{text("tracker_started_at")}</dt><dd>{formatTimestamp(run.startedAt, dateLocale)}</dd></div>
-                  <div><dt>{text("tracker_updated_at")}</dt><dd>{formatTimestamp(run.updatedAt, dateLocale)}</dd></div>
-                  <div><dt>{text("tracker_finished_at")}</dt><dd>{formatTimestamp(run.finishedAt, dateLocale)}</dd></div>
-                  <div><dt>{text("tracker_duration")}</dt><dd>{run.durationSeconds === null ? "—" : `${run.durationSeconds} ${text("tracker_seconds")}`}</dd></div>
-                  <div><dt>{text("tracker_freshness")}</dt><dd><CanonicalState text={text} value={run.freshness} /></dd></div>
-                  <div><dt>{text("tracker_evidence_label")}</dt><dd><CanonicalState text={text} value={run.evidenceState} /></dd></div>
-                  <div><dt>{text("tracker_next_action_label")}</dt><dd><CanonicalState text={text} value={run.nextAction} /></dd></div>
-                </dl>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </section>
-  );
+      <p className="small-copy">{text("tracker_critical_path_note")}</p><p><code>{snapshot.criticalPathTaskIds.join(" → ") || "—"}</code></p>
+    </details>
+  </section>;
 }

@@ -357,11 +357,14 @@ metrics labels with unbounded cardinality.
 
 Prompts, responses, reasoning, complete conversations, file contents, tool
 arguments/results, shell commands, environment variables, credentials, stdout,
-and raw stderr are excluded. An unsuccessful process keeps only a sanitized
-final 4 KiB stderr diagnostic tail below ignored operational state: ANSI/control
+and raw stderr are excluded. An unsuccessful process may retain a sanitized
+complete stderr diagnostic of at most 4 KiB below ignored operational state: ANSI/control
 bytes are removed, absolute paths and secret/PII-bearing lines are redacted, and
-the result is scanned again before a private atomic write. Successful-run stderr
-is discarded. Terminal-tool rejection diagnostics contain only a bounded
+the result is scanned again before a private atomic write. Incomplete or oversized
+stderr is replaced with a fixed omission marker: a truncated fragment may have
+lost the context required to recognize a secret. The Runs DTO also suppresses
+historical tails marked truncated; stored history is not rewritten. Successful-run
+stderr is discarded. Terminal-tool rejection diagnostics contain only a bounded
 exception type/message, never the call arguments, retain at most 32 entries, and
 mark omitted earlier details. Neither diagnostic enters canonical history or
 telemetry. Export endpoints and credentials are operator configuration and pass

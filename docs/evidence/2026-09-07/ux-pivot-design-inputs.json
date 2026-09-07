@@ -1,0 +1,35 @@
+{
+  "schema": "agent-commons.audit.ux-design-inputs.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "baseline": "Uncommitted September 6 audit remediation; source hashes retained in prior remediation evidence.",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "images": [
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-before-work.png",
+      "sha256": "333f1cde9f5f49bd8327661879a6b79c517e35ac58c77bda39f206e3b0a3c920",
+      "classification": "public",
+      "source": "synthetic-workspace-ui",
+      "contains_real_operator_state": false
+    },
+    {
+      "path": "docs/evidence/2026-09-07/ux-pivot-before-inspector.png",
+      "sha256": "80023f818d43da729f9c421d9454c8e84d1ce450da2a2b2172fff2b113d06782",
+      "classification": "public",
+      "source": "synthetic-workspace-ui",
+      "contains_real_operator_state": false
+    }
+  ],
+  "consultation": {
+    "requested_model": "Opus",
+    "reported_primary_model": "claude-opus-5",
+    "inspected_images": [
+      "ux-pivot-before-work.png",
+      "ux-pivot-before-inspector.png"
+    ],
+    "role": "read-only design consultation, not canonical approval",
+    "retained_content": "Design decisions summarized in ADR0014; no raw provider response or transcript retained."
+  }
+}

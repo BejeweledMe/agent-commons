@@ -1,0 +1,79 @@
+{
+  "schema": "agent-commons.audit.merge-polish.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "parent_source_manifest": "docs/evidence/2026-09-07/visual-refinement-source-manifest.json",
+  "parent_source_manifest_sha256": "23bd93044fb2111b2641d930878363d15329e47c61b2ce10963c4f4d1e4fe870",
+  "scope": "Apply this delta to the parent source manifest; all remaining parent entries must match. Historical parent reviews apply only to their exact bytes.",
+  "delta": [
+    {
+      "path": "frontend/work/src/components/ContextSourcePicker.tsx",
+      "before_sha256": "2bf42b9bfbf5e700f8c684ad0befaf527e55b900066535d6f0ee13eb36f2608f",
+      "sha256": "72a1fefd99c217bee74acc466c2967f5c995e9cec65d7f641bea15478137cc54"
+    },
+    {
+      "path": "frontend/work/src/contextSourcePicker.ts",
+      "before_sha256": "3bd3a693296dbc856feceb9222d894e9e1db1cdc5699f6dfaeae900a49039144",
+      "sha256": "677d9d25b013ca237447f37202bee8ae422614150f7b3788f491fd89f1956d5e"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "before_sha256": "12fab2828a1a71636c2b590369f740ddc09617d75f7eeb13b645f8fbff3b7b90",
+      "sha256": "92e98fa3e8dee3e249c27329026a7fea6af98eb0525f7fcbce59f3d70111f05a"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "before_sha256": "e6b956fe55e28d19a11f2be6851e5c3dff9dbf78cb9d0d01f2f7bfd50231dcb9",
+      "sha256": "0238c2c7dbcd3935b2ddc008222b5391f781fc240df06bb4bf220e4226dd1e8f"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DUxshpr4.css",
+      "before_sha256": "20b82ff385ce6bbd12c6d01746df2c6e12184858cf9a366ea9c340b730659a48",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-hWtPVhEt.js",
+      "before_sha256": "251aa1dfe8d31bf66c0bf3cbd46fa8c428e3367f8b439ad0cddca97089113749",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "before_sha256": "146d5588668b4240b6bea9470758b5f24261d22492d691eec08973f737c38726",
+      "sha256": "195a0d15373e4709ae76a980235dbba148f89f585d6b1173b143e242e191e28d"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-kSQJh-gV.css",
+      "before_sha256": null,
+      "sha256": "32096be2c15c97fdccb896ebc07215700ee7d5c1a2bf31f51c70d54400dc9bd9"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-BagaOY2c.js",
+      "before_sha256": null,
+      "sha256": "f5ca03f764a56d9f577da4c2964b7e990f1f2c94951c21cfc05ec336ab7d116e"
+    }
+  ],
+  "behavior": "Preserve the last confirmed readable label for the same exact source selection when the catalog changes; do not change source identity or freshness. Add disclosure spacing.",
+  "focused_tests": {
+    "command": "Node 24 work-library harness",
+    "passed": 22,
+    "skipped": 0
+  },
+  "browser": {
+    "fixture": "isolated temporary workspace, ControlledRunner, synthetic catalog revision drift",
+    "label_retained": true,
+    "exact_selection_retained": true,
+    "stale_status_explicit": true,
+    "aria_invalid": "true",
+    "keyboard_disclosure_focus": "SUMMARY",
+    "disclosure_code_margin_top_px": 8,
+    "narrow_viewport_width": 390,
+    "document_scroll_width": 390
+  },
+  "merge_gate": "Fresh make check, independent review and PR/main CI are required separately.",
+  "open_boundaries": [
+    "L1/R2 qualification",
+    "Grok argv transport privacy",
+    "historical evidence retention governance",
+    "full assistive-technology and real-operator evaluation"
+  ],
+  "live_provider_calls": false
+}

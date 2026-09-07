@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 import agent_commons.runtime.skill_projection as projection_module
+from agent_commons.domain.context_pack import ContextPackRefusal, ContextPackRefusalCode
 from agent_commons.errors import ConfigurationError
 from agent_commons.runtime import (
     AttemptState,
@@ -978,3 +979,265 @@ def test_workspace_ledger_authorization_rejects_unprojected_pack(
         )
     assert refused.value.code == "context_binding_unauthorized"
     assert service.attempts.list_attempts() == ()
+
+
+@pytest.mark.parametrize("entry", ("first", "cached", "retry"))
+@pytest.mark.parametrize(
+    ("source_change", "pack_code", "binding_code"),
+    (
+        ("revised", ContextPackRefusalCode.STALE, "context_binding_stale"),
+        ("restricted", ContextPackRefusalCode.STALE, "context_binding_stale"),
+        ("invalidated", ContextPackRefusalCode.MISSING, "context_binding_missing"),
+        ("missing_manifest", ContextPackRefusalCode.MISSING, "context_binding_missing"),
+        ("superseded_decision", ContextPackRefusalCode.STALE, "context_binding_stale"),
+    ),
+)
+def test_changed_context_sources_refuse_before_new_launch_side_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry: str,
+    source_change: str,
+    pack_code: ContextPackRefusalCode,
+    binding_code: str,
+) -> None:
+    manager, delegation = _workspace(tmp_path)
+    draft = _pack_draft(manager, "Source authorization baseline")
+    source_ref = draft["facts"][0]["source_refs"][0]
+    source_id = source_ref["ref"]["id"]
+    decision = None
+    if source_change == "superseded_decision":
+        proposed = manager.propose_decision(
+            scope="context.sources",
+            proposal="Use the verified source.",
+            idempotency_key="context-source-decision",
+        )
+        decision = manager.accept_decision(
+            proposed["entity_ref"]["id"],
+            proposed["revision"],
+            rationale="The source is current.",
+            evidence_refs=(source_ref["ref"],),
+            idempotency_key="context-source-decision-accepted",
+        )
+        draft["decision_refs"] = [{"ref": decision["entity_ref"], "revision": decision["revision"]}]
+    pack = manager.context_packs.publish(draft, idempotency_key="source-gate-pack")
+    selection = ContextBindingRequest.accumulated(
+        context_pack_id=pack.context_pack_id,
+        context_pack_revision=pack.revision,
+    )
+    initialization = _Initialization(ProviderInitializationState.READY)
+    runner = _SuccessWithoutTerminalMcp()
+    service = _service(manager, runner=runner, initialization=initialization)
+    delegation_id = str(delegation["entity_ref"]["id"])
+    revision = str(delegation["revision"])
+    launch_key = "source-gate-launch"
+    if entry == "cached":
+        initialization.state = ProviderInitializationState.HOST_SANDBOX_REFUSED
+        with pytest.raises(ConfigurationError):
+            service.run(delegation_id, revision, idempotency_key=launch_key, context=selection)
+        initialization.state = ProviderInitializationState.READY
+        assert service.context_bindings.get(delegation_id) is not None
+        assert service.attempts.list_attempts() == ()
+    elif entry == "retry":
+        original_transition = AttemptStore.transition
+
+        def crash_before_launch(
+            store: AttemptStore, attempt_id: str, state: AttemptState, **values: Any
+        ) -> Any:
+            if state is AttemptState.LAUNCHING:
+                raise RuntimeError("source gate crash before launch")
+            return original_transition(store, attempt_id, state, **values)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(AttemptStore, "transition", crash_before_launch)
+            with pytest.raises(RuntimeError, match="source gate crash"):
+                service.run(delegation_id, revision, idempotency_key=launch_key, context=selection)
+        assert len(service.attempts.list_attempts()) == 1
+        assert runner.invocations == []
+
+    if source_change in {"revised", "restricted"}:
+        source = manager.repo_root / "context-source.txt"
+        source.write_text("changed source content", encoding="utf-8")
+        manager.revise_artifact(
+            source_id,
+            source_ref["revision"],
+            source,
+            media_type="text/plain",
+            classification="restricted" if source_change == "restricted" else "internal",
+            idempotency_key="changed-context-source",
+        )
+    elif source_change == "invalidated":
+        manager.invalidate_event(
+            source_ref["revision"],
+            reason="The source is no longer valid.",
+            idempotency_key="invalid-context-source",
+        )
+    elif source_change == "missing_manifest":
+        artifact = manager.snapshot().artifacts[source_id]
+        manager.manifests.get(artifact["manifest_ref"]).path.unlink()
+    else:
+        assert decision is not None
+        replacement = manager.propose_decision(
+            scope="context.sources",
+            proposal="Use a new source after review.",
+            idempotency_key="replacement-context-decision",
+        )
+        manager.supersede_decision(
+            decision["entity_ref"]["id"],
+            decision["revision"],
+            replacement_decision_id=replacement["entity_ref"]["id"],
+            reason="The former source decision no longer applies.",
+            idempotency_key="superseded-context-decision",
+        )
+
+    binding_before = service.context_bindings.get(delegation_id)
+    attempts_before = service.attempts.list_attempts()
+    sessions_before = manager.sessions.list_sessions()
+    events_before = tuple(manager.events.iter_events())
+    probes_before = initialization.calls
+
+    def unexpected_build(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("An unusable source must refuse before invocation construction")
+
+    monkeypatch.setattr(LaunchPlanner, "build", staticmethod(unexpected_build))
+    with pytest.raises(ContextPackRefusal) as compile_refused:
+        manager.context_packs.compile(pack.context_pack_id, pack.revision)
+    assert compile_refused.value.code is pack_code
+    with pytest.raises(ConfigurationError) as selection_refused:
+        service.validate_context_selection(selection)
+    assert selection_refused.value.code == binding_code
+    with pytest.raises(ConfigurationError) as launch_refused:
+        service.run(
+            delegation_id,
+            revision,
+            idempotency_key=launch_key,
+            context=selection,
+            retry=entry == "retry",
+        )
+    assert launch_refused.value.code == binding_code
+    assert initialization.calls == probes_before
+    assert runner.invocations == []
+    assert service.context_bindings.get(delegation_id) == binding_before
+    assert service.attempts.list_attempts() == attempts_before
+    assert manager.sessions.list_sessions() == sessions_before
+    assert tuple(manager.events.iter_events()) == events_before
+    assert manager.get_delegation(delegation_id)["state"] == "requested"
+
+
+def test_historical_pack_launch_remains_authorized_when_its_sources_are_current(
+    tmp_path: Path,
+) -> None:
+    manager, delegation = _workspace(tmp_path)
+    draft = _pack_draft(manager, "Historical authorized baseline")
+    historical = manager.context_packs.publish(draft, idempotency_key="historical-pack")
+    compiled = manager.context_packs.compile(historical.context_pack_id, historical.revision)
+    manager.context_packs.revise(
+        historical.context_pack_id,
+        historical.revision,
+        {**draft, "summary": "Newer baseline"},
+        idempotency_key="newer-pack",
+    )
+    runner = _SuccessWithoutTerminalMcp()
+    service = _service(
+        manager, runner=runner, initialization=_Initialization(ProviderInitializationState.READY)
+    )
+    service.run(
+        str(delegation["entity_ref"]["id"]),
+        str(delegation["revision"]),
+        idempotency_key="historical-launch",
+        context=ContextBindingRequest.accumulated(
+            context_pack_id=historical.context_pack_id,
+            context_pack_revision=historical.revision,
+        ),
+    )
+    assert len(runner.invocations) == 1
+    assert runner.invocations[0].stdin.endswith(compiled.text.encode("utf-8"))
+
+
+@pytest.mark.parametrize("probe", ("initialization", "auth", "child", "build"))
+@pytest.mark.parametrize("classification", ("internal", "restricted"))
+def test_context_sources_changed_during_launch_hooks_never_reach_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    probe: str,
+    classification: str,
+) -> None:
+    manager, delegation = _workspace(tmp_path)
+    draft = _pack_draft(manager, "Pre-probe source baseline")
+    source = draft["facts"][0]["source_refs"][0]
+    pack = manager.context_packs.publish(draft, idempotency_key="probe-change-pack")
+
+    def change_source() -> None:
+        manager.revise_artifact(
+            source["ref"]["id"],
+            source["revision"],
+            manager.repo_root / "context-source.txt",
+            media_type="text/plain",
+            classification=classification,
+            idempotency_key="probe-change-source",
+        )
+
+    class ChangingInitialization(_Initialization):
+        def probe(self, profile: Any, **values: Any) -> ProviderInitializationStatus:
+            if probe == "initialization":
+                change_source()
+            return super().probe(profile, **values)
+
+    class ChangingAuth(_ReadyAuth):
+        def status(self, profile: Any, **values: Any) -> ProviderAuthStatus:
+            if probe == "auth":
+                change_source()
+            return super().status(profile, **values)
+
+    runner = _SuccessWithoutTerminalMcp()
+    service = _service(
+        manager,
+        runner=runner,
+        initialization=ChangingInitialization(ProviderInitializationState.READY),
+    )
+    service.provider_auth = ChangingAuth()
+    sessions_before = manager.sessions.list_sessions()
+    original_open_child = service._open_child_session
+    original_build = LaunchPlanner.build
+    builds = []
+
+    def changing_child(*args: Any, **kwargs: Any) -> Any:
+        child = original_open_child(*args, **kwargs)
+        if probe == "child":
+            change_source()
+        return child
+
+    def changing_build(*args: Any, **kwargs: Any) -> Any:
+        if probe != "build":
+            pytest.fail("Earlier source drift must refuse before invocation construction")
+        result = original_build(*args, **kwargs)
+        builds.append(result)
+        change_source()
+        return result
+
+    monkeypatch.setattr(service, "_open_child_session", changing_child)
+    monkeypatch.setattr(LaunchPlanner, "build", staticmethod(changing_build))
+    with pytest.raises(ConfigurationError) as refused:
+        service.run(
+            str(delegation["entity_ref"]["id"]),
+            str(delegation["revision"]),
+            idempotency_key="probe-change-launch",
+            context=ContextBindingRequest.accumulated(
+                context_pack_id=pack.context_pack_id,
+                context_pack_revision=pack.revision,
+            ),
+        )
+    assert refused.value.code == "context_binding_stale"
+    assert runner.invocations == []
+    assert service.attempts.list_attempts() == ()
+    if probe in {"initialization", "auth"}:
+        assert manager.sessions.list_sessions() == sessions_before
+    else:
+        original_ids = {session.session_id for session in sessions_before}
+        children = [
+            session
+            for session in manager.sessions.list_sessions()
+            if session.session_id not in original_ids
+        ]
+        assert len(children) == 1
+        assert children[0].status == "closed"
+    assert len(builds) == (1 if probe == "build" else 0)

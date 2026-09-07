@@ -38,6 +38,7 @@ _WINDOWS_ABSOLUTE_PATH = re.compile(
 )
 _CONTROL_CHARACTER = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REDACTED_DIAGNOSTIC_LINE = "[agent-commons redacted unsafe diagnostic line]"
+_OMITTED_TRUNCATED_DIAGNOSTIC = "[agent-commons omitted truncated diagnostic]"
 _REDACTED_PATH = "[agent-commons redacted path]"
 
 
@@ -477,12 +478,24 @@ def sanitize_provider_stderr_tail(
     and control bytes removed, replaces absolute paths, and redacts complete
     secret/PII-bearing lines before the attempt document sees it.  A final
     fail-closed scan prevents a sanitizer regression from persisting unsafe
-    content.
+    content. Incomplete stderr is replaced wholesale with a fixed omission
+    marker because truncation may have removed the scanner's secret context.
     """
 
     if result.outcome is RunOutcome.SUCCEEDED:
         return None, False, False
-    raw = result.stderr_tail or result.stderr[-PROVIDER_STDERR_TAIL_BYTES:]
+    raw = result.stderr_tail or result.stderr
+    # Truncation can remove the opening marker of a multiline secret or the
+    # credential name from an assignment. A scanner cannot establish safety
+    # from that fragment, even when it contains no recognizable secret shape.
+    # Keep a fixed omission marker and the separate diagnostic code/hint.
+    # Check byte counts as well for runners using the older stderr-only contract.
+    if (
+        result.stderr_tail_truncated
+        or result.stderr_bytes_seen > len(raw)
+        or len(raw) > PROVIDER_STDERR_TAIL_BYTES
+    ):
+        return _OMITTED_TRUNCATED_DIAGNOSTIC, True, True
     if not raw:
         return None, bool(result.stderr_tail_truncated), False
     text = raw.decode("utf-8", "replace")
@@ -508,6 +521,8 @@ def sanitize_provider_stderr_tail(
     if not safe:
         return None, bool(result.stderr_tail_truncated), redacted
     safe, capped = _utf8_tail(safe, PROVIDER_STDERR_TAIL_BYTES)
+    if capped:
+        return _OMITTED_TRUNCATED_DIAGNOSTIC, True, True
     try:
         security.assert_safe(safe, context="provider stderr diagnostic tail")
     except SecurityPolicyError:

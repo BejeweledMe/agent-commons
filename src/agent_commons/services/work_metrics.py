@@ -84,6 +84,7 @@ def build_work_health(
     generated_at: str,
     stale_after_seconds: int = 60,
     graph: Mapping[str, Any] | None = None,
+    canonical_observed_at: str | None = None,
 ) -> WorkHealth:
     """Join canonical and operational read state without persisting a new truth.
 
@@ -93,6 +94,10 @@ def build_work_health(
     """
 
     now = _timestamp(generated_at, "generated_at")
+    if canonical_observed_at is not None:
+        observed = _timestamp(canonical_observed_at, "canonical_observed_at")
+        if observed > now:
+            raise WorkMetricsInputError("canonical observation cannot be in the future")
     if stale_after_seconds < 0:
         raise WorkMetricsInputError("stale_after_seconds cannot be negative")
     if len(snapshot.tasks) > MAX_ACCEPTANCES:
@@ -114,6 +119,7 @@ def build_work_health(
         graph=graph,
         now=now,
         stale_after_seconds=stale_after_seconds,
+        canonical_observed_at=canonical_observed_at,
     )
     source_gaps = _source_gaps(
         snapshot,
@@ -149,6 +155,7 @@ def build_work_health(
             dependency_evidence=dependency_evidence,
             now=now,
             stale_after_seconds=stale_after_seconds,
+            canonical_observed_at=canonical_observed_at,
         )
         for delegation_id, delegation in sorted(snapshot.delegations.items())
     )
@@ -249,6 +256,7 @@ def _run_view(
     dependency_evidence: Mapping[str, tuple[tuple[str, ...], bool, bool]],
     now: datetime,
     stale_after_seconds: int,
+    canonical_observed_at: str | None,
 ) -> RunView:
     target = _mapping(delegation.get("target_ref"))
     task_id = _optional_string(target.get("id")) if target.get("kind") == "task" else None
@@ -366,6 +374,7 @@ def _run_view(
             attempt,
             now=now,
             stale_after_seconds=stale_after_seconds,
+            canonical_observed_at=canonical_observed_at,
         )
         if timestamp_order_valid
         else FreshnessState.UNKNOWN
@@ -735,6 +744,7 @@ def _freshness(
     graph: Mapping[str, Any] | None,
     now: datetime,
     stale_after_seconds: int,
+    canonical_observed_at: str | None,
 ) -> tuple[FreshnessState, str | None]:
     values: list[object] = []
     candidates: list[tuple[datetime, str]] = []
@@ -750,9 +760,24 @@ def _freshness(
             parsed = _optional_timestamp(_optional_string(value))
             if isinstance(value, str) and parsed is not None and parsed <= now:
                 candidates.append((parsed, value))
+    values = _observed_evidence_times(values, canonical_observed_at, now=now)
+    latest = _latest_attempts(attempts) if canonical_observed_at is not None else {}
     for attempt in attempts:
+        correlation = _mapping(attempt.get("correlation"))
+        delegation_id = _safe_identifier(correlation.get("delegation_id"))
+        delegation = snapshot.delegations.get(delegation_id or "")
         value = attempt.get("updated_at")
-        values.append(value)
+        if canonical_observed_at is not None and delegation is not None:
+            # Prior attempts are history; only the latest attempt needs a live
+            # heartbeat. All historical timestamp/shape validation still runs.
+            if latest.get(delegation_id or "") is not attempt:
+                continue
+            if _coherent_terminal_attempt(delegation, attempt):
+                values.extend(_observed_evidence_times([value], canonical_observed_at, now=now))
+            else:
+                values.append(value)
+        else:
+            values.append(value)
         parsed = _optional_timestamp(_optional_string(value))
         if isinstance(value, str) and parsed is not None and parsed <= now:
             candidates.append((parsed, value))
@@ -871,15 +896,48 @@ def _run_freshness(
     *,
     now: datetime,
     stale_after_seconds: int,
+    canonical_observed_at: str | None,
 ) -> FreshnessState:
     values: list[object] = [delegation.get("recorded_at")]
     if task is not None:
         values.append(task.get("recorded_at"))
     if agent is not None:
         values.append(agent.get("recorded_at"))
+    values = _observed_evidence_times(values, canonical_observed_at, now=now)
     if attempt is not None:
-        values.append(attempt.get("updated_at"))
+        value = attempt.get("updated_at")
+        if canonical_observed_at is not None and _coherent_terminal_attempt(delegation, attempt):
+            values.extend(_observed_evidence_times([value], canonical_observed_at, now=now))
+        else:
+            values.append(value)
     return _freshness_state(values, now=now, stale_after_seconds=stale_after_seconds)
+
+
+def _observed_evidence_times(
+    values: Sequence[object], observed_at: str | None, *, now: datetime
+) -> list[object]:
+    """Age a verified observation, retaining malformed or future source clocks.
+
+    An immutable record does not expire merely because no new event changed it.
+    The caller may provide this clock only after observing the source against a
+    stable fingerprint. Without that evidence the original conservative clock
+    behavior remains in force.
+    """
+
+    if observed_at is None:
+        return list(values)
+    invalid = [
+        value
+        for value in values
+        if (parsed := _optional_timestamp(_optional_string(value))) is None or parsed > now
+    ]
+    return [observed_at, *invalid]
+
+
+def _coherent_terminal_attempt(delegation: Mapping[str, Any], attempt: Mapping[str, Any]) -> bool:
+    canonical = _PHASES.get(_optional_string(delegation.get("state")) or "")
+    operational = _PHASES.get(_optional_string(attempt.get("state")) or "")
+    return canonical in _TERMINAL_RUN_PHASES and operational is canonical
 
 
 def _freshness_state(

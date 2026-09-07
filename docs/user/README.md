@@ -18,7 +18,8 @@ product, not its code or future roadmap:
 2. the normal team workflow;
 3. setup and safe access to the local panel;
 4. statuses, blockers, and common recovery steps; and
-5. the current handoff from the new Work screen to the full panel.
+5. Work, Team, Library and Settings, with Gallery and the full panel for
+   specialized operations and recovery.
 
 For provider configuration, source installation, API details, or operating the
 product from a terminal, use the technical documentation linked from the

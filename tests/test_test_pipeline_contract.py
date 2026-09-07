@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 COMPONENT_PATHS = {
@@ -47,7 +54,13 @@ def test_component_targets_are_hermetic_and_partition_every_test_module() -> Non
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert "PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE" in makefile
     assert "-u AGENT_COMMONS_SESSION_ID" in makefile
-    assert "check: lint format-check frontend-work-test frontend-gallery-test test" in makefile
+    assert (
+        "check: node-version-check lint format-check frontend-work-test frontend-gallery-test test"
+        in makefile
+    )
+    assert "frontend-work-deps: node-version-check" in makefile
+    assert "frontend-gallery-deps: node-version-check" in makefile
+    assert "$(UV) run --locked python tools/check_node_version.py" in makefile
     assert "test:\n\t$(PYTEST) -q" in makefile
     assert "test-contracts: frontend-work-deps" not in makefile
     assert "frontend-work-test: frontend-work-deps" in makefile
@@ -92,3 +105,50 @@ def test_ci_keeps_full_matrix_but_deduplicates_equivalent_runs() -> None:
     assert "cache-dependency-path: |" in workflow
     assert "frontend/work/package-lock.json" in workflow
     assert "frontend/gallery/package-lock.json" in workflow
+
+
+@pytest.mark.parametrize(
+    ("required", "observed", "exit_code", "diagnostic"),
+    [
+        ("24", "v24.1.2", 0, "Node 24.1.2 matches .node-version"),
+        ("24", "v23.11.0", 1, "requires Node 24"),
+        ("24", "v25.0.0", 1, "requires Node 24"),
+        ("25", "v25.2.3", 0, "Node 25.2.3 matches .node-version"),
+        ("24", "unrecognized", 1, "could not determine the Node version"),
+        ("invalid", "v24.1.2", 1, ".node-version must contain a Node major"),
+        ("24", None, 1, "Node is not available"),
+    ],
+)
+def test_node_version_guard_checks_the_version_file_and_selected_binary(
+    tmp_path: Path,
+    required: str,
+    observed: str | None,
+    exit_code: int,
+    diagnostic: str,
+) -> None:
+    """Exercise the real guard with a file and executable, without installing Node."""
+
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    guard = tools / "check_node_version.py"
+    shutil.copyfile(ROOT / "tools" / guard.name, guard)
+    (tmp_path / ".node-version").write_text(required + "\n", encoding="utf-8")
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    if observed is not None:
+        node = binaries / "node"
+        node.write_text(
+            "#!/bin/sh\nprintf '%s\\n' " + shlex.quote(observed) + "\n", encoding="utf-8"
+        )
+        node.chmod(0o700)
+    result = subprocess.run(
+        [sys.executable, str(guard)],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": str(binaries)},
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == exit_code
+    assert diagnostic in result.stdout + result.stderr

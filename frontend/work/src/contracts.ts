@@ -45,6 +45,7 @@ export type Profile = {
 
 export type Catalog = {
   profiles: readonly Profile[];
+  presets: readonly RolePreset[];
   contextModes: readonly string[];
   grantLevels: readonly string[];
 };
@@ -56,10 +57,38 @@ export type RoleOption = {
   contextMode: "fresh" | "accumulated";
 };
 
+export type RolePreset = RoleOption & { skills: readonly string[] };
+
 export type TaskOption = {
   id: string;
   title: string;
   state: string;
+};
+
+export type TaskCreateResult = { taskId: string; revision: string };
+
+export type TaskDetail = {
+  taskId: string;
+  revision: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: readonly string[];
+  state: string;
+  summary: string | null;
+  evidenceRefs: readonly RevisionBoundRef[];
+  truncated: boolean;
+};
+
+export type ContextSourceOption = {
+  ref: RevisionBoundRef;
+  label: string;
+  freshness: "current";
+};
+export type ContextSourceCatalog = {
+  schema: "agent-commons.ui.context-sources.v1";
+  state: "empty" | "ready";
+  sources: readonly ContextSourceOption[];
+  truncated: boolean;
 };
 
 export type ContextPackOption = {
