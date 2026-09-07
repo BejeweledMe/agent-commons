@@ -13,9 +13,15 @@ checkout `e071533c2643ca0f091c4f9dd8f1531740260cb3`.
 
 | File | Classification | SHA-256 | Boundary / note |
 | --- | --- | --- | --- |
-| [`agent_commons_product_architecture_review.md`](../../agent_commons_product_architecture_review.md) | User-provided working input; tracked historical evidence | `7aff0941e61e88e6ee320ae2903f6cbb0c19bcef6507eb0c24a762936c3ea968` | Unique 24-Aug review, based on `f998e33`; not canonical. |
+| [`agent_commons_product_architecture_review.md`](../archive/agent_commons_product_architecture_review.md) | User-provided working input; tracked historical evidence | `7aff0941e61e88e6ee320ae2903f6cbb0c19bcef6507eb0c24a762936c3ea968` | Unique 24-Aug review, based on `f998e33`; not canonical. |
 | [`claude_architecture_improvement_review.md`](../../claude_architecture_improvement_review.md) | Provenance/workspace evidence; tracked historical evidence | `61e49c44b1b69b4294a93b72912030f050118067d3c12d3255d7ae3278c0c788` | 25-Aug review material; hash records bytes, not authorship. |
 | [`codex_architecture_improvement_review.md`](../../codex_architecture_improvement_review.md) | Rewritten review proposal; tracked historical evidence | `2d84d3cf10571dd082a18c38d2e90190695317bcb74d7c131ebf2054c9f46aa8` | Byte-distinct current Codex working copy; not canonical. |
+
+The product review moved byte-for-byte from the repository root to
+`docs/archive/agent_commons_product_architecture_review.md` after merge
+`de4398e0aa5a2f28041e0f6e5191d969db979eb1`; its hash above is unchanged.
+The original path remains retrievable in that Git revision. The two registered
+root review artifacts retain their recorded source paths.
 
 ## Missing local provenance copy
 

@@ -1,75 +1,43 @@
-# Agent Commons: программа доведения agent platform до реальной имплементации
+# Agent Commons: программа реализации
 
-**Статус:** implementation programme / decision-ready execution graph
-**Дата:** 2026-08-29
-**Базовая ревизия кода:** `dd65bdb` (`main`) + явно отмеченные незакоммиченные изменения рабочего дерева
-**Владелец программы:** product-architecture lead / operator
-**Канонический scope:** provider adapters, Design Gallery, task execution tracker, context branching
+**Владелец:** product-architecture lead / operator. **Scope:** provider adapters,
+Design Gallery, task execution tracker и context branching.
 
-### Проверенный checkpoint — 2026-09-06
+## Текущая работа
 
-**UX-продолжение 2026-09-07:** [ADR 0014](adr/0014-task-first-workspace-ux.md)
-и [план с графом владельцев](task-first-workspace-implementation-plan.md)
-задают Work/Team/Library/Settings, task-first создание, читаемый inspector и
-выбор точных источников контекста. Реализация на отдельной ветке прошла полный
-`make check`: Work85, Gallery22, Python1976. [Итоговая проверка](audits/2026-09-07-task-first-pivot-verification.md)
-связывает exact hashes, синтетические скриншоты и границы review. L1/R2, provider
-gates и отдельная приёмка сохраняются.
+Проверенная интеграция: `de4398e0aa5a2f28041e0f6e5191d969db979eb1`. Это граница исходников после
+[PR #5](https://github.com/BejeweledMe/agent-commons/pull/5), а не приёмка всех
+задач или разрешение на release. `implemented`,
+`tested`, `live-qualified`, `accepted` и `released` — разные состояния.
 
-Следующее [уточнение по консилиуму](adr/0015-browser-native-visual-refinement.md)
-реализовано тремя Astra-агентами и проверено полным `make check`: Work94,
-Gallery22, Python1976. [Отдельный отчёт](audits/2026-09-07-browser-visual-refinement.md)
-содержит новую точную границу исходников, браузерные проверки и Figma до/после;
-старые Work85 evidence не распространяются на новые изменения автоматически.
+| Область | Граница и следующий шаг |
+| --- | --- |
+| Work / Team / Library / Settings | Task-first UX и визуальное уточнение интегрированы. [ADR 0014](adr/0014-task-first-workspace-ux.md), [ADR 0015](adr/0015-browser-native-visual-refinement.md), [план UX](task-first-workspace-implementation-plan.md) и [визуальная проверка](audits/2026-09-07-browser-visual-refinement.md) описывают scope и exact evidence. |
+| Context / Gallery / review | [Remediation](audits/2026-09-06-audit-remediation.md) фиксирует проверки актуальности источников, fail-closed provenance, сохранения evidence и response-loss recovery. Сохранённые отчёты относятся к своим ревизиям. |
+| Provider transport / retention | Закрыть оставшийся Grok transport contract и решения по retention/stale coordination. Ограничение размера ввода не закрывает argv privacy. |
+| L1 / R2 | **L1 не доказан; release evidence R2 открыт.** Сначала безопасная проверка Linux receipt scope и green doctor; затем отдельно разрешённая six-profile live qualification на точной source/provider/host границе, независимый review и решение по release. |
 
-**Последующий uncommitted repair:** [remediation report](audits/2026-09-06-audit-remediation.md)
-связывает исправления F01/F02/F03/F04/F06/F07/F12 и F08-size-only с exact hashes,
-полным green gate и независимым scoped review. L1/R2, Grok argv privacy и
-решения по retention остаются открыты. Таблица ниже описывает исходный SHA;
-исправления не объявляются shipped или accepted.
+Финальные исправления stale-label и disclosure описаны в
+[merge-polish delta](evidence/2026-09-07/merge-polish-verification.json). Они
+закрывают соответствующие should-fix замечания исторического визуального отчёта.
+Его слова «uncommitted» и «remaining» описывают прошлую границу и не отменяют
+результат merge.
 
-Текущая проверенная граница — `329d2f3920753853ce265536d9d3ceb4e35f1f91`.
-Ниже сохранён исходный baseline 29 августа; его формулировки «отсутствует» и
-порядок волн не являются текущим backlog. Подробные доказательства, риски и
-следующие работы: [независимый аудит](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+Исторические проверки: [UX pivot](audits/2026-09-07-task-first-pivot-verification.md),
+[визуальное уточнение](audits/2026-09-07-browser-visual-refinement.md),
+[исходный аудит](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+Исторические J1/G6 acceptance и успешные canaries не закрывают поздние failures;
+причина Claude failures не установлена. Broker остаётся experimental/manual.
+Live rerun этим планом не разрешается.
 
-| Область | Подтверждённая граница | Что остаётся открытым |
-| --- | --- | --- |
-| Provider adapters / skills | Реализованы adapter registry, validated launch plan, skill projection и шесть Codex/Claude/Grok profiles. | Реализация профиля не означает его live qualification; Grok argv transport расходится с stdin-only ADR 0004. |
-| Context Packs / Gallery | Canonical packs, compiler, launch binding, Gallery data/authoring/feedback реализованы. | Runtime повторно не проверяет актуальность/допустимость Context Pack sources; Design launch допускает stale screen provenance. |
-| J1 / Work | Task creation/dependencies, tracker actions и hermetic integrated journey реализованы; J1 принят по exact review. | Исторические J1 hashes частично заменены G6. Нужны browser Apply→Hire-from-preset, response-loss retry и сохранение evidence при review. |
-| G6 / Design → Work | G6 принят по exact review; все 18 implementation hashes совпадают с этой границей. | Acceptance остаётся историческим фактом; новый audit выявил незакрытый stale-provenance path. |
-| L1 / R2 | L1 и R2 в ledger имеют `ready`; release evidence ещё не принято. | **L1 not proven / release blocker**: Linux doctor bootstrap, Claude failure и Grok terminal MCP failures остаются отдельными gates. |
+## Как читать оставшуюся программу
 
-Следующий порядок после проверенного uncommitted repair и UX-пивота:
-закрыть оставшийся Grok transport contract и решения retention →
-на Linux безопасно проверить receipt scope и добиться green doctor → только после
-отдельного разрешения оператора выполнить six-profile live matrix → независимый
-review и решение по R2. Старые успешные canaries не закрывают позднейшие failures.
-Claude quota exhaustion — гипотеза оператора, не доказанная причина. Broker остаётся
-experimental/manual; `implemented`, `tested`, `live-qualified`, `accepted` и
-`released` не взаимозаменяемы.
-
-Этот документ отвечает на практический вопрос: какие изменения нужны, чтобы
-текущая система перестала быть набором честных заглушек и стала рабочей
-agent-platform с единым provider-neutral runtime, визуальным пониманием работы
-и контролируемым контекстом. Это план реализации, а не заявление о том, что
-планируемые функции уже существуют.
-
-Документ собран по текущему checkout, `docs/provider-adapter-architecture-plan.md`
-и трём независимым экспертным assessments:
-
-- `docs/reviews/2026-08-29-llm-runtime-implementation-assessment.md` — Fable,
-  LLM/runtime architecture;
-- `docs/reviews/2026-08-29-product-surfaces-implementation-assessment.md` —
-  Opus, product + frontend/design;
-- `docs/reviews/2026-08-29-control-plane-security-operations-assessment.md` —
-  Opus, technical director / security / reliability.
-
-Важная граница истины: эти документы — независимые входы и evidence для
-синтеза. Они не заменяют accepted ADR и не меняют current-product truth. Все
-предложения ниже помечены как решение программы, inference или open decision,
-пока не пройдут соответствующий gate.
+Ниже сохранён проектный baseline **2026-08-29**, исходная ревизия `dd65bdb`
+с явно отмеченными рабочими изменениями. Его таблицы «отсутствует», волны и
+предложения объясняют архитектуру и зависимости, но не являются текущим backlog.
+Текущая последовательность находится только в таблице выше; дальнейшее
+направление — в [Roadmap](ROADMAP.md). Принятые решения читаются через
+[ADR index](adr/README.md), поведение определяется исходниками и тестами.
 
 ---
 
