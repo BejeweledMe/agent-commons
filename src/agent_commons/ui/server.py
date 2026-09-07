@@ -39,6 +39,9 @@ from agent_commons.ui.context import (
     UIContext,
 )
 from agent_commons.ui.gallery_routes import register_gallery_routes
+from agent_commons.ui.gallery_upload import register_gallery_upload
+from agent_commons.ui.library_blueprints import register_blueprint_reads, register_blueprint_writes
+from agent_commons.ui.library_routes import register_library_routes
 from agent_commons.ui.security import (
     AUTH_EXCHANGE_PATH,
     SECURITY_HEADERS,
@@ -61,6 +64,7 @@ from agent_commons.ui.setup import (
     missing_workspace_state,
 )
 from agent_commons.ui.starter_pack_routes import register_starter_pack_routes
+from agent_commons.ui.task_edit_routes import register_task_edit_reads, register_task_edit_writes
 from agent_commons.ui.tracker_reads import ObservedTrackerSource
 from agent_commons.ui.tracker_routes import register_tracker_routes
 from agent_commons.ui.work_routes import register_work_routes
@@ -118,6 +122,10 @@ MUTATING_ROUTES = (
     ("POST", "/api/chat/{thread_id}/messages"),
     ("POST", "/api/gallery/{design_package_id}/screens/{screen_id}/feedback"),
     ("POST", "/api/gallery/packages"),
+    ("POST", "/api/gallery/import"),
+    ("POST", "/api/library/blueprints/{blueprint_id}/apply"),
+    ("POST", "/api/work/tasks/{task_id}/edit"),
+    ("POST", "/api/work/tasks/{task_id}/cancel"),
     ("POST", "/api/gallery/{design_package_id}/revisions"),
     ("POST", "/api/agents"),
     ("POST", "/api/agents/proposals/{thread_id}/approve"),
@@ -144,6 +152,9 @@ MUTATING_ROUTES = (
 #: already serving, so a gated table answered 404 to editing the first-run
 #: screen had just switched on. `_require_catalog_editing` refuses instead.
 CATALOG_ROUTES = (
+    # Service-owned versions are private operator configuration, outside the
+    # canonical event stream, like the legacy catalogue editing routes below.
+    ("POST", "/api/library/{kind}"),
     ("POST", "/api/catalog/entries"),
     ("POST", "/api/catalog/entries/remove"),
 )
@@ -531,6 +542,20 @@ def create_app(
 
     tracker_source = ObservedTrackerSource(context)
 
+    register_blueprint_reads(api_routes, store_factory=context.library_store, dependencies=[])
+    register_library_routes(
+        api_routes,
+        dependencies=[],
+        write_dependencies=reads_workspace,
+        store_factory=context.library_store,
+        authorize_edit=context.authorize_library_edit,
+        editing_enabled=lambda: (
+            context.writes_enabled and missing_workspace_state(context.repo) is None
+        ),
+        register_writes=context.operator_panel,
+    )
+    register_task_edit_reads(api_routes, manager=context.manager, dependencies=reads_workspace)
+
     register_tracker_routes(
         api_routes,
         dependencies=reads_workspace,
@@ -722,6 +747,7 @@ def create_app(
         # or the catalogue's own named refusal.
         recording = _workspace_bound(api_routes, context)
         _register_writes(recording, context)
+        register_gallery_upload(recording, context)
         _register_launch(recording, context)
         _register_catalog_writes(recording, context)
         # First run is the one surface that must answer before the workspace
@@ -816,6 +842,9 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
 
     async def _body(request: Request) -> dict[str, Any]:
         return await _json_body(request)
+
+    register_blueprint_writes(router, context=context, read_body=_body, record=_record)
+    register_task_edit_writes(router, writer=context.writer, record=_record)
 
     @router.post("/api/work/context-packs")
     async def publish_context_pack(request: Request) -> Response:
@@ -955,6 +984,7 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             model=body.get("model"),
             created_by_agent_id=body.get("created_by_agent_id"),
             from_preset_id=body.get("from_preset_id"),
+            specialization_ref=body.get("specialization_ref"),
             idempotency_key=body.get("idempotency_key"),
         )
 

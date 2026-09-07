@@ -1,4 +1,5 @@
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
+import { ScreenImport } from "./ScreenImport";
 
 import {
   AbortSlot,
@@ -262,6 +263,13 @@ export function AuthoringPanel({ apiBase, packages, text, onPublished, announce 
       {state.kind === "error" ? <p aria-live="polite" role="alert">{text("authoring_candidates_refresh_failed")} <code>{state.code}</code></p> : null}
       {currentResponse?.state === "unavailable" ? <div role="status"><p>{text("authoring_unavailable")}</p><code>{currentResponse.error?.code}</code></div> : null}
       {currentResponse?.state === "empty" ? <p role="status">{text("authoring_empty")}</p> : null}
+      <ScreenImport apiBase={apiBase} enabled={currentResponse?.writes_enabled === true} text={text}
+        onImported={async (candidateId, title) => {
+          await load(true);
+          setSelected((current) => current.includes(candidateId) ? current : [...current, candidateId]);
+          setScreenTitles((current) => ({ ...current, [candidateId]: title }));
+          announce(text("import_saved"));
+        }} />
       {savedStatus !== null && savedCopy !== null ? (
         <div aria-live="polite" className={`authoring-status authoring-status-${savedStatus.kind}`} data-saved-revision={savedStatus.revision}>
           <p role={savedStatus.kind === "saved_refresh_failed" ? "alert" : "status"}>

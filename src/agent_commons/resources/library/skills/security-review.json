@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "security-review",
+    "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+  },
+  "content": {
+    "name": "security-review",
+    "description": "Assess security claims for a scoped design, application change, release, repository, or OSS dependency. Use for abuse-path review, application-verification evidence, supplier posture, and security findings or release recommendations; ordinary maintainability review belongs to software-engineering."
+  },
+  "files": {
+    "SKILL.md": "fa324034de3187bd2e863703b828dc842feb25370def4d006b3539aa4e03c202",
+    "agents/openai.yaml": "bc6e8d4d2c976ef77dcfd366acc48367f2998c765d17896b370efb92aedd2b32",
+    "references/00_README.md": "825fd9f3c8155753a1e7b8fc27b1c5c81482c3fc6209092a45a25d3bf877c11c",
+    "references/application-release-review.md": "e23e3d076d674d0a7537ccc48b900416b7ca35d04b3131db4454b9d0f7a4d9cd",
+    "references/evidence-register-and-findings.md": "07720c0adede5e562b0808eca5b320ec96c573ed10909a9d354392f480f79ba3",
+    "references/repository-ossf-review.md": "19aa1a5db7f9846f8fd84cdbe6a364372901c16b40b0c9921fa146043478e4ee",
+    "references/review-scope-and-assurance.md": "506ea1465536aa944bdcac28519a4af509c082391aa81f17fa829ff41c11eb25",
+    "references/source-versions-and-refresh.md": "64fa2bf8bebba7468fff2e5718070701fc531b7f62af68be52856b0a894aafaf"
+  }
+}

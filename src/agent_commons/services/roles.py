@@ -15,6 +15,8 @@ from agent_commons.domain.roles import (
     lineage,
     retirement_blockers,
     turnover_used,
+    validate_specialization_actor,
+    validate_specialization_selection,
 )
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.states import NON_TERMINAL_DELEGATION_STATES
@@ -102,6 +104,8 @@ class RoleCommands:
         turnover_budget: int | None = None,
         template: bool = False,
         model: str | None = None,
+        specialization_ref: Mapping[str, str] | None = None,
+        library_store: Any | None = None,
         created_by_agent_id: str | None = None,
         approval: str | None = None,
         proposal_ref: Mapping[str, str] | None = None,
@@ -131,6 +135,22 @@ class RoleCommands:
         # ledger keeps `agent list` honest about where staff came from.
         creator = created_by_agent_id or acting
         origin = "agent" if creator else "human"
+        if specialization_ref is not None:
+            from agent_commons.library import LibraryStore, validate_library_ref
+
+            if creator or template:
+                raise LifecycleConflictError(
+                    "specializations are hired directly by a human, separately from saved presets"
+                )
+            validate_specialization_actor(snapshot, session.session_id)
+            validate_specialization_selection(skills, tool_allowlist)
+            specialization_ref = validate_library_ref(specialization_ref, kind="role")
+            store = library_store or LibraryStore(
+                workspace_root=self.repo_root,
+                state_root=self.paths.state_root,
+                state_base=getattr(self.paths, "state_base", None),
+            )
+            store.retain(specialization_ref)
         if approval is None:
             approval = (
                 "human"
@@ -165,6 +185,8 @@ class RoleCommands:
             # unsafe name recorded once would be replayed into a provider's
             # argv on every launch of this role afterwards.
             payload["extensions"] = {"model": validate_model_name(model)}
+        if specialization_ref is not None:
+            payload["specialization_ref"] = dict(specialization_ref)
         if proposal_ref is not None:
             payload["proposal_ref"] = normalize_ref(proposal_ref)
         for field_name, values in (

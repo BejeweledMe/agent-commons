@@ -1,0 +1,20 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "computer-vision-modeling-and-training",
+    "version": "c3122e39e0c6401c07b3680051348012a3792adbe403d2cb4fbd7a8c98632ed9"
+  },
+  "content": {
+    "name": "computer-vision-modeling-and-training",
+    "description": "Use when choosing, training, adapting, or debugging computer-vision models for image classification, metric learning and retrieval, detection, segmentation, OCR and documents, multimodal vision, or video and tracking. Covers classical feature-based baselines, deep and foundation models, transfer learning, fine-tuning, PEFT, self-supervised learning, objectives, and reproducible experiments. Not for dataset governance, release metrics, or serving optimization."
+  },
+  "files": {
+    "SKILL.md": "7c76a9acc63743fa4a94e8c7efe0c1c67bbd0ccf67037378fe4236e1ac465696",
+    "references/01_approach_architecture_selection.md": "1ad4df2d9567bf19a37910b43ad1fbeecd66e7b8b6fe8ce6bb8442c457acb32c",
+    "references/02_transfer_adaptation_experiments.md": "f9049368b069adfcc65bf9dec658eff37045621cabfe86d738d3c206f99b08c0",
+    "references/03_image_tasks_retrieval.md": "17395928735b6564e5839e1864eaaf7ff96ca80e4ddc118c798f81910fe6ee37",
+    "references/04_documents_ocr_multimodal.md": "9e5fbf7bd8cee8efbedd157736b7e493c6ca5c64822a9e71033b3e4ad981c59b",
+    "references/05_video_tracking_temporal.md": "d062754a408c3dc009edd0d903aba89399d88d4e98eb3a3b5eda5d7d8a849d62"
+  }
+}

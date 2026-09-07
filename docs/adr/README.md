@@ -32,6 +32,7 @@ contract test. The status written in each ADR remains the detailed record.
 | [0013](0013-design-packages.md) | Accepted for G1 semantic slice | Canonical revisioned Design Packages with exact screen provenance; Gallery API and UI remain subsequent work. |
 | [0014](0014-task-first-workspace-ux.md) | Proposed | Task-first Work workspace, domain-specific UI state, explicit execution and bounded exact-source discovery; branch implementation authorized, verification pending. |
 | [0015](0015-browser-native-visual-refinement.md) | Proposed | Council-guided browser refinement: native status selection, persistent recovery focus, inspector disclosures and readable exact Context sources; bounded branch implementation authorized. |
+| [0016](0016-service-library-and-live-workspace.md) | Proposed | Service-owned professional skills and specializations, editable library, five workflow blueprints, live task graph and browser Gallery; implementation authorized. |
 
 ## How the two records fit together
 

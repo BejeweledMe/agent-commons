@@ -1,0 +1,37 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "software-engineering",
+    "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+  },
+  "content": {
+    "name": "software-engineering",
+    "description": "Design and review long-lived software changes: maintainability, code health, Hyrum's Law, tests, review, builds, dependencies, static analysis, CI, deprecation, migrations, and release evidence. Owns cross-cutting change lifecycle; framework/runtime implementation belongs to the language or frontend owner."
+  },
+  "files": {
+    "SKILL.md": "951f99e66684d794afa133207b8c533dd079c82e8ce4a3f3aed874f93f9e0ce8",
+    "agents/openai.yaml": "0a846dbaff755dfc68367023168f3be280a3b762301d8a48828cfcf5dd13a5a3",
+    "references/00_README.md": "0979ea853ce75fe43a3890b481adc946122ab15edf7bcad1c28c909e70dfe2cd",
+    "references/01-engineering-over-time-and-scale.md": "c53423f2ce07365c3cd23feb3a88655290b1d970d83a7e9ee00f6061d6318b22",
+    "references/02-decision-making-and-productivity-measurement.md": "b2c54ba77e44d4fb3a34947899292b0a1c0305b94262ce6c401035634439d007",
+    "references/03-team-culture-and-knowledge-sharing.md": "3411654797cd9c6cfd86b1734408b14876b112419cb94be40d0a38c7c24e9ba2",
+    "references/04-leadership-ownership-and-delegation.md": "54a17d333b166c2b50c1257df544d63bfa77ac42ba1f10e0732a6c66a56d3672",
+    "references/05-equity-and-user-harm.md": "24d6d85f9bca5c85edc98c3783fbd9cdbb11a3e40a0c49d1361ac62c8a38b791",
+    "references/06-style-guides-rules-and-consistency.md": "75ab68417f52eb65243b887617894f878a2fda00df5974ccf6f5138d788b44a5",
+    "references/07-code-review-and-change-history.md": "126bea048102855c7ac4888a1b91f4cd89770a3e7a0b9dee34a1107b0c3623df",
+    "references/08-documentation-as-code.md": "1a67f23689ce0d394835d8a0dcbbd8082988e210f6b5b8bc7b18cc8ef2cf0480",
+    "references/09-testing-strategy-and-confidence.md": "ff8f70ae7650b4011a7ea98f7dac547bd9fee093a6422d3fece12a656ca052ac",
+    "references/10-unit-tests-and-maintainability.md": "d8693387e0c974b42c3ec821f892d83ed0a8bb56a613af782feefa45f1ade08d",
+    "references/11-test-doubles-fakes-and-mocks.md": "98a5a8ef6c1cdba7ad29d3a913a094961901923944117ba496a3da41cfbef21c",
+    "references/12-larger-tests-and-system-behavior.md": "32c3d22d5eaed4d7bd14f338de7102392084b6cbb57ee0d01422dccd64144a56",
+    "references/13-version-control-branching-and-one-version.md": "246c7bb33f5ac139b8eb937fcb573b9751480654dcf6aee964ed11c393d5e33f",
+    "references/14-builds-and-dependency-management.md": "9a8064edae97ae2417ad8daeea3aa1b5e5ecc688488e7f13ed23814b7d30544a",
+    "references/15-code-search-static-analysis-and-tooling.md": "6a6a4656fc63a42332fa857ee30d6656ba21e87a91e65fcfbf2d0071d3265eae",
+    "references/16-deprecation-large-scale-change-and-migration.md": "6ea0c94b976bfc97a9db46b8399c2108d585a61d5d32961c2f2490dccfecf179",
+    "references/17-ci-cd-release-and-production-safety.md": "e775c5da902d2f52b60dc328e09f118d4c4e42737d6c3b580c08ec5e5bf455c0",
+    "references/18-managed-compute-and-production-abstractions.md": "29e9f5be6fb7dd89cea4412aecc7fe5d9668bbf15802a09b484707a17232c17c",
+    "references/19-swe-agent-operating-model.md": "17d1ee99b4907f896f04498d3a51ede2cf3d1e7057ace16b8b815cc6dbbddab9",
+    "references/20-secure-development-lifecycle-hooks.md": "0c2b4b6c9af6c1092d75e5f9efcd743856313e6e26d5adf91bea0bdcb1eaa02b"
+  }
+}

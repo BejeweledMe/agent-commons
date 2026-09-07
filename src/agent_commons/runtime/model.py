@@ -113,6 +113,7 @@ _CLAUDE_COMMONS_READ_TOOLS = (
     "mcp__agent-commons__commons_show_verification",
     "mcp__agent-commons__commons_show_artifact",
     "mcp__agent-commons__commons_read_artifact",
+    "mcp__agent-commons__commons_read_skill",
     "mcp__agent-commons__commons_repo_files",
     "mcp__agent-commons__commons_repo_read",
     "mcp__agent-commons__commons_repo_search",
@@ -230,6 +231,7 @@ _RUNNER_EXTRA_ENV_KEYS = frozenset(
         *_GROK_EXTRA_ENVIRONMENT,
         "AGENT_COMMONS_GIT_EXECUTABLE",
         "AGENT_COMMONS_GROK_MCP_COMMAND",
+        "AGENT_COMMONS_LIBRARY_ROOT",
         "AGENT_COMMONS_REPO_ROOT",
     }
 )
@@ -361,6 +363,7 @@ def _resolved_worker_mcp(
     *,
     workspace_root: Path,
     state_root: Path | None,
+    library_root: Path | None,
     delegation_id: str,
     child_session_id: str | None,
     mcp_executable: str,
@@ -394,6 +397,9 @@ def _resolved_worker_mcp(
         "--git-executable",
         resolved_git,
     ]
+    if library_root is not None:
+        # Explicit broker input survives sanitized provider environments.
+        arguments.extend(("--library-root", str(library_root.resolve())))
     if child_session_id is not None:
         arguments.extend(("--session-id", _safe_identifier("child_session_id", child_session_id)))
     return resolved_mcp, tuple(arguments)
@@ -671,6 +677,7 @@ class RunnerProfile(Protocol):
         *,
         workspace_root: Path,
         state_root: Path | None = None,
+        library_root: Path | None = None,
         delegation_id: str | None = None,
         child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
@@ -754,6 +761,7 @@ class CodexRunnerProfile:
         *,
         workspace_root: Path,
         state_root: Path | None = None,
+        library_root: Path | None = None,
         delegation_id: str | None = None,
         child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
@@ -772,6 +780,7 @@ class CodexRunnerProfile:
         mcp_executable, mcp_args = _resolved_worker_mcp(
             workspace_root=workspace_root,
             state_root=state_root,
+            library_root=library_root,
             delegation_id=delegation_id,
             child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
@@ -872,6 +881,7 @@ class ClaudeRunnerProfile:
         *,
         workspace_root: Path,
         state_root: Path | None = None,
+        library_root: Path | None = None,
         delegation_id: str | None = None,
         child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
@@ -901,6 +911,7 @@ class ClaudeRunnerProfile:
         mcp_executable, mcp_args = _resolved_worker_mcp(
             workspace_root=workspace_root,
             state_root=state_root,
+            library_root=library_root,
             delegation_id=delegation_id,
             child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
@@ -1035,6 +1046,7 @@ class GrokRunnerProfile:
         *,
         workspace_root: Path,
         state_root: Path | None = None,
+        library_root: Path | None = None,
         delegation_id: str | None = None,
         child_session_id: str | None = None,
         max_budget_microusd: int | None = None,
@@ -1062,6 +1074,7 @@ class GrokRunnerProfile:
         mcp_executable, mcp_args = _resolved_worker_mcp(
             workspace_root=workspace_root,
             state_root=state_root,
+            library_root=library_root,
             delegation_id=delegation_id,
             child_session_id=child_session_id,
             mcp_executable=self.mcp_executable,
@@ -1125,6 +1138,8 @@ class GrokRunnerProfile:
             "AGENT_COMMONS_GROK_MCP_COMMAND": mcp_executable,
             "AGENT_COMMONS_REPO_ROOT": str(workspace_root.resolve()),
         }
+        if library_root is not None:
+            extra_env["AGENT_COMMONS_LIBRARY_ROOT"] = str(library_root.resolve())
         return RunnerInvocation(
             provider=self.provider,
             profile_id=self.profile_id,

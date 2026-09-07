@@ -171,6 +171,7 @@ class UILaunchCoordinator:
             operator_limits=config.limits,
             catalog=config.catalog,
             runner=runner,
+            library_store=self._context.library_store(),
         )
 
     def run(self, request: LaunchRequest) -> LaunchResult:

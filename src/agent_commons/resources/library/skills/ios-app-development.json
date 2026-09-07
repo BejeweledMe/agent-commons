@@ -1,0 +1,31 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "ios-app-development",
+    "version": "1c3be1ceb65b70a6d757ee882836f4187efcfef9455c1ded0d2d0d42fe2bc05a"
+  },
+  "content": {
+    "name": "ios-app-development",
+    "description": "Use for cross-stack iOS product and platform decisions: select Swift, Flutter, or a mixed boundary; shape iOS architecture, native capabilities, privacy, lifecycle, integration, release, and long-term ownership. For framework-specific implementation after stack selection, use swift-skill or flutter-skill."
+  },
+  "files": {
+    "SKILL.md": "b5fc63c8fb74ceb83025815079a7074276b2c5afe66994f77dabb686e69f385b",
+    "agents/openai.yaml": "98fe7d60cc159333f9b5ffa1a5b062781075de94d01d4978b9721d84904c82f4",
+    "references/00-overview.md": "5725c9d004c42d589e3bb647189cbc2c3974bf15c8fe98263bcd350ad2b32780",
+    "references/01-ios-platform-model.md": "e9e6ea484768f75425c4025730a487596d9587874636a1639f1a5234b1c82977",
+    "references/02-flutter-ios-architecture.md": "d49804267cc8fc5006cd6917fd20d09b48f25e1703748726fa87b770fc485079",
+    "references/03-swift-native-architecture.md": "1e74821cae4338666518194162fbb9fbbccd52c3c0263073e73b5782e9e41115",
+    "references/04-project-setup-dependencies.md": "c627c9180aad8af92b07575f6c6d3d9ca985a613848a3b172457665c2f66e278",
+    "references/05-ui-navigation-state.md": "4dc70066004d3f4971da252e493b3e4b08875620d13e5b9af6bffabfbb5a144a",
+    "references/06-platform-integration-plugins.md": "723e690715154b5ad00227bfeaed553233eca99f30150b5de0f993be69759d6e",
+    "references/07-networking-storage-persistence.md": "4c6d75ae94851b3056ba430283f74b8bfdbf687e3520c743f84039c291510dfe",
+    "references/08-concurrency-lifecycle.md": "860dc1492ed9a652a8aeaa80e98c59d66aba63b300033ccf04199a5ecdb7fb9f",
+    "references/09-permissions-privacy-security.md": "3c2c44c3e2cdf6ebe58e87d806aea8c7faeadc13fe361d2e765c951e3a26ea3c",
+    "references/10-performance-memory-battery.md": "498c35eca43967e38b21f440b5ba59725337a872cbf75126797dff22ad041e2b",
+    "references/11-testing-debugging-observability.md": "d20bb4cf4723535d84968dd7770cacfad04d7ee6450f3fe50af109de64fd24d0",
+    "references/12-build-signing-release-app-store.md": "8516ea775b39b101eeb3213b5876fe047704d6ce7f48be3ef5e0cdde4a1fd9f4",
+    "references/13-common-mistakes.md": "4cf896b0c97e027fac42c113acc7af6d8355a39fffac7784966ae9a4a5c3bc75",
+    "references/14-production-checklist.md": "938ad00cb7018b89e74c0db94d8241ee28bddd27ae56855c21ca629e2781dd42"
+  }
+}

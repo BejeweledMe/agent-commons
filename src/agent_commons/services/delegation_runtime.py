@@ -40,6 +40,7 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
+from agent_commons.library import LibraryBundle, LibraryStore
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -172,6 +173,8 @@ class _RoleScope:
     model: str | None = None
     #: None is reserved for delegations not acting on behalf of a standing role.
     context_mode: ContextBindingMode | None = None
+    library_bundle: LibraryBundle | None = None
+    library_root: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -445,10 +448,12 @@ class DelegationRuntimeService:
         design_package_bindings: DesignPackageBindingStore | None = None,
         qualifications: ProviderQualificationStore | None = None,
         qualification_required: bool | None = None,
+        library_store: LibraryStore | None = None,
     ) -> None:
         self.manager = manager
         self.profiles = profiles or default_profile_registry()
         self.catalog = catalog if catalog is not None else empty_catalog()
+        self.library_store = library_store
         self.operator_limits = operator_limits or (
             attempts.operator_limits if attempts is not None else OperatorLimits()
         )
@@ -964,6 +969,19 @@ class DelegationRuntimeService:
             raise LifecycleConflictError(f"delegation names a role that does not exist: {agent_id}")
         if role.get("state") != "active":
             raise LifecycleConflictError(f"a retired role cannot start new work: {agent_id}")
+        library_bundle = None
+        library_root = None
+        if "specialization_ref" in role:
+            from agent_commons.domain.roles import validate_specialization_selection
+
+            validate_specialization_selection(role.get("skills"), role.get("tool_allowlist"))
+            library = self.library_store or LibraryStore(
+                workspace_root=self.manager.repo_root,
+                state_root=self.manager.paths.state_root,
+                state_base=getattr(self.manager.paths, "state_base", None),
+            )
+            library_bundle = library.compose_role(role["specialization_ref"])
+            library_root = library.root.resolve()
         return _RoleScope(
             tools=tuple(str(name) for name in role.get("tool_allowlist") or ()),
             grants=effective_grants(snapshot.agents, agent_id),
@@ -978,6 +996,8 @@ class DelegationRuntimeService:
             ),
             model=role_model(role),
             context_mode=ContextBindingMode(str(role.get("context_mode", "fresh"))),
+            library_bundle=library_bundle,
+            library_root=library_root,
         )
 
     @staticmethod
@@ -1672,6 +1692,8 @@ class DelegationRuntimeService:
             parent_policy, child_policy = self._policies(delegation)
             role_tools, role_grants = scope.tools, scope.grants
             instruction = self._instruction(delegation, profile_id=profile_id)
+            if scope.library_bundle is not None:
+                instruction += scope.library_bundle.instruction
             launch_plan = LaunchPlan(
                 profile_id=profile_id,
                 purpose=LaunchPurpose(str(delegation["purpose"])),
@@ -1785,6 +1807,7 @@ class DelegationRuntimeService:
                         role_tools=role_tools,
                         role_grants=role_grants,
                         context=context_binding,
+                        library_root=scope.library_root,
                     )
                 except (ConfigurationError, ValidationError) as exc:
                     raise sanitized_configuration_failure(exc) from exc

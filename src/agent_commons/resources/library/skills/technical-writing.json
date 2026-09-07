@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "technical-writing",
+    "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+  },
+  "content": {
+    "name": "technical-writing",
+    "description": "Create or revise technical documentation, architecture and design docs, API references, runbooks, troubleshooting guides, benchmarks, experiment reports, and engineering analyses."
+  },
+  "files": {
+    "SKILL.md": "c7e11860653489035a4960ac7810321210b4d0e8cc20d502cca0ca465bd500c7"
+  }
+}

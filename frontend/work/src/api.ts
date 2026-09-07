@@ -24,6 +24,7 @@ import type {
   ProviderAuthStatus,
   RoleOption,
   RolePreset,
+  RoleCreateResult,
   SetupGuidance,
   SetupGuidanceBlockerCode,
   SetupGuidanceNextActionKey,
@@ -48,6 +49,7 @@ import type {
 } from "./contracts";
 import { sanitizedWorkLocation } from "./appRouteState.js";
 import { validateContextPackDraft } from "./contextPackDraftValidation.js";
+import type { LibraryRef } from "./libraryTypes.js";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
 const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
@@ -387,7 +389,11 @@ export function parseCatalog(value: unknown): Catalog {
     throw new ApiProblem(502, null);
   }
   const profiles = stringsAt(value, "profiles").map(
-    (id): Profile => ({ id, label: profileLabel(id, value.profile_info) })
+    (id): Profile => {
+      const info = isObject(value.profile_info) && isObject(value.profile_info[id]) ? value.profile_info[id] : {};
+      return { id, label: profileLabel(id, value.profile_info), provider: stringAt(info, "provider", id.split("-")[0]), model: typeof info.model === "string" ? info.model : null,
+        ...(isObject(value.profile_info) ? { configured: typeof info.provider === "string" } : {}) };
+    }
   );
   const presets = value.presets ?? [];
   if (!Array.isArray(presets) || presets.length > 512) {
@@ -403,7 +409,10 @@ export function parseCatalog(value: unknown): Catalog {
       return { ...role, skills: boundedStringsAt(value, "skills", 128) };
     }),
     contextModes: stringsAt(value, "context_modes"),
-    grantLevels: stringsAt(value, "grant_levels")
+    grantLevels: stringsAt(value, "grant_levels"),
+    modelOptions: isObject(value.model_options) ? Object.fromEntries(Object.entries(value.model_options)
+      .filter(([provider, models]) => ["codex", "claude", "grok"].includes(provider) && Array.isArray(models) && models.length <= 128)
+      .map(([provider, models]) => [provider, (models as unknown[]).filter((model): model is string => typeof model === "string" && SAFE_MODEL.test(model))])) : {}
   };
 }
 
@@ -423,8 +432,18 @@ function parseRole(value: unknown): RoleOption | null {
     id,
     name: stringAt(value, "name", id),
     profileId: stringAt(value, "profile_id"),
-    contextMode
+    contextMode,
+    model: typeof value.model === "string" ? value.model : null,
+    specializationRef: roleSpecializationRef(value.specialization_ref)
   };
+}
+
+function roleSpecializationRef(value: unknown): LibraryRef | null {
+  if (value === undefined || value === null) return null;
+  if (!isObject(value) || value.kind !== "role" || !["builtin", "custom"].includes(String(value.source))
+    || typeof value.id !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(value.id)
+    || typeof value.version !== "string" || !/^[a-f0-9]{64}$/.test(value.version)) throw new ApiProblem(502, null);
+  return { kind: "role", source: value.source as "builtin" | "custom", id: value.id, version: value.version };
 }
 
 function parseTask(value: unknown): TaskOption | null {
@@ -1193,6 +1212,18 @@ function parseTrackerTask(value: unknown): TrackerTask {
   if (!isObject(value)) {
     throw new ApiProblem(502, null);
   }
+  const suggestionKeys = ["suggested_agent_id", "suggested_role_name", "suggested_provider"];
+  const hasSuggestion = suggestionKeys.some((key) => key in value);
+  let suggestedAgentId: string | null = null;
+  let suggestedRoleName: string | null = null;
+  let suggestedProvider: TrackerTask["suggestedProvider"] = null;
+  if (hasSuggestion) {
+    if (!suggestionKeys.every((key) => key in value) || typeof value.suggested_agent_id !== "string"
+      || !/^agent\.[0-9A-HJKMNP-TV-Z]{26}$/.test(value.suggested_agent_id)) throw new ApiProblem(502, null);
+    suggestedAgentId = value.suggested_agent_id;
+    suggestedRoleName = trackerTextAt(value, "suggested_role_name", 160);
+    suggestedProvider = trackerEnumAt(value, "suggested_provider", new Set(["codex", "claude", "grok"])) as TrackerTask["suggestedProvider"];
+  }
   return {
     taskId: trackerIdentifierAt(value, "task_id"),
     title: trackerTextAt(value, "title", 300, true),
@@ -1202,6 +1233,7 @@ function parseTrackerTask(value: unknown): TrackerTask {
     blockingDependencyIds: trackerIdentifiersAt(value, "blocking_dependency_ids", TRACKER_MAX_TASKS),
     ownerSessionId: trackerNullableIdentifierAt(value, "owner_session_id"),
     roleName: trackerNullableTextAt(value, "role_name", 160),
+    suggestedAgentId, suggestedRoleName, suggestedProvider,
     provider: trackerNullableEnumAt(value, "provider", TRACKER_PROVIDERS),
     profileId: trackerNullableEnumAt(value, "profile_id", TRACKER_PROFILES),
     phase: trackerNullableEnumAt(value, "phase", TRACKER_RUN_PHASES),
@@ -1780,23 +1812,33 @@ export class WorkApi {
       rationale: string;
       contextMode: string;
       fromPresetId?: string;
+      specializationRef?: LibraryRef | null;
+      model?: string;
+      modelMode?: "profile" | "explicit";
     },
     signal: AbortSignal,
     idempotencyKey = crypto.randomUUID()
-  ): Promise<void> {
-    await this.post(
+  ): Promise<RoleCreateResult> {
+    if (input.fromPresetId && input.specializationRef) throw new ApiProblem(400, { code: "role_source_conflict", message: "", safeNextActions: [] });
+    const specialization = roleSpecializationRef(input.specializationRef);
+    const result = await this.post(
       "/agents",
       {
         name: input.name,
         rationale: input.rationale,
         ...(input.fromPresetId ? { from_preset_id: input.fromPresetId } : {
           profile_id: input.profileId,
-          context_mode: input.contextMode
+          context_mode: input.contextMode,
+          ...(specialization ? { specialization_ref: specialization } : {}),
+          ...(input.modelMode === "explicit" && input.model?.trim() ? { model: input.model.trim() } : {})
         }),
         idempotency_key: idempotencyKey
       },
       signal
     );
+    if (!isObject(result) || !isObject(result.entity_ref) || result.entity_ref.kind !== "agent"
+      || typeof result.entity_ref.id !== "string" || !/^agent\.[0-9A-HJKMNP-TV-Z]{26}$/.test(result.entity_ref.id)) throw new ApiProblem(502, null);
+    return { agentId: result.entity_ref.id };
   }
 
   async createTask(
@@ -1906,6 +1948,16 @@ export class WorkApi {
       `/tasks/${encodeURIComponent(taskId)}/reopen`,
       { reason: reason.trim() }, idempotencyKey, signal, taskId
     );
+  }
+
+  async requestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown> {
+    let decoded: string;
+    try { decoded = decodeURIComponent(path); } catch { throw new ApiProblem(400, null); }
+    if (!/^\/(library|work)(\/|$)/.test(path) || /[?#\\\x00-\x1f]/.test(decoded)
+      || decoded.split("/").slice(1).some((part) => !part || part === "." || part === "..")) throw new ApiProblem(400, null);
+    return this.request(path, options.method === "POST" ? {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options.body), signal: options.signal
+    } : { method: "GET", signal: options.signal });
   }
 
   private async get(path: string, signal: AbortSignal): Promise<unknown> {

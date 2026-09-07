@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "platform-devops-engineering",
+    "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+  },
+  "content": {
+    "name": "platform-devops-engineering",
+    "description": "Provision, deliver, debug, or recover infrastructure through Terraform/OpenTofu state transitions, container builds, Kubernetes, GitOps reconciliation, CI identity, and deployment admission. Own apply mechanisms; application behavior and live reliability acceptance stay with their engineering owners."
+  },
+  "files": {
+    "SKILL.md": "1924bdcb4ca42a4920998ec27222fc3d54c2750a6c97409f9fb6c29bb88aeaf7",
+    "agents/openai.yaml": "16aca8f35f245338650d0b601e3c6361f273c002fed7fd90b259bea0b7560459",
+    "references/00_README.md": "597161c72f11ad92d1ed0252da2d22ce8ca49a4a5f86e9a29888b4f7f1b492a9",
+    "references/components-state-and-environments.md": "f7d1d3166dadddd83a8a9bdcf8beb3ed5566cba8d502b14d229c2a988f42b4dd",
+    "references/containers-kubernetes-lifecycle.md": "a3352e48137f4792e6a8efda5116d67ab2bcb427907eb635310d26a508270068",
+    "references/gitops-apply-and-recovery.md": "a8ab39cea573bde6d89d8d5abe913352ffe5faf14e87b97b32e48e49fe2f41fc",
+    "references/opentofu-safe-transitions.md": "811f4de737db8246bbd536532d5ee5db467e1c50468ea660b897e342e625a625",
+    "references/provenance-and-deployment-admission.md": "658f420a357b87b8e4cb8a566243facc8d18196b226dae491991ccf838117398"
+  }
+}

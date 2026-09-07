@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-decision-support",
+    "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+  },
+  "content": {
+    "name": "information-decision-support",
+    "description": "Compare realistic alternatives under constraints and produce a defensible recommendation with trade-offs and next steps."
+  },
+  "files": {
+    "SKILL.md": "ca118a52727f183e5a98fc1cd49bfbf4589d4b026c3ee2b625bbb8e2427cce12"
+  }
+}

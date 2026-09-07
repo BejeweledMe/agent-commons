@@ -1,0 +1,16 @@
+{
+  "schema": "agent-commons.library-provenance.v1",
+  "source_name": "Codex Pro Agent Skills",
+  "source_revision": "87408c9e61113b187e8ca320e96a387cf5d19d04",
+  "source_pack_sha256": "7f41e0bba863c3fc6b2cbcbd9151aef9514ffceec8deec86954b737541caea1c",
+  "role_catalog_sha256": "c17ab504e49d038b0af0e51aec8558c5cd54b23440246d035d44830184595ae1",
+  "catalog_date": "2026-09-07",
+  "skill_count": 45,
+  "role_count": 30,
+  "source_file_count": 357,
+  "source_bytes": 1712254,
+  "authorization": "User-authorized product asset import",
+  "upstream_license_file": null,
+  "imported_resource_tree_sha256": "006ba1e8449752187293d206acb70f1be4705ce0cd8e95d919e40254591564bd",
+  "verified_skill_entry_hashes": 45
+}

@@ -1,0 +1,23 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "rag-engineering",
+    "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+  },
+  "content": {
+    "name": "rag-engineering",
+    "description": "Use when designing, implementing, reviewing, debugging, evaluating, or operating retrieval-augmented generation systems. Trigger for ingestion, OCR, chunking, metadata and provenance, embeddings, sparse/dense/hybrid retrieval, ANN, reranking, context assembly, citations, abstention, GraphRAG, agentic retrieval, index versioning, or stage-by-stage RAG diagnosis."
+  },
+  "files": {
+    "SKILL.md": "fe248cfdfaf54e208f43253d1be16064709236a5def4c87964c4ccc954a57bc5",
+    "agents/openai.yaml": "30843543f9cba6436feb52cb73097ce4a39c180d43ff0e6175b10b647be27301",
+    "references/00_README.md": "dbe72935935e5b690487606e6a8a623a82fd8e2db1ba4fbf46322e01a0ef3613",
+    "references/01_operating_model_and_stage_diagnosis.md": "55378f201f68528104ff93b4a8da3987429b60edca850f172ab3dcc5db36bc87",
+    "references/02_ingestion_chunking_metadata.md": "85aae78d86228c08f425d7f61928a0237b3656be8623328c3315e7013a745348",
+    "references/03_retrieval_and_indexing.md": "0c4c44cfa344b5f838679f7d0fb4880f4ede66e58929e111011548bba0f6d62f",
+    "references/04_context_advanced_rag.md": "762cb59cacdb10060ccc381646b989740365a35c1d506b5540c21c6e16518858",
+    "references/05_evaluation_release.md": "e94a89a37bf23b32794653c18cbfd821247b0d51b6ae069b2e3b8b168ac2334c",
+    "references/06_templates.md": "2af2940a1e1805eeb9f018fff13f46333cfdb39bb1eb0c8af6e4c08418e2acfa"
+  }
+}

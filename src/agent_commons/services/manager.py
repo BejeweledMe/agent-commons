@@ -979,6 +979,9 @@ class CommonsManager(
             payload_schema = PAYLOAD_SCHEMAS[family]
         except KeyError as exc:
             raise ValidationError(f"no canonical payload schema for {event_type}") from exc
+        specialized_hire = event_type == "agent.created" and "specialization_ref" in payload_value
+        if specialized_hire:
+            payload_schema = "commons.payload.agent.v2"
         self.schemas.validate(payload_schema, payload_value)
         if spec.entity_kind is None:
             raise ValidationError(f"{event_type} has no canonical subject identity")
@@ -1063,6 +1066,14 @@ class CommonsManager(
                     payload_value,
                     session,
                 )
+                if specialized_hire:
+                    self._require_ledger_semantics("agent.specialization_bound")
+                if (
+                    event_type == "task.revised"
+                    and isinstance(payload_value.get("changes"), Mapping)
+                    and "dependencies" in payload_value["changes"]
+                ):
+                    self._require_ledger_semantics("task.dependencies_revised")
             semantic_candidate = {
                 "schema": "commons.event.v1",
                 "payload_schema": payload_schema,

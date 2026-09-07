@@ -1,0 +1,18 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "computer-vision-system-design",
+    "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+  },
+  "content": {
+    "name": "computer-vision-system-design",
+    "description": "Use when framing, designing, reviewing, or decomposing a computer-vision product or pipeline. Trigger for visual task formulation, sensor and input contracts, classification/detection/segmentation/retrieval/OCR/video decomposition, deterministic versus learned stage boundaries, end-to-end topology, hardware constraints, fallbacks, and build-versus-buy decisions. Route model-family selection, data, evaluation, and measured runtime work to the dedicated CV skills."
+  },
+  "files": {
+    "SKILL.md": "5143dcb758eb0cc14dbe85700a3f3152e9649faac8f8b672587f5ffbbc2d3f4b",
+    "references/01_problem_sensor_task_contract.md": "27924291da73046f99cba77045801d618d45dc407ec08d0753767a1850e796a1",
+    "references/02_task_pipeline_selection.md": "b6a75272b48bcdc8b185a05964c5390c25f71fc0d0929c73e3f07d11a4175853",
+    "references/03_architecture_release_handoffs.md": "29ed698f171ab8a56954a2012c57c29274e62235c86e4ee39012a3843f3e2cd7"
+  }
+}

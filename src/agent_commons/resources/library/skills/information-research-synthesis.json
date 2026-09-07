@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-research-synthesis",
+    "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+  },
+  "content": {
+    "name": "information-research-synthesis",
+    "description": "Research a question across sources and synthesize evidence into a decision-useful finding, survey, or report."
+  },
+  "files": {
+    "SKILL.md": "dffab9d8d701b2ab0a808ae21def67fa79f35b62cfb64c718b8135261573d33f"
+  }
+}

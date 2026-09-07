@@ -1,0 +1,25 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "agent-workflows",
+    "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+  },
+  "content": {
+    "name": "agent-workflows",
+    "description": "Design, implement, operate, or debug LLM agent execution: pipeline-versus-agent decisions, single- or multi-agent orchestration, tool and MCP contracts, durable state and memory, checkpoints, retries, handoffs, stopping, and scaffold evolution. Use llm-system-design for product composition and agent-llm-evals for evaluation."
+  },
+  "files": {
+    "SKILL.md": "57392c281246a66503fd58be4f402e1b36da1d90c102e7e6d2d99c6bc603d209",
+    "agents/openai.yaml": "bbeac6170db0808c16a8ec6b66e4c9ac64fefd494cbca550c51c21eb77b8bc73",
+    "references/00_README.md": "1026a372c6e52ae2947fa284b9cea39dc9ed09e3e9929d2a288c81810ea9da11",
+    "references/01_agent_or_pipeline.md": "8edc2cac757c78dc1d066f6f5b02df2ce2048bc890021585a73c421c1adf936f",
+    "references/02_tools_state_contracts.md": "7cd5a4f355f8aa84eba70837834f3f8537c9f8280028cb573255e2589616420b",
+    "references/03_orchestration_handoffs.md": "b503dddd717d68907613314a3f1e13f31bf0d3ea947cf984088f312a8f624a39",
+    "references/04_control_observability_recovery.md": "65555e6a5cb6277ab6306283406e24602920ba1c4a605aad7684fa4f07cd9a6b",
+    "references/05_templates.md": "54c45c884c74e378430179896e218c9768dda3ba0be5019c18bbf105610ec400",
+    "references/durable-memory-and-context-lifecycle.md": "257a114de5eb412e0b9b28172985e45dd56390650404d7b546251e47878a7be8",
+    "references/mcp-and-tool-integration.md": "7958090ad6c179bd6c1cad84e2a552528c217790768f133a3db5f7cff1627017",
+    "references/verified-search-and-scaffold-evolution.md": "078a2b4d1c69b06c7455c657bd62bb04c9e226114963bd62f641492a075c747f"
+  }
+}

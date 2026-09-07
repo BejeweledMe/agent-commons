@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "flutter-skill",
+    "version": "4d51b9c58df087c1d117669eee88976b1fca68571f7c2f6ba1a7988c71a299b2"
+  },
+  "content": {
+    "name": "flutter-skill",
+    "description": "Use for Flutter application architecture, implementation, and review, including Dart/UI/state/data work and iOS delivery concerns. Use directly for a known Flutter stack; use ios-app-development first when choosing Flutter versus native Swift or defining a mixed-stack boundary."
+  },
+  "files": {
+    "SKILL.md": "e3f7672d1ca5094e0ec41eacee21c87b878abe899336958423a2877ef875d145",
+    "agents/openai.yaml": "3fd968ce466c3b8808a817018bc1cb31568b69967fa31e6d892b49aa1a52fef3",
+    "references/01-flutter-architecture.md": "24cae4a14252f0a4561dc0ec9e828992cf16a51987f33dc7b7062444616407db",
+    "references/02-flutter-ios-platform-dependencies-release.md": "9784edfa1b98a26cea10f0a4327a348f86306e54403c611b081078b9b0ee534f",
+    "references/03-flutter-ui-state-navigation.md": "215e81aeb354561c27dfeda4a229bd83c9e7b033f407d0b18ee2494e5fed5a80",
+    "references/04-flutter-data-persistence-offline.md": "aa46d71c0b516ec5506c41ca21626b55225d0b3d03b4a6072f8963280964085a",
+    "references/05-flutter-platform-integration-security.md": "9548c346bc6a73222853c449f51424502d9ac6741e752f48f677ed5ff234a1d3",
+    "references/06-flutter-concurrency-testing-performance.md": "5c1cb04d3e4e092b69f4d1ca3ba2c78b886d26578b48a5a05ff88f3884bd34bd"
+  }
+}

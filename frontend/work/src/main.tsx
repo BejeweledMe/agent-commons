@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { ApiProblem, WorkApi } from "./api";
 import { ContextPackRetryIdentity } from "./contextPackEditorState";
 import { RolePresetPicker } from "./components/RolePresetPicker";
-import { chooseRolePreset } from "./rolePresetState";
+import { chooseRolePreset, chooseRoleProvider, chooseRoleProfile } from "./rolePresetState";
 import { AppHeader } from "./components/AppHeader";
 import { FailurePanel } from "./components/FailurePanel";
 import { LibrarySection } from "./components/LibrarySection";
@@ -16,6 +16,10 @@ import type { TrackerViewState } from "./trackerState.js";
 import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkRoute } from "./appRouteState";
 import { TrackerSection } from "./components/TrackerSection";
 import { WorkflowCard } from "./components/WorkflowCard";
+import { SpecializationPicker } from "./components/SpecializationPicker.js";
+import { LibraryApi } from "./libraryApi.js";
+import { sameLibraryRef, type LibraryRef, type LibraryRole, type LibraryState } from "./libraryTypes.js";
+import { TaskGraphApi } from "./taskGraphApi.js";
 import type {
   ContextPackOption,
   DesignPackageOption,
@@ -42,6 +46,11 @@ type RoleDraft = {
   profileId: string;
   rationale: string;
   contextMode: string;
+  provider: string;
+  model: string;
+  modelMode: "profile" | "explicit";
+  specializationRef: LibraryRef | null;
+  specializationName: string;
 };
 
 type TaskDraft = {
@@ -59,7 +68,7 @@ type RunDraft = {
 };
 type FormErrors = ReadonlySet<string>;
 
-const emptyRole: RoleDraft = { fromPresetId: "", name: "", profileId: "", rationale: "", contextMode: "fresh" };
+const emptyRole: RoleDraft = { fromPresetId: "", name: "", profileId: "", rationale: "", contextMode: "fresh", provider: "", model: "", modelMode: "profile", specializationRef: null, specializationName: "" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "", dependencyIds: [] };
 const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "", designPackageKey: "" };
 
@@ -191,6 +200,7 @@ function WorkApp(): ReactElement {
   const [actionErrors, setActionErrors] = useState<Record<string, { failure: Failure; retry: () => void; uncertain: boolean }>>({});
   const newTaskButton = useRef<HTMLButtonElement>(null);
   const navigationRevision = useRef(0);
+  const renderedNavigationRevision = navigationRevision.current;
   const [locale, setLocale] = useState<Locale>("en");
   const [state, setState] = useState<AppState>({ kind: "checking" });
   const [activeAction, setActiveAction] = useState<string | null>(null);
@@ -210,14 +220,38 @@ function WorkApp(): ReactElement {
   const [trackerObservation, setTrackerObservation] = useState<TrackerViewState>({ kind: "loading" });
   const dependencies = useMemo(() => taskDependencyCatalog(trackerObservation), [trackerObservation]);
   const apiRef = useRef(new WorkApi());
+  const libraryApiRef = useRef(new LibraryApi(apiRef.current));
+  const [libraryState, setLibraryState] = useState<LibraryState>({ kind: "loading" });
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
+  const [lastHiredRole, setLastHiredRole] = useState<{ id: string; name: string } | null>(null);
   const taskRetryIdentity = useRef(new ContextPackRetryIdentity());
   const authPanelRef = useRef<HTMLElement | null>(null);
   const pendingLaunchRetry = useRef<(() => Promise<void>) | null>(null);
+  const launchSelectionVersion = useRef(0);
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  const libraryAccessible = state.kind === "ready" && state.data.setup.state !== "setup_uninitialized" && state.data.setup.state !== "setup_not_a_repository";
+  useEffect(() => {
+    if (!libraryAccessible) return;
+    const controller = new AbortController();
+    void libraryApiRef.current.load(controller.signal).then((catalog) => {
+      if (!controller.signal.aborted) setLibraryState({ kind: "ready", catalog });
+    }).catch(() => {
+      if (!controller.signal.aborted) setLibraryState((current) => ({ kind: "error", ...(current.kind !== "loading" && current.catalog ? { catalog: current.catalog } : {}) }));
+    });
+    return () => controller.abort();
+  }, [libraryAccessible, libraryRefresh]);
+
+  function chooseSpecialization(selected: LibraryRole | null, showTeam = false): void {
+    setRole((current) => ({ ...current, fromPresetId: "", specializationRef: selected?.ref ?? null,
+      specializationName: selected?.name ?? "", name: current.name || selected?.name || "",
+      rationale: current.rationale || selected?.description || "" }));
+    if (showTeam) navigate({ view: "team" });
+  }
 
 
   function navigate(patch: Partial<WorkRoute>, replace = false): void {
@@ -258,10 +292,20 @@ function WorkApp(): ReactElement {
   }
 
   function prepareLaunch(taskId: string): void {
+    const selectionVersion = ++launchSelectionVersion.current;
     setRun((current) => pendingLaunchRef.current?.input.taskId === taskId ? restoreLaunchDraft(pendingLaunchRef.current) : current.taskId === taskId ? current : { ...emptyRun, taskId });
     navigate({ view: "work", taskId, composer: false });
     setLaunchOpen(true);
     window.setTimeout(() => document.getElementById("run-role")?.focus(), 0);
+    if (state.kind === "ready" && !pendingLaunchRef.current) {
+      const activeRoles = new Set(state.data.launch?.roles.map((option) => option.id) ?? []);
+      void new TaskGraphApi(apiRef.current).detail(taskId, new AbortController().signal).then((detail) => {
+        if (launchSelectionVersion.current !== selectionVersion || pendingLaunchRef.current || routeRef.current.view !== "work" || routeRef.current.taskId !== taskId
+          || !detail.suggestedAgentId || !activeRoles.has(detail.suggestedAgentId)) return;
+        const suggested = detail.suggestedAgentId;
+        setRun((current) => current.taskId === taskId && !current.agentId ? { ...current, agentId: suggested } : current);
+      }).catch(() => { /* The optional hint never replaces an explicit role choice. */ });
+    }
   }
 
   useEffect(() => {
@@ -416,8 +460,10 @@ function WorkApp(): ReactElement {
     if (actionErrors["create-role"]?.uncertain || state.kind !== "ready" || !state.data.meta.writesEnabled || state.data.setup.state !== "setup_configured") return;
     const errors = [
       ...(role.name.trim() ? [] : ["name"]),
-      ...(role.profileId ? [] : ["profile"]),
-      ...(role.rationale.trim() ? [] : ["rationale"])
+      ...(role.profileId && (role.fromPresetId || state.data.catalog?.profiles.some((profile) => profile.id === role.profileId && profile.configured !== false)) ? [] : ["profile"]),
+      ...(role.rationale.trim() ? [] : ["rationale"]),
+      ...(!role.fromPresetId && role.modelMode === "explicit" && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(role.model.trim()) ? ["model"] : []),
+      ...(role.specializationRef && (libraryState.kind !== "ready" || !libraryState.catalog.roles.some((item) => sameLibraryRef(item.ref, role.specializationRef))) ? ["specialization"] : [])
     ];
     setRoleErrors(new Set(errors));
     if (errors.length > 0) {
@@ -425,10 +471,19 @@ function WorkApp(): ReactElement {
     }
     const roleInput = { ...role, name: role.name.trim(), rationale: role.rationale.trim() };
     const roleKey = crypto.randomUUID();
+    const operationNavigation = navigationRevision.current;
+    const operationSelection = launchSelectionVersion.current;
+    const operationRun = { taskId: runRef.current.taskId, agentId: runRef.current.agentId };
+    const targetTaskId = routeRef.current.taskId ?? operationRun.taskId;
     void perform(
       "create-role",
       async (signal) => {
-        await apiRef.current.createRole(roleInput, signal, roleKey);
+        const created = await apiRef.current.createRole(roleInput, signal, roleKey);
+        setLastHiredRole({ id: created.agentId, name: roleInput.name });
+        if (!pendingLaunchRef.current && navigationRevision.current === operationNavigation && launchSelectionVersion.current === operationSelection) {
+          setRun((current) => current.taskId === operationRun.taskId && current.agentId === operationRun.agentId
+            ? { ...current, agentId: created.agentId, taskId: targetTaskId, contextPackKey: "", designPackageKey: "" } : current);
+        }
         setRole((current) => JSON.stringify({ ...current, name: current.name.trim(), rationale: current.rationale.trim() }) === JSON.stringify(roleInput) ? emptyRole : current);
       },
       "created_role"
@@ -727,6 +782,11 @@ function WorkApp(): ReactElement {
   const catalog = data.catalog;
   const launch = data.launch;
   const profileOptions = catalog?.profiles ?? [];
+  const selectedHireProfile = profileOptions.find((profile) => profile.id === role.profileId);
+  const hireProvider = role.provider || selectedHireProfile?.provider || "";
+  const hireProviders = [...new Set(profileOptions.filter((profile) => profile.configured !== false).map((profile) => profile.provider ?? profile.id.split("-")[0]))];
+  const hireProfiles = hireProvider ? profileOptions.filter((profile) => (profile.provider ?? profile.id.split("-")[0]) === hireProvider) : profileOptions;
+  const modelOffers = catalog?.modelOptions?.[hireProvider] ?? [];
   const presetOptions = catalog?.presets ?? [];
   const roleOptions = launch?.roles ?? [];
   const taskOptions = launch?.tasks ?? [];
@@ -886,7 +946,7 @@ function WorkApp(): ReactElement {
             <form noValidate onSubmit={submitRun}>
               <fieldset disabled={!data.meta.writesEnabled || activeAction !== null || pendingLaunchVisible}>
                 <label htmlFor="run-role">{text("select_role")}</label>
-                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => setRun({ ...run, agentId: event.target.value, contextPackKey: "", designPackageKey: "" })} value={run.agentId}>
+                <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => { ++launchSelectionVersion.current; setRun({ ...run, agentId: event.target.value, contextPackKey: "", designPackageKey: "" }); }} value={run.agentId}>
                   <option value="">{text("select_role")}</option>
                   {roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
                 </select>
@@ -952,12 +1012,13 @@ function WorkApp(): ReactElement {
               search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })} /> : null}
           </section>
           <section hidden={route.view !== "team"} aria-label={text("shell_nav_team")} className="team-section">
-            <div className="workspace-toolbar"><p className="small-copy">{text("shell_team_intro")}</p><button className="button button-secondary button-inline" type="button" onClick={() => navigate({ view: "library", libraryTab: "templates" })}>{text("shell_browse_recipes")}</button></div>
+            <div className="workspace-toolbar"><p className="small-copy">{text("shell_team_intro")}</p><button className="button button-secondary button-inline" type="button" onClick={() => navigate({ view: "library", libraryTab: "blueprints" })}>{text("shell_browse_recipes")}</button></div>
             <div className="team-task-target" role="status">
               <p className="small-copy">{text("shell_team_target")}</p>
               <strong>{selectedTeamTask?.title ?? text(route.taskId ? "shell_team_target_unavailable" : "shell_team_select_task")}</strong>
             </div>
-            <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy"><code>{option.profileId}</code> · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
+            {lastHiredRole ? <p className="notice" role="status">{text("created_role")}: <strong>{lastHiredRole.name}</strong>{route.taskId ? <button type="button" className="notice-link" onClick={() => { if (route.taskId) { prepareLaunch(route.taskId); if (!pendingLaunchRef.current) setRun((current) => ({ ...current, agentId: lastHiredRole.id })); } }}>{text("shell_use_role")}</button> : null}</p> : null}
+            <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
               <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled || activeAction !== null}
                 onClick={() => { if (!selectedTeamTask) return; prepareLaunch(selectedTeamTask.taskId); if (pendingLaunchRef.current?.input.taskId !== selectedTeamTask.taskId) setRun((current) => ({ ...current, agentId: option.id })); }}>{text("shell_use_role")}</button>
             </li>)}</ul>
@@ -966,12 +1027,16 @@ function WorkApp(): ReactElement {
             <p className="small-copy">{text("role_help")}</p>
             <form id="hire-role-form" noValidate onSubmit={submitRole}>
               <fieldset disabled={!configured || !data.meta.writesEnabled || activeAction !== null}>
+                <SpecializationPicker library={libraryState} value={role.specializationRef} selectedName={role.specializationName} text={text} onChange={(selected) => chooseSpecialization(selected)} onRefresh={() => setLibraryRefresh((current) => current + 1)} />
+                {roleErrors.has("specialization") ? <p className="field-error">{text("library_selection_unavailable")}</p> : null}
+                <details className="role-legacy-presets"><summary>{text("role_legacy_presets")}</summary>
                 <RolePresetPicker
                   presets={presetOptions}
                   value={role.fromPresetId}
                   text={text}
-                  onChange={(id) => setRole((current) => chooseRolePreset(current, id, presetOptions))}
+                  onChange={(id) => setRole((current) => ({ ...chooseRolePreset(current, id, presetOptions), specializationRef: null, specializationName: "", provider: "" }))}
                 />
+                </details>
                 <label htmlFor="role-name">{text("role_name")}</label>
                 <input
                   aria-describedby={validation([...roleErrors], "name") ? "role-name-error" : undefined}
@@ -982,20 +1047,27 @@ function WorkApp(): ReactElement {
                   value={role.name}
                 />
                 {validation([...roleErrors], "name") ? <p className="field-error" id="role-name-error">{text("form_error_role_name")}</p> : null}
+                <label htmlFor="role-provider">{text("role_provider")}</label>
+                <select id="role-provider" disabled={role.fromPresetId !== ""} value={hireProvider} onChange={(event) => { const provider = event.currentTarget.value; setRole((current) => chooseRoleProvider(current, provider)); }}>
+                  <option value="">{text("role_select_provider")}</option>{hireProviders.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+                </select>
                 <label htmlFor="role-profile">{text("role_profile")}</label>
                 <select
                   aria-describedby={validation([...roleErrors], "profile") ? "role-profile-error" : undefined}
                   aria-invalid={validation([...roleErrors], "profile")}
                   disabled={role.fromPresetId !== ""}
                   id="role-profile"
-                  onChange={(event) => setRole({ ...role, profileId: event.target.value })}
+                  onChange={(event) => { const profileId = event.currentTarget.value; setRole((current) => chooseRoleProfile(current, profileId)); }}
                   value={role.profileId}
                 >
                   <option value="">{text("select_profile")}</option>
-                  {profileOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.id.endsWith("-independent-reviewer") ? `${text("shell_profile_reviewer")} · ` : profile.id.endsWith("-builder") ? `${text("shell_profile_builder")} · ` : ""}{profile.label}</option>)}
+                  {hireProfiles.map((profile) => <option key={profile.id} value={profile.id} disabled={profile.configured === false}>{profile.id.endsWith("-independent-reviewer") ? `${text("shell_profile_reviewer")} · ` : profile.id.endsWith("-builder") ? `${text("shell_profile_builder")} · ` : ""}{profile.label}</option>)}
                 </select>
                 {validation([...roleErrors], "profile") ? <p className="field-error" id="role-profile-error">{text("form_error_profile")}</p> : null}
                 {profileOptions.length === 0 && configured ? <p className="field-error">{text("no_profiles")}</p> : null}
+                {!role.fromPresetId ? <><label htmlFor="role-model-mode">{text("role_model")}</label><select id="role-model-mode" value={role.modelMode} onChange={(event) => { const modelMode = event.currentTarget.value as "profile" | "explicit"; setRole((current) => ({ ...current, modelMode })); }}><option value="profile">{text("role_model_profile")}</option><option value="explicit">{text("role_model_explicit")}</option></select>
+                  {role.modelMode === "explicit" ? <><label htmlFor="role-model">{text("role_model")}</label><input id="role-model" list="role-model-offers" value={role.model} aria-invalid={roleErrors.has("model")} aria-describedby="role-model-help" onChange={(event) => { const model = event.currentTarget.value; setRole((current) => ({ ...current, model })); }} /><datalist id="role-model-offers">{modelOffers.map((model) => <option key={model} value={model} />)}</datalist>{roleErrors.has("model") ? <p className="field-error">{text("role_model_error")}</p> : null}</> : <p className="small-copy">{text("role_model_current")} <code>{selectedHireProfile?.model ?? text("role_model_unspecified")}</code></p>}
+                  <p className="small-copy" id="role-model-help">{text("role_model_help")}</p></> : null}
                 <label htmlFor="role-rationale">{text("role_rationale")}</label>
                 <textarea
                   aria-describedby={validation([...roleErrors], "rationale") ? "role-rationale-error" : undefined}
@@ -1020,6 +1092,15 @@ function WorkApp(): ReactElement {
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
             {workspaceInitialized ? <LibrarySection api={apiRef.current} text={text} writesEnabled={data.meta.writesEnabled}
+              libraryApi={libraryApiRef.current} libraryState={libraryState} onRefreshLibrary={() => setLibraryRefresh((current) => current + 1)} onChooseRole={(selected) => chooseSpecialization(selected, true)}
+              profiles={profileOptions} locale={locale} onBlueprintApplied={(application) => {
+                const first = application.tasks[0];
+                if (first && navigationRevision.current === renderedNavigationRevision && routeRef.current.view === "library") {
+                  navigate({ view: "work", taskId: first.taskId }); setLaunchOpen(false);
+                  if (!pendingLaunchRef.current) setRun({ ...emptyRun, taskId: first.taskId, agentId: first.agentId });
+                }
+                void refresh();
+              }}
               tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })}
               onApplied={async () => { const updated = await apiRef.current.load(new AbortController().signal); setState((current) => current.kind === "ready" ? { ...current, data: updated } : current); }}
               onChooseTeam={() => navigate({ view: "team" })} /> : <p>{text("workspace_needs_setup")}</p>}

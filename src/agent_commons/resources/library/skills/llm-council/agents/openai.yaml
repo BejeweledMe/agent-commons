@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Council"
+  short_description: "Run or design multi-model councils"
+  default_prompt: "Use $llm-council to run or design a transparent multi-model council."

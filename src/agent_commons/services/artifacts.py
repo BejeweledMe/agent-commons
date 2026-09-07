@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -126,8 +127,27 @@ class ArtifactCommands:
         media_type: str = "application/octet-stream",
         classification: str = "internal",
         metadata: Mapping[str, Any] | None = None,
+        expected_revision: str | None = None,
+        expected_size: int | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        """Register the observed content, optionally bound to exact caller bytes.
+
+        Expectations are checked against the same generated manifest that is
+        recorded, so a path replacement before hashing cannot bind a different
+        upload. Replacements after hashing remain detectable by content readers.
+        """
+
+        if expected_revision is not None or expected_size is not None:
+            if (
+                type(expected_revision) is not str
+                or re.fullmatch(r"sha256:[0-9a-f]{64}", expected_revision) is None
+                or type(expected_size) is not int
+                or expected_size < 0
+            ):
+                raise ValidationError(
+                    "artifact content expectations require an exact SHA256 revision and size"
+                )
         key = self._idempotency_key("artifact.registered", idempotency_key)
         artifact_id = self._new_entity_id("artifact", "artifact.registered", key)
         manifest, revision = self._artifact_manifest(
@@ -137,6 +157,10 @@ class ArtifactCommands:
             classification=classification,
             metadata=metadata,
         )
+        if expected_revision is not None and (
+            revision != expected_revision or manifest["size_bytes"] != expected_size
+        ):
+            raise IntegrityError("artifact source does not match the expected content")
         manifest_id = f"mft.artifact.sha256.{canonical_sha256(manifest)}"
         subject = {"kind": "artifact", "id": artifact_id}
         result = self.record_event(

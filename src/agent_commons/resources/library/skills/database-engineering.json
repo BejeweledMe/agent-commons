@@ -1,0 +1,23 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "database-engineering",
+    "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+  },
+  "content": {
+    "name": "database-engineering",
+    "description": "Design, diagnose, and change relational and embedded databases, especially PostgreSQL and SQLite. Use for constraints, transaction anomalies, locks, SQL plans and indexes, schema changes, maintenance, and restore. Store topology and cross-system guarantees belong to system-design."
+  },
+  "files": {
+    "SKILL.md": "df0f9a3279a582e047b9412b0d416e6ed79fca7924cfabfe1f1cbcd9f4861ee1",
+    "agents/openai.yaml": "83b7ce0625fcb55dcdf80d57c66fdff896975cd7648fc2f2c8a1186d78b4be1e",
+    "references/00_README.md": "c0f48199d232bd7eff696185e098f4587cfb49eefe3483a4b54ee0ede8745a95",
+    "references/invariants-transactions-and-concurrency.md": "1ab343354793506362ed5fbc502b0e5a731998db7a2594f9c231517601563fa7",
+    "references/postgresql-maintenance-and-recovery.md": "4d3b0c098615fa0ff11274b3f2b1591ba156882a30494eea8bc32bb483af4d46",
+    "references/postgresql-schema-locking-plans.md": "6beeb55adab4021f7d41b5824eeae1ea5d1d459d6c4827560f009e4e08a0bb62",
+    "references/safe-schema-change.md": "aac9c94fcecb6ae993794864de100ffbe4ae37c15893b84000cf5b4e3953e3da",
+    "references/sql-access-paths-and-index-economics.md": "3cee1c855a3377c7ee1c5f2cb5f91babbc3d77a34999912c92474bab9e2fc533",
+    "references/sqlite-wal-and-backup.md": "b299813166cb876721b643bf870786a6820ebd39a127515ee4a2f37e4fd5d6af"
+  }
+}

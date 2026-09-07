@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "application-security-engineering",
+    "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+  },
+  "content": {
+    "name": "application-security-engineering",
+    "description": "Design, implement, or remediate general application security controls: code-linked threat models, authentication and recovery, sessions, authorization and tenant isolation, OAuth/JWT, browser/API/uploads, secrets and data protection, secure failure, dependency policy, or ASVS implementation. Independent assessments belong to security-review; specialist LLM/RAG/agent threat modeling, security design/review, hardening and authorized testing belong to genai-security-testing."
+  },
+  "files": {
+    "SKILL.md": "feffd2bf2084b3bf35f273114e26e1bbd376dff519302e742f14e37eadf15968",
+    "agents/openai.yaml": "99c9598ca3f92bc0f6eb5c02ac97df50237c73302fb556d7255c6b77d7d6f0c9",
+    "references/00_README.md": "0c3b430eba6655a0e691da785dde020b614f15882b1875bd3aa52235ad275770",
+    "references/asvs-control-implementation.md": "098cf7a7bd232d722e928ec2f0789445d6932cdac5eccc7374f813680dea6db4",
+    "references/credential-and-recovery-controls.md": "c03b0b2bcd24839d80ad4baa48ff035952a1db27ebadf3f7bd55f58246c396b2",
+    "references/secure-development-and-vulnerability-feedback.md": "2423cf0af372145a9186ce6d60417d4ce4832037cea783eb307cb8a73ca5edef",
+    "references/threat-models-and-effective-authority.md": "3470371db82d6d028d29e0cd7e1e482e48891c35f6d4100d61212a7fd5519d5f",
+    "references/web-api-controls.md": "eab6ece2c4c6d4a5afae3676c192afba5e5a5ce69a1deec872a166571e805d47"
+  }
+}

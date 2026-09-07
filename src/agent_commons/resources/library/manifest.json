@@ -1,0 +1,3444 @@
+{
+  "schema": "agent-commons.library-pack.v1",
+  "catalog_date": "2026-09-07",
+  "entries": [
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "agent-llm-evals",
+        "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+      },
+      "name": "agent-llm-evals",
+      "description": "Design, debug, or review LLM and agent evaluations: task datasets, tool/state grading, calibrated judges, traces, candidate selection, repeated trials, and release gates. Use when evaluating model, prompt, tool, or workflow changes; domain owners define the behavior being measured."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "agent-workflows",
+        "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+      },
+      "name": "agent-workflows",
+      "description": "Design, implement, operate, or debug LLM agent execution: pipeline-versus-agent decisions, single- or multi-agent orchestration, tool and MCP contracts, durable state and memory, checkpoints, retries, handoffs, stopping, and scaffold evolution. Use llm-system-design for product composition and agent-llm-evals for evaluation."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ai-platform-llmops",
+        "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+      },
+      "name": "ai-platform-llmops",
+      "description": "Build, diagnose, and operate shared AI infrastructure for predictive and GenAI serving (KServe, Triton, vLLM Production Stack), accelerator capacity, replica controllers, model registry releases, training-job placement, and edge fleet rollout. Runtime tuning and training update semantics stay with their execution owners."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "api-contract-engineering",
+        "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+      },
+      "name": "api-contract-engineering",
+      "description": "Author, diagnose, and evolve HTTP API contracts: OpenAPI, schema/reference context, serialization, HTTP outcomes, errors, and provider/consumer compatibility. Use for contract artifacts and observable interoperability; system-design owns service boundaries."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "application-security-engineering",
+        "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+      },
+      "name": "application-security-engineering",
+      "description": "Design, implement, or remediate general application security controls: code-linked threat models, authentication and recovery, sessions, authorization and tenant isolation, OAuth/JWT, browser/API/uploads, secrets and data protection, secure failure, dependency policy, or ASVS implementation. Independent assessments belong to security-review; specialist LLM/RAG/agent threat modeling, security design/review, hardening and authorized testing belong to genai-security-testing."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "audience-adaptation",
+        "version": "f9083cc03faa47d0deebdcb59711c2e3702f87f50385a1bf47600f99e748c18a"
+      },
+      "name": "audience-adaptation",
+      "description": "Adapt a primary informational artifact for technical, nontechnical, executive, or execution readers. Use alongside the skill that owns the source, research, explanation, decision, edit, or deliverable; it is a reader-model companion rather than a primary content operation."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "business-product-consulting",
+        "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+      },
+      "name": "business-product-consulting",
+      "description": "Use for product and engineering strategy, business cases, market or portfolio choices, operating-model and ownership decisions, executive recommendations, and structured tradeoff analysis. For user discovery, UX, design systems, or product requirements, use product-design as the primary owner."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-data-and-labeling",
+        "version": "677c7921649140c930563b4ee0041d87188407ef599234b385d9f998514041d2"
+      },
+      "name": "computer-vision-data-and-labeling",
+      "description": "Use when designing, collecting, labeling, validating, versioning, or improving computer-vision datasets. Trigger for annotation schemas and QA, source/camera/scene coverage, class and object balance, duplicates, grouped splits, temporal or spatial leakage, augmentation, active learning, auto-labeling, synthetic data, provenance, and production data feedback. Not for choosing model architectures or declaring model quality."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-evaluation",
+        "version": "1158c46a6e1b65accf1af88dc27f14e7c9014f00bf33d6b2027d05da1a6bb96a"
+      },
+      "name": "computer-vision-evaluation",
+      "description": "Use when designing, reviewing, validating, or debugging computer-vision evaluation. Trigger for product-linked and task metrics, thresholds, calibration, class/scale/source slices, visual error analysis, imbalance, robustness, corruptions and OOD, regression suites, human review, and release gates. Not for training procedure, annotation operations, or generic LLM and agent evals."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-inference-optimization",
+        "version": "f415e18599c84f5d1bb08b25fb289a95b618ffb7337662aa695fbf20ac480d38"
+      },
+      "name": "computer-vision-inference-optimization",
+      "description": "Use when profiling, deploying, or optimizing computer-vision inference pipelines for latency, throughput, memory, cost, FPS, or device constraints. Trigger for decode/preprocess/model/postprocess/index stages, tiling, batching, export and runtime compatibility, precision and quantization, streaming video, frame timing, and capacity planning. Not for model training or generic service and SRE ownership."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-modeling-and-training",
+        "version": "c3122e39e0c6401c07b3680051348012a3792adbe403d2cb4fbd7a8c98632ed9"
+      },
+      "name": "computer-vision-modeling-and-training",
+      "description": "Use when choosing, training, adapting, or debugging computer-vision models for image classification, metric learning and retrieval, detection, segmentation, OCR and documents, multimodal vision, or video and tracking. Covers classical feature-based baselines, deep and foundation models, transfer learning, fine-tuning, PEFT, self-supervised learning, objectives, and reproducible experiments. Not for dataset governance, release metrics, or serving optimization."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-system-design",
+        "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+      },
+      "name": "computer-vision-system-design",
+      "description": "Use when framing, designing, reviewing, or decomposing a computer-vision product or pipeline. Trigger for visual task formulation, sensor and input contracts, classification/detection/segmentation/retrieval/OCR/video decomposition, deterministic versus learned stage boundaries, end-to-end topology, hardware constraints, fallbacks, and build-versus-buy decisions. Route model-family selection, data, evaluation, and measured runtime work to the dedicated CV skills."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "data-engineering",
+        "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+      },
+      "name": "data-engineering",
+      "description": "Build, diagnose, and recover batch and streaming data pipelines: event-time windows, CDC/outbox consumption, retry-safe orchestration, replay/backfill, dataset publication, quality, freshness, lineage, and Iceberg/Parquet/Arrow boundaries. Database engine tuning and model or retrieval semantics have separate owners."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "database-engineering",
+        "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+      },
+      "name": "database-engineering",
+      "description": "Design, diagnose, and change relational and embedded databases, especially PostgreSQL and SQLite. Use for constraints, transaction anomalies, locks, SQL plans and indexes, schema changes, maintenance, and restore. Store topology and cross-system guarantees belong to system-design."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "execution-writing",
+        "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+      },
+      "name": "execution-writing",
+      "description": "Create status reports, decision memos, and engineering execution plans that make progress, choices, ownership, dependencies, risks, and next actions clear."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "flutter-skill",
+        "version": "4d51b9c58df087c1d117669eee88976b1fca68571f7c2f6ba1a7988c71a299b2"
+      },
+      "name": "flutter-skill",
+      "description": "Use for Flutter application architecture, implementation, and review, including Dart/UI/state/data work and iOS delivery concerns. Use directly for a known Flutter stack; use ios-app-development first when choosing Flutter versus native Swift or defining a mixed-stack boundary."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "genai-security-testing",
+        "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+      },
+      "name": "genai-security-testing",
+      "description": "Use when threat-modeling, hardening, or authorized testing of LLM, RAG, and agent systems the user controls. Trigger for prompt or indirect injection, RAG ACL or tenant leakage, tool/data-flow misuse, excessive agency, guardrails, sandboxing, least privilege, service identities, self-test/red-team planning, false-refusal evaluation, security evidence, stop conditions, and regression loops."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-decision-support",
+        "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+      },
+      "name": "information-decision-support",
+      "description": "Compare realistic alternatives under constraints and produce a defensible recommendation with trade-offs and next steps."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-editing",
+        "version": "75a8cbce351397a588480b679171714a46dfb517e8fe4fa666c8b2d97c42e8ab"
+      },
+      "name": "information-editing",
+      "description": "Edit existing informational text through copyediting, faithful rewrite, audience adaptation, restructuring, or compression."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-explanation",
+        "version": "578d6271114e5cd9f2c3832361d4b3f80903992eb933666cd9b8bb370d98d978"
+      },
+      "name": "information-explanation",
+      "description": "Explain a concept, mechanism, system, or distinction so the reader builds a correct and usable mental model."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-presentation",
+        "version": "049009ec30219de7c6476d6089159d6a743e901b9544e3de185b982ebddade8c"
+      },
+      "name": "information-presentation",
+      "description": "Create claim-driven presentation content with clear visual evidence, speaker notes, and a decision- or learning-oriented narrative."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-research-synthesis",
+        "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+      },
+      "name": "information-research-synthesis",
+      "description": "Research a question across sources and synthesize evidence into a decision-useful finding, survey, or report."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-source-summary",
+        "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+      },
+      "name": "information-source-summary",
+      "description": "Faithfully summarize supplied articles, lectures, transcripts, or documents without silently adding external research."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-writing",
+        "version": "622bd078818fa0a74af486badaceb4fae363d338017d75f5808f01d512c20390"
+      },
+      "name": "information-writing",
+      "description": "Write substantive user-facing answers and informational artifacts in Russian or English, using this as the shared writing discipline. Route source-bound summaries, research, explanations, decisions, edits, technical documents, execution artifacts, and presentations to their primary skill while retaining the task contract and reader calibration here."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ios-app-development",
+        "version": "1c3be1ceb65b70a6d757ee882836f4187efcfef9455c1ded0d2d0d42fe2bc05a"
+      },
+      "name": "ios-app-development",
+      "description": "Use for cross-stack iOS product and platform decisions: select Swift, Flutter, or a mixed boundary; shape iOS architecture, native capabilities, privacy, lifecycle, integration, release, and long-term ownership. For framework-specific implementation after stack selection, use swift-skill or flutter-skill."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "llm-council",
+        "version": "3f60d978f3ef252ea7e9f270dcddb4e722377415ce0473497161674259b46fb2"
+      },
+      "name": "llm-council",
+      "description": "Run, design, review, or debug multi-model councils using independent first answers, peer critique, and synthesis traceable to intermediate outputs."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "llm-inference-optimization",
+        "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+      },
+      "name": "llm-inference-optimization",
+      "description": "Diagnose and optimize self-hosted LLM runtime latency, goodput, cost, and capacity through prefill/decode profiling, KV cache, batching, admission, quantization, and inference parallelism. Use for execution bottlenecks and runtime scaling signals; replica provisioning and fleet placement belong to ai-platform-llmops."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "llm-system-design",
+        "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+      },
+      "name": "llm-system-design",
+      "description": "Use when designing, reviewing, or evolving an LLM product as a system. Trigger for prompt versus RAG versus agent versus adaptation decisions, model or provider routing, prompt and context architecture, token/cost/latency budgets, degradation and fallbacks, tenant isolation, and versioned LLM releases. Not for detailed retrieval, agent-loop, model-training, eval-harness, security-test, or GPU-runtime implementation."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ml-system-design",
+        "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+      },
+      "name": "ml-system-design",
+      "description": "Design, review and debug predictive/classical ML systems: whether ML is needed, build or buy, metrics, data, validation, baselines, lifecycle pipelines, predictive serving, benchmark claims, placement, A/B versus canary, monitoring, drift, degradation and ownership. Includes ML system design interviews. Modality-specific CV/LLM work and neural execution have dedicated owners."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "neural-training-systems",
+        "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+      },
+      "name": "neural-training-systems",
+      "description": "Diagnose, optimize, scale, or recover neural training runs: OOM, slow steps, mixed precision, gradient accumulation, DDP/FSDP, collectives, and checkpoint consistency. Owns training execution; model/objective choices belong to modeling skills and serving execution to inference skills."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "nlp-modeling-and-adaptation",
+        "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+      },
+      "name": "nlp-modeling-and-adaptation",
+      "description": "Use when choosing or adapting a text model. Trigger for rules, TF-IDF or BM25 baselines, encoder or reranker selection, embeddings, BERT-style discriminative models, seq2seq or decoder LLMs, tokenizer changes, continued pretraining, SFT, PEFT/LoRA/QLoRA, preference optimization, distillation, or training-data and adaptation evaluation. Not for LLM product topology, detailed RAG, agent loops, eval harnesses, or serving bottlenecks."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "node-typescript-backend-engineering",
+        "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+      },
+      "name": "node-typescript-backend-engineering",
+      "description": "Build, review, and debug Node.js/TypeScript backend services, including async lifecycle, streams, workers, Fastify/Express adapters, and runtime validation. Browser rendering belongs to web-frontend-engineering; HTTP/OpenAPI artifacts to api-contract-engineering; engine proof to database-engineering."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "platform-devops-engineering",
+        "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+      },
+      "name": "platform-devops-engineering",
+      "description": "Provision, deliver, debug, or recover infrastructure through Terraform/OpenTofu state transitions, container builds, Kubernetes, GitOps reconciliation, CI identity, and deployment admission. Own apply mechanisms; application behavior and live reliability acceptance stay with their engineering owners."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "product-design",
+        "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+      },
+      "name": "product-design",
+      "description": "Use for user-centered product discovery, UX, product requirements, AI/ML experiences, design systems, and hypothesis validation. Own the path from user outcome and evidence to an experience and measurable product change; use business-product-consulting for strategy, operating-model, or executive tradeoff decisions."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "python-backend-engineering",
+        "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+      },
+      "name": "python-backend-engineering",
+      "description": "Build, review, and debug Python services and background tasks using Django, FastAPI, asyncio, Pydantic, SQLAlchemy, Alembic, or Celery. Covers validation, transactions, resource lifetime, side effects, and Python packaging/tests; HTTP contract compatibility and database engine design have separate owners."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "qa-testing",
+        "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+      },
+      "name": "qa-testing",
+      "description": "Use when designing, reviewing, validating, debugging, or improving classic software QA strategy and automated test suites. Trigger for autotests, unit tests, integration tests, contract tests, end-to-end tests, test pyramid decisions, flaky tests, test doubles, mocks, fakes, stubs, test coverage, test maintainability, CI/CD quality gates, release validation, exploratory testing, and production feedback for non-LLM software systems."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "rag-engineering",
+        "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+      },
+      "name": "rag-engineering",
+      "description": "Use when designing, implementing, reviewing, debugging, evaluating, or operating retrieval-augmented generation systems. Trigger for ingestion, OCR, chunking, metadata and provenance, embeddings, sparse/dense/hybrid retrieval, ANN, reranking, context assembly, citations, abstention, GraphRAG, agentic retrieval, index versioning, or stage-by-stage RAG diagnosis."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "security-review",
+        "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+      },
+      "name": "security-review",
+      "description": "Assess security claims for a scoped design, application change, release, repository, or OSS dependency. Use for abuse-path review, application-verification evidence, supplier posture, and security findings or release recommendations; ordinary maintainability review belongs to software-engineering."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "software-engineering",
+        "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+      },
+      "name": "software-engineering",
+      "description": "Design and review long-lived software changes: maintainability, code health, Hyrum's Law, tests, review, builds, dependencies, static analysis, CI, deprecation, migrations, and release evidence. Owns cross-cutting change lifecycle; framework/runtime implementation belongs to the language or frontend owner."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "sre-reliability-engineering",
+        "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+      },
+      "name": "sre-reliability-engineering",
+      "description": "Define and operate user reliability through SLIs/SLOs, error budgets, observability, alerting, incidents, on-call, recovery, Kubernetes reliability, and resilience validation. Use for production-readiness and reliability decisions; infrastructure provisioning and reconciliation belong to platform engineering."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "swift-skill",
+        "version": "beddf471224052e78d1f0492a9eb93149ab2bcdf46b9d5c59be2dde85f06aca8"
+      },
+      "name": "swift-skill",
+      "description": "Use for implementation and review of native iOS applications or modules built with Swift, SwiftUI, UIKit, SwiftData, and Apple frameworks. Use directly for a known native stack; use ios-app-development first when choosing Swift versus Flutter or defining a mixed-stack boundary."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "system-design",
+        "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+      },
+      "name": "system-design",
+      "description": "Design, review, and evolve classical software and distributed service architecture: boundaries, data authority, capacity, consistency, caching, queues/streams, replication, sharding, recovery architecture, security, and safe migration. Use for architecture documents, production-readiness reviews, and system design interviews. Route HTTP/OpenAPI artifact and wire compatibility work to api-contract-engineering."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "technical-writing",
+        "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+      },
+      "name": "technical-writing",
+      "description": "Create or revise technical documentation, architecture and design docs, API references, runbooks, troubleshooting guides, benchmarks, experiment reports, and engineering analyses."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "telegram-mini-apps",
+        "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+      },
+      "name": "telegram-mini-apps",
+      "description": "Use when designing, building, reviewing, validating, debugging, deploying, or operating Telegram Mini Apps and Telegram Web Apps. Trigger for Telegram bot + mini app architecture, launch modes, BotFather setup, initData authentication, backend validation, HMAC/Ed25519 checks, tma.js, Telegram WebApp API, native buttons, theme/viewport/safe area, CloudStorage/DeviceStorage/SecureStorage, biometrics, sensors, location, Telegram Stars/payments, WebView testing, mobile debugging, production readiness, security reviews, and long-term maintenance."
+    },
+    {
+      "ref": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "web-frontend-engineering",
+        "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+      },
+      "name": "web-frontend-engineering",
+      "description": "Build and debug browser UI, including React and Next.js state, rendering, hydration, route loading, performance, accessible interaction, and browser checks. Product discovery and interaction acceptance belong to product-design."
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "business-operator",
+        "version": "ddedad2dee6fd05dd85c44ca69ca0a35847e3c80cb61c6be79e8d4dc6ed0dbc9"
+      },
+      "name": "Бизнес-консультант по текущему результату",
+      "description": "Найти и обосновать ближайшее изменение продукта или работы команды, которое улучшает текущий бизнес-результат с учётом полной стоимости и ограничений.",
+      "group": "business_product",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "business-product-consulting",
+        "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "business-product-consulting",
+          "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "information-decision-support",
+          "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Для вывода недостаёт текущих внешних данных о цене, альтернативе, сегменте или практике; исследовать отдельно от допущений"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Предоставленные отчёты, интервью или документы задают полную границу доказательств и нужен верный им синтез"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "product-design",
+            "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+          },
+          "when": "Выгода зависит от ещё не подтверждённой пользовательской проблемы, принятия решения или поведения клиента"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Нужно оформить проверенный выбор как decision memo или исполнимый план внедрения с известными зависимостями"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Экономический эффект приписывают качеству ML или A/B-эксперименту и требуется проверить статистическую и продуктовую связь"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Стоимость решения зависит от состояния кодовой базы, миграции, проверки и последующего сопровождения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Потери или операционные издержки связаны с пользовательской надёжностью, инцидентами или toil"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "strategy-advisor",
+        "version": "17cb376d2f157cb0d7ebf7f55368980c6347ef774c35f02ea6e33b6f857d5fa2"
+      },
+      "name": "Советник по стратегии и будущему портфелю",
+      "description": "Обосновать направление развития и набор стратегических ставок с ясными условиями продолжения, изменения или прекращения.",
+      "group": "business_product",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "business-product-consulting",
+        "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "business-product-consulting",
+          "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "information-decision-support",
+          "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Нужно собрать актуальные первичные сведения о рынках, конкурентах, технологиях, ограничениях или внешних тенденциях"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Стратегическое обсуждение ограничено предоставленными исследованиями, финансовыми документами или интервью"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "product-design",
+            "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+          },
+          "when": "Стратегическая ставка опирается на непроверенную потребность, сценарий принятия или опыт целевой аудитории"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Выбор создаёт долгосрочные архитектурные зависимости, стоимость миграции или ограничения развития"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Предиктивная ML-ставка требует оценки данных, достижимого эффекта, build-versus-buy и жизненного цикла"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Стратегическая AI-ставка зависит от реальной применимости LLM, состава продукта, провайдера и стоимости эксплуатации"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Нужно подготовить стратегический decision memo с точками решения и известными владельцами"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-presentation",
+            "version": "049009ec30219de7c6476d6089159d6a743e901b9544e3de185b982ebddade8c"
+          },
+          "when": "Вывод нужно преобразовать в аргументированный материал для стратегического обсуждения или совета"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "product-manager",
+        "version": "b4bce3f8e4cbc732b93e2f830645500a2a8c31ef15db048a079c96b900ee3587"
+      },
+      "name": "Продуктовый менеджер",
+      "description": "Выбрать проверяемое продуктовое изменение, которое ценно пользователю и жизнеспособно для бизнеса, и довести его требования до измеримого результата.",
+      "group": "business_product",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "product-design",
+        "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "product-design",
+          "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-decision-support",
+            "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+          },
+          "when": "Есть несколько реальных продуктовых возможностей и нужен сопоставимый выбор под ограничения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Недостаёт внешних доказательств потребности, альтернатив, рынка или ограничений принятия продукта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Нужно верно синтезировать предоставленные интервью, обращения, исследования и результаты экспериментов"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Продуктовый эффект зависит от ML-метрик, данных, эксперимента или связи offline-качества с outcome"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Нужно согласовать реализуемость LLM-функции, ограничения стоимости, источники, допустимые ошибки и fallback"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Для принятия AI-функции нужен проверяемый набор task-level критериев и release evidence"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "audience-adaptation",
+            "version": "f9083cc03faa47d0deebdcb59711c2e3702f87f50385a1bf47600f99e748c18a"
+          },
+          "when": "Продуктовое решение должно быть понятно конкретным исполнителям или руководителям без изменения его доказательств"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "business-product-consulting",
+            "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+          },
+          "when": "Продуктовый приоритет зависит от экономики, жизнеспособности или бизнес-ограничения; отдельный бизнес-кейс ведёт business-operator, будущую стратегию — strategy-advisor"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Нужно оформить согласованный scope, зависимости, решение или статус; обычный PRD не требует отдельного execution-процесса"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "product-designer",
+        "version": "04c12bac69d3a5f045fd42dccbc3cda8e61ef8e877b2876177f1a995b9805d5c"
+      },
+      "name": "Продуктовый дизайнер",
+      "description": "Создать и проверить пользовательский опыт, в котором целевая аудитория может достичь нужного результата в нормальных и существенных ошибочных сценариях.",
+      "group": "business_product",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "product-design",
+        "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "product-design",
+          "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "business-product-consulting",
+            "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+          },
+          "when": "Решение об опыте зависит от бизнес-модели, поддержки, принятия или стратегического ограничения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Нужно обработать реальные интервью или исследования, сохранив их факты и ограничения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Нужны дополнительные источники для проверки пользовательского контекста или design-гипотезы"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "web-frontend-engineering",
+            "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+          },
+          "when": "Нужно согласовать или проверить реализуемость браузерных состояний, focus и взаимодействия по UX-контракту. Самостоятельную frontend-реализацию ведёт frontend-engineer; разрешённый ограниченный прототип можно сделать здесь с инженерным skill"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ios-app-development",
+            "version": "1c3be1ceb65b70a6d757ee882836f4187efcfef9455c1ded0d2d0d42fe2bc05a"
+          },
+          "when": "Опыт зависит от iOS lifecycle, нативной capability, платформенных ограничений или границы Swift/Flutter"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Дизайн зависит от Telegram WebView, launch mode, native buttons, viewport, theme или платежного контракта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Обещания AI-интерфейса нужно согласовать с источниками, capability, задержкой и fallback LLM-продукта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-editing",
+            "version": "75a8cbce351397a588480b679171714a46dfb517e8fe4fa666c8b2d97c42e8ab"
+          },
+          "when": "Нужно отредактировать существующие интерфейсные тексты без изменения смысла и обязательств продукта"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "writer-editor",
+        "version": "e314ec009bd96ac67cdada870a0fa6d1916d90bd964eea71d2f9ce86bcc10873"
+      },
+      "name": "Автор и редактор",
+      "description": "Создать или улучшить содержательный текст, который точно выполняет задачу читателя и сохраняет согласованную границу фактов, смысла и источников.",
+      "group": "communication",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "information-writing",
+        "version": "622bd078818fa0a74af486badaceb4fae363d338017d75f5808f01d512c20390"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "information-writing",
+          "version": "622bd078818fa0a74af486badaceb4fae363d338017d75f5808f01d512c20390"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "information-editing",
+          "version": "75a8cbce351397a588480b679171714a46dfb517e8fe4fa666c8b2d97c42e8ab"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Primary для верного пересказа: предоставленные источники задают полную границу доказательств"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Primary для исследования: нужно получить новые источники или сделать вывод на более широкой доказательной основе"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-explanation",
+            "version": "578d6271114e5cd9f2c3832361d4b3f80903992eb933666cd9b8bb370d98d978"
+          },
+          "when": "Primary для объяснения: читатель должен понять понятие, различие или механизм"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-decision-support",
+            "version": "10bb7d3614555911396db1986c9e1d051821e1550071ae64e286d180bd578420"
+          },
+          "when": "Primary для содержательного выбора: требуется сравнить реальные альтернативы и обосновать рекомендацию"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-presentation",
+            "version": "049009ec30219de7c6476d6089159d6a743e901b9544e3de185b982ebddade8c"
+          },
+          "when": "Primary для презентации: нужны отдельные тезисы слайдов, визуальные доказательства и заметки спикера"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "audience-adaptation",
+            "version": "f9083cc03faa47d0deebdcb59711c2e3702f87f50385a1bf47600f99e748c18a"
+          },
+          "when": "Аудитория требует иной глубины, аргументации, словаря или следующего действия"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Primary для статуса, decision memo или плана выполнения; подтверждённое содержание уже определено"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "technical-writing",
+            "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+          },
+          "when": "Primary для технического документа или инженерного отчёта, чей контракт важнее общей редакционной операции"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "technical-writer",
+        "version": "ae282487250dcb712baad584dfd9c877bd4c96d93e4966b68a93e53e09a5ac52"
+      },
+      "name": "Технический писатель",
+      "description": "Подготовить технический документ, по которому читатель может корректно понять систему, проверить вывод или выполнить действие при известных условиях.",
+      "group": "communication",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "technical-writing",
+        "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "technical-writing",
+          "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "information-writing",
+          "version": "622bd078818fa0a74af486badaceb4fae363d338017d75f5808f01d512c20390"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-editing",
+            "version": "75a8cbce351397a588480b679171714a46dfb517e8fe4fa666c8b2d97c42e8ab"
+          },
+          "when": "Primary для локальной правки, faithful rewrite или сжатия уже принятого технического текста без изменения его технического контракта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-source-summary",
+            "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+          },
+          "when": "Перед написанием требуется верно обработать предоставленные технические источники как полную границу доказательств"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "information-research-synthesis",
+            "version": "68c3b3f78bea32d903e9f567afb2a0e91e524974fa8e3f67030fbdcc14e6c22f"
+          },
+          "when": "Нужно собрать недостающие первичные источники для технического анализа, оставляя результаты и интерпретацию различимыми"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "audience-adaptation",
+            "version": "f9083cc03faa47d0deebdcb59711c2e3702f87f50385a1bf47600f99e748c18a"
+          },
+          "when": "Документ рассчитан на другую техническую глубину или смешанную аудиторию и нужно сохранить существенные контракты"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Не установлен факт HTTP/OpenAPI-поведения, сериализации, ошибки или совместимости, который требуется описать"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нужны проверенные архитектурные инварианты, потоки данных, переходы и границы гарантий"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Runbook или incident report требует подтвердить диагностику, восстановление, operational preconditions и критерии выхода"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Нужно установить реальное поведение сборки, миграции, зависимости или жизненного цикла артефакта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Primary для coordination-артефакта: статус, формальный decision memo или план исполнения, а не описание технического поведения"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "system-architect",
+        "version": "3e47b6cd7d44c347729065be01eb08858c486dc19df1761becc8ac02df82805a"
+      },
+      "name": "Системный архитектор",
+      "description": "Выбрать минимальную жизнеспособную архитектуру с явными источниками истины, контрактами, гарантиями отказа и путём безопасного изменения.",
+      "group": "engineering_leadership",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "system-design",
+        "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "system-design",
+          "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Архитектурный выбор требует решения о совместимости кода, миграции потребителей, зависимостях и поддерживаемости"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Гарантия зависит от конкретных constraints, isolation, locking, SQL access paths, DDL или восстановления движка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Нужно установить семантику производных данных, event-time, replay, CDC или атомарной публикации"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужно проверить пользовательскую надёжность, деградацию, наблюдаемость и эксплуатационные критерии восстановления"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужен выбор реальных enforcement controls для trust boundary, авторизации или tenant isolation"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Реализуемость перехода зависит от infrastructure identity, deployment, reconciliation, capacity или rollback"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нужно согласовать сервисные гарантии с контрактом предиктивной постановки, данных, baseline, качества и lifecycle; самостоятельное доменное проектирование ведёт ml-engineer. Архитектор сохраняет сервисные границы, а профильный skill задаёт метод доменного решения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Нужно согласовать сервисные гарантии с контрактом композиции LLM-продукта, capability path, context, routing и fallback; самостоятельное доменное проектирование ведёт llm-engineer. Архитектор сохраняет сервисные границы, а профильный skill задаёт метод доменного решения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-system-design",
+            "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+          },
+          "when": "Нужно согласовать сервисные гарантии с контрактом visual contract, sensor/input и perception pipeline; самостоятельное доменное проектирование ведёт cv-engineer. Архитектор сохраняет сервисные границы, а профильный skill задаёт метод доменного решения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "business-product-consulting",
+            "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+          },
+          "when": "Архитектурный tradeoff нельзя разрешить без стоимости владения, организационной ответственности или бизнес-инварианта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Primary для локализованного HTTP/OpenAPI, сериализации или wire compatibility внутри выбранной архитектурной границы; общий архитектурный обзор не обязателен"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "delivery-tech-lead",
+        "version": "a70bc7b986bebb8e3ed02c39c4833b8f62c7e790acd9afa7450b102b747c7a7c"
+      },
+      "name": "Техлид реализации и интеграции",
+      "description": "Довести сложную задачу разработки до целостного работающего результата, сохранив одного владельца реализации, интеграции и проверки.",
+      "group": "engineering_leadership",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "software-engineering",
+        "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "software-engineering",
+          "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Primary для открытых сервисных границ, источников истины, распределённых гарантий или значимой миграции"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "product-design",
+            "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+          },
+          "when": "Нельзя реализовать корректный сценарий без уточнения пользователя, взаимодействия или критерия продуктовой приёмки"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "web-frontend-engineering",
+            "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+          },
+          "when": "Primary для браузерной части: состояние, rendering, hydration, route loading, focus и browser verification"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "python-backend-engineering",
+            "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+          },
+          "when": "Primary для существующего или выбранного Python-сервиса, framework lifecycle, task, transaction и durable effects"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "node-typescript-backend-engineering",
+            "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+          },
+          "when": "Primary для существующего или выбранного Node/TypeScript-сервиса, async lifecycle, streams, workers и HTTP adapter"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Интеграция зависит от HTTP/OpenAPI, сериализации, ошибок или совместимости реальных потребителей"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Корректность реализации зависит от SQL, ограничений, изоляции, миграции или восстановления движка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Изменение затрагивает поддерживаемые data pipelines, temporal state, replay или публикацию производных наборов"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ios-app-development",
+            "version": "1c3be1ceb65b70a6d757ee882836f4187efcfef9455c1ded0d2d0d42fe2bc05a"
+          },
+          "when": "Primary для неизвестного iOS-стека, выбора Swift/Flutter/mixed и платформенных capability/privacy/lifecycle/release границ"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "swift-skill",
+            "version": "beddf471224052e78d1f0492a9eb93149ab2bcdf46b9d5c59be2dde85f06aca8"
+          },
+          "when": "Primary для уже выбранной native iOS-реализации на Swift/SwiftUI/UIKit или Apple-framework module; читать напрямую без обязательного общего iOS-обзора"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "flutter-skill",
+            "version": "4d51b9c58df087c1d117669eee88976b1fca68571f7c2f6ba1a7988c71a299b2"
+          },
+          "when": "Primary для уже выбранного Flutter/Dart приложения, UI/state/data или plugin integration; native границу возвращать платформенному маршруту при необходимости"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Primary для Telegram Mini App как bot+frontend+backend: launch/WebView, initData, host capabilities, payments и platform release; общий frontend не заменяет этот маршрут"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Интеграция зависит от контракта предиктивной постановки, данных, baseline, качества и lifecycle; используй принятый контракт. Если он ещё открыт, выдели решение ml-engineer, а при нескольких связанных ML-решениях — ml-team-lead; это не требует нового агента для каждого skill"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Интеграция зависит от контракта композиции LLM-продукта, capability path, context, routing и fallback; используй принятый контракт. Если он ещё открыт, выдели решение llm-engineer, а при нескольких связанных ML-решениях — ml-team-lead; это не требует нового агента для каждого skill"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-system-design",
+            "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+          },
+          "when": "Интеграция зависит от контракта visual contract, sensor/input и perception pipeline; используй принятый контракт. Если он ещё открыт, выдели решение cv-engineer, а при нескольких связанных ML-решениях — ml-team-lead; это не требует нового агента для каждого skill"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужно выбрать или исправить реальные application controls в изменяемом пути"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Изменяемая AI-функция создаёт trust boundary между недоверенными данными, приватной информацией и действиями"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "В разрешённый результат входит инфраструктурная реализация, deploy/reconciliation или восстановление окружения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Задача затрагивает живую эксплуатацию, пользовательскую надёжность, инцидент или operational acceptance"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Нужно зафиксировать существенные зависимости, решение или статус интеграции; простой фикс не требует отдельного плана"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Не определена достаточная стратегия программной проверки сквозного результата; локальный исполнитель сохраняет собственную проверку"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "qa-engineer",
+        "version": "82a5735549e2358f8414713d21f49be693c55121e4eff3ae78385f40226e01e8"
+      },
+      "name": "Инженер качества программного обеспечения",
+      "description": "Дать достаточные воспроизводимые доказательства программного поведения на значимых рисках и сделать сбои проверки понятными и устранимыми.",
+      "group": "engineering_leadership",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "qa-testing",
+        "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "qa-testing",
+          "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "web-frontend-engineering",
+            "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+          },
+          "when": "Проверка касается браузерного состояния, focus, rendering, readiness или реального действия пользователя"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "python-backend-engineering",
+            "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+          },
+          "when": "Нужно обеспечить достоверные Python fixtures, framework lifecycle, task cancellation, transaction или package checks"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "node-typescript-backend-engineering",
+            "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+          },
+          "when": "Нужны Node runner/fixtures, module packaging, stream/worker lifecycle или async terminal outcome checks"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Нужно доказать provider/consumer agreement для конкретных версий HTTP/OpenAPI, media и сериализации"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Тест должен наблюдать реальные engine constraints, concurrent histories, migrations, SQL plans или restore"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Нужны доказательства incremental/full equivalence, temporal correctness, replay и complete-version publication"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Нужно проверить инфраструктурный переход, артефакт доставки или фактическую способность потребителя"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ios-app-development",
+            "version": "1c3be1ceb65b70a6d757ee882836f4187efcfef9455c1ded0d2d0d42fe2bc05a"
+          },
+          "when": "Критерий зависит от iOS capabilities, privacy/signing/release или поведения на настоящем устройстве"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Проверка должна учитывать Telegram launch mode, auth, WebView host behavior или серверное подтверждение оплаты"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Для затронутой проверки модели применяй LLM/agent метод, а не deterministic QA критерии; самостоятельный dataset/harness/сравнение кандидатов ведёт ai-evaluation-engineer. Контекст программного выпуска может оставаться у QA"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-evaluation",
+            "version": "1158c46a6e1b65accf1af88dc27f14e7c9014f00bf33d6b2027d05da1a6bb96a"
+          },
+          "when": "Для затронутого CV-качества нужны visual metrics и slices; самостоятельный evaluation-артефакт ведёт ai-evaluation-engineer. QA сохраняет программные проверки pipeline и общую картину выпуска"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Нужен специализированный GenAI boundary test; использовать только достаточную ранее установленную авторизацию"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Доказательство зависит от live reliability, эксплуатационной нагрузки, восстановления или инцидентной приёмки"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Тестовый риск связан с поддерживаемостью, совместимостью изменения, зависимостями или миграцией потребителей"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "frontend-engineer",
+        "version": "21847d96c75353368efdb090f62545935035149e7a40795e197c425eea2ebefe"
+      },
+      "name": "Frontend-инженер · JavaScript / TypeScript",
+      "description": "Работающий браузерный сценарий с корректными состояниями и взаимодействием.",
+      "group": "application",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "web-frontend-engineering",
+        "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "web-frontend-engineering",
+          "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "product-design",
+            "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+          },
+          "when": "Не определены приемлемое поведение, состояния или пользовательский сценарий"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Расходятся HTTP-обмен, схема и ожидания клиента"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Нужна стратегия UI-проверок или диагностика flaky suite"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужно реализовать защиту на браузерной границе"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Поведение зависит от Telegram WebView, запуска, initData или платформенного API"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Изменение затрагивает общую архитектуру кода или миграцию компонентов"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "node-backend-engineer",
+        "version": "29b40f955d47b83f824cc8fc069980b274ee7970ae75ad3594c841b7a9327573"
+      },
+      "name": "Backend-инженер · Node.js / TypeScript",
+      "description": "Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.",
+      "group": "application",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "node-typescript-backend-engineering",
+        "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "node-typescript-backend-engineering",
+          "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Авторство или эволюция HTTP/OpenAPI и совместимость потребителей"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Нужны доказательства транзакций, блокировок, SQL или миграций"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нерешены межсервисные гарантии, источник истины или доставка эффекта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужны auth, tenant isolation, input/security controls"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Задача становится maintained pipeline, replay или publication"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Backend реализует Telegram initData, bot или payment contract"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Нужна общая стратегия тестов, а не локальная проверка изменения"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "python-backend-engineer",
+        "version": "0431c1a2724089444de84cf833f2eeffc8c2d3627750c5b5a168218740e80748"
+      },
+      "name": "Backend-инженер · Python",
+      "description": "Корректные Python API и фоновые задачи с явными ресурсами, транзакциями и эффектами.",
+      "group": "application",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "python-backend-engineering",
+        "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "python-backend-engineering",
+          "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Нужно согласовать OpenAPI, сериализацию, errors и клиентов"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Проблема в SQL, изоляции, миграции или восстановлении движка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нерешены cross-service effects и durable delivery"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Проектируются или исправляются защитные контроли"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "telegram-mini-apps",
+            "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+          },
+          "when": "Код выполняет Telegram auth/payment/bot contract"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Нужна риск-ориентированная стратегия тестирования"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Меняется структура общей кодовой базы или путь миграции"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "database-engineer",
+        "version": "c3a5519efb1a1a8bef0ea72472da5683b4a038a068f6b8bdf6a9bb5afd4b97f1"
+      },
+      "name": "Инженер баз данных",
+      "description": "Доказуемые инварианты хранения, эффективный доступ и восстанавливаемые изменения данных.",
+      "group": "data",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "database-engineering",
+        "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "database-engineering",
+          "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нужно решить data authority или гарантию между системами"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Проблема касается CDC, temporal pipeline, replay или reseed"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "python-backend-engineering",
+            "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+          },
+          "when": "Дефект связан с Python Session/UoW"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "node-typescript-backend-engineering",
+            "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+          },
+          "when": "Дефект связан с Node lifecycle/connection usage"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Есть live incident и требуется координация восстановления"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужны access, tenant или privacy controls"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "data-engineer",
+        "version": "193aa991608b3d3cefd0093f51517057298d8e0f48d9f1a59057b91d4507faf2"
+      },
+      "name": "Data Engineer · pipelines и качество данных",
+      "description": "Воспроизводимые данные нужной полноты, времени, происхождения и доступности.",
+      "group": "data",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "data-engineering",
+        "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "data-engineering",
+          "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Нужны snapshot/log/transaction guarantees исходного движка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нужно согласовать feature/label semantics и prediction-time availability с ML-контрактом; data pipeline реализует публикацию и восстановление, а не подменяет смысл признаков"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Нужно получить или уточнить у RAG-метода retrieval semantics, corpus/index, provenance и deletion-требования к публикации; data pipeline не определяет релевантность по числу строк. Самостоятельное retrieval-решение ведёт rag-engineer"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Нужна инфраструктура доставки pipeline"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Нужны fixtures, reconciliation и стратегия regression"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Есть incident, freshness SLO или проблема восстановления"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "ml-team-lead",
+        "version": "da744e4ee2b2f7c9e16fab25c4e34c41c1f69bcaf213b0d30b9342d95b667c88"
+      },
+      "name": "ML team lead",
+      "description": "Довести согласованный ML-результат до проверяемой интеграции и передачи назначенному эксплуатационному владельцу.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ml-system-design",
+        "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "ml-system-design",
+          "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "software-engineering",
+          "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "business-product-consulting",
+            "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+          },
+          "when": "Не определены экономический приоритет, operating model или ответственность команд"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "execution-writing",
+            "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+          },
+          "when": "Нужно оформить проверяемый план, статус или решение о зависимостях"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Основная неопределённость относится к композиции LLM-продукта"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-system-design",
+            "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+          },
+          "when": "Основная неопределённость относится к визуальной постановке или perception pipeline"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Нужен контракт общей инфраструктуры обучения, serving или выпуска моделей"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Открыты SLO, эксплуатационное принятие, инцидент или условия восстановления"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "ml-engineer",
+        "version": "91e80db58f3e785e13f6b107354e9c1fe04abd6b1045e4b4012026471943c0f2"
+      },
+      "name": "Инженер классического ML",
+      "description": "Создать или исправить predictive ML-путь с валидным сравнением, воспроизводимым поведением и доказательствами результата в заданном контексте применения.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ml-system-design",
+        "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "ml-system-design",
+          "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Нужно реализовать source ingestion, temporal processing, replay или publication признаков"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "nlp-modeling-and-adaptation",
+            "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+          },
+          "when": "Открыт выбор или изменение текстовой модели"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "neural-training-systems",
+            "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+          },
+          "when": "Локализована проблема исполнения нейронного обучения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Нужны shared serving, registry или training-job infrastructure"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Prediction semantics нужно согласовать с реальным HTTP-контрактом и потребителями"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужны SLO, эксплуатационная реакция на drift или координация восстановления"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "product-design",
+            "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+          },
+          "when": "Не установлены пользовательский эффект, цена ошибок или приемлемый fallback"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "cv-engineer",
+        "version": "f14d700a7b4716035488be18fc5b25d2ded20ceab5be1f8fa0d41e61e3630b24"
+      },
+      "name": "Инженер компьютерного зрения",
+      "description": "Довести визуальную задачу до проверяемого perception pipeline с согласованными входами, данными, моделью, качеством и условиями исполнения.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "computer-vision-system-design",
+        "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "computer-vision-system-design",
+          "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-evaluation",
+            "version": "1158c46a6e1b65accf1af88dc27f14e7c9014f00bf33d6b2027d05da1a6bb96a"
+          },
+          "when": "Открыты visual metrics, operating thresholds, calibration, slices, robustness или model release evidence; для локализованного вопроса становится primary"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-inference-optimization",
+            "version": "f415e18599c84f5d1bb08b25fb289a95b618ffb7337662aa695fbf20ac480d38"
+          },
+          "when": "Нужны измерение CV-path, export/runtime compatibility, precision, tiling, batching или video timing; для локализованного вопроса становится primary"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "neural-training-systems",
+            "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+          },
+          "when": "Проблема находится в training step, памяти, collectives или coherent restart"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нужно решить общий predictive lifecycle или статистический эксперимент"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "VLM-продукт требует решения о prompt, RAG, agents, provider routing или fallback"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Не определены сервисные гарантии, storage, queues или tenancy вокруг perception pipeline"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Нужны shared serving, accelerator placement или edge fleet rollout"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-inference-optimization",
+            "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+          },
+          "when": "В VLM trace локализует bottleneck в генерации токенов, prefill/decode или KV"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Для VLM нужен generative/language/tool harness вместо только visual task metrics"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-data-and-labeling",
+            "version": "677c7921649140c930563b4ee0041d87188407ef599234b385d9f998514041d2"
+          },
+          "when": "Primary для локализованного вопроса о visual dataset, annotation contract, splits, leakage и provenance; предварительный system-design этап не нужен"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-modeling-and-training",
+            "version": "c3122e39e0c6401c07b3680051348012a3792adbe403d2cb4fbd7a8c98632ed9"
+          },
+          "when": "Primary для локализованного выбора модели, objective, адаптации или причинной диагностики modeling; остальные CV skills подключаются по отдельному вопросу"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "nlp-adaptation-engineer",
+        "version": "0d290afd9cbb681d644e39a99aaa09c10ff74d0838446c3bc7794cbf4ddd1f6a"
+      },
+      "name": "Инженер текстовых моделей и адаптации",
+      "description": "Выбрать или адаптировать минимально достаточную текстовую модель, закрывающую измеренный capability gap с сохранением требуемого общего поведения.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "nlp-modeling-and-adaptation",
+        "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "nlp-modeling-and-adaptation",
+          "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Ещё не решено, нужна ли адаптация в составе продукта вместо prompt, retrieval или workflow"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "neural-training-systems",
+            "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+          },
+          "when": "Нужны step profiling, precision mechanics, distributed execution или coherent restart"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны harness, graders, calibration или regression gate для LLM-поведения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Выбранные embeddings или reranker нужно согласовать с corpus-to-retrieval pipeline"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-inference-optimization",
+            "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+          },
+          "when": "Нужно проверить materialized model/adapter на self-hosted inference workload"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Изменяется поведенческая политика и нужны specialist safety/utility evidence или hardening"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Открыт общий ML lifecycle или predictive эксперимент вокруг текстовой модели"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "training-systems-engineer",
+        "version": "41c0d061b1468a293c991376329466697ed9f565ef5b7cbb7718c5b3568fd48c"
+      },
+      "name": "Инженер систем нейронного обучения",
+      "description": "Обеспечить корректное и измеримо эффективное исполнение согласованного neural training run, включая восстановление согласованного состояния.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "neural-training-systems",
+        "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "neural-training-systems",
+          "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-modeling-and-training",
+            "version": "c3122e39e0c6401c07b3680051348012a3792adbe403d2cb4fbd7a8c98632ed9"
+          },
+          "when": "Изменение execution затрагивает visual objective, batch/data semantics или качество"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "nlp-modeling-and-adaptation",
+            "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+          },
+          "when": "Изменение execution затрагивает text objective, packing, adaptation или качество"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нужно уточнить generic experiment acceptance или time-to-quality contract"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Нужны feasible gang/topology, quota, placement, preemption или recovery reserves"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Feed bottleneck связан с maintained source pipeline или publication mechanics"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Training failure требует живой координации инцидента и восстановления"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "llm-engineer",
+        "version": "7b87c898ba68773f418d998cc1198fda2cacca6004bf09a0eeaf96b53a0233b4"
+      },
+      "name": "Инженер LLM-продуктов",
+      "description": "Создать или исправить минимальную композицию LLM-продукта, которая выполняет пользовательский task contract в согласованных границах качества, доступа, стоимости и отказа.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "llm-system-design",
+        "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "llm-system-design",
+          "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Retrieval выбран и нужно решить corpus, index, context или grounding"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-workflows",
+            "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+          },
+          "when": "Нужен реально неопределённый tool loop, state, retries или recovery"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "nlp-modeling-and-adaptation",
+            "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+          },
+          "when": "Измеренный capability gap требует выбора или изменения текстовой модели"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны task datasets, graders, traces, calibration или release evidence"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Открыты LLM trust boundaries, hardening или разрешённые security tests"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-inference-optimization",
+            "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+          },
+          "when": "Выбранный self-hosted route не укладывается в execution contract"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Нужно реализовать registry, shared capacity, compatible replicas или fleet rollout"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "api-contract-engineering",
+            "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+          },
+          "when": "Нужно согласовать HTTP-артефакт и реальные потребительские контракты"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "rag-engineer",
+        "version": "4f1c20733ac182ff8c89740f637265d7ac99209b7782d991ef3a99e0dcee005b"
+      },
+      "name": "Инженер RAG и retrieval",
+      "description": "Обеспечить проверяемый путь от разрешённых источников к релевантному evidence, grounded answer и корректному отказу при отсутствии оснований.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "rag-engineering",
+        "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "rag-engineering",
+          "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Не установлено, нужен ли retrieval и как он входит в продуктовый task contract"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Нужны source-log, publication, deletion propagation, replay или backfill mechanics"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "nlp-modeling-and-adaptation",
+            "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+          },
+          "when": "Нужно выбрать или адаптировать embedding model либо reranker"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-workflows",
+            "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+          },
+          "when": "Search route или tool sequence действительно неизвестны и требуют управляемого цикла"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны harness, graders, repeated trials или release gate"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Нужны specialist retrieval ACL/tenant threat analysis, hardening или разрешённая проверка границы"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-system-design",
+            "version": "49f76e765850e65e26686b58b1c8e6edb3668917a4aa66217f50a49265d276dd"
+          },
+          "when": "Extraction failure требует пересмотра visual/OCR постановки до построения retrieval"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Открыты storage, queues, tenancy или архитектурные service guarantees"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-inference-optimization",
+            "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+          },
+          "when": "Trace показывает self-hosted generation bottleneck после корректной retrieval/context стадии"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "agent-engineer",
+        "version": "2e6b9e73f5d959b6700cad8a77c1ce439083d74e5f1a9aaa917fd5fb6073c699"
+      },
+      "name": "Инженер агентных процессов",
+      "description": "Создать или исправить минимальный агентный execution pattern, который достигает проверенного терминального исхода в заданных границах полномочий, состояния и восстановления.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "agent-workflows",
+        "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "agent-workflows",
+          "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Ещё не решено, нужен ли агент в составе продукта и каковы его продуктовые бюджеты"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны isolated harness, trajectory/state graders, calibration или repeated-trial release evidence"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Нужны threat model, policy boundaries, argument provenance controls или разрешённые adversarial tests"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Нужно изменить corpus retrieval, используемый как evidence input"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нужны generic distributed guarantees, transaction boundaries или durable delivery"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-council",
+            "version": "3f60d978f3ef252ea7e9f270dcddb4e722377415ce0473497161674259b46fb2"
+          },
+          "when": "Пользователь запросил или отдельно обоснован именно multi-model deliberation с independent answers и critique"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужны production SLO, incident response или operational recovery"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "ai-evaluation-engineer",
+        "version": "7d17d10befa1ae7d584305b38d6b76d0c17db9e228287f44c6b9bb0dd1887954"
+      },
+      "name": "Инженер оценки AI",
+      "description": "Получить воспроизводимые, калиброванные и предметно корректные доказательства поведения AI-кандидата против заданного контракта, с явными пределами выпускного заключения.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "agent-llm-evals",
+        "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "agent-llm-evals",
+          "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+        },
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "computer-vision-evaluation",
+          "version": "1158c46a6e1b65accf1af88dc27f14e7c9014f00bf33d6b2027d05da1a6bb96a"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Нужно определить stage semantics, qrels, retrieval и grounding outcome"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-workflows",
+            "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+          },
+          "when": "Не установлены task/state/permission, terminal, abstention или escalation contracts"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Нужны security scope, paired safety/utility cases и разрешённый тестовый протокол"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-data-and-labeling",
+            "version": "677c7921649140c930563b4ee0041d87188407ef599234b385d9f998514041d2"
+          },
+          "when": "Нужно исправить visual dataset, annotation contract или split integrity"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нужны классический experiment design, A/B statistics или predictive semantic acceptance"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "qa-testing",
+            "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+          },
+          "when": "Нужна отдельная стратегия deterministic software checks вокруг модели и harness"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужно определить operational response, monitoring или исполнение rollback"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "llm-inference-optimizer",
+        "version": "e7a752df082f476917296b3b7b600f181d1fc932d1970bc828bdab22fd2f54c5"
+      },
+      "name": "Оптимизатор self-hosted LLM inference",
+      "description": "Измеримо улучшить self-hosted LLM request execution при сохранении согласованных качества, policy, latency и recovery constraints.",
+      "group": "ai",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "llm-inference-optimization",
+        "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "llm-inference-optimization",
+          "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Нужно изменить product budget, managed/self-hosted choice, provider route или допустимую деградацию"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Открыты capacity provisioning, replica/controller policy, fleet routing или placement"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны behavior, structured-output, long-context или tool regression harnesses"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "nlp-modeling-and-adaptation",
+            "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+          },
+          "when": "Оптимизация требует модельного изменения, adaptation или distillation вместо runtime transformation"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Runtime route/cache changes затрагивают trust, tenant или policy boundary"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Trace показывает, что задержка относится к retrieval/index, а не генерации"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужны incident response, SLO acceptance или operational recovery"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "devops-engineer",
+        "version": "a23b5fe4571ce86b1f5666f440de0c27a9992e19109ae08bb3db8bc7ae474f05"
+      },
+      "name": "DevOps / Platform Delivery Engineer",
+      "description": "Воспроизводимый путь от исходного изменения к артефакту, среде, выпуску и восстановлению.",
+      "group": "platform",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "platform-devops-engineering",
+        "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "platform-devops-engineering",
+          "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "software-engineering",
+            "version": "3496ba9df9d96055877547a9a605ba0f95cce804a160ecfc8260399f3153dc95"
+          },
+          "when": "Нужен source/candidate lifecycle и совместимость изменений"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "system-design",
+            "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+          },
+          "when": "Нерешены topology и transition guarantees"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Определяются identity, secret, supply-chain controls"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужны SLO, live recovery или операционная приёмка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Размещение и выпуск имеют AI workload semantics"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "sre-engineer",
+        "version": "3e4699e81196e40a8338fda9afc36610167fa2f53e1d48fa04102125e391d379"
+      },
+      "name": "SRE · надёжность и инциденты",
+      "description": "Пользовательская надёжность сервиса и доказанное восстановление после отказа.",
+      "group": "platform",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "sre-reliability-engineering",
+        "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "sre-reliability-engineering",
+          "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Восстановление требует изменения инфраструктуры или доставки"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Нужно подтвердить целостность/restore движка"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "data-engineering",
+            "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+          },
+          "when": "Нужно восстановить семантику и полноту pipeline"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ai-platform-llmops",
+            "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+          },
+          "when": "Отказ связан с модельной инфраструктурой"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Есть событие безопасности и требуются defensive controls"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "technical-writing",
+            "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+          },
+          "when": "Нужен исполнимый runbook или технический postmortem"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "ai-platform-engineer",
+        "version": "f766c9da58e66895d5531b6cfca25a178bcddc2474c2f19e1a180f065761259b"
+      },
+      "name": "MLOps / LLMOps / AI Platform Engineer",
+      "description": "Совместимое, наблюдаемое и восстанавливаемое исполнение AI-нагрузок на общей платформе.",
+      "group": "platform",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "ai-platform-llmops",
+        "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "ai-platform-llmops",
+          "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Нужны общие IaC/Kubernetes/build/identity mechanics"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-inference-optimization",
+            "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+          },
+          "when": "Нужны service curves, KV/readiness и execution envelope LLM"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "computer-vision-inference-optimization",
+            "version": "f415e18599c84f5d1bb08b25fb289a95b618ffb7337662aa695fbf20ac480d38"
+          },
+          "when": "Нужны execution constraints визуального runtime"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "neural-training-systems",
+            "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+          },
+          "when": "Нужны update/restart/gang execution constraints обучения"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужны SLO или координация live incident"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "ml-system-design",
+            "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+          },
+          "when": "Нерешены predictive quality/placement/fallback acceptance"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Нерешены product routing, cost/quality и fallback"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "appsec-engineer",
+        "version": "9b69da7ffb9e9e12fafb72961771307cc378b0ddb252ae967e8e6eac7af300f4"
+      },
+      "name": "Application Security Engineer",
+      "description": "Защитные контроли приложения, работающие на реальной доверенной границе.",
+      "group": "security",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "application-security-engineering",
+        "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "application-security-engineering",
+          "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "python-backend-engineering",
+            "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+          },
+          "when": "Контроль реализуется в Python runtime"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "node-typescript-backend-engineering",
+            "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+          },
+          "when": "Контроль реализуется в Node runtime"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "web-frontend-engineering",
+            "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+          },
+          "when": "Нужен браузерный защитный механизм"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Нужно исполнить CI/build/deploy identity и admission policy"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Контроль касается LLM/RAG/tool trust boundary"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "security-review",
+            "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+          },
+          "when": "Запрошена отдельная независимая оценка после реализации"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "genai-safety-engineer",
+        "version": "5947eb1b52418ad2bdf3b8de54cd310947b48a04b2cab73273ccfbf750b83f9f"
+      },
+      "name": "AI Safety / LLM Security Operations Engineer",
+      "description": "Безопасные границы LLM/RAG/agents с сохранением полезности разрешённых сценариев.",
+      "group": "security",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "genai-security-testing",
+        "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "genai-security-testing",
+          "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-workflows",
+            "version": "509d9016a2922de1b83e59f7239b0f7359b1f4ce0e52dd0483ab75532c691956"
+          },
+          "when": "Нужен enforcement в tool loop, state, memory или handoff"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "rag-engineering",
+            "version": "d1adbd8cc0e2a8ab422ba03f1368f50770cb933992ac74f69862f140952558bf"
+          },
+          "when": "Нужны retrieval ACL, corpus provenance и tenant boundaries"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "agent-llm-evals",
+            "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+          },
+          "when": "Нужны парные safety/utility slices, graders и regression harness"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужны общие auth, isolation, identity и data controls"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "llm-system-design",
+            "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+          },
+          "when": "Меняется продуктовая policy, fallback или release bundle"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "sre-reliability-engineering",
+            "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+          },
+          "when": "Нужна координация containment и восстановления инцидента"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "security-review",
+            "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+          },
+          "when": "Требуется независимое заключение по проверяемым security claims"
+        }
+      ]
+    },
+    {
+      "ref": {
+        "kind": "role",
+        "source": "builtin",
+        "id": "security-reviewer",
+        "version": "0ea2cdb4be35be445268236a0c89568060588b9504477c631e6857d26d44a970"
+      },
+      "name": "Независимый Security Reviewer",
+      "description": "Ограниченное доказательствами заключение о security claims конкретного артефакта.",
+      "group": "security",
+      "entry_skill": {
+        "kind": "skill",
+        "source": "builtin",
+        "id": "security-review",
+        "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+      },
+      "core_skills": [
+        {
+          "kind": "skill",
+          "source": "builtin",
+          "id": "security-review",
+          "version": "11174855247d10003520a33cd6e85b123b8eb141cb6bba8fd641986f0c1cc403"
+        }
+      ],
+      "conditional_skills": [
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "genai-security-testing",
+            "version": "9de5fec26ea424baf183a1a97aa3b59d63c8921a7718483ee8eff97b9b387807"
+          },
+          "when": "Нужны specialist LLM/RAG/agent boundary evidence"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "application-security-engineering",
+            "version": "bf9637720608602666675440689cb0997d4cf1e85f42e4e60a304168a7c26162"
+          },
+          "when": "Нужно оценить адекватность контроля и направление исправления"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "platform-devops-engineering",
+            "version": "a64765ae59ebbd6d76a06be811ecdf1938e4c731fc0061b8963417f5a29cd32c"
+          },
+          "when": "Оцениваются artifact provenance, CI/CD identity или admission claims"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "database-engineering",
+            "version": "42164536cf8a013e02f36cb9d5b1d8241a51d54d2b50f1c4182e5504ca1ef577"
+          },
+          "when": "Нужно проверить конкретное свойство isolation/access/restore"
+        },
+        {
+          "ref": {
+            "kind": "skill",
+            "source": "builtin",
+            "id": "technical-writing",
+            "version": "d4c93616b64b71c646d197bcee216540383a661caa7c097e4873d4cb69be90b2"
+          },
+          "when": "Нужен отчёт, пригодный для воспроизведения и следующего решения"
+        }
+      ]
+    }
+  ]
+}

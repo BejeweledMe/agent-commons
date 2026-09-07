@@ -589,6 +589,7 @@ def test_claude_reviewer_allows_bounded_review_writes_but_not_test_execution(
         "mcp__agent-commons__commons_show_verification",
         "mcp__agent-commons__commons_show_artifact",
         "mcp__agent-commons__commons_read_artifact",
+        "mcp__agent-commons__commons_read_skill",
         "mcp__agent-commons__commons_repo_files",
         "mcp__agent-commons__commons_repo_read",
         "mcp__agent-commons__commons_repo_search",

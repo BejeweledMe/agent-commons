@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-writing",
+    "version": "622bd078818fa0a74af486badaceb4fae363d338017d75f5808f01d512c20390"
+  },
+  "content": {
+    "name": "information-writing",
+    "description": "Write substantive user-facing answers and informational artifacts in Russian or English, using this as the shared writing discipline. Route source-bound summaries, research, explanations, decisions, edits, technical documents, execution artifacts, and presentations to their primary skill while retaining the task contract and reader calibration here."
+  },
+  "files": {
+    "SKILL.md": "2091d6fd0342a08d1b5e1ce843352d71c7cbfa0c64c5f5528e8c01c104dd06a1"
+  }
+}

@@ -28,6 +28,7 @@ class TaskChangesPayload(TypedDict):
     title: NotRequired[str]
     description: NotRequired[str]
     acceptance_criteria: NotRequired[list[str]]
+    dependencies: NotRequired[list[str]]
 
 
 class TaskPayload(TypedDict):
@@ -116,6 +117,7 @@ class TaskChanges:
     title: str | None
     description: str | None
     acceptance_criteria: tuple[str, ...] | None
+    dependencies: tuple[str, ...] | None = None
 
     @classmethod
     def from_payload(cls, value: Mapping[str, object]) -> TaskChanges:
@@ -123,6 +125,7 @@ class TaskChanges:
             title=_optional_string(value, "title"),
             description=_optional_string(value, "description"),
             acceptance_criteria=_optional_string_tuple(value, "acceptance_criteria"),
+            dependencies=_optional_string_tuple(value, "dependencies"),
         )
 
     def to_payload(self) -> TaskChangesPayload:
@@ -133,6 +136,8 @@ class TaskChanges:
             payload["description"] = self.description
         if self.acceptance_criteria is not None:
             payload["acceptance_criteria"] = list(self.acceptance_criteria)
+        if self.dependencies is not None:
+            payload["dependencies"] = list(self.dependencies)
         return payload
 
 

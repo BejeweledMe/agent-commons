@@ -206,6 +206,8 @@ _ANSWERS_IN_EVERY_STATE = {
     "/work/",
     "/api/meta",
     "/api/setup",
+    "/api/library",
+    "/api/library/blueprints",
 }
 
 

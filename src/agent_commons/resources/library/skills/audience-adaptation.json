@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "audience-adaptation",
+    "version": "f9083cc03faa47d0deebdcb59711c2e3702f87f50385a1bf47600f99e748c18a"
+  },
+  "content": {
+    "name": "audience-adaptation",
+    "description": "Adapt a primary informational artifact for technical, nontechnical, executive, or execution readers. Use alongside the skill that owns the source, research, explanation, decision, edit, or deliverable; it is a reader-model companion rather than a primary content operation."
+  },
+  "files": {
+    "SKILL.md": "ad5edc91c7180a387ff2f81aaa90e3128d80af5f92667d9463cf4a265591b485"
+  }
+}

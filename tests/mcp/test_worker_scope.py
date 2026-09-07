@@ -460,6 +460,7 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_show_verification",
         "commons_show_artifact",
         "commons_read_artifact",
+        "commons_read_skill",
         "commons_finalize_review",
         "commons_record_verification",
         "commons_delegation_input_needed",

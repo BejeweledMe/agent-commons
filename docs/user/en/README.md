@@ -209,9 +209,10 @@ to launch or accept work.
 
 ### Reuse templates, context and design
 
-Open **Library**. **Templates** previews the bundled team recipes and their
-permissions. Confirming a recipe creates ordinary role templates; hiring in
-**Team** and launching in **Work** are separate actions.
+Open **Library** for 30 specializations, 45 skills, five blueprints, context and
+design in separate tabs. Create or update methods and role definitions in the UI.
+A blueprint creates roles and tasks from your project brief; launching remains
+explicit. See the [library and task graph guide](service-library.md).
 
 In **Context**, use the guided editor for a bounded summary, facts with exact
 source references, decisions and open questions. The source picker shows

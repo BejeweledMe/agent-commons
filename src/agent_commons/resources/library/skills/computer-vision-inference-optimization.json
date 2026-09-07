@@ -1,0 +1,19 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "computer-vision-inference-optimization",
+    "version": "f415e18599c84f5d1bb08b25fb289a95b618ffb7337662aa695fbf20ac480d38"
+  },
+  "content": {
+    "name": "computer-vision-inference-optimization",
+    "description": "Use when profiling, deploying, or optimizing computer-vision inference pipelines for latency, throughput, memory, cost, FPS, or device constraints. Trigger for decode/preprocess/model/postprocess/index stages, tiling, batching, export and runtime compatibility, precision and quantization, streaming video, frame timing, and capacity planning. Not for model training or generic service and SRE ownership."
+  },
+  "files": {
+    "SKILL.md": "a943ce27f81639cd20296d8b5199fca32df93ff9b8fc401be98fcdbadea4d5fa",
+    "references/01_workload_measurement_bottlenecks.md": "0294c0abbfe951a2ee8670a97eb380c85c4188d7e08b5173d6066594b1b4019d",
+    "references/02_spatial_prepostprocess.md": "b2d31c6ff5289bb0042df853fb81c950209a4a0584f5b44601f99b480d2c2220",
+    "references/03_runtime_compression_compatibility.md": "f761a01bb706021399a45586d4c3b1db3bde13c0ac9b8f9d637497ddc7b6ad4a",
+    "references/04_video_capacity_release.md": "d3e65048bcafc54481293806882a76615141cd3e2a1dfa2e91f2ef67af9f62a9"
+  }
+}

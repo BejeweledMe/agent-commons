@@ -12,10 +12,12 @@ from itertools import islice
 from typing import TYPE_CHECKING, Any
 
 from agent_commons.core.bounded import truncate_utf8
+from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.execution_plan import PlanGap, PlanState
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.work_state import FreshnessState
 from agent_commons.runtime import AttemptStore
+from agent_commons.runtime.model import BuiltinProfileId
 from agent_commons.services.execution_plan import MAX_ATTEMPT_INPUTS, build_execution_plan
 from agent_commons.services.work_metrics import build_work_health
 from agent_commons.ui.tracker_dtos import (
@@ -194,6 +196,7 @@ def build_tracker_snapshot(
             freshness=node.freshness.value,
             evidence_state=node.evidence_state.value,
             gaps=tuple(gap.value for gap in node.gaps),
+            **_suggested_role(snapshot, node.task_id),
         )
         for node in plan.nodes
     )
@@ -417,6 +420,34 @@ def _task_title(task: object) -> str:
     if not isinstance(title, str):
         return ""
     return truncate_utf8("".join(character for character in title if ord(character) >= 32), 300)
+
+
+def _suggested_role(snapshot: ProjectSnapshot, task_id: str) -> dict[str, str]:
+    """Project a planned role hint without assigning work or changing readiness."""
+
+    task = snapshot.tasks.get(task_id)
+    extensions = task.get("extensions") if task is not None else None
+    identifier = extensions.get("suggested_agent_id") if isinstance(extensions, Mapping) else None
+    if type(identifier) is not str or not is_typed_id(identifier, "agent"):
+        return {}
+    role = snapshot.agents.get(identifier)
+    if role is None or role.get("state") != "active" or role.get("template"):
+        return {}
+    name = role.get("name")
+    if type(name) is not str:
+        return {}
+    name = truncate_utf8("".join(character for character in name if character.isprintable()), 160)
+    if not name.strip():
+        return {}
+    try:
+        profile = BuiltinProfileId(role.get("profile_id"))
+    except (ValueError, TypeError):
+        return {}
+    return {
+        "suggested_agent_id": identifier,
+        "suggested_role_name": name,
+        "suggested_provider": profile.value.split("-", 1)[0],
+    }
 
 
 def _surface_state(*, empty: bool, partial: bool, stale: bool) -> TrackerSurfaceState:

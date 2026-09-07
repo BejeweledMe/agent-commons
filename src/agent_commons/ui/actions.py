@@ -382,6 +382,10 @@ class UIActions:
 
         manager = self.writer()
         fields["model"] = self._chosen_model(fields.get("model"))
+        if fields.get("specialization_ref") is not None:
+            if from_preset_id:
+                raise ValidationError("choose a specialization or a legacy preset")
+            fields["library_store"] = self.library_store()
         if from_preset_id:
             preset = manager.get_agent(from_preset_id)
             if not preset.get("template"):

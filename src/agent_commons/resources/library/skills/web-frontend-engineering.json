@@ -1,0 +1,23 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "web-frontend-engineering",
+    "version": "1d857d43873a66a3c424296ef1ee208a5c0be67ca92c987f5c6c4e22fad9986d"
+  },
+  "content": {
+    "name": "web-frontend-engineering",
+    "description": "Build and debug browser UI, including React and Next.js state, rendering, hydration, route loading, performance, accessible interaction, and browser checks. Product discovery and interaction acceptance belong to product-design."
+  },
+  "files": {
+    "SKILL.md": "749c0e2c71e77f56eb37421e070cf2eba7b69e8e8c9d8bfc0c57b5345c2860a6",
+    "agents/openai.yaml": "c8123259ca00ae0667d401a809207d0a41455d098ecb41e5e32072b49ceeb71f",
+    "references/00_README.md": "0a41c71abaef07bb496bb8153c02f7f4e99b6c59db258a97a7727012680f0b25",
+    "references/accessibility-focus-and-deferred-ui.md": "97f9cecb69cb239a0544908c905d2ed237e004981e8ceee66f67abe664e1d63c",
+    "references/browser-pipeline-and-diagnostics.md": "95d3971a00973f499c6724487a8a4da6dfdeef955a8e657c6f1d75fe92200e32",
+    "references/browser-testing.md": "dd001d0db5a8716cae74f5e955490214b5094dc4cc12c00494115fd48f44ba52",
+    "references/react-next-state-and-rendering.md": "ba4f42d3d7e1d1acd41940bcc5210a3f9f27f02f5fa5d3b75d8c2cc344d3d1bc",
+    "references/route-loading-and-performance.md": "4e68a905c50ad5c2fdb0303c39b73c1c4c40adb6b418d24ccc5c78bc21abddee",
+    "references/server-client-and-request-boundaries.md": "3b69db29ac2459bbb95198c33dabef8264c9c51fc4e1a566cb15014be853b968"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "telegram-mini-apps",
+    "version": "02eed16936f2961ace11b2733ddd381f81f883b79f44a700d719559931caf397"
+  },
+  "content": {
+    "name": "telegram-mini-apps",
+    "description": "Use when designing, building, reviewing, validating, debugging, deploying, or operating Telegram Mini Apps and Telegram Web Apps. Trigger for Telegram bot + mini app architecture, launch modes, BotFather setup, initData authentication, backend validation, HMAC/Ed25519 checks, tma.js, Telegram WebApp API, native buttons, theme/viewport/safe area, CloudStorage/DeviceStorage/SecureStorage, biometrics, sensors, location, Telegram Stars/payments, WebView testing, mobile debugging, production readiness, security reviews, and long-term maintenance."
+  },
+  "files": {
+    "SKILL.md": "5f8aa09661b728482adce014e2589434ef75a6d9bc301b3f3f218fadc22ba140",
+    "agents/openai.yaml": "c7b2f0dea419386974f7f1dd17b514ddb810d7966552ddd4d51b39938e19f455",
+    "references/00_README.md": "b203d0ceda1bca63099e203efcaee9defbed6c701a8b8e31a11c2e8ecf18fc35",
+    "references/01-overview.md": "aac41d6fd2a360e49661b568e1acc00866f536c49454abc99a922e9bc930ba10",
+    "references/02-launch-modes-and-lifecycle.md": "15a0d17c442c8a9668af0b29676b62e417c6752742d4d110cc03f37487733cb8",
+    "references/03-auth-initdata.md": "d1b57a888de0dcebfcf297d927cafe33fea6d8f76660afe695de62cf0f4f8048",
+    "references/04-backend-validation.md": "480c80cbf28003d13df48266d9968335f187e887e7e8db4401a2f0fce93ab02d",
+    "references/05-frontend-backend-architecture.md": "c9d2925fc21f9cfaebb088381b279c101da7a53f95821b42424b2414b5cb7602",
+    "references/06-sdk-api-and-native-capabilities.md": "2dfec1afbd6e3a72e4601f51d947040c50d8d2dc129d81ed5c6a25b47b69aa25",
+    "references/07-ui-theme-viewport.md": "892bb5f7274502240a54379e16c70fe91acea6771e85bad95f8207d4b1817a58",
+    "references/08-storage-biometry-sensors-location.md": "f11fc7c5741ff7b4f7f87fa3aeb20a1e3f62cce69c64579550ca6a358c05c6fa",
+    "references/09-payments-and-stars.md": "53308711a477c6841d0a041a4df17e17e09cfe841dbfefdf24d176dee570d366",
+    "references/10-testing-debugging-local-dev.md": "33f83d6e29b23ec6fb04c976fcb6294fe92ea1e102bfb63508af97d25a1cf7b4",
+    "references/11-deployment-production-checklist.md": "7ec336f0767be6bcb499cbe1e02867faa0e84cb761e90eaab563e449f17287f3",
+    "references/12-common-mistakes.md": "38cb777915faff0c78b3df11bda7a70edaa8639bedacd4c205f8d1c777bf83ea",
+    "references/13-future-skill-outline.md": "2f8b695b343d78c32eb3ae7d1b90ade832a565bbd4cfaef8b8295ee87f73e014"
+  }
+}

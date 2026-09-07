@@ -1,0 +1,1 @@
+This package contains the user-authorized Codex Pro Agent Skills snapshot and role catalog. Exact source identity is recorded in provenance.json. The supplied source snapshot contains no upstream LICENSE file; this import does not assign a new license to those materials.
