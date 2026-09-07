@@ -20,21 +20,20 @@ final decision. It does not make product decisions or accept work for you.
 The product follows one simple chain:
 
 ```text
-Role → Task → Run → independent Review → human Acceptance
+Task → choose a role → Run → independent Review → human Acceptance
 ```
 
 ### Role
 
 A **role** is a continuing responsibility in your team: for example, `Backend
-developer`, `Product designer`, or `Independent reviewer`. In the Work screen,
+developer`, `Product designer`, or `Independent reviewer`. In **Team**,
 create one with a name, a **Runtime profile**, a short explanation of what it is
 responsible for, and a starting context.
 
-Choose **Fresh** when a role should be marked as starting without earlier work
-context. **Accumulated** records a less-isolated context mode and makes that
-provenance visible when the role reviews work. In the current runtime it does
-not carry one run's conversation or working context into a later run. A role is
-not the same thing as a single attempt to do work.
+Choose **Fresh** for an isolated start. **Accumulated** requires one exact,
+current Context Pack revision when launching. It carries that bounded baseline,
+not the previous provider conversation. This provenance remains visible during
+review. A role is not the same thing as a single attempt to do work.
 
 ### Task
 
@@ -64,7 +63,8 @@ of an older task version cannot be used after you edit the task.
 
 ### Attention and blockers
 
-The full panel marks items that are **waiting on you**. A blocker means an
+In **Work**, use **Needs attention** and select a task to see its next step.
+The full panel also marks items that are **waiting on you**. A blocker means an
 agent, run, task, or review cannot continue without a decision or correction.
 Open the item to see the next available action. Do not treat a blocked item as
 finished work.
@@ -102,7 +102,7 @@ workspace**, make sure the terminal is in the project you intend to use.
 
 ### 1. Initialize the workspace
 
-If the Work screen says **Workspace files have not been created**, choose
+Open **Settings**. If it says **Workspace files have not been created**, choose
 **Initialize workspace**. Agent Commons creates its workspace files in the
 current repository. If the screen says the folder is not a Git repository,
 initialize or choose a Git repository first, then start the UI again.
@@ -110,12 +110,12 @@ initialize or choose a Git repository first, then start the UI again.
 ### 2. Configure the runtime
 
 To start a role, the product needs a local provider runtime. Choose **Configure
-runtime** when the screen offers it. The setup checks for locally installed
+runtime** in **Settings** when offered. The setup checks for locally installed
 Claude, Codex, or Grok Build tools and writes only generated configuration.
 
 If no provider is available, install and authenticate either provider CLI using
 your own account, then return to the panel and refresh its status. The current
-Work screen may not say exactly which local requirement is missing; use the
+Settings screen may not say exactly which local requirement is missing; use the
 full panel or the [technical troubleshooting guide](../../TROUBLESHOOTING.md)
 when the next action is unclear.
 
@@ -125,9 +125,11 @@ technical operator documentation.
 
 ## Create a role and task
 
+Start with the task; you can prepare the team before its first run.
+
 ### Create a role
 
-In **2. Create a role**:
+Open **Team** and its role form:
 
 1. Enter a **Role name**.
 2. Select a **Runtime profile**.
@@ -140,27 +142,29 @@ profiles are available yet**, finish runtime setup before creating a role.
 
 ### Create a task
 
-In **3. Describe the task**:
+Open **Work → New task**:
 
 1. Give the task a short **Task title**.
 2. Explain **What should be done** and any important constraints.
 3. Add **Acceptance criteria**, one result per line.
-4. Select **Create task**.
+4. Optionally choose prerequisite tasks.
+5. Select **Create task**. Its details open automatically.
 
 The task is intentionally separate from a role. You can decide which active
 role should work on it when you start a run.
 
 ## Start and follow a run
 
-In **4. Start the run**, choose a role and a task, then select **Start run**.
-The role must be active and the runtime must be configured.
+Select a ready task in **Work**, then **Prepare run**. The task is already
+selected. Choose an active role and a run preset, inspect the budget and any
+Context Pack or Design Package requirements, then explicitly select **Start
+run**. Creating a task never starts a provider. Readiness and dependency checks
+can prevent launch even when the task's recorded state is `ready`.
 
-After a successful launch, the Work screen says **Run started** and directs you
-to **Open legacy panel**. This is the current workflow boundary:
-
-- The Work screen is for setup, creating roles and tasks, and starting one run.
-- The full panel is for detailed run monitoring, the **Runs** view, review,
-  acceptance, and recovery.
+The inspector shows the goal, dependencies, run history and next available
+action. **Technical details** exposes exact identifiers and revisions when
+needed. Use the legacy panel for provider input, detailed run recovery and
+advanced record editing.
 
 In the full panel, a run can be requested, active, `input_needed`, succeeded,
 failed, timed out, or `needs_operator`. `input_needed` means the run is waiting
@@ -172,18 +176,19 @@ another run; it is not a successful result.
 
 ## Review and accept completed work
 
-Use the full panel for this stage.
+Use the selected task's actions in **Work**; advanced recovery is also available
+in the full panel. Review and acceptance always target an exact task revision.
 
 1. Open the task after its work is ready.
-2. Select **Send for review**. The task now waits for an independent review.
+2. Select **Request review**. The task now waits for an independent review.
 3. Start or ask an independent reviewer to check that task. The person or role
    doing the work cannot provide the independent review needed for acceptance.
 4. If the verdict is approved and still matches the current task version, open
-   the task, select **Accept…**, write **What are you accepting?**, then select
-   **Record the acceptance**.
+   the task, write an **Acceptance summary**, then select **Accept exact task
+   revision**. The full panel uses its own acceptance dialog for the same rule.
 
-If review finds a problem, use **Send back to work…**, explain why, and let the
-team revise the task or result. Editing a task creates a new version and makes
+If review finds a problem, provide a **Revision reason**, confirm reopening and
+select **Reopen task**. Let the team revise the task or result. Editing a task creates a new version and makes
 earlier reviews stale. Send the new version for review again.
 
 The panel refuses direct acceptance when there is no current approved
@@ -197,6 +202,26 @@ Depending on its progress, a task can appear as `ready`, `assigned`, `active`,
 of its current step, not a quality score. In particular, `completed` means the
 author reported the work complete; it still needs review before `accepted`.
 `blocked` and `cancelled` have no review action available in the task drawer.
+**Evidence data complete** describes the completeness of evidence metadata; it
+does not mean that the task has been completed or accepted. Readiness is shown
+separately from task state. An unknown or stale observation is not permission
+to launch or accept work.
+
+### Reuse templates, context and design
+
+Open **Library**. **Templates** previews the bundled team recipes and their
+permissions. Confirming a recipe creates ordinary role templates; hiring in
+**Team** and launching in **Work** are separate actions.
+
+In **Context**, use the guided editor for a bounded summary, facts with exact
+source references, decisions and open questions. The source picker shows
+eligible metadata, not source bodies. Refreshing it never upgrades an already
+selected revision. An unavailable or outdated reference must be resolved before
+publication. The advanced editor preserves structured JSON when needed.
+
+**Design** leads to Gallery. A Design Package is selected explicitly during
+launch and is checked again for freshness and access; merely viewing it does
+not attach it to a task or run.
 
 ### Use the full panel for team operations
 
@@ -223,8 +248,13 @@ updated task again.
 | `needs_operator` | The system reached an outcome it cannot safely resolve. | Inspect the run and task in the full panel. Do not assume success or blindly retry. |
 | Acceptance is refused | The task lacks a current approved independent review, or the task changed after review. | Send the current task version for an independent review, then accept only after approval. |
 
-If a page is temporarily unavailable, refresh once. If it continues, reopen the
-local UI using a new URL and use the full panel for recovery. Do not paste
+An action error appears beside its form. For an uncertain outcome, use the
+offered retry: it preserves the original request and its identity. Do not
+submit a second independent request merely because the response was lost. A
+confirmed refusal can offer a new attempt after you correct the cause.
+
+If workspace access itself has expired, restart the local UI and use its new
+one-time URL. Use the full panel for advanced recovery. Do not paste
 provider output, prompts, credentials, or the local sign-in URL into a bug
 report.
 
@@ -234,13 +264,12 @@ Agent Commons is alpha software for macOS and Linux. It supports local provider
 tools; Windows is not supported. The provider runtime is experimental and may
 require operator action.
 
-Today, the product has two connected UI surfaces rather than one finished
-single-page workflow. The Work screen starts work; the full panel completes the
-operational loop. Native Work views for Runs, review, acceptance, visual design
-artifacts, context inheritance, or automatic scheduling are not available in
-this release unless the UI explicitly shows them.
+This checkout provides **Work**, **Team**, **Library** and **Settings**, with
+Gallery and the legacy panel for specialized views. The task-first interface
+does not add automatic task scheduling, provider conversation resume or
+project switching. A successful local test does not qualify a live provider.
 
-The Work screen includes a Starter Packs examples section with two bundled mock
+Library includes a Starter Packs examples section with two bundled mock
 packs. Viewing examples changes nothing. Applying a blueprint requires explicit
 confirmation and creates ordinary role templates with deny-by-default grants. It
 does not change runtime profiles, download external skills, or start a run.

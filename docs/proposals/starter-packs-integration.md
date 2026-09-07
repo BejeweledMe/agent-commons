@@ -1,5 +1,12 @@
 # Starter Packs: безопасный путь от примеров к управляемой интеграции
 
+**Checkpoint 2026-09-06 (`329d2f3`):** baseline `e071533` ниже исторический.
+Просмотр каталога остаётся read-only, но explicit Apply уже создаёт обычные
+canonical role templates с `DENY_ALL` и `fresh`; это не запуск provider.
+Внешняя загрузка/materialization остаётся отдельным scope. Work UI ещё не
+предоставляет обещанный hire-from-preset шаг; backend API и J1 fixture его
+поддерживают. См. [audit F07](../audits/2026-09-06-total-plan-work-adr-prd-review.md).
+
 **Статус:** утверждённый продуктовый flow и технический план. Этот документ не
 означает, что внешние skills уже скачиваются, что роли уже созданы или что UI уже
 умеет применить pack. В первом срезе появятся только два bundled mock-пака и их

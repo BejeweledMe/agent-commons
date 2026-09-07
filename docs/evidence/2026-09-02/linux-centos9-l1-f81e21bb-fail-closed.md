@@ -6,8 +6,11 @@ Source: operator-supplied CentOS 9 qualification summary from the external Linux
 
 Commit under test: `f81e21bb1f5f47e2a7152097927048520679d2c4`
 
-Local Linux evidence path reported by the external host:
-`/home/bejeweled/cv_projects/agent-commons-l1-f81e21bb/docs/evidence/2026-09-02/linux-centos9-skill-aware-provider-canaries-f81e21bb.json`
+External Linux evidence was reported from the operator-owned checkout; the
+absolute home/checkout path was removed on 2026-09-06 for public-proof minimization.
+Measured outcomes are unchanged. This redacted document has new bytes; earlier
+artifact bindings remain bound to the original revision. See the
+[audit](../../audits/2026-09-06-total-plan-work-adr-prd-review.md).
 
 ## Deterministic checks
 

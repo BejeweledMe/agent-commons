@@ -1,0 +1,77 @@
+{
+  "schema": "agent-commons.audit.ux-test-verification.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "branch": "codex/task-first-ux-pivot",
+  "source_manifest": {
+    "path": "docs/evidence/2026-09-07/ux-pivot-source-manifest.json",
+    "sha256": "c44b28c59f2fc645bd5504054c0202732ca76597849fb0e7991a5825f40c735d",
+    "artifact_id": "artifact.564MPYTS632BVPWWAWVW30Y1ZJ",
+    "revision": "evt.01M1WE38WQ5FKNK2H0M8MHPD25",
+    "checked_files": 469,
+    "hash_mismatches": 0
+  },
+  "browser_evidence": {
+    "path": "docs/evidence/2026-09-07/ux-pivot-browser-verification.json",
+    "sha256": "a61bda95f932dc8654a22ea1fecf874452a7ff16f7f10d16537c168a81749640",
+    "artifact_id": "artifact.5DMF26K420TKPZ6FSJPWXN0Y2V",
+    "revision": "evt.01M1WEGEV7CQPEEDM0KEJ6777V"
+  },
+  "commands": [
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "make check",
+      "environment": "Repository-pinned Node24.20.0, Python3.14.5, Ruff0.16.3; inherited alternate Agent Commons state variables unset",
+      "exit_code": 0,
+      "results": {
+        "ruff_check": "pass",
+        "ruff_format_check": "470 files already formatted",
+        "work_frontend": {
+          "passed": 85,
+          "skipped": 0
+        },
+        "gallery_frontend": {
+          "passed": 22,
+          "skipped": 0
+        },
+        "pytest": {
+          "passed": 1976,
+          "skipped": 13,
+          "warnings": 2,
+          "duration_seconds": 738.54
+        }
+      }
+    }
+  ],
+  "skips": {
+    "automatic_grant_withheld": 12,
+    "CI_only_invariant_not_applicable_locally": 1,
+    "frontend_skipped": 0
+  },
+  "warnings": "Two existing Starlette/httpx TestClient deprecations.",
+  "earlier_failed_attempts": [
+    "First gate failed two E501 test assertions; line wrapping corrected.",
+    "Next gate1973passed/2failed/13skipped: old provider-auth UI assertions referenced replaced pendingLaunchKey. Tests migrated to frozenLaunchIntent safety contract, including behavioral coverage; full gate repeated successfully."
+  ],
+  "independent_checks_observed": {
+    "source_manifest_hashes": 469,
+    "saved_screenshot_hashes": 5,
+    "saved_images_visually_inspected": 5,
+    "focused_frontend": 42,
+    "backend_observation": 19,
+    "final_auth_module": 4
+  },
+  "claim_boundary": {
+    "implemented": true,
+    "hermetically_tested": true,
+    "synthetic_browser_verified": true,
+    "canonical_review": "separate exact review record; not implied by this test artifact",
+    "accepted": false,
+    "committed": false,
+    "pushed": false,
+    "live_qualified": false,
+    "released": false
+  }
+}

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import textwrap
 from pathlib import Path
 
 _WORK = Path(__file__).parents[2] / "frontend" / "work" / "src"
@@ -66,7 +68,7 @@ def test_provider_auth_recovery_is_accessible_explicit_and_bilingual() -> None:
     assert "provider-auth-critical" in styles
     assert "border: 2px" in styles
     assert "apiRef.current.providerAuthAction(profileId, action" in entry
-    assert "pendingLaunchKey" in entry
+    assert "LaunchRecoveryPanel intent={pendingLaunch}" in entry
     assert "text(providerAuthActionMessage.continue_launch)" in entry
     assert "postStartRecovery" not in entry
     assert "repair_host_credentials" not in entry
@@ -77,10 +79,61 @@ def test_work_keeps_the_launch_draft_until_auth_is_ready() -> None:
     entry = _source("main.tsx")
     api = _source("api.ts")
 
-    assert "const key = pendingLaunchKey ?? crypto.randomUUID()" in entry
-    assert "setPendingLaunchKey(key)" in entry
+    assert "const intent = freezeLaunchIntent({ key, input, draft: run," in entry
+    assert "pendingLaunchRef.current = intent" in entry
+    assert "apiRef.current.startRun(intent.input, intent.key, controller.signal)" in entry
     assert "authStatus?.blocksLaunch === true" in entry
-    assert 'visibleAuth?.state === "ready"' in entry
-    assert "setPendingLaunchKey(null)" in entry
+    assert 'pendingLaunchVisible && visibleAuth?.state === "ready"' in entry
+    assert "onClick={retryPendingLaunch}" in entry
+    assert "launchIntentIsVisible(intent, routeRef.current.taskId, runRef.current)" in entry
+    assert "pendingLaunch?.profileId ?? undefined : selectedRole?.profileId" in entry
+    assert "pendingLaunchRef.current = null" in entry
     assert "idempotencyKey: string" in api
     assert "idempotency_key: idempotencyKey" in api
+
+
+def test_frozen_launch_identity_survives_auth_wait_and_other_task_selection() -> None:
+    """Exercise the real state helper; API replay is covered by Work's retry harness."""
+    script = textwrap.dedent(
+        """
+        import assert from 'node:assert/strict';
+        import { pathToFileURL } from 'node:url';
+        const { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft } =
+          await import(pathToFileURL(process.argv[2]));
+        const draft = {
+          taskId: 'task.A', agentId: 'agent.A', contextPackKey: 'context@revision',
+          designPackageKey: 'design@revision'
+        };
+        const input = {
+          taskId: draft.taskId, agentId: draft.agentId,
+          contextPackId: 'context', contextPackRevision: 'revision',
+          designPackageId: 'design', designPackageRevision: 'revision'
+        };
+        const intent = freezeLaunchIntent({
+          key: 'original-key', taskTitle: 'Task A', roleName: 'Role A',
+          profileId: 'profile-A', draft, input
+        });
+        const original = JSON.stringify(intent);
+        // User edits while authentication is pending cannot mutate the frozen request.
+        draft.taskId = 'task.B';
+        input.agentId = 'agent.B';
+        assert.equal(launchIntentIsVisible(intent, 'task.B', draft), false);
+        assert.equal(intent.profileId, 'profile-A');
+        assert.equal(JSON.stringify(intent), original);
+        assert.throws(() => { intent.input.taskId = 'task.B'; }, TypeError);
+        const restored = restoreLaunchDraft(intent);
+        assert.equal(launchIntentIsVisible(intent, 'task.A', restored), true);
+        assert.equal(intent.key, 'original-key');
+        assert.equal(intent.input.agentId, 'agent.A');
+        assert.equal(intent.input.contextPackRevision, 'revision');
+        assert.equal(intent.input.designPackageRevision, 'revision');
+        """
+    )
+    result = subprocess.run(
+        ["node", "--input-type=module", "-", str(_WORK / "launchIntentState.ts")],
+        input=script,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

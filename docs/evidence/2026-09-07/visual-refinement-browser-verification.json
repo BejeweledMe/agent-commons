@@ -1,0 +1,93 @@
+{
+  "schema": "agent-commons.audit.visual-refinement-browser.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "source_artifact": {
+    "kind": "artifact",
+    "id": "artifact.378BZQDMCH67ES4K6H3DNQE87X",
+    "revision": "evt.01M1XW75Z6HV2BPRC88C3NBDBZ"
+  },
+  "source_manifest_sha256": "23bd93044fb2111b2641d930878363d15329e47c61b2ce10963c4f4d1e4fe870",
+  "build_assets": [
+    "work-hWtPVhEt.js",
+    "work-DUxshpr4.css"
+  ],
+  "method": "CUA-controlled actual in-app browser against isolated disposable Python test fixtures with ControlledRunner; no real provider calls. Fault fixture changes only synthetic GET response observations and delays/fails detail responses.",
+  "screenshots": [
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-context-source-ru.jpg",
+      "sha256": "2cf0ccdaa61cda2f4eaceeafc166a4c404bfd7eafe5e40d31cd588a97aea2319",
+      "format": "JPEG",
+      "pixel_width": 1440,
+      "pixel_height": 842,
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-library-ru.jpg",
+      "sha256": "68f0f68b62ab3bb8663f63fa5abdb591baed550b6c5160e7d94f654739551d8d",
+      "format": "JPEG",
+      "pixel_width": 1440,
+      "pixel_height": 842,
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-narrow-blocked-ru.jpg",
+      "sha256": "bea9c66c80163566f77176993268c5b6594624be5583f90fa32d6344f9a732ae",
+      "format": "JPEG",
+      "pixel_width": 390,
+      "pixel_height": 844,
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-refresh-failure-en.jpg",
+      "sha256": "8d92574a78d9a9a4c45aaa8c49052602370e314031d31d27dcfcbd17d05690a8",
+      "format": "JPEG",
+      "pixel_width": 1280,
+      "pixel_height": 720,
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-stale-source-en.jpg",
+      "sha256": "ddc6a1288673ebfae26e26316075a3ffcb81175ac73ca905c0c9cfbc26ca4fd9",
+      "format": "JPEG",
+      "pixel_width": 1280,
+      "pixel_height": 720,
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/2026-09-07/visual-refinement-work-ru.jpg",
+      "sha256": "92365d0200b0862f644b3dac6bd6276741e23fa8ad61049a9faae1560dd8750b",
+      "format": "JPEG",
+      "pixel_width": 1440,
+      "pixel_height": 842,
+      "synthetic_only": true
+    }
+  ],
+  "viewport_notes": "Final RU desktop CSS viewport 1440x1000; captured bitmap1440x842. Narrow390x844. EN fault captures1280x720; the attempted viewport override applied to another tab, so no larger fault-viewport claim. Library and Context captures are scrolled views. Image metadata inspected with sips, actual files visually inspected.",
+  "observed_checks": [
+    "all ten status filters select matching URL values, all omits default query",
+    "actual browser Back restores active filter; Forward restores all",
+    "native summary Enter toggles open and focuses SUMMARY",
+    "close inspector returns focus to selected task row; narrow selection focuses inspector",
+    "same-task changed observation plus delayed detail response retains open goal and explicit loading/cached notices",
+    "detail failure retains open focused SUMMARY with failure/retry/cached warning",
+    "successful retry retains disclosure; selecting different task resets disclosure and excludes previous goal",
+    "one Refresh remains focused when synthetic partial warning disappears",
+    "newer source catalog marks original reference stale and aria-invalid without changing select value or advanced JSON revision",
+    "Context draft survives guided/advanced editor and Work/Library navigation",
+    "Russian desktop and390px layouts have document width equal viewport; visible blockers and evidence explanation remain",
+    "recipe consent unchecked and apply disabled; default-deny guidance stays visible"
+  ],
+  "hermetic_only": [
+    "uncertain run and Context publication retry identity",
+    "forced-colors selected-tab selector and reduced-motion CSS contract"
+  ],
+  "not_claimed": [
+    "real live provider qualification",
+    "real operator workflow or data",
+    "full WCAG or screen-reader certification",
+    "forced-colors or reduced-motion browser emulation",
+    "actual Context publication click",
+    "pixel-identical capture height across CSS viewport and bitmap"
+  ],
+  "figma_url": "https://www.figma.com/design/5GbVebHulITT4gWLVTmtGh"
+}

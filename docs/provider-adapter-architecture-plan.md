@@ -3,6 +3,13 @@
 Статус: design plan, подготовлен 2026-08-29 на `main` `dd65bdb`.
 Связанный follow-up task: `task.2V7NT6H48CE9X4BCMHFXW2SY3M`.
 
+**Checkpoint 2026-09-06 (`329d2f3`):** августовские inventory и sequence ниже
+исторические. Adapter registry, validated launch plan и skill projections уже
+реализованы; built-in профилей шесть (Codex/Claude/Grok × builder/reviewer).
+L1 Linux qualification не доказана. Grok instruction transport через argv
+расходится с stdin-only ADR 0004 и требует отдельного решения runtime/security.
+Точные границы и gates: [audit](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+
 Этот документ продолжает графы `docs/architecture-improvement-agent-team-plan.md`,
 `docs/architecture-improvement-implementation-plan.md` и ADR 0004. Он не меняет
 объём P0 remediation из `docs/feedback-remediation-plan-2026-08-28.md`.

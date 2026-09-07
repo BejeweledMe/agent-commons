@@ -122,16 +122,33 @@ class TaskCommands:
             task_id, expected_revision, "unblocked", resolution=resolution, **kwargs
         )
 
+    def _task_evidence_bindings(
+        self, task_id: str, artifact_refs: Sequence[Mapping[str, str]] | None
+    ) -> list[dict[str, Any]]:
+        """None retains exact task evidence; an explicit sequence replaces it."""
+
+        if artifact_refs is not None:
+            return self._bind_evidence_refs(artifact_refs)
+        task = entity(self.snapshot(), "task", task_id)
+        if task is None:
+            raise LifecycleConflictError(f"task does not exist: {task_id}")
+        bindings = [dict(bound) for bound in task.get("artifact_bindings") or ()]
+        if task.get("artifact_stale") or list(task.get("artifact_refs") or ()) != [
+            bound["ref"] for bound in bindings
+        ]:
+            raise LifecycleConflictError("task has stale or unbound artifact evidence")
+        return bindings
+
     def complete_task(
         self,
         task_id: str,
         expected_revision: str,
         *,
         summary: str,
-        artifact_refs: Sequence[Mapping[str, str]] = (),
+        artifact_refs: Sequence[Mapping[str, str]] | None = (),
         **kwargs: Any,
     ) -> dict[str, Any]:
-        bindings = self._bind_evidence_refs(artifact_refs)
+        bindings = self._task_evidence_bindings(task_id, artifact_refs)
         refs = [dict(binding["ref"]) for binding in bindings]
         subject = {"kind": "task", "id": task_id}
         return self._task_transition(
@@ -151,10 +168,10 @@ class TaskCommands:
         expected_revision: str,
         *,
         summary: str,
-        artifact_refs: Sequence[Mapping[str, str]] = (),
+        artifact_refs: Sequence[Mapping[str, str]] | None = (),
         **kwargs: Any,
     ) -> dict[str, Any]:
-        bindings = self._bind_evidence_refs(artifact_refs)
+        bindings = self._task_evidence_bindings(task_id, artifact_refs)
         refs = [dict(binding["ref"]) for binding in bindings]
         subject = {"kind": "task", "id": task_id}
         return self._task_transition(

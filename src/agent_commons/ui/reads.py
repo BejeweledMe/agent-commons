@@ -27,6 +27,7 @@ from agent_commons.runtime.model import (
 )
 from agent_commons.runtime.provider_qualification import ProviderQualificationStore
 from agent_commons.services.delegation_runtime import load_runtime_configuration
+from agent_commons.services.design_gallery import DesignGalleryReads, GalleryReadRefusal
 from agent_commons.services.provider_availability import ProviderAvailabilityService
 from agent_commons.services.roles import role_model
 from agent_commons.ui.actions import SETUP_SUPPORT_BINARY_UNRESOLVED
@@ -34,6 +35,7 @@ from agent_commons.ui.context_pack_dtos import (
     context_pack_catalog_payload,
     context_pack_detail_payload,
 )
+from agent_commons.ui.context_source_dtos import context_source_catalog_payload
 from agent_commons.ui.read_dtos import (
     AttentionItem,
     AttentionResponse,
@@ -117,6 +119,11 @@ class UIReads:
 
         records = self.manager().context_packs.list()
         return context_pack_catalog_payload(records)
+
+    def work_context_sources(self) -> dict[str, Any]:
+        """Return only bounded, eligible exact source metadata from one snapshot."""
+
+        return context_source_catalog_payload(self.manager().snapshot())
 
     def work_context_pack(self, *, context_pack_id: str) -> dict[str, Any]:
         """Return the current exact revision for editing in Work."""
@@ -546,12 +553,20 @@ class UIReads:
                     "summary": (
                         str(delegation.get("summary"))[:500] if delegation.get("summary") else None
                     ),
-                    "stderr_diagnostic_tail": record.get("stderr_diagnostic_tail"),
+                    # Older attempts may have scanned only an already-truncated
+                    # tail, after a secret's opening marker was lost. Never
+                    # expose that historical provider-controlled fragment.
+                    "stderr_diagnostic_tail": (
+                        None
+                        if record.get("stderr_diagnostic_tail_truncated", False)
+                        else record.get("stderr_diagnostic_tail")
+                    ),
                     "stderr_diagnostic_tail_truncated": bool(
                         record.get("stderr_diagnostic_tail_truncated", False)
                     ),
                     "stderr_diagnostic_tail_redacted": bool(
                         record.get("stderr_diagnostic_tail_redacted", False)
+                        or record.get("stderr_diagnostic_tail_truncated", False)
                     ),
                     "terminal_tool_rejections": rejection_count,
                     "terminal_tool_rejection_details": rejection_details,
@@ -564,7 +579,8 @@ class UIReads:
     def launch_options(self) -> dict[str, Any]:
         """Active roles, open tasks, and exact current packs offered for a run."""
 
-        snapshot = self.manager().snapshot()
+        manager = self.manager()
+        snapshot = manager.snapshot()
         roles = [
             {
                 "id": rid,
@@ -604,15 +620,23 @@ class UIReads:
             if record.state == "published"
         ]
         max_design_package_options = 256
-        design_packages = [
-            LaunchDesignPackageDTO(
-                design_package_id=record.design_package_id,
-                revision=record.revision,
-                title=str(record.draft.title),
-                screen_count=len(record.draft.screens),
-            ).to_wire()
-            for record in design_package_records[:max_design_package_options]
-        ]
+        design_packages = []
+        gallery = DesignGalleryReads(manager)
+        for record in design_package_records[:max_design_package_options]:
+            try:
+                sources = gallery.inspect_sources(record, snapshot=snapshot)
+            except GalleryReadRefusal:
+                continue
+            if sources.freshness != "fresh":
+                continue
+            design_packages.append(
+                LaunchDesignPackageDTO(
+                    design_package_id=record.design_package_id,
+                    revision=record.revision,
+                    title=str(record.draft.title),
+                    screen_count=len(record.draft.screens),
+                ).to_wire()
+            )
         design_packages_truncated = len(design_package_records) > max_design_package_options
         return {
             "launch_enabled": self.launch_enabled,

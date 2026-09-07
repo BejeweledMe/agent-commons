@@ -1,0 +1,45 @@
+{
+  "schema": "agent-commons.audit.visual-refinement-tests.v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "branch": "codex/task-first-ux-pivot",
+  "source_manifest_sha256": "23bd93044fb2111b2641d930878363d15329e47c61b2ce10963c4f4d1e4fe870",
+  "browser_verification_sha256": "7249a80da66b2a181396b758d1ee4fe74fbe1ccf9f692ddb4ed433f3dc1f0db6",
+  "command": "make check",
+  "environment": "AGENT_COMMONS_STATE_ROOT, STATE_BASE and SESSION_ID unset; Node24.20.0 selected per .node-version; locked uv environment",
+  "result": "passed",
+  "exit_code": 0,
+  "ruff_check": "passed",
+  "ruff_format_check": "472 files already formatted",
+  "work_tests": {
+    "passed": 94,
+    "skipped": 0
+  },
+  "gallery_tests": {
+    "passed": 22,
+    "skipped": 0
+  },
+  "pytest": {
+    "passed": 1976,
+    "skipped": 13,
+    "warnings": 2,
+    "seconds": 549.69
+  },
+  "skip_scope": "12 explicitly withheld automatic-grant paths, one local-only CI environment check; no frontend skips",
+  "warnings": "Two existing Starlette/httpx deprecations",
+  "git_diff_check": "passed",
+  "first_attempt": {
+    "result": "failed",
+    "pytest_passed": 1975,
+    "pytest_failed": 1,
+    "reason": "ADR0015 existed before its index entry was added; index corrected and full gate repeated after source freeze",
+    "seconds": 535.35
+  },
+  "live_provider_calls": false,
+  "task_acceptance": false,
+  "release": false,
+  "limitations": [
+    "No real provider qualification",
+    "No full accessibility certification",
+    "No browser Context publication click"
+  ]
+}

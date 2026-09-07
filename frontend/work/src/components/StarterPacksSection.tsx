@@ -1,9 +1,10 @@
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
-import { ApiProblem, type WorkApi } from "../api";
+import { ApiProblem, type WorkApi } from "../api.js";
 import type { AppliedStarterPackRole, StarterPack, StarterPackBlueprint, StarterPackCatalog } from "../contracts";
-import { ContextPackRetryIdentity } from "../contextPackEditorState";
+import { ContextPackRetryIdentity } from "../contextPackEditorState.js";
 import type { MessageKey } from "../i18n";
+import { starterPackPresentation } from "../starterPackPresentation.js";
 
 type RefusalKind = "catalog_unavailable" | "setup" | "unavailable";
 
@@ -20,6 +21,9 @@ type ApplyState =
 
 type StarterPacksSectionProps = {
   api: WorkApi;
+  onApplied: () => Promise<void>;
+  onChooseTeam?: () => void;
+  writesEnabled?: boolean;
   text: (key: MessageKey) => string;
 };
 
@@ -89,13 +93,15 @@ function AppliedRoles({
   );
 }
 
-function PackCard({
+export function StarterPackCard({
   applyState,
   confirmed,
   onApply,
   onConfirm,
+  onChooseTeam,
   pack,
-  text
+  text,
+  writesEnabled
 }: {
   applyState: ApplyState;
   confirmed: Readonly<Record<string, boolean>>;
@@ -103,33 +109,27 @@ function PackCard({
   onConfirm: (key: string, confirmed: boolean) => void;
   pack: StarterPack;
   text: (key: MessageKey) => string;
+  writesEnabled: boolean;
+  onChooseTeam?: () => void;
 }): ReactElement {
+  const presentation = starterPackPresentation(pack, text);
   return (
     <article className="starter-pack-card">
       <header className="starter-pack-header">
-        <h3>{pack.title}</h3>
-        <span className="example-badge">{text("starter_packs_example_badge")}</span>
+        <h3>{presentation.title}</h3>
       </header>
-      <p className="starter-pack-meta">
-        <code>{pack.id}</code>
-        {" · "}
-        {text("starter_packs_version_label")} <code>{pack.version}</code>
-        {" · "}
-        {text("starter_packs_source_label")}: <code>{pack.sourceKind}</code>
-        {" — "}
-        {text("starter_packs_source_bundled_gloss")}
-      </p>
-      <p className="small-copy">{pack.summary}</p>
-      {pack.blueprints.map((blueprint) => (
+      <p className="lead-copy">{presentation.summary}</p>
+      {presentation.blueprints.map((blueprint) => (
         <section aria-label={blueprint.title} className="starter-pack-blueprint" key={blueprint.id}>
-          <h4>{blueprint.title}</h4>
-          <p className="small-copy">{blueprint.summary}</p>
-          <p className="starter-pack-roles-label">{text("starter_packs_roles_label")}</p>
+          {presentation.blueprints.length !== 1 || blueprint.title !== presentation.title ? <h4>{blueprint.title}</h4> : null}
+          <p className="lead-copy">{blueprint.summary}</p>
+          <p className="starter-pack-roles-label">{text("recipe_details")}</p>
           <ul className="starter-pack-role-list">
             {blueprint.roles.map((role) => (
               <li className="starter-pack-role" key={role.id}>
                 <p className="starter-pack-role-name">{role.name}</p>
                 <p className="small-copy">{role.purpose}</p>
+                <details className="recipe-preview"><summary>{text("library_technical_details")}</summary>
                 <p className="starter-pack-role-meta">
                   {text("starter_packs_profile_label")}: <code>{role.profileId}</code>
                 </p>
@@ -144,16 +144,17 @@ function PackCard({
                     {role.skills.map((skill) => <code className="skill-chip" key={skill}>{skill}</code>)}
                   </span>
                 </p>
+                </details>
               </li>
             ))}
           </ul>
           <div className="starter-pack-apply">
+            <p className="small-copy">{text("recipe_permissions")}</p>
             <label className="starter-pack-confirm">
               <input
                 checked={confirmed[blueprintKey(pack.id, blueprint.id)] === true}
                 disabled={
-                  applyState.kind === "submitting"
-                  && applyState.key === blueprintKey(pack.id, blueprint.id)
+                  !writesEnabled || applyState.kind === "submitting"
                 }
                 onChange={(event) => onConfirm(
                   blueprintKey(pack.id, blueprint.id),
@@ -166,11 +167,8 @@ function PackCard({
             <button
               className="button button-primary"
               disabled={
-                confirmed[blueprintKey(pack.id, blueprint.id)] !== true
-                || (
-                  applyState.kind === "submitting"
-                  && applyState.key === blueprintKey(pack.id, blueprint.id)
-                )
+                !writesEnabled || confirmed[blueprintKey(pack.id, blueprint.id)] !== true
+                || applyState.kind === "submitting"
               }
               onClick={() => onApply(pack, blueprint)}
               type="button"
@@ -183,7 +181,8 @@ function PackCard({
               <div aria-live="polite" className="notice starter-pack-result" role="status">
                 <p className="starter-pack-role-name">{text("starter_packs_apply_success")}</p>
                 <p className="small-copy">{text("starter_packs_apply_success_next")}</p>
-                <AppliedRoles roles={applyState.roles} text={text} />
+                <AppliedRoles roles={applyState.roles.map((role) => ({ ...role, name: blueprint.roles.find((source) => source.id === role.sourceRoleId)?.name ?? role.name }))} text={text} />
+                {onChooseTeam ? <button className="button button-secondary" onClick={onChooseTeam} type="button">{text("starter_packs_go_to_hire")}</button> : <a className="button button-secondary" href="#role-preset">{text("starter_packs_go_to_hire")}</a>}
               </div>
             ) : null}
             {applyState.kind === "error" && applyState.key === blueprintKey(pack.id, blueprint.id) ? (
@@ -202,26 +201,35 @@ function PackCard({
           </div>
         </section>
       ))}
+      <details><summary>{text("library_technical_details")}</summary>
+      <p className="starter-pack-meta">
+        <code>{pack.id}</code>
+        {" · "}
+        {text("starter_packs_version_label")} <code>{pack.version}</code>
+        {" · "}
+        {text("starter_packs_source_label")}: <code>{pack.sourceKind}</code>
+        {" — "}
+        {text("starter_packs_source_bundled_gloss")}
+      </p>
+      </details>
     </article>
   );
 }
 
-export function StarterPacksSection({ api, text }: StarterPacksSectionProps): ReactElement {
+export function StarterPacksSection({ api, text, onApplied, onChooseTeam, writesEnabled = true }: StarterPacksSectionProps): ReactElement {
   const [state, setState] = useState<SectionState>({ kind: "loading" });
   const [reloadToken, setReloadToken] = useState(0);
   const [confirmed, setConfirmed] = useState<Readonly<Record<string, boolean>>>({});
   const [applyState, setApplyState] = useState<ApplyState>({ kind: "idle" });
-  const retryIdentity = useRef(new ContextPackRetryIdentity());
+  const retryIdentities = useRef(new Map<string, ContextPackRetryIdentity>());
 
   useEffect(() => {
     const controller = new AbortController();
     setState({ kind: "loading" });
     api.loadStarterPacks(controller.signal).then(
-      (catalog) => setState({ kind: "ready", catalog }),
+      (catalog) => { if (!controller.signal.aborted) setState({ kind: "ready", catalog }); },
       (error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
+        if (controller.signal.aborted) return;
         setState({ kind: "refused", ...refusalFrom(error) });
       }
     );
@@ -241,17 +249,24 @@ export function StarterPacksSection({ api, text }: StarterPacksSectionProps): Re
 
   const applyBlueprint = (pack: StarterPack, blueprint: StarterPackBlueprint): void => {
     const key = blueprintKey(pack.id, blueprint.id);
-    const idempotencyKey = retryIdentity.current.forOperation(
+    if (!writesEnabled || confirmed[key] !== true || applyState.kind === "submitting") return;
+    const retryIdentity = retryIdentities.current.get(key) ?? new ContextPackRetryIdentity();
+    retryIdentities.current.set(key, retryIdentity);
+    const idempotencyKey = retryIdentity.forOperation(
       JSON.stringify({ operation: "starter-pack-apply", packId: pack.id, blueprintId: blueprint.id })
     );
     const controller = new AbortController();
     setApplyState({ kind: "submitting", key });
     api.applyStarterPackBlueprint(pack.id, blueprint.id, idempotencyKey, controller.signal).then(
       (result) => {
-        retryIdentity.current.reset();
-        setApplyState({ kind: "success", key, roles: result.roles });
-        setConfirmed((current) => ({ ...current, [key]: false }));
-        setReloadToken((token) => token + 1);
+        void onApplied().then(() => {
+          retryIdentity.reset();
+          setApplyState({ kind: "success", key, roles: result.roles });
+          setConfirmed((current) => ({ ...current, [key]: false }));
+          setReloadToken((token) => token + 1);
+        }, () => {
+          setApplyState({ kind: "error", key, code: "preset_refresh_unavailable", safeNextActions: [] });
+        });
       },
       (error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -268,7 +283,7 @@ export function StarterPacksSection({ api, text }: StarterPacksSectionProps): Re
         <h2>{text("starter_packs_title")}</h2>
         <span className="example-badge">{text("starter_packs_example_badge")}</span>
       </header>
-      <p className="small-copy">{text("starter_packs_intro")}</p>
+      <p className="lead-copy">{text("starter_packs_intro")}</p>
       {state.kind === "loading" ? (
         <p aria-live="polite" className="small-copy" role="status">{text("starter_packs_loading")}</p>
       ) : null}
@@ -293,12 +308,14 @@ export function StarterPacksSection({ api, text }: StarterPacksSectionProps): Re
           <p className="small-copy">{text("starter_packs_empty")}</p>
         ) : (
           state.catalog.packs.map((pack) => (
-            <PackCard
+            <StarterPackCard
               applyState={applyState}
               confirmed={confirmed}
               key={pack.id}
               onApply={applyBlueprint}
               onConfirm={confirmBlueprint}
+              onChooseTeam={onChooseTeam}
+              writesEnabled={writesEnabled}
               pack={pack}
               text={text}
             />

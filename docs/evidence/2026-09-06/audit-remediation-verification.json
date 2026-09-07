@@ -1,0 +1,67 @@
+{
+  "schema": "agent-commons-audit-remediation-verification-v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "source_inventory": {
+    "path": "docs/evidence/2026-09-06/audit-remediation-wave2.json",
+    "sha256": "1a979904863e5e09ac611c7c1290bfb30fb3df7155c3ed69efe20642d59808b9"
+  },
+  "green_contract": {
+    "command": "npm exec --yes --package=node@24 -- make check",
+    "node": "24.20.0",
+    "python": "3.14.5",
+    "ruff": "0.16.3",
+    "exit_code": 0,
+    "ruff_check": "passed",
+    "ruff_format_files": 463,
+    "pytest": {
+      "passed": 1945,
+      "skipped": 13,
+      "warnings": 2,
+      "elapsed_seconds": 715.02
+    },
+    "work": {
+      "passed": 38,
+      "skipped": 0
+    },
+    "gallery": {
+      "passed": 22,
+      "skipped": 0
+    }
+  },
+  "diff_check": "passed",
+  "independent_review": {
+    "F01": "approved; exact wave1 sources unchanged",
+    "F02_F03_F04_F08_size_only": "approved;154 independent tests and negative synchronous drift reproductions",
+    "F06_F07": "approved;17 independent checks including exact rebuild parity",
+    "F12": "approved; canonical review recorded"
+  },
+  "browser_verification": {
+    "kind": "real browser, isolated synthetic workspace, fake runner only",
+    "starter_apply_hire_launch": "passed",
+    "hired_role_not_template": true,
+    "exact_preset_skills_preserved": true,
+    "inherited_profile": "claude-builder",
+    "fake_delegation_succeeded": true,
+    "task_acceptances": 0,
+    "locale_draft_and_preset_preserved": true,
+    "native_keyboard_typeahead": "passed",
+    "task_create_response_lost_after_commit": {
+      "post_count": 2,
+      "exact_serialized_body_and_key_replayed": true,
+      "canonical_task_count": 1,
+      "draft_retained_after_error": true,
+      "draft_cleared_after_success": true
+    },
+    "synthetic_server_stopped": true,
+    "synthetic_fixtures_and_browser_snapshots_removed": true
+  },
+  "limits": [
+    "Uncommitted working-tree verification; no new CI run",
+    "No live provider work, provider transport qualification or release",
+    "Retry state is in-memory; reload persistence was not promised or tested",
+    "Browser response-loss injection covered create; review/accept/reopen covered by Node/API regressions",
+    "Last-snapshot source checks do not lock out later external writers",
+    "Grok argv privacy and aggregate host argument/environment limits remain open",
+    "Task acceptance deliberately not performed"
+  ]
+}

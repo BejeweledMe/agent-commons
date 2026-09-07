@@ -30,6 +30,8 @@ contract test. The status written in each ADR remains the detailed record.
 | [0011](0011-hierarchical-delegation-closure.md) | Proposed | H0 semantic contract; no write path is authorized by this ADR. |
 | [0012](0012-context-packs.md) | Accepted for C1 semantic slice | Canonical revisioned Context Packs and their bounded compiler contract. |
 | [0013](0013-design-packages.md) | Accepted for G1 semantic slice | Canonical revisioned Design Packages with exact screen provenance; Gallery API and UI remain subsequent work. |
+| [0014](0014-task-first-workspace-ux.md) | Proposed | Task-first Work workspace, domain-specific UI state, explicit execution and bounded exact-source discovery; branch implementation authorized, verification pending. |
+| [0015](0015-browser-native-visual-refinement.md) | Proposed | Council-guided browser refinement: native status selection, persistent recovery focus, inspector disclosures and readable exact Context sources; bounded branch implementation authorized. |
 
 ## How the two records fit together
 

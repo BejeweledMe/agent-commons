@@ -195,6 +195,19 @@ class DesignGalleryReads:
         package = self._package(snapshot, record, self._reader())
         return GallerySnapshot(freshness=package.freshness, packages=(package,))
 
+    def inspect_sources(
+        self, record: DesignPackageRecord, *, snapshot: ProjectSnapshot
+    ) -> GalleryPackage:
+        """Share Gallery's current-source result with launch and launch options.
+
+        The release posture is fail closed: stale or unavailable screen
+        provenance is not launchable. A broader mode allowing historical
+        screen sources requires a separate product decision; selecting an
+        exact package revision alone does not authorize that mode.
+        """
+
+        return self._package(snapshot, record, self._reader())
+
     def _snapshot(self) -> ProjectSnapshot:
         try:
             snapshot = self._manager.snapshot()

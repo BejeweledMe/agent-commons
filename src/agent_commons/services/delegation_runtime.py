@@ -28,7 +28,11 @@ from agent_commons.domain.context_pack import (
     ContextPackRefusal,
     ContextPackRefusalCode,
 )
-from agent_commons.domain.design_packages import DesignPackageRecord, DesignPackageRefusal
+from agent_commons.domain.design_packages import (
+    DesignPackageRecord,
+    DesignPackageRefusal,
+    DesignPackageRefusalCode,
+)
 from agent_commons.errors import (
     ConfigurationError,
     IdempotencyConflictError,
@@ -114,6 +118,7 @@ from agent_commons.storage.opstate import DELEGATION_STORAGE, exclusive_lock
 
 from ..domain.agents import effective_grants
 from .delegation_instruction import DelegationInstructionInput, compose_delegation_instruction
+from .design_gallery import DesignGalleryReads
 from .manager import CommonsManager
 from .roles import role_model
 
@@ -1327,7 +1332,7 @@ class DelegationRuntimeService:
         return ContextBindingMetadata.from_binding(self._resolve_context_binding(request))
 
     def _authorize_exact_context_pack(self, record: ContextPackRecord) -> bool:
-        """Prove the exact record belongs to this active session's workspace ledger."""
+        """Prove workspace membership and current authorization of every source."""
 
         try:
             active = self.manager.sessions.require_active(self.manager.session_id)
@@ -1339,7 +1344,7 @@ class DelegationRuntimeService:
                 return False
             source = self.manager.events.get(record.source_event_id).event
             payload = source.get("payload")
-            return bool(
+            belongs_to_workspace = bool(
                 source.get("workspace_id") == self.manager.workspace_id
                 and source.get("event_id") == record.source_event_id
                 and source.get("event_type") in {"context_pack.created", "context_pack.revised"}
@@ -1348,6 +1353,13 @@ class DelegationRuntimeService:
             )
         except Exception:
             return False
+        if not belongs_to_workspace:
+            return False
+        # Use the same snapshot for membership and source checks. This runs on
+        # every resolution, including a cached binding and an explicit retry,
+        # before compiled bytes or any new launch-side state can be produced.
+        self.manager.context_packs.validate_sources(record.draft, snapshot)
+        return True
 
     @staticmethod
     def _binding_request_matches_metadata(
@@ -1451,7 +1463,7 @@ class DelegationRuntimeService:
         return self._resolve_design_package_binding(request)
 
     def _authorize_exact_design_package(self, record: DesignPackageRecord) -> bool:
-        """Prove the exact package belongs to this active session's workspace ledger."""
+        """Prove workspace membership and apply Gallery's source freshness gate."""
 
         try:
             active = self.manager.sessions.require_active(self.manager.session_id)
@@ -1465,7 +1477,7 @@ class DelegationRuntimeService:
                 return False
             source = self.manager.events.get(record.source_event_id).event
             payload = source.get("payload")
-            return bool(
+            belongs_to_workspace = bool(
                 source.get("workspace_id") == self.manager.workspace_id
                 and source.get("event_id") == record.source_event_id
                 and source.get("event_type") in {"design_package.created", "design_package.revised"}
@@ -1474,6 +1486,16 @@ class DelegationRuntimeService:
             )
         except Exception:
             return False
+        if not belongs_to_workspace:
+            return False
+        sources = DesignGalleryReads(self.manager).inspect_sources(record, snapshot=snapshot)
+        if sources.freshness != "fresh":
+            raise DesignPackageRefusal(
+                DesignPackageRefusalCode.STALE,
+                "The selected Design Package has stale or unavailable screen sources.",
+                "Refresh the Gallery and publish a package with current verified sources.",
+            )
+        return True
 
     @staticmethod
     def _design_package_request_matches_metadata(
@@ -1677,6 +1699,10 @@ class DelegationRuntimeService:
             # pure static validation but before crashable probes, child session,
             # launch-plan build, or attempt reservation.
             if existing is None:
+                if design_package is not None:
+                    # Refuse unusable design sources before persisting even a
+                    # fresh-context binding for this combined selection.
+                    self._resolve_design_package_binding(design_package)
                 context_binding = self._bind_context_for_launch(
                     delegation_id=delegation_id,
                     launch_key_sha256=launch_key_sha256,
@@ -1692,12 +1718,48 @@ class DelegationRuntimeService:
                     retry=retry,
                 )
             assert context_binding is not None
+            instruction_refusal = self.launch_planner.validate_instruction_size(
+                static_validation, context_binding
+            )
+            if instruction_refusal is not None:
+                raise launch_refusal_error(instruction_refusal)
+
+            def revalidate_bound_inputs() -> ContextBinding:
+                # Each gate reads current canonical sources and compares the
+                # frozen fingerprints. It is not a lock excluding concurrent
+                # source writers after the final snapshot.
+                current_context = self._bind_context_for_launch(
+                    delegation_id=delegation_id,
+                    launch_key_sha256=launch_key_sha256,
+                    request=context,
+                    existing_attempt=existing,
+                    retry=retry,
+                )
+                self._bind_design_package_for_launch(
+                    delegation_id=delegation_id,
+                    launch_key_sha256=launch_key_sha256,
+                    request=design_package,
+                    existing_attempt=existing,
+                    retry=retry,
+                )
+                assert current_context is not None
+                size_refusal = self.launch_planner.validate_instruction_size(
+                    static_validation, current_context
+                )
+                if size_refusal is not None:
+                    raise launch_refusal_error(size_refusal)
+                return current_context
+
             # Both host probes are pre-child and pre-attempt.  Initialization
             # establishes that the fixed provider operation is viable first;
             # auth is intentionally last so its READY result is adjacent to
             # child creation rather than stale behind another process probe.
             self._assert_provider_initialized(profile)
             self._assert_provider_authenticated(profile)
+            # Probes may take long enough for another writer to revise sources.
+            # Recheck current authorization and the frozen fingerprints after
+            # both probes, before child creation or invocation construction.
+            context_binding = revalidate_bound_inputs()
             child = self._open_child_session(delegation, profile_id=profile_id)
             child_session_id = str(child["session_id"])
             nonce = str(child["nonce"])
@@ -1710,21 +1772,29 @@ class DelegationRuntimeService:
             )
             child_manager.sessions.require_active(child_session_id)
             try:
-                validated_launch_plan = self.launch_planner.build(
-                    static_validation,
-                    workspace_root=self.manager.repo_root,
-                    state_root=self.manager.paths.state_root,
-                    delegation_id=delegation_id,
-                    child_session_id=child_session_id,
-                    max_budget_microusd=child_policy.max_budget_microusd,
-                    worker_purpose=str(delegation["purpose"]),
-                    role_tools=role_tools,
-                    role_grants=role_grants,
-                    context=context_binding,
-                )
-            except (ConfigurationError, ValidationError) as exc:
+                context_binding = revalidate_bound_inputs()
+                try:
+                    validated_launch_plan = self.launch_planner.build(
+                        static_validation,
+                        workspace_root=self.manager.repo_root,
+                        state_root=self.manager.paths.state_root,
+                        delegation_id=delegation_id,
+                        child_session_id=child_session_id,
+                        max_budget_microusd=child_policy.max_budget_microusd,
+                        worker_purpose=str(delegation["purpose"]),
+                        role_tools=role_tools,
+                        role_grants=role_grants,
+                        context=context_binding,
+                    )
+                except (ConfigurationError, ValidationError) as exc:
+                    raise sanitized_configuration_failure(exc) from exc
+                # Build hooks may also observe or change canonical state. Refuse
+                # their drift before reserving an attempt or handing off to the
+                # runner, and close the already-created child on refusal.
+                revalidate_bound_inputs()
+            except (ConfigurationError, ValidationError):
                 child_manager.end_session(nonce=nonce)
-                raise sanitized_configuration_failure(exc) from exc
+                raise
             target = delegation["target_ref"]
             trace_id = hashlib.sha256(
                 (

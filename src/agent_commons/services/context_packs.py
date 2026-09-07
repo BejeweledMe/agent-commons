@@ -137,7 +137,7 @@ class ContextPackCommands:
 
     def compile(self, context_pack_id: str, revision: str) -> CompiledContext:
         record = self.get(context_pack_id, revision=revision)
-        self._validate_references(record.draft, self._manager.snapshot())
+        self.validate_sources(record.draft, self._manager.snapshot())
         return self._manager.context_compiler.compile(record)
 
     def _record(
@@ -149,7 +149,7 @@ class ContextPackCommands:
         key: str,
     ) -> dict[str, Any]:
         if not self._has_idempotent_record(key):
-            self._validate_references(draft, self._manager.snapshot())
+            self.validate_sources(draft, self._manager.snapshot())
         self._manager._require_ledger_semantics(event_type)
         subject = {"kind": "context_pack", "id": str(payload["context_pack_id"])}
         references = (*draft.source_refs, *draft.decision_refs)
@@ -278,7 +278,14 @@ class ContextPackCommands:
             ) from exc
 
     @staticmethod
-    def _validate_references(draft: ContextPackDraft, snapshot: ProjectSnapshot) -> None:
+    def validate_sources(draft: ContextPackDraft, snapshot: ProjectSnapshot) -> None:
+        """Require current, authorized sources for publication, compile and launch.
+
+        Historical pack revisions remain selectable; their source revisions
+        must still be effective in the caller's current workspace snapshot.
+        A saved runtime binding never exempts its sources from this gate.
+        """
+
         for ref in (*draft.source_refs, *draft.decision_refs):
             try:
                 current = entity(snapshot, ref.kind, ref.identifier)

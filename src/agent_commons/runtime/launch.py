@@ -36,6 +36,7 @@ from .model import (
     RunnerInvocation,
     RunnerProfile,
     fixed_profile_environment,
+    grok_instruction_fits_argument,
     invocation_instruction_bytes,
     resolve_trusted_executable,
     validate_profile_launch_boundary,
@@ -271,6 +272,25 @@ class LaunchPlanner:
         )
 
     @staticmethod
+    def validate_instruction_size(
+        validation: StaticLaunchValidation,
+        context: ContextBinding | None = None,
+    ) -> TypedRefusal | None:
+        """Check the composed prompt's application bound before opening a child."""
+
+        if validation.plan.provider is Provider.GROK and not grok_instruction_fits_argument(
+            launch_instruction_with_context(
+                validation.instruction, context or ContextBinding.fresh()
+            )
+        ):
+            return TypedRefusal.create(
+                ProviderRefusalCode.INSTRUCTION_TOO_LARGE,
+                provider=validation.plan.provider,
+                profile_id=validation.plan.profile_id,
+            )
+        return None
+
+    @staticmethod
     def validate_skill_projection(
         validation: StaticLaunchValidation,
     ) -> TypedRefusal | None:
@@ -310,6 +330,9 @@ class LaunchPlanner:
     ) -> ValidatedLaunchPlan:
         context = context if context is not None else ContextBinding.fresh()
         refusal = LaunchPlanner.validate_skill_projection(validation)
+        if refusal is not None:
+            raise launch_refusal_error(refusal)
+        refusal = LaunchPlanner.validate_instruction_size(validation, context)
         if refusal is not None:
             raise launch_refusal_error(refusal)
         # This is the sole production call to ProviderAdapter.build_invocation.

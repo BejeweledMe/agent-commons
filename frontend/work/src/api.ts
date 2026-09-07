@@ -2,6 +2,10 @@ import type {
   ApiError,
   Catalog,
   ContextPackOption,
+  ContextSourceCatalog,
+  ContextSourceOption,
+  TaskCreateResult,
+  TaskDetail,
   ContextPackCatalog,
   ContextPackDetail,
   ContextPackDraft,
@@ -19,6 +23,7 @@ import type {
   ProviderAuthState,
   ProviderAuthStatus,
   RoleOption,
+  RolePreset,
   SetupGuidance,
   SetupGuidanceBlockerCode,
   SetupGuidanceNextActionKey,
@@ -41,6 +46,7 @@ import type {
   WorkspaceData,
   WorkspaceMeta
 } from "./contracts";
+import { sanitizedWorkLocation } from "./appRouteState.js";
 import { validateContextPackDraft } from "./contextPackDraftValidation.js";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
@@ -372,18 +378,30 @@ function profileLabel(profileId: string, profileInfo: unknown): string {
     return profileId;
   }
   const profile = profileInfo[profileId];
-  return stringAt(profile, "title", stringAt(profile, "provider", profileId));
+  const label = stringAt(profile, "title", stringAt(profile, "provider", profileId));
+  return label === profileId ? profileId : `${label} · ${profileId}`;
 }
 
-function parseCatalog(value: unknown): Catalog {
+export function parseCatalog(value: unknown): Catalog {
   if (!isObject(value)) {
     throw new ApiProblem(502, null);
   }
   const profiles = stringsAt(value, "profiles").map(
     (id): Profile => ({ id, label: profileLabel(id, value.profile_info) })
   );
+  const presets = value.presets ?? [];
+  if (!Array.isArray(presets) || presets.length > 512) {
+    throw new ApiProblem(502, null);
+  }
   return {
     profiles,
+    presets: presets.map((value): RolePreset => {
+      const role = parseRole(value);
+      if (!role || !isObject(value) || value.template !== true || value.state !== "active") {
+        throw new ApiProblem(502, null);
+      }
+      return { ...role, skills: boundedStringsAt(value, "skills", 128) };
+    }),
     contextModes: stringsAt(value, "context_modes"),
     grantLevels: stringsAt(value, "grant_levels")
   };
@@ -1376,12 +1394,147 @@ async function responsePayload(response: Response): Promise<unknown> {
   }
 }
 
+const TASK_ID = /^task\.[0-9A-HJKMNP-TV-Z]{26}$/;
+const TRUNCATED_TEXT = /…\[truncated\]$/;
+const TRUNCATED_ITEMS = /^\[truncated: \d+ items omitted\]$/;
+
+export function parseTaskCreateResult(value: unknown): TaskCreateResult {
+  if (!isObject(value) || value.event_type !== "task.created" || !isObject(value.entity_ref)
+    || value.entity_ref.kind !== "task" || typeof value.entity_ref.id !== "string"
+    || !TASK_ID.test(value.entity_ref.id) || typeof value.revision !== "string"
+    || !EVENT_ID.test(value.revision) || value.event_id !== value.revision) {
+    throw new ApiProblem(502, null);
+  }
+  return { taskId: value.entity_ref.id, revision: value.revision };
+}
+
+export function parseTaskDetail(value: unknown, taskId: string): TaskDetail {
+  if (!TASK_ID.test(taskId) || !isObject(value)
+    || value.schema !== "agent_commons.ui.entity.v1" || value.kind !== "task"
+    || value.id !== taskId || !isObject(value.record)) {
+    throw new ApiProblem(502, null);
+  }
+  const record = value.record;
+  const revision = record.effective_revision ?? record.revision;
+  if (record.id !== taskId || typeof revision !== "string" || !EVENT_ID.test(revision)
+    || typeof record.state !== "string" || !TRACKER_TASK_STATES.has(record.state)) {
+    throw new ApiProblem(502, null);
+  }
+  let truncated = false;
+  let remainingTextBytes = 65_536;
+  function detailText(raw: unknown): string {
+    if (typeof raw !== "string" || new TextEncoder().encode(raw).byteLength > 4096) {
+      throw new ApiProblem(502, null);
+    }
+    remainingTextBytes -= new TextEncoder().encode(raw).byteLength;
+    if (remainingTextBytes < 0) throw new ApiProblem(502, null);
+    if (TRUNCATED_TEXT.test(raw)) truncated = true;
+    return raw;
+  }
+  function detailArray(raw: unknown): unknown[] {
+    if (!Array.isArray(raw) || raw.length > 33
+      || (raw.length === 33 && (typeof raw[32] !== "string" || !TRUNCATED_ITEMS.test(raw[32])))) {
+      throw new ApiProblem(502, null);
+    }
+    return raw.filter((item, index) => {
+      if (typeof item === "string" && TRUNCATED_ITEMS.test(item)) {
+        if (index !== raw.length - 1) throw new ApiProblem(502, null);
+        truncated = true;
+        return false;
+      }
+      return true;
+    });
+  }
+  const title = detailText(record.title);
+  const description = detailText(record.description);
+  const acceptanceCriteria = detailArray(record.acceptance_criteria).map(detailText);
+  const summary = record.summary === undefined ? null : detailText(record.summary);
+  const evidenceRefs = detailArray(record.artifact_bindings ?? []).map((raw): RevisionBoundRef => {
+    if (!isObject(raw) || !isObject(raw.ref) || raw.ref.kind !== "artifact"
+      || typeof raw.ref.id !== "string" || !/^artifact\.[0-9A-HJKMNP-TV-Z]{26}$/.test(raw.ref.id)
+      || typeof raw.revision !== "string" || !EVENT_ID.test(raw.revision)) {
+      throw new ApiProblem(502, null);
+    }
+    return { kind: "artifact", id: raw.ref.id, revision: raw.revision };
+  });
+  return { taskId, revision, title, description, acceptanceCriteria,
+    state: record.state, summary, evidenceRefs, truncated };
+}
+
+export function parseContextSourceCatalog(value: unknown): ContextSourceCatalog {
+  if (!isObject(value) || !hasExactKeys(value, ["schema", "state", "sources", "truncated"])
+    || value.schema !== "agent-commons.ui.context-sources.v1"
+    || (value.state !== "empty" && value.state !== "ready")
+    || typeof value.truncated !== "boolean") throw new ApiProblem(502, null);
+  const seen = new Set<string>();
+  const sources = boundedArray(value.sources, 256).map((raw): ContextSourceOption => {
+    if (!isObject(raw) || !hasExactKeys(raw, ["ref", "label", "freshness"])
+      || !isObject(raw.ref) || !hasExactKeys(raw.ref, ["kind", "id", "revision"])
+      || raw.freshness !== "current" || typeof raw.label !== "string" || raw.label.trim().length === 0
+      || new TextEncoder().encode(raw.label).byteLength > 256
+      || /[\p{C}\p{Zl}\p{Zp}]/u.test(raw.label) || /[^\S ]/u.test(raw.label)
+      || typeof raw.ref.kind !== "string" || typeof raw.ref.id !== "string"
+      || typeof raw.ref.revision !== "string" || !CONTEXT_PACK_REF_ID.test(raw.ref.id)
+      || !raw.ref.id.startsWith(`${raw.ref.kind}.`) || !EVENT_ID.test(raw.ref.revision)
+      || (raw.ref.kind !== "decision" && !CONTEXT_PACK_SOURCE_KINDS.has(raw.ref.kind as ContextPackReferenceKind))
+      || seen.has(raw.ref.id)) throw new ApiProblem(502, null);
+    seen.add(raw.ref.id);
+    return { ref: { kind: raw.ref.kind as ContextPackReferenceKind, id: raw.ref.id, revision: raw.ref.revision },
+      label: raw.label, freshness: "current" };
+  });
+  if ((sources.length === 0) !== (value.state === "empty")) throw new ApiProblem(502, null);
+  return { schema: "agent-commons.ui.context-sources.v1", state: value.state, sources, truncated: value.truncated };
+}
+
 export class WorkApi {
+  private taskWrites = new Map<string, { signature: string; body: Promise<string> }>();
+
+  forgetTaskWrite(key: string): void {
+    this.taskWrites.delete(key);
+  }
+
+  private async postTaskWrite(
+    path: string,
+    input: JsonObject,
+    key: string,
+    signal: AbortSignal,
+    taskId?: string
+  ): Promise<unknown> {
+    // Capture semantic input before the first await. A retry owns the exact
+    // serialized body, including its original CAS, even after server commit.
+    const signature = JSON.stringify([path, input]);
+    let saved = this.taskWrites.get(key);
+    if (saved && saved.signature !== signature) {
+      throw new ApiProblem(409, { code: "task_retry_intent_changed", message: "", safeNextActions: [] });
+    }
+    if (!saved) {
+      const owned = JSON.parse(JSON.stringify(input)) as JsonObject;
+      const body = (async () => {
+        const revision = taskId === undefined ? undefined : await this.currentTaskRevision(taskId, signal);
+        return JSON.stringify({
+          ...owned,
+          ...(revision === undefined ? {} : { expected_revision: revision }),
+          idempotency_key: key
+        });
+      })();
+      saved = { signature, body };
+      this.taskWrites.set(key, saved);
+      // A failed read did not prepare or send a write and can safely be retried.
+      void body.catch(() => this.taskWrites.delete(key));
+    }
+    return this.request(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: await saved.body,
+      signal
+    });
+  }
+
   private apiBase = "";
 
   async connect(signal: AbortSignal): Promise<void> {
     const exchangeCode = exchangeCodeFromFragment();
-    window.history.replaceState(null, "", window.location.pathname);
+    window.history.replaceState(null, "", sanitizedWorkLocation(window.location.pathname, window.location.search));
 
     if (await this.restoreStoredSession(signal)) {
       return;
@@ -1563,6 +1716,15 @@ export class WorkApi {
     ));
   }
 
+  async loadContextSources(signal: AbortSignal): Promise<ContextSourceCatalog> {
+    return parseContextSourceCatalog(await this.get("/work/context-sources", signal));
+  }
+
+  async loadTaskDetail(taskId: string, signal: AbortSignal): Promise<TaskDetail> {
+    if (!TASK_ID.test(taskId)) throw new ApiProblem(400, null);
+    return parseTaskDetail(await this.get(`/entities/task/${encodeURIComponent(taskId)}`, signal), taskId);
+  }
+
   async loadTracker(signal: AbortSignal): Promise<TrackerSnapshot> {
     return parseTrackerSnapshot(await this.get("/work/tracker", signal));
   }
@@ -1617,17 +1779,21 @@ export class WorkApi {
       profileId: string;
       rationale: string;
       contextMode: string;
+      fromPresetId?: string;
     },
-    signal: AbortSignal
+    signal: AbortSignal,
+    idempotencyKey = crypto.randomUUID()
   ): Promise<void> {
     await this.post(
       "/agents",
       {
         name: input.name,
-        profile_id: input.profileId,
         rationale: input.rationale,
-        context_mode: input.contextMode,
-        idempotency_key: crypto.randomUUID()
+        ...(input.fromPresetId ? { from_preset_id: input.fromPresetId } : {
+          profile_id: input.profileId,
+          context_mode: input.contextMode
+        }),
+        idempotency_key: idempotencyKey
       },
       signal
     );
@@ -1640,19 +1806,20 @@ export class WorkApi {
       criteria: readonly string[];
       dependencyIds: readonly string[];
     },
-    signal: AbortSignal
-  ): Promise<void> {
-    await this.post(
+    signal: AbortSignal,
+    idempotencyKey: string
+  ): Promise<TaskCreateResult> {
+    return parseTaskCreateResult(await this.postTaskWrite(
       "/tasks",
       {
         title: input.title,
         description: input.description,
-        acceptance_criteria: input.criteria,
-        dependencies: input.dependencyIds,
-        idempotency_key: crypto.randomUUID()
+        acceptance_criteria: [...input.criteria],
+        dependencies: [...input.dependencyIds]
       },
+      idempotencyKey,
       signal
-    );
+    ));
   }
 
   async providerAuthStatus(profileId: string, signal: AbortSignal): Promise<ProviderAuthStatus> {
@@ -1710,15 +1877,10 @@ export class WorkApi {
     idempotencyKey: string,
     signal: AbortSignal
   ): Promise<void> {
-    const revision = await this.currentTaskRevision(taskId, signal);
-    await this.post(
+    await this.postTaskWrite(
       `/tasks/${encodeURIComponent(taskId)}/review-request`,
-      {
-        expected_revision: revision,
-        criteria: criteria.map((item) => item.trim()).filter((item) => item.length > 0),
-        idempotency_key: idempotencyKey
-      },
-      signal
+      { criteria: criteria.map((item) => item.trim()).filter((item) => item.length > 0) },
+      idempotencyKey, signal, taskId
     );
   }
 
@@ -1728,15 +1890,9 @@ export class WorkApi {
     idempotencyKey: string,
     signal: AbortSignal
   ): Promise<void> {
-    const revision = await this.currentTaskRevision(taskId, signal);
-    await this.post(
+    await this.postTaskWrite(
       `/tasks/${encodeURIComponent(taskId)}/accept`,
-      {
-        expected_revision: revision,
-        summary: summary.trim(),
-        idempotency_key: idempotencyKey
-      },
-      signal
+      { summary: summary.trim() }, idempotencyKey, signal, taskId
     );
   }
 
@@ -1746,15 +1902,9 @@ export class WorkApi {
     idempotencyKey: string,
     signal: AbortSignal
   ): Promise<void> {
-    const revision = await this.currentTaskRevision(taskId, signal);
-    await this.post(
+    await this.postTaskWrite(
       `/tasks/${encodeURIComponent(taskId)}/reopen`,
-      {
-        expected_revision: revision,
-        reason: reason.trim(),
-        idempotency_key: idempotencyKey
-      },
-      signal
+      { reason: reason.trim() }, idempotencyKey, signal, taskId
     );
   }
 

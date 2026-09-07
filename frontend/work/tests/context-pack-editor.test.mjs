@@ -184,7 +184,9 @@ test("failed retry retains identity while explicit New rotates it", () => {
   assert.equal(identity.forOperation("same-draft"), "create-2");
 
   const component = readFileSync(resolve(root, "src/components/ContextPacksSection.tsx"), "utf8");
-  assert.match(component, /retryIdentity\.current\.reset\(\); setEditor\(emptyEditor\)/);
+  assert.match(component, /const newPack = [\s\S]*?if \(pending\.current !== null\) return;/);
+  assert.match(component, /retryIdentity\.current\.reset\(\)/);
+  assert.match(component, /setEditor\(emptyContextForm\(\)\)/);
 });
 
 test("publish and revise preserve caller idempotency and exact expected revision", async () => {

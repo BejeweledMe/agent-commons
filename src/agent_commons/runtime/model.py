@@ -532,6 +532,16 @@ def _resolve_or_demo_placeholder(
         return DEMO_UNRESOLVED_EXECUTABLE
 
 
+# A conservative application bound for Grok's single prompt argument, with
+# one byte reserved for its terminating NUL. This is not a guarantee about
+# any host's aggregate argv/environment limit or an argv privacy boundary.
+GROK_PROMPT_ARGUMENT_MAX_BYTES = 128 * 1024 - 1
+
+
+def grok_instruction_fits_argument(instruction: str) -> bool:
+    return len(instruction.encode("utf-8")) <= GROK_PROMPT_ARGUMENT_MAX_BYTES
+
+
 def _instruction_bytes(instruction: str) -> bytes:
     if not isinstance(instruction, str) or not instruction.strip():
         raise ValidationError("runner instruction must be non-empty")
@@ -1034,6 +1044,9 @@ class GrokRunnerProfile:
         demo_unresolved_placeholder: bool = False,
     ) -> RunnerInvocation:
         validate_profile_launch_boundary(self)
+        prompt = _instruction_bytes(instruction).decode("utf-8")
+        if not grok_instruction_fits_argument(prompt):
+            raise ConfigurationError("Grok instruction exceeds the prompt argument byte limit")
         if delegation_id is None:
             raise ConfigurationError("Grok runtime requires an exact delegation binding")
         _safe_identifier("delegation_id", delegation_id)
@@ -1102,10 +1115,9 @@ class GrokRunnerProfile:
         # Grok Build 1.0.13 explicitly does not read piped stdin as a prompt.
         # Its documented --prompt-file cannot consume '-', and the broker has
         # no pre-existing owned prompt-file lifecycle.  The fixed -p argument
-        # is therefore the only real headless transport.  The one-megabyte
-        # product limit still applies, though a host with a smaller ARG_MAX may
-        # refuse a very large prompt before Grok starts.
-        prompt = _instruction_bytes(instruction).decode("utf-8")
+        # is therefore the only real headless transport. Its conservative
+        # application byte bound is checked before executable resolution above;
+        # a host can still refuse its aggregate argv/environment size.
         argv.extend(("-p", prompt))
         extra_env = {
             **_GROK_EXTRA_ENVIRONMENT,

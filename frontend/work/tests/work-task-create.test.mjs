@@ -37,7 +37,7 @@ test("task creation sends canonical dependencies without private launch data", a
   const calls = [];
   globalThis.fetch = async (url, init) => {
     calls.push({ url, init });
-    return jsonResponse({ ok: true });
+    return jsonResponse({ event_type: "task.created", entity_ref: { kind: "task", id: "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ" }, event_id: "evt.01M1FPPEZHYF9C9QTR6PFKM2Q9", revision: "evt.01M1FPPEZHYF9C9QTR6PFKM2Q9" });
   };
 
   const api = new apiModule.WorkApi();
@@ -49,7 +49,8 @@ test("task creation sends canonical dependencies without private launch data", a
       criteria: ["visible in tracker"],
       dependencyIds: ["task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ"]
     },
-    new AbortController().signal
+    new AbortController().signal,
+    "create-task-key"
   );
 
   assert.equal(calls.length, 1);

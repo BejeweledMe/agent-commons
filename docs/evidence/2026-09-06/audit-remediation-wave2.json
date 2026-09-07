@@ -1,0 +1,197 @@
+{
+  "schema": "agent-commons-audit-remediation-evidence-v1",
+  "base_sha": "329d2f3920753853ce265536d9d3ceb4e35f1f91",
+  "status": "frozen implementation awaiting final integrated gate and independent review",
+  "scopes": {
+    "F01": [
+      {
+        "path": "src/agent_commons/ui/actions.py",
+        "sha256": "55159a2486e165f2dd3583b7979503c049a058e8ea41911d467e8319ff7df37b"
+      },
+      {
+        "path": "src/agent_commons/services/tasks.py",
+        "sha256": "47eb6e5da6f80b01c46b0253ca6c7d59dc5261762151eb309134ca26ea8e1130"
+      },
+      {
+        "path": "tests/ui/test_review_evidence.py",
+        "sha256": "d586d7e8a7485bbbd10a2a00f10ddc394d0d55143f73d48804473942238745a7"
+      }
+    ],
+    "F02": [
+      {
+        "path": "src/agent_commons/services/context_packs.py",
+        "sha256": "39579dace231bf053ff5bd45fae6131ae212c3400f934e20de536709ec34f249"
+      },
+      {
+        "path": "src/agent_commons/runtime/context_binding.py",
+        "sha256": "571290c282d41fa71b205ba59036a78176e75028b24f5c8b0428a252dfdbb7dc"
+      },
+      {
+        "path": "src/agent_commons/services/delegation_runtime.py",
+        "sha256": "ae31c4f58e197fe91d542987ce7082d4ec544f052d08c930e2e104fa1c66c194"
+      },
+      {
+        "path": "tests/services/test_delegation_launch_plan.py",
+        "sha256": "0356608bbe7ac23a1f575829e8e11949e7eb81adacc5ff8136677a482ccf8bc0"
+      },
+      {
+        "path": "tests/runtime/test_context_binding.py",
+        "sha256": "ff02b24d3deb7c203d0156f7d642b5deea865d15fe6052310955f42fb398cc40"
+      }
+    ],
+    "F03": [
+      {
+        "path": "src/agent_commons/runtime/diagnostics.py",
+        "sha256": "91cc3894d5a3da402692e0efeed8c89bdd01ec362eb69d887aa730088aafdd19"
+      },
+      {
+        "path": "src/agent_commons/ui/reads.py",
+        "sha256": "00534218d7f1e3f9d2693ae4201c08f7c63e1ed582362fb86b8034d92c210e69"
+      },
+      {
+        "path": "tests/runtime/test_attempts.py",
+        "sha256": "a114cb49b3dc635217e329bec73e57c7dbc6568d8f849a9985616fbbcedb23ee"
+      },
+      {
+        "path": "tests/ui/test_launch.py",
+        "sha256": "b76986aafe589fef9290e7c2fc06e6ed5405f927c9662e4517b938186c22b5f1"
+      }
+    ],
+    "F12": [
+      {
+        "path": "Makefile",
+        "sha256": "5cf3effabbef02960514a0e8e92a618e091e464f99a906a7b209605f61f03825"
+      },
+      {
+        "path": "tools/check_node_version.py",
+        "sha256": "5491460ada641705d583832803c01c2254887255293348d45a3e7724cf13c501"
+      },
+      {
+        "path": "tests/test_test_pipeline_contract.py",
+        "sha256": "82b9a2b2c4ee797472393d3a18a3d118841abe8c495d3270704ade658b34fa7f"
+      }
+    ],
+    "F04": [
+      {
+        "path": "src/agent_commons/services/design_gallery.py",
+        "sha256": "a84ecdbe8e3043ee5c04c02b8b0f17b1323eeded45339977df4df4a212e62b3a"
+      },
+      {
+        "path": "src/agent_commons/runtime/design_package_binding.py",
+        "sha256": "57bf772995660cc006baa9c632cdb664cc60f78f0d7e4f49e69e56ed0c3975fe"
+      },
+      {
+        "path": "src/agent_commons/services/delegation_runtime.py",
+        "sha256": "ae31c4f58e197fe91d542987ce7082d4ec544f052d08c930e2e104fa1c66c194"
+      },
+      {
+        "path": "src/agent_commons/ui/reads.py",
+        "sha256": "00534218d7f1e3f9d2693ae4201c08f7c63e1ed582362fb86b8034d92c210e69"
+      },
+      {
+        "path": "tests/services/test_design_launch_freshness.py",
+        "sha256": "f07839c99ddeefe40e2d2c58b624b1fdd376b050c17f180d35ffc4e5e373f4ba"
+      },
+      {
+        "path": "tests/runtime/test_design_package_binding.py",
+        "sha256": "e609d48cb25aa0c687d746705c278351a5dd1385cc5dc0ad05d8d7344911e72b"
+      }
+    ],
+    "F08-size-only": [
+      {
+        "path": "src/agent_commons/runtime/model.py",
+        "sha256": "daf34c6112852b55dc988950e2db7ddefd44caffa9ba80e1e18a08f5856469d6"
+      },
+      {
+        "path": "src/agent_commons/runtime/adapters.py",
+        "sha256": "b02b64b4bdfc1b98e58ed5c91fa73dc2ec3e6a583577b7ec5d404f1112d1181b"
+      },
+      {
+        "path": "src/agent_commons/runtime/capabilities.py",
+        "sha256": "7bb88fc252dfdd5a3a685a2646196ec303642f9d3be0f63f64d5a73666e5c1b6"
+      },
+      {
+        "path": "src/agent_commons/runtime/launch.py",
+        "sha256": "0bd2ad762e8d25e1d9a7c75d625bb1d377ff207f2d8c74c96ba6b2bd152daff1"
+      },
+      {
+        "path": "src/agent_commons/services/delegation_runtime.py",
+        "sha256": "ae31c4f58e197fe91d542987ce7082d4ec544f052d08c930e2e104fa1c66c194"
+      },
+      {
+        "path": "tests/runtime/test_grok_instruction_limits.py",
+        "sha256": "525cfdd914219b4e18f3af1d2776b05ab4d349d7782202e5ce7877eadba29126"
+      },
+      {
+        "path": "tests/services/test_grok_launch_limits.py",
+        "sha256": "211cd36cd103a31a6c810e7a6cfb2371d15c813f7b3b0f7e9d226a37cbdb310f"
+      }
+    ],
+    "F06-F07": [
+      {
+        "path": "frontend/work/src/api.ts",
+        "sha256": "c4d3bdedf0981c206325585458c0aca7a22d307130a62f313c5ed04531181544"
+      },
+      {
+        "path": "frontend/work/src/components/StarterPacksSection.tsx",
+        "sha256": "7a988e25db2dc71ebfdbf3e7867b6a389beafab35695764e52d61d6c01955797"
+      },
+      {
+        "path": "frontend/work/src/components/TrackerSection.tsx",
+        "sha256": "842e86a1f3489f28033e2a1c8c51f354b79456b932102f3385bd9d021bed41ab"
+      },
+      {
+        "path": "frontend/work/src/components/RolePresetPicker.tsx",
+        "sha256": "b5931cbf0b4b3c4e99a126dcb5bf74215ec5bebd72043a4230b1c51bc666aa4c"
+      },
+      {
+        "path": "frontend/work/src/rolePresetState.ts",
+        "sha256": "7aaa3bf7d08d2d3a08d436438784c0542068953c5dcad4c00a050a3e84c58535"
+      },
+      {
+        "path": "frontend/work/src/contracts.ts",
+        "sha256": "940f78afde7d5a595234560e656956b2dd484c06fc5ff8d46178981057f5896e"
+      },
+      {
+        "path": "frontend/work/src/i18n.json",
+        "sha256": "c24e4e5176ac2fe20d8f7b8685bdda334eb48de3ebf373844010a8bba65f75e1"
+      },
+      {
+        "path": "frontend/work/src/main.tsx",
+        "sha256": "57f1f8c8e21197adb80015c69ff4d282449cd9255c93d60eb0ef93157cb92e50"
+      },
+      {
+        "path": "frontend/work/tests/work-task-create.test.mjs",
+        "sha256": "34b2bc649ed50ba56e55cf73dbb9c9a327fb1a7b2dff420945f2dca45657c569"
+      },
+      {
+        "path": "frontend/work/tests/work-recovery-presets.test.mjs",
+        "sha256": "0c12afc01cc5ee2ca796fe72c4b5ff0186ab8785351adf0966d12410df87841c"
+      },
+      {
+        "path": "src/agent_commons/ui/static/work/index.html",
+        "sha256": "572fcb21dad20e4b8f91f45fdb05c18a60475f90b794ab3435ba3436e575dd01"
+      },
+      {
+        "path": "src/agent_commons/ui/static/work/assets/work-BVPh4rPV.js",
+        "sha256": "815e89f014095a879749933963d355fe51c7b5f2576192e7f2e171d08b8fa8d6"
+      }
+    ]
+  },
+  "removed_paths": [
+    "src/agent_commons/ui/static/work/assets/work-C5iDpjsL.js"
+  ],
+  "scoped_checks": {
+    "F02-F04": "153 passed in final focused run; nine Gallery-code assertions corrected and all nine rerun passed. Full gate required on corrected bytes.",
+    "F06-F07": "Node24 Work38 passed and TypeScript/Vite build passed; Python28 passed; final contracts21 passed.",
+    "F08-size-only": "130 passed including18 new cases; source and context composition size guard.",
+    "F01-F03-F12": "Wave1 results retained; final shared files require new scoped review."
+  },
+  "limits": [
+    "Full gate and browser check results supplied separately",
+    "No live provider canaries or transport qualification",
+    "No commit, push, release or task acceptance",
+    "Grok argv privacy remains unresolved",
+    "Last-snapshot authorization does not atomically exclude later external ledger writers"
+  ]
+}

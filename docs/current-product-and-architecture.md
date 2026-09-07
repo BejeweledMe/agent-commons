@@ -11,6 +11,35 @@
 текущего статуса используйте [карту документации](README.md), исходный код, тесты и текущую
 ревизию Git.
 
+**Дополнение 2026-09-06:** [независимый аудит текущей границы
+`329d2f3`](audits/2026-09-06-total-plan-work-adr-prd-review.md) подтверждает
+реализацию Context Packs, Gallery, Starter Pack Apply, J1 и G6 после этого снимка.
+J1/G6 имеют exact acceptance, но L1 live qualification и R2 release остаются
+открытыми; audit также выявил P1 в review evidence и runtime privacy/provenance.
+Исторические статусы таблицы ниже сохранены и не описывают текущий checkout.
+
+После аудита подготовлены [проверенные uncommitted fixes](audits/2026-09-06-audit-remediation.md)
+для review evidence, source/privacy gates и Work recovery/preset hire. Полный
+green gate и scoped review пройдены; live qualification, acceptance и release
+этим не подтверждаются.
+
+**Дополнение 2026-09-07:** отдельная ветка `codex/task-first-ux-pivot`
+реализует Work / Team / Library / Settings, task-first создание, инспектор,
+выбор точных источников и локальное восстановление. Совместный дизайн с Opus
+и Astra, границы и проверки заданы [ADR 0014](adr/0014-task-first-workspace-ux.md)
+и [планом с графом работ](task-first-workspace-implementation-plan.md).
+Реализация прошла полный `make check` (Work85, Gallery22, Python1976);
+[итоговый отчёт](audits/2026-09-07-task-first-pivot-verification.md) отделяет
+exact source review и синтетическую браузерную проверку от live qualification
+и приёмки. Историческая таблица ниже остаётся снимком августа, а не списком
+функций ветки.
+
+**Визуальное уточнение:** по [ADR 0015](adr/0015-browser-native-visual-refinement.md)
+три Astra-агента внедрили нативные фильтры, устойчивые раскрытия инспектора
+и читаемые точные источники Context. [Новый отчёт](audits/2026-09-07-browser-visual-refinement.md)
+фиксирует браузерные проверки, Figma до/после и полный gate Work94/Gallery22/
+Python1976. Предыдущие хеши и результаты остаются историческими.
+
 Это описание опирается на исходный код, тесты, документацию и реестр решений в этом
 репозитории. Оно не является отчётом об использовании у клиентов: здесь нет придуманных
 рыночных цифр, adoption-метрик или заявлений о production-ready статусе.

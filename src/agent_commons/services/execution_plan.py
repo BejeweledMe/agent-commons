@@ -62,6 +62,7 @@ def build_execution_plan(
     graph: Mapping[str, Any] | None = None,
     resume_gap: bool = False,
     capacity: Mapping[str, Any] | None = None,
+    canonical_observed_at: str | None = None,
 ) -> ExecutionPlanView:
     """Build a deterministic advisory plan from existing read sources.
 
@@ -73,6 +74,10 @@ def build_execution_plan(
     parsed_generated_at = _timestamp(generated_at)
     if parsed_generated_at is None or stale_after_seconds < 0 or type(resume_gap) is not bool:
         return _error_view(generated_at, PlanGap.PROJECTION_MISSING, capacity=capacity)
+    if canonical_observed_at is not None:
+        observed = _timestamp(canonical_observed_at)
+        if observed is None or observed > parsed_generated_at:
+            return _error_view(generated_at, PlanGap.PROJECTION_MISSING, capacity=capacity)
     if snapshot is None:
         return _error_view(generated_at, PlanGap.PROJECTION_MISSING, capacity=capacity)
     if len(snapshot.tasks) > MAX_PLAN_TASKS:
@@ -109,6 +114,7 @@ def build_execution_plan(
             generated_at=generated_at,
             stale_after_seconds=stale_after_seconds,
             graph=graph,
+            canonical_observed_at=canonical_observed_at,
         )
     except Exception:
         gaps.add(PlanGap.ATTEMPTS_PARTIAL)
@@ -119,6 +125,7 @@ def build_execution_plan(
                 generated_at=generated_at,
                 stale_after_seconds=stale_after_seconds,
                 graph=None,
+                canonical_observed_at=canonical_observed_at,
             )
         except Exception:
             health = None

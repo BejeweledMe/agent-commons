@@ -30,6 +30,8 @@ from agent_commons.runtime import (
     classify_process_result,
 )
 from agent_commons.runtime.attempts import ATTEMPT_SCHEMA, REQUEST_SCHEMA
+from agent_commons.runtime.diagnostics import sanitize_provider_stderr_tail
+from agent_commons.runtime.subprocess_runner import _BoundedOutput
 
 
 class Clock:
@@ -327,10 +329,10 @@ def test_failure_persists_only_a_bounded_sanitized_stderr_diagnostic_tail(
             stdout=b"",
             stderr=raw_stderr,
             stdout_bytes_seen=0,
-            stderr_bytes_seen=9000,
+            stderr_bytes_seen=len(raw_stderr),
             output_truncated=True,
             stderr_tail=raw_stderr,
-            stderr_tail_truncated=True,
+            stderr_tail_truncated=False,
         ),
     )
 
@@ -338,7 +340,7 @@ def test_failure_persists_only_a_bounded_sanitized_stderr_diagnostic_tail(
     assert safe_error in str(finished.stderr_diagnostic_tail)
     assert "redacted unsafe diagnostic line" in str(finished.stderr_diagnostic_tail)
     assert "redacted path" in str(finished.stderr_diagnostic_tail)
-    assert finished.stderr_diagnostic_tail_truncated is True
+    assert finished.stderr_diagnostic_tail_truncated is False
     assert finished.stderr_diagnostic_tail_redacted is True
     persisted = next((state_root / "runtime" / "requests").glob("*.json")).read_text()
     assert secret not in persisted
@@ -346,6 +348,84 @@ def test_failure_persists_only_a_bounded_sanitized_stderr_diagnostic_tail(
     assert "/private/tmp/project/file.py" not in persisted
     assert safe_error in persisted
     assert '"diagnostic_code":"mcp_handshake_failed"' in persisted
+
+
+@pytest.mark.parametrize("chunk_size", [1, 257, 65536])
+@pytest.mark.parametrize("secret_shape", ["pem", "unfinished-pem", "assignment"])
+def test_truncated_stderr_cannot_persist_a_secret_fragment(
+    tmp_path: Path, chunk_size: int, secret_shape: str
+) -> None:
+    # Synthetic markers deliberately have no independently recognizable token
+    # shape: safety depends on the opening context that the tail has evicted.
+    marker = b"SYNTHETIC_PRIVATE_BODY_FRAGMENT"
+    opening = b"api_key=" if secret_shape == "assignment" else b"-----BEGIN PRIVATE KEY-----\n"
+    closing = b"\n-----END PRIVATE KEY-----" if secret_shape == "pem" else b""
+    raw = opening + b"A" * 4600 + marker + closing + b"\nMCP handshake failed\n"
+    output = _BoundedOutput(32)
+    for offset in range(0, len(raw), chunk_size):
+        output.consume("stderr", raw[offset : offset + chunk_size])
+    assert opening not in output.stderr_tail()
+    assert marker in output.stderr_tail()
+    result = ProcessResult(
+        outcome=RunOutcome.FAILED,
+        reason=RunReason.NONZERO_EXIT,
+        exit_code=1,
+        pid=None,
+        duration_seconds=0.1,
+        stdout=b"",
+        stderr=output.value("stderr"),
+        stdout_bytes_seen=0,
+        stderr_bytes_seen=output.seen("stderr"),
+        output_truncated=output.truncated,
+        stderr_tail=output.stderr_tail(),
+        stderr_tail_truncated=output.stderr_tail_truncated,
+    )
+    assert sanitize_provider_stderr_tail(result) == (
+        "[agent-commons omitted truncated diagnostic]",
+        True,
+        True,
+    )
+    store = AttemptStore(tmp_path / "state", clock=Clock())
+    parent, _ = policies()
+    attempt = store.reserve(spec(tmp_path), parent_policy=parent).attempt
+    store.transition(attempt.attempt_id, AttemptState.LAUNCHING, reason="process_starting")
+    finished = store.finish(attempt.attempt_id, result)
+    assert finished.stderr_diagnostic_tail == "[agent-commons omitted truncated diagnostic]"
+    assert finished.stderr_diagnostic_tail_truncated is True
+    assert finished.stderr_diagnostic_tail_redacted is True
+    assert finished.diagnostic_code is DiagnosticCode.MCP_HANDSHAKE_FAILED
+    persisted = next((tmp_path / "state" / "runtime" / "requests").glob("*.json")).read_text()
+    assert marker.decode() not in persisted
+    assert "MCP handshake failed" not in persisted
+    assert '"diagnostic_code":"mcp_handshake_failed"' in persisted
+    assert store.list_attempts()[0].stderr_diagnostic_tail == finished.stderr_diagnostic_tail
+
+
+@pytest.mark.parametrize(
+    ("raw", "seen", "explicit_truncation"),
+    [(b"SYNTHETIC_FRAGMENT", 5000, False), (b"A" * 5000, 5000, False), (b"", 0, True)],
+)
+def test_stderr_only_and_empty_truncated_results_fail_closed(
+    raw: bytes, seen: int, explicit_truncation: bool
+) -> None:
+    result = ProcessResult(
+        outcome=RunOutcome.FAILED,
+        reason=RunReason.NONZERO_EXIT,
+        exit_code=1,
+        pid=None,
+        duration_seconds=0.1,
+        stdout=b"",
+        stderr=raw,
+        stdout_bytes_seen=0,
+        stderr_bytes_seen=seen,
+        output_truncated=True,
+        stderr_tail_truncated=explicit_truncation,
+    )
+    assert sanitize_provider_stderr_tail(result) == (
+        "[agent-commons omitted truncated diagnostic]",
+        True,
+        True,
+    )
 
 
 def test_successful_provider_stderr_is_never_persisted(tmp_path: Path) -> None:

@@ -156,6 +156,7 @@ class ProviderRefusalCode(StrEnum):
     TRUSTED_WORKSPACE_REQUIRED = "trusted_workspace_required"
     PROVIDER_CAPABILITY_UNSUPPORTED = "provider_capability_unsupported"
     SKILL_PROJECTION_UNAVAILABLE = "skill_projection_unavailable"
+    INSTRUCTION_TOO_LARGE = "instruction_too_large"
     BUDGET_NOT_ENFORCEABLE = "budget_not_enforceable"
     HOST_SANDBOX_REFUSED = "host_sandbox_refused"
     INITIALIZATION_TIMEOUT = "initialization_timeout"
@@ -205,6 +206,10 @@ _REFUSAL_COPY: dict[ProviderRefusalCode, tuple[str, tuple[str, ...]]] = {
             "Remove the skill requirement or use the manual workflow until a verified "
             "provider projection is installed.",
         ),
+    ),
+    ProviderRefusalCode.INSTRUCTION_TOO_LARGE: (
+        "The composed Grok instruction exceeds the supported prompt argument byte limit.",
+        ("Reduce instruction, skill, or Context Pack size before retrying.",),
     ),
     ProviderRefusalCode.BUDGET_NOT_ENFORCEABLE: (
         "The selected provider cannot enforce the requested monetary budget.",
