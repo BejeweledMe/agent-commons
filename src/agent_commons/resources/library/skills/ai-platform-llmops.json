@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "ai-platform-llmops",
+    "version": "57e93405bddc259db80edb76a77f17804ce7b4ff9f6f00d2808583deb8d910ac"
+  },
+  "content": {
+    "name": "ai-platform-llmops",
+    "description": "Build, diagnose, and operate shared AI infrastructure for predictive and GenAI serving (KServe, Triton, vLLM Production Stack), accelerator capacity, replica controllers, model registry releases, training-job placement, and edge fleet rollout. Runtime tuning and training update semantics stay with their execution owners."
+  },
+  "files": {
+    "SKILL.md": "52dbf5947ad99bfd755266e44139c67df0404e029ae0b21dddf1073f9341e346",
+    "agents/openai.yaml": "c1e091f4aa8098e7fd5d97320c4db2d7b62c47fe862020bebed967ac2d7cc2ff",
+    "references/00_README.md": "2a5270db0bf97bbeaa28f2fd415252db075c086168a1d8cdd5275b5fa0ef4096",
+    "references/capacity-topology-and-isolation.md": "a1eab60466b8f047cfbda62c239752f2dbba7a58f0360ec009e462f8414f4796",
+    "references/edge-fleet-rollout.md": "87c8ef2156f69d6e09d9a4e21f72dd5f221c3fdc233250dbf94164a056a99989",
+    "references/registry-compatibility-and-fleet-rollout.md": "2f50ab1beae17e64eaf7f91e5f1e83aa6b0e93fecb949cac997bd33270d625ee",
+    "references/serving-control-plane-and-protocols.md": "c0922cc66409a82759dc49554eaa0aba42e593647570e2eb766d88ebee71363e",
+    "references/training-job-placement-and-recovery-capacity.md": "29b3109ca4b0ac074e3c81ee26735c7778a577c437983a6a09ce57fdf7fd7d15"
+  }
+}

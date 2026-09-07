@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "execution-writing",
+    "version": "0e9bbfe79dae2463583e02dd9060d68232c3d566c1aa37c52f6ce8392f286965"
+  },
+  "content": {
+    "name": "execution-writing",
+    "description": "Create status reports, decision memos, and engineering execution plans that make progress, choices, ownership, dependencies, risks, and next actions clear."
+  },
+  "files": {
+    "SKILL.md": "800a9db74c64ae60490e283e2394165d69816bef45f0fad815a836446aa905b1"
+  }
+}

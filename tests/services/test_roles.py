@@ -27,7 +27,9 @@ _SIGNATURES = {
         "None, context_mode: 'str' = 'fresh', rationale: 'str', lifetime: 'Mapping[str, Any] "
         "| None' = None, skills: 'Sequence[str]' = (), tool_allowlist: 'Sequence[str]' = (), "
         "turnover_budget: 'int | None' = None, template: 'bool' = False, model: 'str | None' = "
-        "None, created_by_agent_id: 'str | None' = None, approval: 'str | None' = None, "
+        "None, specialization_ref: 'Mapping[str, str] | None' = None, "
+        "library_store: 'Any | None' = None, created_by_agent_id: 'str | None' = None, "
+        "approval: 'str | None' = None, "
         "proposal_ref: 'Mapping[str, str] | None' = None, idempotency_key: 'str | None' = None) "
         "-> 'dict[str, Any]'"
     ),

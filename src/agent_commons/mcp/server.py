@@ -26,6 +26,7 @@ from agent_commons.errors import (
     LifecycleConflictError,
     ValidationError,
 )
+from agent_commons.library import LibraryStore
 
 # Compatibility re-exports: the console script and existing imports keep this facade.
 from agent_commons.mcp.entrypoint import _parser as _parser
@@ -158,6 +159,7 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_show_verification",
         "commons_show_artifact",
         "commons_read_artifact",
+        "commons_read_skill",
         "commons_delegation_input_needed",
         "commons_delegation_needs_operator",
         "commons_repo_files",
@@ -283,6 +285,7 @@ def build_server(
     catalog_only_purpose: str | None = None,
     binding_wait_seconds: float = 5.0,
     git_executable: str = "/usr/bin/git",
+    library_store: LibraryStore | None = None,
     server_factory: Callable[[str], ServerT] | None = None,
 ) -> ServerT | MCPServer:
     """Build a local stdio server with an intentionally bounded tool set."""
@@ -926,6 +929,55 @@ def build_server(
         )
         worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
         return result
+
+    @register(_READ_ONLY, worker_only=True)
+    def commons_read_skill(
+        skill_id: str, path: str = "SKILL.md", offset: int = 0, limit: int = 16_000
+    ) -> dict[str, Any]:
+        """Read a pinned service skill resource allowed by this role.
+
+        Paths are relative manifest entries, never host paths. Offset/limit are
+        character offsets; next_offset permits bounded progressive reading.
+        Instruction bytes are returned only to this live worker, not recorded
+        as events or included in ordinary catalog/graph observations.
+        """
+
+        if not acting_agent_id or worker is None:
+            raise LifecycleConflictError("a specialized standing role is required")
+        if (
+            type(offset) is not int
+            or offset < 0
+            or type(limit) is not int
+            or not 1 <= limit <= 16_000
+        ):
+            raise ValidationError("skill read offset or limit is invalid")
+        snapshot = binding_snapshot or commons.snapshot()
+        role = snapshot.agents.get(acting_agent_id)
+        ref = role.get("specialization_ref") if role is not None else None
+        if not isinstance(ref, dict):
+            raise LifecycleConflictError("this role has no pinned service specialization")
+        store = library_store or LibraryStore(
+            workspace_root=commons.repo_root,
+            state_root=commons.paths.state_root,
+            state_base=commons.paths.state_base,
+        )
+        allowed = store.allowed_skill_refs(ref)
+        matches = [item for item in allowed if item["id"] == skill_id]
+        if len(matches) != 1:
+            raise LifecycleConflictError("skill is outside this role's pinned methods")
+        resource = store.read_file(matches[0], path)
+        content = resource["text"]
+        if offset > len(content):
+            raise ValidationError("skill read offset is outside the resource")
+        end = min(offset + limit, len(content))
+        return {
+            "skill_ref": matches[0],
+            "path": resource["path"],
+            "sha256": resource["sha256"],
+            "text": content[offset:end],
+            "offset": offset,
+            "next_offset": end if end < len(content) else None,
+        }
 
     # -- staff changes ------------------------------------------------------
     # Each of the three tools below is registered only when the standing role

@@ -1,0 +1,19 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "computer-vision-data-and-labeling",
+    "version": "677c7921649140c930563b4ee0041d87188407ef599234b385d9f998514041d2"
+  },
+  "content": {
+    "name": "computer-vision-data-and-labeling",
+    "description": "Use when designing, collecting, labeling, validating, versioning, or improving computer-vision datasets. Trigger for annotation schemas and QA, source/camera/scene coverage, class and object balance, duplicates, grouped splits, temporal or spatial leakage, augmentation, active learning, auto-labeling, synthetic data, provenance, and production data feedback. Not for choosing model architectures or declaring model quality."
+  },
+  "files": {
+    "SKILL.md": "b295b6b00895ad47b8834c4fe689b21332cc85091d7ea70e11c067611dc28c96",
+    "references/01_collection_lineage_coverage.md": "dab6acf3e0c7e8208b46ed751bbd882137e2a07d1aafbc942f7adaccdb519199",
+    "references/02_annotation_contract_quality.md": "9aa0e36f68fbc4478adaa560078162deec3cc09c0d3a999aae7a9eaa950137a3",
+    "references/03_splits_leakage_augmentation.md": "d90176faba33001ede9665513927b7689eff2b49bcc794ecea4b5ff721952c77",
+    "references/04_iteration_feedback.md": "e99c1a9677272c6876cb390cb6f626edb844ca9316a15ca5d81f0284d5cf1e6e"
+  }
+}

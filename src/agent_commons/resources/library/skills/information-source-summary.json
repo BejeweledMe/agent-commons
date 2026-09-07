@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-source-summary",
+    "version": "87e833199baa258158a41eed98b82b40d23c955a119c53b6c77081a9e3a8b242"
+  },
+  "content": {
+    "name": "information-source-summary",
+    "description": "Faithfully summarize supplied articles, lectures, transcripts, or documents without silently adding external research."
+  },
+  "files": {
+    "SKILL.md": "5388df97a9ac537fd25a3e74f685dae6e63b4cce02ea7f947cbe17c6bbc032ba"
+  }
+}

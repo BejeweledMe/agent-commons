@@ -9,6 +9,7 @@ from agent_commons.core.refs import normalize_ref
 from agent_commons.domain.context_pack import validate_context_pack_payload
 from agent_commons.domain.design_packages import validate_design_package_payload
 from agent_commons.domain.roles import RolePayloadValidators, validate_role_payload
+from agent_commons.domain.task_edits import validate_task_dependencies
 from agent_commons.errors import ValidationError
 
 
@@ -364,7 +365,7 @@ _STRING_LIST_FIELDS = {
 _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
 
 _OBJECTIVE_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "extensions"}
-_TASK_CHANGE_FIELDS = {"title", "description", "acceptance_criteria"}
+_TASK_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "dependencies"}
 
 _DELEGATION_TARGET_PROFILES = {
     "codex-builder",
@@ -451,6 +452,8 @@ def _validate_objective_changes(value: Any) -> None:
             raise ValidationError(f"changes.{field} must be a non-empty string")
     if "acceptance_criteria" in value:
         _validate_string_list(value["acceptance_criteria"], "changes.acceptance_criteria")
+    if "dependencies" in value:
+        validate_task_dependencies(value["dependencies"])
     if "extensions" in value and not isinstance(value["extensions"], Mapping):
         raise ValidationError("changes.extensions must be an object")
 

@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Explicit operator-authorized operational state directory.",
     )
     parser.add_argument(
+        "--library-root",
+        default=None,
+        help="Broker-selected private service library; never a worker tool argument.",
+    )
+    parser.add_argument(
         "--preflight",
         action="store_true",
         help="Validate imports and the root tool catalog without opening stdio or writing state.",
@@ -103,6 +108,16 @@ def main(argv: list[str] | None = None) -> int:
             state_root=arguments.state_root,
             read_only=arguments.preflight or arguments.stdio_preflight_purpose is not None,
         )
+        library_store = None
+        if arguments.library_root:
+            from agent_commons.library import LibraryStore
+
+            library_store = LibraryStore(
+                Path(arguments.library_root),
+                workspace_root=manager.repo_root,
+                state_root=manager.paths.state_root,
+                state_base=manager.paths.state_base,
+            )
         if arguments.preflight:
             git = resolve_trusted_executable(
                 arguments.git_executable,
@@ -111,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             server = build_server(
                 arguments.repo.expanduser().resolve(),
                 manager=manager,
+                library_store=library_store,
                 git_executable=git,
                 enable_controls=not arguments.disable_controls,
             )
@@ -149,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             runtime = DelegationRuntimeService(
                 manager,
+                library_store=library_store,
                 profiles=runtime_config.profiles,
                 operator_limits=runtime_config.limits,
                 catalog=runtime_config.catalog,
@@ -159,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             session_id=arguments.session_id,
             manager=manager,
             runtime=runtime,
+            library_store=library_store,
             delegation_id=arguments.delegation_id,
             catalog_only_purpose=arguments.stdio_preflight_purpose,
             git_executable=arguments.git_executable,

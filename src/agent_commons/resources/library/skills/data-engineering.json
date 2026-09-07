@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "data-engineering",
+    "version": "aae2c95506e0669277bbf999afa0e4cb1e870c97762206c08ac8842fa5524adb"
+  },
+  "content": {
+    "name": "data-engineering",
+    "description": "Build, diagnose, and recover batch and streaming data pipelines: event-time windows, CDC/outbox consumption, retry-safe orchestration, replay/backfill, dataset publication, quality, freshness, lineage, and Iceberg/Parquet/Arrow boundaries. Database engine tuning and model or retrieval semantics have separate owners."
+  },
+  "files": {
+    "SKILL.md": "f75708588f23b63e807aa9c5650d9c9d82e75fe5116a9d0e456498dcac677098",
+    "agents/openai.yaml": "b0e3aa2e5c602d8b7006ec2c22a6f7a0e83977546f73ce9eae9de15ca0016b8b",
+    "references/00_README.md": "cb643a6339c744a4ed8bbccccc481ca98552c5412b2c3a2f90ed92068e74719e",
+    "references/batch-stream-window-semantics.md": "82b95f4ecae6a5f6e456a0adcf3ab57d6b8f74c0e57a4f0554a519973e1b8c1a",
+    "references/cdc-outbox-and-replay.md": "ac954ecf7feee669894e5441bb2f5a7faf6397ac0322d5ef170a1166199619ab",
+    "references/orchestration-idempotent-publication.md": "188c4a5caaf5f19e4428aa7c7b81f12b6649346d04bc2ff07ce676e40649df43",
+    "references/quality-lineage-table-formats.md": "87342613b7ed778e935c6a58667055dafd9d4d24110e4c6fe9584a41898f0745",
+    "references/source-contracts-and-derived-state.md": "6b6490594b925511564bf2a30d42a215f5623abcd4ea421fb709f7812aba2a49"
+  }
+}

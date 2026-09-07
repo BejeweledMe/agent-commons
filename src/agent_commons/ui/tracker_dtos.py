@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 TrackerSurfaceState = Literal["loading", "empty", "ready", "partial", "stale", "error"]
 _SOURCE_REVISION = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -32,6 +32,9 @@ class TrackerTaskPayload(TypedDict):
     freshness: str
     evidence_state: str
     gaps: list[str]
+    suggested_agent_id: NotRequired[str]
+    suggested_role_name: NotRequired[str]
+    suggested_provider: NotRequired[str]
 
 
 class TrackerEdgePayload(TypedDict):
@@ -120,6 +123,9 @@ class TrackerTaskDTO:
     freshness: str
     evidence_state: str
     gaps: tuple[str, ...]
+    suggested_agent_id: str | None = None
+    suggested_role_name: str | None = None
+    suggested_provider: str | None = None
 
     def to_wire(self) -> TrackerTaskPayload:
         return {
@@ -139,6 +145,17 @@ class TrackerTaskDTO:
             "freshness": self.freshness,
             "evidence_state": self.evidence_state,
             "gaps": list(self.gaps),
+            **(
+                {
+                    "suggested_agent_id": self.suggested_agent_id,
+                    "suggested_role_name": self.suggested_role_name,
+                    "suggested_provider": self.suggested_provider,
+                }
+                if self.suggested_agent_id is not None
+                and self.suggested_role_name is not None
+                and self.suggested_provider is not None
+                else {}
+            ),
         }
 
 

@@ -35,6 +35,23 @@ GRANT_NAMES = ("create_roles", "retire_roles", "open_links")
 
 DENY_ALL: dict[str, str] = dict.fromkeys(GRANT_NAMES, "deny")
 
+
+def validate_specialization_actor(snapshot: ProjectSnapshot, actor_session_id: str) -> None:
+    """Specialized roles can only be hired from an unbound operator session."""
+    if any(
+        item.get("child_session_id") == actor_session_id for item in snapshot.delegations.values()
+    ):
+        raise LifecycleConflictError("specializations require an unbound human operator session")
+
+
+def validate_specialization_selection(skills: Any, tool_allowlist: Any) -> None:
+    """A service specialization must retain its exact method-reading contract."""
+    if skills:
+        raise ValidationError("a specialization selects service methods, not legacy catalog skills")
+    if tool_allowlist and "commons_read_skill" not in tool_allowlist:
+        raise ValidationError("a specialization tool selection must include commons_read_skill")
+
+
 #: Which profiles a role may hand to a role it creates.  A builder may create a
 #: builder or the strictly weaker reviewer of the same provider; a reviewer may
 #: only create reviewers.  Cross-provider profiles are incomparable, so neither
@@ -176,6 +193,13 @@ def _validate_agent_lifetime(value: Any) -> None:
 def _validate_agent_created(
     payload: Mapping[str, Any], *, validators: RolePayloadValidators
 ) -> None:
+    if "specialization_ref" in payload:
+        from agent_commons.library import validate_library_ref
+
+        validate_library_ref(payload["specialization_ref"], kind="role")
+        if payload.get("origin") != "human" or payload.get("template"):
+            raise ValidationError("specializations require a direct human hire")
+        validate_specialization_selection(payload.get("skills"), payload.get("tool_allowlist"))
     _validate_agent_grants(payload["grants"], "grants")
     _validate_agent_lifetime(payload["lifetime"])
     if payload["profile_id"] not in PROFILE_NARROWING:
@@ -369,6 +393,8 @@ def _validate_agent_creation(
     context: RoleTransitionContext,
     payload: Mapping[str, Any],
 ) -> None:
+    if "specialization_ref" in payload:
+        validate_specialization_actor(context.snapshot, context.actor_session_id)
     creator_id = payload.get("created_by_agent_id")
     acting = context.acting_agent_id
     origin = str(payload["origin"])
@@ -471,6 +497,11 @@ def _validate_agent_reconfiguration(
     payload: Mapping[str, Any],
 ) -> None:
     changes = dict(payload["changes"])
+    if "specialization_ref" in current:
+        validate_specialization_selection(
+            changes.get("skills", current.get("skills")),
+            changes.get("tool_allowlist", current.get("tool_allowlist")),
+        )
     acting = context.acting_agent_id
     if acting is not None:
         raise LifecycleConflictError("a role's configuration is changed by a human, not by a role")

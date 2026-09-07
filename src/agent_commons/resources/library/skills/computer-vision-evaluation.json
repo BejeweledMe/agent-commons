@@ -1,0 +1,18 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "computer-vision-evaluation",
+    "version": "1158c46a6e1b65accf1af88dc27f14e7c9014f00bf33d6b2027d05da1a6bb96a"
+  },
+  "content": {
+    "name": "computer-vision-evaluation",
+    "description": "Use when designing, reviewing, validating, or debugging computer-vision evaluation. Trigger for product-linked and task metrics, thresholds, calibration, class/scale/source slices, visual error analysis, imbalance, robustness, corruptions and OOD, regression suites, human review, and release gates. Not for training procedure, annotation operations, or generic LLM and agent evals."
+  },
+  "files": {
+    "SKILL.md": "36bf23005ee169370a00e2795a323d11e89a580571fcf98b671deca7d521809f",
+    "references/01_metrics_thresholds.md": "7aa4c93d573abdb6faeae8754adaefaedf6cd5abdc77bb0d86abc6997cda5418",
+    "references/02_slices_visual_errors.md": "494ee11cbba332981bb1a004007c99021f2b702ee8b025f920d8e97063bdfc9f",
+    "references/03_calibration_robustness_release.md": "cd17cbc8e4422e82dfcf7ee7669a53e6c3a0d742c6ff41e8662b4df1812fda9f"
+  }
+}

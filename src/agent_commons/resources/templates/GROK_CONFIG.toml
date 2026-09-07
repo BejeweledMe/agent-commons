@@ -7,6 +7,8 @@ args = [
   "${AGENT_COMMONS_STATE_ROOT:-.agent-commons}",
   "--delegation-id",
   "${AGENT_COMMONS_DELEGATION_ID:-delegation.initialization-probe}",
+  "--library-root",
+  "${AGENT_COMMONS_LIBRARY_ROOT:-}",
   "--git-executable",
   "${AGENT_COMMONS_GIT_EXECUTABLE:-/usr/bin/git}",
   "--session-id",

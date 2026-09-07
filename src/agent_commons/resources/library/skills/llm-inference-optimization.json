@@ -1,0 +1,21 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "llm-inference-optimization",
+    "version": "5b2ea3889ad2105626c6d4b2576d5524986969072b762a658387b5a280a78e4e"
+  },
+  "content": {
+    "name": "llm-inference-optimization",
+    "description": "Diagnose and optimize self-hosted LLM runtime latency, goodput, cost, and capacity through prefill/decode profiling, KV cache, batching, admission, quantization, and inference parallelism. Use for execution bottlenecks and runtime scaling signals; replica provisioning and fleet placement belong to ai-platform-llmops."
+  },
+  "files": {
+    "SKILL.md": "bc296680d6ecc0d8d2146dee947dcffdbe74fb390f08b6df4052138b941c7ab3",
+    "agents/openai.yaml": "10dfa405b47d0cf38ae12ef3e2c74dcb341b313d3945186f4d5c5333b439ae4d",
+    "references/01_measurement_diagnosis.md": "32414f5ae26a2675d8bbd2e4c3551a31a3d691d7f16e72e7ab09d94cef3318f0",
+    "references/02_memory_capacity.md": "d400c19b0ea0a1875a154705fab936184f4359afb8523837491d1fbd5acb0df9",
+    "references/03_runtime_controls.md": "79793fb56140c7d7ecd024201c543d8e6ced681c1b53a4900cba94970cf284a2",
+    "references/04_quantization.md": "f77777e45a5b68516dd4ba9cf2c925679e670a37bbaba4fa9bccb9d66eedddca",
+    "references/05_release_operations.md": "27bf62420fe6728e93dbf97074b7897b58b074d271ad5ffeb20d81b85acd798a"
+  }
+}

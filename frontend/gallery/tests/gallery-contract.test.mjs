@@ -135,6 +135,17 @@ test("exact Gallery parser accepts one bounded backend-shaped response", () => {
   assert.equal(parsed.packages[0].screens[0].artifact_id, `artifact.${ulid}`);
 });
 
+test("Gallery accepts real UUID-hex producer sessions without widening other IDs", () => {
+  const session = `session.${"a1".repeat(16)}`;
+  const valid = response([packageValue([screen({producer_session_id: session})], {producer_session_id: session})]);
+  assert.equal(parseGalleryResponse(valid).packages[0].screens[0].producer_session_id, session);
+  for (const invalid of ["session.short", `session.${"a".repeat(33)}`, `session.${"Z".repeat(32)}`, `task.${"a1".repeat(16)}`]) {
+    assert.throws(() => parseGalleryResponse(response([packageValue([screen({producer_session_id: invalid})])])), /gallery_contract_invalid/);
+    assert.throws(() => parseGalleryResponse(response([packageValue([screen()], {producer_session_id: invalid})])), /gallery_contract_invalid/);
+  }
+  assert.throws(() => parseGalleryResponse(response([packageValue([screen({artifact_id: `artifact.${"a1".repeat(16)}`})])])), /gallery_contract_invalid/);
+});
+
 test("exact Gallery parser rejects unknown fields, open enums, and inconsistent state", () => {
   assert.throws(() => parseGalleryResponse({ ...response(), surprise: true }), /gallery_contract_invalid/);
   assert.throws(() => parseGalleryResponse(response([packageValue([screen({ classification: "secret" })])])), /gallery_contract_invalid/);

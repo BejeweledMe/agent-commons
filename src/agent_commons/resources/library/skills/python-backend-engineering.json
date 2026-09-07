@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "python-backend-engineering",
+    "version": "d2223d93787929aff7a0e5a5efd4479aaeb1892a671816e6e84d7a4d347e209e"
+  },
+  "content": {
+    "name": "python-backend-engineering",
+    "description": "Build, review, and debug Python services and background tasks using Django, FastAPI, asyncio, Pydantic, SQLAlchemy, Alembic, or Celery. Covers validation, transactions, resource lifetime, side effects, and Python packaging/tests; HTTP contract compatibility and database engine design have separate owners."
+  },
+  "files": {
+    "SKILL.md": "138043b1a78c08ab900f2b1c78eaae319bc3f56c593e93459fd12f5c205b9c1b",
+    "agents/openai.yaml": "b323b0db043717a7bf5dc5ba132eb0a00f716f1d5f73f306ba79e859d28d8976",
+    "references/00_README.md": "d08ace87c31afea6260c2448943e18aaed0e35a09c7f779ea68eedb5782ff667",
+    "references/asyncio-lifecycle-and-capacity.md": "41a1f0b9f4844b945136d6b5956ca64fff3756ad1b3b6586c081469c34f1e769",
+    "references/django-fastapi-boundaries.md": "623295bc3e99fe9bb8b19d3f56d876ffc2fa3e615900571874aced62294ce412",
+    "references/domain-services-and-uow.md": "66497cc1bafcf6057b3de2c6539d6ae07cb788116fc6429f4a6a72c09625770f",
+    "references/packaging-and-tests.md": "948db1c850c3564bcb8ca73164a50c52ac9c9933659e162b28cea42f06867d90",
+    "references/sqlalchemy-and-durable-side-effects.md": "77839ee1d12558a06bec2079a582e7a983520a88285f199808716d292e067bd8"
+  }
+}

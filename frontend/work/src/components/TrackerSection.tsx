@@ -5,6 +5,10 @@ import type { Locale, MessageKey } from "../i18n";
 import { filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, type TaskFilter } from "../taskPresentation.js";
 import { trackerLoadFailed, trackerLoadSucceeded, trackerStreamSucceeded, type TrackerViewState } from "../trackerState.js";
 import { TaskInspector, TaskState } from "./TaskInspector.js";
+import { TaskGraph } from "./TaskGraph.js";
+import { TaskEditor, type TaskEditorEntries } from "./TaskEditor.js";
+import { taskGraphText } from "../taskGraphStrings.js";
+import "../taskGraph.css";
 
 type Props = {
   api: WorkApi;
@@ -52,6 +56,10 @@ function trackerActionFailure(error: unknown): { code: string; safeNextActions: 
 
 export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
+  const [taskView, setTaskView] = useState<"graph" | "list">("graph");
+  const [editorEntries, setEditorEntries] = useState<TaskEditorEntries>({});
+  const selectedTaskRef = useRef(selectedTaskId);
+  selectedTaskRef.current = selectedTaskId;
   const [drafts, setDrafts] = useState<Readonly<Record<string, TaskActionDraft>>>({});
   const [actionStates, setActionStates] = useState<Readonly<Record<string, TrackerActionState>>>({});
   const { reviewCriteria, acceptSummary, reopenReason, reopenConfirmed } = drafts[selectedTaskId ?? ""] ?? emptyDraft;
@@ -307,9 +315,15 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
     <div className={`task-workspace${selectedTaskId !== null ? " task-workspace-selected" : ""}`}>
       <section className="task-list-pane" aria-labelledby="task-list-title">
         <h2 id="task-list-title">{text("tracker_title")} <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${visibleTasks.length}/${tasks.length}`}>{visibleTasks.length}/{tasks.length}</span></h2>
+        <div className="task-graph-switch" role="group" aria-label={taskGraphText(locale, "graph")}>
+          <button type="button" className="button button-secondary" aria-pressed={taskView === "graph"} onClick={() => setTaskView("graph")}>{taskGraphText(locale, "graph")}</button>
+          <button type="button" className="button button-secondary" aria-pressed={taskView === "list"} onClick={() => setTaskView("list")}>{taskGraphText(locale, "list")}</button>
+        </div>
+        {taskView === "graph" ? <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={selectTask} locale={locale} /> : null}
+        {taskView === "graph" && visibleTasks.length !== tasks.length ? <p className="small-copy">{taskGraphText(locale, "filtered")}</p> : null}
         <p className="visually-hidden" id="tracker-keyboard-help">{text("tracker_keyboard_help")}</p>
         {snapshot.state === "empty" ? <p>{text("tracker_empty")}</p> : visibleTasks.length === 0 && tasks.length > 0 ? <div><p>{text("task_view_empty_filter")}</p><button className="button button-secondary" type="button" onClick={() => { onSearchChange(""); onFilterChange("all"); }}>{text("task_view_clear_filter")}</button></div> : null}
-        <ul className="task-list" aria-describedby="tracker-keyboard-help">
+        <ul className={`task-list${taskView === "graph" ? " graph-fallback-list" : ""}`} aria-describedby="tracker-keyboard-help">
           {visibleTasks.map((task) => <li key={task.taskId}>
             <button className={`task-row-button${task.taskId === selectedTaskId ? " selected" : ""}${task.awaitsHuman ? " attention" : ""}`}
               aria-pressed={task.taskId === selectedTaskId} type="button" onClick={() => selectTask(task.taskId)} onKeyDown={(event) => moveTaskFocus(event, task.taskId)}
@@ -328,6 +342,12 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
           {selectedTask === null ? <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-missing-title"><header className="inspector-header"><h2 id="inspector-missing-title">{text("inspector_missing")}</h2><button type="button" className="button button-secondary" onClick={() => selectTask(null)}>{text("inspector_close")}</button></header><p>{text("inspector_missing_help")}</p><details className="inspector-technical"><summary>{text("inspector_technical")}</summary><code>{selectedTaskId}</code></details></section>
             : <TaskInspector api={api} task={selectedTask} tasks={tasks} runs={snapshot.runs} sourceRevision={snapshot.sourceRevision} locale={locale} text={text} actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={selectTask} onLaunchTask={onLaunchTask}>
               {trackerTaskActions(selectedTask)}
+              <TaskEditor api={api} task={selectedTask} tasks={tasks} sourceRevision={snapshot.sourceRevision} locale={locale}
+                entries={editorEntries} setEntries={setEditorEntries}
+                writesEnabled={writesEnabled} actionsCurrent={actionsCurrent} onSelectTask={(id) => {
+                  if (selectedTaskRef.current === selectedTask.taskId) selectTask(id);
+                }}
+                onChanged={() => void load(new AbortController().signal)} />
             </TaskInspector>}
         </div>}
     </div>

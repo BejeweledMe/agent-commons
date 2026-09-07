@@ -1,0 +1,21 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "api-contract-engineering",
+    "version": "9d89db6c6bacec357293851abcafbce2bc361d1bdf9100be2f057d2e1b4d8ff7"
+  },
+  "content": {
+    "name": "api-contract-engineering",
+    "description": "Author, diagnose, and evolve HTTP API contracts: OpenAPI, schema/reference context, serialization, HTTP outcomes, errors, and provider/consumer compatibility. Use for contract artifacts and observable interoperability; system-design owns service boundaries."
+  },
+  "files": {
+    "SKILL.md": "6c601be1e30d8d950e85a78b7b158ff21878dcddca68d52b576c14f2f95775a9",
+    "agents/openai.yaml": "b1af841adca8edf54e207b2c3ea9174545b712609c91b88fd19535774f9367ca",
+    "references/00_README.md": "773c76f0a3353d2247302669a0056396a598d64a1960c7fddf6b85f0acef9e5e",
+    "references/compatibility-consumer-matrix.md": "3cc43acf2b57b551319e70f58c3a85a5cd5bc8151e535031ad1c2e94ff067582",
+    "references/contract-identity-and-openapi-context.md": "9dabd3aedc6b8f05e0cd16c427eb43695fc3eb02a210b0b51a228ba36a4b84e7",
+    "references/http-media-errors-and-retries.md": "0c7b2000c6ba2b9afd249c7af16e1e1c845ce4f96c4f7cf6756c13e4f165a3b8",
+    "references/validation-tooling-and-targeted-refresh.md": "3e55001ee643ddd6f32421525b97a0f18f3849a9337aff24d3de8f9e55272b16"
+  }
+}

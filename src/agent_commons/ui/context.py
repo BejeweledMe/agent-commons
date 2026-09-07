@@ -134,6 +134,7 @@ class UIContext(UIReads, UIActions):
         catalog_path: Path | None = None,
         profile_config: Path | None = None,
         runtime_factory: Any | None = None,
+        library_root: Path | None = None,
         design_package_writes_enabled: bool = True,
     ) -> None:
         self.repo = repo
@@ -143,6 +144,7 @@ class UIContext(UIReads, UIActions):
         self._catalog_path = catalog_path
         self._profile_config = profile_config
         self._runtime_factory = runtime_factory
+        self._library_root = library_root
         self._design_package_writes_enabled = design_package_writes_enabled
         given = [
             item
@@ -165,6 +167,31 @@ class UIContext(UIReads, UIActions):
         # on every catalogue poll.
         self._profile_info: dict[str, dict[str, Any]] | None = None
         self._launch_coordinator = UILaunchCoordinator(self)
+
+    def library_store(self) -> Any:
+        """Resolve service storage from trusted process configuration only."""
+        from agent_commons.library import LibraryStore
+
+        return LibraryStore(
+            self._library_root,
+            workspace_root=self.repo,
+            state_root=self._state_root,
+            state_base=self._state_base,
+        )
+
+    def authorize_library_edit(self) -> None:
+        manager = self.writer()
+        session = manager._active_session()
+        snapshot = manager.snapshot()
+        if any(issue.severity == "error" for issue in snapshot.issues):
+            raise ConfigurationError(
+                "Workspace integrity must be resolved before editing the library."
+            )
+        if any(
+            item.get("child_session_id") == session.session_id
+            for item in snapshot.delegations.values()
+        ):
+            raise ConfigurationError("Service library editing requires a human operator session.")
 
     def await_launches(self, timeout: float = 30.0) -> None:
         """Join background launches through the dedicated coordinator."""

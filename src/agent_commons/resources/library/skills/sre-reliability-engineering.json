@@ -1,0 +1,34 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "sre-reliability-engineering",
+    "version": "284574cb39078e505a019cac0d438c02c90c036e0239fcb291be4ce222fd353b"
+  },
+  "content": {
+    "name": "sre-reliability-engineering",
+    "description": "Define and operate user reliability through SLIs/SLOs, error budgets, observability, alerting, incidents, on-call, recovery, Kubernetes reliability, and resilience validation. Use for production-readiness and reliability decisions; infrastructure provisioning and reconciliation belong to platform engineering."
+  },
+  "files": {
+    "SKILL.md": "8838fd96dafa3ed4458a19a0544a5c1ace80522b340732409a4b4bb16d9be160",
+    "agents/openai.yaml": "ffee95a2772ed23cca63cd488bcce395c98902b10e9c5072041cf37c1c81ecb9",
+    "references/00_README.md": "4d8b37a0401e840c0017675160f792490726ffde05b64d0865b96b3b2250f3aa",
+    "references/01-sre-foundations.md": "a46c92399da847f961d950a443f34cca4bef318e5a7259e4382a550f516ed07a",
+    "references/02-slo-sli-sla.md": "e35a611638ce1daa5df14436ffcfae07aa538a3d26a98ce03c454de5bd5ddbb1",
+    "references/03-error-budget.md": "78d324a2a7c5f67b3fd942f0585c1cb9e37398282e2d9ed7da0103ddebb2ed85",
+    "references/04-monitoring.md": "b830f8d918cce9a923acb9e272c3b5225453865d5fdb5e95935fc9d68d6fa0e0",
+    "references/05-logs-traces.md": "e3dadb98e215401a9245651122e38f6a6f7d5e227291c45a17cdeab144002f60",
+    "references/06-alerting.md": "5bee98ca9c988a54ea799953d877c2c5c20aadbb7f4324f25178d8167f9779fa",
+    "references/07-incident-management.md": "ae358e1b5bf76e51840bc2c1527debdc0448730cbb12483ef50f40831126d192",
+    "references/08-postmortems.md": "be3d904ba80c831c1191244971a84f2a69b74427d6bf0715cdf65c4f3f2c8653",
+    "references/09-oncall.md": "58f3f80381956b6240b7ea57eb6b90b179925e5627b984eecfd1299669dfdb0d",
+    "references/10-reliability-architecture.md": "731d13171b67c95423dee4eb2ab6320c90d2823aa86327aea98b4d6cc0ade520",
+    "references/11-kubernetes-reliability.md": "5cb78a399d96ea43def997f5ddc9a8143121df4cfc4271e8a481b2b629a642da",
+    "references/12-chaos-load-testing.md": "36a4e6a7deba1e720b837c9a5ccedea6ab9997688d59a86bb0ef8b44e4168019",
+    "references/13-toil-automation.md": "b790d7f23a5cc63b0bd86576bfcf0cb67bbc284ba463bca635ce60d43928d712",
+    "references/14-business-culture-war-stories.md": "5bf13eecf5ad3842519eb861e6b0360e35bc633301011f9e495e3139bff7f65c",
+    "references/15-tools-glossary.md": "2c5abb63e0a9ea17efc5b39fb3c10dea93dcf7f8bf71294c6d124377ef27e190",
+    "references/16-recovery-and-integrity.md": "f71c8af032d3208795ef5615a0c67c46211f0dbfee46e6c1ee621fe9a4b0dc17",
+    "references/sre-agent-operating-model.md": "940a8164211ff08ae604f4b5f40b90cc9162cb8ccf0a894e192db86a8f5de27f"
+  }
+}

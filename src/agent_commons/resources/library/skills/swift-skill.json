@@ -1,0 +1,21 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "swift-skill",
+    "version": "beddf471224052e78d1f0492a9eb93149ab2bcdf46b9d5c59be2dde85f06aca8"
+  },
+  "content": {
+    "name": "swift-skill",
+    "description": "Use for implementation and review of native iOS applications or modules built with Swift, SwiftUI, UIKit, SwiftData, and Apple frameworks. Use directly for a known native stack; use ios-app-development first when choosing Swift versus Flutter or defining a mixed-stack boundary."
+  },
+  "files": {
+    "SKILL.md": "4e9caba90dfd210bfeddc7ca7335da8b1dd6e7e26e239bfdfd8c55ac2170cbdd",
+    "agents/openai.yaml": "3c30b8831d81a06f3685299524060597fc13785fa6f7b605c5ed9d4696c8b4e8",
+    "references/01-swift-native-architecture.md": "ef51ef4fcbaf3f03b67bf8ff539a0ff85a26c967a2e5aef4811b0f9ff0b4cb47",
+    "references/02-swiftui-state-navigation.md": "5c9fb05ffe5d51629de6281945f398c8ca21febeb4a012e9d4c533b6397ff514",
+    "references/03-swiftdata-networking-persistence.md": "1a5055bc31c7099662026c395e45dedff50ff42d5a7a915d696a6d5cda5300b6",
+    "references/04-swift-concurrency-memory-performance.md": "851be4a071500b92b0e79f0fa7245b78ef7e84f9a0df8bf08485a6a4ec626787",
+    "references/05-swift-platform-security-testing-release.md": "7ef3711de73e86cf79427102a8ee933bc14087aa3266896c6606ab3fd3fb9ab1"
+  }
+}

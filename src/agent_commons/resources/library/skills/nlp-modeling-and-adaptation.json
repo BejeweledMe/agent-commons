@@ -1,0 +1,21 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "nlp-modeling-and-adaptation",
+    "version": "e68c698d0058590e5afca22ed61d77b03dc33a59862827a79c224ac80f69581c"
+  },
+  "content": {
+    "name": "nlp-modeling-and-adaptation",
+    "description": "Use when choosing or adapting a text model. Trigger for rules, TF-IDF or BM25 baselines, encoder or reranker selection, embeddings, BERT-style discriminative models, seq2seq or decoder LLMs, tokenizer changes, continued pretraining, SFT, PEFT/LoRA/QLoRA, preference optimization, distillation, or training-data and adaptation evaluation. Not for LLM product topology, detailed RAG, agent loops, eval harnesses, or serving bottlenecks."
+  },
+  "files": {
+    "SKILL.md": "da524ab2f8f82065da17314d9a2628ff82bda35d66f923a1f3a41106e40d12dd",
+    "agents/openai.yaml": "dd1a8fc3f1879e067f433dffbb39ee8c06493470737503feca9565582f81cb8a",
+    "references/01_model_selection.md": "b031f44d7eb08e1c3163be244961dd20f7c250c44842abd5211cfd91174587ac",
+    "references/02_adaptation_methods.md": "c32f84fae602552c6d961ab779c964ee58f9a7dcac4b57fcd39978b13a733648",
+    "references/03_data_training_control.md": "d3158640853f711226fbb3b0db349092d6f20eaf07e921899f85e9110e7cef01",
+    "references/04_preference_optimization.md": "b6dabc51da2981071c2d3ae6c62d333a44e0ccab5f616f5579cd5df475091fe7",
+    "references/05_evaluation_release.md": "0922ad7dac158c409df8471c09a90fabd458728ff3ae4e6e4de7cd129b0b8ee0"
+  }
+}

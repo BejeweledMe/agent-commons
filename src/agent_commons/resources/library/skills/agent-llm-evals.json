@@ -1,0 +1,27 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "agent-llm-evals",
+    "version": "2419063abf530de1bf5d336558e0b3650c003275444051aab0a36b23fe7e2482"
+  },
+  "content": {
+    "name": "agent-llm-evals",
+    "description": "Design, debug, or review LLM and agent evaluations: task datasets, tool/state grading, calibrated judges, traces, candidate selection, repeated trials, and release gates. Use when evaluating model, prompt, tool, or workflow changes; domain owners define the behavior being measured."
+  },
+  "files": {
+    "SKILL.md": "38fe0275854e68445a9ec538b4148ae5b282381f771361c98da52160f1a2520e",
+    "agents/openai.yaml": "704a28dd44ae11440fb5f4c7dea631c8268f39aac6da0307b3f4870fc995c43a",
+    "references/00_README.md": "7d533327c6b5134edb7dc5c220ba6349b39855c324419af775bffa07246ea132",
+    "references/01-evals-foundations.md": "73b4bf2ab00d34a26125d7e33c6ed2d3ffa70411e3cf9c14431427c9a222b65b",
+    "references/02-agent-eval-design.md": "e95bd97106c1eaa1f99837942acd606e224ce5aedfd67c26cb5950fc0c91d012",
+    "references/03-graders-rubrics-human-calibration.md": "d97cbe3366854b706fdb4b28e21e303331946b5958a433d9e56407b004300486",
+    "references/04-traces-transcripts-observability.md": "fdb150c5d6ef1a084898c1fffdeb4ccb685e516258de5dce01a1c33ca1a983e1",
+    "references/05-capability-regression-release.md": "995f42baac97301989e04fd4a92bdc910aa00f2dfef86aa9c03b8f9f1c7f9bca",
+    "references/06-agent-eval-checklists-and-templates.md": "48813e474602bfd973e3fae809a3b4587642036dbebe44e7e5a614b9c9db86bd",
+    "references/07-eval-pyramid-and-feedback-loops.md": "cfb9994a9706c6cd2b23d887a14739582b4f9bbb936a9b86449bcec1ac213d69",
+    "references/08-continuous-evaluation-gates.md": "ae1af2e338c1db9484a5e768b697a3a877848ee6598de62865678906b62b1188",
+    "references/09-rag-and-security-eval-protocols.md": "d00f7ed822c55b50c12190f03e8517e2b4a290669d1cefb61b3b4f846c0c7bac",
+    "references/search-selection-and-verification.md": "677ae61020fdde7a170aba9ed6cd6b79d17c3c5451ec62581b50f2e6f2ce7ce1"
+  }
+}

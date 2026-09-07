@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-editing",
+    "version": "75a8cbce351397a588480b679171714a46dfb517e8fe4fa666c8b2d97c42e8ab"
+  },
+  "content": {
+    "name": "information-editing",
+    "description": "Edit existing informational text through copyediting, faithful rewrite, audience adaptation, restructuring, or compression."
+  },
+  "files": {
+    "SKILL.md": "bd13915f6b3dedaed2b221e124f453c7b8b7a09af7b672180f76ee84a4854511"
+  }
+}

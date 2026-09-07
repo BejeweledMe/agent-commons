@@ -260,6 +260,8 @@ def _grok_mcp_config(
         "--session-id",
         "session.preflight",
     ]
+    if environment.get("AGENT_COMMONS_LIBRARY_ROOT"):
+        arguments.extend(("--library-root", environment["AGENT_COMMONS_LIBRARY_ROOT"]))
     allowed = {
         value.removeprefix("MCPTool(agent-commons__").removesuffix(")")
         for index, value in enumerate(invocation.argv)

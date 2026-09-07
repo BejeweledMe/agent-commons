@@ -1,0 +1,29 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "system-design",
+    "version": "dc4659b3f1bd8b984bfc12143f29cb9b0668768817ab5557ceb683b32fd4459a"
+  },
+  "content": {
+    "name": "system-design",
+    "description": "Design, review, and evolve classical software and distributed service architecture: boundaries, data authority, capacity, consistency, caching, queues/streams, replication, sharding, recovery architecture, security, and safe migration. Use for architecture documents, production-readiness reviews, and system design interviews. Route HTTP/OpenAPI artifact and wire compatibility work to api-contract-engineering."
+  },
+  "files": {
+    "SKILL.md": "69fa37a782fc285ecec8b4f4ccbf6bebbfb674333963c103b4632af297bcedeb",
+    "agents/openai.yaml": "675dda9b41b019469c467735ade26af6441c4c6d3101bfd93b41b6fa30945a74",
+    "references/01-operating-model.md": "819c9da8ff5b46f7ec4c6c8510bb3e5acdac830085261d46c8ad5be2935b8f18",
+    "references/02-requirements-and-capacity.md": "72e4e7390302990ed5a67e368aa7cb4db251083139be7453361f74291dd11294",
+    "references/03-boundaries-and-contracts.md": "e9fb14fb87b98bd4972ad5fe7b59133ecc6524f4e54fae2b56e84b11366dd25a",
+    "references/04-data-and-consistency.md": "221cd052e5ea231032d4871e00b1ea6d78f25404919f467db6e3adb90a70b909",
+    "references/05-distributed-communication.md": "1283c449925f837aeb39d1cf69343f846860a15d31769a9d015e529ce51aa8bd",
+    "references/06-scalability-performance-cost.md": "24d3addcc8a09660fca55cac97d693dbc994abb7a3702d09c2c7d16213a5fca4",
+    "references/07-reliability-and-recovery.md": "1b5b6ced2f5a9f2b73d16b9b38cab7e88061eae78b57575a0567f66fb467e165",
+    "references/08-security-and-multitenancy.md": "76fa549b712220c6b1e61ce9dbe529fd4bbd0fbc082dffa08d1598f0fcac5546",
+    "references/09-operability-and-production-readiness.md": "443cbded72cd59873941439ed0a359780a14b2de382199350e14977d5715f76b",
+    "references/10-evolution-and-maintainability.md": "ae85305717753cf03ffed2a4232123f13ea898bcca55626684878b603b24023f",
+    "references/11-pattern-selection.md": "0ba8b8ae4ea5fa52a726a1520fc4e487a614ee5c3651bc960941b78dd3028b58",
+    "references/12-templates-and-review-checklists.md": "ede31efcb1546a86df933efd3746127cf5c309e6160510749480f339622f8038",
+    "references/distributed-guarantees-and-recovery.md": "2ab545893e74c7270175a33dd9d08724971cfd9d6e669f3545341612335cbb63"
+  }
+}

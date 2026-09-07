@@ -86,7 +86,20 @@
     "authoring_stale": "The selected package or screen evidence changed",
     "authoring_stale_help": "Nothing was published. Refresh eligible artifacts and review the current package revision before retrying.",
     "authoring_failed": "Design Package could not be published",
-    "authoring_failed_help": "No canonical success was recorded. Check the typed status code, correct the form, and retry."
+    "authoring_failed_help": "No canonical success was recorded. Check the typed status code, correct the form, and retry.",
+    "import_title": "Add a screen",
+    "import_help": "Import a PNG or JPEG up to 10 MiB and 16 megapixels. The image becomes a project artifact; importing does not approve the design.",
+    "import_name": "Screen name",
+    "import_file": "Image file",
+    "import_another": "Add another screen",
+    "import_pending": "Importing…",
+    "import_retry": "Retry the same import",
+    "import_submit": "Import screen",
+    "import_invalid": "Choose a PNG or JPEG within the size limit and enter a name.",
+    "import_saved_refresh_failed": "The screen was imported. Refresh the Gallery to select it; do not upload it again.",
+    "import_saved": "Screen imported and selected. Add it to a new or existing Design Package below.",
+    "import_uncertain": "The response was lost. Retry the same import to recover its result without creating a duplicate.",
+    "import_failed": "The image could not be imported. Check the image and workspace, then retry."
   },
   "ru": {
     "app_title": "Галерея дизайна",
@@ -175,6 +188,19 @@
     "authoring_stale": "Выбранный пакет или свидетельства экрана изменились",
     "authoring_stale_help": "Ничего не опубликовано. Обновите список артефактов и проверьте текущую ревизию пакета перед повторной попыткой.",
     "authoring_failed": "Не удалось опубликовать пакет дизайна",
-    "authoring_failed_help": "Канонический успех не записан. Проверьте типизированный код статуса, исправьте форму и повторите попытку."
+    "authoring_failed_help": "Канонический успех не записан. Проверьте типизированный код статуса, исправьте форму и повторите попытку.",
+    "import_title": "Добавить экран",
+    "import_help": "Загрузите PNG или JPEG до 10 МиБ и 16 мегапикселей. Изображение станет артефактом проекта; загрузка не означает одобрения дизайна.",
+    "import_name": "Название экрана",
+    "import_file": "Файл изображения",
+    "import_another": "Добавить ещё экран",
+    "import_pending": "Загрузка…",
+    "import_retry": "Повторить эту загрузку",
+    "import_submit": "Загрузить экран",
+    "import_invalid": "Выберите PNG или JPEG допустимого размера и укажите название.",
+    "import_saved_refresh_failed": "Экран загружен. Обновите галерею, чтобы выбрать его; повторная загрузка не нужна.",
+    "import_saved": "Экран загружен и выбран. Добавьте его в новый или существующий дизайн-пакет ниже.",
+    "import_uncertain": "Ответ потерян. Повторите эту загрузку, чтобы получить результат без дубликата.",
+    "import_failed": "Не удалось загрузить изображение. Проверьте файл и рабочее пространство, затем повторите."
   }
 }

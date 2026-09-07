@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "neural-training-systems",
+    "version": "1494b9dd99a9ed39916b86fc981ead6a2fa898d2c1caa333a2e5290102ee68e6"
+  },
+  "content": {
+    "name": "neural-training-systems",
+    "description": "Diagnose, optimize, scale, or recover neural training runs: OOM, slow steps, mixed precision, gradient accumulation, DDP/FSDP, collectives, and checkpoint consistency. Owns training execution; model/objective choices belong to modeling skills and serving execution to inference skills."
+  },
+  "files": {
+    "SKILL.md": "272303ddbe43b172ed30e7d0b7d5469cc4c1c76f616760506f4aec2aca3951a7",
+    "agents/openai.yaml": "51d530ca5c1bf0a538d2da0c77516740b5b1cd65cd3b84cb63bc266c6b2cdf28",
+    "references/00_README.md": "54885e6d13f8923481c3a7e0e65677d46f4137962b244dcc9cbf5566c81b11bf",
+    "references/checkpoint-consistency-and-recovery.md": "e4b35e4aac0395eeefe4dae5c0ae2ad63be4a229d103877fc0d055f861cde99b",
+    "references/correctness-memory-and-step-profile.md": "b73191e0d501bbfd03124d6364b3be34bfcc43b5394f8657f75a8d7b5c5f9a6e",
+    "references/parallelism-collectives-and-topology.md": "1af4f8c7614abadcbc92dd05d4382c38a8c668bd3e992649a46bd5959c21a927",
+    "references/precision-batching-recompute-and-compilation.md": "fc61c6108ab08b44bb7b918f7e38deae8bc8c731dfec31066eac63a15cb1cfbf",
+    "references/training-performance-and-compression.md": "c9ae64b8ca9009ba980913c8252cee9488364c26f0f4d991d32d6c38ba4da7da"
+  }
+}

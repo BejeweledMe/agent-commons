@@ -62,6 +62,14 @@ def invocation_fingerprint(invocation: RunnerInvocation) -> str:
     ):
         digest.update(len(value).to_bytes(8, "big"))
         digest.update(value)
+    # Provider-owned fixed environment is part of the immutable invocation.
+    # It contains no inherited host credentials; Grok carries its managed MCP
+    # bridge settings here instead of forwarding provider argv to the server.
+    for key, value in sorted((invocation.extra_env or {}).items()):
+        for part in (key, value):
+            encoded = part.encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
     return digest.hexdigest()
 
 
@@ -327,6 +335,7 @@ class LaunchPlanner:
         role_tools: tuple[str, ...],
         role_grants: Mapping[str, str],
         context: ContextBinding | None = None,
+        library_root: Path | None = None,
     ) -> ValidatedLaunchPlan:
         context = context if context is not None else ContextBinding.fresh()
         refusal = LaunchPlanner.validate_skill_projection(validation)
@@ -341,6 +350,7 @@ class LaunchPlanner:
             launch_instruction_with_context(validation.instruction, context),
             workspace_root=workspace_root,
             state_root=state_root,
+            library_root=library_root,
             delegation_id=delegation_id,
             child_session_id=child_session_id,
             max_budget_microusd=max_budget_microusd,

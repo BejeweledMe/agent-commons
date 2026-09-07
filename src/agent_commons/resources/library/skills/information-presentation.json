@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-presentation",
+    "version": "049009ec30219de7c6476d6089159d6a743e901b9544e3de185b982ebddade8c"
+  },
+  "content": {
+    "name": "information-presentation",
+    "description": "Create claim-driven presentation content with clear visual evidence, speaker notes, and a decision- or learning-oriented narrative."
+  },
+  "files": {
+    "SKILL.md": "63098a0b9249acaebe19f5265697640e0506b883ffa59d98e8fe46d8982fe720"
+  }
+}

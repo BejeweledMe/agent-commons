@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:agent:v2",
+  "x-schema-name": "commons.payload.agent.v2",
+  "x-event-types": [
+    "agent.created"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^agent\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "profile_id": {
+      "enum": [
+        "codex-builder",
+        "codex-independent-reviewer",
+        "claude-builder",
+        "claude-independent-reviewer",
+        "grok-builder",
+        "grok-independent-reviewer"
+      ]
+    },
+    "grants": {
+      "$ref": "#/$defs/grants"
+    },
+    "context_mode": {
+      "enum": [
+        "fresh",
+        "accumulated"
+      ]
+    },
+    "template": {
+      "const": false
+    },
+    "origin": {
+      "const": "human"
+    },
+    "approval": {
+      "enum": [
+        "human",
+        "human_confirmed",
+        "automatic"
+      ]
+    },
+    "created_by_agent_id": {
+      "type": "null"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "proposal_ref": {
+      "$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"
+    },
+    "turnover_budget": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "lifetime": {
+      "$ref": "#/$defs/lifetime"
+    },
+    "skills": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/catalogId"
+      },
+      "maxItems": 0
+    },
+    "tool_allowlist": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/catalogId"
+      }
+    },
+    "extensions": {
+      "type": "object"
+    },
+    "specialization_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "source",
+        "id",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "const": "role"
+        },
+        "source": {
+          "enum": [
+            "builtin",
+            "custom"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "catalogId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+    },
+    "grantLevel": {
+      "enum": [
+        "deny",
+        "ask",
+        "auto"
+      ]
+    },
+    "grants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "create_roles",
+        "retire_roles",
+        "open_links"
+      ],
+      "properties": {
+        "create_roles": {
+          "$ref": "#/$defs/grantLevel"
+        },
+        "retire_roles": {
+          "$ref": "#/$defs/grantLevel"
+        },
+        "open_links": {
+          "$ref": "#/$defs/grantLevel"
+        }
+      }
+    },
+    "lifetime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "persistent",
+            "task_scoped"
+          ]
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"
+        }
+      }
+    }
+  },
+  "required": [
+    "agent_id",
+    "name",
+    "profile_id",
+    "grants",
+    "context_mode",
+    "origin",
+    "approval",
+    "rationale",
+    "lifetime",
+    "specialization_ref"
+  ]
+}

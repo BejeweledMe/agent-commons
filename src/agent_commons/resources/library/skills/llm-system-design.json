@@ -1,0 +1,21 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "llm-system-design",
+    "version": "aea24706b94ecd1c501e307d7ae63adf240e35c1623f77a48bb795fd32582720"
+  },
+  "content": {
+    "name": "llm-system-design",
+    "description": "Use when designing, reviewing, or evolving an LLM product as a system. Trigger for prompt versus RAG versus agent versus adaptation decisions, model or provider routing, prompt and context architecture, token/cost/latency budgets, degradation and fallbacks, tenant isolation, and versioned LLM releases. Not for detailed retrieval, agent-loop, model-training, eval-harness, security-test, or GPU-runtime implementation."
+  },
+  "files": {
+    "SKILL.md": "cd376611683afdbcd3e4bbb26309da16f12b418465673392a2c9503f313275f7",
+    "agents/openai.yaml": "931c616eb98864d11a920ba802c354e469dd96aff07446d60869bc8e1d5a201c",
+    "references/01_capability_selection.md": "bc4e918f728b2e13dec18a2c96270d48a47796aa3211160198271b8ef12b95b8",
+    "references/02_models_prompts_context.md": "eee584e99cd3c4dc0eecf5f08a6cead3cf57de493bc5f0e1293f617b81c82784",
+    "references/03_architecture_routing_fallbacks.md": "1ca38e7281e18e9898c66ab19da7abd8a313f6d333cefe6dbc2865122a2aa59c",
+    "references/04_release_tenancy_controls.md": "937e20958f5cd9a6c60771152e35da0051f2b4c4862e677c17aa8a69d5ca0046",
+    "references/05_templates.md": "a51d85cef6b09692137b9991e608d76167af41d4e16f2d22986d3b9ff670a319"
+  }
+}

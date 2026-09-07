@@ -718,15 +718,52 @@ def files_under(path: Path) -> list[Path]:
     return [candidate for candidate in path.rglob("*") if candidate.is_file()]
 
 
-def test_every_event_spec_has_exactly_one_complete_payload_family() -> None:
+def test_every_event_spec_has_only_its_explicit_complete_payload_families() -> None:
     registry = SchemaRegistry()
     index = payload_schema_index(registry)
 
     assert set(index) == set(EVENT_SPECS)
-    assert all(len(index[event_type]) == 1 for event_type in EVENT_SPECS)
+    versioned_families = {
+        "agent.created": {"commons.payload.agent.v1", "commons.payload.agent.v2"},
+    }
     for event_type, spec in EVENT_SPECS.items():
-        schema = registry.schema(index[event_type][0])
-        assert set(spec.required) <= set(schema.get("properties", {})), event_type
+        if event_type in versioned_families:
+            assert set(index[event_type]) == versioned_families[event_type]
+        else:
+            assert len(index[event_type]) == 1, event_type
+        for schema_name in index[event_type]:
+            schema = registry.schema(schema_name)
+            assert set(spec.required) <= set(schema.get("properties", {})), event_type
+
+
+def test_agent_v2_is_closed_to_specialized_creation_payloads() -> None:
+    registry = SchemaRegistry()
+    payload = {
+        **deepcopy(PAYLOADS["agent.created"]),
+        "specialization_ref": {
+            "kind": "role",
+            "source": "builtin",
+            "id": "frontend-engineer",
+            "version": "a" * 64,
+        },
+    }
+    schema = registry.schema("commons.payload.agent.v2")
+    assert schema["x-event-types"] == ["agent.created"]
+    assert set(schema["required"]) == {*EVENT_SPECS["agent.created"].required, "specialization_ref"}
+    registry.validate("commons.payload.agent.v2", payload)
+    with pytest.raises(ValidationError):
+        registry.validate("commons.payload.agent.v1", payload)
+    with pytest.raises(ValidationError):
+        registry.validate("commons.payload.agent.v2", PAYLOADS["agent.created"])
+    for key, value in {
+        "expected_revision": EVENT_ID,
+        "link_id": AGENT_LINK_ID,
+        "changes": {"name": "Changed"},
+        "template": True,
+        "origin": "agent",
+    }.items():
+        with pytest.raises(ValidationError):
+            registry.validate("commons.payload.agent.v2", {**payload, key: value})
 
 
 @pytest.mark.parametrize("event_type", sorted(EVENT_SPECS))

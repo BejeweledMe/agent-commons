@@ -57,6 +57,7 @@ class AgentCreatedPayload(TypedDict):
     tool_allowlist: NotRequired[list[str]]
     proposal_ref: NotRequired[TypedRefPayload]
     extensions: NotRequired[dict[str, JsonValue]]
+    specialization_ref: NotRequired[dict[str, JsonValue]]
 
 
 class AgentReconfiguredPayload(TypedDict):
@@ -219,6 +220,7 @@ class AgentCreatedEnvelope(AgentEnvelope):
     tool_allowlist: tuple[str, ...] | None
     proposal_ref: TypedRef | None
     extensions: FrozenJsonObject | None
+    specialization_ref: FrozenJsonObject | None = None
     event_type: AgentCreatedEventType = "agent.created"
 
     def to_payload(self) -> AgentCreatedPayload:
@@ -249,6 +251,8 @@ class AgentCreatedEnvelope(AgentEnvelope):
             payload["proposal_ref"] = self.proposal_ref.to_payload()
         if self.extensions is not None:
             payload["extensions"] = thaw_json_object(self.extensions)
+        if self.specialization_ref is not None:
+            payload["specialization_ref"] = thaw_json_object(self.specialization_ref)
         return payload
 
 
@@ -364,6 +368,7 @@ def parse_agent_role_envelope(
             tool_allowlist=_optional_string_tuple(payload, "tool_allowlist"),
             proposal_ref=_optional_ref(payload, "proposal_ref"),
             extensions=_optional_frozen_object(payload, "extensions"),
+            specialization_ref=_optional_frozen_object(payload, "specialization_ref"),
         )
     if event_type == "agent.reconfigured":
         return AgentReconfiguredEnvelope(

@@ -1,0 +1,15 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "information-explanation",
+    "version": "578d6271114e5cd9f2c3832361d4b3f80903992eb933666cd9b8bb370d98d978"
+  },
+  "content": {
+    "name": "information-explanation",
+    "description": "Explain a concept, mechanism, system, or distinction so the reader builds a correct and usable mental model."
+  },
+  "files": {
+    "SKILL.md": "17c2d65119aad0095ba309a0849d6e6c7cb8cc8f4382ed64215e49671b33ec6c"
+  }
+}

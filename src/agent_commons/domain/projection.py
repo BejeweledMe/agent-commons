@@ -112,7 +112,7 @@ _LIFETIME_CLOSING_TASK_STATES = frozenset({"accepted", "cancelled"})
 #: families.  A ledger
 #: stamped above the reader makes projection say "update agent-commons"
 #: instead of reporting integrity findings it cannot judge.
-LEDGER_SEMANTICS_VERSION = 4
+LEDGER_SEMANTICS_VERSION = 5
 
 #: Event types whose replay depends on newer-than-v1 semantics, and the
 #: version each one requires.  Writers consult this to stamp the ledger
@@ -124,6 +124,10 @@ SEMANTICS_SENSITIVE_EVENTS = {
     "context_pack.revised": 3,
     "design_package.created": 4,
     "design_package.revised": 4,
+    # Synthetic writer keys: legacy roles and ordinary task text edits keep
+    # their existing floor; exact library pins and graph edits need v5 readers.
+    "agent.specialization_bound": 5,
+    "task.dependencies_revised": 5,
 }
 
 

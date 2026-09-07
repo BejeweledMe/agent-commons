@@ -1,0 +1,28 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "business-product-consulting",
+    "version": "356987ac0943b11999c9a6917737accd2f4030d5a60ea12494f7aacfce8e913f"
+  },
+  "content": {
+    "name": "business-product-consulting",
+    "description": "Use for product and engineering strategy, business cases, market or portfolio choices, operating-model and ownership decisions, executive recommendations, and structured tradeoff analysis. For user discovery, UX, design systems, or product requirements, use product-design as the primary owner."
+  },
+  "files": {
+    "SKILL.md": "4598f70f3b924a1553a297d26ad5b112b57583610b791b68c21eb296967edb0c",
+    "agents/openai.yaml": "2bd37a3c3abe6c3f39c36b6fee1e47e2f5e7457376046ded251a9f9bbd38059f",
+    "references/00_README.md": "24ba2134d5c6e592667703d85c78e8f3c2b37fedaeb750cbe8da289f19893f9d",
+    "references/01-business-thinking.md": "d8047781071f373248236e364daaed3527e9c860f95e633fcc664bec7701c5b7",
+    "references/02-scr-scqa-communication.md": "eec5c6dacd9fac8ab90a9c6b89b1acab00153528276496db5f1de52b795c9ba0",
+    "references/03-pyramid-principle.md": "811edd7bdeb69737b6afd999f877c45a31a54eb98dd4061f2726cad6c74038fa",
+    "references/04-mece-issue-trees.md": "c8a5b5d658cb55a92b1577426839bc17ca1045cf5e921e43485abe0191c441f6",
+    "references/05-product-discovery-and-market-analysis.md": "82ba5f76bb23b8b34ce2916083cf175be5f3a893ffd9e90e787e801f1ea8ec0b",
+    "references/06-developer-productivity-space.md": "fbbb218160df1e4f815b9eadb9bf7292e76fae5be9e6a2f9c19741a08ef6c9da",
+    "references/07-ai-assisted-development-dora.md": "0433cd2217544769f2bb1816dae939167672dfa90fee3b0e10e4a68eec420d56",
+    "references/08-team-topologies-fast-flow.md": "28af3dbe587e37aa0ef35deda3d02c1071c612f3faed6118911c505ea535c9a3",
+    "references/09-risk-and-second-order-effects.md": "9d54e24e1dd6acec79aeb26f85a9d82b076fb07a3437b652650f631d9ad88215",
+    "references/10-presentation-review-checklist.md": "f4886f6b1c927e355f4bf4d2133ae144a80929b11e57cddfc2cabd1aa99b6a18",
+    "references/11-agent-operating-model-and-skill-outline.md": "cafa3a6c57da0bca2bc06a4166c38ad7589f6ab871331f5dd99ca8819b50b1c1"
+  }
+}

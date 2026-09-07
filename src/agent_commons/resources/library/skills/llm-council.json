@@ -1,0 +1,16 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "llm-council",
+    "version": "3f60d978f3ef252ea7e9f270dcddb4e722377415ce0473497161674259b46fb2"
+  },
+  "content": {
+    "name": "llm-council",
+    "description": "Run, design, review, or debug multi-model councils using independent first answers, peer critique, and synthesis traceable to intermediate outputs."
+  },
+  "files": {
+    "SKILL.md": "5cdf1699556fd87a7d108e363fe380ce8b01c159869308d88f6767500e507933",
+    "agents/openai.yaml": "be1f53e116b832b6e7090e6750b22c8d0d458e4f8388d5b6cb0e7a08f6862569"
+  }
+}

@@ -41,6 +41,9 @@ export type SetupGuidance = {
 export type Profile = {
   id: string;
   label: string;
+  provider?: string;
+  model?: string | null;
+  configured?: boolean;
 };
 
 export type Catalog = {
@@ -48,6 +51,7 @@ export type Catalog = {
   presets: readonly RolePreset[];
   contextModes: readonly string[];
   grantLevels: readonly string[];
+  modelOptions?: Readonly<Record<string, readonly string[]>>;
 };
 
 export type RoleOption = {
@@ -55,7 +59,11 @@ export type RoleOption = {
   name: string;
   profileId: string;
   contextMode: "fresh" | "accumulated";
+  model?: string | null;
+  specializationRef?: import("./libraryTypes.js").LibraryRef | null;
 };
+
+export type RoleCreateResult = { agentId: string };
 
 export type RolePreset = RoleOption & { skills: readonly string[] };
 
@@ -343,6 +351,9 @@ export type TrackerTask = {
   blockingDependencyIds: readonly string[];
   ownerSessionId: string | null;
   roleName: string | null;
+  suggestedAgentId: string | null;
+  suggestedRoleName: string | null;
+  suggestedProvider: "codex" | "claude" | "grok" | null;
   provider: string | null;
   profileId: string | null;
   phase: string | null;

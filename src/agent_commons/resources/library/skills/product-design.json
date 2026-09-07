@@ -1,0 +1,30 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "product-design",
+    "version": "8c7bcb70f7769dd131580e0ef572fc10a8b19601c7a4a94b381d6155256066cd"
+  },
+  "content": {
+    "name": "product-design",
+    "description": "Use for user-centered product discovery, UX, product requirements, AI/ML experiences, design systems, and hypothesis validation. Own the path from user outcome and evidence to an experience and measurable product change; use business-product-consulting for strategy, operating-model, or executive tradeoff decisions."
+  },
+  "files": {
+    "SKILL.md": "1460b0afd0e60116f194dc03e63c478363bcf1bad581922a11002be271ffc5a6",
+    "agents/openai.yaml": "ffb5cc9b78ee1ecd599e27af8e0c96e834db3f16e9fa1e117364930545289362",
+    "references/00-index.md": "1746fd578dd945d8ee47882d6d0d77c2c0103aafe5176ba2f33afce9be5069ff",
+    "references/01-terminology.md": "17705c158c9ac7a30a1437f6e5697f16dc7e30a425b27ffaf1f38724ac9bb1f2",
+    "references/02-product-operating-model.md": "5c0c7b86c324797c366a34eff0d8db3f7c7e0d8aa46d057ad240c9b3e2eb6659",
+    "references/03-discovery-and-opportunity-solution-trees.md": "2dd374550756baf593d8f9e4fb6fc8f4a336ed57d7a480ed3e2704a4fbc0f15b",
+    "references/04-user-research-and-interviewing.md": "f37a294cd0abf06ba6790f9bcf5319de07d47f57bff8431f336e30dcf25c0e4a",
+    "references/05-validation-and-assumption-tests.md": "83567303cd7216579a1fe1c6fcee8eea9883b50e6250cc7a8e3ff31387612b6d",
+    "references/06-ai-ml-product-ux.md": "6d4a98419ec25b2c28334a7d6d626360875ae34250aa7ea4a3c10feff38025b4",
+    "references/07-calibrated-trust-and-human-control.md": "d715954dfa7da58b11d61a9c03433f8e588ed88f31cb67c3150c79f50447590c",
+    "references/08-ui-ux-product-quality.md": "fcc9f929cb9ee1c44c8be63c5b3a920cf79dacd04cdfd5a13657f625cd550af5",
+    "references/09-design-systems-as-product.md": "3e1ed0547f275b0a3531f53e69451afbbc20414e93ff7cc9f82aa3efb5413b7d",
+    "references/10-design-system-governance-adoption-metrics.md": "54815ef8c76ee5e2c16e5624ed018ea46e1fa587302e22550e0a2b7c0ea4559a",
+    "references/11-business-outcomes-and-product-metrics.md": "bf435b458bdb0e76f5e404f514b95f1d0720d8f8779045bf561c32a9537869cf",
+    "references/12-agent-product-design-checklists.md": "2151f960516f6427dd87c0d765305a93114cfe45fd673db6818ee5e77ad271ce",
+    "references/13-anti-patterns.md": "acbaf2dca5f4c61eba13cfef25dd5be74eec0179b42e4f4b06234b09abec7702"
+  }
+}

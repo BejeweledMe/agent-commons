@@ -15,6 +15,10 @@ from agent_commons.domain.states import (
     LIVE_WORKER_DELEGATION_STATES,
     NON_TERMINAL_DELEGATION_STATES,
 )
+from agent_commons.domain.task_edits import (
+    validate_task_dependency_change,
+    validate_task_suggestion,
+)
 from agent_commons.domain.transitions import transition_spec
 from agent_commons.domain.validation import EVENT_SPECS
 from agent_commons.errors import LifecycleConflictError, ValidationError
@@ -116,6 +120,8 @@ def validate_transition(
         raise LifecycleConflictError(
             f"{event_type} is not allowed from {family} state {current.get('state')}"
         )
+    if event_type == "task.revised":
+        validate_task_dependency_change(snapshot, payload)
     if event_type == "context_pack.revised":
         _validate_context_pack_bindings(snapshot, payload)
     if event_type == "design_package.revised":
@@ -437,6 +443,7 @@ def _validate_creation(
     if event_type == "delegation.requested":
         _validate_target_binding(snapshot, payload)
     if event_type == "task.created":
+        validate_task_suggestion(snapshot, payload)
         for dependency in payload.get("dependencies") or []:
             require_entity(snapshot, "task", str(dependency))
     if event_type == "delegation.requested":

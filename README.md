@@ -51,9 +51,11 @@ Role → Task → Run → independent Review → human Acceptance
 - A completed run is not automatically accepted. Send the work for an
   independent review, then record acceptance only when you are satisfied.
 
-The new **Work** screen helps with setup and starting a run. The full (legacy)
-panel currently remains the place to monitor runs, request review, accept work,
-or return it for changes. This handoff is deliberate and visible in the UI.
+**Work** provides a live task graph, task editing, run preparation, review and
+human acceptance. **Library** includes 45 skills, 30 provider-neutral
+specializations and five workflow blueprints. See the
+[library guide](docs/user/en/service-library.md) or
+[руководство по библиотеке](docs/user/ru/service-library.md).
 
 ## Current limits
 

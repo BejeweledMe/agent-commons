@@ -215,6 +215,7 @@ def create_agent(client, *, name: str) -> dict[str, Any]:  # type: ignore[no-unt
 
 def test_every_mutating_route_dies_without_the_manager_write_path(
     writable_client,  # type: ignore[no-untyped-def]
+    writable: UIContext,
     workspace: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -265,11 +266,35 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
     thread_id = thread.get("entity_ref", {}).get("id") or thread.get("thread_id")
     thread_revision = str(thread.get("revision", ""))
 
+    from agent_commons.ui.library_blueprints import blueprint_catalog
+    from tests.ui.test_gallery_upload import _body as upload_body
+    from tests.ui.test_library_blueprints import _selection
+
+    writable._library_root = workspace["repo"].parent / "library"
+    blueprint = blueprint_catalog(writable.library_store())["blueprints"][0]
     monkeypatch.setattr(CommonsManager, "record_event", explode)
     # Every route in the sealed tuple, not a sample of it: the docstring's claim
     # is only true if the list below is the list up there. A route missing from
     # here is a route that could stop being thin without this test noticing.
     calls = (
+        ("/api/gallery/import", upload_body()),
+        (f"/api/library/blueprints/{blueprint['id']}/apply", _selection(blueprint)),
+        (
+            f"/api/work/tasks/{second_task['id']}/edit",
+            {
+                "expected_revision": second_task["revision"],
+                "changes": {"title": "Updated"},
+                "idempotency_key": "sealed-edit",
+            },
+        ),
+        (
+            f"/api/work/tasks/{second_task['id']}/cancel",
+            {
+                "expected_revision": second_task["revision"],
+                "reason": "Scope changed",
+                "idempotency_key": "sealed-cancel",
+            },
+        ),
         ("/api/agents", _agent_body(name="Second")),
         (
             f"/api/agents/{agent_id}/reconfigure",
@@ -333,6 +358,10 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
     }
     covered = {
+        ("POST", "/api/gallery/import"),
+        ("POST", "/api/library/blueprints/{blueprint_id}/apply"),
+        ("POST", "/api/work/tasks/{task_id}/edit"),
+        ("POST", "/api/work/tasks/{task_id}/cancel"),
         ("POST", "/api/agents"),
         ("POST", "/api/agents/{agent_id}/reconfigure"),
         ("POST", "/api/agents/{agent_id}/retire"),

@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "node-typescript-backend-engineering",
+    "version": "2d28f8838521b93cc469d168fd40dbc401a60c530e64505ffeaa3fd7a13884dd"
+  },
+  "content": {
+    "name": "node-typescript-backend-engineering",
+    "description": "Build, review, and debug Node.js/TypeScript backend services, including async lifecycle, streams, workers, Fastify/Express adapters, and runtime validation. Browser rendering belongs to web-frontend-engineering; HTTP/OpenAPI artifacts to api-contract-engineering; engine proof to database-engineering."
+  },
+  "files": {
+    "SKILL.md": "0b61fb18acf4b2306b7b9a6de065343b499eef321f64e58006a105a56bfdbe80",
+    "agents/openai.yaml": "38e5792191264a3be2f0e0cbfe469324c0720ad8420b102175bc8259ef8b71a9",
+    "references/00_README.md": "90e49cb194da19404a96ebfff83d5f88c7af6a921e7035e1ef6e4c9a54d76b36",
+    "references/fastify-express-http-lifecycle.md": "0bdf90e8eaa9a9c6dfd45ffa2e9fafdd01bd17995e1ed66cc4a52fb7c2af1895",
+    "references/runtime-modules-and-async-contracts.md": "568427a88f54e772e7e396468311bc7404baa914deb7552f3d071fbb513cd51b",
+    "references/streams-backpressure-and-cancellation.md": "03300101c046342ae2359a0b17297b61365b1deb24017b2825c9edc663e327eb",
+    "references/testing-and-packaging.md": "38a812df0756c6b2a0fc9803f28c1a07f3b1c6792d4b1823ced7b89bb675a03b",
+    "references/workers-and-bounded-capacity.md": "9e0d86b94f1759d30a5920d44a952ac326838676222b7bdfd569c5a647b20342"
+  }
+}

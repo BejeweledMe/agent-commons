@@ -106,6 +106,7 @@ const MAX_ERROR_MESSAGE_BYTES = 2_048;
 const MAX_SAFE_ACTIONS = 4;
 const MAX_PREVIEW_PIXELS = 16_000_000;
 const TYPED_ID = /^[a-z][a-z0-9_]*\.[0-9A-HJKMNP-TV-Z]{26}$/;
+const SESSION_ID = /^session\.[a-f0-9]{32}$/;
 const CONTENT_REVISION = /^sha256:[a-f0-9]{64}$/;
 const ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
@@ -222,7 +223,8 @@ export function applyDocumentLocale(root: Pick<HTMLElement, "lang">, locale: "en
 }
 
 function typedId(value: unknown, prefix: string): string {
-  if (typeof value !== "string" || !TYPED_ID.test(value) || !value.startsWith(`${prefix}.`)) fail();
+  if (typeof value !== "string" || !value.startsWith(`${prefix}.`)
+    || !(TYPED_ID.test(value) || (prefix === "session" && SESSION_ID.test(value)))) fail();
   return value;
 }
 

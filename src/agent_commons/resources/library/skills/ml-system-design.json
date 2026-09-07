@@ -1,0 +1,36 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "ml-system-design",
+    "version": "1ebf5eee6c3341307156d470261fb61b7697ffb2ebdcfa229456637f6538e5bb"
+  },
+  "content": {
+    "name": "ml-system-design",
+    "description": "Design, review and debug predictive/classical ML systems: whether ML is needed, build or buy, metrics, data, validation, baselines, lifecycle pipelines, predictive serving, benchmark claims, placement, A/B versus canary, monitoring, drift, degradation and ownership. Includes ML system design interviews. Modality-specific CV/LLM work and neural execution have dedicated owners."
+  },
+  "files": {
+    "SKILL.md": "cd1ce433aee08d257c68fcfbe6fa6f64d5b89102b4112bbae5e9d4a6a5963849",
+    "agents/openai.yaml": "bc337a77544a79a9c81b56c80f27ff11c206bddeb1584a788fac9246e710e119",
+    "references/00_README.md": "7c8f873c73465fdfe96ad51bd82e58044809419ab6c27a70b4faec7136349390",
+    "references/01_principles_process_agent_checklist.md": "40a5e0eed2a36733418b29e4512eb13f3eb14878a575db7d80a2f7d09bf3dd94",
+    "references/02_problem_framing.md": "5e7b3834df3e78adcbc026ee10d5a0073e5218cb510bfcc961ba457a17162d7f",
+    "references/03_preliminary_research_build_vs_buy.md": "090640acdf0f9ad4d529183a09b64c6ebe684beb8e0544deb3bb7cf04c69bc6d",
+    "references/04_design_doc.md": "239a02b9dece10bbc74549816929988730771ccc3cd0add16ad260a52d88592f",
+    "references/05_metrics_losses.md": "eca6c75596d67c105c58034c71644345a29fb144e5436b6789d8d058740bb311",
+    "references/06_data_labeling_metadata.md": "d08957958a8f28921a72318a8364b49738241f8702a21befe17863a9f3d7be8e",
+    "references/07_validation_leakage_splits.md": "5a3d56bb611b4686b2243b7642c2b6905b6e92a226a4a78f0ab1f3c75d50d496",
+    "references/08_baselines.md": "cd70b01420817b0229621808cf23f78a4db600b580497f99015b3d0980112f2f",
+    "references/09_error_analysis.md": "6febe5ed74dac8f3776a1c84389ee739feb1ecfa0ca908a229f0f3709de13fbc",
+    "references/10_training_pipelines.md": "f660085f6a8229a24f89330101d119a15436bc26938452c25792da25bef6c602",
+    "references/11_features_feature_store.md": "0ccc23eb6c83f4a0c5b892f68e1fa981f23d223d0cf5bae4b26812cd394a5162",
+    "references/12_measuring_ab_reporting.md": "d99af7b12cb77bfb56795576de38dbe1a45b9ac09d30d66fc61426dcc81134e3",
+    "references/13_integration_api_release_fallbacks.md": "09e37ceb29b5c2ffbcca74eabfa244a14a126eb5134f5010591519c2146e75dc",
+    "references/14_serving_inference_optimization.md": "948b671d3dc9a9439d12b18f8321e476f9917d04089b2d7f773ec7979cb4fec7",
+    "references/15_monitoring_ownership_maintenance.md": "68a4b7bb9a6aa9b35e566d9f3f0a116b8eb8f997bd218f640e6dbff91a761faa",
+    "references/16_llm_model_selection_and_adaptation.md": "bb92e273a5aed13b2caf6a6eed8dc200fe4fddd0e129641fdad612f27575c03b",
+    "references/17_llm_inference_serving_and_bottleneck_diagnosis.md": "6e19641ecbc0461b07cb3f042ceca5326b609af990d7a5a6d48bbfa6be5e26c7",
+    "references/benchmark-contract-and-claims.md": "e91d2ec4cc883aaae801cc98f4789d5a243d27d03e5a8214192f644083da3992",
+    "references/deployment-placement-and-device-envelope.md": "49aeed3981bf085cfaf3d12ea5d8dc74b661e4c9073ee1db4601f1efe8502849"
+  }
+}

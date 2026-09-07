@@ -1,0 +1,25 @@
+{
+  "ref": {
+    "kind": "skill",
+    "source": "builtin",
+    "id": "qa-testing",
+    "version": "0025c896fbc8f2e1b03495a90c47ac545feb791c36cb90ba2a2edf310b8aad8e"
+  },
+  "content": {
+    "name": "qa-testing",
+    "description": "Use when designing, reviewing, validating, debugging, or improving classic software QA strategy and automated test suites. Trigger for autotests, unit tests, integration tests, contract tests, end-to-end tests, test pyramid decisions, flaky tests, test doubles, mocks, fakes, stubs, test coverage, test maintainability, CI/CD quality gates, release validation, exploratory testing, and production feedback for non-LLM software systems."
+  },
+  "files": {
+    "SKILL.md": "2f10e6508fe98ad951e663b8136ad266241a8d1ec1fc1e60c8b231077f5f6d2b",
+    "agents/openai.yaml": "81d6c00bbac77dc1c76014180035be4b12d3f138f402fc94f8f8e9e90b3f0f39",
+    "references/00_README.md": "f6e1f4426e5f5609ce577d49de5554b5694bb4ecbbd238ea730f89867dc54d03",
+    "references/01-testing-strategy.md": "9d7a4f8ef0916a9f183a04cd6bed738414eab648c759f924bd00a9ff7e220de4",
+    "references/02-test-pyramid-and-feedback-loops.md": "6c8814b4f01a52323d88d5bf12880e2ff22013ad3fb848a158880884a6e96837",
+    "references/03-unit-tests.md": "63979dfac7a48eda988ced68dd6d940db174a310d6f551eef061192bfe00a2de",
+    "references/04-test-doubles.md": "d73f2f1b5023eadbf9e6916afe6d8e87202aa5ab898fc70e1cd226acd37ac6fb",
+    "references/05-integration-and-larger-tests.md": "00a574d314a7d36c21bac854b15af7f53865bafa0f02db51a48922f1b687d88b",
+    "references/06-ci-cd-quality-gates.md": "20f8866ec5d6ee226bf18b03f03cae010668019017ebaf8c9182e0a26f25aa7b",
+    "references/07-checklists-and-templates.md": "3895e605e359163beb6375063fa5e3274890ea0dcb01a3d09f5b763e5e174800",
+    "references/data-infrastructure-and-recovery-checks.md": "7139fc0ba6a5c4b678162e9ece0de6875dccd4b0196519c157a55617d7551e77"
+  }
+}

@@ -9,6 +9,11 @@ from agent_commons.core.refs import normalize_ref
 from agent_commons.domain.acceptance import select_qualifying_review
 from agent_commons.domain.lifecycle import entity
 from agent_commons.domain.projection import SEMANTICS_SENSITIVE_EVENTS
+from agent_commons.domain.task_edits import (
+    TaskEditRefusal,
+    require_task_editable,
+    validate_task_dependency_change,
+)
 from agent_commons.errors import LifecycleConflictError, ValidationError
 from agent_commons.storage import EventRecord
 
@@ -26,6 +31,7 @@ class TaskCommands:
         acceptance_criteria: Sequence[str],
         priority: str = "normal",
         dependencies: Sequence[str] = (),
+        suggested_agent_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("task.created", idempotency_key)
@@ -36,6 +42,11 @@ class TaskCommands:
             self._relation(subject, "depends_on", {"kind": "task", "id": dependency})
             for dependency in dependency_ids
         ]
+        suggestion = (
+            {"extensions": {"suggested_agent_id": suggested_agent_id}}
+            if suggested_agent_id is not None
+            else {}
+        )
         return self.record_event(
             "task.created",
             {
@@ -45,6 +56,7 @@ class TaskCommands:
                 "acceptance_criteria": _nonempty_list(acceptance_criteria, "acceptance_criteria"),
                 "priority": priority,
                 "dependencies": dependency_ids,
+                **suggestion,
             },
             idempotency_key=key,
             relations=relations,
@@ -75,6 +87,62 @@ class TaskCommands:
             idempotency_key=key,
             tags=("task",),
         )
+
+    def _has_task_edit_retry(self, key: str) -> bool:
+        namespace = self._namespace(self._active_session())
+        return (
+            self.events.idempotency.lookup(namespace=namespace, key=key) is not None
+            or self._event_for_idempotency_identity(namespace, key) is not None
+        )
+
+    def edit_task(
+        self,
+        task_id: str,
+        expected_revision: str,
+        *,
+        changes: Mapping[str, Any],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Edit idle work with CAS; identical retries retain their original body.
+
+        The operational guard is deliberately outside replay. Older histories
+        can contain edits made during a run; they continue to invalidate that
+        run's original target without becoming corrupt historical events.
+        """
+
+        key = self._idempotency_key("task.revised", idempotency_key)
+        owned = dict(changes)
+        with self._canonical_write_lock():
+            if not self._has_task_edit_retry(key):
+                snapshot = self.snapshot()
+                require_task_editable(snapshot, task_id)
+                if snapshot.tasks[task_id].get("revision") != expected_revision:
+                    raise TaskEditRefusal(
+                        "task_edit_stale", "The task changed. Refresh before saving a new edit."
+                    )
+                validate_task_dependency_change(snapshot, {"task_id": task_id, "changes": owned})
+            return self.revise_task(task_id, expected_revision, changes=owned, idempotency_key=key)
+
+    def cancel_idle_task(
+        self,
+        task_id: str,
+        expected_revision: str,
+        *,
+        reason: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Cancel a task without pretending an active provider was stopped."""
+
+        key = self._idempotency_key("task.cancelled", idempotency_key)
+        with self._canonical_write_lock():
+            if not self._has_task_edit_retry(key):
+                snapshot = self.snapshot()
+                require_task_editable(snapshot, task_id, cancel=True)
+                if snapshot.tasks[task_id].get("revision") != expected_revision:
+                    raise TaskEditRefusal(
+                        "task_edit_stale", "The task changed. Refresh before cancelling it."
+                    )
+            return self.cancel_task(task_id, expected_revision, reason=reason, idempotency_key=key)
 
     def _task_transition(
         self,

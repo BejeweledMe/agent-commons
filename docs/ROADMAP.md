@@ -19,8 +19,10 @@ need explicit owner decisions.
 Build on Work, Team, Library and Settings, with clear task outcomes, exact context
 sources, independent review and human acceptance. Further work includes inbox
 cursors and acknowledgements, duplicate-work suggestions, stale-work handling,
-richer dependency views and configuration presets. Dependency visibility does
-not imply automatic scheduling.
+large-graph navigation and configuration presets. The service-owned library,
+five blueprints and editable graph are defined in
+[ADR 0016](adr/0016-service-library-and-live-workspace.md), with verification
+separate from L1. Dependency visibility does not imply automatic scheduling.
 
 Summarized workspace exchange and conformance fixtures for additional clients
 remain future work. Keep user guidance focused on available behaviour.

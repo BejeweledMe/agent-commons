@@ -100,6 +100,10 @@ def test_gallery_csp_allows_only_packaged_same_origin_assets() -> None:
     policy = gallery_content_security_policy()
     assert "script-src 'self'" in policy
     assert "style-src 'self'" in policy
+    # Verified preview bytes are displayed through a revoked-on-close object
+    # URL. Permit that image transport without enabling executable blob URLs.
+    assert "img-src 'self' data: blob:;" in policy
+    assert "script-src 'self';" in policy
     assert "unsafe-inline" not in policy
     assert "unsafe-eval" not in policy
 

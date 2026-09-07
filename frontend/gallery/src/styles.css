@@ -278,3 +278,10 @@ h1 { font-size: clamp(1.3rem, 2vw, 1.8rem); margin-bottom: 3px; }
   .preview-stage { min-height: 300px; }
   .inspector-details { border-left: 0; border-top: 1px solid #33415d; overflow: visible; }
 }
+/* Image imports are explicit authoring actions, separate from publication. */
+.screen-import { margin-block: 1.5rem; padding: 1rem; border: 1px solid var(--border, #dce2e8); border-radius: .75rem; background: var(--surface, #fff); }
+.screen-import h3 { margin-top: 0; }
+.screen-import form { display: grid; gap: .6rem; max-width: 42rem; }
+.screen-import input { min-width: 0; width: 100%; padding: .65rem; border: 1px solid var(--border, #dce2e8); border-radius: .4rem; font: inherit; }
+.screen-import button { justify-self: start; min-height: 2.5rem; padding: .6rem 1rem; font: inherit; }
+.screen-import [role="alert"] { color: var(--danger, #a12828); }
