@@ -13,7 +13,7 @@ PYTEST = env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE \
 
 .PHONY: check node-version-check lint format-check format frontend-work-deps frontend-gallery-deps \
 	frontend-work-test frontend-gallery-test help test test-domain test-runtime \
-	test-ui test-contracts sync
+	test-ui test-contracts sync clean-preview clean
 
 check: node-version-check lint format-check frontend-work-test frontend-gallery-test test
 
@@ -29,6 +29,13 @@ format-check:
 # Writes, unlike the checks above: use it to fix what format-check reports.
 format:
 	$(UV) run --locked ruff format .
+
+# Stop builds and tests before applying cleanup; preview never deletes files.
+clean-preview:
+	$(UV) run --locked python tools/clean_generated.py
+
+clean:
+	$(UV) run --locked python tools/clean_generated.py --apply
 
 frontend-work-deps: node-version-check
 	npm ci --ignore-scripts --prefix frontend/work
@@ -70,7 +77,9 @@ help:
 		'make test-runtime    Provider runtime and scoped MCP' \
 		'make test-ui         CLI and UI, including Node harnesses' \
 		'make test-contracts  Cross-boundary, security and release contracts' \
-		'make check           Authoritative full-tree green contract'
+		'make check           Authoritative full-tree green contract' \
+		'make clean-preview   Preview disposable root build/cache directories' \
+		'make clean           Remove previewed directory kinds after stopping builds/tests'
 
 sync:
 	$(UV) sync --locked --extra test

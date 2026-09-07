@@ -1,90 +1,63 @@
 # Documentation map
 
-This page is the routing guide for Agent Commons documentation. It is not a
-second product specification. When prose conflicts with executable behaviour,
-the current source code, tests, schemas, and canonical project state win.
+Use this page to choose a document. Current source and tests define implemented
+behaviour; accepted Agent Commons decisions constrain future work. Plans and
+reviews do not establish delivery or acceptance.
 
 ## Read first
 
-| Need | Primary source | Status rule |
-| --- | --- | --- |
-| Product purpose and boundaries | [Vision](VISION.md) | Product intent, not proof that a feature is shipped. |
-| What the current checkout actually does | Source code and tests at the current Git revision | This is the release truth; verify with `make check`. |
-| Human-readable product snapshot | [Current product and architecture](current-product-and-architecture.md) | Historical baseline at `f998e33`; it is not a live release dashboard. |
-| Protocol and promotion-to-truth rules | [Protocol](PROTOCOL.md), then the [ADR and decision index](adr/README.md) | The canonical decision registry resolves product choices; proposed and withdrawn ADRs do not authorize implementation. |
-| System boundaries and threat model | [Architecture](ARCHITECTURE.md), [Threat model](THREAT_MODEL.md), [Frontend contract](FRONTEND_CONTRACT.md) | Code and tests decide shipped behaviour; these documents explain invariants and boundaries. |
-| User-visible workflows | [English guide](user/en/README.md) or [Russian guide](user/ru/README.md) | Describe available UI behaviour only; link future work as future. |
-| Active implementation programme | [Agent platform implementation programme](agent-platform-implementation-program.md) | The programme records its own baseline and scope. Verify the current checkout; a plan remains intent until code, tests, evidence and review exist. |
-| Roadmap and longer-term direction | [Roadmap](ROADMAP.md) | Direction, never evidence of delivery. |
+| Need | Primary source |
+| --- | --- |
+| Use the app | [English guide](user/en/README.md) · [Русское руководство](user/ru/README.md) |
+| Current work and remaining gates | [Implementation programme](agent-platform-implementation-program.md) |
+| Product purpose and future direction | [Vision](VISION.md) · [Roadmap](ROADMAP.md) |
+| Architecture and invariants | [Architecture](ARCHITECTURE.md) · [Protocol](PROTOCOL.md) · [Threat model](THREAT_MODEL.md) · [Frontend contract](FRONTEND_CONTRACT.md) |
+| Install, operate or troubleshoot | [Quickstart](QUICKSTART.md) · [Technical workflows](USER_WORKFLOWS.md) · [Troubleshooting](TROUBLESHOOTING.md) · [Broker operations](BROKER_OPERATIONS.md) |
+| Decisions and evidence | [ADR index](adr/README.md) · [Review provenance](reviews/README.md) · [Audits](audits/) · [Evidence](evidence/) |
 
-## Canonical data versus derived material
-
-The repository follows this order of authority:
-
-1. Immutable project events and manifests under `.agent-commons/` are the
-   canonical project history. They are append-only and must not be edited by
-   hand.
-2. Source code, schemas, and tests define the behaviour of the current Git
-   revision. A Markdown statement cannot make an unimplemented capability
-   real.
-3. SQLite projections, Markdown views, UI bundles, `build/`, `dist/`, and local
-   caches are derived or generated. They may be rebuilt and are not a second
-   source of truth.
-4. Accepted decisions in the Agent Commons ledger constrain future work.
-   Reviews, audits, proposals, plans, and PRDs remain analysis or intent until
-   an explicit owner-authorized decision promotes them.
-
-## Document collections
-
-- [ADRs and canonical decision routing](adr/README.md) — the discoverable status
-  index for architecture records and the command that reads current product
-  decisions from the ledger.
-- [Reviews](reviews/) — revision-bound judgments and corrected assessments.
-- [Audits](audits/) — historical observations, characterization, and evidence.
-- [Proposals](proposals/) — product and technical options that still need the
-  relevant owner gates.
-- [Evals](evals/) — reproducible evaluation contracts and measurements.
-- [Tutorials](tutorials/) — guided exercises, not implementation contracts.
+Read the current decision registry through the command in the ADR index. An ADR,
+PRD, review or completed task alone does not promote a proposal to project truth.
+Implementation sequencing belongs in the programme; revision-bound results
+belong in their verification reports, not in repeated status lists.
 
 ## Historical plans
 
-Historical plans remain in Git because they explain why the current system has
-its boundaries, but they are not competing execution graphs:
+- [UI pivot analysis](pivot-ui-only-plan.md) — historical decision intake.
+- [Managed-loop plan](architecture-improvement-implementation-plan.md) — predecessor programme.
+- [Product snapshot](current-product-and-architecture.md) — baseline at `f998e33`.
+- [Initial council synthesis](archive/COUNCIL_SYNTHESIS.md) and
+  [24-August product review](archive/agent_commons_product_architecture_review.md)
+  — archived inputs, preserved byte-for-byte.
 
-- [UI pivot analysis](pivot-ui-only-plan.md) — the decision-intake snapshot that
-  preceded the accepted UI and CLI decisions;
-- [managed-loop implementation plan](architecture-improvement-implementation-plan.md)
-  — the predecessor programme for hierarchical closure and structural work.
-
-For implementation sequencing, always return to the
-[active programme](agent-platform-implementation-program.md).
+These explain past reasoning; they are not the current backlog. Use the
+[implementation programme](agent-platform-implementation-program.md).
 
 ## Current direction summaries
 
 The [visual orchestrator PRD](visual_multi_agent_orchestrator_prd.md) and
-[visual orchestrator plan](visual_orchestrator_plan.md) were rewritten in place
-under `decision.55YN4B2W60Z8HD03WDD0T1V2A9`. They describe the current product
-direction and architecture path, but remain non-authoritative summaries: source,
-tests and canonical decisions determine behaviour and constraints, while the
-[active programme](agent-platform-implementation-program.md) determines
-implementation sequencing.
+[navigation plan](visual_orchestrator_plan.md) summarize direction under
+`decision.55YN4B2W60Z8HD03WDD0T1V2A9`. They remain subordinate to accepted
+decisions and verified implementation. [Proposals](proposals/), [evals](evals/)
+and [tutorials](tutorials/) have separate purposes.
 
-The three architecture-review files currently at the repository root are
-tracked user-provided working materials and provenance evidence:
+## Retention and maintenance
 
-- [`agent_commons_product_architecture_review.md`](../agent_commons_product_architecture_review.md)
-- [`claude_architecture_improvement_review.md`](../claude_architecture_improvement_review.md)
-- [`codex_architecture_improvement_review.md`](../codex_architecture_improvement_review.md)
+Keep immutable events, manifests, receipts and registered proof retrievable.
+Historical artifact retention does not make an old plan current. The
+[provenance register](reviews/README.md) locates retained architecture inputs;
+registered root review files remain at their recorded paths.
 
-They are intentionally not canonical product truth and are not promoted into
-the decision record merely by being tracked. Their exact revision,
-authorship, and status are recorded in the [review provenance register](reviews/README.md)
-and must be resolved before any recommendation becomes an accepted decision.
+For new verification, retain a bounded result summary, meaningful delta or exact
+Git reference. Keep temporary full logs outside the tracked repository. Do not
+routinely copy full-source inventories or screenshots; retain them only when
+they prove distinct behaviour or satisfy an explicit verification requirement.
+Never prune registered evidence or canonical history as cache cleanup.
 
-## Maintenance rules
+SQLite projections, views, local caches and build output are derived. Shipped UI
+bundles are generated too, but remain required package assets. Update the
+relevant current guide when behaviour changes and run `make check`.
 
-When behaviour changes, update code and tests first, then update the relevant
-current-status or user documentation with the exact Git boundary. Keep older
-reviews and withdrawn proposals as historical evidence; mark them rather than
-silently rewriting their conclusions. A claim that a feature is shipped should
-have an implementation, tests, and a reproducible verification path.
+With tests and builds stopped, `make clean-preview` previews cleanup and
+`make clean` applies it only to `build/`, `dist/`, `.pytest_cache/` and
+`.ruff_cache/`. Tracked files are refused; canonical state, evidence, dependency
+environments and shipped UI assets are outside that scope.

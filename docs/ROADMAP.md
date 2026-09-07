@@ -1,152 +1,57 @@
 # Roadmap
 
-Agent Commons deliberately starts as a reliable shared-filesystem protocol. The
-first release proves the collaboration model before introducing a server or a
-public extension ABI.
+Agent Commons develops a local application for work by agent teams, backed by
+an immutable shared-filesystem protocol. The [implementation programme](agent-platform-implementation-program.md)
+is the single current-work list and links exact verification boundaries. This
+page records direction; it does not certify shipped or accepted work.
 
-## Audited checkpoint — 2026-09-06
+## Release qualification first
 
-**Active UX branch — 2026-09-07:** the Opus/Astra
-[task-first workspace plan](task-first-workspace-implementation-plan.md) and
-[ADR 0014](adr/0014-task-first-workspace-ux.md) define the next Work increment
-on `codex/task-first-ux-pivot`. The bounded implementation passed the full
-`make check` (Work85, Gallery22, Python1976); exact source and synthetic browser
-evidence are in the [verification report](audits/2026-09-07-task-first-pivot-verification.md).
-This does not close L1/R2 or declare task acceptance/release readiness.
-
-**Subsequent visual refinement:** [ADR 0015](adr/0015-browser-native-visual-refinement.md)
-implements the council-approved native filters, stable inspector disclosures and
-readable exact Context sources. The [new checkpoint](audits/2026-09-07-browser-visual-refinement.md)
-passed `make check` (Work94, Gallery22, Python1976) and records new source/image
-hashes. Earlier Work85 evidence remains historical; L1/R2 are unchanged.
-
-**Implementation follow-up:** the uncommitted [audit remediation](audits/2026-09-06-audit-remediation.md)
-fixes F01/F02/F03/F04/F06/F07/F12 and bounds oversized Grok input. The exact
-working-tree inventory passed `make check` and independent scoped review;
-L1/R2 and Grok transport privacy remain open. This does not change the historical
-base-SHA assessment below or imply task acceptance/release.
-
-At `329d2f3920753853ce265536d9d3ceb4e35f1f91`, Context Packs, Gallery
-authoring/feedback, Work task/dependency actions, Starter Pack Apply and G6 Design
-Package launch metadata are implemented. J1 and G6 have exact canonical acceptance
-records; this does not establish release readiness. Dependency/readiness views
-are delivered in part; automatic DAG scheduling remains deferred.
-
-**L1 is not proven; R2 release evidence remains open.** The latest retained Linux
-run reports receipt-scope bootstrap refusal, Claude provider errors and missing
-Grok terminal MCP outcomes. The six implemented profiles require qualification
-separately on the intended source/provider/host boundary. No live rerun is implied.
-
-The uncommitted remediation closes the scoped P1 review/source/stderr paths,
-applies fail-closed Gallery provenance, and verifies preset hire and response-loss
-recovery. The task-first pivot adds the verified Work/Library interaction layer.
-Before release, resolve the remaining Grok transport contract, receipt-scope and
-provider-host gates; obtain separately authorized Linux live qualification and
-refresh exact independent release evidence. Retention and stale coordination
+L1 remains unproven and R2 release evidence remains open. Resolve the remaining
+Grok transport contract, receipt-scope and provider-host gates; qualify the six
+implemented profiles on the intended source/provider/host boundary with separate
+operator authorization, then obtain independent release review. Earlier successful
+canaries do not override later failures. Retention and stale coordination also
 need explicit owner decisions.
-See the [risk register and actionable checklist](audits/2026-09-06-total-plan-work-adr-prd-review.md).
 
-## MVP-0 — local shared workspace
+## Daily work
 
-- immutable, schema-validated events and artifact manifests;
-- explicit sessions, tasks, hierarchical claims, discussions, reviews,
-  verifications, findings, decisions, and handoffs;
-- security scanning before durable writes;
-- rebuildable SQLite/WAL query projection and Markdown views;
-- safe project initialization for Codex and Claude Code;
-- one CLI business layer and paired project-local skills;
-- doctor, recovery, idempotency, concurrency, and end-to-end tests.
+Build on Work, Team, Library and Settings, with clear task outcomes, exact context
+sources, independent review and human acceptance. Further work includes inbox
+cursors and acknowledgements, duplicate-work suggestions, stale-work handling,
+richer dependency views and configuration presets. Dependency visibility does
+not imply automatic scheduling.
 
-## MVP-1 — daily ergonomics
+Summarized workspace exchange and conformance fixtures for additional clients
+remain future work. Keep user guidance focused on available behaviour.
 
-- delivered: workspace-namespaced state bases, fail-closed exact-root ownership,
-  source-aware support diagnostics, linked-worktree compatibility, and no
-  automatic legacy migration;
-- delivered: compact bounded `orient`/`inbox`, verified SQLite warm reads with
-  canonical fallback, plus `--verbose` and `--fresh` escape hatches;
-- delivered: explicit `session current`, one-time shell exports, and
-  field-aware typed-reference diagnostics;
-- delivered: a 25-case privacy-safe offline orchestration eval catalog, with
-  unsupported capabilities reported as non-passing rather than simulated;
-- per-session inbox cursors and acknowledgement state;
-- duplicate-work suggestions and stale-work cleanup;
-- richer dependency and decision graph views;
-- machine-enforced configuration presets for the documented light, standard,
-  and governed operating modes;
-- import/export of summarized records between workspaces;
-- protocol conformance fixtures for additional agent clients.
+## Runtime evolution
 
-## MVP-2 — optional local delegation runtime
+The [optional delegation runtime](adr/0004-optional-local-delegation-runtime.md)
+retains the standalone file-ledger core. Its shared manager boundary, scoped MCP
+tools, explicit budgets and checkout claims remain constraints on expansion.
+The existing task-scoped communication channel does not provide provider
+reattachment or by itself prove provider termination after cancellation.
 
-MVP-2 removes the need to prompt every agent window manually while preserving the
-file-ledger core as a complete standalone mode. Its governing contract is
-[ADR 0004](adr/0004-optional-local-delegation-runtime.md).
+Deferred work includes a long-running same-host broker, proof-driven active
+provider cancellation, reattachment, changed-path attestation, DAG scheduling,
+model routing, council templates, cursor subscriptions and OpenTelemetry metrics.
+Recovery of requested work must not be widened to cover a possibly live process;
+adjudication requires proven termination and attempt identity.
 
-- a canonical, exact-revision-bound `delegation` aggregate with bounded lineage,
-  time, attempts, concurrency, and provider budget;
-- a long-running same-host broker for notification, live status, conservative
-  crash recovery, cancellation, and lower-latency queries;
-- one shared MCP adapter over `CommonsManager` and the broker, never a parallel
-  business-logic or generic-shell write path;
-- authenticated local client grants and operator-allowlisted Codex and Claude
-  provider profiles;
-- one writable worker per checkout scope, with explicit claims and
-  operator-provisioned worktrees when isolation is required;
-- metadata-only local observability, with optional OpenTelemetry export and no
-  prompts, reasoning, transcripts, secrets, or raw process output;
-- compatibility-preserving canonical migrations and versioned, disposable
-  operational state.
+API providers are a separate deferred stage: Anthropic, OpenAI, Google,
+OpenRouter and local vLLM. Provider-enforced structured output belongs there;
+subscription CLI MCP schemas validate tool input without constraining generation.
+A public provider adapter or other extension must preserve the same authority,
+privacy and lifecycle boundaries. Every stage must be independently usable or
+removable. Deterministic CI uses fake runners; live verification is explicit.
 
-Delivery is staged and feature-gated:
+## Remote teams and extensions
 
-1. delegation schema, replay, manager, CLI, projection, and fake-runner contract;
-2. authenticated bounded MCP tools with CLI/manager parity;
-3. one quiescent-checkout, read-only Codex-to-Claude review and reverse-direction
-   verification slices;
-4. writable delegation with checkout leases, claims, crash injection,
-   cancellation, and budget enforcement;
-5. local status/watch UX, optional OpenTelemetry export, and an optional AHP
-   adapter after its value and compatibility are independently validated.
+Remote or multi-host operation requires authenticated principals, authorization,
+server transactions, distributed leases, retention, encryption and administrative
+audit. Local session metadata does not supply that trust boundary.
 
-The task-scoped operational communication slice is now implemented for a live
-task-target worker: bounded request/progress/blocker records, parent reply,
-parent guidance and safe-boundary checkpoints, child polling/acknowledgement,
-fixed canonical lifecycle summaries, exact attempt/participant binding,
-deadlines, HMAC integrity, and two-phase operation cancellation. Provider reattachment after process exit, proof-driven active
-provider cancellation, changed-path attestation, DAG scheduling, model routing,
-council templates, cursor subscriptions, and OpenTelemetry metrics remain
-explicitly deferred; no release claim depends on them.
-
-API-based providers are a deferred stage of their own, and they are plural by
-decision: Anthropic, OpenAI, Google, OpenRouter, and a local vLLM endpoint,
-not a single vendor. They are what unlocks enforced structured output (SGR) —
-schemas stored as pure JSON Schema so one library serves every backend
-(Anthropic `output_config`/strict tools, OpenAI structured outputs, Google
-`responseSchema`, vLLM `guided_json`; OpenRouter passes through what the
-routed model supports). On subscription CLIs the only typed channel remains
-MCP tool input schemas, which validate but do not constrain generation.
-
-The long-running broker stage must also define an authenticated operator
-adjudication path for `active` or `input_needed` work whose requester becomes
-unavailable. It may classify that work only after provider termination and
-attempt identity are proven; the requested-only `delegation.recovered` path
-must never be widened to cover a possibly live process.
-
-Every stage must be usable or removable independently. Deterministic CI uses fake
-runners; real-provider tests are explicit and opt-in so credentials and network
-access are not build prerequisites.
-
-## Later — remote teams
-
-Remote and multi-host operation requires a different trust and coordination
-boundary: authenticated principals, authorization, server-side transactions,
-distributed leases, retention policy, encryption, and administrative audit.
-Those capabilities will not be simulated by treating local session metadata as
-security credentials.
-
-## Extension policy
-
-The internal schema registry is extensible, but a stable public plugin ABI is
-deferred until at least two substantial external domain packs validate the
-boundary. Domain-specific workflows must remain optional and must not change the
-meaning of the universal core entities.
+A stable public plugin ABI remains deferred until at least two substantial
+external domain packs validate it. Optional domain workflows must preserve the
+meaning of universal core entities.
