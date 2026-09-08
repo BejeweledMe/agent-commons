@@ -125,3 +125,40 @@ ADR 0014's historical deferral of the project switcher is superseded for this
 scope by ADR 0017, without rewriting the historical decision. Earlier source
 manifests in this wave are stale for approval but retained as finding provenance.
 No completed, accepted or released status is inferred from worker messages.
+
+## Post-merge CI follow-up: process identity fixture
+
+PR #8 passed all ten CI jobs at `6930d76f40777a3e4457edff7152a9aaa6184fd2`
+and was merged as `87cfe486800f204918a713f598f524bda62fdcdd`; the trees are
+identical. Main run `34214072750` then failed on macOS / Python 3.13 in
+`test_post_start_transport_exception_does_not_falsely_close_child`.
+
+The inherited test's fake runner records PID 9001, then expects reconciliation to
+treat that PID as dead. If it belongs to a live process, the runtime correctly
+retains `running`. A controlled local probe treating PID 9001 as occupied
+reproduced the exact failure. This violates the repository's existing requirement
+to spawn and reap a real child whenever a test depends on process death.
+
+The bounded follow-up on `codex/ci-reaped-process-fixture` changes only that test
+fixture and records its verification separately. Application code, the installed
+wheel and the project browser evidence remain unchanged. A successful rerun alone
+would not remove the fixture's invalid assumption; the correction must preserve
+the assertions that a transport exception leaves the child session open and that
+recovery after process exit requires operator action.
+
+The independent reviewer verified frozen test SHA-256
+`b1bf293e5d6a041c244ed205d6ad393b45ea11f90d72448fb4277145ef3370a5`,
+passed all 11 module tests, and independently reproduced baseline failure / fixed
+success when PID 9001 is treated as occupied. Approved source review
+`review.60MVCSW01JSYZJ0BM9AACGTW7B` completed at
+`evt.01M209Y992NSV482XB3685B717`, bound to artifact revision
+`evt.01M209RJ53R8VKMRGKSAV01JBB`. The original crash/session/reconciliation
+assertions are unchanged. This judgment does not replace the full `make check`,
+remote CI or task acceptance.
+
+The follow-up full `make check` passed: Work 132, Gallery 27, Python 2,103 passed,
+13 skipped and two upstream warnings in 831.09 seconds. The skip scope is unchanged
+and no frontend tests were skipped. `git diff --check` passed. The compact
+[regression evidence](../evidence/2026-09-08/project-workspaces-ci-pid-regression.json)
+binds these results to the exact source and independent judgment. The follow-up
+PR and main CI remain separate delivery checks; this record claims no future run.

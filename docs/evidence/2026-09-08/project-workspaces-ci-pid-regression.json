@@ -1,0 +1,49 @@
+{
+  "schema": "agent-commons.project-workspaces-ci-pid-regression.v1",
+  "date": "2026-09-08",
+  "baseline": "87cfe486800f204918a713f598f524bda62fdcdd",
+  "trigger": {
+    "run": "https://github.com/BejeweledMe/agent-commons/actions/runs/34214072750",
+    "job": "macOS / Python 3.13",
+    "test": "test_post_start_transport_exception_does_not_falsely_close_child",
+    "failure": "FakeRunner PID 9001 could belong to a live process; reconciliation correctly retained running instead of the test's expected needs_operator."
+  },
+  "source": {
+    "path": "tests/runtime/test_orchestration_security.py",
+    "sha256": "b1bf293e5d6a041c244ed205d6ad393b45ea11f90d72448fb4277145ef3370a5",
+    "artifact_id": "artifact.31ZAY1RA764F390Q27WVVN6VN1",
+    "artifact_revision": "evt.01M209RJ53R8VKMRGKSAV01JBB",
+    "change": "Inject the PID of a spawned and reaped Python child into the crash test; preserve its session and recovery assertions."
+  },
+  "independent_review": {
+    "review_id": "review.60MVCSW01JSYZJ0BM9AACGTW7B",
+    "completion_revision": "evt.01M209Y992NSV482XB3685B717",
+    "verdict": "approved",
+    "module_tests_passed": 11,
+    "occupied_9001_diagnostic": {
+      "baseline": "expected assertion failure",
+      "fixed": "passed, actual reaped child PID probed, PID 9001 not probed"
+    },
+    "scope": "Exact source judgment; no task acceptance or live qualification."
+  },
+  "green_contract": {
+    "command": "make check",
+    "exit_code": 0,
+    "work_passed": 132,
+    "gallery_passed": 27,
+    "python_passed": 2103,
+    "python_skipped": 13,
+    "python_warnings": 2,
+    "python_seconds": 831.09,
+    "python_version": "3.14.5",
+    "node_version": "24.20.0",
+    "skip_scope": "12 withheld automatic-governance paths and one CI-only environment check; no frontend tests skipped."
+  },
+  "boundaries": {
+    "application_code_changed": false,
+    "installed_wheel_changed": false,
+    "provider_calls": 0,
+    "l1": "open",
+    "remote_ci": "A separate delivery gate: verify the exact follow-up PR and main revisions."
+  }
+}

@@ -5,6 +5,9 @@ Current evidence is the [final source manifest](project-workspaces-final-source-
 [test/wheel/review verification](project-workspaces-release-verification.json).
 The [audit](../../audits/2026-09-08-project-workspaces-verification.md) records
 verdicts and limits. The three PNGs contain synthetic Alpha/Beta project data.
+The later [CI PID-fixture regression](project-workspaces-ci-pid-regression.json)
+records the isolated test correction after PR #8; application and wheel bytes
+are unchanged from the project-workspace evidence above.
 
 Registry v1–v4, host v1–v2 and frontend v1–v2 are superseded review inputs. Registry
 v5, host v3 and frontend v3/v4 identify approved component scopes. They are kept
