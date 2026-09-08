@@ -1,0 +1,326 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "Frontend v4 closes project-scoped tracker SSE bypass; independent re-review pending",
+  "files": [
+    {
+      "path": "frontend/gallery/package-lock.json",
+      "sha256": "b9c814146168b398b922ddde630bfe02c6fd619cf3828e31b9662de16511fe4b"
+    },
+    {
+      "path": "frontend/gallery/package.json",
+      "sha256": "8bb04a0534561dada59da950a8fbd913c54ed233b2da984501ed76a96ed3dc60"
+    },
+    {
+      "path": "frontend/gallery/src/AuthoringPanel.tsx",
+      "sha256": "0e5ef1e65990bbcaf4cbf3b0d27259b6a92f89c25234877c263d49c4ead08760"
+    },
+    {
+      "path": "frontend/gallery/src/ScreenImport.tsx",
+      "sha256": "aa03d75f42985660ba898e3a7f19c780cd49eb58c5bcc88c4531dcdaeb882985"
+    },
+    {
+      "path": "frontend/gallery/src/contracts.ts",
+      "sha256": "e3addcf919ead2717ab04cd7bf195eab6d727806ea61d1121e7657358c7890b9"
+    },
+    {
+      "path": "frontend/gallery/src/i18n.json",
+      "sha256": "2e026f76859239653c133da5c7c38c16ebde3bfa76a75acc38dc83946c6b6116"
+    },
+    {
+      "path": "frontend/gallery/src/main.tsx",
+      "sha256": "cf3539d75d657ed3302ceb9bc5cf25cdb79ac7a40ce76c0c168b5c207d41039d"
+    },
+    {
+      "path": "frontend/gallery/src/screenImportState.ts",
+      "sha256": "c269e3743bca744582112533d96716d8dd14d2912b25911b7c97ecf0b5050215"
+    },
+    {
+      "path": "frontend/gallery/src/styles.css",
+      "sha256": "41e7430cebc2173a13a396982da4bfba9ee1891b0fb73434b17284060e63b697"
+    },
+    {
+      "path": "frontend/gallery/src/vite-env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "frontend/gallery/tests/gallery-a11y.test.mjs",
+      "sha256": "be28aa00056091ac88ce026842e9d214d3c4095a005d29c8bc962efef5c4a822"
+    },
+    {
+      "path": "frontend/gallery/tests/gallery-contract.test.mjs",
+      "sha256": "b779b6a89e92e7a43b864f55cc986a11ffa7d85502cee138b75c2f5f78088e0a"
+    },
+    {
+      "path": "frontend/gallery/tests/screen-import.test.mjs",
+      "sha256": "69a8787e466b52b3626d2b7c77d7120b7eb0fca7f9fe156dbee734c449115f09"
+    },
+    {
+      "path": "frontend/gallery/tsconfig.json",
+      "sha256": "cc32a3c2be133425d30e112e3dc863c9dbe1ecbbdd81123abf6d6a0300a8ae5c"
+    },
+    {
+      "path": "frontend/gallery/vite.config.ts",
+      "sha256": "c13a103e61b5570a344c0b2f6bdf81ec47bfbdd8dc91404f646b9cfdf9180623"
+    },
+    {
+      "path": "frontend/work/package-lock.json",
+      "sha256": "2f0f67b563fb10b7e701235f75828ff5680f9b94952833d675827bd78d3a93f1"
+    },
+    {
+      "path": "frontend/work/package.json",
+      "sha256": "6183bd35aaad4963cfada9122f8c116bbe43668e48cd92d21cc565eaaf4a71d4"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "89ea86a190e766973d8d75f85b7e1cd8c9f9c977167612e84e01d6b92f5b4b6d"
+    },
+    {
+      "path": "frontend/work/src/appRouteState.ts",
+      "sha256": "60e7243a58383617058d2ee45a9bec70727aeb018d1f9662461979800d61ef40"
+    },
+    {
+      "path": "frontend/work/src/components/AppHeader.tsx",
+      "sha256": "febc5be710ba8dc169962dbe125bcdefd7142f58ba43b99afb48351126493e87"
+    },
+    {
+      "path": "frontend/work/src/components/ContextPacksSection.tsx",
+      "sha256": "da8072155029e9554cf36765a5b02d313a530db3813477c03a41ec56735340af"
+    },
+    {
+      "path": "frontend/work/src/components/ContextSourcePicker.tsx",
+      "sha256": "72a1fefd99c217bee74acc466c2967f5c995e9cec65d7f641bea15478137cc54"
+    },
+    {
+      "path": "frontend/work/src/components/FailurePanel.tsx",
+      "sha256": "5a367b1412660d0552327c54b01d16da73130f2431ad1d070e15a94fc611115a"
+    },
+    {
+      "path": "frontend/work/src/components/LaunchRecoveryPanel.tsx",
+      "sha256": "d1b0db720759fd59e845d855baf7dcf38a828fe5fc177feafe05678ce9521307"
+    },
+    {
+      "path": "frontend/work/src/components/LibrarySection.tsx",
+      "sha256": "7ed909232e2b31ca693bc52a43f379bc0d3bdb525d8de36f32286e30edd685c0"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectSidebar.tsx",
+      "sha256": "d34bbe8b0df8f94d5b30cced132795393e35eb1461f246dca58cfa4c179cffa0"
+    },
+    {
+      "path": "frontend/work/src/components/RolePresetPicker.tsx",
+      "sha256": "b5931cbf0b4b3c4e99a126dcb5bf74215ec5bebd72043a4230b1c51bc666aa4c"
+    },
+    {
+      "path": "frontend/work/src/components/ServiceLibraryEditor.tsx",
+      "sha256": "345875c4b8854c0cd92bb51de6836806154c57af3dd5d168a31da451236ac328"
+    },
+    {
+      "path": "frontend/work/src/components/ServiceLibrarySection.tsx",
+      "sha256": "d5ebcd915aa5be648345e8fc6dd6b06961b2aa7deece217419aac5c6d940a4be"
+    },
+    {
+      "path": "frontend/work/src/components/SpecializationPicker.tsx",
+      "sha256": "32bb3075489dd4cc9df60a89d51e635f436821d55f1a3e1b328639daa221bf5f"
+    },
+    {
+      "path": "frontend/work/src/components/StarterPacksSection.tsx",
+      "sha256": "7a3b935d7e26592c0c8ebb335ac40af3a9f0e09d0d10b614a707c95bc6118960"
+    },
+    {
+      "path": "frontend/work/src/components/TaskComposer.tsx",
+      "sha256": "3cbc829013a72049c2554c9c8c83194de87bbbd7e046859e663abc8d0bf265a9"
+    },
+    {
+      "path": "frontend/work/src/components/TaskEditor.tsx",
+      "sha256": "57e804c7960aafd2873a81cc343e6cd597f3a182c7df25e8730030c562c1f3ef"
+    },
+    {
+      "path": "frontend/work/src/components/TaskGraph.tsx",
+      "sha256": "36d33a116542ea6b84938dba486d9bcb3feb95450b4aad67248eabe314f7f02f"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "63888e6c381d36011fa2781fae0c5a9f1e7f082666a8fb9e5a8d16da94419c2e"
+    },
+    {
+      "path": "frontend/work/src/components/TrackerSection.tsx",
+      "sha256": "69d1e68944f4e073fabf80a6f791c7db6a43e63ab738f15ec5eceeb90f30fea7"
+    },
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "sha256": "1d94ac5ae20b085cf68074cea3c705bf9559b28fc26cef248304cd36a4286dea"
+    },
+    {
+      "path": "frontend/work/src/components/WorkflowCard.tsx",
+      "sha256": "27a5b0b1cd36cb6cf14f6cb3f8125ed4c5525e0aa633a767e39d225e86472ea8"
+    },
+    {
+      "path": "frontend/work/src/contextPackDraftValidation.ts",
+      "sha256": "9a5d879b73e10d80d0253a2a4d9d5a35e3e121c9c02b1ef6ae9d9203f88bd55d"
+    },
+    {
+      "path": "frontend/work/src/contextPackEditorState.ts",
+      "sha256": "7a5b5dca0e9695f8491531c74ff779cc457fc5739511625be4e864cc6a40142f"
+    },
+    {
+      "path": "frontend/work/src/contextPackFormState.ts",
+      "sha256": "a8c87a1a482a60855860075684ffe3486922a6c21d670b27215e726e474e1b0f"
+    },
+    {
+      "path": "frontend/work/src/contextSourcePicker.ts",
+      "sha256": "677d9d25b013ca237447f37202bee8ae422614150f7b3788f491fd89f1956d5e"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "226091b37988cdbf382d252d9d6012a1c00b11ae2fbbf369279abccbe5feff2a"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "b58fd56d374660e8ea26403dc01486249355ab01279f894d535e52ce35dde301"
+    },
+    {
+      "path": "frontend/work/src/i18n.ts",
+      "sha256": "78a01714bdd50106b5eb0b6f916f101aaeeeac19fea13087b38e1eb4621431cc"
+    },
+    {
+      "path": "frontend/work/src/launchIntentState.ts",
+      "sha256": "1ade0a118ec0e74b9027974e628eba36c1a134db47965359729a05126d871580"
+    },
+    {
+      "path": "frontend/work/src/libraryApi.ts",
+      "sha256": "d9aff9ace9c77148215be7d0c0f13fbc4363482f6d6dfa76cb0dce0407fd5aeb"
+    },
+    {
+      "path": "frontend/work/src/libraryEditorState.ts",
+      "sha256": "ccb04dc26cada05af5b162d71d626b649b66214a766db71664934d02e403b53f"
+    },
+    {
+      "path": "frontend/work/src/libraryTypes.ts",
+      "sha256": "2b462c4060f5d4a9fef0b125c882348161068d64615e82cd8b757f1d4de55860"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "79860fb25e91f824eb32eb1d449e5bbe87bab106935402ccb025b5e92e1a29d1"
+    },
+    {
+      "path": "frontend/work/src/projectWorkspace.ts",
+      "sha256": "e52e8dd8e54544362d5453ee2be240005199a390ac5f3badd4ff1e50d714291b"
+    },
+    {
+      "path": "frontend/work/src/rolePresetState.ts",
+      "sha256": "0e5d1f1c7c5a6f87304d6f6ac9fd31148c928d18b29e78d853838eb75271e0c9"
+    },
+    {
+      "path": "frontend/work/src/starterPackPresentation.ts",
+      "sha256": "b4f6b90255ecb4ac5b2ae5c323caf433d24f05034d76d1ed43e9b38d9a25a108"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "403eb60664eaf4e541f42d9e020c24fe4139107dce7f1d8db65c5862bcc4d868"
+    },
+    {
+      "path": "frontend/work/src/taskDependencyState.ts",
+      "sha256": "3b03852501ed0367e47dce50c4dd98e117540408766d70f3afb2a9852bb23afb"
+    },
+    {
+      "path": "frontend/work/src/taskEditorState.ts",
+      "sha256": "7828a6556867a26074686dac3d73d4e3ca8c577cf6238feaa99285a3839bc983"
+    },
+    {
+      "path": "frontend/work/src/taskGraph.css",
+      "sha256": "3f1150724a9882f4bf5577b0766411aec1d286d7713bf244ec5b4afc7b048c37"
+    },
+    {
+      "path": "frontend/work/src/taskGraph.ts",
+      "sha256": "224448d65bf4169261897b369b9f5679ff460ef4af4cbff9503434626d0fe20d"
+    },
+    {
+      "path": "frontend/work/src/taskGraphApi.ts",
+      "sha256": "e17c5cdb44b41b0fbec8c0049e8d61de8f285be2f4340a6720922d0a463e481b"
+    },
+    {
+      "path": "frontend/work/src/taskGraphStrings.ts",
+      "sha256": "1f9bbeb03a870f74b6ff873913bc8605de88d1199b7beb43a4e2034fea1a5c35"
+    },
+    {
+      "path": "frontend/work/src/taskPresentation.ts",
+      "sha256": "e721d905a64e4530fa9cbd48a22e0683f34de8a57f205d61fd8c44ff915a7cb2"
+    },
+    {
+      "path": "frontend/work/src/trackerState.ts",
+      "sha256": "c1a02e5c2eb4a4f4a16c15bdce659cdf35fa870d568b4c1d84b816a4d4010284"
+    },
+    {
+      "path": "frontend/work/src/vite-env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "frontend/work/tests/context-pack-editor.test.mjs",
+      "sha256": "b746ad7bf1385e8c6b24f4f85fd196647f7c95748f40ecfd3f8814de3cfab836"
+    },
+    {
+      "path": "frontend/work/tests/context-pack-launch.test.mjs",
+      "sha256": "65846931140f66d6e9b2ab19d67bee35a907bd53c0f22ffbe55c8cb0fab4dc31"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "247967f5ded03bd6f2db3d69dd4bd539572b830041d22ec70960004ddea8588d"
+    },
+    {
+      "path": "frontend/work/tests/provider-availability.test.mjs",
+      "sha256": "b958bef7a7e87048494924a7a046d27fc1a55ad2b64e32d26cf3b6b1bbe213f3"
+    },
+    {
+      "path": "frontend/work/tests/service-library.test.mjs",
+      "sha256": "d47a4455f446deb789d27308f307bc45c55d649459b472b71a63454797ffc5e5"
+    },
+    {
+      "path": "frontend/work/tests/task-graph.test.mjs",
+      "sha256": "3a7a59c7c66b49774e6b5acf0a769bfbc10d9282b75410a765eadda24c9d3050"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "ae912105eb051ab6cd316de523ed6002d7d96e92679ece8780385aa36006d504"
+    },
+    {
+      "path": "frontend/work/tests/tracker-actions.test.mjs",
+      "sha256": "cfe3e6fcf18f95f8e681b3ce76652e90e48f015f25c042507c66a76eebdd0f76"
+    },
+    {
+      "path": "frontend/work/tests/tracker-contract.test.mjs",
+      "sha256": "44f533f83973ba15c9874555f84d31f333073fa6a0ceaf25e60fda7f3163e895"
+    },
+    {
+      "path": "frontend/work/tests/tracker-parser.test.mjs",
+      "sha256": "774516f8a3ef118afb5cbcf655e58d287bdd03c43c991f7de1a9bbbb2d90cae0"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "f2f07e23cbe07a76110dbbeb7cd288a7a4569c10feb700de81aacb77f10894aa"
+    },
+    {
+      "path": "frontend/work/tests/work-recovery-presets.test.mjs",
+      "sha256": "12f2505fac518a0815063249668a0d68f407d28fa308d7f16d9a078a631ab273"
+    },
+    {
+      "path": "frontend/work/tests/work-shell-recovery.test.mjs",
+      "sha256": "206cc099c0fad3c22904221cdef4e1daf158d09ce67a99f4f6b7b30568dc6508"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "9269d0ef032a9752b297e6e1d131f7819f8eb8aeb9446c962bdc08d0994aa7ba"
+    },
+    {
+      "path": "frontend/work/tests/work-task-create.test.mjs",
+      "sha256": "4226078bf7bc910361c024d3e2446c47a12daa7361883389d2aab2cd4f08073a"
+    },
+    {
+      "path": "frontend/work/tsconfig.json",
+      "sha256": "cc32a3c2be133425d30e112e3dc863c9dbe1ecbbdd81123abf6d6a0300a8ae5c"
+    },
+    {
+      "path": "frontend/work/vite.config.ts",
+      "sha256": "2f6abe52f9d7daad0579c5de2f8d86c9cc99fa2ef447c853ec168f342701116b"
+    }
+  ]
+}

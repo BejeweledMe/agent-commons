@@ -5,8 +5,8 @@ Design Gallery, task execution tracker и context branching.
 
 ## Текущая работа
 
-Проверенная интеграция: `de4398e0aa5a2f28041e0f6e5191d969db979eb1`. Это граница исходников после
-[PR #5](https://github.com/BejeweledMe/agent-commons/pull/5), а не приёмка всех
+Проверенная интеграция: `605c0d7c9c5965c0a8303550056d07ce63afa697`. Это граница исходников после
+[PR #7](https://github.com/BejeweledMe/agent-commons/pull/7), а не приёмка всех
 задач или разрешение на release. `implemented`,
 `tested`, `live-qualified`, `accepted` и `released` — разные состояния.
 
@@ -14,6 +14,7 @@ Design Gallery, task execution tracker и context branching.
 | --- | --- |
 | Work / Team / Library / Settings | Task-first UX и визуальное уточнение интегрированы. [ADR 0014](adr/0014-task-first-workspace-ux.md), [ADR 0015](adr/0015-browser-native-visual-refinement.md), [план UX](task-first-workspace-implementation-plan.md) и [визуальная проверка](audits/2026-09-07-browser-visual-refinement.md) описывают scope и exact evidence. |
 | Service Library / live workspace | Реализованы 45 предустановленных профессиональных навыков, 30 специализаций с отдельным выбором провайдера, UI-редакторы, пять шаблонов проектов, редактируемый граф задач и импорт экранов в Gallery. [ADR 0016](adr/0016-service-library-and-live-workspace.md) содержит границы и граф работ; [проверка](audits/2026-09-07-service-library-verification.md) отделяет установленный пакет, браузер и scoped review от L1 и release. |
+| Project workspaces | Реализованы на `codex/project-workspaces-program`: [ADR 0017](adr/0017-project-scoped-service-host.md), [план и задачи](project-workspace-ux-plan.md). Registry/create, host/routing/lifetime и Work/Gallery прошли scoped independent review, полный `make check` и двухпроектный browser journey; проверенный wheel установлен. [Отчёт](audits/2026-09-08-project-workspaces-verification.md) отделяет эти доказательства от Git delivery и L1/R2. |
 | Context / Gallery / review | [Remediation](audits/2026-09-06-audit-remediation.md) фиксирует проверки актуальности источников, fail-closed provenance, сохранения evidence и response-loss recovery. Сохранённые отчёты относятся к своим ревизиям. |
 | Provider transport / retention | Закрыть оставшийся Grok transport contract и решения по retention/stale coordination. Ограничение размера ввода не закрывает argv privacy. |
 | L1 / R2 | **L1 не доказан; release evidence R2 открыт.** Сначала безопасная проверка Linux receipt scope и green doctor; затем отдельно разрешённая six-profile live qualification на точной source/provider/host границе, независимый review и решение по release. |
@@ -30,6 +31,21 @@ Design Gallery, task execution tracker и context branching.
 Исторические J1/G6 acceptance и успешные canaries не закрывают поздние failures;
 причина Claude failures не установлена. Broker остаётся experimental/manual.
 Live rerun этим планом не разрешается.
+
+Будущий scope, записанный по запросу оператора 2026-09-07: выбор подключения роли
+через подписочный CLI, hosted API или Local vLLM API; SGR/guided reasoning для
+совместимых API/local backend и отдельный conversational execution contract.
+SGR для подписочного CLI в этом продуктовом режиме недоступен. Подробности и
+условия входа в реализацию — в [будущем направлении Roadmap](ROADMAP.md#future-role-connections-sgr-and-conversations)
+и [ADR 0018](adr/0018-role-connections-and-execution-modes.md).
+Это отложенный план, не следующая запущенная волна и не реализованная возможность.
+
+Отдельный UX-запрос 2026-09-08: **проект — верхний уровень навигации**; каждый
+проект имеет собственные команду, карту задач, Gallery, контекст и запуски.
+[Проектный UX-план](project-workspace-ux-plan.md) фиксирует создание через brief /
+blueprint, границы общей библиотеки, изоляцию и граф реализации. Пользователь
+разрешил реализацию; установленный wheel теперь поддерживает список отдельных
+проектов. Создание пустого workspace предшествует выбору blueprint и brief.
 
 ## Как читать оставшуюся программу
 

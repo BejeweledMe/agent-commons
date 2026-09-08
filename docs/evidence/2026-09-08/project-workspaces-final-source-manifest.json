@@ -1,0 +1,231 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "Final project workspace source, contract tests and packaged assets; excludes documentation and private runtime state",
+  "files": [
+    {
+      "path": "frontend/gallery/src/i18n.json",
+      "state": "present",
+      "sha256": "2e026f76859239653c133da5c7c38c16ebde3bfa76a75acc38dc83946c6b6116"
+    },
+    {
+      "path": "frontend/gallery/src/main.tsx",
+      "state": "present",
+      "sha256": "cf3539d75d657ed3302ceb9bc5cf25cdb79ac7a40ce76c0c168b5c207d41039d"
+    },
+    {
+      "path": "frontend/gallery/src/styles.css",
+      "state": "present",
+      "sha256": "cc96c34e0c2b9d063c72973d500fc7054037682f9f31cc789ac6a53b887f018f"
+    },
+    {
+      "path": "frontend/gallery/tests/gallery-contract.test.mjs",
+      "state": "present",
+      "sha256": "b779b6a89e92e7a43b864f55cc986a11ffa7d85502cee138b75c2f5f78088e0a"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "state": "present",
+      "sha256": "89ea86a190e766973d8d75f85b7e1cd8c9f9c977167612e84e01d6b92f5b4b6d"
+    },
+    {
+      "path": "frontend/work/src/appRouteState.ts",
+      "state": "present",
+      "sha256": "60e7243a58383617058d2ee45a9bec70727aeb018d1f9662461979800d61ef40"
+    },
+    {
+      "path": "frontend/work/src/components/ContextPacksSection.tsx",
+      "state": "present",
+      "sha256": "da8072155029e9554cf36765a5b02d313a530db3813477c03a41ec56735340af"
+    },
+    {
+      "path": "frontend/work/src/components/LibrarySection.tsx",
+      "state": "present",
+      "sha256": "7ed909232e2b31ca693bc52a43f379bc0d3bdb525d8de36f32286e30edd685c0"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectSidebar.tsx",
+      "state": "present",
+      "sha256": "d34bbe8b0df8f94d5b30cced132795393e35eb1461f246dca58cfa4c179cffa0"
+    },
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "state": "present",
+      "sha256": "1d94ac5ae20b085cf68074cea3c705bf9559b28fc26cef248304cd36a4286dea"
+    },
+    {
+      "path": "frontend/work/src/contextPackEditorState.ts",
+      "state": "present",
+      "sha256": "7a5b5dca0e9695f8491531c74ff779cc457fc5739511625be4e864cc6a40142f"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "state": "present",
+      "sha256": "b58fd56d374660e8ea26403dc01486249355ab01279f894d535e52ce35dde301"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "state": "present",
+      "sha256": "79860fb25e91f824eb32eb1d449e5bbe87bab106935402ccb025b5e92e1a29d1"
+    },
+    {
+      "path": "frontend/work/src/projectWorkspace.ts",
+      "state": "present",
+      "sha256": "e52e8dd8e54544362d5453ee2be240005199a390ac5f3badd4ff1e50d714291b"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "state": "present",
+      "sha256": "403eb60664eaf4e541f42d9e020c24fe4139107dce7f1d8db65c5862bcc4d868"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "state": "present",
+      "sha256": "247967f5ded03bd6f2db3d69dd4bd539572b830041d22ec70960004ddea8588d"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "state": "present",
+      "sha256": "9269d0ef032a9752b297e6e1d131f7819f8eb8aeb9446c962bdc08d0994aa7ba"
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "state": "present",
+      "sha256": "73c5ca4f86bccaa385eb6dc2b2eee8a653dab40419e20bc1c4e24cff1e26645a"
+    },
+    {
+      "path": "src/agent_commons/ui/context.py",
+      "state": "present",
+      "sha256": "b4917a6720240b5c4f60b6072989724f1c2858c74a94c1c0ba1208405dae77a5"
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "state": "present",
+      "sha256": "50dcd92955a538a29fd5838e53277a946782a7c4358f035178b471c1f17be737"
+    },
+    {
+      "path": "src/agent_commons/ui/project_host.py",
+      "state": "present",
+      "sha256": "7963ab95eb8153ae511a3e0a11b293466a7d9d673af804e39966238137ef4943"
+    },
+    {
+      "path": "src/agent_commons/ui/project_operations.py",
+      "state": "present",
+      "sha256": "276e300064dc4a4e3d89378350d1ada22200ace3e2b3970f7cbfa5e1dbfe838c"
+    },
+    {
+      "path": "src/agent_commons/ui/project_registry.py",
+      "state": "present",
+      "sha256": "f4227da76bdd0bb3b590b70e61221ae4a7958ff0686ab4c30c06a1f86f305767"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "state": "present",
+      "sha256": "c79031b7a2a40dedb11685468b4c97e90e23211539ff94382a0a201605e47466"
+    },
+    {
+      "path": "src/agent_commons/ui/session_owner.py",
+      "state": "present",
+      "sha256": "b0f05aeb780b9750087d15d0393c084f7ef6eb7b47783f42e0755aa7fd02adbc"
+    },
+    {
+      "path": "src/agent_commons/ui/static/gallery/assets/gallery-C4hvTKLN.css",
+      "state": "present",
+      "sha256": "8a4c953d72cc1fc613ef1880dbaab89815c8ad811cdb7260bd0ef0013bd1f024"
+    },
+    {
+      "path": "src/agent_commons/ui/static/gallery/assets/gallery-C6nMOsQc.css",
+      "state": "deleted",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/gallery/assets/gallery-DgJGm_-W.js",
+      "state": "deleted",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/gallery/assets/gallery-Djtn_TWU.js",
+      "state": "present",
+      "sha256": "be93839fb862b98c93cff6f85c26944eeb9e2f5fa3d3180b3323817212620f48"
+    },
+    {
+      "path": "src/agent_commons/ui/static/gallery/index.html",
+      "state": "present",
+      "sha256": "e3fb4c87684e72f222ebcc811f70d68b9dc9a548d25b07d0fbc1d83a752b2dff"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-BggXbAK7.js",
+      "state": "present",
+      "sha256": "f8555f6b549899233ed891a0026907ef7c75826daf421c498f9fb775852b9706"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-CcAsvCpk.css",
+      "state": "deleted",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DAg_73Ra.css",
+      "state": "present",
+      "sha256": "0eb346db488e8be817c2812ddcba08075e05c0a79e87f3cf18b354585dda65d1"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DuoJrVGp.js",
+      "state": "deleted",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "state": "present",
+      "sha256": "a525d4a511c0d37af81a708c49e04a529da0255089d7aaee52be512a0a9052e2"
+    },
+    {
+      "path": "tests/cli/test_ui_command.py",
+      "state": "present",
+      "sha256": "1ab2d48238f2a114ccd9c4de97856eb7066128979f230eaec6088fdb270db0df"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "state": "present",
+      "sha256": "c989863b4ad99322aed0ce27a8d1c9ea43ac39941fcb403c538f8e2a3feef287"
+    },
+    {
+      "path": "tests/ui/test_project_host.py",
+      "state": "present",
+      "sha256": "4c549706bf6bb3bad7e76465e71322b85b5fc1dc773697a429d2f5c7a999449c"
+    },
+    {
+      "path": "tests/ui/test_project_operations.py",
+      "state": "present",
+      "sha256": "4754e8649a03effa2265b7549ab7f32ee0269b7f1eaa2a9b1f49507b4b410d26"
+    },
+    {
+      "path": "tests/ui/test_project_registry.py",
+      "state": "present",
+      "sha256": "17706d41c28238f4ed7a47c9893b1a01aa3379ed838db49a640b042f814edc64"
+    },
+    {
+      "path": "tests/ui/test_provider_auth_work_ui.py",
+      "state": "present",
+      "sha256": "51eabd1e24ffd963c80332652c971236caf56402847a2a34206274bbf296ab34"
+    },
+    {
+      "path": "tests/ui/test_react_gallery.py",
+      "state": "present",
+      "sha256": "1d2ee5bc6557c1e9b30271c8cac568ffb32c759cd2198079ce1113d59e5649a2"
+    },
+    {
+      "path": "tests/ui/test_removed_switches.py",
+      "state": "present",
+      "sha256": "506d00eda9ccdf955754908808908c3b59749a3494c908d9b69b869cb20e9a8d"
+    },
+    {
+      "path": "tests/ui/test_work_app_contract.py",
+      "state": "present",
+      "sha256": "26bdf08e6f26cf3fb09904801ffebe21fa28ffe46986a4b3a18eafc7633fed3d"
+    },
+    {
+      "path": "tests/ui/test_work_starter_packs_ui.py",
+      "state": "present",
+      "sha256": "5696525e0ba3a0045eb742221bc1522b618b17c8a1174a17f81560b62b5d0d87"
+    }
+  ]
+}

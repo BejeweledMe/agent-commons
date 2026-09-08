@@ -1,0 +1,22 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "Registry v4 after changes-required review; independent re-review pending",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_registry.py",
+      "sha256": "f4227da76bdd0bb3b590b70e61221ae4a7958ff0686ab4c30c06a1f86f305767"
+    },
+    {
+      "path": "src/agent_commons/ui/project_operations.py",
+      "sha256": "8de88c0426f6a74706b60c996c253a93daef8f47f98125aaca3f97b0d3e30c31"
+    },
+    {
+      "path": "tests/ui/test_project_registry.py",
+      "sha256": "17706d41c28238f4ed7a47c9893b1a01aa3379ed838db49a640b042f814edc64"
+    },
+    {
+      "path": "tests/ui/test_project_operations.py",
+      "sha256": "40970a2d72334465cd7c538f4e5c7703d11d6088610d42349f6bc84ea6c91bad"
+    }
+  ]
+}

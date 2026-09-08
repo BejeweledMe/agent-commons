@@ -1,0 +1,22 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "project-registry-source-manifest-v3 after changes-required review; independent re-review pending",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_registry.py",
+      "sha256": "eeae9b9435d9cab441ec61dfeb74547a9324d25b044be7b758fe343b172dbe91"
+    },
+    {
+      "path": "src/agent_commons/ui/project_operations.py",
+      "sha256": "609669ebac98571607a134414ea91a352ec2505955edad5a5ccdc85d427cda66"
+    },
+    {
+      "path": "tests/ui/test_project_registry.py",
+      "sha256": "fec399dac968f20b4bdcdd7e14580539c873053202b1e38c0b19ec4ea96eabcb"
+    },
+    {
+      "path": "tests/ui/test_project_operations.py",
+      "sha256": "540d01383d60faf5d5a8e9e99d2bf02846e8dd83ba3587d3be45bb0ffabc3c52"
+    }
+  ]
+}

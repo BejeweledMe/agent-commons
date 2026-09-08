@@ -255,6 +255,9 @@ def test_starter_pack_parser_round_trips_and_rejects_unknown_shapes(tmp_path: Pa
           }
         };
         globalThis.fetch = async (url, init = {}) => {
+          if (url === `${apiBase}/projects`) {
+            return { ok: false, status: 404, json: async () => ({ error: { code: "not_found" } }) };
+          }
           if (url === `${apiBase}/setup`) {
             return { ok: true, status: 200, json: async () => ({ state: "setup_configured" }) };
           }
@@ -387,6 +390,9 @@ def test_starter_pack_catalogue_409_surfaces_as_a_typed_refusal(tmp_path: Path) 
           }
         };
         globalThis.fetch = async (url) => {
+          if (url === `${apiBase}/projects`) {
+            return { ok: false, status: 404, json: async () => ({ error: { code: "not_found" } }) };
+          }
           if (url === `${apiBase}/setup`) {
             return { ok: true, status: 200, json: async () => ({ state: "setup_configured" }) };
           }

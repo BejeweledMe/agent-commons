@@ -173,6 +173,11 @@ def _operator_runtime_config(
 )
 @click.option("--no-browser", is_flag=True, help="Do not open a browser automatically.")
 @click.option(
+    "--single-project",
+    is_flag=True,
+    help="Open only this checkout without the service project registry.",
+)
+@click.option(
     "--read-only",
     "ui_read_only",
     is_flag=True,
@@ -194,6 +199,7 @@ def ui_command(
     state: CLIState,
     port: int,
     no_browser: bool,
+    single_project: bool,
     ui_read_only: bool,
     role_catalog: Path | None,
     profile_config: Path | None,
@@ -292,7 +298,60 @@ def ui_command(
         profile_config=profile_config,
     )
 
+    project_host = None
+    bound_port_holder = [port]
+    if not single_project:
+        from agent_commons.library import default_library_root
+        from agent_commons.ui.project_host import ProjectHost
+        from agent_commons.ui.project_operations import ProjectOperations
+        from agent_commons.ui.project_registry import ProjectRegistry, open_project_manager
+        from agent_commons.ui.setup import default_runtime_config_path
+
+        registry = ProjectRegistry()
+
+        def project_context(repo: Path, state_binding: Path | None) -> UIContext:
+            # Resolve this binding once, explicitly. Inherited state-root
+            # environment belongs to the startup checkout, never every project.
+            manager = open_project_manager(repo, state_binding, read_only=read_only)
+            project_owner = None
+            if not read_only:
+                project_owner = ProjectSessionOwner(
+                    repo,
+                    state_root=manager.paths.state_root,
+                    state_source="project-registry",
+                )
+                project_owner.acquire_panel_lock(bound_port_holder[0])
+                try:
+                    project_owner.start()
+                except Exception:
+                    project_owner.shutdown()
+                    raise
+            return UIContext(
+                repo,
+                state_root=manager.paths.state_root,
+                state_source="project-registry",
+                session_owner=project_owner,
+                catalog_path=context._catalog_path,
+                profile_config=context._profile_config,
+                library_root=context._library_root,
+            )
+
+        protected_roots = [default_runtime_config_path().parent, default_library_root()]
+        if context._state_root is not None:
+            protected_roots.append(context._state_root)
+        if context._state_base is not None:
+            protected_roots.append(context._state_base)
+        operations = ProjectOperations(registry, forbidden_roots=protected_roots)
+        project_host = ProjectHost(
+            registry,
+            operations,
+            context,
+            read_only=read_only,
+            context_factory=project_context,
+        )
+
     def emit(bound_port: int, exchange_code: str) -> None:
+        bound_port_holder[0] = bound_port
         writer_session_id = None
         if owner is not None:
             # The lock was taken in the command body, before the server bound
@@ -353,8 +412,16 @@ def ui_command(
         click.echo("  stop    Ctrl-C closes the panel session unless a run is still live")
 
     try:
-        serve(context, port=port, open_browser=not no_browser, emit=emit)
+        serve(
+            context,
+            port=port,
+            open_browser=not no_browser,
+            emit=emit,
+            project_host=project_host,
+        )
     finally:
+        if project_host is not None:
+            project_host.shutdown()
         if owner is not None:
             outcome = owner.shutdown()
             if outcome["session_id"] is not None and not outcome["closed"]:

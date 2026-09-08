@@ -1,6 +1,8 @@
 {
   "en": {
     "app_title": "Design Gallery",
+    "gallery_project": "Project",
+    "gallery_back_to_work": "Back to project Work",
     "app_subtitle": "Published design packages with exact screen provenance",
     "language": "Language",
     "switch_to_english": "Switch to English",
@@ -11,6 +13,7 @@
     "authentication_required_help": "Stop and restart the local panel, then open the newly printed Gallery URL once in this browser.",
     "gallery_unavailable": "Gallery is unavailable",
     "gallery_unavailable_help": "The Gallery could not read a safe canonical snapshot. Run workspace diagnostics, rebuild the derived projection, and try a newly printed UI URL.",
+    "project_unavailable_help": "This project is unavailable or needs identity repair. Return to Work and choose an available project; Gallery did not open another project.",
     "setup_uninitialized_help": "Initialize Agent Commons from the local panel, then reopen the Gallery from its newly printed URL.",
     "setup_not_a_repository_help": "Open the panel from a Git repository, initialize Agent Commons there, and use its newly printed Gallery URL.",
     "gallery_data_unavailable": "No published design packages",
@@ -103,6 +106,8 @@
   },
   "ru": {
     "app_title": "Галерея дизайна",
+    "gallery_project": "Проект",
+    "gallery_back_to_work": "Вернуться к работе проекта",
     "app_subtitle": "Опубликованные пакеты дизайна с точным происхождением экранов",
     "language": "Язык",
     "switch_to_english": "Переключить на английский",
@@ -113,6 +118,7 @@
     "authentication_required_help": "Остановите и заново запустите локальную панель, затем один раз откройте новый URL галереи в этом браузере.",
     "gallery_unavailable": "Галерея недоступна",
     "gallery_unavailable_help": "Галерея не смогла прочитать безопасный канонический снимок. Запустите диагностику рабочего пространства, пересоберите производную проекцию и откройте новый URL интерфейса.",
+    "project_unavailable_help": "Этот проект недоступен или требует проверки идентичности. Вернитесь в работу и выберите доступный проект; галерея не открыла другой проект.",
     "setup_uninitialized_help": "Инициализируйте Agent Commons в локальной панели, затем откройте галерею по новому URL из панели.",
     "setup_not_a_repository_help": "Откройте панель из Git-репозитория, инициализируйте там Agent Commons и используйте новый URL галереи.",
     "gallery_data_unavailable": "Нет опубликованных пакетов дизайна",

@@ -169,6 +169,7 @@ class ProjectSessionOwner:
         self._thread: threading.Thread | None = None
         self._panel_lock_fd: int | None = None
         self._lock_refused = False
+        self._draining = False
 
     # -- managers ----------------------------------------------------------
 
@@ -347,6 +348,10 @@ class ProjectSessionOwner:
 
         needed = int(wall_time_seconds) + RUN_TTL_FINALIZATION_SECONDS + RUN_TTL_MARGIN_SECONDS
         with self._guard:
+            if self._draining:
+                raise ConfigurationError(
+                    "this panel is draining existing work and cannot launch another run"
+                )
             if self._session_id is None:
                 self._open_locked()
             remaining = self._expires_at - self._clock()
@@ -528,6 +533,12 @@ class ProjectSessionOwner:
 
     # -- shutdown ----------------------------------------------------------
 
+    def begin_draining(self) -> None:
+        """Reject new launches while retaining the owner for live work."""
+
+        with self._guard:
+            self._draining = True
+
     def shutdown(self) -> dict[str, Any]:
         """Stop renewing and close the session unless live work still needs it.
 
@@ -537,13 +548,9 @@ class ProjectSessionOwner:
         can print why the session was intentionally left open.
         """
 
-        self._stop.set()
-        thread = self._thread
-        if thread is not None:
-            thread.join(timeout=5.0)
-            self._thread = None
         outcome: dict[str, Any] = {"session_id": None, "closed": False, "reason": None}
         with self._guard:
+            self._draining = True
             if self._session_id is not None:
                 outcome["session_id"] = self._session_id
                 if self._lock_refused:
@@ -564,8 +571,18 @@ class ProjectSessionOwner:
                         # session already expired needs no closing either way.
                         outcome["reason"] = str(exc)
                         _LOG.warning("panel session left open: %s", exc)
+                        # The owner remains responsible for the active run:
+                        # do not stop heartbeats or release the panel lock.
+                        return outcome
                     except CommonsError as exc:  # pragma: no cover - defence
                         outcome["reason"] = str(exc)
                         _LOG.warning("panel session could not be closed: %s", exc)
+                        return outcome
+            self._stop.set()
+            thread = self._thread
+        if thread is not None:
+            thread.join(timeout=5.0)
+        with self._guard:
+            self._thread = None
             self._release_panel_lock_locked()
         return outcome

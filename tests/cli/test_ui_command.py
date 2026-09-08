@@ -64,8 +64,11 @@ def _isolated_operator_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
 
 
 def _serve_spy(captured: dict[str, Any]) -> Any:
-    def serve(context: Any, *, port: int, open_browser: bool, emit: Any) -> None:
+    def serve(
+        context: Any, *, port: int, open_browser: bool, emit: Any, project_host: Any = None
+    ) -> None:
         captured["context"] = context
+        captured["project_host"] = project_host
         captured["port"] = port
         captured["open_browser"] = open_browser
         emit(port or 49999, "test-exchange-code")
@@ -114,6 +117,94 @@ def test_the_ui_command_explains_default_browser_consumption(
     assert "opened your default browser automatically" in result.output
     assert "single-use" in result.output
     assert "--no-browser" in result.output
+
+
+def test_the_ui_command_can_explicitly_keep_the_single_project_entry(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr("agent_commons.ui.server.serve", _serve_spy(captured))
+    result = CliRunner().invoke(
+        cli, ["--repo", str(repo), "ui", "--no-browser", "--single-project"]
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["project_host"] is None
+
+
+def test_ui_hosts_two_projects_and_keeps_writes_in_the_selected_workspace(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise the command's real host factory, owner and route composition."""
+    from fastapi.testclient import TestClient
+
+    second = tmp_path / "second-product"
+    captured: dict[str, Any] = {}
+
+    def serve(
+        context: Any, *, port: int, open_browser: bool, emit: Any, project_host: Any = None
+    ) -> None:
+        assert project_host is not None
+        emit(49999, "test-exchange-code")
+        app = project_host.create_app(token="test-session-token", port=49999, api_base="/api")
+        headers = {"Cookie": "agent_commons_ui_session=test-session-token"}
+        with TestClient(app, base_url="http://127.0.0.1:49999") as client:
+            listing = client.get("/api/projects", headers=headers)
+            assert listing.status_code == 200, listing.text
+            initial = listing.json()["default_project_id"]
+            assert initial is not None
+            inspected = client.post(
+                "/api/projects/inspect",
+                headers=headers,
+                json={"mode": "new", "path": str(second), "name": "Second product"},
+            )
+            assert inspected.status_code == 200, inspected.text
+            created = client.post(
+                "/api/projects",
+                headers=headers,
+                json={
+                    "inspection_id": inspected.json()["inspection_id"],
+                    "idempotency_key": "cli-create-second",
+                },
+            )
+            assert created.status_code == 200, created.text
+            project = created.json()["project"]
+            assert project["id"] != initial
+            updated = client.post(
+                f"/api/projects/{project['id']}/update",
+                headers=headers,
+                json={
+                    "expected_revision": project["revision"],
+                    "name": "Renamed product",
+                    "archived": False,
+                    "idempotency_key": "cli-rename-second",
+                },
+            )
+            assert updated.status_code == 200, updated.text
+            recorded = client.post(
+                f"/api/projects/{project['id']}/tasks",
+                headers=headers,
+                json={
+                    "title": "Only in the second project",
+                    "description": "The project-qualified route owns this write.",
+                    "acceptance_criteria": ["The first workspace has no such task."],
+                    "idempotency_key": "cli-second-task",
+                },
+            )
+            assert recorded.status_code == 200, recorded.text
+            captured["task_id"] = recorded.json()["entity_ref"]["id"]
+            meta = client.get(f"/api/projects/{project['id']}/meta", headers=headers)
+            assert meta.status_code == 200, meta.text
+            captured["second_session"] = meta.json()["writer_session_id"]
+            assert captured["second_session"] != context.writer().session_id
+
+    monkeypatch.setattr("agent_commons.ui.server.serve", serve)
+    result = CliRunner().invoke(cli, ["--repo", str(repo), "ui", "--no-browser"])
+    assert result.exit_code == 0, (result.output, result.exception)
+    first = CommonsManager(repo, read_only=True).snapshot()
+    other = CommonsManager(second, read_only=True)
+    assert captured["task_id"] not in first.tasks
+    assert captured["task_id"] in other.snapshot().tasks
+    assert other.show_session(captured["second_session"])["status"] == "closed"
 
 
 def test_the_ui_command_explains_manual_browser_selection(
@@ -286,7 +377,9 @@ def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_fir
     subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True)
     seen: dict[str, Any] = {}
 
-    def serve(context: Any, *, port: int, open_browser: bool, emit: Any) -> None:
+    def serve(
+        context: Any, *, port: int, open_browser: bool, emit: Any, project_host: Any = None
+    ) -> None:
         emit(port or 49999, "test-exchange-code")
         app = create_app(
             context,
@@ -294,6 +387,7 @@ def test_the_panel_starts_on_a_repository_with_no_workspace_and_writes_after_fir
             exchange_code="test-exchange-code",
             port=49999,
             api_base="/api",
+            project_host=project_host,
         )
         headers = {"Cookie": "agent_commons_ui_session=test-session-token"}
         with TestClient(app, base_url="http://127.0.0.1:49999") as client:

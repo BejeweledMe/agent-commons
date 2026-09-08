@@ -7,27 +7,46 @@ import type { Locale, MessageKey } from "../i18n.js";
 import type { BlueprintApplication, BlueprintApplyInput, BlueprintBinding, WorkBlueprint } from "../libraryTypes.js";
 
 type ApplyIntent = Readonly<{ id: string; input: BlueprintApplyInput; key: string }>;
-export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabled, onApplied, onCount }: {
+type BlueprintSession = {
+  selected: WorkBlueprint | null; title: string; brief: string; bindings: BlueprintBinding[];
+  defaultRuntime: BlueprintRuntimeChoice; status: "idle" | "applying" | "refused" | "uncertain";
+  intent: ApplyIntent | null; result: BlueprintApplication | null; invalid: boolean; code: string;
+};
+// RAM only. A project switch may unmount this panel without discarding a draft
+// or the immutable retry key that describes an uncertain apply.
+const sessions = new Map<string, BlueprintSession>();
+export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabled, onApplied, onCount, projectId }: {
   api: LibraryApi; profiles: readonly Profile[]; locale: Locale; text: (key: MessageKey) => string;
-  writesEnabled: boolean; onApplied: (application: BlueprintApplication) => void; onCount?: (count: number) => void;
+  writesEnabled: boolean; onApplied: (application: BlueprintApplication) => void; onCount?: (count: number) => void; projectId?: string | null;
 }): ReactElement {
+  const sessionKey = projectId ?? "legacy";
+  const restored = sessions.get(sessionKey);
+  const restoredStatus: "idle" | "applying" | "refused" | "uncertain" = restored?.status === "applying"
+    ? "uncertain" : restored?.status ?? "idle";
   const [blueprints, setBlueprints] = useState<readonly WorkBlueprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const [selected, setSelected] = useState<WorkBlueprint | null>(null);
-  const [title, setTitle] = useState("");
-  const [brief, setBrief] = useState("");
-  const [bindings, setBindings] = useState<BlueprintBinding[]>([]);
-  const [defaultRuntime, setDefaultRuntime] = useState<BlueprintRuntimeChoice>({ profile_id: "", model: null });
+  const [selected, setSelected] = useState<WorkBlueprint | null>(() => restored?.selected ?? null);
+  const [title, setTitle] = useState(() => restored?.title ?? "");
+  const [brief, setBrief] = useState(() => restored?.brief ?? "");
+  const [bindings, setBindings] = useState<BlueprintBinding[]>(() => restored?.bindings ?? []);
+  const [defaultRuntime, setDefaultRuntime] = useState<BlueprintRuntimeChoice>(() => restored?.defaultRuntime ?? { profile_id: "", model: null });
   const defaultProfile = defaultRuntime.profile_id;
   const defaultModel = defaultRuntime.model ?? "";
-  const [status, setStatus] = useState<"idle" | "applying" | "refused" | "uncertain">("idle");
-  const [intent, setIntent] = useState<ApplyIntent | null>(null);
-  const [result, setResult] = useState<BlueprintApplication | null>(null);
-  const [invalid, setInvalid] = useState(false);
-  const [code, setCode] = useState("");
+  const [status, setStatus] = useState<"idle" | "applying" | "refused" | "uncertain">(() => restoredStatus);
+  const [intent, setIntent] = useState<ApplyIntent | null>(() => restored?.intent ?? null);
+  const [result, setResult] = useState<BlueprintApplication | null>(() => restored?.result ?? null);
+  const [invalid, setInvalid] = useState(() => restored?.invalid ?? false);
+  const [code, setCode] = useState(() => restored?.code ?? "");
   const executing = useRef(false);
+  const mounted = useRef(true);
+  const snapshot = useRef<BlueprintSession | null>(null);
+  snapshot.current = { selected, title, brief, bindings, defaultRuntime, status, intent, result, invalid, code };
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; if (snapshot.current) sessions.set(sessionKey, snapshot.current); };
+  }, [sessionKey]);
   const locked = status === "applying" || status === "uncertain";
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setLoadError(false);
@@ -48,8 +67,13 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
     if (executing.current) return;
     executing.current = true;
     setStatus("applying"); setCode("");
-    try { const application = await api.applyBlueprint(operation.id, operation.input, operation.key, new AbortController().signal); setResult(application); setIntent(null); setStatus("idle"); onApplied(application); }
-    catch (error: unknown) { const problem = error instanceof ApiProblem ? error : null; setIntent(operation); setStatus(problem && problem.status >= 400 && problem.status < 500 ? "refused" : "uncertain"); setCode(problem?.apiError?.code ?? "request_unavailable"); }
+    if (snapshot.current) {
+      const interrupted = { ...snapshot.current, status: "applying" as const, intent: operation };
+      snapshot.current = interrupted;
+      sessions.set(sessionKey, interrupted);
+    }
+    try { const application = await api.applyBlueprint(operation.id, operation.input, operation.key, new AbortController().signal); if (!mounted.current) return; setResult(application); setIntent(null); setStatus("idle"); onApplied(application); }
+    catch (error: unknown) { if (!mounted.current) return; const problem = error instanceof ApiProblem ? error : null; setIntent(operation); setStatus(problem && problem.status >= 400 && problem.status < 500 ? "refused" : "uncertain"); setCode(problem?.apiError?.code ?? "request_unavailable"); }
     finally { executing.current = false; }
   }
   function submit(event: FormEvent): void {

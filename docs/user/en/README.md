@@ -96,9 +96,25 @@ to this local panel; it is not a link to share with collaborators.
 
 ## Set up a workspace and runtime
 
-The UI works with the Git repository from which you started it. It does not let
-you choose another project in the browser. Before pressing **Initialize
-workspace**, make sure the terminal is in the project you intend to use.
+The startup repository becomes the first project. Use **Projects** in the left
+sidebar to select another one. Each project has its own team, tasks, design
+gallery and run history; installed skill and blueprint definitions are shared.
+
+Choose **New project**, enter its name and an absolute workspace path, then
+**Check workspace** and **Create project**. Choose the existing-repository option
+to connect a checkout you already have. A new project opens its blueprint
+library; apply a template there or return to **Work** for an empty start.
+Creating a project does not launch a provider.
+
+Task and Library drafts are kept separately in browser memory while switching.
+Reloading or closing the page clears unsaved drafts. Existing runs continue
+while the local service remains running. **Project actions** contains rename,
+archive and restore; archiving does not delete files or stop a run.
+
+If initialization was interrupted and its result is ambiguous, keep the path,
+go back and explicitly inspect/connect that existing repository. The app does
+not silently assign an unrelated workspace to the original request. Operators
+can use `ui --single-project` when they need the previous single-project entry.
 
 ### 1. Initialize the workspace
 
@@ -266,9 +282,9 @@ tools; Windows is not supported. The provider runtime is experimental and may
 require operator action.
 
 This checkout provides **Work**, **Team**, **Library** and **Settings**, with
-Gallery and the legacy panel for specialized views. The task-first interface
-does not add automatic task scheduling, provider conversation resume or
-project switching. A successful local test does not qualify a live provider.
+Gallery and the legacy panel for specialized views. Projects can be created
+and switched in the sidebar. Automatic task scheduling and provider conversation
+resume are not implemented. A successful local test does not qualify a live provider.
 
 Library includes a Starter Packs examples section with two bundled mock
 packs. Viewing examples changes nothing. Applying a blueprint requires explicit

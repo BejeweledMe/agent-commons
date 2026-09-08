@@ -93,12 +93,25 @@ test("Gallery uses a CSP-safe semantic board without ReactFlow", () => {
 });
 
 test("Gallery consumes only typed same-origin routes", () => {
-  assert.match(source, /fetch\(`\$\{currentApiBase\}\/gallery`/);
+  assert.match(source, /fetch\(`\$\{scopedApiBase\}\/gallery`/);
+  assert.match(source, /fetch\(`\$\{currentApiBase\}\/projects`/);
+  assert.match(source, /projects\/\$\{encodeURIComponent\(selected\)\}/);
+  assert.match(source, /\?project=\$\{encodeURIComponent\(projectId\)\}/);
   assert.match(source, /\/artifacts\/\$\{encodeURIComponent\(screen\.artifact_id\)\}\/preview/);
   assert.match(source, /\/gallery\/\$\{encodeURIComponent\(packageValue\.design_package_id\)\}/);
   assert.match(source, /credentials: "same-origin"/);
   assert.doesNotMatch(source, /Authorization|localStorage|filesystem|file:\/\//);
   assert.doesNotMatch(source, /stdout|stderr|transcript|reasoning/);
+});
+
+test("Gallery bootstraps each tab from its own opaque project URL and never stores project drafts", () => {
+  assert.match(source, /function projectFromSearch\(search: string\): string \| null/);
+  assert.match(source, /const \[activeProjectId, setActiveProjectId\].*projectFromSearch\(window\.location\.search\)/);
+  assert.match(source, /\[activeProjectId\]\);/);
+  assert.match(source, /window\.addEventListener\("popstate", onPop\)/);
+  assert.match(source, /scopedApiBase = `\$\{currentApiBase\}\/projects\/\$\{encodeURIComponent\(selected\)\}`/);
+  assert.match(source, /href=\{`\/work\?project=\$\{encodeURIComponent\(activeProjectId\)\}`\}/);
+  assert.doesNotMatch(source, /localStorage/);
 });
 
 test("preview bytes are revision-checked and object URLs are revoked", () => {

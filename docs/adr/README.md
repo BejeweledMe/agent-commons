@@ -33,6 +33,8 @@ contract test. The status written in each ADR remains the detailed record.
 | [0014](0014-task-first-workspace-ux.md) | Proposed | Task-first Work workspace, domain-specific UI state, explicit execution and bounded exact-source discovery; branch implementation authorized, verification pending. |
 | [0015](0015-browser-native-visual-refinement.md) | Proposed | Council-guided browser refinement: native status selection, persistent recovery focus, inspector disclosures and readable exact Context sources; bounded branch implementation authorized. |
 | [0016](0016-service-library-and-live-workspace.md) | Proposed | Service-owned professional skills and specializations, editable library, five workflow blueprints, live task graph and browser Gallery; implementation authorized. |
+| [0017](0017-project-scoped-service-host.md) | Proposed | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery; branch implementation authorized. |
+| [0018](0018-role-connections-and-execution-modes.md) | Proposed | Future role connection, API/local, SGR and conversation contracts; no runtime capability or live qualification claimed. |
 
 ## How the two records fit together
 

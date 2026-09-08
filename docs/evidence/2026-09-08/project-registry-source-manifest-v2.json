@@ -1,0 +1,22 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "Registry and project operations after first changes-required review; independent re-review pending",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_registry.py",
+      "sha256": "f669b65b245a940c97298b732b9192e556e1ce6df6f4f52104cef1a94ec26f6d"
+    },
+    {
+      "path": "src/agent_commons/ui/project_operations.py",
+      "sha256": "a9181626f1e0aacff0442abd76f3546c14fcd2ae68debc8f538120d0e69baba2"
+    },
+    {
+      "path": "tests/ui/test_project_registry.py",
+      "sha256": "9925c35da3aa460bba3572603d5979d76bf2b917dfa74af894ea079ca7641291"
+    },
+    {
+      "path": "tests/ui/test_project_operations.py",
+      "sha256": "87e833686c0b99b83d9e1a666f9a564c7757b2988cbf5082ce779608bb227621"
+    }
+  ]
+}

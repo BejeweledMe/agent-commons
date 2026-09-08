@@ -57,14 +57,16 @@ def test_no_capability_switch_is_named_anywhere_in_the_asset() -> None:
     # command has no capability switch to advise in the first place.
     switches = _ui_switches()
     assert not [switch for switch in switches if switch.startswith("--enable-")], switches
-    # The two that remain are overrides of where a file is read from, plus the
-    # view that records nothing -- none of them turns a capability on.
+    # These are connection and source-location overrides, a read-only view,
+    # and the explicit one-project compatibility mode.  None turns a product
+    # capability on.
     assert switches == {
         "--port",
         "--no-browser",
         "--read-only",
         "--role-catalog",
         "--profile-config",
+        "--single-project",
     }
 
 

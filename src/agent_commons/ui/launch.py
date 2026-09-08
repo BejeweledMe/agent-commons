@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, TypedDict, cast
 
@@ -102,6 +104,10 @@ class UILaunchCoordinator:
     def __init__(self, context: UIContext) -> None:
         self._context = context
         self._launch_threads: list[threading.Thread] = []
+        self._thread_factory: Callable[..., threading.Thread] = threading.Thread
+        self._lifecycle = threading.Condition(threading.RLock())
+        self._launch_preparations = 0
+        self._draining = False
         # A test/embedder runtime factory is a construction-time dependency.
         # Capturing it prevents later mutable context state from swapping the
         # auth probe independently of the coordinator that owns its flights.
@@ -121,11 +127,25 @@ class UILaunchCoordinator:
 
         self._provider_auth = UIProviderAuthCoordinator(build_auth_runtime)
 
-    def await_launches(self, timeout: float = 30.0) -> None:
+    def await_launches(self, timeout: float | None = 30.0) -> None:
         """Join any background launch threads. For tests and clean shutdown."""
 
-        for thread in list(self._launch_threads):
-            thread.join(timeout=timeout)
+        deadline = None if timeout is None else time.monotonic() + timeout
+        with self._lifecycle:
+            threads = tuple(self._launch_threads)
+        for thread in threads:
+            thread.join(timeout=None if deadline is None else max(0.0, deadline - time.monotonic()))
+
+    def begin_draining(self) -> None:
+        """Close launch admission before a host starts draining its projects."""
+
+        with self._lifecycle:
+            self._draining = True
+
+    def _finish_preparation(self) -> None:
+        with self._lifecycle:
+            self._launch_preparations -= 1
+            self._lifecycle.notify_all()
 
     def provider_auth_status(self, profile_id: str) -> ProviderAuthPayload:
         return self._provider_auth.status(profile_id)
@@ -139,10 +159,21 @@ class UILaunchCoordinator:
     def cancel_provider_login(self, profile_id: str) -> ProviderAuthPayload:
         return self._provider_auth.cancel_login(profile_id)
 
-    def shutdown(self) -> None:
-        """Stop provider-auth processes owned by this panel."""
+    def shutdown(self, timeout: float | None = None) -> dict[str, int]:
+        """Drain owned launch threads, preserving truthful live-work state."""
 
-        self._provider_auth.shutdown()
+        self.begin_draining()
+        with self._lifecycle:
+            while self._launch_preparations:
+                self._lifecycle.wait()
+        self.await_launches(timeout=timeout)
+        with self._lifecycle:
+            live = sum(1 for thread in self._launch_threads if thread.is_alive())
+        # Provider-auth cleanup has its own short, bounded process barrier;
+        # only recorded delegation threads are drained without a speculative
+        # timeout during host shutdown.
+        self._provider_auth.shutdown(timeout=5.0 if timeout is None else timeout)
+        return {"live": live}
 
     def _runtime_service(self, manager: CommonsManager) -> DelegationRuntimeService:
         """Build the same runtime service the CLI uses, under the writer session."""
@@ -244,28 +275,56 @@ class UILaunchCoordinator:
             # delegation, child session, or attempt exists.  The runtime
             # repeats this exact validation under the per-delegation lock.
             runtime.validate_context_selection(request.context)
-        delegation = writer.create_delegation(
-            target_ref={"kind": "task", "id": request.task_id},
-            target_revision=str(task.get("effective_revision") or task["revision"]),
-            target_profile=profile_id,
-            purpose=purpose,
-            limits=limits,
-            on_behalf_of_agent_id=request.agent_id,
-            idempotency_key=request.idempotency_key,
-        )
+        # The writer is pinned before background ownership begins.  Runtime
+        # construction remains in the owned launch body so a configuration
+        # failure is recorded on the newly-created delegation as
+        # `needs_operator`, rather than turning a truthful async refusal into
+        # an HTTP failure with no delegation to inspect.
+        launch_runtime = runtime
+        with self._lifecycle:
+            if self._draining:
+                raise ConfigurationError(
+                    "this panel is draining existing work and cannot launch another run"
+                )
+            self._launch_preparations += 1
+        admission = context._launch_admission
+        admitted = False
+        if admission is not None:
+            if not admission.acquire(blocking=False):
+                self._finish_preparation()
+                raise ConfigurationError(
+                    "this local host is already running its maximum number of provider launches"
+                )
+            admitted = True
+        try:
+            delegation = writer.create_delegation(
+                target_ref={"kind": "task", "id": request.task_id},
+                target_revision=str(task.get("effective_revision") or task["revision"]),
+                target_profile=profile_id,
+                purpose=purpose,
+                limits=limits,
+                on_behalf_of_agent_id=request.agent_id,
+                idempotency_key=request.idempotency_key,
+            )
+        except Exception:
+            if admitted:
+                admission.release()
+            self._finish_preparation()
+            raise
         delegation_id = str(delegation["entity_ref"]["id"])
         launch_key = f"ui-launch-{delegation_id}"
 
         def launch() -> None:
             try:
-                launch_runtime = runtime or self._runtime_service(context.writer())
                 launch_kwargs = {
                     "idempotency_key": launch_key,
                     "context": request.context,
                 }
                 if request.design_package is not None:
                     launch_kwargs["design_package"] = request.design_package
-                launch_runtime.run(delegation_id, delegation["revision"], **launch_kwargs)
+                (launch_runtime or self._runtime_service(writer)).run(
+                    delegation_id, delegation["revision"], **launch_kwargs
+                )
             except Exception as exc:  # a launch failure is reported, never silent
                 # The runtime repeats the auth gate immediately before opening
                 # the child.  If credentials changed after the UI precheck,
@@ -291,7 +350,7 @@ class UILaunchCoordinator:
                     delegation_id,
                 )
                 try:
-                    context.writer().mark_delegation_needs_operator(
+                    writer.mark_delegation_needs_operator(
                         delegation_id,
                         str(delegation["revision"]),
                         reason_code="launch_failed",
@@ -306,13 +365,63 @@ class UILaunchCoordinator:
                     )
             finally:
                 context.invalidate()
+                if admitted:
+                    admission.release()
+
+        def mark_unlaunched(summary: str) -> None:
+            try:
+                writer.mark_delegation_needs_operator(
+                    delegation_id,
+                    str(delegation["revision"]),
+                    reason_code="launch_failed",
+                    summary=summary,
+                    idempotency_key=f"{launch_key}:unlaunched",
+                )
+            except CommonsError:
+                _LOG.warning("unlaunched UI delegation %s could not be finalized", delegation_id)
+            finally:
+                context.invalidate()
 
         if request.background:
-            thread = threading.Thread(target=launch, name=launch_key, daemon=True)
-            self._launch_threads.append(thread)
-            thread.start()
+            # A recorded delegation is bounded work this host owns.  It must
+            # survive server-route shutdown long enough to reach its truthful
+            # terminal state; a daemon would be silently killed as the CLI
+            # process exits and the session lock/heartbeat then lied about it.
+            thread = self._thread_factory(target=launch, name=launch_key, daemon=False)
+            refused = False
+            start_error: RuntimeError | None = None
+            with self._lifecycle:
+                if self._draining:
+                    refused = True
+                else:
+                    self._launch_threads.append(thread)
+                    try:
+                        thread.start()
+                    except RuntimeError as exc:
+                        self._launch_threads.remove(thread)
+                        start_error = exc
+                self._launch_preparations -= 1
+                self._lifecycle.notify_all()
+            if refused or start_error is not None:
+                mark_unlaunched(
+                    "the local panel stopped before this bounded run could start"
+                    if refused
+                    else "the local panel could not start this bounded run"
+                )
+                if admitted:
+                    admission.release()
+                if start_error is not None:
+                    raise ConfigurationError(
+                        "the local panel could not start this bounded run"
+                    ) from start_error
+                raise ConfigurationError(
+                    "this panel is draining existing work and cannot launch another run"
+                )
         else:
-            launch()
+            try:
+                launch()
+            finally:
+                self._finish_preparation()
         context.invalidate()
         return {
             "delegation_id": delegation_id,
