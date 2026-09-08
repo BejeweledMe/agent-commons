@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -95,11 +97,13 @@ class FakeRunner:
         reason: RunReason = RunReason.NONZERO_EXIT,
         after_start: Callable[[str], None] | None = None,
         raise_after_start: bool = False,
+        pid: int | None = None,
     ) -> None:
         self.outcome = outcome
         self.reason = reason
         self.after_start = after_start
         self.raise_after_start = raise_after_start
+        self.pid = pid
         self.calls = 0
 
     def run(self, invocation: Any, **values: Any) -> ProcessResult:
@@ -107,7 +111,7 @@ class FakeRunner:
         self.calls += 1
         pid = None
         if self.reason is not RunReason.START_FAILED:
-            pid = 9_000 + self.calls
+            pid = self.pid if self.pid is not None else 9_000 + self.calls
             values["on_started"](pid)
             if self.raise_after_start:
                 raise RuntimeError("provider transport crashed after process start")
@@ -520,7 +524,12 @@ def test_post_start_transport_exception_does_not_falsely_close_child(
     manager, task = _workspace(tmp_path)
     delegation = _delegation(manager, task)
     delegation_id = delegation["entity_ref"]["id"]
-    crashed = _service(manager, FakeRunner(raise_after_start=True))
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    assert exited.wait(timeout=5) == 0
+    crashed = _service(
+        manager,
+        FakeRunner(raise_after_start=True, pid=exited.pid),
+    )
 
     with pytest.raises(RuntimeError, match="transport crashed"):
         crashed.run(

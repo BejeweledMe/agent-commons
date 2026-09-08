@@ -1,10 +1,12 @@
 # Проекты как верхний уровень Agent Commons
 
-Статус: реализация разрешена и начата 2026-09-08 на
-`codex/project-workspaces-program`. Registry, host и frontend прошли scoped
+Статус: реализация из `codex/project-workspaces-program` слита через PR #8
+в `87cfe486800f204918a713f598f524bda62fdcdd`. Registry, host и frontend прошли scoped
 independent review; полный `make check` и двухпроектный browser journey пройдены,
-проверенный wheel установлен. Git delivery проверяется отдельно, L1/R2 остаются
-открытыми. Владелец: implementation lead. Архитектурный контракт —
+проверенный wheel установлен. PR CI прошёл; последующий main CI выявил старую
+ошибку PID-fixture, исправление и точная проверка описаны в
+[отчёте](audits/2026-09-08-project-workspaces-verification.md#post-merge-ci-follow-up-process-identity-fixture).
+L1/R2 остаются открытыми. Владелец: implementation lead. Архитектурный контракт —
 [ADR 0017](adr/0017-project-scoped-service-host.md); live-запуски требуют отдельного
 явного разрешения.
 
@@ -186,9 +188,11 @@ flowchart TD
   assets и независимый exact source review.
 - [x] Собрать и установить проверенный wheel, открыть рабочий сервис пользователю.
 - [ ] Провести разрешённый one-shot canary и отделить его результат от six-profile L1.
-- [ ] После green CI выполнить разрешённый merge и проверить main CI.
-- [ ] Cleanup только подтверждённых временных/generated дублей; canonical history,
-  чужие изменения и значимые evidence не удалять.
+- [x] После green PR CI выполнить разрешённый merge PR #8.
+- [ ] Подтвердить green main CI после исправления PID-fixture; ссылка на результат
+  должна указывать точный Git revision, а не только успешный локальный прогон.
+- [x] Cleanup подтверждённых временных/generated дублей и merged-ветки;
+  canonical history, чужие изменения и значимые evidence сохранены.
 
 API/local/SGR — отдельное [будущее направление](ROADMAP.md#future-role-connections-sgr-and-conversations),
 не prerequisite для проектного UX. L1/R2 и явное разрешение live canaries
