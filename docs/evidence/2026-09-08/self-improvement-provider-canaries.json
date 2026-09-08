@@ -1,0 +1,136 @@
+{
+  "schema": "agent_commons.audit.provider_canaries.v1",
+  "source_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "authorization": "User explicitly approved one Codex and one Claude canary, up to 300 seconds each.",
+  "attempt_limit_per_profile": 1,
+  "wall_time_seconds_per_profile": 300,
+  "reports": [
+    {
+      "ok": true,
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "purpose": "implementation",
+      "model": null,
+      "provider_version": "codex-cli 0.145.0",
+      "agent_commons_source_sha256": "4ba7587f70790bb7fe4cb1e3fcdf85700c0a9621f5803e90ce909824fc42f13b",
+      "preflight": {
+        "checks": {
+          "mcp_contract": {
+            "agent_commons_source_sha256": "4ba7587f70790bb7fe4cb1e3fcdf85700c0a9621f5803e90ce909824fc42f13b",
+            "catalog": "available",
+            "ok": true,
+            "tool_catalog_sha256": "1a35d290143b38cd4dd90b1418dda50f93b8a6828ec57c2fae908b4758732db9",
+            "tool_count": 26
+          },
+          "mcp_handshake": {
+            "ok": true,
+            "protocol": "initialized",
+            "required_tools": "available",
+            "tool_count": 26
+          },
+          "provider_help": {
+            "ok": true,
+            "required_flags": "present"
+          }
+        },
+        "consumed_delegation_attempt": false,
+        "ok": true,
+        "profile_id": "codex-builder",
+        "provider": "codex",
+        "provider_help_process_started": true,
+        "provider_work_process_started": false
+      },
+      "initialization": {
+        "blocks_launch": false,
+        "state": "ready",
+        "supported": true
+      },
+      "provider_work_process_started": true,
+      "process": {
+        "duration_seconds": 92.78952479199506,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false,
+        "stderr_bytes_seen": 1470,
+        "stdout_bytes_seen": 30656
+      },
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "terminal_tool_rejection_details": [],
+      "terminal_tool_rejection_details_truncated": false,
+      "child_session_closed": true,
+      "cli_exit_code": 0
+    },
+    {
+      "ok": true,
+      "profile_id": "claude-independent-reviewer",
+      "provider": "claude",
+      "purpose": "independent_review",
+      "model": null,
+      "provider_version": "2.1.257 (Claude Code)",
+      "agent_commons_source_sha256": "4ba7587f70790bb7fe4cb1e3fcdf85700c0a9621f5803e90ce909824fc42f13b",
+      "preflight": {
+        "checks": {
+          "mcp_contract": {
+            "agent_commons_source_sha256": "4ba7587f70790bb7fe4cb1e3fcdf85700c0a9621f5803e90ce909824fc42f13b",
+            "catalog": "available",
+            "ok": true,
+            "tool_catalog_sha256": "5fcf2a733fe366146145c32b87ed9661bf9ef1f6345d4d82da29d5f37297086c",
+            "tool_count": 27
+          },
+          "mcp_handshake": {
+            "ok": true,
+            "protocol": "initialized",
+            "required_tools": "available",
+            "tool_count": 27
+          },
+          "provider_help": {
+            "ok": true,
+            "required_flags": "present"
+          }
+        },
+        "consumed_delegation_attempt": false,
+        "ok": true,
+        "profile_id": "claude-independent-reviewer",
+        "provider": "claude",
+        "provider_help_process_started": true,
+        "provider_work_process_started": false
+      },
+      "initialization": {
+        "blocks_launch": false,
+        "state": "ready",
+        "supported": true
+      },
+      "provider_work_process_started": true,
+      "process": {
+        "duration_seconds": 22.75190258398652,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false,
+        "stderr_bytes_seen": 0,
+        "stdout_bytes_seen": 46705
+      },
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "terminal_tool_rejection_details": [],
+      "terminal_tool_rejection_details_truncated": false,
+      "child_session_closed": true,
+      "cli_exit_code": 0
+    }
+  ],
+  "qualification_fingerprints_current_in_project": true,
+  "limitations": [
+    "Only codex-builder and claude-independent-reviewer on this host/runtime boundary were checked.",
+    "This is not six-profile Linux L1 qualification, product acceptance, or release approval.",
+    "No raw provider output, prompts, credentials, private configuration, or state-root paths are included."
+  ]
+}

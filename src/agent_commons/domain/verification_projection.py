@@ -9,14 +9,32 @@ records yet.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
 from typing import NotRequired, cast
 
-from .envelopes import FrozenJsonObject, JsonValue, TypedRef, freeze_json_object, thaw_json_object
+from .envelopes import (
+    FrozenJsonObject,
+    JsonValue,
+    TypedRef,
+    freeze_json_object,
+    thaw_json_field,
+    thaw_json_object,
+)
 from .snapshot import ProjectSnapshot
 from .task_review_envelopes import RevisionBoundRef
 from .truth_evidence_envelopes import VerificationEnvelope, VerificationPayload
+
+_VERIFICATION_OVERLAY_KEYS = (
+    "id",
+    "state",
+    "revision",
+    "effective_revision",
+    "recorded_at",
+    "actor",
+    "author_session_ids",
+    "stale",
+)
 
 
 class VerificationRecordPayload(VerificationPayload):
@@ -107,13 +125,38 @@ class VerificationRecord(Mapping[str, object]):
         return payload
 
     def __getitem__(self, key: str) -> object:
-        return self.to_dict()[key]
+        if key == "id":
+            return self.verification_id
+        if key == "state":
+            return "recorded"
+        if key == "revision":
+            return self.revision
+        if key == "effective_revision":
+            return self.effective_revision
+        if key == "recorded_at":
+            return self.recorded_at
+        if key == "actor":
+            return thaw_json_object(self.actor)
+        if key == "author_session_ids":
+            return list(self.author_session_ids)
+        if key == "stale":
+            return self.stale
+        return thaw_json_field(self.payload, key)
 
-    def __iter__(self):
-        return iter(self.to_dict())
+    def __iter__(self) -> Iterator[str]:
+        seen: set[str] = set()
+        for key, _ in self.payload.values:
+            yield key
+            seen.add(key)
+        for key in _VERIFICATION_OVERLAY_KEYS:
+            if key not in seen:
+                yield key
 
     def __len__(self) -> int:
-        return len(self.to_dict())
+        payload_keys = {key for key, _ in self.payload.values}
+        return len(self.payload.values) + sum(
+            1 for key in _VERIFICATION_OVERLAY_KEYS if key not in payload_keys
+        )
 
 
 def apply_verification_record(

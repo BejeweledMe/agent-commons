@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse, Response
 
 from agent_commons.errors import CommonsError
 from agent_commons.ui.context import UIContext
+from agent_commons.ui.project_folder_picker import ProjectFolderPicker
 from agent_commons.ui.project_operations import ProjectOperations
 from agent_commons.ui.project_registry import ProjectRegistry, ProjectRegistryRefusal
 
@@ -72,6 +73,8 @@ class ProjectHost:
         self._port: int | None = None
         self._draining = False
         self._guard = threading.RLock()
+        self._folder_picker = ProjectFolderPicker()
+        self._picker_guard = threading.Lock()
 
     @property
     def default_project_id(self) -> str | None:
@@ -193,6 +196,33 @@ class ProjectHost:
         async def projects() -> Response:
             try:
                 return JSONResponse(await asyncio.to_thread(self.list_projects))
+            except ProjectRegistryRefusal as exc:
+                return refusal(exc)
+
+        @routes.post("/api/projects/pick-folder")
+        async def pick_folder(request: Request) -> Response:
+            if self.read_only:
+                return _error(403, "read_only", "This host is read-only.")
+            body = await project_body(request, fields=frozenset({"purpose"}))
+            if isinstance(body, Response):
+                return body
+            if body["purpose"] not in ("parent", "existing"):
+                return _error(400, "project_invalid", "Folder selection purpose is invalid.")
+
+            def choose() -> dict[str, object]:
+                if not self._picker_guard.acquire(blocking=False):
+                    raise ProjectRegistryRefusal(
+                        "project_picker_busy", "A folder chooser is already open.", 409
+                    )
+                try:
+                    return self._folder_picker.pick(body["purpose"])
+                finally:
+                    self._picker_guard.release()
+
+            try:
+                return JSONResponse(
+                    await asyncio.to_thread(choose), headers={"Cache-Control": "no-store"}
+                )
             except ProjectRegistryRefusal as exc:
                 return refusal(exc)
 

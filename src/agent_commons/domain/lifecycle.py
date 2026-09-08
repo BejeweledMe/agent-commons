@@ -94,6 +94,12 @@ def validate_transition(
             actor_session_id=actor_session_id,
             relations=relations,
         )
+        if event_type == "thread.opened" and "conversation_scope" in payload:
+            from .conversations import validate_scope_exists
+
+            if _child_delegations(snapshot, actor_session_id):
+                raise LifecycleConflictError("Only the operator may create scoped conversations")
+            validate_scope_exists(payload["conversation_scope"], snapshot)
         if event_type == "context_pack.created":
             _validate_context_pack_bindings(snapshot, payload)
         if event_type == "design_package.created":
@@ -253,6 +259,11 @@ def validate_transition(
     ):
         raise LifecycleConflictError("review result does not bind the requested target revision")
     if event_type == "thread.replied":
+        reply = payload.get("reply_to_message_id")
+        if reply is not None and not any(
+            item.get("message_id") == reply for item in current.get("messages", [])
+        ):
+            raise LifecycleConflictError("Reply refers to a message outside this conversation")
         # A delegated worker speaks where it was spoken to.  Without this, the
         # reply tool it now carries would let one bounded run write into every
         # conversation in the workspace.  Terminal bindings keep the rule: a
@@ -266,6 +277,10 @@ def validate_transition(
                 for delegation in bound
                 if delegation.get("agent_id")
             }
+            for delegation in bound:
+                target = delegation.get("target_ref") or {}
+                if target.get("kind") == "task":
+                    reachable.add("task:" + str(target.get("id")))
             if not addressed & reachable:
                 raise LifecycleConflictError(
                     "a delegated worker may reply only to a thread it is addressed in"

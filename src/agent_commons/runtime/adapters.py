@@ -156,7 +156,7 @@ def _descriptor(profile: RunnerProfile) -> ProviderDescriptor:
         sandbox_boundary=_sandbox_boundary(profile),
         permission_mode=_permission_mode(profile),
         budget_units=_budget_units(profile),
-        instruction_transport=("prompt_argument" if profile.provider is Provider.GROK else "stdin"),
+        instruction_transport="stdin",
     )
 
 
@@ -168,7 +168,7 @@ def _capabilities(profile: RunnerProfile) -> CapabilitySet:
         mcp=True,
         mcp_tool_names=_mcp_tools(profile.profile_id),
         skills=BUILTIN_SKILL_IDS,
-        input_modes=("prompt_argument",) if profile.provider is Provider.GROK else ("stdin",),
+        input_modes=("stdin",),
         resume_mode=ResumeMode.NONE,
         cancellation_mode=CancellationMode.BROKER,
         # Existing diagnostics are bounded, but provider-reported usage totals

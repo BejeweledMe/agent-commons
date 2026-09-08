@@ -1,7 +1,35 @@
 :root {
+  --surface: #161b23;
+  --surface-subtle: #202833;
+  --surface-input: #121820;
+  --surface-warning: #332b1b;
+  --text-primary: #e8edf5;
+  --text-muted: #a9b8d1;
+  --text-warning: #ffd89c;
+  --border: #455873;
+  --border-control: #7184a4;
+  --accent: #92b8ff;
+  --button-primary: #4775c8;
+  --button-primary-hover: #3f68b1;
+  --dialog-backdrop: rgb(4 9 18 / 75%);
   background: #101319;
   color: #e8edf5;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+
+:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-primary {
+  background: var(--button-primary);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-primary:hover:not(:disabled) {
+  background: var(--button-primary-hover);
+}
+:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-secondary {
+  background: var(--surface-subtle);
+  border-color: var(--border-control);
+  color: var(--text-primary);
 }
 
 .service-library { margin-bottom: 40px; }
@@ -979,6 +1007,7 @@ fieldset .button {
 /* Task-first workspace: shared shell, inspector and Library scale. */
 :root { color-scheme: dark; font-size: 14px; line-height: 1.5; background: #101319; }
 [hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 h1 { font-size: 24px; line-height: 1.25; }
 h2, h3 { font-size: 16px; line-height: 1.4; }
 h4 { font-size: 14px; }
@@ -1003,19 +1032,23 @@ code { overflow-wrap: anywhere; font-size: 12px; color: #bdd2fb; }
 .project-sidebar { border-bottom: 1px solid #354050; margin: 0 -8px 18px; padding: 0 8px 18px; }
 .project-sidebar-heading { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
 .project-sidebar-heading h2 { font-size: .9rem; margin: 0; }
-.project-list { display: grid; gap: 5px; list-style: none; margin: 12px 0; padding: 0; }
+.project-list { display: grid; gap: 5px; list-style: none; margin: 10px 0; padding: 0; }
 .project-search { font-size: .84rem; margin-top: 12px; min-height: 36px; }
 .archived-projects { border-top: 1px solid #354050; margin-top: 12px; padding-top: 10px; }
 .archived-projects summary { color: #b8c9e6; cursor: pointer; font-size: .82rem; }
-.project-list-item { background: transparent; border: 1px solid transparent; border-radius: 8px; color: #c7d4e9; display: grid; gap: 2px; padding: 9px 10px; text-align: left; width: 100%; }
+.project-row { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) 36px; }
+.project-list-item { background: transparent; border: 1px solid transparent; border-radius: 8px; color: #c7d4e9; display: grid; gap: 2px; min-width: 0; padding: 7px 9px; text-align: left; width: 100%; }
 .project-list-item span { color: #9eafc7; font-size: .75rem; }
 .project-list-item:hover { background: #232b37; }
 .project-list-item[aria-current="page"] { background: #21385e; border-color: #5272a4; color: #fff; }
 .project-list-item:disabled { cursor: not-allowed; opacity: .65; }
-.project-actions { margin: 2px 0 0 10px; }
-.project-actions summary { color: #b8c9e6; cursor: pointer; font-size: .8rem; }
-.project-actions button { display: block; font-size: .8rem; margin-top: 7px; }
-.gallery-link { background: transparent; border: 0; color: #b3ccff; cursor: pointer; padding: 5px 0; text-align: left; text-decoration: underline; }
+.project-actions { position: relative; }
+.project-actions summary { align-items: center; border-radius: 8px; color: #b8c9e6; display: flex; font-size: 1.25rem; justify-content: center; list-style: none; min-height: 36px; padding: 0; }
+.project-actions summary::-webkit-details-marker { display: none; }
+.project-actions summary:hover { background: #232b37; }
+.project-actions-menu { background: #202833; border: 1px solid #455873; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 35%); min-width: 180px; padding: 10px; position: absolute; right: 0; top: 38px; z-index: 2; }
+.project-actions-menu form { margin: 0; }
+.project-actions-menu button { display: block; font-size: .8rem; margin-top: 7px; }
 .project-dialog { background: #142137; border: 1px solid #607baf; border-radius: 12px; color: #e8edf5; max-width: min(560px, calc(100vw - 32px)); padding: 0; width: 100%; }
 .project-dialog::backdrop { background: rgb(4 9 18 / 72%); }
 .project-dialog form { margin: 0; padding: 22px; }
@@ -1040,6 +1073,7 @@ code { overflow-wrap: anywhere; font-size: 12px; color: #bdd2fb; }
 .workspace-toolbar, .composer-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .workspace-toolbar p, .composer-heading h2 { margin: 0; }
 .workspace-toolbar .button { flex: 0 0 auto; }
+.workspace-toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-left: auto; flex: 0 0 auto; }
 .button-secondary { background: #232b37; border-color: #354765; width: auto; }
 .button-primary { background: #4775c8; border-color: #608cda; }
 .button-row { align-items: center; }
@@ -1159,8 +1193,9 @@ label { font-size: 14px; font-weight: 550; }
   .primary-navigation a { padding: 10px 12px; }
   .app-header { padding: 24px 16px 12px; flex-direction: row; }
   .workspace-content { padding: 8px 16px 32px; }
-  .workspace-toolbar { align-items: start; gap: 12px; }
-  .workspace-toolbar p { max-width: 65%; }
+  .workspace-toolbar { align-items: start; gap: 12px; flex-wrap: wrap; }
+  .workspace-toolbar p { max-width: 100%; }
+  .workspace-toolbar-actions { flex-wrap: wrap; margin-left: 0; justify-content: flex-start; max-width: 100%; }
   .workflow-card, .task-composer, .launch-composer, .settings-panel, .provider-availability, .task-inspector, .context-pack-form, .starter-pack-card { padding: 18px; }
   .tracker-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .team-role-list li { align-items: start; flex-direction: column; }
@@ -1237,3 +1272,19 @@ label { font-size: 14px; font-weight: 550; }
   button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
   textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid Highlight; }
 }
+
+/* Library organization and reusable workflow definitions. */
+.skill-group { border: 1px solid #354256; border-radius: 10px; margin: 12px 0; background: #18202b; }
+.skill-group > summary { cursor: pointer; padding: 16px; font-weight: 600; }
+.skill-group > summary .library-tab-count { margin-left: 10px; }
+.skill-group-body { padding: 0 16px 16px; }
+.skill-group-body .library-catalog-grid { max-height: none; overflow: visible; margin-top: 12px; }
+.skill-move-label { display: grid; gap: 6px; margin-top: 14px; font-size: .85rem; }
+.skill-move-label select { max-width: 100%; }
+.blueprint-authoring { margin-bottom: 16px; }
+.blueprint-archive-toggle { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
+.blueprint-definition-row { padding: 16px; margin: 16px 0; border: 1px solid #354256; border-radius: 8px; }
+.blueprint-definition-row h5 { font-size: 1rem; margin: 0; }
+.blueprint-definition-editor .blueprint-dependencies { margin: 16px 0; }
+.blueprint-definition-editor .blueprint-dependencies label { display: flex; align-items: center; gap: 8px; }
+.blueprint-definition-editor .blueprint-dependencies input { display: inline; width: auto; }

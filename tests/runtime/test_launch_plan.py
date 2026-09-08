@@ -141,7 +141,7 @@ def test_fingerprint_covers_actual_stdin_bytes(tmp_path: Path) -> None:
         ValidatedLaunchPlan.create(validation=validation, invocation=changed_invocation)
 
 
-def test_grok_plan_proves_prompt_argument_and_fingerprints_it(tmp_path: Path) -> None:
+def test_grok_plan_proves_fixed_stdin_and_fingerprints_it(tmp_path: Path) -> None:
     planner = LaunchPlanner.default()
     profile = _profile(BuiltinProfileId.GROK_BUILDER)
     validation = _static(planner, profile, tmp_path)
@@ -156,13 +156,11 @@ def test_grok_plan_proves_prompt_argument_and_fingerprints_it(tmp_path: Path) ->
         role_tools=(),
         role_grants={},
     )
-    prompt_index = built.invocation.argv.index("-p") + 1
-    assert built.invocation.stdin == b""
-    assert built.invocation.argv[prompt_index] == "bound instruction"
+    assert built.invocation.argv[-2:] == ("--prompt-file", "/dev/stdin")
+    assert built.invocation.stdin == b"bound instruction"
+    assert "bound instruction" not in " ".join(built.invocation.argv)
 
-    changed_argv = list(built.invocation.argv)
-    changed_argv[prompt_index] = "different instruction"
-    changed = replace(built.invocation, argv=tuple(changed_argv))
+    changed = replace(built.invocation, stdin=b"different instruction")
     assert invocation_fingerprint(changed) != built.invocation_fingerprint
     with pytest.raises(ConfigurationError, match="skill/context composition"):
         ValidatedLaunchPlan.create(validation=validation, invocation=changed)

@@ -359,7 +359,7 @@ def test_descriptors_and_capabilities_expose_only_bounded_neutral_fields() -> No
 
         assert descriptor.provider is profile.provider
         assert descriptor.profile_id is profile_id
-        expected_transport = "prompt_argument" if profile.provider is Provider.GROK else "stdin"
+        expected_transport = "stdin"
         assert descriptor.instruction_transport == expected_transport
         assert capabilities.provider is profile.provider
         assert capabilities.profile_id is profile_id

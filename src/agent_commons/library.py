@@ -443,12 +443,16 @@ class LibraryStore:
     def catalog(self, *, include_editable: bool = False) -> dict[str, Any]:
         entries = [dict(entry) for entry in _manifest()["entries"]]
         entries.extend(self._summary(self.resolve(ref)) for ref in self._state()["heads"].values())
-        return {
+        result = {
             "schema": LIBRARY_SCHEMA,
             "roles": [entry for entry in entries if entry["ref"]["kind"] == "role"],
             "skills": [entry for entry in entries if entry["ref"]["kind"] == "skill"],
             "editing_enabled": bool(include_editable),
         }
+        from agent_commons.library_organization import SkillOrganization
+
+        result["skill_organization"] = SkillOrganization(self).catalog(result["skills"])
+        return result
 
     def detail(self, value: object, *, editable: bool = False) -> dict[str, Any]:
         snapshot = self.resolve(value)

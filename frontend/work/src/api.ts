@@ -1,3 +1,4 @@
+import { attachmentPath, boundedAttachmentBlob, conversationPath } from "./conversationTransport.js";
 import type {
   ApiError,
   Catalog,
@@ -1969,10 +1970,71 @@ export class WorkApi {
     );
   }
 
+  async readOutputs(kind: "task" | "agent", id: string, versions: "latest" | "all", summary: boolean, signal: AbortSignal): Promise<unknown> {
+    if ((kind !== "task" && kind !== "agent") || !new RegExp(`^${kind}\\.[0-7][0-9A-HJKMNP-TV-Z]{25}$`).test(id)
+      || (versions !== "latest" && versions !== "all")) throw new ApiProblem(400, null);
+    const query = new URLSearchParams({ scope_kind: kind, scope_id: id });
+    if (!summary) query.set("versions", versions);
+    return this.get(`/outputs${summary ? "/summary" : ""}?${query}`, signal);
+  }
+
+  async readOutputImage(artifactId: string, signal: AbortSignal): Promise<Blob> {
+    if (!/^artifact\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactId)) throw new ApiProblem(400, null);
+    if (!this.apiBase) throw new ApiProblem(401, null);
+    const response = await fetch(`${this.apiBase}${this.scopedPath(`/artifacts/${encodeURIComponent(artifactId)}/preview`)}`, {
+      method: "GET", credentials: "same-origin", redirect: "error", signal,
+    });
+    if (!response.ok) {
+      if (response.status === 401) { clearStoredApiBase(); this.apiBase = ""; }
+      throw new ApiProblem(response.status, null);
+    }
+    const type = (response.headers.get("Content-Type") ?? "").split(";", 1)[0].trim();
+    if (type !== "image/png" && type !== "image/jpeg") { await response.body?.cancel(); throw new ApiProblem(502, null); }
+    const limit = 10 * 1024 * 1024;
+    const declared = response.headers.get("Content-Length");
+    if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) { await response.body?.cancel(); throw new ApiProblem(502, null); }
+    if (!response.body) throw new ApiProblem(502, null);
+    const reader = response.body.getReader(), chunks: BlobPart[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > limit || signal.aborted) { await reader.cancel(); throw new ApiProblem(502, null); }
+        chunks.push(Uint8Array.from(value));
+      }
+    } finally { reader.releaseLock(); }
+    if (total === 0 || signal.aborted) throw new ApiProblem(502, null);
+    return new Blob(chunks, { type });
+  }
+
+  async requestConversation(path: string, options: { method: "GET" | "POST"; body?: unknown; operationId?: string; signal: AbortSignal }): Promise<unknown> {
+    const file = typeof File !== "undefined" && options.body instanceof File ? options.body : null;
+    try { conversationPath(path, options.method, file); } catch { throw new ApiProblem(400, null); }
+    if (file) {
+      if (!options.operationId || !/^[A-Za-z0-9._-]{1,128}$/.test(options.operationId) || file.size < 1 || file.size > 15_000_000) throw new ApiProblem(400, null);
+      return this.request(path, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream", "Idempotency-Key": options.operationId }, body: file, signal: options.signal, redirect: "error" });
+    }
+    return this.request(path, options.method === "POST" ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options.body), signal: options.signal, redirect: "error" } : { method: "GET", signal: options.signal, redirect: "error" });
+  }
+  async conversationAttachment(thread: string, message: string, attachment: string, signal: AbortSignal): Promise<Blob> {
+    let path: string;
+    try { path = attachmentPath(thread, message, attachment); } catch { throw new ApiProblem(400, null); }
+    if (!this.apiBase) throw new ApiProblem(401, null);
+    const response = await fetch(`${this.apiBase}${this.scopedPath(path)}`, { credentials: "same-origin", signal, redirect: "error" });
+    if (!response.ok) {
+      if (response.status === 401) { clearStoredApiBase(); this.apiBase = ""; }
+      throw new ApiProblem(response.status, parseApiError(await responsePayload(response)));
+    }
+    try { return await boundedAttachmentBlob(response); } catch { throw new ApiProblem(502, null); }
+  }
+
   async requestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown> {
     let decoded: string;
-    try { decoded = decodeURIComponent(path); } catch { throw new ApiProblem(400, null); }
-    if (!/^\/(library|work)(\/|$)/.test(path) || /[?#\\\x00-\x1f]/.test(decoded)
+    const checkedPath = options.method !== "POST" && path === "/library/blueprints?include_archived=true" ? "/library/blueprints" : path;
+    try { decoded = decodeURIComponent(checkedPath); } catch { throw new ApiProblem(400, null); }
+    if (!/^\/(library|work)(\/|$)/.test(checkedPath) || /[?#\\\x00-\x1f]/.test(decoded)
       || decoded.split("/").slice(1).some((part) => !part || part === "." || part === "..")) throw new ApiProblem(400, null);
     return this.request(path, options.method === "POST" ? {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options.body), signal: options.signal

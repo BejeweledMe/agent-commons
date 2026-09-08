@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Request
@@ -266,7 +267,13 @@ def _definitions() -> list[dict[str, Any]]:
     ]
 
 
-def blueprint_catalog(store: LibraryStore) -> dict[str, Any]:
+def blueprint_catalog(
+    store: LibraryStore,
+    *,
+    include_custom: bool = True,
+    include_archived: bool = False,
+    include_custom_content: bool = True,
+) -> dict[str, Any]:
     roles = {
         item["ref"]["id"]: item
         for item in store.catalog()["roles"]
@@ -280,6 +287,27 @@ def blueprint_catalog(store: LibraryStore) -> dict[str, Any]:
             for item in slot_ids
         ]
         plan["version"] = canonical_sha256(plan)
+        plan.update(source="builtin", archived=False)
+    if include_custom:
+        from agent_commons.library_blueprint_store import BlueprintStore
+
+        custom = BlueprintStore(store).catalog(include_archived=include_archived)
+        if include_custom_content:
+            plans.extend(custom)
+        else:
+            plans.extend(
+                {
+                    "id": plan["id"],
+                    "source": plan["source"],
+                    "version": plan["version"],
+                    "name": plan["name"],
+                    "archived": plan["archived"],
+                    "slot_count": len(plan["slots"]),
+                    "task_count": len(plan["tasks"]),
+                    "content_available": False,
+                }
+                for plan in custom
+            )
     return {"schema": "agent_commons.library-blueprints.v1", "blueprints": plans}
 
 
@@ -303,9 +331,10 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
     if not isinstance(key, str) or not 1 <= len(key) <= 128:
         raise ValidationError("blueprint application needs a bounded idempotency key")
     store = context.library_store()
-    plan = next((p for p in blueprint_catalog(store)["blueprints"] if p["id"] == identifier), None)
-    if plan is None or body["expected_version"] != plan["version"]:
-        raise ValidationError("blueprint changed; refresh its exact version before applying")
+    from agent_commons.library_blueprint_store import BlueprintStore, ordered_tasks
+
+    # Retained exact definitions survive edits/archival and partial application.
+    plan = BlueprintStore(store).for_apply(identifier, body["expected_version"])
     bindings = body["bindings"]
     slots = {slot["id"]: slot for slot in plan["slots"]}
     if not isinstance(bindings, list) or len(bindings) != len(slots):
@@ -330,6 +359,8 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
         selected[slot] = value
     manager = context.writer()
     manager.policy.assert_safe(body, context="blueprint application metadata")
+    context.authorize_library_edit()
+    BlueprintStore(store).for_apply(identifier, body["expected_version"], retain=True)
     prefix = "blueprint-" + hashlib.sha256(key.encode()).hexdigest()
     intent = canonical_sha256({**body, "bindings": [selected[slot] for slot in slots]})
     roles: dict[str, str] = {}
@@ -354,7 +385,7 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
                 idempotency_key=prefix + ":role:" + str(ordinal),
             )
             roles[slot_id] = str(result["entity_ref"]["id"])
-        for node in plan["tasks"]:
+        for node in ordered_tasks(plan["tasks"]):
             result = manager.create_task(
                 title=f"{title.strip()} · {node['title'][locale]}",
                 description=node["description"][locale] + "\n\n" + brief.strip(),
@@ -381,11 +412,39 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
     }
 
 
-def register_blueprint_reads(routes: Any, *, store_factory: Any, dependencies: list[Any]) -> None:
+def register_blueprint_reads(
+    routes: Any,
+    *,
+    store_factory: Any,
+    dependencies: list[Any],
+    authorize_content: Callable[[], None] | None = None,
+) -> None:
+    """Expose custom prose only after the composition root's content gate.
+
+    An absent or refusing gate keeps custom rows discoverable as explicit
+    metadata summaries. Packaged definitions remain publicly readable metadata.
+    """
+
+    def read(include_archived: bool) -> dict[str, Any]:
+        content_allowed = False
+        if authorize_content is not None:
+            try:
+                authorize_content()
+                content_allowed = True
+            except Exception:
+                # Missing operator authority or an unavailable integrity check
+                # cannot grant access; no exception text reaches the catalog.
+                pass
+        return blueprint_catalog(
+            store_factory(),
+            include_archived=include_archived,
+            include_custom_content=content_allowed,
+        )
+
     @routes.get("/api/library/blueprints", dependencies=dependencies)
-    async def blueprints() -> JSONResponse:
+    async def blueprints(include_archived: bool = False) -> JSONResponse:
         try:
-            result = await asyncio.to_thread(lambda: blueprint_catalog(store_factory()))
+            result = await asyncio.to_thread(lambda: read(include_archived))
         except CommonsError:
             return JSONResponse(
                 {

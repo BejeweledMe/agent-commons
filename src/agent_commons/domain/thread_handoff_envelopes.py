@@ -21,6 +21,9 @@ class ThreadPayload(TypedDict):
     expected_revision: NotRequired[str]
     resolution: NotRequired[str]
     summary: NotRequired[str]
+    conversation_scope: NotRequired[dict[str, JsonValue]]
+    attachments: NotRequired[list[dict[str, JsonValue]]]
+    reply_to_message_id: NotRequired[str]
     extensions: NotRequired[dict[str, JsonValue]]
 
 
@@ -61,11 +64,20 @@ class ThreadEnvelope(EventEnvelope):
     resolution: str | None
     summary: str | None
     extensions: FrozenJsonObject | None
+    conversation_scope: FrozenJsonObject | None = None
+    attachments: tuple[FrozenJsonObject, ...] | None = None
+    reply_to_message_id: str | None = None
 
     def to_payload(self) -> ThreadPayload:
         from .envelopes import thaw_json_object
 
         payload: ThreadPayload = {"thread_id": self.thread_id}
+        if self.conversation_scope is not None:
+            payload["conversation_scope"] = thaw_json_object(self.conversation_scope)
+        if self.attachments is not None:
+            payload["attachments"] = [thaw_json_object(item) for item in self.attachments]
+        if self.reply_to_message_id is not None:
+            payload["reply_to_message_id"] = self.reply_to_message_id
         if self.thread_type is not None:
             payload["thread_type"] = self.thread_type
         if self.subject is not None:
@@ -148,6 +160,9 @@ def parse_thread_handoff_envelope(
         return ThreadEnvelope(
             event_type=cast(ThreadEventType, event_type),
             thread_id=_required_string(payload, "thread_id"),
+            conversation_scope=_optional_frozen_object(payload, "conversation_scope"),
+            attachments=_attachment_objects(payload),
+            reply_to_message_id=_optional_string(payload, "reply_to_message_id"),
             thread_type=_optional_string(payload, "thread_type"),
             subject=_optional_string(payload, "subject"),
             desired_outcome=_optional_string(payload, "desired_outcome"),
@@ -213,3 +228,11 @@ def _required_mapping(payload: Mapping[str, object], field: str) -> Mapping[str,
 
 def _mapping_list(payload: Mapping[str, object], field: str) -> list[Mapping[str, object]]:
     return cast(list[Mapping[str, object]], payload[field])
+
+
+def _attachment_objects(payload: Mapping[str, object]) -> tuple[FrozenJsonObject, ...] | None:
+    if "attachments" not in payload:
+        return None
+    from .envelopes import freeze_json_object
+
+    return tuple(freeze_json_object(item) for item in _mapping_list(payload, "attachments"))

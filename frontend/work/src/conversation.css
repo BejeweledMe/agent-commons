@@ -1,0 +1,44 @@
+.conversation-dialog{width:min(880px,calc(100vw - 32px));max-height:calc(100dvh - 40px);padding:0;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text-primary);box-shadow:0 24px 80px #0003}
+.conversation-dialog::backdrop{background:var(--dialog-backdrop)}
+.conversation-dialog[open]{display:flex;flex-direction:column}
+.conversation-header{display:flex;align-items:flex-start;gap:20px;justify-content:space-between;padding:24px 28px 18px;border-bottom:1px solid var(--border)}
+.conversation-header h2{margin:0 0 8px;font-size:1.2rem}
+.conversation-header p,.conversation-hint{margin:0;color:var(--text-muted);font-size:.86rem;line-height:1.5}
+.conversation-history{overflow:auto;min-height:100px;padding:20px 28px;flex:1}
+.conversation-messages,.conversation-attachments,.conversation-uploads{list-style:none;padding:0;margin:0}
+.conversation-messages{display:flex;flex-direction:column;gap:18px}
+.conversation-message{padding:16px;border:1px solid var(--border);border-radius:12px;overflow-wrap:anywhere}
+.conversation-message-operator{background:var(--surface-subtle)}
+.conversation-message header,.conversation-message footer{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.conversation-message time,.conversation-message footer{font-size:.75rem;color:var(--text-muted)}
+.conversation-message time{margin-left:auto}
+.conversation-message footer{margin-top:12px}
+.conversation-body{white-space:pre-wrap;line-height:1.55;margin:12px 0}
+.conversation-delivery{border:1px solid var(--border);padding:3px 7px;border-radius:6px;font-weight:600}
+.conversation-composer{margin:0;padding:18px 28px 24px;border-top:1px solid var(--border);overflow:auto;max-height:50dvh}
+.conversation-composer>label{margin:0}
+.conversation-composer textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:72px;max-height:200px;margin:8px 0;padding:12px;font:inherit;border:1px solid var(--border-control);border-radius:8px;background:var(--surface-input);color:var(--text-primary)}
+.conversation-compose-actions{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:14px}
+.conversation-file-label{margin:0;font-size:.85rem;display:flex;flex-direction:column;gap:6px;max-width:70%;overflow:hidden}
+.conversation-file-label input{font:inherit;max-width:100%;border-color:var(--border-control);background:var(--surface-input);color:var(--text-primary)}
+.conversation-file-label input::file-selector-button{background:var(--surface-subtle);border:1px solid var(--border-control);border-radius:6px;color:var(--text-primary);padding:6px 10px;margin-right:10px;font:inherit;cursor:pointer}
+.conversation-uploads li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border)}
+.conversation-uploads strong,.conversation-uploads small{display:block;overflow-wrap:anywhere}
+.conversation-uploads small{font-size:.75rem;margin-top:4px}
+.conversation-image{display:block;object-fit:contain;max-width:100%;max-height:220px;border-radius:8px}
+.conversation-uploads .conversation-image{width:70px;max-height:70px}
+.conversation-attachment{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+.conversation-attachment .conversation-image{flex-basis:100%;width:auto}
+.conversation-notice{padding:12px;border-radius:8px;background:var(--surface-warning);color:var(--text-warning);line-height:1.5}
+.conversation-empty{color:var(--text-muted);text-align:center;margin:32px}
+.conversation-reply{font-size:.85rem;margin-bottom:8px}
+.conversation-entry{white-space:nowrap}
+@media(max-width:600px){.conversation-dialog{width:calc(100vw - 12px);max-height:calc(100dvh - 12px)}
+.conversation-header,.conversation-history,.conversation-composer{margin:0;padding:16px}
+.conversation-compose-actions{align-items:stretch;flex-direction:column}
+.conversation-file-label{max-width:100%}
+.conversation-message time{margin-left:0}
+}
+
+.conversation-history-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 20px 12px; }
+.conversation-history-picker select { min-width: 0; max-width: 100%; }

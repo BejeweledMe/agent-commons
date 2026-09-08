@@ -317,3 +317,74 @@ def test_host_shutdown_keeps_owner_heartbeat_and_lock_for_requested_work(
         idempotency_key="requested-work-cleanup",
     )
     assert owner.shutdown()["closed"] is True
+
+
+def test_native_picker_is_authenticated_nonmutating_and_serialized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.ui.conftest import tree_digest
+
+    host, first, _ = _host(tmp_path, monkeypatch)
+    calls = []
+    result = {
+        "schema": "agent_commons.project_folder_selection.v1",
+        "status": "selected",
+        "path": str(tmp_path / "first"),
+        "name": "first",
+    }
+
+    def pick(purpose: object) -> dict[str, object]:
+        calls.append(purpose)
+        return result
+
+    monkeypatch.setattr(host._folder_picker, "pick", pick)
+    before = tree_digest(tmp_path / "first" / ".agent-commons")
+    app = host.create_app(token="test-token", port=PORT, api_base="/api")
+    with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
+        assert (
+            client.post("/api/projects/pick-folder", json={"purpose": "existing"}).status_code
+            == 401
+        )
+        assert not calls
+        assert (
+            client.post(
+                "/api/projects/pick-folder",
+                headers=_COOKIE,
+                json={"purpose": "existing", "path": "/untrusted"},
+            ).status_code
+            == 400
+        )
+        with host._picker_guard:
+            busy = client.post(
+                "/api/projects/pick-folder", headers=_COOKIE, json={"purpose": "existing"}
+            )
+        assert busy.status_code == 409
+        assert busy.json()["error"]["code"] == "project_picker_busy"
+        assert not calls
+        selected = client.post(
+            "/api/projects/pick-folder", headers=_COOKIE, json={"purpose": "existing"}
+        )
+        assert selected.status_code == 200
+        assert selected.json() == result
+        assert selected.headers["cache-control"] == "no-store"
+        assert client.get(f"/api/projects/{first['id']}/meta", headers=_COOKIE).status_code == 200
+    assert calls == ["existing"]
+    assert tree_digest(tmp_path / "first" / ".agent-commons") == before
+
+
+def test_native_picker_readonly_refusal_precedes_host_dialog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    host, _, _ = _host(tmp_path, monkeypatch, read_only=True)
+
+    def forbidden(_purpose: object) -> dict[str, object]:
+        raise AssertionError("read-only host opened a chooser")
+
+    monkeypatch.setattr(host._folder_picker, "pick", forbidden)
+    app = host.create_app(token="test-token", port=PORT, api_base="/api")
+    with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
+        response = client.post(
+            "/api/projects/pick-folder", headers=_COOKIE, json={"purpose": "parent"}
+        )
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "read_only"

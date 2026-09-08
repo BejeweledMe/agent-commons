@@ -10,7 +10,7 @@ import type { BlueprintApplication, LibraryRole, LibraryState } from "../library
 import type { Profile } from "../contracts.js";
 import { WorkBlueprintsSection } from "./WorkBlueprintsSection.js";
 
-export type LibraryTab = "roles" | "skills" | "blueprints" | "context" | "design";
+export type LibraryTab = "roles" | "skills" | "blueprints" | "context";
 type Props = {
   tab: LibraryTab;
   onTabChange: (tab: LibraryTab) => void;
@@ -28,7 +28,7 @@ type Props = {
   projectId?: string | null;
   onBlueprintApplied?: (application: BlueprintApplication) => void;
 };
-const tabs: readonly LibraryTab[] = ["roles", "skills", "blueprints", "context", "design"];
+const tabs: readonly LibraryTab[] = ["roles", "skills", "blueprints", "context"];
 
 export function LibrarySection({ tab, onTabChange, api, text, writesEnabled, onApplied, onChooseTeam, libraryApi, libraryState, onRefreshLibrary, onChooseRole, profiles, locale, projectId, onBlueprintApplied }: Props): ReactElement {
   const buttons = useRef<Partial<Record<LibraryTab, HTMLButtonElement | null>>>({});
@@ -52,20 +52,16 @@ export function LibrarySection({ tab, onTabChange, api, text, writesEnabled, onA
         ))}
       </div>
       {(["roles", "skills"] as const).map((value) => <div key={value} aria-labelledby={`library-tab-${value}`} className="library-panel" hidden={tab !== value} id={`library-panel-${value}`} role="tabpanel">
-        {libraryApi && libraryState && onRefreshLibrary && onChooseRole ? <ServiceLibrarySection kind={value === "roles" ? "role" : "skill"} api={libraryApi} state={libraryState} onRefresh={onRefreshLibrary} onChooseRole={onChooseRole} text={text} writesEnabled={writesEnabled} /> : null}
+        {libraryApi && libraryState && onRefreshLibrary && onChooseRole ? <ServiceLibrarySection locale={locale ?? "en"} projectId={projectId} kind={value === "roles" ? "role" : "skill"} api={libraryApi} state={libraryState} onRefresh={onRefreshLibrary} onChooseRole={onChooseRole} text={text} writesEnabled={writesEnabled} /> : null}
       </div>)}
       <div aria-labelledby="library-tab-blueprints" className="library-panel" hidden={tab !== "blueprints"} id="library-panel-blueprints" role="tabpanel">
-        {libraryApi && onBlueprintApplied ? <WorkBlueprintsSection api={libraryApi} profiles={profiles ?? []} locale={locale ?? "en"} projectId={projectId} text={text} writesEnabled={writesEnabled} onApplied={onBlueprintApplied} onCount={setBlueprintCount} /> : null}
+        {libraryApi && onBlueprintApplied ? <WorkBlueprintsSection catalog={catalog ?? undefined} api={libraryApi} profiles={profiles ?? []} locale={locale ?? "en"} projectId={projectId} text={text} writesEnabled={writesEnabled} onApplied={onBlueprintApplied} onCount={setBlueprintCount} /> : null}
         <details className="role-legacy-presets"><summary>{text("role_legacy_presets")}</summary><StarterPacksSection api={api} onApplied={onApplied} onChooseTeam={onChooseTeam} text={text} writesEnabled={writesEnabled} /></details>
       </div>
       <div aria-labelledby="library-tab-context" className="library-panel" hidden={tab !== "context"} id="library-panel-context" role="tabpanel">
         <ContextPacksSection api={api} projectId={projectId} text={text} writesEnabled={writesEnabled} />
       </div>
-      <div aria-labelledby="library-tab-design" className="library-panel" hidden={tab !== "design"} id="library-panel-design" role="tabpanel">
-        <h2>{text("library_design")}</h2>
-        <p className="lead-copy">{text("library_design_intro")}</p>
-        <a className="button button-primary" href={projectId === null || projectId === undefined ? "/gallery" : `/gallery?project=${encodeURIComponent(projectId)}`}>{text("library_open_gallery")}</a>
-      </div>
+
     </div>
   );
 }

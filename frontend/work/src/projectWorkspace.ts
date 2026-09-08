@@ -1,3 +1,4 @@
+import { parseFolderSelection, type FolderPurpose, type FolderSelection } from "./projectCreation.js";
 import { ApiProblem } from "./api.js";
 
 export type ProjectState = "ready" | "missing" | "identity_conflict";
@@ -93,6 +94,10 @@ export type ProjectTransport = {
 
 export class ProjectRegistryApi {
   constructor(private readonly transport: ProjectTransport) {}
+  pickFolder(purpose: FolderPurpose, signal: AbortSignal): Promise<FolderSelection> {
+    if (purpose !== "parent" && purpose !== "existing") return Promise.reject(new ApiProblem(400, null));
+    return this.transport.hostRequestData("/projects/pick-folder", { method: "POST", body: { purpose }, signal }).then(parseFolderSelection);
+  }
   list(signal: AbortSignal): Promise<ProjectList> {
     return this.transport.hostRequestData("/projects", { signal }).then(parseProjectList);
   }

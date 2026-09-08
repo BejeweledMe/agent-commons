@@ -1,3 +1,4 @@
+import type { BlueprintSave, SkillOrganization } from "./libraryTypes.js";
 import { ApiProblem } from "./api.js";
 import type { LibraryDetail, LibraryFile, LibraryItem, LibraryKind, LibraryRef, LibraryRole, LibrarySave, RoleContent, ServiceLibrary, SkillContent, SkillRoute } from "./libraryTypes.js";
 import { libraryRefKey } from "./libraryTypes.js";
@@ -59,7 +60,7 @@ export function parseServiceLibrary(value: unknown): ServiceLibrary {
   });
   const skills = list(data.skills, 600).map((row) => item(row, "skill"));
   if (new Set([...roles, ...skills].map((row) => libraryRefKey(row.ref))).size !== roles.length + skills.length) return fail();
-  return { roles, skills, editingEnabled: data.editing_enabled };
+  return { roles, skills, editingEnabled: data.editing_enabled, ...(data.skill_organization === undefined ? {} : { skillOrganization: parseSkillOrganization(data.skill_organization, skills) }) };
 }
 function content(value: unknown, kind: LibraryKind): SkillContent | RoleContent {
   const raw = object(value);
@@ -91,9 +92,14 @@ function identifier(value: unknown): string {
 export function parseWorkBlueprints(value: unknown): WorkBlueprint[] {
   const raw = object(value);
   if (raw.schema !== "agent_commons.library-blueprints.v1") return fail();
-  const blueprints = list(raw.blueprints, 20).map((value): WorkBlueprint => {
+  const blueprints = list(raw.blueprints, 133).map((value): WorkBlueprint => {
     const item = object(value);
     if (typeof item.version !== "string" || !digest.test(item.version)) return fail();
+    if (item.content_available === false) {
+      if (item.source !== "custom" || typeof item.archived !== "boolean" || !Number.isSafeInteger(item.slot_count) || Number(item.slot_count) < 1 || Number(item.slot_count) > 32 || !Number.isSafeInteger(item.task_count) || Number(item.task_count) < 1 || Number(item.task_count) > 64) return fail();
+      return { id: identifier(item.id), version: item.version, name: translated(item.name), source: "custom", archived: item.archived, contentAvailable: false, slotCount: Number(item.slot_count), taskCount: Number(item.task_count), description: { en: "", ru: "" }, slots: [], tasks: [] };
+    }
+    if (item.content_available !== undefined && item.content_available !== true) return fail();
     const slots = list(item.slots, 32).map((value) => { const slot = object(value); return { id: identifier(slot.id), name: text(slot.name, 800, true), role_ref: parseLibraryRef(slot.role_ref, "role") }; });
     const tasks = list(item.tasks, 64).map((value) => {
       const task = object(value); const criteria = object(task.acceptance_criteria);
@@ -107,7 +113,9 @@ export function parseWorkBlueprints(value: unknown): WorkBlueprint[] {
     const visited = new Set<string>();
     const visit = (id: string, ancestors: Set<string>): void => { if (ancestors.has(id)) return fail(); if (visited.has(id)) return; const next = new Set(ancestors).add(id); for (const dep of tasks.find((task) => task.id === id)!.depends_on) visit(dep, next); visited.add(id); };
     for (const task of tasks) visit(task.id, new Set());
-    return { id: identifier(item.id), version: item.version, name: translated(item.name), description: translated(item.description), slots, tasks };
+    if (item.source !== undefined && item.source !== "builtin" && item.source !== "custom") return fail();
+    if (item.archived !== undefined && typeof item.archived !== "boolean") return fail();
+    return { id: identifier(item.id), version: item.version, source: item.source === "custom" ? "custom" : "builtin", archived: item.archived === true, contentAvailable: true, name: translated(item.name), description: translated(item.description), slots, tasks };
   });
   if (new Set(blueprints.map((item) => item.id)).size !== blueprints.length) return fail();
   return blueprints;
@@ -120,6 +128,21 @@ export function parseBlueprintApplication(value: unknown, expectedId: string): B
   const tasks = list(raw.tasks, 64).map((value) => { const task = object(value); return { nodeId: identifier(task.node_id), taskId: entity(task.task_id, "task"), agentId: entity(task.agent_id, "agent") }; });
   if (!tasks.length || !roles.length || tasks.some((task) => !roles.some((role) => role.agentId === task.agentId))) return fail();
   return { blueprintId: expectedId, roles, tasks };
+}
+
+export function parseSkillOrganization(value: unknown, skills?: readonly LibraryItem[]): SkillOrganization {
+  const raw = object(value);
+  if (raw.schema !== "agent_commons.skill-organization.v1" || typeof raw.revision !== "string" || !digest.test(raw.revision)) return fail();
+  const groups = list(raw.groups, 136).map((value) => { const group = object(value); if (group.source !== "builtin" && group.source !== "custom") return fail(); return { id: identifier(group.id), name: translated(group.name), source: group.source as "builtin" | "custom" }; });
+  if (new Set(groups.map((group) => group.id)).size !== groups.length) return fail();
+  const assignments = list(raw.assignments, 600).map((value) => { const item = object(value); if ((item.source !== "builtin" && item.source !== "custom") || !groups.some((group) => group.id === item.group_id)) return fail(); return { source: item.source as "builtin" | "custom", id: identifier(item.id), group_id: identifier(item.group_id) }; });
+  const identities = new Set(assignments.map((item) => `${item.source}:${item.id}`));
+  if (identities.size !== assignments.length || (skills && (skills.length !== assignments.length || skills.some((skill) => !identities.has(`${skill.ref.source}:${skill.ref.id}`))))) return fail();
+  return { schema: "agent_commons.skill-organization.v1", revision: raw.revision, groups, assignments };
+}
+function parseSavedBlueprint(value: unknown, id: string): WorkBlueprint {
+  const result = parseWorkBlueprints({ schema: "agent_commons.library-blueprints.v1", blueprints: [value] })[0];
+  if (result.id !== id || result.source !== "custom" || result.contentAvailable === false) return fail(); return result;
 }
 
 export class LibraryApi {
@@ -148,8 +171,24 @@ export class LibraryApi {
     if (raw.path !== selected.path || raw.sha256 !== selected.sha256) return fail();
     return text(raw.text, 262_144);
   }
-  async blueprints(signal: AbortSignal): Promise<WorkBlueprint[]> {
-    return parseWorkBlueprints(await this.api.requestData("/library/blueprints", { signal }));
+  async blueprints(signal: AbortSignal, includeArchived = false): Promise<WorkBlueprint[]> {
+    return parseWorkBlueprints(await this.api.requestData(`/library/blueprints${includeArchived ? "?include_archived=true" : ""}`, { signal }));
+  }
+  async saveSkillGroup(input: { id: string; name: { en: string; ru: string }; expected_revision: string }, key: string, signal: AbortSignal): Promise<SkillOrganization> {
+    identifier(input.id);
+    return parseSkillOrganization(await this.api.requestData("/library/organization/groups", { method: "POST", signal, body: { ...input, idempotency_key: key } }));
+  }
+  async moveSkill(input: { skill: { source: "builtin" | "custom"; id: string }; group_id: string; expected_revision: string }, key: string, signal: AbortSignal): Promise<SkillOrganization> {
+    identifier(input.skill.id); identifier(input.group_id);
+    return parseSkillOrganization(await this.api.requestData("/library/organization/move", { method: "POST", signal, body: { ...input, idempotency_key: key } }));
+  }
+  async saveBlueprint(input: BlueprintSave, key: string, signal: AbortSignal): Promise<WorkBlueprint> {
+    identifier(input.id);
+    return parseSavedBlueprint(await this.api.requestData("/library/blueprints/custom", { method: "POST", signal, body: { ...input, idempotency_key: key } }), input.id);
+  }
+  async archiveBlueprint(id: string, input: { expected_version: string; archived: boolean }, key: string, signal: AbortSignal): Promise<WorkBlueprint> {
+    identifier(id);
+    return parseSavedBlueprint(await this.api.requestData(`/library/blueprints/custom/${id}/archive`, { method: "POST", signal, body: { ...input, idempotency_key: key } }), id);
   }
   async applyBlueprint(id: string, input: BlueprintApplyInput, key: string, signal: AbortSignal): Promise<BlueprintApplication> {
     identifier(id);

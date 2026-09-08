@@ -177,15 +177,15 @@ for (const locale of ["en", "ru"]) {
     assert.ok(duplicate.includes(`Shared title — ${exactSourceKey(ref("artifact"))}</option>`));
   });
   test(`${locale} Library keeps every editor mounted and identifies its selected URL-owned tab`, () => {
-    for (const tab of ["roles", "skills", "blueprints", "context", "design"]) {
+    for (const tab of ["roles", "skills", "blueprints", "context"]) {
       const html = renderToStaticMarkup(createElement(LibrarySection, {
         tab, onTabChange: () => {}, api: {}, text, writesEnabled: false, onApplied: async () => {}, onChooseTeam: () => {}
       }));
       assert.doesNotMatch(html, /<h1|aria-labelledby="library-title"/);
-      assert.equal((html.match(/role="tabpanel"/g) ?? []).length, 5);
+      assert.equal((html.match(/role="tabpanel"/g) ?? []).length, 4);
       assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1);
       assert.ok(html.includes('id="context-pack-summary"'));
-      assert.ok(html.includes('href="/gallery"'));
+      assert.ok(!html.includes('href="/gallery"'));
       assert.ok(html.includes(`id="library-panel-${tab}" role="tabpanel"`));
       assert.match(html, /<fieldset disabled="">/);
     }

@@ -74,6 +74,17 @@ def register_library_routes(
     async def library_catalog() -> Response:
         return await _response(lambda: store_factory().catalog(include_editable=editing_enabled()))
 
+    @routes.get("/api/library/blueprints/{source}/{id}/{version}", dependencies=write_dependencies)
+    async def blueprint_detail(source: str, id: str, version: str) -> Response:
+        from agent_commons.library_blueprint_store import BlueprintStore
+
+        def operation() -> dict[str, Any]:
+            if source == "custom":
+                content_gate()
+            return BlueprintStore(store_factory()).resolve(source, id, version)
+
+        return await _response(operation)
+
     @routes.get("/api/library/{kind}/{source}/{id}/{version}", dependencies=write_dependencies)
     async def library_detail(kind: str, source: str, id: str, version: str) -> Response:
         def operation() -> dict[str, Any]:
@@ -99,6 +110,58 @@ def register_library_routes(
 
     if not register_writes:
         return
+
+    async def metadata_edit(
+        request: Request, operation: Callable[[dict[str, Any]], dict[str, Any]]
+    ) -> Response:
+        try:
+            body = await _body(request)
+        except (LibraryError, ValidationError) as exc:
+            return JSONResponse(
+                {
+                    "error": {
+                        "code": "library_invalid",
+                        "message": "Library metadata edit is invalid or too large.",
+                    }
+                },
+                status_code=exc.status if isinstance(exc, LibraryError) else 422,
+            )
+
+        def run() -> dict[str, Any]:
+            authorize_edit()
+            return operation(body)
+
+        return await _response(run)
+
+    @routes.post("/api/library/organization/groups", dependencies=write_dependencies)
+    async def organization_groups(request: Request) -> Response:
+        from agent_commons.library_organization import SkillOrganization
+
+        return await metadata_edit(
+            request, lambda body: SkillOrganization(store_factory()).save("groups", body)
+        )
+
+    @routes.post("/api/library/organization/move", dependencies=write_dependencies)
+    async def organization_move(request: Request) -> Response:
+        from agent_commons.library_organization import SkillOrganization
+
+        return await metadata_edit(
+            request, lambda body: SkillOrganization(store_factory()).save("move", body)
+        )
+
+    @routes.post("/api/library/blueprints/custom", dependencies=write_dependencies)
+    async def blueprint_save(request: Request) -> Response:
+        from agent_commons.library_blueprint_store import BlueprintStore
+
+        return await metadata_edit(request, lambda body: BlueprintStore(store_factory()).save(body))
+
+    @routes.post("/api/library/blueprints/custom/{id}/archive", dependencies=write_dependencies)
+    async def blueprint_archive(id: str, request: Request) -> Response:
+        from agent_commons.library_blueprint_store import BlueprintStore
+
+        return await metadata_edit(
+            request, lambda body: BlueprintStore(store_factory()).archive(id, body)
+        )
 
     @routes.post("/api/library/{kind}", dependencies=write_dependencies)
     async def save_library(kind: str, request: Request) -> Response:

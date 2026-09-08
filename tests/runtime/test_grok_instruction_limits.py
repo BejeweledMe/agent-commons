@@ -1,4 +1,4 @@
-"""The Grok argv size bound is an application limit, not a privacy guarantee."""
+"""The conservative Grok instruction bound is retained for the stdin transport."""
 
 from __future__ import annotations
 
@@ -133,11 +133,11 @@ def test_direct_grok_profile_refuses_before_executable_resolution(
             workspace_root=tmp_path,
             delegation_id="delegation.synthetic-size-guard",
         )
-    assert str(caught.value) == "Grok instruction exceeds the prompt argument byte limit"
+    assert str(caught.value) == "Grok instruction exceeds the supported instruction byte limit"
     assert "SYNTHETIC_OVERSIZED_INSTRUCTION" not in str(caught.value)
 
 
-def test_direct_grok_profile_accepts_exact_bound_without_rewriting_transport(
+def test_direct_grok_profile_accepts_exact_bound_over_fixed_stdin(
     tmp_path: Path,
 ) -> None:
     instruction = sized_instruction(model.GROK_PROMPT_ARGUMENT_MAX_BYTES, "界")
@@ -146,5 +146,5 @@ def test_direct_grok_profile_accepts_exact_bound_without_rewriting_transport(
         workspace_root=tmp_path,
         delegation_id="delegation.synthetic-size-guard",
     )
-    assert invocation.argv[invocation.argv.index("-p") + 1] == instruction
-    assert invocation.stdin == b""
+    assert invocation.argv[-2:] == ("--prompt-file", "/dev/stdin")
+    assert invocation.stdin == instruction.encode("utf-8")

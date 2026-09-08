@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -47,11 +48,13 @@ class ArtifactCommands:
             raise ValidationError("artifact source must be inside the project") from exc
         if not resolved.is_file():
             raise ValidationError("artifact source must be a regular file")
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
         descriptor = os.open(resolved, flags)
         digest = hashlib.sha256()
         try:
             before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode):
+                raise ValidationError("artifact source must be a regular file")
             before_identity = (
                 before.st_dev,
                 before.st_ino,
@@ -129,6 +132,7 @@ class ArtifactCommands:
         metadata: Mapping[str, Any] | None = None,
         expected_revision: str | None = None,
         expected_size: int | None = None,
+        expected_source_path: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         """Register the observed content, optionally bound to exact caller bytes.
@@ -161,6 +165,11 @@ class ArtifactCommands:
             revision != expected_revision or manifest["size_bytes"] != expected_size
         ):
             raise IntegrityError("artifact source does not match the expected content")
+        if expected_source_path is not None and (
+            not isinstance(expected_source_path, str)
+            or manifest["source"]["path"] != expected_source_path
+        ):
+            raise IntegrityError("artifact source does not match the expected relative path")
         manifest_id = f"mft.artifact.sha256.{canonical_sha256(manifest)}"
         subject = {"kind": "artifact", "id": artifact_id}
         result = self.record_event(

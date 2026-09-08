@@ -85,17 +85,38 @@ def ledger_fingerprint(paths: CommonsPaths) -> str:
     """Cheap change detector over immutable ledger and operational run files."""
 
     digest = hashlib.sha256()
-    for root, pattern in ((paths.events, "*/*/*/evt.*.json"), (paths.manifests, "*/*/*.json")):
-        if not root.exists():
-            continue
+
+    def stamp(path: Path, label: str) -> None:
+        try:
+            info = path.lstat()
+        except OSError:  # The cache loader refuses unavailable canonical input.
+            digest.update(f"{label}\0unavailable\n".encode())
+            return
+        digest.update(
+            f"{label}\0{info.st_dev}\0{info.st_ino}\0{info.st_mode}\0"
+            f"{info.st_size}\0{info.st_mtime_ns}\0{info.st_ctime_ns}\n".encode()
+        )
+
+    # This is only a graph refresh trigger; the read cache separately hashes
+    # every canonical byte before reuse. ctime/inode and ancestor identities
+    # ensure equal-size, restored-mtime edits and directory replacement trigger
+    # that validation. lstat preserves the identity of unsafe symlink inputs.
+    stamp(paths.commons_root, "commons")
+    stamp(paths.commons_root / "workspace.yaml", "workspace.yaml")
+    for label, root, pattern in (
+        ("events", paths.events, "*/*/*/evt.*.json"),
+        ("manifests", paths.manifests, "*/*/*.json"),
+    ):
+        stamp(root, label)
+        seen: set[Path] = set()
         for path in sorted(root.glob(pattern)):
-            try:
-                info = path.stat()
-            except OSError:  # pragma: no cover - file vanished mid-scan
-                continue
-            digest.update(
-                f"{path.relative_to(root)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
-            )
+            for candidate in (
+                *reversed(path.relative_to(root).parents[:-1]),
+                path.relative_to(root),
+            ):
+                if candidate not in seen:
+                    seen.add(candidate)
+                    stamp(root / candidate, f"{label}/{candidate}")
     # Sessions and runtime attempts are graph/operational state, not canonical
     # events.  Include both so an open panel sees an expired session and live
     # run-phase changes even when the immutable ledger remains quiet.
@@ -108,13 +129,7 @@ def ledger_fingerprint(paths: CommonsPaths) -> str:
         for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue
-            try:
-                info = path.stat()
-            except OSError:  # pragma: no cover - file vanished mid-scan
-                continue
-            digest.update(
-                f"{label}/{path.relative_to(root)}\0{info.st_size}\0{info.st_mtime_ns}\n".encode()
-            )
+            stamp(path, f"{label}/{path.relative_to(root)}")
     return "sha256:" + digest.hexdigest()
 
 
@@ -163,6 +178,9 @@ class UIContext(UIReads, UIActions):
         self._session_refusal: ConfigurationError | None = None
         self.server_instance_id = uuid.uuid4().hex
         self._guard = threading.RLock()
+        from agent_commons.ui.snapshot_cache import UIReadSnapshotCache
+
+        self._read_snapshot_cache = UIReadSnapshotCache()
         self._seq = 0
         self._fingerprint = ""
         self._graph: dict[str, Any] | None = None
@@ -345,8 +363,11 @@ class UIContext(UIReads, UIActions):
     def manager(self) -> CommonsManager:
         """Create the manager that backs every panel read."""
 
-        return CommonsManager(
+        from agent_commons.ui.snapshot_cache import CachedUIReadManager
+
+        return CachedUIReadManager(
             self.repo,
+            snapshot_cache=self._read_snapshot_cache,
             state_root=self._state_root,
             state_base=self._state_base,
             state_source=self._state_source,

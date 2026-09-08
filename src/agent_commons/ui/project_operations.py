@@ -13,6 +13,7 @@ from pathlib import Path
 
 from agent_commons.errors import ConfigurationError, IntegrityError
 from agent_commons.services.manager import CommonsManager
+from agent_commons.ui.project_folder_picker import expand_user_home, inferred_project_name
 from agent_commons.ui.project_registry import (
     ProjectRegistry,
     ProjectRegistryRefusal,
@@ -48,6 +49,7 @@ class ProjectOperations:
         state_binding: str | Path | None = None,
         forbidden_roots: Iterable[str | Path] = (),
         clock: Callable[[], float] = time.monotonic,
+        home: str | Path | None = None,
     ) -> None:
         self.registry = registry
         self._state_binding = Path(state_binding).expanduser().resolve() if state_binding else None
@@ -55,18 +57,22 @@ class ProjectOperations:
             Path(item).expanduser().resolve() for item in (registry.root, *forbidden_roots)
         )
         self._clock = clock
+        self._home = Path(home) if home is not None else Path.home()
         self._inspections: dict[str, _Inspection] = {}
 
     def list_projects(self) -> dict[str, object]:
         return self.registry.list_projects()
 
-    def inspect(self, mode: object, path: object, name: object) -> dict[str, object]:
-        label = _safe_text(name)
+    def inspect(self, mode: object, path: object, name: object = None) -> dict[str, object]:
         if mode not in ("new", "existing"):
             raise ProjectRegistryRefusal("project_invalid", "Project mode is invalid.")
-        if type(path) is not str or not Path(path).is_absolute():
+        target = expand_user_home(path, home=self._home)
+        if not target.is_absolute():
             raise ProjectRegistryRefusal("project_invalid", "Project path is invalid.")
-        target = Path(path)
+        if name is None or (type(name) is str and not name.strip()):
+            label = inferred_project_name(target)
+        else:
+            label = _safe_text(name)
         self._refuse_overlap(target)
         if target.is_symlink():
             raise ProjectRegistryRefusal("project_path_unsafe", "Project path is unavailable.")
@@ -77,8 +83,7 @@ class ProjectOperations:
             git_identity = None
         else:
             target = self._validate_existing_target(target)
-            workspace = target / ".agent-commons" / "workspace.yaml"
-            required = not workspace.is_file() or workspace.is_symlink()
+            required = (not self._is_git_repository(target)) or self._needs_initialization(target)
             anchor = target
             git_identity = self._git_identity(target)
         anchor_identity = self._directory_identity(anchor)
@@ -147,16 +152,26 @@ class ProjectOperations:
         else:
             self._validate_existing_target(inspection.checkout)
             self._require_anchor(inspection.checkout, inspection.anchor_identity)
-            if inspection.git_identity != self._git_identity(inspection.checkout):
+            current_git = self._git_identity(inspection.checkout)
+            if inspection.git_identity is not None and inspection.git_identity != current_git:
                 raise ProjectRegistryRefusal(
                     "project_path_changed", "Project path changed after inspection.", 409
                 )
-            if inspection.initialization_required and self._needs_initialization(
-                inspection.checkout
+            if (
+                inspection.git_identity is None
+                and current_git is not None
+                and not inspection.initialization_required
             ):
-                CommonsManager.initialize(
-                    inspection.checkout, integrations=(), workspace_name=inspection.name
+                raise ProjectRegistryRefusal(
+                    "project_path_changed", "Project path changed after inspection.", 409
                 )
+            if inspection.initialization_required:
+                if not self._is_git_repository(inspection.checkout):
+                    self._git_init(inspection.checkout)
+                if self._needs_initialization(inspection.checkout):
+                    CommonsManager.initialize(
+                        inspection.checkout, integrations=(), workspace_name=inspection.name
+                    )
         binding = self._state_binding if inspection.mode == "existing" else None
         try:
             manager = open_project_manager(inspection.checkout, binding)
@@ -252,7 +267,7 @@ class ProjectOperations:
                 "project_not_repository", "Project repository is unavailable."
             ) from exc
         self._safe_owned_directory(resolved)
-        if target.is_symlink() or not self._is_git_repository(resolved):
+        if target.is_symlink():
             raise ProjectRegistryRefusal(
                 "project_not_repository", "Project repository is unavailable."
             )
@@ -335,6 +350,23 @@ class ProjectOperations:
             return None
         return str((candidate if candidate.is_absolute() else path / candidate).resolve())
 
+    def _git_init(self, checkout: Path) -> None:
+        try:
+            subprocess.run(
+                [_GIT, "init", "--quiet", "."],
+                cwd=checkout,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=20,
+                env=_git_environment(),
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ProjectRegistryRefusal(
+                "project_git_init_failed", "Project repository could not be initialized.", 409
+            ) from exc
+
     @staticmethod
     def _is_empty_git_shell(path: Path) -> bool:
         try:
@@ -380,21 +412,7 @@ class ProjectOperations:
                 "project_path_changed", "New project path changed after inspection.", 409
             )
         if milestone == "directory_created":
-            try:
-                subprocess.run(
-                    [_GIT, "init", "--quiet", "."],
-                    cwd=checkout,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=True,
-                    timeout=20,
-                    env=_git_environment(),
-                )
-            except (OSError, subprocess.SubprocessError) as exc:
-                raise ProjectRegistryRefusal(
-                    "project_git_init_failed", "Project repository could not be initialized.", 409
-                ) from exc
+            self._git_init(checkout)
             self.registry.advance_create(idempotency_key, intent, "git_initialized", checkout)
             progress = self.registry.create_progress(idempotency_key, intent)
             milestone = progress.get("milestone")

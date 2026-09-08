@@ -10,6 +10,7 @@ reviews do not establish delivery or acceptance.
 | --- | --- |
 | Use the app | [English guide](user/en/README.md) · [Русское руководство](user/ru/README.md) |
 | Current work and remaining gates | [Implementation programme](agent-platform-implementation-program.md) |
+| Project-native collaboration: current implementation and gates | [Implementation plan](project-native-collaboration-implementation-plan.md) · [Current validation](audits/2026-09-08-project-native-collaboration-validation.md) · [Product contract](adr/0019-project-native-collaboration-and-outputs.md) |
 | Project workspaces and future connection modes | [Project execution plan](project-workspace-ux-plan.md) · [Verification](audits/2026-09-08-project-workspaces-verification.md) · [Future API/local modes](adr/0018-role-connections-and-execution-modes.md) |
 | Product purpose and future direction | [Vision](VISION.md) · [Roadmap](ROADMAP.md) |
 | Architecture and invariants | [Architecture](ARCHITECTURE.md) · [Protocol](PROTOCOL.md) · [Threat model](THREAT_MODEL.md) · [Frontend contract](FRONTEND_CONTRACT.md) |

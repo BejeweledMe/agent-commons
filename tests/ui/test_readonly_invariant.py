@@ -22,6 +22,7 @@ from agent_commons.ui.server import (
     CATALOG_ROUTES,
     LAUNCH_ROUTES,
     MUTATING_ROUTES,
+    PRIVATE_COLLABORATION_ROUTES,
     SETUP_ROUTES,
 )
 from tests.ui.conftest import authorized, expected_surface, mutating_surface, tree_digest
@@ -198,12 +199,16 @@ def test_the_writable_app_exposes_exactly_the_declared_mutating_surface(
 ) -> None:
     # Both halves on purpose: the derived expectation reads the same property
     # `create_app` reads, so on its own it could only ever agree with itself.
-    # The literal union of the four declared tuples is what actually pins the
+    # The literal union of the five declared tuples is what actually pins the
     # surface -- a route silently dropped from registration *and* from the
     # declaration would pass the first comparison and fail this one.
     assert mutating_surface(writable_client.app) == expected_surface(writable)
     assert mutating_surface(writable_client.app) == (
-        set(MUTATING_ROUTES) | set(LAUNCH_ROUTES) | set(SETUP_ROUTES) | set(CATALOG_ROUTES)
+        set(MUTATING_ROUTES)
+        | set(LAUNCH_ROUTES)
+        | set(SETUP_ROUTES)
+        | set(CATALOG_ROUTES)
+        | set(PRIVATE_COLLABORATION_ROUTES)
     )
 
 
@@ -265,6 +270,13 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
     ).json()
     thread_id = thread.get("entity_ref", {}).get("id") or thread.get("thread_id")
     thread_revision = str(thread.get("revision", ""))
+    conversation_response = writable_client.post(
+        "/api/conversations",
+        json={"scope": {"kind": "project"}, "idempotency_key": "sealed-project-conversation"},
+        headers=authorized(),
+    )
+    assert conversation_response.status_code == 200, conversation_response.text
+    conversation = conversation_response.json()
 
     from agent_commons.ui.library_blueprints import blueprint_catalog
     from tests.ui.test_gallery_upload import _body as upload_body
@@ -277,6 +289,21 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
     # is only true if the list below is the list up there. A route missing from
     # here is a route that could stop being thin without this test noticing.
     calls = (
+        (
+            "/api/conversations",
+            {
+                "scope": {"kind": "task", "id": second_task["id"]},
+                "idempotency_key": "sealed-task-conversation",
+            },
+        ),
+        (
+            f"/api/conversations/{conversation['thread_id']}/messages",
+            {
+                "body": "A concrete update",
+                "expected_revision": conversation["revision"],
+                "idempotency_key": "sealed-conversation-message",
+            },
+        ),
         ("/api/gallery/import", upload_body()),
         (f"/api/library/blueprints/{blueprint['id']}/apply", _selection(blueprint)),
         (
@@ -358,6 +385,8 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
     }
     covered = {
+        ("POST", "/api/conversations"),
+        ("POST", "/api/conversations/{thread_id}/messages"),
         ("POST", "/api/gallery/import"),
         ("POST", "/api/library/blueprints/{blueprint_id}/apply"),
         ("POST", "/api/work/tasks/{task_id}/edit"),

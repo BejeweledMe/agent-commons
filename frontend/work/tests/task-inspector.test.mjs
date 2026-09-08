@@ -17,7 +17,7 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), [
 ], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const { WorkApi, ApiProblem, parseTaskCreateResult, parseTaskDetail, parseContextSourceCatalog, parseCatalog } = await import(pathToFileURL(resolve(compiled, "api.js")).href);
-const { stateLabel, filterTrackerTasks, TASK_FILTERS, taskObservationCurrent } = await import(pathToFileURL(resolve(compiled, "taskPresentation.js")).href);
+const { stateLabel, filterTrackerTasks, TASK_FILTERS, taskObservationCurrent, trackerCapacityOnlyGap } = await import(pathToFileURL(resolve(compiled, "taskPresentation.js")).href);
 const { loadTaskDetailState } = await import(pathToFileURL(resolve(compiled, "trackerState.js")).href);
 const { TaskInspectorContent, updateDetailPresentation } = await import(pathToFileURL(resolve(compiled, "components/TaskInspector.js")).href);
 const messages = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
@@ -316,11 +316,13 @@ for (const locale of ["en", "ru"]) {
       actionsCurrent: false, writesEnabled: true, onSelectTask: () => {}, onLaunchTask: () => {},
       detailState: { kind: "ready", taskId, detail: parseTaskDetail(detailPayload(), taskId) }, onRefresh: () => {} });
     const visible = initiallyVisible(view);
-    for (const label of ["Resolve source mismatch", "resolve_dependencies", text("inspector_actions_stale"), text("evidence_complete"), text("inspector_evidence_help"), text("inspector_close")]) assert.ok(visible.includes(label), label);
-    assert.ok(visible.indexOf("Resolve source mismatch") < visible.indexOf("resolve_dependencies"));
+    for (const label of ["Resolve source mismatch", text("tracker_gloss_resolve_dependencies"), text("inspector_actions_stale"), text("evidence_complete"), text("inspector_evidence_help"), text("inspector_close")]) assert.ok(visible.includes(label), label);
+    assert.ok(visible.indexOf("Resolve source mismatch") < visible.indexOf(text("tracker_gloss_resolve_dependencies")));
     assert.equal(visible.includes(text("inspector_no_summary")), false);
     assert.equal(visible.includes(text("inspector_no_runs")), false);
-    assert.equal(visible.includes("A concrete goal"), false);
+    assert.equal(visible.includes("A concrete goal"), true);
+    assert.ok(visible.includes("An observable criterion"));
+    assert.equal(renderToStaticMarkup(view).includes(text("inspector_summary")), false);
     assert.ok(renderToStaticMarkup(view).includes("A concrete goal"));
   });
   test(`${locale}: a recorded summary remains initially visible`, () => {
@@ -366,3 +368,38 @@ for (const locale of ["en", "ru"]) {
     assert.ok(html.includes(text("inspector_detail_loading")));
   });
 }
+
+
+test("only absent capacity telemetry avoids the global task-evidence warning", () => {
+  const snapshot = {state:"partial",truncated:false,gaps:["capacity_missing"],capacity:{state:"unknown"},tasks:[task()],runs:[]};
+  assert.equal(trackerCapacityOnlyGap(snapshot),true);
+  for(const patch of [
+    {truncated:true}, {gaps:[]}, {gaps:["capacity_malformed"]}, {gaps:["capacity_missing","projection_missing"]},
+    {tasks:[task({gaps:["dependency_missing"]})]}, {runs:[{evidenceState:"missing"}]}, {capacity:{state:"available"}}
+  ]) assert.equal(trackerCapacityOnlyGap({...snapshot,...patch}),false);
+  const source=readFileSync(resolve(root,"src/components/TrackerSection.tsx"),"utf8");
+  assert.match(source,/!trackerCapacityOnlyGap\(snapshot\)/);
+  assert.match(source,/TaskState domain="capacity" value=\{snapshot.capacity.state\}/);
+  assert.match(source,/snapshot.gaps.map/);
+});
+
+
+for (const locale of ["en", "ru"]) test(`${locale}: primary task status uses prose and keeps exact states in diagnostics`, () => {
+  const text = (key) => messages[locale][key];
+  const render = (current) => TaskInspectorContent({task:current,tasks:[current],runs:[],sourceRevision:revision,locale,text,actionsCurrent:true,writesEnabled:true,onSelectTask:()=>{},onLaunchTask:()=>{},detailState:{kind:"ready",taskId,detail:parseTaskDetail(detailPayload(),taskId)},onRefresh:()=>{}});
+  const view=render(task()), visible=initiallyVisible(view), markup=renderToStaticMarkup(view);
+  assert.ok(visible.includes(text("task_view_state_ready")));
+  assert.ok(visible.includes(text("tracker_gloss_start_ready_work")));
+  assert.equal(visible.includes("start_ready_work"),false);
+  assert.equal(visible.includes(text("tracker_readiness_label")),false);
+  assert.ok(markup.includes('<code>start_ready_work</code>'));
+  assert.ok(markup.includes('data-value="ready"'));
+  const blocked=initiallyVisible(render(task({readiness:"blocked",nextAction:"resolve_dependencies"})));
+  assert.ok(blocked.includes(text("task_view_state_ready")));
+  assert.ok(blocked.includes(text("tracker_readiness_label")));
+  assert.ok(blocked.includes(text("inspector_readiness_blocked")));
+  assert.equal(blocked.includes("resolve_dependencies"),false);
+  const unknown=initiallyVisible(render(task({readiness:"policy_unknown",nextAction:"future_action"})));
+  assert.ok(unknown.includes(text("tracker_gloss_policy_unknown")));
+  assert.ok(unknown.includes(text("tracker_gloss_unknown")));
+});

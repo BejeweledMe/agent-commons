@@ -31,6 +31,7 @@ classifiers = [
 dependencies = [
   "click>=8.1",
   "jsonschema>=4.21",
+  "pillow>=12.3,<13",
   "PyYAML>=6.0",
 ]
 

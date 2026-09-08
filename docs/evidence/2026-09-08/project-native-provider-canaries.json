@@ -1,0 +1,295 @@
+{
+  "schema": "agent_commons.audit.provider_canaries.v1",
+  "source_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "authorization": "Operator explicitly authorized additional Codex, Claude and Grok runs without a total count cap on 2026-09-08.",
+  "fixture": "Isolated synthetic repository containing a two-line answer() function, with packaged commons-start. No actual project task content supplied.",
+  "wall_time_seconds_per_profile": 300,
+  "reports": [
+    {
+      "ok": true,
+      "profile_id": "grok-builder",
+      "provider": "grok",
+      "purpose": "implementation",
+      "model": null,
+      "provider_version": "grok 1.0.13",
+      "agent_commons_source_sha256": "6e592ada489a01fa677922ff530fedaeb616bee2a899d498111c1a1a1b78729c",
+      "provider_work_process_started": true,
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "cli_exit_code": 0,
+      "process": {
+        "duration_seconds": 96.60217129200464,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false
+      },
+      "preflight_ok": true
+    },
+    {
+      "ok": true,
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "purpose": "implementation",
+      "model": null,
+      "provider_version": "codex-cli 0.145.0",
+      "agent_commons_source_sha256": "6e592ada489a01fa677922ff530fedaeb616bee2a899d498111c1a1a1b78729c",
+      "provider_work_process_started": true,
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "cli_exit_code": 0,
+      "process": {
+        "duration_seconds": 59.23885670804884,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false
+      },
+      "preflight_ok": true
+    },
+    {
+      "ok": true,
+      "profile_id": "claude-builder",
+      "provider": "claude",
+      "purpose": "implementation",
+      "model": null,
+      "provider_version": "2.1.257 (Claude Code)",
+      "agent_commons_source_sha256": "6e592ada489a01fa677922ff530fedaeb616bee2a899d498111c1a1a1b78729c",
+      "provider_work_process_started": true,
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "cli_exit_code": 0,
+      "process": {
+        "duration_seconds": 30.833585041982587,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false
+      },
+      "preflight_ok": true
+    },
+    {
+      "ok": true,
+      "profile_id": "claude-independent-reviewer",
+      "provider": "claude",
+      "purpose": "independent_review",
+      "model": null,
+      "provider_version": "2.1.257 (Claude Code)",
+      "agent_commons_source_sha256": "6e592ada489a01fa677922ff530fedaeb616bee2a899d498111c1a1a1b78729c",
+      "provider_work_process_started": true,
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "cli_exit_code": 0,
+      "process": {
+        "duration_seconds": 24.557664124993607,
+        "exit_code": 0,
+        "outcome": "succeeded",
+        "output_truncated": false
+      },
+      "preflight_ok": true
+    }
+  ],
+  "limitations": [
+    "Current macOS source-bound canaries only, not Linux six-profile L1 or release approval.",
+    "Builder canaries establish startup and terminal MCP behavior, not successful product implementation or visual attachment delivery.",
+    "Runtime source changes invalidate these qualification fingerprints.",
+    "Only whitelisted outcome metadata retained; no provider output, prompts, credentials or private configuration."
+  ],
+  "subsequent_service_execution": [
+    {
+      "provider": "codex",
+      "purpose": "implementation",
+      "delegation_id": "delegation.7XBPV7EP9S524STBG346P3BVAK",
+      "attempt_id": "attempt.7W5PYE6NWHMFA0SHAQHGPTDT3C",
+      "canonical_state": "succeeded",
+      "process_exit_code": 0,
+      "duration_seconds": 826.25,
+      "scope": "R3A compact project sidebar",
+      "acceptance": "open"
+    },
+    {
+      "provider": "grok",
+      "purpose": "implementation",
+      "delegation_id": "delegation.30S71ZCK6QH74M7KN3M99CVFAV",
+      "attempt_id": "attempt.7RAGP5N6X1CXMQ6AJ4EWGTNSK4",
+      "canonical_state": "needs_operator",
+      "workflow_diagnostic_code": "terminal_tool_not_called",
+      "process_exit_code": 0,
+      "duration_seconds": 717.81,
+      "scope": "R7 projection field reads",
+      "acceptance": "open"
+    },
+    {
+      "provider": "grok",
+      "purpose": "implementation",
+      "delegation_id": "delegation.6FZY6R45HKX0724PP1FWN1AB2T",
+      "final_revision": "evt.01M214D5VSP2746Q0CPY5QDZ78",
+      "canonical_state": "succeeded",
+      "process_exit_code": 0,
+      "duration_seconds": 1310.26,
+      "scope": "R1 native folder backend",
+      "acceptance": "open"
+    }
+  ],
+  "subsequent_claude_diagnostic": {
+    "ok": false,
+    "profile_id": "claude-builder",
+    "provider": "claude",
+    "canonical_state": "failed",
+    "workflow_diagnostic_code": "provider_reported_error",
+    "provider_work_process_started": true,
+    "terminal_tool_calls": 0,
+    "terminal_tool_completions": 0,
+    "terminal_tool_rejections": 0,
+    "child_session_closed": true,
+    "closed_classification": "provider_usage_limit",
+    "auth_status": "ready",
+    "raw_output_retained": false
+  },
+  "final_installed_checkpoint": {
+    "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+    "host_platform": "macOS",
+    "installed_python_source_matches_checkout": true,
+    "reports": [
+      {
+        "ok": true,
+        "profile_id": "claude-builder",
+        "provider": "claude",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 36.55575166695053
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "claude-independent-reviewer",
+        "provider": "claude",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 27.559071749972645
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "codex-builder",
+        "provider": "codex",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 57.8778852079995
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "codex-independent-reviewer",
+        "provider": "codex",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 41.244025749969296
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "grok-builder",
+        "provider": "grok",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 160.24532650003675
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "grok-independent-reviewer",
+        "provider": "grok",
+        "canonical_state": "succeeded",
+        "workflow_diagnostic_code": "none",
+        "provider_work_process_started": true,
+        "terminal_tool_calls": 1,
+        "terminal_tool_completions": 1,
+        "terminal_tool_rejections": 0,
+        "child_session_closed": true,
+        "agent_commons_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+        "preflight_ok": null,
+        "cli_exit_code": 0,
+        "process": {
+          "outcome": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 55.3243194159586
+        }
+      }
+    ],
+    "claude_previous_usage_limit": "Historical attempt was limited; both fresh Claude profiles subsequently succeeded. No billing-mode change."
+  }
+}

@@ -190,8 +190,9 @@ def test_grok_profiles_build_fixed_headless_prompt_and_isolated_tools(tmp_path: 
     assert "--continue" not in invocation.argv
     assert invocation.argv[invocation.argv.index("--sandbox") + 1] == "workspace"
     assert invocation.argv[invocation.argv.index("--cwd") + 1] == str(tmp_path.resolve())
-    assert invocation.argv[-2:] == ("-p", "Implement the exact submitted task")
-    assert invocation.stdin == b""
+    assert invocation.argv[-2:] == ("--prompt-file", "/dev/stdin")
+    assert invocation.stdin == b"Implement the exact submitted task"
+    assert invocation.stdin.decode() not in " ".join(invocation.argv)
     assert invocation.extra_env is not None
     assert invocation.extra_env["GROK_FOLDER_TRUST"] == "0"
     assert invocation.extra_env["AGENT_COMMONS_GROK_MCP_COMMAND"] == str(

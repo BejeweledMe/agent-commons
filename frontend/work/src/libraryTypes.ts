@@ -17,6 +17,7 @@ export type ServiceLibrary = Readonly<{
   roles: readonly LibraryRole[];
   skills: readonly LibraryItem[];
   editingEnabled: boolean;
+  skillOrganization?: SkillOrganization;
 }>;
 export type SkillContent = Readonly<{ name: string; description: string; instruction: string }>;
 export type RoleContent = Readonly<{
@@ -56,6 +57,8 @@ export function sameLibraryRef(a: LibraryRef | null | undefined, b: LibraryRef |
 
 export type BlueprintText = Readonly<{ en: string; ru: string }>;
 export type WorkBlueprint = Readonly<{
+  source?: "builtin" | "custom"; archived?: boolean;
+  contentAvailable?: boolean; slotCount?: number; taskCount?: number;
   id: string; version: string; name: BlueprintText; description: BlueprintText;
   slots: readonly { id: string; name: string; role_ref: LibraryRef }[];
   tasks: readonly { id: string; title: BlueprintText; description: BlueprintText; acceptance_criteria: { en: readonly string[]; ru: readonly string[] }; depends_on: readonly string[]; slot_id: string }[];
@@ -66,3 +69,11 @@ export type BlueprintApplication = Readonly<{
   blueprintId: string; roles: readonly { slotId: string; agentId: string }[];
   tasks: readonly { nodeId: string; taskId: string; agentId: string }[];
 }>;
+
+export type SkillOrganization = Readonly<{
+  schema: "agent_commons.skill-organization.v1"; revision: string;
+  groups: readonly { id: string; name: BlueprintText; source: "builtin" | "custom" }[];
+  assignments: readonly { source: "builtin" | "custom"; id: string; group_id: string }[];
+}>;
+export type BlueprintDefinition = Pick<WorkBlueprint, "name" | "description" | "slots" | "tasks">;
+export type BlueprintSave = Readonly<{ id: string; expected_version: string | null; definition: BlueprintDefinition; fork_ref?: { source: "builtin" | "custom"; id: string; version: string } }>;

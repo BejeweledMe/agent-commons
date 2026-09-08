@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import errno
 import hashlib
+import io
 import os
 import stat
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -131,6 +133,79 @@ class ArtifactPreviewReader:
         self._root = manager.repo_root.resolve()
         self._max_bytes = max_bytes
         self._max_pixels = max_pixels
+
+    def inspect_generated_source(self, source_path: str) -> ArtifactPreview:
+        """Validate a generated relative image before any metadata is registered.
+
+        Sources in hidden/private directories, links, special files and images
+        exceeding the normal preview limits are refused. No bytes are persisted.
+        """
+        from PIL import Image
+
+        if not isinstance(source_path, str) or len(source_path.encode()) > 1024:
+            _invalid_image()
+        relative = _relative_source(source_path)
+        if (
+            relative.as_posix() != source_path
+            or any(part.startswith(".") for part in relative.parts)
+            or any(ord(char) < 32 or ord(char) == 127 for char in source_path)
+            or "\\" in source_path
+        ):
+            _invalid_image()
+        suffix = relative.suffix.lower()
+        if suffix not in {".png", ".jpg", ".jpeg"}:
+            _invalid_image()
+        media_type: PreviewMediaType = "image/png" if suffix == ".png" else "image/jpeg"
+        descriptor = self._open_regular(relative)
+        try:
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                _refuse("artifact_preview_non_regular_source", 409, "Unsafe image source")
+            if not 1 <= info.st_size <= self._max_bytes:
+                _refuse("artifact_preview_oversize", 413, "Image exceeds preview bounds")
+            content = b""
+            while len(content) <= info.st_size:
+                chunk = os.read(descriptor, min(65536, info.st_size + 1 - len(content)))
+                if not chunk:
+                    break
+                content += chunk
+            identity = _FileIdentity.from_stat(info)
+            if (
+                len(content) != info.st_size
+                or _FileIdentity.from_stat(os.fstat(descriptor)) != identity
+            ):
+                _refuse("artifact_preview_stale_source", 409, "Image changed while reading")
+        finally:
+            os.close(descriptor)
+        self._assert_path_identity(relative, identity)
+        width, height = _image_dimensions(content, media_type)
+        if width * height > self._max_pixels:
+            _refuse("artifact_preview_pixel_limit", 413, "Image exceeds preview bounds")
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(io.BytesIO(content), formats=("PNG", "JPEG")) as image:
+                    if image.format != ("PNG" if media_type == "image/png" else "JPEG"):
+                        _invalid_image()
+                    image.verify()
+                with Image.open(io.BytesIO(content), formats=("PNG", "JPEG")) as image:
+                    image.load()
+        except (
+            OSError,
+            ValueError,
+            SyntaxError,
+            Image.DecompressionBombError,
+            Image.DecompressionBombWarning,
+        ):
+            _invalid_image()
+        return ArtifactPreview(
+            artifact_id="",
+            revision="sha256:" + hashlib.sha256(content).hexdigest(),
+            media_type=media_type,
+            content=content,
+            width=width,
+            height=height,
+        )
 
     def read(self, artifact_id: str) -> ArtifactPreview:
         """Return verified pixels only when the current source still matches its manifest."""
@@ -298,7 +373,7 @@ class ArtifactPreviewReader:
                 "artifact preview source cannot be opened safely",
             )
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-        file_flags = os.O_RDONLY | os.O_NOFOLLOW
+        file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
         directories: list[int] = []
         try:
             current = os.open(self._root, directory_flags)
