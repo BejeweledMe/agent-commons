@@ -40,12 +40,16 @@ export function stateLabel(domain: StateDomain, value: string): MessageKey {
 export function readinessUnconfirmed(task: TrackerTask): boolean {
   return ["unknown", "policy_unknown", "terminal_dependency_failure"].includes(task.readiness);
 }
-// Aggregate partial data (for example unknown capacity) does not make a
-// separately fresh task observation stale. This is a UI gate; canonical
-// writes still resolve and compare the server's exact task revision.
+// Run progress can be stale while the canonical task revision was just
+// observed. Preserve the run warning while permitting edits of that task.
+// Missing source evidence or a stream gap still blocks all task actions.
 export function taskObservationCurrent(snapshot: TrackerSnapshot, task: TrackerTask): boolean {
-  return (snapshot.state === "ready" || snapshot.state === "partial")
-    && snapshot.freshness.state === "fresh"
+  const usableObservation = ((snapshot.state === "ready" || snapshot.state === "partial")
+    && snapshot.freshness.state === "fresh")
+    || (snapshot.state === "stale" && snapshot.freshness.state === "stale");
+  return usableObservation
+    && !snapshot.gaps.some((gap) => ["graph_stale", "graph_malformed",
+      "projection_missing", "source_revision_unavailable", "resume_gap"].includes(gap))
     && !snapshot.freshness.resumeGap
     && task.freshness === "fresh"
     && !readinessUnconfirmed(task);
@@ -56,4 +60,13 @@ export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter
   return snapshot.tasks.filter((task) => (filter === "all"
     || (filter === "attention" ? task.awaitsHuman || attentionIds.has(task.taskId) : task.taskState === filter))
     && (!query || [task.title, task.roleName ?? "", task.taskId].some((value) => value.toLocaleLowerCase().includes(query))));
+}
+
+/** Optional capacity telemetry does not imply missing task or run evidence. */
+export function trackerCapacityOnlyGap(snapshot: TrackerSnapshot): boolean {
+  return snapshot.state === "partial" && !snapshot.truncated
+    && snapshot.gaps.length === 1 && snapshot.gaps[0] === "capacity_missing"
+    && snapshot.capacity.state === "unknown"
+    && snapshot.tasks.every((task) => task.gaps.length === 0 && task.evidenceState === "complete")
+    && snapshot.runs.every((run) => run.evidenceState === "complete");
 }

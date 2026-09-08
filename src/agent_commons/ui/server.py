@@ -30,6 +30,8 @@ from agent_commons.core.canonical import loads_json_strict
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.context_pack import ContextPackRefusal
 from agent_commons.errors import CommonsError
+from agent_commons.runtime.collaboration_storage import collaboration_state_root
+from agent_commons.runtime.live_previews import LivePreviewRegistry
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
 from agent_commons.services.design_authoring import publish_from_selection, revise_from_selection
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
@@ -38,10 +40,12 @@ from agent_commons.ui.context import (
     PANEL_ALREADY_OPEN_ACTIONS,
     UIContext,
 )
+from agent_commons.ui.conversation_routes import register_conversation_routes
 from agent_commons.ui.gallery_routes import register_gallery_routes
 from agent_commons.ui.gallery_upload import register_gallery_upload
 from agent_commons.ui.library_blueprints import register_blueprint_reads, register_blueprint_writes
 from agent_commons.ui.library_routes import register_library_routes
+from agent_commons.ui.output_routes import register_output_routes
 from agent_commons.ui.security import (
     AUTH_EXCHANGE_PATH,
     SECURITY_HEADERS,
@@ -117,6 +121,8 @@ BROWSER_SESSION_RECOVERY_ACTIONS = (
 #: `CommonsManager` method; the UI is a third adapter beside the CLI and MCP,
 #: not a second write path.
 MUTATING_ROUTES = (
+    ("POST", "/api/conversations"),
+    ("POST", "/api/conversations/{thread_id}/messages"),
     ("POST", "/api/operations/{operation_id}/answer"),
     ("POST", "/api/chat"),
     ("POST", "/api/chat/{thread_id}/messages"),
@@ -145,6 +151,15 @@ MUTATING_ROUTES = (
     ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
 )
 
+#: Private collaboration bytes and preview metadata never enter canonical events.
+#: Authentication and read-only registration still seal this operational surface.
+PRIVATE_COLLABORATION_ROUTES = (
+    ("POST", "/api/outputs/live-previews"),
+    ("POST", "/api/conversations/{thread_id}/drafts"),
+    ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments"),
+    ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments/{attachment_id}/remove"),
+)
+
 #: Catalogue editing keeps its own allowlist: adding a skill and adding a role
 #: are different privileges and the test that pins the mutating surface should
 #: say so. It is no longer its own registration gate -- the generated runtime
@@ -155,6 +170,10 @@ CATALOG_ROUTES = (
     # Service-owned versions are private operator configuration, outside the
     # canonical event stream, like the legacy catalogue editing routes below.
     ("POST", "/api/library/{kind}"),
+    ("POST", "/api/library/organization/groups"),
+    ("POST", "/api/library/organization/move"),
+    ("POST", "/api/library/blueprints/custom"),
+    ("POST", "/api/library/blueprints/custom/{id}/archive"),
     ("POST", "/api/catalog/entries"),
     ("POST", "/api/catalog/entries/remove"),
 )
@@ -575,9 +594,43 @@ def create_app(
         authoring_session_factory=lambda: context.writer_session_id,
     )
 
+    def live_preview_registry() -> LivePreviewRegistry:
+        manager = context.manager()
+        return LivePreviewRegistry(
+            collaboration_state_root(manager),
+            project_root=manager.repo_root,
+            workspace_id=manager.workspace_id,
+            forbidden_ports=frozenset({port}),
+        )
+
+    register_output_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        manager_factory=context.manager,
+        live_registry_factory=live_preview_registry,
+        writer_factory=context.writer,
+        authorize_publish=lambda: context.writer(),
+        write_dependencies=reads_workspace,
+        register_writes=context.operator_panel and not read_only,
+    )
+
+    register_conversation_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        manager_factory=context.manager,
+        writer_factory=context.writer,
+        authorize_write=lambda: context.writer(),
+        register_writes=context.operator_panel and not read_only,
+    )
+
     tracker_source = ObservedTrackerSource(context)
 
-    register_blueprint_reads(api_routes, store_factory=context.library_store, dependencies=[])
+    register_blueprint_reads(
+        api_routes,
+        store_factory=context.library_store,
+        dependencies=[],
+        authorize_content=context.authorize_library_edit,
+    )
     register_library_routes(
         api_routes,
         dependencies=[],

@@ -593,3 +593,18 @@ def thaw_json_object(value: FrozenJsonObject) -> dict[str, JsonValue]:
     """Restore the JSON object a typed envelope serializes to disk."""
 
     return _thaw_object(value)
+
+
+def thaw_json_field(value: FrozenJsonObject, key: str) -> JsonValue:
+    """Return a fresh copy of one frozen JSON object field.
+
+    Only the selected field is thawed. Sibling objects and arrays are not
+    walked. Missing keys raise ``KeyError``. Nested containers are mutable
+    copies, so callers cannot mutate the frozen record through the returned
+    value.
+    """
+
+    for field, child in value.values:
+        if field == key:
+            return _thaw_json(child)
+    raise KeyError(key)

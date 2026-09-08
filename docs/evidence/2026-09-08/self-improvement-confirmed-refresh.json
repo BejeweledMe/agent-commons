@@ -1,0 +1,86 @@
+{
+  "schema": "agent_commons.audit.confirmed_refresh.v1",
+  "source_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "frozen_at": "2026-09-08T14:00:35.415825+00:00",
+  "files": [
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "6b362333fe691313695f46d21667f4a7ab1033a941a820311be30a64499d9738",
+      "size_bytes": 81833
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "89849ec3e0e893a49d2c0186a5c46d32763c1d5eb6caf002c266e61d439fd0a0",
+      "size_bytes": 118699
+    },
+    {
+      "path": "frontend/work/src/projectWorkspace.ts",
+      "sha256": "e52e8dd8e54544362d5453ee2be240005199a390ac5f3badd4ff1e50d714291b",
+      "size_bytes": 7909
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "5eca9530b83ec2bd599e44439ef2fc5880bc671dc30f4b8114d26c20c8c13b46",
+      "size_bytes": 5759
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "a9a6adb420f6e539b1dc3b96d5f44973cfc19142c266b19aa1f21d7e2352a039",
+      "size_bytes": 411
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-CDh5zmy0.js",
+      "sha256": "cabbb055f67b2199264c5451852bddd99a14cedc303e7b8990922f101b98217f",
+      "size_bytes": 516114
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DAg_73Ra.css",
+      "sha256": "0eb346db488e8be817c2812ddcba08075e05c0a79e87f3cf18b354585dda65d1",
+      "size_bytes": 34429
+    }
+  ],
+  "checks": {
+    "git_diff_check": {
+      "exit_code": 0
+    },
+    "work_build": {
+      "exit_code": 0,
+      "node": "24.20.0"
+    },
+    "focused_behavior": {
+      "passed": 7,
+      "worker_diff_failures_reproduced_before_integration": 4
+    },
+    "make_check": {
+      "exit_code": 0,
+      "ruff_check": "passed",
+      "ruff_format": "passed",
+      "work_tests_passed": 139,
+      "gallery_tests_passed": 27,
+      "frontend_skips": 0,
+      "pytest_passed": 2103,
+      "pytest_skipped": 13,
+      "pytest_warnings": 2,
+      "pytest_duration_seconds": 847.53,
+      "skips": "12 withheld automatic-grant paths; 1 local CI-only check"
+    }
+  },
+  "builder_attempt": {
+    "delegation_id": "delegation.03RBA9AHCSYDSWTEYB786AWNJN",
+    "attempt_id": "attempt.2R040N1RZX6CKZYBYGWYH391W2",
+    "canonical_state": "timed_out",
+    "wall_time_seconds": 600,
+    "terminal_calls": 0,
+    "terminal_completions": 0,
+    "terminal_rejections": 0,
+    "process_stopped": true,
+    "child_session_closed": true,
+    "lead_integration": "Corrected confirmed-result semantics and stale-read/busy-state races in the remaining frontend diff."
+  },
+  "limitations": [
+    "Hermetic verification is not six-profile L1, release or task acceptance.",
+    "Source and built asset verification; installation/browser recheck is recorded separately in the audit.",
+    "No provider output, prompts, credentials or private operator configuration are included."
+  ]
+}

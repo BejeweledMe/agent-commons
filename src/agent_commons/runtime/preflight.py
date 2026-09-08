@@ -70,7 +70,7 @@ _HELP_FLAGS = {
 _CODEX_ROOT_HELP_FLAGS = ("--ask-for-approval", "--sandbox")
 _CODEX_EXEC_HELP_FLAGS = ("--config", "--ignore-user-config", "--strict-config", "--json")
 _GROK_HELP_FLAGS = (
-    "--single",
+    "--prompt-file",
     "--cwd",
     "--output-format",
     "--always-approve",

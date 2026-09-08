@@ -26,6 +26,31 @@ contract for Work. Its evidence/checklist is tracked separately in the
 - The exact-source picker consumes a closed metadata DTO. Current catalog
   eligibility never replaces source validation at publication and execution.
 
+## Project-native collaboration increment
+
+[ADR 0019](adr/0019-project-native-collaboration-and-outputs.md) governs the
+current Work changes. The legacy single-file laws below continue to apply to
+the legacy asset; Work is a separate compiled React application.
+
+- Project actions belong to the project row. Accessible search labels remain
+  present but visually hidden. A native folder chooser supplements manual paths;
+  a browser directory upload never establishes a trusted server path.
+- Reusable skills/groups and versioned Blueprint definitions belong to Library.
+  Producer outputs are task/agent scoped; legacy Design links redirect away
+  from the reusable catalog. Results buttons require scoped server counts.
+- Conversations retain local drafts by project and scope. Mutations preserve
+  exact intent and idempotency across uncertain transport; confirmed writes do
+  not become failed writes merely because a subsequent refresh fails.
+- Attachments use bounded private upload/download routes and validated descriptors.
+  Source paths and raw bytes never enter URL query state or localStorage.
+  Actual image bytes require the addressed MCP image tool, not a filename string.
+- Private operational mutations are separately enumerated by
+  `PRIVATE_COLLABORATION_ROUTES`. Canonical conversation create/send remain in
+  `MUTATING_ROUTES` and the manager-write invariant. Readonly apps mount neither
+  kind of mutation. New routes require first-run and real transport tests.
+- Runtime/run freshness is not the freshness of an independently observed task.
+  Preserve old-run warnings without disabling a freshly observed unrelated task.
+
 ## One file, one writer, no toolchain
 
 - The whole panel is a single self-contained asset: one nonce'd `<style>`

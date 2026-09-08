@@ -1,8 +1,9 @@
+import { OutputsButton } from "./OutputsPanel.js";
 import { type KeyboardEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { ApiProblem, type WorkApi } from "../api";
 import type { TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
-import { filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, type TaskFilter } from "../taskPresentation.js";
+import { filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, trackerCapacityOnlyGap, type TaskFilter } from "../taskPresentation.js";
 import { trackerLoadFailed, trackerLoadSucceeded, trackerStreamSucceeded, type TrackerViewState } from "../trackerState.js";
 import { TaskInspector, TaskState } from "./TaskInspector.js";
 import { TaskGraph } from "./TaskGraph.js";
@@ -309,7 +310,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
       </label>
     </div>
     {stale ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_stale_title")}</strong><p>{text(snapshot.freshness.resumeGap ? "tracker_resume_gap" : "tracker_stale_next")}</p></div> : null}
-    {snapshot.state === "partial" || snapshot.truncated ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_partial_title")}</strong><p>{text("tracker_partial_next")}</p></div> : null}
+    {(snapshot.state === "partial" && !trackerCapacityOnlyGap(snapshot)) || snapshot.truncated ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_partial_title")}</strong><p>{text("tracker_partial_next")}</p></div> : null}
     {snapshot.state === "error" ? <div className="tracker-state tracker-state-error" role="alert"><strong>{text("tracker_projection_error_title")}</strong><p>{text("tracker_projection_error_next")}</p></div> : null}
     {snapshot.state === "loading" ? <p role="status">{text("tracker_loading")}</p> : null}
     <div className={`task-workspace${selectedTaskId !== null ? " task-workspace-selected" : ""}`}>
@@ -332,6 +333,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
               <span className="task-row-meta"><span><span className="task-domain-label">{text("tracker_task_label")}: </span><TaskState domain="task" value={task.taskState} text={text} /></span><span className="task-row-role">{task.roleName ?? text("inspector_unassigned")}</span></span>
               <span className="task-row-readiness"><span className="task-domain-label">{text("tracker_readiness_label")}: </span><TaskState domain="readiness" value={task.readiness} text={text} /></span>
             </button>
+            <OutputsButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} />
           </li>)}
         </ul>
       </section>

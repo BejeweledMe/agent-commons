@@ -60,7 +60,7 @@ _CLAUDE_HELP_FLAGS = (
     "--max-budget-usd",
 )
 _GROK_HELP_FLAGS = (
-    "--single",
+    "--prompt-file",
     "--cwd",
     "--output-format",
     "--always-approve",
@@ -728,12 +728,15 @@ def test_grok_preflight_validates_real_help_and_shared_mcp_contract(tmp_path: Pa
     assert "--delegation-id" not in runner.calls[1]
 
 
-def test_grok_preflight_fails_closed_when_installed_help_drifted(tmp_path: Path) -> None:
+@pytest.mark.parametrize("missing_flag", ["--sandbox", "--prompt-file"])
+def test_grok_preflight_fails_closed_when_installed_help_drifted(
+    tmp_path: Path, missing_flag: str
+) -> None:
     result = preflight_profile(
         _grok_profiles(),
         BuiltinProfileId.GROK_BUILDER,
         workspace_root=tmp_path,
-        runner=GrokProbeRunner(missing_flag="--sandbox"),  # type: ignore[arg-type]
+        runner=GrokProbeRunner(missing_flag=missing_flag),  # type: ignore[arg-type]
     )
     assert result["ok"] is False
     assert result["checks"]["provider_help"]["missing_flag_count"] == 1

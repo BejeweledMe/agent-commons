@@ -177,7 +177,15 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_reply_thread",
     }
 )
-IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {"commons_succeed_delegation"}
+IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
+    "commons_succeed_delegation",
+    "commons_publish_live_preview",
+    "commons_publish_design_image",
+    "commons_read_message",
+    "commons_read_message_image",
+    "commons_read_message_file",
+    "commons_acknowledge_message",
+}
 VERIFICATION_WORKER_TOOL_NAMES = IMPLEMENTATION_WORKER_TOOL_NAMES | {"commons_record_verification"}
 INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
     "commons_record_verification",
@@ -703,11 +711,27 @@ def build_server(
             deadline_seconds=deadline_seconds,
         )
 
+    from agent_commons.mcp.conversation_tools import register_conversation_tools
+
+    register_conversation_tools(register, commons, require_live_worker)
+
+    from agent_commons.mcp.live_preview_tools import register_live_preview_tools
+
+    register_live_preview_tools(register, commons, require_live_worker, worker_binding=worker)
+
+    from agent_commons.mcp.design_output_tools import register_design_output_tools
+
+    register_design_output_tools(register, commons, require_live_worker, worker_binding=worker)
+
     @register(_READ_ONLY, worker_only=True)
     def commons_list_my_threads() -> list[dict[str, Any]]:
         """Conversations this role is addressed in, including the main chat."""
 
         reachable = {"*", active_session_id} | ({acting_agent_id} if acting_agent_id else set())
+        current = require_live_worker() or {}
+        target = current.get("target_ref") or {}
+        if target.get("kind") == "task":
+            reachable.add("task:" + target["id"])
         return [
             {
                 "thread_id": str(thread["id"]),
@@ -716,7 +740,8 @@ def build_server(
                 "subject": thread.get("subject"),
                 "desired_outcome": thread.get("desired_outcome"),
                 "state": thread.get("state"),
-                "messages": [dict(item) for item in thread.get("messages") or ()],
+                "messages": [dict(item) for item in (thread.get("messages") or ())[-20:]],
+                "messages_truncated": len(thread.get("messages") or ()) > 20,
             }
             for thread in commons.list_threads(state="open")
             if {str(item) for item in thread.get("to") or ()} & reachable
@@ -728,6 +753,7 @@ def build_server(
         expected_revision: str,
         body: str,
         idempotency_key: str,
+        reply_to_message_id: str | None = None,
     ) -> dict[str, Any]:
         """Reply in a conversation this role is addressed in.
 
@@ -740,6 +766,7 @@ def build_server(
             thread_id,
             expected_revision,
             body=body,
+            reply_to_message_id=reply_to_message_id,
             idempotency_key=idempotency_key,
         )
 
@@ -909,7 +936,7 @@ def build_server(
 
     @register(_READ_ONLY, worker_only=True)
     def commons_read_artifact(artifact_id: str) -> dict[str, Any]:
-        """Read one exact UTF-8 evidence artifact after manifest hash verification."""
+        """Read exact UTF-8 evidence; redacted content cannot establish source absence."""
 
         if workspace is None:  # pragma: no cover - tool is registered only for workers
             raise LifecycleConflictError("workspace snapshot is unavailable")
@@ -1253,7 +1280,14 @@ def build_server(
         if current_review is None or not _review_matches_worker(dict(current_review), worker):
             raise LifecycleConflictError("worker review write is outside its delegation scope")
         review = dict(current_review)
-        expected_revision = str(worker.get("target_revision"))
+        # A delegation may target the subject itself, whose revision is not the
+        # review request revision. A restarted server can also bind an already
+        # completed review after a lost response; retain its original precondition.
+        expected_revision = str(
+            bound_review.get("revision")
+            if bound_review.get("state") == "requested"
+            else bound_review.get("expected_revision")
+        )
         target_revision = str(bound_review.get("target_revision"))
         required_artifact_ids: list[str] = []
         review_target = dict(bound_review.get("target_ref") or {})
@@ -1468,17 +1502,20 @@ def build_server(
 
     @register(_READ_ONLY, worker_only=True)
     def commons_repo_read(path: str, expected_sha256: str | None = None) -> dict[str, Any]:
-        """Read one unchanged, bounded UTF-8 file from the reviewer snapshot."""
+        """Read unchanged UTF-8 snapshot text; content_complete=false forbids absence inference."""
 
         if workspace is None:  # pragma: no cover - tool is registered only for workers
             raise LifecycleConflictError("workspace snapshot is unavailable")
         return workspace.read(path, expected_sha256=expected_sha256)
 
     @register(_READ_ONLY, worker_only=True)
-    def commons_repo_search(
-        query: str, prefix: str = "", max_matches: int = 100
-    ) -> list[dict[str, Any]]:
-        """Literal-search unchanged snapshot text without exposing native filesystem tools."""
+    def commons_repo_search(query: str, prefix: str = "", max_matches: int = 100) -> dict[str, Any]:
+        """Search safe snapshot text, returning v2 matches and coverage.
+
+        coverage.complete=false forbids absence claims: inspect redacted or
+        unreadable files and narrow the prefix when the 500-file limit applies.
+        Match snippets include the query; columns are one-based characters.
+        """
 
         if workspace is None:  # pragma: no cover - tool is registered only for workers
             raise LifecycleConflictError("workspace snapshot is unavailable")

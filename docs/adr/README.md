@@ -35,6 +35,7 @@ contract test. The status written in each ADR remains the detailed record.
 | [0016](0016-service-library-and-live-workspace.md) | Proposed | Service-owned professional skills and specializations, editable library, five workflow blueprints, live task graph and browser Gallery; implementation authorized. |
 | [0017](0017-project-scoped-service-host.md) | Proposed | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery; branch implementation authorized. |
 | [0018](0018-role-connections-and-execution-modes.md) | Proposed | Future role connection, API/local, SGR and conversation contracts; no runtime capability or live qualification claimed. |
+| [0019](0019-project-native-collaboration-and-outputs.md) | Accepted direction, implementation open | Compact project shell, grouped reusable library, producer-scoped outputs, private message attachments and truthful human/agent delivery; current program is on the self-improvement branch. |
 
 ## How the two records fit together
 

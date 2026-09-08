@@ -13,7 +13,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 _HELP_FLAGS = (
-    "--single --cwd --output-format --always-approve --no-alt-screen --max-turns "
+    "--prompt-file --cwd --output-format --always-approve --no-alt-screen --max-turns "
     "--model --sandbox --allow --tools --disallowed-tools --no-plan --no-subagents "
     "--disable-web-search --rules"
 )
@@ -36,14 +36,14 @@ def _value(result: Any) -> Any:
 
 
 def _prompt(arguments: list[str]) -> str:
-    if "-p" not in arguments:
-        raise RuntimeError("Grok prompt argument is missing")
-    return arguments[arguments.index("-p") + 1]
+    if arguments[-2:] != ["--prompt-file", "/dev/stdin"]:
+        raise RuntimeError("Grok fixed stdin transport is missing")
+    return Path(arguments[-1]).read_text(encoding="utf-8")
 
 
 def _assert_commons_start_projection(prompt: str) -> None:
     if "Provider-projected packaged skills" not in prompt or "name: commons-start" not in prompt:
-        raise RuntimeError("commons-start skill projection did not reach Grok prompt argv")
+        raise RuntimeError("commons-start skill projection did not reach Grok prompt stdin")
 
 
 def _mcp_parameters() -> StdioServerParameters:

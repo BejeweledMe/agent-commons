@@ -530,6 +530,8 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
     if missing:
         raise ValidationError(f"{event_type} is missing required fields: {', '.join(missing)}")
     for field in _STRING_FIELDS.intersection(payload):
+        if event_type == "thread.replied" and field == "body" and payload.get("attachments"):
+            continue
         value = payload[field]
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(f"{field} must be a non-empty string")
@@ -578,6 +580,10 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         or payload["verdict"] not in {"approved", "changes_requested", "rejected", "abstained"}
     ):
         raise ValidationError("invalid review verdict")
+    if event_type.startswith("thread."):
+        from .conversations import validate_conversation_payload
+
+        validate_conversation_payload(event_type, payload)
     if event_type == "thread.opened" and (
         not isinstance(payload["thread_type"], str)
         or payload["thread_type"]

@@ -10,7 +10,13 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
-from .envelopes import FrozenJsonObject, JsonValue, freeze_json_object, thaw_json_object
+from .envelopes import (
+    FrozenJsonObject,
+    JsonValue,
+    freeze_json_object,
+    thaw_json_field,
+    thaw_json_object,
+)
 
 
 @dataclass(frozen=True)
@@ -41,7 +47,7 @@ class HandoffRecord(Mapping[str, object]):
         return thaw_json_object(self.data)
 
     def __getitem__(self, key: str) -> object:
-        return self.to_dict()[key]
+        return thaw_json_field(self.data, key)
 
     def __iter__(self) -> Iterator[str]:
         return (key for key, _ in self.data.values)

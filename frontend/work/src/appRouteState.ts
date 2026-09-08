@@ -5,13 +5,13 @@ export type WorkRoute = {
   view: WorkView;
   taskId: string | null;
   filter: WorkFilter;
-  libraryTab: "roles" | "skills" | "blueprints" | "context" | "design";
+  libraryTab: "roles" | "skills" | "blueprints" | "context";
   composer: boolean;
 };
 
 const views = new Set(["work", "team", "library", "settings"]);
 const filters = new Set(["all", "attention", "ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"]);
-const tabs = new Set(["roles", "skills", "blueprints", "context", "design"]);
+const tabs = new Set(["roles", "skills", "blueprints", "context"]);
 const taskId = /^task\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 const projectId = /^project\.[a-f0-9]{32}$/;
 
@@ -22,7 +22,7 @@ export function parseWorkRoute(search: string): WorkRoute {
   const libraryTab = query.get("tab") === "templates" ? "blueprints" : query.get("tab");
   return {
     projectId: project !== null && projectId.test(project) ? project : null,
-    view: views.has(query.get("view") ?? "") ? query.get("view") as WorkView : "work",
+    view: query.get("view") === "library" && libraryTab === "design" ? "work" : views.has(query.get("view") ?? "") ? query.get("view") as WorkView : "work",
     taskId: task !== null && taskId.test(task) ? task : null,
     filter: filters.has(query.get("filter") ?? "") ? query.get("filter") as WorkFilter : "all",
     libraryTab: tabs.has(libraryTab ?? "") ? libraryTab as WorkRoute["libraryTab"] : "roles",

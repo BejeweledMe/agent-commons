@@ -229,6 +229,12 @@ def build_execution_plan(
                 aggregate_freshness=(
                     health.freshness if health is not None else FreshnessState.UNKNOWN
                 ),
+                observed_task_freshness=_task_observation_freshness(
+                    task,
+                    observed_at=canonical_observed_at,
+                    generated_at=parsed_generated_at,
+                    stale_after_seconds=stale_after_seconds,
+                ),
             )
         )
 
@@ -419,6 +425,24 @@ def _runs_by_task(runs: tuple[RunView, ...]) -> dict[str, RunView]:
     return selected
 
 
+def _task_observation_freshness(
+    task: Mapping[str, Any],
+    *,
+    observed_at: str | None,
+    generated_at: datetime,
+    stale_after_seconds: int,
+) -> FreshnessState | None:
+    if observed_at is None:
+        return None
+    recorded = _timestamp(task.get("recorded_at"))
+    observed = _timestamp(observed_at)
+    if recorded is None or recorded > generated_at or observed is None or observed > generated_at:
+        return FreshnessState.UNKNOWN
+    if int((generated_at - observed).total_seconds()) > stale_after_seconds:
+        return FreshnessState.STALE
+    return FreshnessState.FRESH
+
+
 def _task_readiness(
     task_id: str,
     task: Mapping[str, Any],
@@ -431,6 +455,7 @@ def _task_readiness(
     acceptance: AcceptanceView | None,
     gaps: set[PlanGap],
     aggregate_freshness: FreshnessState,
+    observed_task_freshness: FreshnessState | None = None,
 ) -> TaskReadiness:
     state = str(task.get("state", "unknown"))
     action = (
@@ -477,7 +502,13 @@ def _task_readiness(
         readiness = ReadinessState.UNKNOWN
         gaps.add(PlanGap.TASK_MALFORMED)
         action = NextAction.INSPECT_MISSING_EVIDENCE
-    freshness = run.freshness if run is not None else aggregate_freshness
+    # Task edits depend on an observed canonical task revision. Run progress
+    # freshness remains on the run and never establishes process liveness.
+    freshness = (
+        observed_task_freshness
+        if observed_task_freshness is not None
+        else (run.freshness if run is not None else aggregate_freshness)
+    )
     evidence = (
         run.evidence_state
         if run is not None

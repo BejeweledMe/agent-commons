@@ -137,6 +137,14 @@ _CLAUDE_COMMONS_CHAT_TOOLS = (
     "mcp__agent-commons__commons_list_my_threads",
     "mcp__agent-commons__commons_reply_thread",
 )
+_CLAUDE_COMMONS_COLLABORATION_TOOLS = (
+    "mcp__agent-commons__commons_read_message",
+    "mcp__agent-commons__commons_read_message_image",
+    "mcp__agent-commons__commons_read_message_file",
+    "mcp__agent-commons__commons_acknowledge_message",
+    "mcp__agent-commons__commons_publish_live_preview",
+    "mcp__agent-commons__commons_publish_design_image",
+)
 _CLAUDE_COMMONS_REVIEW_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 #: Staff-changing tools, keyed by the standing grant *and its level*.  A run
@@ -286,6 +294,8 @@ def _worker_tools(
     )
     tools = _CLAUDE_COMMONS_READ_TOOLS + outcome_tools
     tools += _CLAUDE_COMMONS_CHAT_TOOLS
+    if purpose in {"implementation", "verification"}:
+        tools += _CLAUDE_COMMONS_COLLABORATION_TOOLS
     if profile_id.independent_reviewer:
         tools += (
             _CLAUDE_COMMONS_REVIEW_TOOLS
@@ -538,9 +548,9 @@ def _resolve_or_demo_placeholder(
         return DEMO_UNRESOLVED_EXECUTABLE
 
 
-# A conservative application bound for Grok's single prompt argument, with
-# one byte reserved for its terminating NUL. This is not a guarantee about
-# any host's aggregate argv/environment limit or an argv privacy boundary.
+# Preserve the existing conservative Grok instruction bound when moving its
+# transport from argv to stdin. The historical name remains for compatibility;
+# this limit no longer describes bytes passed in a process argument.
 GROK_PROMPT_ARGUMENT_MAX_BYTES = 128 * 1024 - 1
 
 
@@ -653,14 +663,23 @@ def invocation_instruction_bytes(invocation: RunnerInvocation) -> bytes:
 
     if invocation.provider is not Provider.GROK:
         return invocation.stdin
-    try:
-        position = invocation.argv.index("-p")
-        prompt = invocation.argv[position + 1]
-    except (ValueError, IndexError) as exc:
-        raise ConfigurationError("Grok invocation has no fixed headless prompt") from exc
-    if invocation.argv.count("-p") != 1 or invocation.stdin:
-        raise ConfigurationError("Grok invocation has an ambiguous instruction transport")
-    return prompt.encode("utf-8")
+    # The special file explicitly consumes the existing pipe; Grok does not
+    # otherwise read stdin as a prompt. Never accept caller-selected files or
+    # alternate prompt arguments alongside this fixed transport.
+    alternate_prompt = any(
+        argument.startswith("-p")
+        or argument in {"--single", "--prompt-json"}
+        or argument.startswith(("--single=", "--prompt-json=", "--prompt-file="))
+        for argument in invocation.argv[1:]
+    )
+    if (
+        invocation.argv[-2:] != ("--prompt-file", "/dev/stdin")
+        or invocation.argv.count("--prompt-file") != 1
+        or alternate_prompt
+        or not invocation.stdin
+    ):
+        raise ConfigurationError("Grok invocation has an invalid fixed stdin transport")
+    return invocation.stdin
 
 
 class RunnerProfile(Protocol):
@@ -1058,7 +1077,9 @@ class GrokRunnerProfile:
         validate_profile_launch_boundary(self)
         prompt = _instruction_bytes(instruction).decode("utf-8")
         if not grok_instruction_fits_argument(prompt):
-            raise ConfigurationError("Grok instruction exceeds the prompt argument byte limit")
+            raise ConfigurationError(
+                "Grok instruction exceeds the supported instruction byte limit"
+            )
         if delegation_id is None:
             raise ConfigurationError("Grok runtime requires an exact delegation binding")
         _safe_identifier("delegation_id", delegation_id)
@@ -1125,13 +1146,11 @@ class GrokRunnerProfile:
             short_name = tool.removeprefix(_MCP_TOOL_PREFIX)
             argv.extend(("--allow", f"MCPTool({_GROK_MCP_SERVER}__{short_name})"))
 
-        # Grok Build 1.0.13 explicitly does not read piped stdin as a prompt.
-        # Its documented --prompt-file cannot consume '-', and the broker has
-        # no pre-existing owned prompt-file lifecycle.  The fixed -p argument
-        # is therefore the only real headless transport. Its conservative
-        # application byte bound is checked before executable resolution above;
-        # a host can still refuse its aggregate argv/environment size.
-        argv.extend(("-p", prompt))
+        # Grok does not automatically read piped stdin. Its explicit file
+        # transport opens the existing pipe, without putting instruction bytes
+        # in argv or persisting a prompt file. The exec gate releases the bytes
+        # only after canonical start; /dev/stdin is fixed, never caller-owned.
+        argv.extend(("--prompt-file", "/dev/stdin"))
         extra_env = {
             **_GROK_EXTRA_ENVIRONMENT,
             "AGENT_COMMONS_GIT_EXECUTABLE": str(mcp_args[mcp_args.index("--git-executable") + 1]),
@@ -1144,7 +1163,7 @@ class GrokRunnerProfile:
             provider=self.provider,
             profile_id=self.profile_id,
             argv=tuple(argv),
-            stdin=b"",
+            stdin=prompt.encode("utf-8"),
             extra_env=extra_env,
         )
 

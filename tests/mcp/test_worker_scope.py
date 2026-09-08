@@ -80,6 +80,7 @@ def _workspace(
     tmp_path: Path,
     *,
     reviewer_profile: str = "claude-independent-reviewer",
+    delegation_target: str = "review",
 ) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -197,9 +198,10 @@ def _workspace(
         criteria=("Review unrelated work",),
         idempotency_key="worker-scope-unrelated-review",
     )
+    target = task if delegation_target == "task" else review
     delegation = parent.create_delegation(
-        target_ref=review["entity_ref"],
-        target_revision=review["revision"],
+        target_ref=target["entity_ref"],
+        target_revision=target["revision"],
         target_profile=reviewer_profile,
         purpose="independent_review",
         limits={
@@ -581,8 +583,21 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
     source = server.tools["commons_repo_read"]("src/app.py", source_item["sha256"])
     assert "return 42" in source["content"]
     assert source["redactions"] == []
-    assert server.tools["commons_repo_search"]("return 42", "src", 10) == [
-        {"path": "src/app.py", "line": 2, "text": "    return 42"}
+    result = server.tools["commons_repo_search"]("return 42", "src", 10)
+    assert result["schema"] == "agent_commons.repo_search.v2"
+    assert result["matches"] == [
+        {
+            "path": "src/app.py",
+            "line": 2,
+            "column": 5,
+            "text": "    return 42",
+            "text_start_column": 1,
+            "text_truncated": False,
+        }
+    ]
+    assert result["coverage"]["complete"] is False
+    assert result["coverage"]["redacted_files"] == [
+        {"path": "src/reviewable_gate.py", "line_count": 1}
     ]
     reviewable_item = next(item for item in files if item["path"] == "src/reviewable_gate.py")
     reviewable = server.tools["commons_repo_read"](
@@ -597,11 +612,14 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
             "classifications": ["secret"],
         }
     ]
-    assert server.tools["commons_repo_search"]("gated_argv", "src", 10) == [
+    assert server.tools["commons_repo_search"]("gated_argv", "src", 10)["matches"] == [
         {
             "path": "src/reviewable_gate.py",
             "line": 2,
             "text": "    return gated_argv(provider_argv)",
+            "column": 12,
+            "text_start_column": 1,
+            "text_truncated": False,
         }
     ]
     with pytest.raises(ValidationError, match="remain relative"):
@@ -650,7 +668,10 @@ def test_worker_reader_denies_sensitive_and_outside_files_and_unrelated_results(
     )
 
 
-def test_canonical_ledger_writes_do_not_invalidate_reviewer_snapshot(tmp_path: Path) -> None:
+@pytest.mark.parametrize("delegation_target", ("review", "task"))
+def test_canonical_ledger_writes_do_not_invalidate_reviewer_snapshot(
+    tmp_path: Path, delegation_target: str
+) -> None:
     """Lifecycle events are not review subject bytes.
 
     A real project can track ``.agent-commons/events``.  Completing a review
@@ -659,7 +680,7 @@ def test_canonical_ledger_writes_do_not_invalidate_reviewer_snapshot(tmp_path: P
     ignoring only this system-owned ledger.
     """
 
-    workspace = _workspace(tmp_path)
+    workspace = _workspace(tmp_path, delegation_target=delegation_target)
     ledger_event = workspace["repo"] / ".agent-commons" / "events" / "lifecycle.json"
     ledger_event.parent.mkdir(parents=True, exist_ok=True)
     ledger_event.write_text("review.requested\n", encoding="utf-8")
@@ -701,10 +722,14 @@ def test_canonical_ledger_writes_do_not_invalidate_reviewer_snapshot(tmp_path: P
     assert audit.terminal_tool_rejections == 0
 
 
-def test_review_finalizer_converges_after_review_was_already_recorded(tmp_path: Path) -> None:
+@pytest.mark.parametrize("delegation_target", ("review", "task"))
+@pytest.mark.parametrize("restart_server", (False, True))
+def test_review_finalizer_converges_after_review_was_already_recorded(
+    tmp_path: Path, delegation_target: str, restart_server: bool
+) -> None:
     """A lost response between the two canonical appends must not duplicate the review."""
 
-    workspace = _workspace(tmp_path)
+    workspace = _workspace(tmp_path, delegation_target=delegation_target)
     server = _worker_server(workspace)
     child: CommonsManager = workspace["child"]
     review_id = workspace["review"]["entity_ref"]["id"]
@@ -717,6 +742,9 @@ def test_review_finalizer_converges_after_review_was_already_recorded(tmp_path: 
         summary="The exact review was recorded before the response was lost.",
         idempotency_key=f"{operation_key}:review",
     )
+
+    if restart_server:
+        server = _worker_server(workspace)
 
     converged = server.tools["commons_finalize_review"](
         "approved",

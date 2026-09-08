@@ -9,6 +9,9 @@ from agent_commons.core.canonical import canonical_sha256
 
 CORRECTION_IMMUTABLE_FIELDS = frozenset(
     {
+        "conversation_scope",
+        "attachments",
+        "reply_to_message_id",
         "artifact_refs",
         "artifact_bindings",
         "acceptance_review",

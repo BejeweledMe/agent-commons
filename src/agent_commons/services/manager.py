@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -948,7 +948,12 @@ class CommonsManager(
         relations: Sequence[Mapping[str, Any]] = (),
         tags: Sequence[str] = (),
         _manifest: Mapping[str, Any] | None = None,
+        _before_append: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
+        if _before_append is not None and event_type != "thread.replied":
+            raise ValidationError(
+                "The private message binding hook only applies to thread replies."
+            )
         if event_type in {"context_pack.created", "context_pack.revised"}:
             payload_value = own_context_pack_payload(payload)
         elif event_type in {"design_package.created", "design_package.revised"}:
@@ -982,6 +987,12 @@ class CommonsManager(
         specialized_hire = event_type == "agent.created" and "specialization_ref" in payload_value
         if specialized_hire:
             payload_schema = "commons.payload.agent.v2"
+        conversation_write = family == "thread" and any(
+            field in payload_value
+            for field in ("conversation_scope", "attachments", "reply_to_message_id")
+        )
+        if conversation_write:
+            payload_schema = "commons.payload.thread.v2"
         self.schemas.validate(payload_schema, payload_value)
         if spec.entity_kind is None:
             raise ValidationError(f"{event_type} has no canonical subject identity")
@@ -1068,6 +1079,8 @@ class CommonsManager(
                 )
                 if specialized_hire:
                     self._require_ledger_semantics("agent.specialization_bound")
+                if conversation_write:
+                    self._require_ledger_semantics("thread.conversation_bound")
                 if (
                     event_type == "task.revised"
                     and isinstance(payload_value.get("changes"), Mapping)
@@ -1112,6 +1125,10 @@ class CommonsManager(
                 manifest_record = self.manifests.put(manifest)
                 if payload_value.get("manifest_ref") != manifest_record.manifest_id:
                     raise IntegrityError("artifact event does not bind its immutable manifest")
+            if _before_append is not None:
+                # Trusted service hook, after complete validation and retry identity
+                # checks, while the canonical lock still protects this append.
+                _before_append()
             record = self.events.append_event(
                 workspace_id=self.workspace_id,
                 event_type=event_type,

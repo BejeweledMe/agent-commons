@@ -256,11 +256,15 @@ class ScopedRepoReader:
             "sha256": digest,
             "content": content,
             "redactions": redactions,
+            "content_complete": not redactions,
         }
 
-    def search(
-        self, query: str, *, prefix: str = "", max_matches: int = 100
-    ) -> list[dict[str, Any]]:
+    def search(self, query: str, *, prefix: str = "", max_matches: int = 100) -> dict[str, Any]:
+        """Search safe text; only complete coverage can establish absence.
+
+        Version 2 reports redaction, unreadable files and both scan limits.
+        Never search the hidden source to provide a redacted-content oracle.
+        """
         if not isinstance(query, str) or not query or len(query) > 256 or "\x00" in query:
             raise ValidationError("search query must contain 1 to 256 safe characters")
         if (
@@ -269,20 +273,78 @@ class ScopedRepoReader:
             or not 1 <= max_matches <= 200
         ):
             raise ValidationError("max_matches must be between 1 and 200")
+        if not isinstance(prefix, str):
+            raise ValidationError("workspace prefix must be a string")
+        candidates = self.list_files(prefix=prefix, max_items=500)
+        normalized_prefix = prefix.strip().replace("\\", "/")
+        total_files = sum(path.startswith(normalized_prefix) for path in self.files)
         results: list[dict[str, Any]] = []
-        for item in self.list_files(prefix=prefix, max_items=500):
+        coverage: dict[str, Any] = {
+            "scope": "delegated_snapshot",
+            "complete": False,
+            "files_matching_prefix": total_files,
+            "files_scanned": 0,
+            "file_limit": 500,
+            "file_limit_reached": total_files > len(candidates),
+            "match_limit_reached": False,
+            "redacted_files_total": 0,
+            "redacted_files": [],
+            "unreadable_files_total": 0,
+            "unreadable_files": [],
+            "diagnostics_truncated": False,
+        }
+        response = {
+            "schema": "agent_commons.repo_search.v2",
+            "matches": results,
+            "coverage": coverage,
+        }
+        for item in candidates:
+            coverage["files_scanned"] += 1
             try:
-                content = self.read(item["path"])["content"]
+                read = self.read(item["path"])
             except (SecurityPolicyError, ValidationError):
+                coverage["unreadable_files_total"] += 1
+                if len(coverage["unreadable_files"]) < 20:
+                    coverage["unreadable_files"].append({"path": item["path"]})
+                else:
+                    coverage["diagnostics_truncated"] = True
                 continue
-            for line_number, line in enumerate(content.splitlines(), start=1):
-                if query in line:
-                    results.append(
-                        {"path": item["path"], "line": line_number, "text": line[:1_000]}
+            hidden_lines = {redaction["line"] for redaction in read["redactions"]}
+            if hidden_lines:
+                coverage["redacted_files_total"] += 1
+                if len(coverage["redacted_files"]) < 20:
+                    coverage["redacted_files"].append(
+                        {"path": item["path"], "line_count": len(hidden_lines)}
                     )
-                    if len(results) >= max_matches:
-                        return results
-        return results
+                else:
+                    coverage["diagnostics_truncated"] = True
+            for line_number, line in enumerate(read["content"].splitlines(), start=1):
+                # Redaction placeholders are not literal source matches either.
+                if line_number in hidden_lines:
+                    continue
+                column = line.find(query)
+                if column < 0:
+                    continue
+                start = max(0, column - 200)
+                results.append(
+                    {
+                        "path": item["path"],
+                        "line": line_number,
+                        "column": column + 1,
+                        "text": line[start : start + 1_000],
+                        "text_start_column": start + 1,
+                        "text_truncated": start != 0 or len(line) > start + 1_000,
+                    }
+                )
+                if len(results) >= max_matches:
+                    coverage["match_limit_reached"] = True
+                    return response
+        coverage["complete"] = not (
+            coverage["file_limit_reached"]
+            or coverage["redacted_files_total"]
+            or coverage["unreadable_files_total"]
+        )
+        return response
 
     def read_registered_artifact(
         self,
@@ -327,4 +389,5 @@ class ScopedRepoReader:
             "sha256": digest,
             "content": content,
             "redactions": redactions,
+            "content_complete": not redactions,
         }

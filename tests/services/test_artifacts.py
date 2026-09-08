@@ -25,6 +25,7 @@ _SIGNATURES = {
         "(self, source: 'str | Path', *, media_type: 'str' = 'application/octet-stream', "
         "classification: 'str' = 'internal', metadata: 'Mapping[str, Any] | None' = None, "
         "expected_revision: 'str | None' = None, expected_size: 'int | None' = None, "
+        "expected_source_path: 'str | None' = None, "
         "idempotency_key: 'str | None' = None) -> 'dict[str, Any]'"
     ),
     "revise_artifact": (

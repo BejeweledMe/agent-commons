@@ -208,7 +208,7 @@ _REFUSAL_COPY: dict[ProviderRefusalCode, tuple[str, tuple[str, ...]]] = {
         ),
     ),
     ProviderRefusalCode.INSTRUCTION_TOO_LARGE: (
-        "The composed Grok instruction exceeds the supported prompt argument byte limit.",
+        "The composed Grok instruction exceeds the supported instruction byte limit.",
         ("Reduce instruction, skill, or Context Pack size before retrying.",),
     ),
     ProviderRefusalCode.BUDGET_NOT_ENFORCEABLE: (
@@ -253,7 +253,7 @@ class ProviderDescriptor:
     sandbox_boundary: SandboxBoundary
     permission_mode: str
     budget_units: tuple[BudgetUnit, ...]
-    instruction_transport: Literal["stdin", "prompt_argument"] = "stdin"
+    instruction_transport: Literal["stdin"] = "stdin"
 
     def __post_init__(self) -> None:
         provider = Provider(_normalized_enum(self.provider, Provider, label="provider descriptor"))
@@ -282,7 +282,7 @@ class ProviderDescriptor:
             or any(ord(character) < 32 for character in self.permission_mode)
         ):
             raise ValidationError("provider descriptor permission mode is invalid")
-        if self.instruction_transport not in {"stdin", "prompt_argument"}:
+        if self.instruction_transport != "stdin":
             raise ValidationError("provider descriptor instruction transport is unsupported")
         if self.model is not None and not isinstance(self.model, str):
             raise ValidationError("provider descriptor model is invalid")
@@ -314,7 +314,7 @@ class ProviderDescriptor:
         if provider is Provider.GROK and (
             sandbox_boundary is not SandboxBoundary.OS_ENFORCED
             or budget_units != (BudgetUnit.PROVIDER_UNITS,)
-            or self.instruction_transport != "prompt_argument"
+            or self.instruction_transport != "stdin"
         ):
             raise ValidationError("Grok provider descriptor capabilities are inconsistent")
         object.__setattr__(self, "provider", provider)
@@ -410,7 +410,7 @@ class CapabilitySet:
             allow_empty=False,
             max_count=PROVIDER_CAPABILITY_COLLECTION_LIMIT,
         )
-        expected_input_modes = ("prompt_argument",) if provider is Provider.GROK else ("stdin",)
+        expected_input_modes = ("stdin",)
         if input_modes != expected_input_modes:
             raise ValidationError("input-mode capabilities are unsupported")
         budget_units = _normalized_budget_units(

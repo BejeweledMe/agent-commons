@@ -1,3 +1,10 @@
+import { ProjectCreation, type FolderPurpose, type FolderSelection } from "./projectCreation.js";
+import "./projectCreation.css";
+import { ConversationButton, ConversationWorkspace } from "./components/ConversationPanel.js";
+import { ConversationSessions } from "./conversationState.js";
+import "./conversation.css";
+import { OutputsButton, OutputsWorkspace } from "./components/OutputsPanel.js";
+import "./outputs.css";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -69,7 +76,7 @@ type RunDraft = {
   designPackageKey: string;
 };
 type FormErrors = ReadonlySet<string>;
-type ActionError = { failure: Failure; retry: () => void; uncertain: boolean };
+type ActionError = { failure: Failure; retry: () => void; uncertain: boolean; retryKind: "mutation" | "refresh" };
 type ProjectTransient = {
   pendingLaunch: LaunchIntent | null;
   pendingLaunchRetry: (() => Promise<void>) | null;
@@ -207,6 +214,8 @@ function repositoryBasename(path: string): string {
 }
 
 function WorkApp(): ReactElement {
+  const projectCreation = useRef(new ProjectCreation());
+  const conversationSessions = useRef(new ConversationSessions());
   const [route, setRoute] = useState<WorkRoute>(() => parseWorkRoute(window.location.search));
   const routeRef = useRef(route);
   const [search, setSearch] = useState("");
@@ -385,16 +394,21 @@ function WorkApp(): ReactElement {
   }
   function recordActionError(action: string, error: unknown, retry: () => void): void {
     setActionErrors((current) => ({ ...current, [action]: { failure: failureFrom(error, text), retry,
-      uncertain: !(error instanceof ApiProblem) || error.status >= 500 } }));
+      uncertain: !(error instanceof ApiProblem) || error.status >= 500, retryKind: "mutation" } }));
+  }
+  function recordRefreshError(action: string, error: unknown, retry: () => void): void {
+    setActionErrors((current) => ({ ...current, [action]: {
+      failure: failureFrom(error, text), retry, uncertain: false, retryKind: "refresh"
+    } }));
   }
   function actionFeedback(action: string): ReactElement | null {
     const actionError = actionErrors[action];
     if (!actionError) return null;
     return <div className="action-failure" role="alert">
       <h3>{actionError.failure.title}</h3>
-      <p>{text("shell_retry_help")}</p>
+      <p>{text(actionError.retryKind === "refresh" ? "shell_refresh_retry_help" : "shell_retry_help")}</p>
       <p>{actionError.failure.nextStep}</p>
-      <button className="button button-secondary button-inline" disabled={activeAction !== null} onClick={actionError.retry} type="button">{text("shell_retry_original")}</button>
+      <button className="button button-secondary button-inline" disabled={activeAction !== null} onClick={actionError.retry} type="button">{text(actionError.retryKind === "refresh" ? "refresh_status" : "shell_retry_original")}</button>
       <details><summary>{text("shell_technical_details")}</summary><code>{actionError.failure.code}</code>
         <ul>{actionError.failure.safeNextActions.map((item) => <li key={item}>{item}</li>)}</ul>
       </details>
@@ -560,6 +574,10 @@ function WorkApp(): ReactElement {
     return transient.selectedTaskId;
   }
 
+  function pickProjectFolder(purpose: FolderPurpose, signal: AbortSignal): Promise<FolderSelection> {
+    return registryApiRef.current.pickFolder(purpose, signal);
+  }
+
   async function inspectProject(input: { mode: "new" | "existing"; path: string; name: string }): Promise<ProjectInspection> {
     return registryApiRef.current.inspect(input, new AbortController().signal);
   }
@@ -589,11 +607,6 @@ function WorkApp(): ReactElement {
     projectMutationKeys.current.delete(intent);
   }
 
-  function openProjectGallery(): void {
-    const projectId = routeRef.current.projectId;
-    if (projectId !== null) window.location.assign(`/gallery?project=${encodeURIComponent(projectId)}`);
-  }
-
   async function perform(
     action: string,
     api: WorkApi,
@@ -606,15 +619,28 @@ function WorkApp(): ReactElement {
       && routeRef.current.projectId === projectId;
     setActiveAction(action);
     clearActionError(action);
+    // A snapshot started before this write must not publish after it.
+    readRequestRef.current.abort();
     const controller = new AbortController();
     try {
       await work(controller.signal);
-      const data = await api.load(controller.signal);
       if (!stillCurrent()) return false;
-      setState({ kind: "ready", data, notice });
+      // The mutation is now authoritative. End its busy phase and retain the
+      // confirmed outcome while the follow-up read catches the snapshot up.
+      setState((current) => current.kind === "ready" ? { ...current, notice } : current);
+      setActiveAction(null);
+      void refreshAfterConfirmed(action, api, notice, projectId);
       return true;
     } catch (error: unknown) {
       if (stillCurrent() && !(error instanceof DOMException && error.name === "AbortError")) {
+        if (action === "runtime" && error instanceof ApiProblem
+          && error.status === 409 && error.apiError?.code === "setup_configured") {
+          // This definite refusal happens before any configuration write. A
+          // previous successful write's refresh may have been cancelled above;
+          // replace that read without replaying setup or inventing success.
+          void refreshAfterConfirmed(action, api, null, projectId);
+          return false;
+        }
         // The retry retains the original immutable project client and input
         // closure. It may only run after this same project is visible again.
         recordActionError(action, error, () => {
@@ -624,6 +650,33 @@ function WorkApp(): ReactElement {
       return false;
     } finally {
       if (stillCurrent()) setActiveAction(null);
+    }
+  }
+
+  async function refreshAfterConfirmed(
+    action: string,
+    api: WorkApi,
+    notice: MessageKey | null,
+    projectId: string | null
+  ): Promise<boolean> {
+    if (routeRef.current.projectId !== projectId) return false;
+    const generation = projectSelectionRef.current.currentGeneration();
+    const read = readRequestRef.current.begin();
+    const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(generation)
+      && routeRef.current.projectId === projectId && readRequestRef.current.isCurrent(read.generation);
+    clearActionError(action);
+    try {
+      const data = await api.load(read.signal);
+      if (!stillCurrent()) return false;
+      setState((current) => ({ kind: "ready", data, notice: current.kind === "ready" ? current.notice : notice }));
+      return true;
+    } catch (error: unknown) {
+      if (stillCurrent() && !(error instanceof DOMException && error.name === "AbortError")) {
+        recordRefreshError(action, error, () => {
+          if (routeRef.current.projectId === projectId) void refreshAfterConfirmed(action, api, notice, projectId);
+        });
+      }
+      return false;
     }
   }
 
@@ -983,8 +1036,8 @@ function WorkApp(): ReactElement {
 
   if (state.kind === "failure") {
     if (state.failure.code === "project_required") {
-      return <main className="work-app project-empty-app"><ProjectSidebar currentProjectId={null} legacy={false} locale={locale}
-        projects={projectList} text={text} onGallery={openProjectGallery} onInspect={inspectProject}
+      return <main className="work-app project-empty-app"><ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder} currentProjectId={null} legacy={false} locale={locale}
+        projects={projectList} text={text} onInspect={inspectProject}
         onCreate={createProject} onSelect={selectProject} onUpdate={updateProject} /></main>;
     }
     return (
@@ -1044,22 +1097,22 @@ function WorkApp(): ReactElement {
 
   const workspaceInitialized = !["setup_uninitialized", "setup_not_a_repository"].includes(data.setup.state);
   return (
+    <ConversationWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId} locale={locale} writesEnabled={workspaceInitialized && data.meta.writesEnabled} sessions={conversationSessions.current}>
+    <OutputsWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId}
+      revision={trackerObservation.kind === "ready" ? trackerObservation.snapshot.sourceRevision : null} locale={locale}>
     <main className="work-app">
       <aside className="app-rail" aria-label={text("shell_navigation")}>
-        <ProjectSidebar
+        <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}
           currentProjectId={route.projectId}
           legacy={legacyProjectHost}
           locale={locale}
           projects={projectList}
           text={text}
-          onGallery={openProjectGallery}
           onInspect={inspectProject}
           onCreate={createProject}
           onSelect={selectProject}
           onUpdate={updateProject}
         />
-        <p className="project-label">{text("project_label")}</p>
-        <p className="project-name">{projectList?.projects.find((project) => project.id === route.projectId)?.name ?? repositoryBasename(data.meta.repo)}</p>
         <nav className="primary-navigation">
           {(["work", "team", "library", "settings"] as const).map((view) => <a key={view}
             aria-current={route.view === view ? "page" : undefined}
@@ -1078,7 +1131,10 @@ function WorkApp(): ReactElement {
           {actionFeedback("refresh")}
           <section hidden={route.view !== "work"} aria-label={text("shell_nav_work")}>
             <div className="workspace-toolbar"><p className="small-copy">{text("shell_work_intro")}</p>
-              <button ref={newTaskButton} className="button button-primary" disabled={!workspaceInitialized || !data.meta.writesEnabled} onClick={() => { navigate({ composer: true }); window.setTimeout(() => document.getElementById("task-title")?.focus(), 0); }} type="button">{text("shell_new_task")}</button>
+              <div className="workspace-toolbar-actions">
+                {workspaceInitialized ? <ConversationButton scope={{ kind: "project" }} title={projectList?.projects.find((project) => project.id === renderedProjectId)?.name ?? data.meta.repo.split(/[\\/]/).pop() ?? text("shell_nav_work")} /> : null}
+                <button ref={newTaskButton} className="button button-primary" disabled={!workspaceInitialized || !data.meta.writesEnabled} onClick={() => { navigate({ composer: true }); window.setTimeout(() => document.getElementById("task-title")?.focus(), 0); }} type="button">{text("shell_new_task")}</button>
+              </div>
             </div>
             {!configured ? <div className="notice setup-notice" role="status"><p>{text(workspaceInitialized ? "shell_provider_setup_later" : "workspace_needs_setup")}</p><button className="notice-link" onClick={() => navigate({ view: "settings" })} type="button">{text("shell_open_settings")}</button></div> : null}
             <div hidden={!route.composer}>
@@ -1251,6 +1307,8 @@ function WorkApp(): ReactElement {
             </div>
             {lastHiredRole ? <p className="notice" role="status">{text("created_role")}: <strong>{lastHiredRole.name}</strong>{route.taskId ? <button type="button" className="notice-link" onClick={() => { if (route.taskId) { prepareLaunch(route.taskId); if (!pendingLaunchRef.current) setRun((current) => ({ ...current, agentId: lastHiredRole.id })); } }}>{text("shell_use_role")}</button> : null}</p> : null}
             <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
+              <OutputsButton scope={{ kind: "agent", id: option.id }} title={option.name} />
+              <ConversationButton scope={{ kind: "agent", id: option.id }} title={option.name} />
               <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled || activeAction !== null}
                 onClick={() => { if (!selectedTeamTask) return; prepareLaunch(selectedTeamTask.taskId); if (pendingLaunchRef.current?.input.taskId !== selectedTeamTask.taskId) setRun((current) => ({ ...current, agentId: option.id })); }}>{text("shell_use_role")}</button>
             </li>)}</ul>
@@ -1445,6 +1503,8 @@ function WorkApp(): ReactElement {
         </div>
       </div>
     </main>
+    </OutputsWorkspace>
+    </ConversationWorkspace>
   );
 }
 

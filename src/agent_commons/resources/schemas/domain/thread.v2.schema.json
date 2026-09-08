@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:thread:v2",
+  "x-schema-name": "commons.payload.thread.v2",
+  "x-event-types": [
+    "thread.opened",
+    "thread.replied"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "thread_id": {
+      "type": "string",
+      "pattern": "^thread\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "thread_type": {
+      "enum": [
+        "question",
+        "proposal",
+        "critique",
+        "risk",
+        "help_request",
+        "review_discussion",
+        "decision_request",
+        "engagement"
+      ]
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "desired_outcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "to": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "related_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:agent-commons:schema:common:v1#/$defs/typedRef"
+      }
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^message\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "body": {
+      "type": "string",
+      "minLength": 0
+    },
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^evt\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "extensions": {
+      "type": "object"
+    },
+    "conversation_scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "project"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "task",
+                "agent"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "attachments": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attachment_id",
+          "digest",
+          "media_type",
+          "size_bytes",
+          "display_name",
+          "category"
+        ],
+        "properties": {
+          "attachment_id": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15000000
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "category": {
+            "enum": [
+              "image",
+              "file"
+            ]
+          }
+        }
+      }
+    },
+    "reply_to_message_id": {
+      "type": "string",
+      "pattern": "^message\\.[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "thread_id",
+        "thread_type",
+        "subject",
+        "desired_outcome",
+        "to",
+        "related_refs",
+        "conversation_scope"
+      ]
+    },
+    {
+      "required": [
+        "thread_id",
+        "message_id",
+        "body",
+        "expected_revision"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "attachments"
+          ]
+        },
+        {
+          "required": [
+            "reply_to_message_id"
+          ]
+        }
+      ]
+    }
+  ]
+}

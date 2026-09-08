@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from agent_commons.errors import ValidationError
@@ -25,6 +25,7 @@ class ThreadCommands:
         to: Sequence[str],
         related_refs: Sequence[Mapping[str, str]] = (),
         extensions: Mapping[str, Any] | None = None,
+        conversation_scope: Mapping[str, str] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("thread.opened", idempotency_key)
@@ -40,6 +41,8 @@ class ThreadCommands:
         }
         if extensions:
             payload["extensions"] = dict(extensions)
+        if conversation_scope is not None:
+            payload["conversation_scope"] = dict(conversation_scope)
         return self.record_event(
             "thread.opened",
             payload,
@@ -119,7 +122,10 @@ class ThreadCommands:
         }
         found = []
         for identifier, thread in sorted(snapshot.threads.items()):
-            if thread.get("thread_type") != "engagement":
+            if (
+                thread.get("thread_type") != "engagement"
+                or thread.get("conversation_scope") is not None
+            ):
                 continue
             if not include_resolved and thread.get("state") != "open":
                 continue
@@ -144,7 +150,10 @@ class ThreadCommands:
         expected_revision: str,
         *,
         body: str,
+        attachments: Sequence[Mapping[str, Any]] | None = None,
+        reply_to_message_id: str | None = None,
         idempotency_key: str | None = None,
+        _before_append: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("thread.replied", idempotency_key)
         message_id = self._new_entity_id("message", "thread.replied", key)
@@ -155,9 +164,20 @@ class ThreadCommands:
                 "message_id": message_id,
                 "body": body,
                 "expected_revision": expected_revision,
+                **(
+                    {"attachments": [dict(item) for item in attachments]}
+                    if attachments is not None
+                    else {}
+                ),
+                **(
+                    {"reply_to_message_id": reply_to_message_id}
+                    if reply_to_message_id is not None
+                    else {}
+                ),
             },
             idempotency_key=key,
             tags=("thread",),
+            _before_append=_before_append,
         )
 
     def resolve_thread(

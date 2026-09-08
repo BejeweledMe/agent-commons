@@ -225,10 +225,11 @@ to launch or accept work.
 
 ### Reuse templates, context and design
 
-Open **Library** for 30 specializations, 45 skills, five blueprints, context and
-design in separate tabs. Create or update methods and role definitions in the UI.
-A blueprint creates roles and tasks from your project brief; launching remains
-explicit. See the [library and task graph guide](service-library.md).
+Open **Library** for 30 specializations, 45 grouped skills and five built-in
+blueprints. Create or update methods, role definitions and custom blueprints in
+the UI. A blueprint creates roles and tasks from your project brief; launching
+remains explicit. The **Context** tab holds project background and constraints.
+See the [library and task graph guide](service-library.md).
 
 In **Context**, use the guided editor for a bounded summary, facts with exact
 source references, decisions and open questions. The source picker shows
@@ -236,9 +237,16 @@ eligible metadata, not source bodies. Refreshing it never upgrades an already
 selected revision. An unavailable or outdated reference must be resolved before
 publication. The advanced editor preserves structured JSON when needed.
 
-**Design** leads to Gallery. A Design Package is selected explicitly during
-launch and is checked again for freshness and access; merely viewing it does
-not attach it to a task or run.
+Open **Results** on a task or hired agent when accessible outputs exist. Results
+show that producer's images and separate live previews; generated designs are
+not a Library tab. A Design Package is selected explicitly during launch and is
+checked again for freshness and access; merely viewing it does not attach it to
+a task or run.
+
+Use **Conversation** in Work for project messages, or on a task or agent for that
+scope. Sending a message does not start a run or prove that a worker read it.
+See [conversations and results](service-library.md#conversations-and-results)
+for delivery states, private attachments and draft recovery.
 
 ### Use the full panel for team operations
 

@@ -37,6 +37,31 @@ no-model `mcp list` operation; Codex uses the fixed `app-server --stdio`
 operation. Neither operation accepts workspace argv or counts as a delegation
 attempt.
 
+## Scoped review search coverage
+
+`commons_repo_search` returns the `agent_commons.repo_search.v2` envelope:
+`matches` and `coverage`, replacing the former bare match list. Coverage reports
+matching snapshot files, scanned files, the 500-file scan limit, the requested
+match limit, and bounded per-file redaction/unreadable diagnostics. Diagnostic
+lists retain at most 20 files each; totals and `diagnostics_truncated` disclose
+additional omissions. Search examines only policy-approved text. It never probes
+redacted bytes for a query or returns matches from redaction placeholders.
+
+A zero-match result proves absence only within the specified prefix of the
+eligible delegated snapshot when `coverage.complete` is true. Files excluded
+from that snapshot are outside this claim; completeness is not whole-repository
+coverage. Otherwise narrow the prefix, inspect available
+sources and their redactions, or report the evidence as unavailable. Do not
+turn incomplete source visibility into a missing-feature finding. Read tools
+also expose `content_complete`; a matching raw-file SHA-256 does not mean the
+returned redacted text contains every byte of that file.
+
+Matches retain line and one-based character column, a snippet containing the
+query, its `text_start_column`, and `text_truncated`. A minified line is not
+represented by its first 1,000 characters when the match occurs later. Bounded
+matches are not exhaustive occurrence counts. An independent review must keep
+source/bundle mismatch claims separate from redacted or unscanned evidence.
+
 ## Packaged skill projection
 
 A role may select a skill identity from the operator catalogue, but a provider

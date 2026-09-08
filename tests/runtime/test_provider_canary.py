@@ -405,7 +405,7 @@ elif sys.argv[1:] == ["inspect", "--json"]:
     }))
 elif "--help" in sys.argv:
     print(
-        "--single --cwd --output-format --always-approve --no-alt-screen "
+        "--prompt-file --cwd --output-format --always-approve --no-alt-screen "
         "--max-turns --model --sandbox --allow --tools --disallowed-tools "
         "--no-plan --no-subagents --disable-web-search --rules"
     )

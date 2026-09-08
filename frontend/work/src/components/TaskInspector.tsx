@@ -1,3 +1,5 @@
+import { ConversationButton } from "./ConversationPanel.js";
+import { OutputsButton } from "./OutputsPanel.js";
 import { type ReactElement, type ReactNode, useEffect, useState } from "react";
 import type { WorkApi } from "../api";
 import type { TaskDetail, TrackerRun, TrackerTask } from "../contracts";
@@ -6,9 +8,9 @@ import { loadTaskDetailState, type TaskDetailState } from "../trackerState.js";
 import { readinessUnconfirmed, stateLabel, type StateDomain } from "../taskPresentation.js";
 
 type Text = (key: MessageKey) => string;
-export function TaskState({ domain, value, text }: { domain: StateDomain; value: string; text: Text }): ReactElement {
+export function TaskState({ domain, value, text, plain = false }: { domain: StateDomain; value: string; text: Text; plain?: boolean }): ReactElement {
   return <span className="task-state" data-domain={domain} data-value={value}>
-    <code>{value}</code> — <span>{text(stateLabel(domain, value))}</span>
+    {plain ? <span>{text(stateLabel(domain, value))}</span> : <><code>{value}</code> — <span>{text(stateLabel(domain, value))}</span></>}
   </span>;
 }
 
@@ -51,13 +53,14 @@ export function TaskInspector(props: Props): ReactElement {
   // Even before effect cleanup, never render the previous identity's details.
   const selectedState: TaskDetailState = state.taskId === task.taskId
     ? state : { kind: "loading", taskId: task.taskId };
-  return <TaskInspectorContent {...props} detailState={selectedState} cachedDetail={presentation.lastReady?.taskId === task.taskId ? presentation.lastReady : null} onRefresh={() => setAttempt((value) => value + 1)} />;
+  return <TaskInspectorContent {...props} headerActions={<><OutputsButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} eager /><ConversationButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} /></>} detailState={selectedState} cachedDetail={presentation.lastReady?.taskId === task.taskId ? presentation.lastReady : null} onRefresh={() => setAttempt((value) => value + 1)} />;
 }
 
 export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsCurrent, writesEnabled,
-  onSelectTask, onLaunchTask, children, detailState, cachedDetail = null, onRefresh }: Omit<Props, "api"> & {
+  onSelectTask, onLaunchTask, children, detailState, cachedDetail = null, headerActions = null, onRefresh }: Omit<Props, "api"> & {
     detailState: TaskDetailState;
     cachedDetail?: TaskDetail | null;
+    headerActions?: ReactNode;
     onRefresh: () => void;
   }): ReactElement {
   const detailsCurrent = detailState.kind === "ready" && detailState.taskId === task.taskId;
@@ -70,12 +73,13 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
   return <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-title">
     <header className="inspector-header">
       <h2 id="inspector-title">{detail?.title || task.title || task.taskId}</h2>
+      {headerActions}
       <button className="button button-secondary button-inline" type="button" onClick={() => onSelectTask(null)}>{text("inspector_close")}</button>
     </header>
     <div className="inspector-section inspector-decision">
-      <p className="task-primary-state"><span className="task-domain-label">{text("tracker_task_state_label")}: </span><TaskState domain="task" value={task.taskState} text={text} /></p>
+      <p className="task-primary-state"><span className="task-domain-label">{text("tracker_task_state_label")}: </span><TaskState domain="task" value={task.taskState} text={text} plain /></p>
       <dl className="inspector-facts">
-        <div><dt>{text("tracker_readiness_label")}</dt><dd><TaskState domain="readiness" value={task.readiness} text={text} /></dd></div>
+        {task.taskState !== "ready" || task.readiness !== "ready" ? <div><dt>{text("tracker_readiness_label")}</dt><dd><TaskState domain="readiness" value={task.readiness} text={text} plain /></dd></div> : null}
         <div><dt>{text("inspector_responsible")}</dt><dd>{task.roleName ?? text("inspector_unassigned")}</dd></div>
       </dl>
       {readinessUnconfirmed(task) ? <p className="inspector-notice" role="status">{text("inspector_readiness_unknown")}</p> : null}
@@ -83,10 +87,10 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
         <h3>{text("inspector_blockers")}</h3>
         <ul>{task.blockingDependencyIds.map((id) => <li key={id}><button type="button" className="task-reference" onClick={() => onSelectTask(id)}>{taskName(id)}</button></li>)}</ul>
       </div> : null}
-      {task.freshness !== "fresh" ? <p className="inspector-notice" role="status"><span className="task-domain-label">{text("tracker_freshness")}: </span><TaskState domain="freshness" value={task.freshness} text={text} /></p> : null}
+      {task.freshness !== "fresh" ? <p className="inspector-notice" role="status"><span className="task-domain-label">{text("tracker_freshness")}: </span><TaskState domain="freshness" value={task.freshness} text={text} plain /></p> : null}
       <div className="inspector-next-action">
         <h3>{text("inspector_next")}</h3>
-        <TaskState domain="action" value={task.nextAction} text={text} />
+        <TaskState domain="action" value={task.nextAction} text={text} plain />
         {!actionsCurrent ? <p className="inspector-notice" role="status">{text(writesEnabled ? "inspector_actions_stale" : "inspector_actions_readonly")}</p> : null}
         {canPrepare ? <button className="button button-primary" type="button" disabled={!actionsCurrent || task.freshness !== "fresh" || readinessUnconfirmed(task)} onClick={() => onLaunchTask(task.taskId)}>{text("inspector_prepare_run")}</button> : null}
         {children}
@@ -101,14 +105,14 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
     {!detailsCurrent && detail !== null ? <p className="inspector-notice" role="status">{text("inspector_detail_cached")}</p> : null}
     {detail === null ? null : <>
         {detail.truncated ? <p className="inspector-section inspector-notice" role="status">{text("inspector_partial")}</p> : null}
-        <details key={`${task.taskId}:goal`} className="inspector-section inspector-disclosure"><summary><h3>{text("inspector_goal")}</h3></summary><p className="inspector-prose">{detail.description}</p>
+        <details key={`${task.taskId}:goal`} className="inspector-section inspector-disclosure" open><summary><h3>{text("inspector_goal")}</h3></summary><p className="inspector-prose">{detail.description}</p>
           <h3>{text("inspector_criteria")}</h3><ul className="inspector-criteria">{detail.acceptanceCriteria.map((item, index) => <li key={index}>{item}</li>)}</ul>
         </details>
-        <details key={`${task.taskId}:summary`} className="inspector-section inspector-disclosure" open={detail.summary !== null}><summary><h3>{text("inspector_summary")}</h3></summary><p className="inspector-prose">{detail.summary ?? text("inspector_no_summary")}</p></details>
+        {detail.summary !== null ? <details key={`${task.taskId}:summary`} className="inspector-section inspector-disclosure" open={detail.summary !== null}><summary><h3>{text("inspector_summary")}</h3></summary><p className="inspector-prose">{detail.summary}</p></details> : null}
       </>}
 
     <section className="inspector-section inspector-evidence-state"><h3>{text("inspector_evidence")}</h3>
-      <TaskState domain="evidence" value={task.evidenceState} text={text} />
+      <TaskState domain="evidence" value={task.evidenceState} text={text} plain />
       <p className="small-copy">{text("inspector_evidence_help")}</p>
       {detail === null ? null : detail.evidenceRefs.length === 0 ? <p className="small-copy">{text("inspector_no_evidence")}</p>
         : <ul>{detail.evidenceRefs.map((ref) => <li key={`${ref.id}@${ref.revision}`}><code>{ref.id} @ {ref.revision}</code></li>)}</ul>}
@@ -117,7 +121,7 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
       {taskRuns.length === 0 ? <p>{text("inspector_no_runs")}</p> : <ol className="inspector-run-list">
         {taskRuns.map((run) => <li key={run.delegationId}>
           <strong>{run.roleName ?? text("inspector_unassigned")}</strong>
-          <TaskState domain="run" value={run.phase} text={text} />
+          <TaskState domain="run" value={run.phase} text={text} plain />
           <p className="small-copy">{run.provider ?? "—"} · {date(run.finishedAt ?? run.updatedAt ?? run.startedAt)}</p>
           <details key={`${task.taskId}:${run.delegationId}`} className="inspector-technical"><summary>{text("inspector_run_details")}</summary>
             <dl><div><dt>{text("tracker_attempt_label")}</dt><dd><code>{run.attemptId ?? "—"}</code></dd></div>
@@ -133,7 +137,10 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
       <p className="small-copy">{text("inspector_launch_attachments")}</p>
     </details>
     <details key={`${task.taskId}:technical`} className="inspector-section inspector-technical"><summary>{text("inspector_technical")}</summary>
-      <dl><div><dt>{text("tracker_task_label")}</dt><dd><code>{task.taskId}</code></dd></div>
+      <dl><div><dt>{text("tracker_task_state_label")}</dt><dd><TaskState domain="task" value={task.taskState} text={text} /></dd></div>
+        <div><dt>{text("tracker_readiness_label")}</dt><dd><TaskState domain="readiness" value={task.readiness} text={text} /></dd></div>
+        <div><dt>{text("inspector_next")}</dt><dd><TaskState domain="action" value={task.nextAction} text={text} /></dd></div>
+        <div><dt>{text("tracker_task_label")}</dt><dd><code>{task.taskId}</code></dd></div>
         <div><dt>{text("inspector_revision")}</dt><dd><code>{detail?.revision ?? "—"}</code></dd></div>
         <div><dt>{text("tracker_provider_label")}</dt><dd><code>{task.provider ?? "—"}</code></dd></div>
         <div><dt>{text("tracker_profile_label")}</dt><dd><code>{task.profileId ?? "—"}</code></dd></div>

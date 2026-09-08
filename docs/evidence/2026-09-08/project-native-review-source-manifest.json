@@ -1,0 +1,799 @@
+{
+  "schema": "agent_commons.audit.exact_source.v1",
+  "base_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "python_source_sha256": "f35c5fe05ff340989be417a70e73daa102a81795c69a88e504ebecb4c0bc552e",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "50c0c2ea23dd4d9fed9cce133babd164de90aac6922ff830cd12abd21034046a",
+      "state": "present"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "340bd5254154150b1ebe364f35d199e2133f55deded46b4523389ed6693cfef5",
+      "state": "present"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "346b00c7541820ec5f1236734f9f742837b672d3825a4cf044df85125f013b12",
+      "state": "present"
+    },
+    {
+      "path": "docs/adr/0019-project-native-collaboration-and-outputs.md",
+      "sha256": "c51ce335a36709cf01d4702538f5d112b3c1c68cb2ccce57a533904d9f19eea7",
+      "state": "present"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "8d864544f7c6bfe3aecbf3045562d41c9659cdb9e176f846ae70ce986052c326",
+      "state": "present"
+    },
+    {
+      "path": "docs/agent-platform-implementation-program.md",
+      "sha256": "bdd4a7e7f7514a5a9bce37ea9a78ba132384f21623375947e2a1055b7b6a7316",
+      "state": "present"
+    },
+    {
+      "path": "docs/audits/2026-09-08-project-native-collaboration-validation.md",
+      "sha256": "75beaaf64e725232c8a2ef9f37ad6709441495550b171facbe711ec59a2fcfdc",
+      "state": "present"
+    },
+    {
+      "path": "docs/audits/2026-09-08-service-self-improvement-dogfood.md",
+      "sha256": "b120b9016d6e1cae8bd3499e1be1fc59ce6c5718f50b45857606534f108fb08c",
+      "state": "present"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/README.md",
+      "sha256": "3242738d877d485463805e9ecf1b0a8fde4ef1dabf539d91e992681e38fc538d",
+      "state": "present"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/project-native-provider-canaries.json",
+      "sha256": "3bc9bee28f0eac56cbf679dc463f8f9d9ee676a165bc76d56eb02b4709f4880b",
+      "state": "present"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/self-improvement-confirmed-refresh.json",
+      "sha256": "4e688d8ac101fdc4a93722d4e3e53580621111e6c073ce8ab709624b5ba96582",
+      "state": "present"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/self-improvement-provider-canaries.json",
+      "sha256": "58a1757cca248b40685da991cdcb6a5092c4cc5c701611983f933c32c1ec6f0e",
+      "state": "present"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/self-improvement-review-finalizer.json",
+      "sha256": "c85cb80eb6290cda67766e0244283ae7242729e3109ba94721bca4c749fcdae4",
+      "state": "present"
+    },
+    {
+      "path": "docs/project-native-collaboration-implementation-plan.md",
+      "sha256": "b1e512aea41d13a05b7313f81f5a85d03195e387db9e0e799fbc429cd097f901",
+      "state": "present"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "sha256": "c2f12280b73520a58d2b1d512f53bdb52be8da24fad62a8f2d834bb0b908e541",
+      "state": "present"
+    },
+    {
+      "path": "docs/user/en/service-library.md",
+      "sha256": "8670a4bcfea19af632c81ef015c87d1d0f8217c399cfd3fd68c0f466bddc3f24",
+      "state": "present"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "sha256": "7099e195cd9b077bb256aa44444d94ef83aa67064a6684f638ac8b174ca6c894",
+      "state": "present"
+    },
+    {
+      "path": "docs/user/ru/service-library.md",
+      "sha256": "efa33b08aab553141fafd5c6e39ffdde3338d6daddfe1a07509be1ca23fbb8d0",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "d124d48d3a4dcbba994bdf49d99000db819ef4c5f43e1374982457adde6cfa37",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/appRouteState.ts",
+      "sha256": "354464837a954a720ede1e27ac68c51842059bee0002a51719d9072629f21780",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintAuthoring.tsx",
+      "sha256": "353afd7628a965b7a5d4fc58c4d3e09ca09e9b7e06acab8923987023813fb6ed",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintDefinitionEditor.tsx",
+      "sha256": "0971ede73130c9b39db5b31ec0a7f975b30f0913b70e3683066fd2fd76096148",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/ConversationPanel.tsx",
+      "sha256": "c209e4268b6f6e1a437859648b0bcd9cc77e83071f289b23931b0811e19a32eb",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/LibraryMutationFeedback.tsx",
+      "sha256": "3836dce105de20fb587ceed34161182ed53240b2fc476b4700daa396f40802d4",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/LibrarySection.tsx",
+      "sha256": "7234215d6a694affbb00b7beb88645b6b8ae8cf47f3eb3b03374dfb2bc4a9f12",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/OutputsPanel.tsx",
+      "sha256": "2d3e12347abbbda7ca49074d6c60f9d44c96d2c5404ad4aa6a1bdf5a0779b504",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectCreateDialog.tsx",
+      "sha256": "898331fd2424356464f1259f57898e7251820fb7d6a5512094f528dc4732c4ad",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectSidebar.tsx",
+      "sha256": "711f1edaa21dae80eda179179725f7aebddc5b8595bf1ef5834ea816209d32db",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/ServiceLibrarySection.tsx",
+      "sha256": "4ee857548d18f23dcb1512c8057a9202778c3f6bb5095a6d457a62abdf2ff3c1",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/SkillGroups.tsx",
+      "sha256": "51dc3b4162db20c6b29b6ba3aae0fdca1fed350077fdfac2c2c2158d0fee8518",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "c15a469ea74da57fbe97b3566afc787bfc7572bdcb164f368a505c450d6dafdf",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/TrackerSection.tsx",
+      "sha256": "fe50141e83353f1d5673896fa7f105208da09e44dbe8c6ad03074aad534c2b06",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "sha256": "eadbc05d8d6cf4492bcf0b4422ea67d40afa68ad2069a68c903145bc17012f73",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/conversation.css",
+      "sha256": "8333cf9d169c03915fa5af7e15d2c53d0178a0330006a41f2b1d08e97ac770de",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/conversationApi.ts",
+      "sha256": "82f914607b92b3a52441da0b16c4fbf1a79760e14df1abb4cfc7b2ac72ea0b51",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/conversationState.ts",
+      "sha256": "07b0b2d2015c21a0082b301af9dd02e6371086370916e062d3e75d9dab7cdc0b",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/conversationStrings.ts",
+      "sha256": "c035b2df205b39834ec9c0af46f8f425ee09f9deb0de8adf0b50b605eb456047",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/conversationTransport.ts",
+      "sha256": "0e064953796552e7cf14a350faad2cfd189b902e5d678ba12594dea990a61239",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "b78fab5fa09c890dba7209c8d58f909322d19048ee4820e199e5c7c1726fdb22",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/libraryApi.ts",
+      "sha256": "3924a227a82616d4b52af256c6144dfec81d2d05684d1be4a852e93fbdd24c76",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/libraryAuthoringState.ts",
+      "sha256": "b1402c774e040ada750e5e95993e1a8991debc107c798f3dd2b6cf70515e153f",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/libraryTypes.ts",
+      "sha256": "ebdddee0e8e74f70f7601173ce491f2161e275c8aed5a6a5555ee6640ad0f5e4",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "ecd5cd7979acbaa557057d0e79e5456a7b3fc83be7c4efce71fcd9db38d80901",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/outputs.css",
+      "sha256": "0a6944145aeb148f5de43dba834f6a65c079282533baa2c15f18420b4643a9d4",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/outputsApi.ts",
+      "sha256": "d8df3c5518a664e94306d5978b65578cb54eaac9f1b465d42c87149aed17e2c9",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/outputsStrings.ts",
+      "sha256": "674078d7ef385b7a56989e2ee41cd30b86ca92809e7a9df6cea62c9d73a430c6",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/outputsTypes.ts",
+      "sha256": "b3213f1434d1a1ac4c5333db87d0234ef7539d26de4c69a1b4a8ff0c949d8bb6",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/projectCreation.css",
+      "sha256": "fc12df71bfef127f1c8680ff64821963bce574140cd7bbab310d2fcf5473bade",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/projectCreation.ts",
+      "sha256": "3945ddf43e1773ade094542e69badb8e34c1de37b3c5916cc8ff7e5cc151d9b9",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/projectCreationStrings.ts",
+      "sha256": "7da5fb5366d5c7e025a632f01f4c6c3b1b39789954bd3d650e0b3a83a4b904be",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/projectWorkspace.ts",
+      "sha256": "8d392dbc871cd5accdc1b0d7ca72be3f1dcf95e9922f63907395e2929251f737",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "a6f09a398f883b52a311fdb03e966c23c93ecc079c10a0beb29cb35b4e05a6c4",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/src/taskPresentation.ts",
+      "sha256": "4443d1eba0171cb832e9c6f45a69eb0560fa7dd36256d883bb77ec72a21b0b46",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "5eca9530b83ec2bd599e44439ef2fc5880bc671dc30f4b8114d26c20c8c13b46",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/conversations.test.mjs",
+      "sha256": "866bcb2b625ea7ae1b5cdcbe596c7a6113539d216bb6d5d0f793c33d1d36b6a7",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/library-authoring.test.mjs",
+      "sha256": "e5f1116acd63dff8ceeb7848f7855122bcc7525d721e6912fea6d329c2ef7cb0",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/outputs.test.mjs",
+      "sha256": "de498361b33eccf1f5b776515a74ad3ad2f956154369b7ba8f034aea08624774",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/project-creation.test.mjs",
+      "sha256": "ca1aa9f941615ba4db74d62652349252087254585d2cffc3b70f2e0bc1ccd5f2",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/service-library.test.mjs",
+      "sha256": "78506b4c74e39c78131ecc30d6839f8ea39d995795beb2920f999b2cea916080",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/task-freshness.test.mjs",
+      "sha256": "4f422548eec3bddd2ccd1fee4dacf6648e52d7b3c858ec3b3e9120d298cf1341",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "5fe7915b15f6baeac19ffb01e218b21a04ba0e6e4292269f903af1bfccc779f4",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "198e092bd98ff0b9ca5cf3cc447ed010d5450b5ba763d628935b1bbbd572d456",
+      "state": "present"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "b6473ea7f8a7303ac336b9a9384ad403425211e2c70629e82aae8eeabf8a890d",
+      "state": "present"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "d0c3371671b937462b1f84b32ea60b244c7611eeb37655502ba8230ce250f1c6",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/agent_projection.py",
+      "sha256": "fdace80c1264c84cf53e5c0392195124614c50f36fb556c6e627afcb0cf695fa",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/artifact_projection.py",
+      "sha256": "6fd6cf77e7f89a76fcfa3e1a5dfe5a38a2ba4fcd4a802f0ceaa222b9d16d4ac0",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/conversations.py",
+      "sha256": "0002578dd8e61809c17369cd58aa15813bf8bf33bfb8cd84810f0eea4bf24b9e",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/decision_projection.py",
+      "sha256": "31b3a8fbf5797fd830aa7e3aff73d66a535b578abd2eefc9332c6406820aba8c",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/delegation_projection.py",
+      "sha256": "5b7b1ab7e5216c5e5d06a578881ef8693a49c528bb1da9ed54c03494b04a0363",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/envelopes.py",
+      "sha256": "4aa3f2cf42dc21235814bb30d8a5eab0a94e2093d64141f872127e7c18212661",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/finding_projection.py",
+      "sha256": "b424673ddd5914548744cba0724040fe2cdc3f6d078be603137204db4e38fa2d",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/handoff_projection.py",
+      "sha256": "6e18c7669a6a675df4264ffedd4f9544edd7dd0015144ebd6ad2f001f2cace05",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/lifecycle.py",
+      "sha256": "c106f4711df70505d9e5908e504533ca835f522ed891988cdea425aa6a533651",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/objective_projection.py",
+      "sha256": "b9ae6a2d1236e0532d95384bc26a2d838e9b13d642494016491247c5faa2e5a2",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/projection.py",
+      "sha256": "349b690ae36a953ede12b874a9284a7653322253caf4dfd9c2c6bf8a712c4743",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/review_projection.py",
+      "sha256": "b84b9b5e7650917b942100da98577bd6b7d0f02b47438983a2698ce77d853039",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/revisions.py",
+      "sha256": "5ece1038587d019668e10674a2266762588980084287408662532b7568e6aef4",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/task_projection.py",
+      "sha256": "1d6f456be56877079fbaafe7d4fc4dcc564b60c72158ec2dd47f405a36809461",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/thread_handoff_envelopes.py",
+      "sha256": "dd7680ba26b0bb1d4e2150561f19e9adb2e395e4d784a2c7a0e650cc255dc8d3",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/thread_projection.py",
+      "sha256": "e8b288d25b68bfa5e6c8cf68934f4db849c9c2da654387caf993858f53289d2c",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/validation.py",
+      "sha256": "427155bc7cd8080ccf4f939f3b48d2b81865ef772f43726cdf328a1659b1b2f7",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/domain/verification_projection.py",
+      "sha256": "6000951d482a3daac8fc2fad72c396efd2267321209b4fa46d56bfd529cbe2bc",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/library.py",
+      "sha256": "92ac6864dbe4f9184dec89859f9b07023e1aa87120788c13995558c87e787ff1",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/library_blueprint_store.py",
+      "sha256": "53078073a58741730858a901c5de85108795f5e5baa8add473d32608d4f502c0",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/library_organization.py",
+      "sha256": "5f45092b89952d37b1311b1654337482ef0a5ff21d1b6624ddb0ca52a8c9b847",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/mcp/conversation_tools.py",
+      "sha256": "1324e22379d220ae648ec25685fb51dd40e7e7a5d11ee2c6a595cf70cb44f162",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/mcp/design_output_tools.py",
+      "sha256": "bb19f3e990a8d6eb70dcd6a52fd6a01764e3baad78f1cd36e0984adee2b1911b",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/mcp/live_preview_tools.py",
+      "sha256": "f1421fa9c80f93c8ae089370829f71746be44e1443de4adf6fcb9182e6adbd57",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "sha256": "b6ac047415549238422c5a74cec0686fef132b5db800b4b3866aca57219a1c43",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/thread.v2.schema.json",
+      "sha256": "4204a38f99468905b9359153f91532b4adffccd3120d990bc745d1dbc436cab4",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/adapters.py",
+      "sha256": "20908a254bc1648ddf5acdb98dbadbee222d7ade17348062538df373c38dec8a",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/capabilities.py",
+      "sha256": "218e0414f1f82bdf20c75b20d30b42f563eccb16e93ab11f7b2eff9e26d1e68a",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/collaboration_storage.py",
+      "sha256": "c89de8d11c77158a27966df9d378c871920f1e540812d2e6970a23a4be518180",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/live_previews.py",
+      "sha256": "c5273f7fb63fb7a130289a42903c8208da362ebc934399b95d665059c0e613b0",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/message_attachments.py",
+      "sha256": "ea4f54692190dc1752926bfe30260f03719668e7008341fda2dabcee4e73853e",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/message_delivery.py",
+      "sha256": "b25f60b72dad7996d61f1abd63c2bc1d1ab720e8aa0d90057cf0dc8f78bee887",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/model.py",
+      "sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/runtime/preflight.py",
+      "sha256": "0d40f56b5ddbe2579c1a178cb0a77a6fa6ce971b63f8bca25e05d99d35d1c047",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/artifact_content.py",
+      "sha256": "8806d61ba2d01018f4dcdbb6dd9da5c2a02f149cf9374eb7f6feec8adb6ebad8",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/artifacts.py",
+      "sha256": "4e60f87b5b3201f7019d96922af889ad2dc9ae849ca499767c1654c1e2fa404d",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/conversations.py",
+      "sha256": "22664b9ceaf30b6aa4a0ba3320d4a17469e98381b98fab4d71cba7deff091d77",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_instruction.py",
+      "sha256": "07e1a9df165a4fc04ae96c5eaf21730d9d388b4c1c1d126f46b036f9377b5483",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/execution_plan.py",
+      "sha256": "5e3d060453632a0b6fe8708ba7744c98cd902f1cee4554a6dcac53d5fb396aba",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/generated_outputs.py",
+      "sha256": "9466dad95a9da737c60f6343cca8fdf09f9ffdc1e245bcbce9cbcc3902fb870e",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/manager.py",
+      "sha256": "341bb473d5a991ed377e472eab4a44e6b8dea0a6ce5343088a50e15ca327afc1",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/outputs.py",
+      "sha256": "265f5a68fb1c294b60b5581180dc33d44fb0a263d310128a8632cdebcfb84040",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/services/threads.py",
+      "sha256": "59758f89cd8f79a6b1309673bbc75407cc7d97b2643b2feb0b6b0947a17bba67",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/context.py",
+      "sha256": "042f4d053fffec8deb31b6bd80ee4de93e3f17c2eda237a4a7e2c1623093b5e6",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/conversation_routes.py",
+      "sha256": "ec8960ae99f4928a221459196c707f2eb6e9dc219b959d203d84d804cab05d00",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/library_blueprints.py",
+      "sha256": "5e72e09762f5b2476af8c527a5e330a06e3532d0fafb889646b5c9a8dbc4a043",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/library_routes.py",
+      "sha256": "5bfc747e03d152ba81985e9f6746fd7cb487f723baebe94d0bb6a2389e537e7d",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/output_routes.py",
+      "sha256": "dd59badfb83cc7913a7df6e9b9d6d1175994945f401a8d6c025b5798650dd751",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/project_folder_picker.py",
+      "sha256": "3d36cc6f6a76e126c0003267d9523049faddd38aa6076856384b310aaa66199c",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/project_host.py",
+      "sha256": "4e91b5542df432260b08407df05c6e95d1530c94d62419a0c6b28b3551ad1711",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/project_operations.py",
+      "sha256": "f3a5320c90fa19e1106bf543926ce284bccf5407b3705f39e4c5a99e0f179478",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/security.py",
+      "sha256": "fdeb561b7be2df293c0a0f3e0a28b72a3c6734271c8f2640f151a59f1d81a453",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "864e86ff81b6e69e1c4432c3309962ad4f982782a3537bd72376feab485179e2",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/snapshot_cache.py",
+      "sha256": "e8e914d582e136d7fb99c0e9b6580181b5729d13e7c05ea4c475bdb86d1b9912",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-BggXbAK7.js",
+      "sha256": null,
+      "state": "deleted"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-BuAI-tN9.css",
+      "sha256": "fb8fff6a006a84e12700247e4e8c3bdb6639432683139d3e7666b84f5a378cf8",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-CEMJyPpv.js",
+      "sha256": "ff45a1e04f634402e2f61bf89e8049c95c42bf26d2385d2619905dd8b4b69050",
+      "state": "present"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DAg_73Ra.css",
+      "sha256": null,
+      "state": "deleted"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "66f3cbc485ad85df50deb93300fed0618e6cf00a05a3809bc05f108e9db73cc8",
+      "state": "present"
+    },
+    {
+      "path": "tests/domain/test_projection_field_reads.py",
+      "sha256": "620c8f2c3b070dab319bce5dee2309033b1e37b80c3cbb73e2a42a5326f3b71f",
+      "state": "present"
+    },
+    {
+      "path": "tests/fixtures/fake_grok_mcp_provider.py",
+      "sha256": "4dc8a90f76b5ce85007cb77bbd88f0f09c1434c03cf5ee5516543393aca2b450",
+      "state": "present"
+    },
+    {
+      "path": "tests/mcp/test_design_output_tools.py",
+      "sha256": "09f7d046ed4dfe86c0c9549d9990dabd8087dabab3586face2bcd55124e83fb6",
+      "state": "present"
+    },
+    {
+      "path": "tests/mcp/test_live_preview_tools.py",
+      "sha256": "e6a6f12079957dd2166cd686cb8e2b480e3750e580caa04e50f523431306b74e",
+      "state": "present"
+    },
+    {
+      "path": "tests/mcp/test_worker_scope.py",
+      "sha256": "9fef4c0701b221c002c34f04140388c1fff2a6b65821de6e0fd0a02d00cea8fe",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_collaboration_storage.py",
+      "sha256": "46ea17dea6eceed0ebf1c0bc6127937073382c7936da1ef9407d3b12ea6fd4dc",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_grok_instruction_limits.py",
+      "sha256": "936af83de11f4b84e33b969a8483885c4a315b862d50fc0c8c05a2359f2fcac1",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_grok_stdin_transport.py",
+      "sha256": "cc7f35066e47f3971d1641a63ad1a83ffe62b46341db998e9eb558bb332a22aa",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_launch_plan.py",
+      "sha256": "f4a64748f0ece4fe1f24b00f14df22e30482ccc3a104793960336b1643de8b8b",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_live_previews.py",
+      "sha256": "a456e0aae63ac4d5d4e1f813ebf81687dfd148dce700d15b941d9f9a0d87957b",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_message_attachments.py",
+      "sha256": "f1ca900889a766ec7db9accf4e60896f6d13e2c2fbbc9c0e889cfcefbe2d1eaa",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_message_delivery.py",
+      "sha256": "8bf0eec8cee4b2d515a8c0bc87e41ec2f21ac1236e4c2c1ad4a57f973dcaa31c",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_preflight.py",
+      "sha256": "59c3314d50182c4adc8a896429459270a4031fd49bc2733f65e8a33e6d39a4fb",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_profiles_policy.py",
+      "sha256": "67d367eb8ff563565263b7507097d8829fc0c12d9b0a5f97bdb494cad74be0a9",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_provider_adapters.py",
+      "sha256": "0e5f0f947935af0be5a46e439827696893d5a0c157d917fec7bcf3111b6f8de5",
+      "state": "present"
+    },
+    {
+      "path": "tests/runtime/test_provider_canary.py",
+      "sha256": "276ca5a08aadaaa4e35245742c9b0c5d22748a374b0c2b9588903b5fbdf696e7",
+      "state": "present"
+    },
+    {
+      "path": "tests/schemas/test_universal_contracts.py",
+      "sha256": "c8dc94b8813e9f88e847f368d0acd6dce3386ac18bd36464b9e40d60cbd70628",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_artifacts.py",
+      "sha256": "140dadb1ac6a1431cd99e6bb023be0384fc819a9f4e937710218bcd32c46727e",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_conversation_latency.py",
+      "sha256": "c9da8d933dfb61f8afec86cf21c60e0264b53f86ca4eb67c1d42ecc093f633fb",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_conversations.py",
+      "sha256": "84a1ca4a5cb05af122136da441a8b4edaf4780157ef062cc2b97ae8a0b611725",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_library_organization.py",
+      "sha256": "f96a196c382dc41dcee3a12442083445a0f34a27a155d859b991525cadbaa209",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_outputs.py",
+      "sha256": "3b5484c1c0f59a5248f068e7150716ce84e107b9c65edb3cc72e316fc2f7d1e4",
+      "state": "present"
+    },
+    {
+      "path": "tests/services/test_task_observation_freshness.py",
+      "sha256": "63a10c56c7f70a3c0e88eec2488bb6cb4479635c990ed57b811be41dca60f441",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/conftest.py",
+      "sha256": "5bc11a5bd1d258108d6e1e3c0ec89c0b98eacd44c156ca1980c938ef7630cfd1",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_conversation_routes.py",
+      "sha256": "323713896abd1fdf14d92889124765a19c469d60399da700ffcf4b525523b994",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_custom_library_blueprints.py",
+      "sha256": "7f29a202e48374222e55ac4c77f4d0a449b2cc1655451cc88ab225d857fc1b6e",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_default_collaboration_storage.py",
+      "sha256": "49df4fb38cc53ef6a81cc0782f4c0975952783cf7a18967aa2b91b8bdf8da145",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_output_routes.py",
+      "sha256": "bfd506af67720451a7a2653409949d5867ca2ad890abf80766d3213781220267",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_profile_choice_and_link_offer.py",
+      "sha256": "cb943d4dea1ab297ca2754497e248b55abb5592320bbcd4e905b7daf3949c2bd",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_project_folder_picker.py",
+      "sha256": "92d102f9263b9abf6ff7683819c9ee27ef2d2e58d4cade64c699b1ab7c426a8b",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_project_host.py",
+      "sha256": "d6dbb20ba4b797b3934d4e8ce571afcda48e9816bd900ac65fbc3ced918ae112",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_project_operations.py",
+      "sha256": "e2a9fe614846b9357691b2a8b84df850fdf479fd3d5dc5962cafd30e14cc34e7",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_readonly_invariant.py",
+      "sha256": "098624e9832ff21ab620bfabe7a001a64882e4ed338d6ebbbadda9f889f7957f",
+      "state": "present"
+    },
+    {
+      "path": "tests/ui/test_snapshot_cache.py",
+      "sha256": "6786c6e81b573b925c08b77cd08a6b977d70c775bbe2d4e4c773fc59b2153c1c",
+      "state": "present"
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "c148e226c1cfd147fd39a5122de187de8ad6ada0404add466e7ce0b6e1e7477e",
+      "state": "present"
+    }
+  ],
+  "scope": "All changed tracked and nonignored untracked files at freeze, excluding this manifest and immutable Commons state. Review all implementation changes with particular attention to security boundaries and source/bundle correspondence. Tests currently repeating; no green or release claim."
+}

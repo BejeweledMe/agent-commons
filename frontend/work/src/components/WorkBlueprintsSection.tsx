@@ -1,10 +1,11 @@
+import { BlueprintAuthoring } from "./BlueprintAuthoring.js";
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { ApiProblem } from "../api.js";
 import type { Profile } from "../contracts.js";
 import { blueprintBriefIsValid, type LibraryApi } from "../libraryApi.js";
 import { selectBlueprintProfile, type BlueprintRuntimeChoice } from "../libraryEditorState.js";
 import type { Locale, MessageKey } from "../i18n.js";
-import type { BlueprintApplication, BlueprintApplyInput, BlueprintBinding, WorkBlueprint } from "../libraryTypes.js";
+import type { BlueprintApplication, BlueprintApplyInput, BlueprintBinding, ServiceLibrary, WorkBlueprint } from "../libraryTypes.js";
 
 type ApplyIntent = Readonly<{ id: string; input: BlueprintApplyInput; key: string }>;
 type BlueprintSession = {
@@ -15,8 +16,8 @@ type BlueprintSession = {
 // RAM only. A project switch may unmount this panel without discarding a draft
 // or the immutable retry key that describes an uncertain apply.
 const sessions = new Map<string, BlueprintSession>();
-export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabled, onApplied, onCount, projectId }: {
-  api: LibraryApi; profiles: readonly Profile[]; locale: Locale; text: (key: MessageKey) => string;
+export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabled, onApplied, onCount, projectId, catalog }: {
+  catalog?: ServiceLibrary; api: LibraryApi; profiles: readonly Profile[]; locale: Locale; text: (key: MessageKey) => string;
   writesEnabled: boolean; onApplied: (application: BlueprintApplication) => void; onCount?: (count: number) => void; projectId?: string | null;
 }): ReactElement {
   const sessionKey = projectId ?? "legacy";
@@ -27,6 +28,7 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [selected, setSelected] = useState<WorkBlueprint | null>(() => restored?.selected ?? null);
   const [title, setTitle] = useState(() => restored?.title ?? "");
   const [brief, setBrief] = useState(() => restored?.brief ?? "");
@@ -50,11 +52,11 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
   const locked = status === "applying" || status === "uncertain";
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setLoadError(false);
-    void api.blueprints(controller.signal).then((items) => { if (!controller.signal.aborted) { setBlueprints(items); setLoading(false); onCount?.(items.length); } }).catch(() => { if (!controller.signal.aborted) { setLoadError(true); setLoading(false); } });
+    void api.blueprints(controller.signal, includeArchived).then((items) => { if (!controller.signal.aborted) { setBlueprints(items); setLoading(false); onCount?.(items.filter((item) => !item.archived).length); } }).catch(() => { if (!controller.signal.aborted) { setLoadError(true); setLoading(false); } });
     return () => controller.abort();
-  }, [api, refresh, onCount]);
+  }, [api, refresh, onCount, includeArchived]);
   function choose(blueprint: WorkBlueprint): void {
-    if (locked) return;
+    if (locked || blueprint.contentAvailable === false) return;
     setSelected(blueprint); setTitle(blueprint.name[locale]); setBindings(blueprint.slots.map((slot) => ({ slot_id: slot.id, name: slot.name, profile_id: "", model: null })));
     setStatus("idle"); setIntent(null); setResult(null); setInvalid(false);
   }
@@ -77,7 +79,7 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
     finally { executing.current = false; }
   }
   function submit(event: FormEvent): void {
-    event.preventDefault(); if (!selected || locked || executing.current || !writesEnabled) return;
+    event.preventDefault(); if (!selected || !canInspectSelected || !current || selected.contentAvailable === false || selected.archived || locked || executing.current || !writesEnabled) return;
     const valid = title.trim() && title.length <= 128 && blueprintBriefIsValid(brief) && bindings.length === selected.slots.length
       && bindings.every((binding) => binding.name.trim() && binding.name.length <= 128 && profiles.some((profile) => profile.id === binding.profile_id && profile.configured !== false)
         && (binding.model === null || /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(binding.model.trim())));
@@ -85,13 +87,17 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
     const operation: ApplyIntent = { id: selected.id, key: crypto.randomUUID(), input: structuredClone({ expected_version: selected.version, title: title.trim(), brief: brief.trim(), locale, bindings: bindings.map((binding) => ({ ...binding, name: binding.name.trim(), model: binding.model?.trim() || null })) }) };
     setIntent(operation); void execute(operation);
   }
-  const current = !selected || blueprints.some((blueprint) => blueprint.id === selected.id && blueprint.version === selected.version);
+  const canInspectSelected = !selected || (!loading && !loadError && blueprints.some((blueprint) => blueprint.id === selected.id && blueprint.contentAvailable !== false));
+  const current = !selected || blueprints.some((blueprint) => blueprint.id === selected.id && blueprint.version === selected.version && blueprint.contentAvailable !== false && !blueprint.archived);
   const options = profiles.map((profile) => <option key={profile.id} value={profile.id} disabled={profile.configured === false}>{profile.label}</option>);
   return <section className="work-blueprints" aria-label={text("blueprints_title")}>
-    <div className="composer-heading"><div><h2>{text("blueprints_title")}</h2><p className="lead-copy">{text("blueprints_intro")}</p></div><button type="button" className="button button-secondary" onClick={() => setRefresh((value) => value + 1)}>{text("refresh_status")}</button></div>
+    <div className="composer-heading"><div><h2>{text("blueprints_title")}</h2><p className="lead-copy">{text("blueprints_intro")}</p></div><button type="button" className="button button-secondary" onClick={() => setRefresh((value) => value + 1)}>{text("library_refresh")}</button></div>
+    <BlueprintAuthoring api={api} catalog={catalog} selected={canInspectSelected ? selected : null} plans={blueprints} locale={locale} text={text} editable={writesEnabled} applying={locked} projectId={projectId} onRefresh={() => setRefresh((value) => value + 1)} />
+    <label className="blueprint-archive-toggle"><input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.currentTarget.checked)} />{text("library_show_archived")}</label>
     {loading ? <p role="status">{text("library_loading")}</p> : null}{loadError ? <p className="field-error" role="alert">{text("blueprints_load_error")}</p> : null}
-    <div className="blueprint-choice-grid">{blueprints.map((blueprint) => <button className="blueprint-choice" type="button" key={blueprint.id} disabled={locked} aria-pressed={selected?.id === blueprint.id} onClick={() => choose(blueprint)}><strong>{blueprint.name[locale]}</strong><span>{blueprint.description[locale]}</span><span className="small-copy">{blueprint.slots.length} {text("blueprints_roles_count")} · {blueprint.tasks.length} {text("blueprints_tasks_count")}</span></button>)}</div>
-    {selected ? <div className="blueprint-composer"><h3>{selected.name[locale]}</h3><p>{text("blueprints_preview_help")}</p>
+    <div className="blueprint-choice-grid">{blueprints.map((blueprint) => <button className="blueprint-choice" type="button" key={blueprint.id} disabled={locked || blueprint.contentAvailable === false} aria-pressed={selected?.id === blueprint.id} onClick={() => choose(blueprint)}><strong>{blueprint.name[locale]}</strong><span>{blueprint.contentAvailable === false ? text("library_blueprint_content_unavailable") : blueprint.description[locale]}</span><span className="small-copy">{blueprint.slotCount ?? blueprint.slots.length} {text("blueprints_roles_count")} · {blueprint.taskCount ?? blueprint.tasks.length} {text("blueprints_tasks_count")}{blueprint.archived ? ` · ${text("library_blueprint_archived")}` : ""}</span></button>)}</div>
+    {selected && !loading && !canInspectSelected ? <p className="notice">{text("library_selection_unavailable")}</p> : null}
+    {selected && canInspectSelected ? <div className="blueprint-composer"><h3>{selected.name[locale]}</h3><p>{text("blueprints_preview_help")}</p>
       <ol className="blueprint-task-preview">{selected.tasks.map((task) => <li key={task.id}><strong>{task.title[locale]}</strong><p className="small-copy">{selected.slots.find((slot) => slot.id === task.slot_id)?.name}</p>{task.depends_on.length ? <p className="small-copy">{text("blueprints_after")}: {task.depends_on.map((id) => selected.tasks.find((item) => item.id === id)?.title[locale] ?? id).join(" · ")}</p> : <p className="small-copy">{text("blueprints_start_node")}</p>}</li>)}</ol>
       {!current ? <p className="field-error" role="alert">{text("library_selection_unavailable")}</p> : null}
       <form onSubmit={submit} noValidate><fieldset disabled={!writesEnabled || locked || !current || result !== null}>

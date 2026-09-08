@@ -15,6 +15,7 @@ from agent_commons.ui.server import (
     CATALOG_ROUTES,
     LAUNCH_ROUTES,
     MUTATING_ROUTES,
+    PRIVATE_COLLABORATION_ROUTES,
     SETUP_ROUTES,
 )
 
@@ -148,7 +149,11 @@ def writable_client(writable: UIContext):  # type: ignore[no-untyped-def]
 #: depend on any of them.  A new tuple joins the surface by being added here and
 #: nowhere else.
 OPERATOR_SURFACE: frozenset[tuple[str, str]] = frozenset(
-    set(MUTATING_ROUTES) | set(LAUNCH_ROUTES) | set(SETUP_ROUTES) | set(CATALOG_ROUTES)
+    set(MUTATING_ROUTES)
+    | set(LAUNCH_ROUTES)
+    | set(SETUP_ROUTES)
+    | set(CATALOG_ROUTES)
+    | set(PRIVATE_COLLABORATION_ROUTES)
 )
 
 

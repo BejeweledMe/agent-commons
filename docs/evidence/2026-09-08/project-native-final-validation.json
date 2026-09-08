@@ -1,0 +1,294 @@
+{
+  "schema": "agent_commons.project_native_final_validation.v1",
+  "checkpoint_date": "2026-09-09",
+  "base_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "tree_before": "dirty",
+  "tree_at_checkpoint": "dirty",
+  "python_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+  "green_contract": {
+    "command": "make check",
+    "exit_code": 0,
+    "node": "24.20.0",
+    "ruff_check": "passed",
+    "ruff_format_check": "878 files already formatted",
+    "work_frontend": "passed",
+    "gallery_frontend": {
+      "passed": 27,
+      "skipped": 0
+    },
+    "python": {
+      "passed": 2586,
+      "skipped": 13,
+      "warnings": 2,
+      "duration_seconds": 1097.54
+    },
+    "skip_categories": {
+      "withheld_automatic_grant": 12,
+      "ci_environment_only": 1
+    }
+  },
+  "provider_canaries": [
+    {
+      "ok": true,
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 59.89229908300331,
+        "stdout_bytes_seen": 35461,
+        "stderr_bytes_seen": 1323,
+        "output_truncated": false
+      }
+    },
+    {
+      "ok": true,
+      "profile_id": "codex-independent-reviewer",
+      "provider": "codex",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 46.43132708303165,
+        "stdout_bytes_seen": 27637,
+        "stderr_bytes_seen": 1029,
+        "output_truncated": false
+      }
+    },
+    {
+      "ok": true,
+      "profile_id": "claude-builder",
+      "provider": "claude",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 37.182249875040725,
+        "stdout_bytes_seen": 72293,
+        "stderr_bytes_seen": 0,
+        "output_truncated": false
+      }
+    },
+    {
+      "ok": true,
+      "profile_id": "claude-independent-reviewer",
+      "provider": "claude",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 25.861548250017222,
+        "stdout_bytes_seen": 50408,
+        "stderr_bytes_seen": 0,
+        "output_truncated": false
+      }
+    },
+    {
+      "ok": true,
+      "profile_id": "grok-builder",
+      "provider": "grok",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 128.09125550003955,
+        "stdout_bytes_seen": 4495,
+        "stderr_bytes_seen": 0,
+        "output_truncated": false
+      }
+    },
+    {
+      "ok": true,
+      "profile_id": "grok-independent-reviewer",
+      "provider": "grok",
+      "canonical_state": "succeeded",
+      "workflow_diagnostic_code": "none",
+      "provider_work_process_started": true,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true,
+      "agent_commons_source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+      "process": {
+        "outcome": "succeeded",
+        "exit_code": 0,
+        "duration_seconds": 74.79078966699308,
+        "stdout_bytes_seen": 3342,
+        "stderr_bytes_seen": 0,
+        "output_truncated": false
+      }
+    }
+  ],
+  "installed": {
+    "source_matches": true,
+    "ui_and_mcp_extras_present": true,
+    "work_asset": "work-cJnL5_T-.js",
+    "clean_wheel_asset_inventory_matches": true,
+    "browser_loaded_exact_work_asset": true
+  },
+  "browser_installed": {
+    "new_project_manual_path": "passed_previous_checkpoint",
+    "custom_blueprint_create_apply_archive": "passed_previous_checkpoint",
+    "custom_group_create_rename_en_ru": "passed",
+    "custom_archived_blueprint_edit_new_version": "passed",
+    "expected_outcome_open": "passed",
+    "empty_summary_omitted": "passed",
+    "capacity_only_false_warning_removed": "passed",
+    "native_folder_picker_selection": "not_verified",
+    "keyboard_and_narrow_layout": "hermetic_only",
+    "browser_file_chooser_upload": "not_verified"
+  },
+  "updated_results_automated": {
+    "broker_path": "DelegationRuntimeService/SubprocessRunner",
+    "canonical_state": "succeeded",
+    "different_origin": true,
+    "exact_image_bytes": true,
+    "expected_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+    "fixture_sha256": "37c487c47625027a9e603c1018282cbecc6e0a2f41c86a83226b6e8d49e061f7",
+    "frontend_created_by": "harness",
+    "historical_preview_verified": true,
+    "history_browser_confirmed": true,
+    "image_created_by": "harness",
+    "initialization_state": "ready",
+    "installed_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+    "live_browser_confirmed": false,
+    "ok": false,
+    "other_agent_output_count": 0,
+    "other_task_output_count": 0,
+    "phase": "complete",
+    "post_delegation_image_states": [
+      "ready"
+    ],
+    "post_delegation_live_link": true,
+    "post_delegation_live_states": [
+      "reported_ready"
+    ],
+    "post_task_image_states": [
+      "stale"
+    ],
+    "post_task_live_link": false,
+    "post_task_live_states": [
+      "stale"
+    ],
+    "post_task_state": "completed",
+    "preclick_request_count": 0,
+    "preview_requests": {
+      "authorization_seen": false,
+      "commons_cookie_seen": false,
+      "navigation_referer_seen": false,
+      "navigation_request_count": 1,
+      "request_count": 2
+    },
+    "process_outcome": "succeeded",
+    "producer_matches": true,
+    "provider": "codex",
+    "provider_role": "publish existing synthetic outputs through MCP",
+    "provider_version": "codex-cli 0.145.0",
+    "provider_work_started": true,
+    "qualification_recorded": false,
+    "raw_header_values_retained": false,
+    "raw_provider_output_retained": false,
+    "reachability": "unknown",
+    "runner_invocation_modified": false,
+    "same_source": true,
+    "schema": "agent_commons.updated-results-canary.v1",
+    "servers_stopped": true,
+    "source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+    "static_preflight_ok": true,
+    "synthetic_workspace_removed": true,
+    "terminal_tool_calls": 1,
+    "terminal_tool_completions": 1,
+    "terminal_tool_rejections": 0,
+    "workflow_diagnostic_code": "none"
+  },
+  "updated_results_browser": {
+    "source_sha256": "a5ba8bf35e9c0241525e25e4b5c1a38de13186b1419e5fac7c143298167683db",
+    "live_preview_after_delegation_success": {
+      "clicked": true,
+      "new_tab_loaded": true,
+      "heading": "Live preview verification",
+      "automated_signal_within_cap": false,
+      "tool_snapshot_duration_seconds": 75.718
+    },
+    "historical_image_after_task_completion": {
+      "button": "View recorded image",
+      "state_label": "Out of date",
+      "decoded": true,
+      "width": 320,
+      "height": 180,
+      "visually_verified": "blue square left, yellow/gold circle right"
+    },
+    "fixture_origin": "separate local origin",
+    "task_lifecycle_changed_by_operator_harness": true
+  },
+  "independent_build": {
+    "evidence_sha256": "c1e3d051278889c5d555db3868383385cc4ec6d37217b9cffb0206bee66881c4",
+    "result": "exact_match",
+    "files": [
+      {
+        "path": "src/agent_commons/ui/static/work/assets/work-BuAI-tN9.css",
+        "sha256": "fb8fff6a006a84e12700247e4e8c3bdb6639432683139d3e7666b84f5a378cf8",
+        "size_bytes": 45408
+      },
+      {
+        "path": "src/agent_commons/ui/static/work/assets/work-cJnL5_T-.js",
+        "sha256": "a1653da71582e59681040d93a46f83f37780b019f7f2a365c2c76a8a131c6acf",
+        "size_bytes": 610950
+      },
+      {
+        "path": "src/agent_commons/ui/static/work/index.html",
+        "sha256": "0d370c80a73619ab88d6225760c56a5d50d37b2b68f5ba4f989068618142d8d5",
+        "size_bytes": 411
+      }
+    ]
+  },
+  "review_at_checkpoint": "Claude follow-up pending; prior changes_requested retained",
+  "task_acceptance_at_checkpoint": "pending exact task reviews",
+  "release_scope": {
+    "linux_L1": "unproven",
+    "release_R2": "open"
+  },
+  "retention": {
+    "raw_provider_output": false,
+    "auth_paths_or_values": false,
+    "private_config": false,
+    "raw_headers": false
+  }
+}

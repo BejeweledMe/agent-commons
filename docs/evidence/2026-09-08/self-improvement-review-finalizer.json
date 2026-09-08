@@ -1,0 +1,136 @@
+{
+  "schema": "agent_commons.audit.review_finalizer.v1",
+  "source_head": "e08488f392936c43d35f1013d6468fe45fa89b00",
+  "branch": "codex/service-self-improvement",
+  "agent_commons_source_sha256": "e8a5d2a9c354e685b7f2e588cd15e2ea0c8a07af41c36f6391bccd3ecd7eaff5",
+  "files": [
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "sha256": "864883ec8ca8955a0c8dcda7e19461668ecba0494f30ad46d41c784381617e0a",
+      "size_bytes": 63712
+    },
+    {
+      "path": "tests/mcp/test_worker_scope.py",
+      "sha256": "9fef4c0701b221c002c34f04140388c1fff2a6b65821de6e0fd0a02d00cea8fe",
+      "size_bytes": 48902
+    }
+  ],
+  "real_claude_review": {
+    "delegation_id": "delegation.58BVQTHAWEG8KKS95VYW19XMKG",
+    "review_id": "review.029FAJGR57T2Q27TB2XQVW1HSK",
+    "target_task_revision": "evt.01M20NAQCMXWMY0ZBT8WMT5NP1",
+    "review_request_revision": "evt.01M20NCG9B3VWZGMNNZGSNK0QT",
+    "canonical_state": "needs_operator",
+    "process_exit_code": 0,
+    "process_canonical_mismatch": true,
+    "duration_seconds": 1369.979315,
+    "terminal_calls": 5,
+    "terminal_completions": 1,
+    "terminal_rejections": 4,
+    "child_session_closed": true,
+    "intended_verdict": "approved",
+    "canonical_review_approved": false
+  },
+  "repair": {
+    "task_id": "task.64Z9RGK58YFMR6GP9CBG3QPMFA",
+    "finding_id": "finding.76KS3GHQZBWAC1NEMPGYPARSN4",
+    "change": "Derive the review CAS precondition from its frozen record, preserving the original precondition after partial completion.",
+    "baseline_regression_failed": 3,
+    "baseline_regression_passed": 3,
+    "worker_scope_passed": 24,
+    "worker_scope_seconds": 101.83,
+    "supplemental_native_astra_audit": "No actionable findings; read-only code audit, not canonical approval."
+  },
+  "frontend_rebuild": {
+    "node": "24.20.0",
+    "exit_code": 0,
+    "frozen_asset_hashes_and_sizes_match": true
+  },
+  "wheel": {
+    "wheel_sha256": "964a7152587ba1819933c3844148c0ea95de5ba96f2e7451384801d2726b78f6",
+    "python_files_compared": 174,
+    "python_mismatches": 0,
+    "frontend_hashes_match": true,
+    "private_state_paths": 0
+  },
+  "full_check": {
+    "exit_code": 0,
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "work_passed": 139,
+    "gallery_passed": 27,
+    "frontend_skipped": 0,
+    "python_passed": 2107,
+    "python_skipped": 13,
+    "python_warnings": 2,
+    "python_duration_seconds": 865.71
+  },
+  "installation": {
+    "state": "installed",
+    "source_hash_matches_branch": true,
+    "locked_dependencies_preserved": true,
+    "served_work_bundle_matches_branch": true,
+    "browser_project_and_task_loaded": true,
+    "browser_mutation_path_retested": false,
+    "profiles_preflight": [
+      {
+        "ok": true,
+        "profile_id": "codex-builder",
+        "provider": "codex",
+        "consumed_delegation_attempt": false,
+        "provider_work_process_started": false,
+        "checks": {
+          "mcp_contract": {
+            "agent_commons_source_sha256": "e8a5d2a9c354e685b7f2e588cd15e2ea0c8a07af41c36f6391bccd3ecd7eaff5",
+            "catalog": "available",
+            "ok": true,
+            "tool_catalog_sha256": "1a35d290143b38cd4dd90b1418dda50f93b8a6828ec57c2fae908b4758732db9",
+            "tool_count": 26
+          },
+          "mcp_handshake": {
+            "ok": true,
+            "protocol": "initialized",
+            "required_tools": "available",
+            "tool_count": 26
+          },
+          "provider_help": {
+            "ok": true,
+            "required_flags": "present"
+          }
+        }
+      },
+      {
+        "ok": true,
+        "profile_id": "claude-independent-reviewer",
+        "provider": "claude",
+        "consumed_delegation_attempt": false,
+        "provider_work_process_started": false,
+        "checks": {
+          "mcp_contract": {
+            "agent_commons_source_sha256": "e8a5d2a9c354e685b7f2e588cd15e2ea0c8a07af41c36f6391bccd3ecd7eaff5",
+            "catalog": "available",
+            "ok": true,
+            "tool_catalog_sha256": "5fcf2a733fe366146145c32b87ed9661bf9ef1f6345d4d82da29d5f37297086c",
+            "tool_count": 27
+          },
+          "mcp_handshake": {
+            "ok": true,
+            "protocol": "initialized",
+            "required_tools": "available",
+            "tool_count": 27
+          },
+          "provider_help": {
+            "ok": true,
+            "required_flags": "present"
+          }
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "The real Claude run did not record an approved review; neither task is accepted.",
+    "Prior two canaries qualify the earlier Python source hash only. Fresh live canaries require separate authorization.",
+    "No provider output, prompts, credentials, auth paths, private configuration or skill contents are retained here."
+  ],
+  "frozen_at": "2026-09-08T15:02:02.397354+00:00"
+}
