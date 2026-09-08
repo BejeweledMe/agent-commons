@@ -11,7 +11,7 @@ import type { ContextPackCatalog, ContextPackDetail, ContextSourceCatalog } from
 import type { MessageKey } from "../i18n";
 import { ContextSourcePicker } from "./ContextSourcePicker.js";
 
-type Props = { api: WorkApi; text: (key: MessageKey) => string; writesEnabled: boolean };
+type Props = { api: WorkApi; text: (key: MessageKey) => string; writesEnabled: boolean; projectId?: string | null };
 type LoadState =
   | { kind: "loading" }
   | { kind: "ready"; catalog: ContextPackCatalog }
@@ -25,6 +25,13 @@ type SaveState =
   | { kind: "success"; revision: string }
   | { kind: "validation"; code: MessageKey }
   | { kind: "error"; code: string; uncertain: boolean };
+type ContextPackSession = {
+  save: SaveState; editor: ContextPackForm; identity: { id: string; revision: string } | null;
+  mode: "structured" | "advanced"; advanced: string; pending: ContextSaveOperation | null;
+  retry: ReturnType<ContextPackRetryIdentity["snapshot"]>;
+};
+// RAM only: drafts and exact retry identities are deliberately never persisted.
+const sessions = new Map<string, ContextPackSession>();
 
 function problemCode(error: unknown): string {
   return error instanceof ApiProblem ? error.apiError?.code ?? "request_unavailable" : "request_unavailable";
@@ -40,29 +47,44 @@ export function ContextPackNewButton({ locked, text, onNew }: {
   }} type="button">{text("context_packs_new")}</button>;
 }
 
-export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactElement {
+export function ContextPacksSection({ api, text, writesEnabled, projectId }: Props): ReactElement {
+  const sessionKey = projectId ?? "legacy";
+  const restored = sessions.get(sessionKey);
+  // A request can settle after this project's panel unmounts. Its body/key are
+  // retained, but its busy render is never restored: the next visit presents
+  // an explicit uncertain retry instead of a permanent disabled editor.
+  const restoredSave: SaveState = restored?.save.kind === "saving"
+    ? { kind: "error", code: "request_unavailable", uncertain: true }
+    : restored?.save ?? { kind: "idle" };
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   const [sources, setSources] = useState<SourceState>({ kind: "loading" });
-  const [save, setSave] = useState<SaveState>({ kind: "idle" });
-  const [editor, setEditor] = useState<ContextPackForm>(emptyContextForm);
-  const [identity, setIdentity] = useState<{ id: string; revision: string } | null>(null);
-  const [mode, setMode] = useState<"structured" | "advanced">("structured");
-  const [advanced, setAdvanced] = useState("");
+  const [save, setSave] = useState<SaveState>(() => restoredSave);
+  const [editor, setEditor] = useState<ContextPackForm>(() => restored?.editor ?? emptyContextForm());
+  const [identity, setIdentity] = useState<{ id: string; revision: string } | null>(() => restored?.identity ?? null);
+  const [mode, setMode] = useState<"structured" | "advanced">(() => restored?.mode ?? "structured");
+  const [advanced, setAdvanced] = useState(() => restored?.advanced ?? "");
   const [reload, setReload] = useState(0);
   const [sourceReload, setSourceReload] = useState(0);
   const [reading, setReading] = useState(false);
   const retryIdentity = useRef(new ContextPackRetryIdentity());
-  const pending = useRef<ContextSaveOperation | null>(null);
+  const restoredRetry = useRef(false);
+  const pending = useRef<ContextSaveOperation | null>(restored?.pending ?? null);
   const detailRequest = useRef<AbortController | null>(null);
   const detailGeneration = useRef(0);
   const mounted = useRef(true);
+  const snapshot = useRef<ContextPackSession | null>(null);
+  snapshot.current = { save, editor, identity, mode, advanced, pending: pending.current, retry: retryIdentity.current.snapshot() };
+  if (!restoredRetry.current) {
+    retryIdentity.current.restore(restored?.retry ?? null);
+    restoredRetry.current = true;
+  }
   const uncertain = save.kind === "error" && save.uncertain;
   const locked = !writesEnabled || save.kind === "saving" || reading || uncertain;
   const sourceCatalog = sources.kind === "ready" ? sources.catalog : null;
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; detailRequest.current?.abort(); };
+    return () => { mounted.current = false; detailRequest.current?.abort(); if (snapshot.current) sessions.set(sessionKey, snapshot.current); };
   }, []);
 
   useEffect(() => {
@@ -148,6 +170,12 @@ export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactE
   const performSave = (operation: ContextSaveOperation): void => {
     pending.current = operation;
     setSave({ kind: "saving" });
+    if (snapshot.current) {
+      const interrupted = { ...snapshot.current, save: { kind: "saving" } as SaveState, pending: operation,
+        retry: retryIdentity.current.snapshot() };
+      snapshot.current = interrupted;
+      sessions.set(sessionKey, interrupted);
+    }
     const signal = new AbortController().signal;
     const request = operation.contextPackId === null || operation.expectedRevision === null
       ? api.publishContextPack(operation.draft, operation.idempotencyKey, signal)
@@ -156,6 +184,9 @@ export function ContextPacksSection({ api, text, writesEnabled }: Props): ReactE
       (detail) => {
         pending.current = null;
         retryIdentity.current.reset();
+        // The unmount snapshot already carries this exact operation as an
+        // explicit uncertain retry. An old request must not overwrite a newer
+        // remount or retry for the same project.
         if (!mounted.current) return;
         showDetail(detail);
         setSave({ kind: "success", revision: detail.revision });

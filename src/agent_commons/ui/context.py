@@ -144,6 +144,10 @@ class UIContext(UIReads, UIActions):
         self._catalog_path = catalog_path
         self._profile_config = profile_config
         self._runtime_factory = runtime_factory
+        # Set once by ProjectHost before this context is mounted.  It is an
+        # in-memory host resource limit, deliberately separate from each
+        # project's canonical delegation budget.
+        self._launch_admission: threading.BoundedSemaphore | None = None
         self._library_root = library_root
         self._design_package_writes_enabled = design_package_writes_enabled
         given = [

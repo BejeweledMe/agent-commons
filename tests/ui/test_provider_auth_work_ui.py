@@ -67,7 +67,12 @@ def test_provider_auth_recovery_is_accessible_explicit_and_bilingual() -> None:
     assert "authPanelRef.current?.focus()" in entry
     assert "provider-auth-critical" in styles
     assert "border: 2px" in styles
-    assert "apiRef.current.providerAuthAction(profileId, action" in entry
+    # Each project selection captures its own immutable API client before a
+    # request, so a later navigation cannot send auth recovery to another
+    # project.
+    assert "const api = apiRef.current" in entry
+    assert "api.providerAuthAction(profileId, action, controller.signal)" in entry
+    assert "projectSelectionRef.current.isCurrent(generation)" in entry
     assert "LaunchRecoveryPanel intent={pendingLaunch}" in entry
     assert "text(providerAuthActionMessage.continue_launch)" in entry
     assert "postStartRecovery" not in entry
@@ -81,7 +86,9 @@ def test_work_keeps_the_launch_draft_until_auth_is_ready() -> None:
 
     assert "const intent = freezeLaunchIntent({ key, input, draft: run," in entry
     assert "pendingLaunchRef.current = intent" in entry
-    assert "apiRef.current.startRun(intent.input, intent.key, controller.signal)" in entry
+    assert "const api = apiRef.current" in entry
+    assert "api.startRun(intent.input, intent.key, controller.signal)" in entry
+    assert "routeRef.current.projectId !== projectId" in entry
     assert "authStatus?.blocksLaunch === true" in entry
     assert 'pendingLaunchVisible && visibleAuth?.state === "ready"' in entry
     assert "onClick={retryPendingLaunch}" in entry

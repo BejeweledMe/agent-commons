@@ -169,7 +169,10 @@ def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
 
     assert "exchangeCodeFromFragment" in source
     assert "restoreStoredSession" in source
-    assert 'await this.get("/setup", signal)' in source
+    assert 'await this.hostGet("/projects", signal)' in source
+    assert "A project host has no unscoped /setup" in source
+    assert "error instanceof ApiProblem && error.status === 404" in source
+    assert 'this.get("/setup", signal)' in source
     assert 'fetch("/api/auth/exchange"' in source
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
@@ -238,7 +241,7 @@ def test_work_preserves_a_live_stored_session_when_a_stale_fragment_meets_a_5xx(
             exchangeAttempts += 1;
             throw new Error("a transient stored-session failure must not exchange the fragment");
           }
-          assert.equal(url, `${storedBase}/setup`);
+          assert.equal(url, `${storedBase}/projects`);
           return {
             ok: false,
             status: 503,
@@ -321,7 +324,8 @@ def test_work_guidance_is_user_actionable_without_automatic_setup_mutation() -> 
     assert "onClick={() => setConfigurationConfirmationOpen(true)}" in entry
     assert 'role="dialog"' in entry
     assert 'aria-modal="true"' in entry
-    assert entry.count('apiRef.current.setup("runtime", signal)') == 1
+    assert entry.count('api.setup("runtime", signal)') == 1
+    assert "const api = apiRef.current" in entry
     assert "function confirmRuntimeConfiguration" in entry
     assert 'guidance?.nextActionKey === "configure_runtime"' in entry
 
@@ -380,6 +384,9 @@ def test_work_guidance_reconciles_uninitialized_and_409_without_rendering_raw_va
         };
         globalThis.fetch = async (url) => {
           calls.push(url);
+          if (url === `${apiBase}/projects`) {
+            return { ok: false, status: 404, json: async () => ({ error: { code: "not_found" } }) };
+          }
           if (url === `${apiBase}/setup`) {
             return { ok: true, status: 200, json: async () => ({ state: setupState }) };
           }

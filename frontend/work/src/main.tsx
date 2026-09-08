@@ -6,6 +6,7 @@ import { ContextPackRetryIdentity } from "./contextPackEditorState";
 import { RolePresetPicker } from "./components/RolePresetPicker";
 import { chooseRolePreset, chooseRoleProvider, chooseRoleProfile } from "./rolePresetState";
 import { AppHeader } from "./components/AppHeader";
+import { ProjectSidebar } from "./components/ProjectSidebar";
 import { FailurePanel } from "./components/FailurePanel";
 import { LibrarySection } from "./components/LibrarySection";
 import { TaskComposer } from "./components/TaskComposer";
@@ -14,6 +15,7 @@ import { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, type Lau
 import { taskDependencyCatalog } from "./taskDependencyState.js";
 import type { TrackerViewState } from "./trackerState.js";
 import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkRoute } from "./appRouteState";
+import { ProjectDraftStore, ProjectReadRequest, ProjectRegistryApi, ProjectSelection, type ProjectInspection, type ProjectList } from "./projectWorkspace.js";
 import { TrackerSection } from "./components/TrackerSection";
 import { WorkflowCard } from "./components/WorkflowCard";
 import { SpecializationPicker } from "./components/SpecializationPicker.js";
@@ -67,6 +69,18 @@ type RunDraft = {
   designPackageKey: string;
 };
 type FormErrors = ReadonlySet<string>;
+type ActionError = { failure: Failure; retry: () => void; uncertain: boolean };
+type ProjectTransient = {
+  pendingLaunch: LaunchIntent | null;
+  pendingLaunchRetry: (() => Promise<void>) | null;
+  taskRetry: ReturnType<ContextPackRetryIdentity["snapshot"]>;
+  actionErrors: Record<string, ActionError>;
+  lastHiredRole: { id: string; name: string } | null;
+  roleErrors: FormErrors;
+  taskErrors: FormErrors;
+  runErrors: FormErrors;
+  selectedTaskId: string | null;
+};
 
 const emptyRole: RoleDraft = { fromPresetId: "", name: "", profileId: "", rationale: "", contextMode: "fresh", provider: "", model: "", modelMode: "profile", specializationRef: null, specializationName: "" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "", dependencyIds: [] };
@@ -197,7 +211,7 @@ function WorkApp(): ReactElement {
   const routeRef = useRef(route);
   const [search, setSearch] = useState("");
   const [launchOpen, setLaunchOpen] = useState(false);
-  const [actionErrors, setActionErrors] = useState<Record<string, { failure: Failure; retry: () => void; uncertain: boolean }>>({});
+  const [actionErrors, setActionErrors] = useState<Record<string, ActionError>>({});
   const newTaskButton = useRef<HTMLButtonElement>(null);
   const navigationRevision = useRef(0);
   const renderedNavigationRevision = navigationRevision.current;
@@ -207,6 +221,9 @@ function WorkApp(): ReactElement {
   const [role, setRole] = useState<RoleDraft>(emptyRole);
   const [task, setTask] = useState<TaskDraft>(emptyTask);
   const [run, setRun] = useState<RunDraft>(emptyRun);
+  const draftsRef = useRef(new ProjectDraftStore<{ role: RoleDraft; task: TaskDraft; run: RunDraft }>());
+  const currentDraftRef = useRef({ role: emptyRole, task: emptyTask, run: emptyRun });
+  currentDraftRef.current = { role, task, run };
   const [roleErrors, setRoleErrors] = useState<FormErrors>(new Set());
   const [taskErrors, setTaskErrors] = useState<FormErrors>(new Set());
   const [runErrors, setRunErrors] = useState<FormErrors>(new Set());
@@ -219,12 +236,24 @@ function WorkApp(): ReactElement {
   const [launchedTaskId, setLaunchedTaskId] = useState<string | null>(null);
   const [trackerObservation, setTrackerObservation] = useState<TrackerViewState>({ kind: "loading" });
   const dependencies = useMemo(() => taskDependencyCatalog(trackerObservation), [trackerObservation]);
-  const apiRef = useRef(new WorkApi());
+  const hostApiRef = useRef(new WorkApi());
+  const apiRef = useRef(hostApiRef.current);
   const libraryApiRef = useRef(new LibraryApi(apiRef.current));
+  const registryApiRef = useRef(new ProjectRegistryApi(hostApiRef.current));
+  const projectSelectionRef = useRef(new ProjectSelection());
+  const readRequestRef = useRef(new ProjectReadRequest());
+  const projectMutationKeys = useRef(new Map<string, string>());
+  const [projectList, setProjectList] = useState<ProjectList | null>(null);
+  const [legacyProjectHost, setLegacyProjectHost] = useState(false);
   const [libraryState, setLibraryState] = useState<LibraryState>({ kind: "loading" });
   const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [lastHiredRole, setLastHiredRole] = useState<{ id: string; name: string } | null>(null);
   const taskRetryIdentity = useRef(new ContextPackRetryIdentity());
+  const projectTransientRef = useRef(new ProjectDraftStore<ProjectTransient>());
+  const currentTransientRef = useRef<Omit<ProjectTransient, "pendingLaunch" | "pendingLaunchRetry" | "taskRetry">>({
+    actionErrors: {}, lastHiredRole: null, roleErrors: new Set(), taskErrors: new Set(), runErrors: new Set(), selectedTaskId: null
+  });
+  currentTransientRef.current = { actionErrors, lastHiredRole, roleErrors, taskErrors, runErrors, selectedTaskId: route.taskId };
   const authPanelRef = useRef<HTMLElement | null>(null);
   const pendingLaunchRetry = useRef<(() => Promise<void>) | null>(null);
   const launchSelectionVersion = useRef(0);
@@ -238,10 +267,15 @@ function WorkApp(): ReactElement {
   useEffect(() => {
     if (!libraryAccessible) return;
     const controller = new AbortController();
-    void libraryApiRef.current.load(controller.signal).then((catalog) => {
-      if (!controller.signal.aborted) setLibraryState({ kind: "ready", catalog });
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = libraryApiRef.current;
+    const stillCurrent = (): boolean => !controller.signal.aborted
+      && projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId;
+    void api.load(controller.signal).then((catalog) => {
+      if (stillCurrent()) setLibraryState({ kind: "ready", catalog });
     }).catch(() => {
-      if (!controller.signal.aborted) setLibraryState((current) => ({ kind: "error", ...(current.kind !== "loading" && current.catalog ? { catalog: current.catalog } : {}) }));
+      if (stillCurrent()) setLibraryState((current) => ({ kind: "error", ...(current.kind !== "loading" && current.catalog ? { catalog: current.catalog } : {}) }));
     });
     return () => controller.abort();
   }, [libraryAccessible, libraryRefresh]);
@@ -293,14 +327,22 @@ function WorkApp(): ReactElement {
 
   function prepareLaunch(taskId: string): void {
     const selectionVersion = ++launchSelectionVersion.current;
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
     setRun((current) => pendingLaunchRef.current?.input.taskId === taskId ? restoreLaunchDraft(pendingLaunchRef.current) : current.taskId === taskId ? current : { ...emptyRun, taskId });
     navigate({ view: "work", taskId, composer: false });
     setLaunchOpen(true);
-    window.setTimeout(() => document.getElementById("run-role")?.focus(), 0);
+    window.setTimeout(() => {
+      if (projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId) {
+        document.getElementById("run-role")?.focus();
+      }
+    }, 0);
     if (state.kind === "ready" && !pendingLaunchRef.current) {
       const activeRoles = new Set(state.data.launch?.roles.map((option) => option.id) ?? []);
-      void new TaskGraphApi(apiRef.current).detail(taskId, new AbortController().signal).then((detail) => {
-        if (launchSelectionVersion.current !== selectionVersion || pendingLaunchRef.current || routeRef.current.view !== "work" || routeRef.current.taskId !== taskId
+      void new TaskGraphApi(api).detail(taskId, new AbortController().signal).then((detail) => {
+        if (!projectSelectionRef.current.isCurrent(generation) || routeRef.current.projectId !== projectId
+          || launchSelectionVersion.current !== selectionVersion || pendingLaunchRef.current || routeRef.current.view !== "work" || routeRef.current.taskId !== taskId
           || !detail.suggestedAgentId || !activeRoles.has(detail.suggestedAgentId)) return;
         const suggested = detail.suggestedAgentId;
         setRun((current) => current.taskId === taskId && !current.agentId ? { ...current, agentId: suggested } : current);
@@ -312,6 +354,7 @@ function WorkApp(): ReactElement {
     const onPop = (): void => {
       navigationRevision.current += 1;
       const next = parseWorkRoute(window.location.search);
+      if (next.projectId !== routeRef.current.projectId) bindProject(next.projectId);
       routeRef.current = next;
       setRoute(next);
       setLaunchOpen(false);
@@ -358,26 +401,59 @@ function WorkApp(): ReactElement {
     </div>;
   }
 
-  async function load(signal: AbortSignal): Promise<void> {
+  async function load(): Promise<void> {
+    const projectGeneration = projectSelectionRef.current.currentGeneration();
+    const read = readRequestRef.current.begin();
+    const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(projectGeneration)
+      && readRequestRef.current.isCurrent(read.generation);
     setState((current) => current.kind === "ready" ? current : { kind: "checking" });
     try {
-      await apiRef.current.connect(signal);
-      const data = await apiRef.current.load(signal);
+      const host = hostApiRef.current;
+      await host.connect(read.signal);
+      let projectApi = host;
+      try {
+        const projects = await registryApiRef.current.list(read.signal);
+        if (!stillCurrent()) return;
+        setLegacyProjectHost(false);
+        setProjectList(projects);
+        const selectedId = routeRef.current.projectId ?? projects.defaultProjectId ?? projects.projects.find((item) => item.available && item.state === "ready")?.id ?? null;
+        if (selectedId === null) {
+          setState({ kind: "failure", failure: { code: "project_required", title: text("project_none"), nextStep: text("project_new"), canRetry: true, safeNextActions: [] } });
+          return;
+        }
+        if (routeRef.current.projectId !== selectedId) {
+          const next = { ...routeRef.current, projectId: selectedId };
+          routeRef.current = next;
+          window.history.replaceState(null, "", workRouteHref(next));
+          setRoute(next);
+        }
+        projectApi = host.forProject(selectedId);
+      } catch (error: unknown) {
+        if (!(error instanceof ApiProblem) || error.status !== 404) throw error;
+        // A single-workspace host predates the registry endpoint. Keep its
+        // authenticated transport and do not erase it merely because projects is absent.
+        setLegacyProjectHost(true);
+        setProjectList(null);
+      }
+      apiRef.current = projectApi;
+      libraryApiRef.current = new LibraryApi(projectApi);
+      const data = await projectApi.load(read.signal);
+      if (!stillCurrent()) return;
       setState((current) => ({ kind: "ready", data, notice: current.kind === "ready" ? current.notice : null }));
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
+      if (!stillCurrent()) return;
       setState((current) => current.kind === "ready" ? current : { kind: "failure", failure: failureFrom(error, text) });
       recordActionError("refresh", error, () => void refresh());
-    }
+    } finally { /* The next project selection owns cancellation of this request. */ }
   }
 
   useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, []);
+    void load();
+    return () => readRequestRef.current.abort();
+  }, [route.projectId]);
 
   useEffect(() => {
     if (state.kind !== "ready") {
@@ -389,11 +465,14 @@ function WorkApp(): ReactElement {
     if (activeProfiles.length === 0) {
       return;
     }
+    const generation = projectSelectionRef.current.currentGeneration();
+    const api = apiRef.current;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void Promise.allSettled(
-        activeProfiles.map((profileId) => apiRef.current.providerAuthStatus(profileId, controller.signal))
+        activeProfiles.map((profileId) => api.providerAuthStatus(profileId, controller.signal))
       ).then((results) => {
+        if (!projectSelectionRef.current.isCurrent(generation)) return;
         setState((current) => {
           if (current.kind !== "ready") {
             return current;
@@ -428,30 +507,123 @@ function WorkApp(): ReactElement {
 
   async function refresh(): Promise<void> {
     clearActionError("refresh");
-    const controller = new AbortController();
-    await load(controller.signal);
+    await load();
+  }
+
+  function selectProject(projectId: string): void {
+    if (routeRef.current.projectId === projectId) return;
+    // Drafts are intentionally RAM-only and keyed by opaque project identity.
+    // Selection also closes the active tracker through a new immutable client.
+    const selectedTaskId = bindProject(projectId);
+    navigate({ projectId, taskId: selectedTaskId, composer: false });
+  }
+
+  function bindProject(projectId: string | null): string | null {
+    const previousId = routeRef.current.projectId;
+    if (previousId !== null) {
+      draftsRef.current.set(previousId, currentDraftRef.current);
+      projectTransientRef.current.set(previousId, {
+        pendingLaunch: pendingLaunchRef.current,
+        pendingLaunchRetry: pendingLaunchRetry.current,
+        taskRetry: taskRetryIdentity.current.snapshot(),
+        ...currentTransientRef.current
+      });
+    }
+    const nextDraft = projectId === null ? { role: emptyRole, task: emptyTask, run: emptyRun }
+      : draftsRef.current.get(projectId, { role: emptyRole, task: emptyTask, run: emptyRun });
+    setRole(nextDraft.role); setTask(nextDraft.task); setRun(nextDraft.run);
+    const transient = projectId === null
+      ? { pendingLaunch: null, pendingLaunchRetry: null, taskRetry: null, actionErrors: {}, lastHiredRole: null, roleErrors: new Set<string>(), taskErrors: new Set<string>(), runErrors: new Set<string>(), selectedTaskId: null }
+      : projectTransientRef.current.get(projectId, { pendingLaunch: null, pendingLaunchRetry: null, taskRetry: null, actionErrors: {}, lastHiredRole: null, roleErrors: new Set<string>(), taskErrors: new Set<string>(), runErrors: new Set<string>(), selectedTaskId: null });
+    pendingLaunchRef.current = transient.pendingLaunch;
+    pendingLaunchRetry.current = transient.pendingLaunchRetry;
+    setPendingLaunch(transient.pendingLaunch);
+    taskRetryIdentity.current.restore(transient.taskRetry);
+    projectSelectionRef.current.select();
+    readRequestRef.current.abort();
+    if (projectId !== null) {
+      try { apiRef.current = hostApiRef.current.forProject(projectId); libraryApiRef.current = new LibraryApi(apiRef.current); }
+      catch { /* The route loader presents the typed host failure. */ }
+    }
+    // Never retain a ready snapshot while its project heading/client changes.
+    // The route effect owns the next scoped read and will replace this shell.
+    setState({ kind: "checking" });
+    setLibraryState({ kind: "loading" });
+    setActiveAction(null);
+    setActionErrors(transient.actionErrors);
+    setLastHiredRole(transient.lastHiredRole);
+    setRoleErrors(transient.roleErrors);
+    setTaskErrors(transient.taskErrors);
+    setRunErrors(transient.runErrors);
+    setTrackerObservation({ kind: "loading" });
+    setLaunchOpen(false);
+    return transient.selectedTaskId;
+  }
+
+  async function inspectProject(input: { mode: "new" | "existing"; path: string; name: string }): Promise<ProjectInspection> {
+    return registryApiRef.current.inspect(input, new AbortController().signal);
+  }
+
+  async function createProject(inspection: ProjectInspection): Promise<void> {
+    const intent = `create:${inspection.inspectionId}`;
+    const key = projectMutationKeys.current.get(intent) ?? `project-create-${crypto.randomUUID()}`;
+    projectMutationKeys.current.set(intent, key);
+    const result = await registryApiRef.current.create(inspection.inspectionId, key, new AbortController().signal);
+    setProjectList((current) => current === null ? current : { ...current, revision: result.revision,
+      defaultProjectId: current.defaultProjectId ?? result.project.id,
+      projects: [...current.projects.filter((item) => item.id !== result.project.id), result.project] });
+    selectProject(result.project.id);
+    // Blueprint and profile choices are intentionally collected only after the
+    // registry has created this project, through the existing scoped apply flow.
+    navigate({ view: "library", libraryTab: "blueprints" });
+    projectMutationKeys.current.delete(intent);
+  }
+
+  async function updateProject(projectId: string, expectedRevision: string, input: { name: string; archived: boolean }): Promise<void> {
+    const intent = `update:${projectId}:${expectedRevision}:${JSON.stringify(input)}`;
+    const key = projectMutationKeys.current.get(intent) ?? `project-update-${crypto.randomUUID()}`;
+    projectMutationKeys.current.set(intent, key);
+    const result = await registryApiRef.current.update(projectId, expectedRevision, input, key, new AbortController().signal);
+    setProjectList((current) => current === null ? current : { ...current, revision: result.revision,
+      projects: current.projects.map((item) => item.id === result.project.id ? result.project : item) });
+    projectMutationKeys.current.delete(intent);
+  }
+
+  function openProjectGallery(): void {
+    const projectId = routeRef.current.projectId;
+    if (projectId !== null) window.location.assign(`/gallery?project=${encodeURIComponent(projectId)}`);
   }
 
   async function perform(
     action: string,
+    api: WorkApi,
     work: (signal: AbortSignal) => Promise<void>,
-    notice: MessageKey
+    notice: MessageKey,
+    projectId = routeRef.current.projectId
   ): Promise<boolean> {
+    const generation = projectSelectionRef.current.currentGeneration();
+    const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(generation)
+      && routeRef.current.projectId === projectId;
     setActiveAction(action);
     clearActionError(action);
     const controller = new AbortController();
     try {
       await work(controller.signal);
-      const data = await apiRef.current.load(controller.signal);
+      const data = await api.load(controller.signal);
+      if (!stillCurrent()) return false;
       setState({ kind: "ready", data, notice });
       return true;
     } catch (error: unknown) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        recordActionError(action, error, () => void perform(action, work, notice));
+      if (stillCurrent() && !(error instanceof DOMException && error.name === "AbortError")) {
+        // The retry retains the original immutable project client and input
+        // closure. It may only run after this same project is visible again.
+        recordActionError(action, error, () => {
+          if (routeRef.current.projectId === projectId) void perform(action, api, work, notice, projectId);
+        });
       }
       return false;
     } finally {
-      setActiveAction(null);
+      if (stillCurrent()) setActiveAction(null);
     }
   }
 
@@ -471,14 +643,19 @@ function WorkApp(): ReactElement {
     }
     const roleInput = { ...role, name: role.name.trim(), rationale: role.rationale.trim() };
     const roleKey = crypto.randomUUID();
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
     const operationNavigation = navigationRevision.current;
     const operationSelection = launchSelectionVersion.current;
     const operationRun = { taskId: runRef.current.taskId, agentId: runRef.current.agentId };
     const targetTaskId = routeRef.current.taskId ?? operationRun.taskId;
     void perform(
       "create-role",
+      api,
       async (signal) => {
-        const created = await apiRef.current.createRole(roleInput, signal, roleKey);
+        const created = await api.createRole(roleInput, signal, roleKey);
+        if (!projectSelectionRef.current.isCurrent(generation) || routeRef.current.projectId !== projectId) return;
         setLastHiredRole({ id: created.agentId, name: roleInput.name });
         if (!pendingLaunchRef.current && navigationRevision.current === operationNavigation && launchSelectionVersion.current === operationSelection) {
           setRun((current) => current.taskId === operationRun.taskId && current.agentId === operationRun.agentId
@@ -486,7 +663,8 @@ function WorkApp(): ReactElement {
         }
         setRole((current) => JSON.stringify({ ...current, name: current.name.trim(), rationale: current.rationale.trim() }) === JSON.stringify(roleInput) ? emptyRole : current);
       },
-      "created_role"
+      "created_role",
+      projectId
     );
   }
 
@@ -509,12 +687,21 @@ function WorkApp(): ReactElement {
     };
     const idempotencyKey = taskRetryIdentity.current.forOperation(JSON.stringify(input));
     const operationNavigation = navigationRevision.current;
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
     const submit = async (): Promise<void> => {
+      // A retry may happen after A → B → A. It keeps A's immutable client,
+      // input and idempotency key, while taking A's current selection generation.
+      if (routeRef.current.projectId !== projectId) return;
+      const generation = projectSelectionRef.current.currentGeneration();
+      const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(generation)
+        && routeRef.current.projectId === projectId;
       setActiveAction("create-task");
       clearActionError("create-task");
       try {
-        const result = await apiRef.current.createTask(input, new AbortController().signal, idempotencyKey);
-        apiRef.current.forgetTaskWrite(idempotencyKey);
+        const result = await api.createTask(input, new AbortController().signal, idempotencyKey);
+        if (!stillCurrent()) return;
+        api.forgetTaskWrite(idempotencyKey);
         taskRetryIdentity.current.reset();
         setTask((current) => JSON.stringify({ title: current.title.trim(), description: current.description.trim(), criteria: current.criteria.split("\n").map((item) => item.trim()).filter(Boolean), dependencyIds: [...current.dependencyIds] }) === JSON.stringify(input) ? emptyTask : current);
         if (navigationRevision.current === operationNavigation) {
@@ -524,8 +711,9 @@ function WorkApp(): ReactElement {
         setState((current) => current.kind === "ready" ? { ...current, notice: "created_task" } : current);
         void refresh();
       } catch (error: unknown) {
+        if (!stillCurrent()) return;
         recordActionError("create-task", error, () => void submit());
-      } finally { setActiveAction(null); }
+      } finally { if (stillCurrent()) setActiveAction(null); }
     };
     void submit();
   }
@@ -539,8 +727,12 @@ function WorkApp(): ReactElement {
     });
   }
 
-  function focusAuthRecovery(): void {
-    window.setTimeout(() => authPanelRef.current?.focus(), 0);
+  function focusAuthRecovery(projectId = routeRef.current.projectId, generation = projectSelectionRef.current.currentGeneration()): void {
+    window.setTimeout(() => {
+      if (projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId) {
+        authPanelRef.current?.focus();
+      }
+    }, 0);
   }
 
   function replaceProviderStatus(status: ProviderAuthStatus): void {
@@ -640,6 +832,9 @@ function WorkApp(): ReactElement {
     const profileId = selectedRole?.profileId;
     const authStatus = state.data.providerAuth.find((status) => status.profileId === profileId);
     const key = crypto.randomUUID();
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
     const input = {
       agentId: run.agentId, taskId: run.taskId,
       contextPackId: selectedPack?.contextPackId ?? null,
@@ -654,11 +849,16 @@ function WorkApp(): ReactElement {
     pendingLaunchRef.current = intent;
     setPendingLaunch(intent);
     const execute = async (): Promise<void> => {
+      const attemptGeneration = projectSelectionRef.current.currentGeneration();
+      if (routeRef.current.projectId !== projectId) return;
+      const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(attemptGeneration)
+        && routeRef.current.projectId === projectId;
       setActiveAction("start-run");
       clearActionError("start-run");
       const controller = new AbortController();
       try {
-        await apiRef.current.startRun(intent.input, intent.key, controller.signal);
+        await api.startRun(intent.input, intent.key, controller.signal);
+        if (!stillCurrent()) return;
         setPendingLaunch(null);
         pendingLaunchRef.current = null;
         setLaunchedTaskId(intent.input.taskId);
@@ -666,22 +866,31 @@ function WorkApp(): ReactElement {
         setState((current) => current.kind === "ready" ? { ...current, notice: "run_started" } : current);
         void refresh();
       } catch (error: unknown) {
+        if (!stillCurrent()) return;
         const problem = error instanceof ApiProblem ? error : null;
         setPendingLaunch(intent);
         pendingLaunchRetry.current = execute;
         if (profileId !== undefined && ["provider_auth_required", "provider_auth_unknown", "credential_store_unavailable"].includes(problem?.apiError?.code ?? "")) {
-          try { replaceProviderStatus(await apiRef.current.providerAuthStatus(profileId, controller.signal)); } catch { /* The unavailable recovery state stays visible. */ }
-          focusAuthRecovery();
+          try {
+            const status = await api.providerAuthStatus(profileId, controller.signal);
+            if (!stillCurrent()) return;
+            replaceProviderStatus(status);
+          } catch {
+            if (!stillCurrent()) return;
+            /* The unavailable recovery state stays visible. */
+          }
+          if (!stillCurrent()) return;
+          focusAuthRecovery(projectId, attemptGeneration);
         }
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           recordActionError("start-run", error, () => void execute());
         }
-      } finally { setActiveAction(null); }
+      } finally { if (stillCurrent()) setActiveAction(null); }
     };
     pendingLaunchRetry.current = execute;
     if (profileId !== undefined && (authStatus?.blocksLaunch === true || state.data.providerAuthErrors.includes(profileId))) {
       setPendingLaunch(intent);
-      focusAuthRecovery();
+      focusAuthRecovery(projectId, generation);
       return;
     }
     await execute();
@@ -691,14 +900,17 @@ function WorkApp(): ReactElement {
     profileId: string,
     action: "login" | "cancel" | "check"
   ): Promise<void> {
+    const generation = projectSelectionRef.current.currentGeneration();
+    const api = apiRef.current;
     setActiveAction(`provider-auth-${action}`);
     const controller = new AbortController();
     try {
-      const status = await apiRef.current.providerAuthAction(profileId, action, controller.signal);
+      const status = await api.providerAuthAction(profileId, action, controller.signal);
+      if (!projectSelectionRef.current.isCurrent(generation)) return;
       replaceProviderStatus(status);
       focusAuthRecovery();
     } catch (error: unknown) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+      if (projectSelectionRef.current.isCurrent(generation) && !(error instanceof DOMException && error.name === "AbortError")) {
         setState((current) => {
           if (current.kind !== "ready") {
             return { kind: "failure", failure: failureFrom(error, text) };
@@ -714,7 +926,7 @@ function WorkApp(): ReactElement {
         focusAuthRecovery();
       }
     } finally {
-      setActiveAction(null);
+      if (projectSelectionRef.current.isCurrent(generation)) setActiveAction(null);
     }
   }
 
@@ -770,6 +982,11 @@ function WorkApp(): ReactElement {
   }
 
   if (state.kind === "failure") {
+    if (state.failure.code === "project_required") {
+      return <main className="work-app project-empty-app"><ProjectSidebar currentProjectId={null} legacy={false} locale={locale}
+        projects={projectList} text={text} onGallery={openProjectGallery} onInspect={inspectProject}
+        onCreate={createProject} onSelect={selectProject} onUpdate={updateProject} /></main>;
+    }
     return (
       <main className="work-app work-app-centered">
         <FailurePanel failure={state.failure} onRetry={() => void refresh()} text={text} />
@@ -778,6 +995,9 @@ function WorkApp(): ReactElement {
   }
 
   const { data, notice } = state;
+  const renderedProjectId = route.projectId;
+  const renderedProjectGeneration = projectSelectionRef.current.currentGeneration();
+  const renderedProjectApi = apiRef.current;
   const configured = data.setup.state === "setup_configured";
   const catalog = data.catalog;
   const launch = data.launch;
@@ -818,16 +1038,28 @@ function WorkApp(): ReactElement {
 
   function confirmRuntimeConfiguration(): void {
     setConfigurationConfirmationOpen(false);
-    void perform("runtime", (signal) => apiRef.current.setup("runtime", signal), "action_complete");
+    const api = apiRef.current;
+    void perform("runtime", api, (signal) => api.setup("runtime", signal), "action_complete");
   }
 
   const workspaceInitialized = !["setup_uninitialized", "setup_not_a_repository"].includes(data.setup.state);
   return (
     <main className="work-app">
       <aside className="app-rail" aria-label={text("shell_navigation")}>
-        <p className="app-brand">Agent Commons</p>
+        <ProjectSidebar
+          currentProjectId={route.projectId}
+          legacy={legacyProjectHost}
+          locale={locale}
+          projects={projectList}
+          text={text}
+          onGallery={openProjectGallery}
+          onInspect={inspectProject}
+          onCreate={createProject}
+          onSelect={selectProject}
+          onUpdate={updateProject}
+        />
         <p className="project-label">{text("project_label")}</p>
-        <p className="project-name">{repositoryBasename(data.meta.repo)}</p>
+        <p className="project-name">{projectList?.projects.find((project) => project.id === route.projectId)?.name ?? repositoryBasename(data.meta.repo)}</p>
         <nav className="primary-navigation">
           {(["work", "team", "library", "settings"] as const).map((view) => <a key={view}
             aria-current={route.view === view ? "page" : undefined}
@@ -1091,9 +1323,10 @@ function WorkApp(): ReactElement {
           </WorkflowCard>
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
-            {workspaceInitialized ? <LibrarySection api={apiRef.current} text={text} writesEnabled={data.meta.writesEnabled}
+            {workspaceInitialized ? <LibrarySection key={route.projectId ?? "legacy"} api={apiRef.current} text={text} writesEnabled={data.meta.writesEnabled}
               libraryApi={libraryApiRef.current} libraryState={libraryState} onRefreshLibrary={() => setLibraryRefresh((current) => current + 1)} onChooseRole={(selected) => chooseSpecialization(selected, true)}
-              profiles={profileOptions} locale={locale} onBlueprintApplied={(application) => {
+              profiles={profileOptions} locale={locale} projectId={route.projectId} onBlueprintApplied={(application) => {
+                if (!projectSelectionRef.current.isCurrent(renderedProjectGeneration) || routeRef.current.projectId !== renderedProjectId) return;
                 const first = application.tasks[0];
                 if (first && navigationRevision.current === renderedNavigationRevision && routeRef.current.view === "library") {
                   navigate({ view: "work", taskId: first.taskId }); setLaunchOpen(false);
@@ -1102,7 +1335,12 @@ function WorkApp(): ReactElement {
                 void refresh();
               }}
               tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })}
-              onApplied={async () => { const updated = await apiRef.current.load(new AbortController().signal); setState((current) => current.kind === "ready" ? { ...current, data: updated } : current); }}
+              onApplied={async () => {
+                const updated = await renderedProjectApi.load(new AbortController().signal);
+                if (projectSelectionRef.current.isCurrent(renderedProjectGeneration) && routeRef.current.projectId === renderedProjectId) {
+                  setState((current) => current.kind === "ready" ? { ...current, data: updated } : current);
+                }
+              }}
               onChooseTeam={() => navigate({ view: "team" })} /> : <p>{text("workspace_needs_setup")}</p>}
           </section>
           <section hidden={route.view !== "settings"} aria-label={text("shell_nav_settings")} className="settings-section">
@@ -1132,7 +1370,7 @@ function WorkApp(): ReactElement {
                   <button
                     className="button button-primary"
                     disabled={activeAction !== null}
-                    onClick={() => void perform("initialize", (signal) => apiRef.current.setup("initialize", signal), "action_complete")}
+                    onClick={() => { const api = apiRef.current; void perform("initialize", api, (signal) => api.setup("initialize", signal), "action_complete"); }}
                     type="button"
                   >
                     {activeAction === "initialize" ? text("working") : text("initialize_workspace")}

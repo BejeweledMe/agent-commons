@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import replace
 from types import SimpleNamespace
@@ -828,3 +829,31 @@ def test_a_launch_that_never_starts_says_so_instead_of_looking_pending(
     assert record["state"] == "needs_operator"
     assert "could not start" in str(record.get("summary", ""))
     assert "claude-independent-reviewer" in str(record.get("summary", ""))
+
+
+def test_thread_start_failure_finalizes_the_requested_delegation_and_releases_admission(
+    workspace: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    admission = threading.BoundedSemaphore(1)
+    context._launch_admission = admission
+
+    class RefusingThread:
+        def start(self) -> None:
+            raise RuntimeError("test start failure")
+
+    monkeypatch.setattr(
+        context._launch_coordinator, "_thread_factory", lambda **_: RefusingThread()
+    )
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={"agent_id": fixture["role_id"], "task_id": fixture["task_id"]},
+            headers=authorized(),
+        )
+    assert response.status_code == 409
+    records = tuple(fixture["manager"].snapshot().delegations.values())
+    assert len(records) == 1 and records[0]["state"] == "needs_operator"
+    assert not context._launch_coordinator._launch_threads
+    assert admission.acquire(blocking=False)

@@ -15,4 +15,8 @@ export class ContextPackRetryIdentity {
   reset(): void {
     this.current = null;
   }
+
+  snapshot(): RetryIdentity | null { return this.current; }
+
+  restore(value: RetryIdentity | null): void { this.current = value === null ? null : { ...value }; }
 }

@@ -1520,6 +1520,24 @@ export function parseContextSourceCatalog(value: unknown): ContextSourceCatalog 
 
 export class WorkApi {
   private taskWrites = new Map<string, { signature: string; body: Promise<string> }>();
+  private apiBase = "";
+
+  /** A scoped client is immutable: an in-flight request can never follow a later project selection. */
+  constructor(private readonly scopedProjectId: string | null = null, apiBase = "") {
+    this.apiBase = apiBase;
+  }
+
+  forProject(projectId: string): WorkApi {
+    if (!/^project\.[a-f0-9]{32}$/.test(projectId) || !this.apiBase) {
+      throw new ApiProblem(400, { code: "project_invalid", message: "", safeNextActions: [] });
+    }
+    return new WorkApi(projectId, this.apiBase);
+  }
+
+  async hostRequestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown> {
+    if (options.method === "POST") return this.hostPost(path, options.body ?? {}, options.signal);
+    return this.hostGet(path, options.signal);
+  }
 
   forgetTaskWrite(key: string): void {
     this.taskWrites.delete(key);
@@ -1562,8 +1580,6 @@ export class WorkApi {
     });
   }
 
-  private apiBase = "";
-
   async connect(signal: AbortSignal): Promise<void> {
     const exchangeCode = exchangeCodeFromFragment();
     window.history.replaceState(null, "", sanitizedWorkLocation(window.location.pathname, window.location.search));
@@ -1603,17 +1619,20 @@ export class WorkApi {
     }
     this.apiBase = storedBase;
     try {
-      await this.get("/setup", signal);
+      // A project host has no unscoped /setup. A legacy host deliberately
+      // answers 404 here and remains a valid authenticated fallback.
+      await this.hostGet("/projects", signal);
       return true;
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
         throw error;
       }
-      if (error instanceof ApiProblem && (error.status === 401 || error.status === 404)) {
+      if (error instanceof ApiProblem && error.status === 401) {
         clearStoredApiBase();
         this.apiBase = "";
         return false;
       }
+      if (error instanceof ApiProblem && error.status === 404) return true;
       throw error;
     }
   }
@@ -1774,7 +1793,7 @@ export class WorkApi {
       onProtocolError();
       return () => undefined;
     }
-    const stream = new EventSource(`${this.apiBase}/work/tracker/stream`, {
+    const stream = new EventSource(`${this.apiBase}${this.scopedPath("/work/tracker/stream")}`, {
       withCredentials: true
     });
     const receive = (event: Event): void => {
@@ -1974,7 +1993,20 @@ export class WorkApi {
     });
   }
 
-  private async request(path: string, init: RequestInit): Promise<unknown> {
+  private scopedPath(path: string): string {
+    if (this.scopedProjectId === null) return path;
+    return `/projects/${encodeURIComponent(this.scopedProjectId)}${path}`;
+  }
+
+  private async hostGet(path: string, signal: AbortSignal): Promise<unknown> {
+    return this.hostRequest(path, { signal });
+  }
+
+  private async hostPost(path: string, body: unknown, signal: AbortSignal): Promise<unknown> {
+    return this.hostRequest(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  }
+
+  private async hostRequest(path: string, init: RequestInit): Promise<unknown> {
     if (!this.apiBase) {
       throw new ApiProblem(401, { code: "unauthorized", message: "", safeNextActions: [] });
     }
@@ -1984,11 +2016,16 @@ export class WorkApi {
     });
     const payload = await responsePayload(response);
     if (!response.ok) {
-      if (response.status === 401 || response.status === 404) {
+      if (response.status === 401) {
         clearStoredApiBase();
+        this.apiBase = "";
       }
       throw new ApiProblem(response.status, parseApiError(payload));
     }
     return payload;
+  }
+
+  private async request(path: string, init: RequestInit): Promise<unknown> {
+    return this.hostRequest(this.scopedPath(path), init);
   }
 }

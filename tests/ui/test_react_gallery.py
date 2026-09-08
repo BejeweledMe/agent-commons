@@ -124,7 +124,10 @@ def test_gallery_source_uses_a_csp_safe_board_and_cookie_session_typed_refusal()
     assert 'className="gallery-board"' in source
     assert "<ScreenCard" in source
     assert "style={{" not in source
-    assert "fetch(`${currentApiBase}/gallery`" in source
+    assert "fetch(`${currentApiBase}/projects`" in source
+    assert "let scopedApiBase = currentApiBase;" in source
+    assert "scopedApiBase = `${currentApiBase}/projects/${encodeURIComponent(selected)}`" in source
+    assert "fetch(`${scopedApiBase}/gallery`" in source
     assert 'fetch("/api/auth/exchange"' in source
     assert 'credentials: "same-origin"' in source
     assert "window.history.replaceState" in source
@@ -133,7 +136,8 @@ def test_gallery_source_uses_a_csp_safe_board_and_cookie_session_typed_refusal()
     assert "window.sessionStorage.getItem(API_BASE_STORAGE_KEY)" in source
     assert "window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value)" in source
     assert "clearStoredApiBase();" in source
-    assert "response.status === 401 || response.status === 404" in source
+    assert "projectsResponse.status !== 404" in source
+    assert "if (response.status === 401)" in source
     assert "localStorage" not in source
     assert "Authorization" not in source
     assert "tokenFromFragment" not in source

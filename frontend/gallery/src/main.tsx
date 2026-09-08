@@ -38,9 +38,12 @@ type FeedbackState =
   | { kind: "authentication_required"; code: "unauthorized" }
   | { kind: "error"; code: string };
 type SessionExchange = { api_base?: unknown };
+type ProjectRow = { id: string; name: string; archived: boolean; available: boolean; state: "ready" | "missing" | "identity_conflict" };
+type ProjectListResponse = { schema: "agent_commons.project_list.v1"; default_project_id: string | null; projects: ProjectRow[] };
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
 const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
+const PROJECT_ID = /^project\.[a-f0-9]{32}$/;
 const ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
 const SUPPORTED_MEDIA = new Set(["image/png", "image/jpeg"]);
 const FEEDBACK_CODES = new Set([
@@ -78,6 +81,32 @@ function rememberApiBase(value: unknown): string {
   if (typeof value !== "string" || !API_BASE_PATTERN.test(value)) throw new Error("local_session_exchange_failed");
   try { window.sessionStorage.setItem(API_BASE_STORAGE_KEY, value); } catch { /* Keep it in this page closure. */ }
   return value;
+}
+
+function projectFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get("project");
+  return value !== null && PROJECT_ID.test(value) ? value : null;
+}
+function galleryLocation(projectId: string | null): string {
+  return `/gallery${projectId === null ? "" : `?project=${encodeURIComponent(projectId)}`}`;
+}
+function projectName(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || [...value].length > 160
+    || new TextEncoder().encode(value).byteLength > 640) throw new Error("gallery_contract_invalid");
+  return value;
+}
+function parseProjectList(value: unknown): ProjectListResponse {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("gallery_contract_invalid");
+  const payload = value as Record<string, unknown>;
+  if (payload.schema !== "agent_commons.project_list.v1" || !(payload.default_project_id === null || PROJECT_ID.test(payload.default_project_id as string)) || !Array.isArray(payload.projects)) throw new Error("gallery_contract_invalid");
+  const projects = payload.projects.map((item): ProjectRow => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) throw new Error("gallery_contract_invalid");
+    const row = item as Record<string, unknown>;
+    if (!PROJECT_ID.test(row.id as string) || typeof row.archived !== "boolean" || typeof row.available !== "boolean"
+      || (row.state !== "ready" && row.state !== "missing" && row.state !== "identity_conflict")) throw new Error("gallery_contract_invalid");
+    return { id: row.id as string, name: projectName(row.name), archived: row.archived, available: row.available, state: row.state };
+  });
+  return { schema: "agent_commons.project_list.v1", default_project_id: payload.default_project_id as string | null, projects };
 }
 
 function message(locale: Locale, key: MessageKey): string { return messages[locale][key]; }
@@ -127,6 +156,8 @@ function GalleryApp(): ReactElement {
   const [locale, setLocale] = useState<Locale>("en");
   const [state, setState] = useState<GalleryState>({ kind: "checking" });
   const [apiBase, setApiBase] = useState("");
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => projectFromSearch(window.location.search));
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
   const [inspector, setInspector] = useState<InspectorState>({ kind: "closed" });
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: "idle" });
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -157,6 +188,12 @@ function GalleryApp(): ReactElement {
     applyDocumentLocale(document.documentElement, locale);
   }, [locale]);
 
+  useEffect(() => {
+    const onPop = (): void => setActiveProjectId(projectFromSearch(window.location.search));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   function revokeObjectUrl(): void {
     if (objectUrlRef.current !== null) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = null;
@@ -166,7 +203,7 @@ function GalleryApp(): ReactElement {
     const controller = new AbortController();
     const exchangeCode = exchangeCodeFromFragment();
     let currentApiBase = storedApiBase();
-    window.history.replaceState(null, "", window.location.pathname);
+    window.history.replaceState(null, "", galleryLocation(activeProjectId));
 
     async function loadGallery(): Promise<GalleryResponse> {
       if (exchangeCode !== null) {
@@ -180,9 +217,32 @@ function GalleryApp(): ReactElement {
         catch { clearStoredApiBase(); throw new Error("local_session_exchange_failed"); }
       }
       if (!currentApiBase) throw new Error("local_session_exchange_failed");
-      setApiBase(currentApiBase);
-      const response = await fetch(`${currentApiBase}/gallery`, { credentials: "same-origin", signal: controller.signal });
-      if (response.status === 401 || response.status === 404) { clearStoredApiBase(); throw new Error("local_session_exchange_failed"); }
+      let scopedApiBase = currentApiBase;
+      try {
+        const projectsResponse = await fetch(`${currentApiBase}/projects`, { credentials: "same-origin", signal: controller.signal });
+        if (projectsResponse.status === 401) { clearStoredApiBase(); throw new Error("local_session_exchange_failed"); }
+        if (projectsResponse.status !== 404) {
+          if (!projectsResponse.ok) throw new Error("gallery_unavailable");
+          const projects = parseProjectList(await readBoundedJson(projectsResponse, 131_072));
+          const selected = activeProjectId ?? projects.default_project_id ?? projects.projects.find((item) => item.available && item.state === "ready" && !item.archived)?.id ?? null;
+          if (selected === null) throw new Error("project_unavailable");
+          const project = selected === null ? null : projects.projects.find((item) => item.id === selected);
+          if (project === undefined || project === null || !project.available || project.state !== "ready") throw new Error("project_unavailable");
+          if (activeProjectId !== selected) {
+            window.history.replaceState(null, "", galleryLocation(selected));
+            setActiveProjectId(selected);
+          }
+          setActiveProjectName(project.name);
+          scopedApiBase = `${currentApiBase}/projects/${encodeURIComponent(selected)}`;
+        }
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        if (error instanceof Error && error.message === "local_session_exchange_failed") throw error;
+        throw error;
+      }
+      setApiBase(scopedApiBase);
+      const response = await fetch(`${scopedApiBase}/gallery`, { credentials: "same-origin", signal: controller.signal });
+      if (response.status === 401) { clearStoredApiBase(); throw new Error("local_session_exchange_failed"); }
       const raw = await readBoundedJson(response);
       if (!response.ok && (raw as { schema?: unknown }).schema !== "agent_commons.gallery.v1") {
         throw new Error(safeErrorCode(raw, READ_REFUSAL_CODES) ?? "gallery_unavailable");
@@ -202,7 +262,7 @@ function GalleryApp(): ReactElement {
       setState({ kind: "gallery_unavailable", code });
     });
     return () => controller.abort();
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => () => {
     previewRequests.current.abort();
@@ -326,13 +386,14 @@ function GalleryApp(): ReactElement {
   const inspectorScreen = inspector.kind === "closed" ? null : inspector.screen;
   const stateHelpKey: MessageKey = state.kind === "gallery_unavailable" && state.code === "setup_uninitialized"
     ? "setup_uninitialized_help" : state.kind === "gallery_unavailable" && state.code === "setup_not_a_repository"
-      ? "setup_not_a_repository_help" : state.kind === "checking" ? "checking_access" : (`${state.kind}_help` as MessageKey);
+      ? "setup_not_a_repository_help" : state.kind === "gallery_unavailable" && state.code === "project_unavailable"
+        ? "project_unavailable_help" : state.kind === "checking" ? "checking_access" : (`${state.kind}_help` as MessageKey);
 
   return (
     <main className="gallery-app">
       <p className="sr-only" aria-live="polite">{announcement}</p>
       <header className="gallery-header">
-        <div><p className="gallery-eyebrow">Agent Commons</p><h1>{text("app_title")}</h1><p className="gallery-subtitle">{text("app_subtitle")}</p></div>
+        <div><p className="gallery-eyebrow">Agent Commons</p><h1>{text("app_title")}</h1><p className="gallery-subtitle">{activeProjectName === null ? text("app_subtitle") : `${text("gallery_project")}: ${activeProjectName}`}</p>{activeProjectId !== null ? <a className="gallery-backlink" href={`/work?project=${encodeURIComponent(activeProjectId)}`}>{text("gallery_back_to_work")}</a> : null}</div>
         <div className="locale-switcher" aria-label={text("language")} role="group">
           <button aria-label={text("switch_to_english")} aria-pressed={locale === "en"} className={locale === "en" ? "locale-button locale-button-selected" : "locale-button"} onClick={() => setLocale("en")} type="button">EN</button>
           <button aria-label={text("switch_to_russian")} aria-pressed={locale === "ru"} className={locale === "ru" ? "locale-button locale-button-selected" : "locale-button"} onClick={() => setLocale("ru")} type="button">RU</button>

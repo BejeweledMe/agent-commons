@@ -257,6 +257,12 @@ class _BoundApiRoutes:
     def _bound_path(self, path: str) -> str:
         if not path.startswith("/api/"):
             raise ValueError(f"API routes must start with /api/: {path}")
+        if not self.api_base:
+            # A project is mounted below the process-wide opaque base.  Its
+            # route registrar still speaks the long-standing logical `/api`
+            # vocabulary, while Starlette removes the mount prefix before the
+            # project application sees the request.
+            return path.removeprefix("/api")
         return self.api_base + path.removeprefix("/api")
 
     def get(self, path: str, **kwargs: Any) -> Callable[[Any], Any]:
@@ -354,6 +360,10 @@ def create_app(
     port: int,
     exchange_code: str | None = None,
     api_base: str | None = None,
+    hosted: bool = False,
+    project_host: Any | None = None,
+    read_only: bool = False,
+    manage_shutdown: bool = True,
 ) -> FastAPI:
     """Build the local UI with a private session token and exchange code.
 
@@ -368,30 +378,52 @@ def create_app(
     supplies an exchange code and therefore never selects that exception.
     """
 
+    if project_host is not None:
+        if hosted:
+            raise ValueError("a hosted project cannot contain another project host")
+        return project_host.create_app(
+            token=token,
+            port=port,
+            exchange_code=exchange_code,
+            api_base=api_base,
+        )
     app = FastAPI(title="Agent Commons UI", docs_url=None, redoc_url=None, openapi_url=None)
-    hosts = allowed_hosts(port)
-    origins = allowed_origins(port)
-    selected_api_base = (
-        api_base
-        if api_base is not None
-        else new_api_base()
-        if exchange_code is not None
-        else "/api"
-    )
-    if selected_api_base != "/api" and (
-        not selected_api_base.startswith("/api/")
-        or selected_api_base.endswith("/")
-        or "?" in selected_api_base
-        or "#" in selected_api_base
-    ):
-        raise ValueError("api_base must be a non-empty /api/<opaque-path> prefix")
-    browser_session = LocalBrowserSession(
-        exchange_code=exchange_code if exchange_code is not None else new_token(),
-        session_token=token,
-        api_base=selected_api_base,
-    )
-    app.state.api_base = browser_session.api_base
-    api_routes = _BoundApiRoutes(app, browser_session.api_base)
+    # A hosted project is deliberately a route-only application.  The outer
+    # process owns the one browser-session exchange, Host/Origin boundary,
+    # CSP/static shell, and cookie.  Mounting ordinary `create_app` instances
+    # would otherwise create independent guards and exchange codes.
+    if hosted:
+        if api_base not in (None, ""):
+            raise ValueError("hosted project applications use an empty local API base")
+        selected_api_base = ""
+        browser_session: LocalBrowserSession | None = None
+    else:
+        selected_api_base = (
+            api_base
+            if api_base is not None
+            else new_api_base()
+            if exchange_code is not None
+            else "/api"
+        )
+        if selected_api_base != "/api" and (
+            not selected_api_base.startswith("/api/")
+            or selected_api_base.endswith("/")
+            or "?" in selected_api_base
+            or "#" in selected_api_base
+        ):
+            raise ValueError("api_base must be a non-empty /api/<opaque-path> prefix")
+        browser_session = LocalBrowserSession(
+            exchange_code=exchange_code if exchange_code is not None else new_token(),
+            session_token=token,
+            api_base=selected_api_base,
+        )
+    app.state.api_base = selected_api_base
+    api_routes = _BoundApiRoutes(app, selected_api_base)
+
+    if not hosted:
+        assert browser_session is not None
+        hosts = allowed_hosts(port)
+        origins = allowed_origins(port)
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Any]) -> Response:
@@ -426,6 +458,7 @@ def create_app(
         return response
 
     def _authorized(request: Request) -> bool:
+        assert browser_session is not None
         return browser_session.session_matches(request.cookies.get(SESSION_COOKIE_NAME))
 
     def _is_bound_api_path(request: Request) -> bool:
@@ -450,6 +483,7 @@ def create_app(
         if not _same_origin(request):
             return _error(403, "forbidden_origin", "cross-origin requests are refused")
         body = await _json_body(request)
+        assert browser_session is not None
         if browser_session.consume_exchange_code(body.get("code")) is None:
             return _error(
                 401,
@@ -499,35 +533,36 @@ def create_app(
 
     app.add_exception_handler(_NotInitialized, _not_initialized)
 
-    # The Gallery bundle holds no workspace data, so it is served as a public
-    # shell like the legacy root. Its API bootstrap uses the same HTTP-only
-    # browser session established from the one-time fragment code.
-    gallery_directory = gallery_static_directory()
-    app.mount(
-        "/gallery/assets",
-        StaticFiles(directory=gallery_directory / "assets"),
-        name="gallery-assets",
-    )
-    register_work_routes(app)
+    if not hosted:
+        # The Gallery bundle holds no workspace data, so it is served as a public
+        # shell like the legacy root. Its API bootstrap uses the same HTTP-only
+        # browser session established from the one-time fragment code.
+        gallery_directory = gallery_static_directory()
+        app.mount(
+            "/gallery/assets",
+            StaticFiles(directory=gallery_directory / "assets"),
+            name="gallery-assets",
+        )
+        register_work_routes(app)
 
-    @app.get("/", response_class=HTMLResponse)
-    async def index() -> Response:
-        nonce = secrets.token_urlsafe(16)
-        body = read_spa().replace("__CSP_NONCE__", nonce)
-        response = HTMLResponse(body)
-        response.headers["Content-Security-Policy"] = content_security_policy(nonce)
-        return response
+        @app.get("/", response_class=HTMLResponse)
+        async def index() -> Response:
+            nonce = secrets.token_urlsafe(16)
+            body = read_spa().replace("__CSP_NONCE__", nonce)
+            response = HTMLResponse(body)
+            response.headers["Content-Security-Policy"] = content_security_policy(nonce)
+            return response
 
-    @app.get("/gallery", response_class=HTMLResponse)
-    @app.get("/gallery/", response_class=HTMLResponse)
-    async def gallery() -> Response:
-        response = HTMLResponse(read_gallery_shell())
-        response.headers["Content-Security-Policy"] = gallery_content_security_policy()
-        return response
+        @app.get("/gallery", response_class=HTMLResponse)
+        @app.get("/gallery/", response_class=HTMLResponse)
+        async def gallery() -> Response:
+            response = HTMLResponse(read_gallery_shell())
+            response.headers["Content-Security-Policy"] = gallery_content_security_policy()
+            return response
 
-    @app.get("/favicon.ico")
-    async def favicon() -> Response:
-        return Response(status_code=204)
+        @app.get("/favicon.ico")
+        async def favicon() -> Response:
+            return Response(status_code=204)
 
     @api_routes.get("/api/meta")
     async def meta() -> Response:
@@ -550,9 +585,11 @@ def create_app(
         store_factory=context.library_store,
         authorize_edit=context.authorize_library_edit,
         editing_enabled=lambda: (
-            context.writes_enabled and missing_workspace_state(context.repo) is None
+            not read_only
+            and context.writes_enabled
+            and missing_workspace_state(context.repo) is None
         ),
-        register_writes=context.operator_panel,
+        register_writes=context.operator_panel and not read_only,
     )
     register_task_edit_reads(api_routes, manager=context.manager, dependencies=reads_workspace)
 
@@ -735,7 +772,7 @@ def create_app(
         except CommonsError as exc:
             return _error(422, type(exc).__name__, str(exc))
 
-    if context.operator_panel:
+    if context.operator_panel and not read_only:
         # One condition for the whole non-GET surface, and it is the only
         # structural one left.  Every capability this panel might gain -- a
         # workspace, an operator runtime config, a catalogue beside it -- can
@@ -754,7 +791,8 @@ def create_app(
         # exists -- it is what makes it exist -- so it is bound to nothing.
         _register_setup(_RouteGroup(api_routes), context)
 
-    app.router.add_event_handler("shutdown", context._launch_coordinator.shutdown)
+    if not hosted and manage_shutdown:
+        app.router.add_event_handler("shutdown", context._launch_coordinator.shutdown)
 
     @api_routes.get("/api/stream", dependencies=reads_workspace)
     async def stream(request: Request) -> Response:
@@ -764,6 +802,21 @@ def create_app(
             media_type="text/event-stream",
             headers={"X-Accel-Buffering": "no"},
         )
+
+    if hosted:
+        # `FastAPI.middleware()` and the exchange decorator above deliberately
+        # share the single-route registration implementation with the ordinary
+        # app.  A hosted project must expose neither of them: the containing
+        # host already performed both checks before dispatch.  Removing these
+        # construction-time registrations leaves the child with only logical
+        # project routes and prevents an accidental second exchange endpoint.
+        app.user_middleware.clear()
+        app.middleware_stack = None
+        app.router.routes[:] = [
+            route
+            for route in app.router.routes
+            if getattr(route, "path", None) != AUTH_EXCHANGE_PATH
+        ]
 
     return app
 
@@ -1390,6 +1443,7 @@ def serve(
     port: int = 0,
     open_browser: bool = True,
     emit: Callable[[int, str], None] | None = None,
+    project_host: Any | None = None,
 ) -> None:
     """Bind loopback, print the one-time URL, then run the server."""
 
@@ -1407,6 +1461,7 @@ def serve(
         token=session_token,
         exchange_code=exchange_code,
         port=bound_port,
+        project_host=project_host,
     )
     if emit is not None:
         emit(bound_port, exchange_code)

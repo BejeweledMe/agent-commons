@@ -1,0 +1,38 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "Project host, session and launch lifetime, server and CLI; registry subject to separate changes-required review",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_host.py",
+      "sha256": "61f037cd361358da674e7a5c7b2053f7c3c9c377fced40d2604cb5192398c7ef"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "81c3af5ea8bd36077ee2cbc3983d72ee8836f4c40ea18a5b631b104e940369b2"
+    },
+    {
+      "path": "src/agent_commons/ui/context.py",
+      "sha256": "b4917a6720240b5c4f60b6072989724f1c2858c74a94c1c0ba1208405dae77a5"
+    },
+    {
+      "path": "src/agent_commons/ui/session_owner.py",
+      "sha256": "b0f05aeb780b9750087d15d0393c084f7ef6eb7b47783f42e0755aa7fd02adbc"
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "cc5c892392ad2cccc38630d60fc8373d115e60d835356a01076992c140d1f3d9"
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "sha256": "73c5ca4f86bccaa385eb6dc2b2eee8a653dab40419e20bc1c4e24cff1e26645a"
+    },
+    {
+      "path": "tests/ui/test_project_host.py",
+      "sha256": "9419b06269db02cfd8e57b92ba39786628853750a859ee97be3aaabed6e74275"
+    },
+    {
+      "path": "tests/cli/test_ui_command.py",
+      "sha256": "2e010fedf1aeb1f23337ad533d3ab9258b26da1e9d20548d97cefb2741a5296b"
+    }
+  ]
+}

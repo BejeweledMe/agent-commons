@@ -1,0 +1,85 @@
+{
+  "schema": "agent-commons.project-workspaces-release-verification.v1",
+  "date": "2026-09-08",
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "source_manifest": {
+    "path": "docs/evidence/2026-09-08/project-workspaces-final-source-manifest.json",
+    "sha256": "2acd1c56321425eda70ea671e9ab2f746dab34115889dff8d27cc3d424874aaf",
+    "verified_paths": 45
+  },
+  "independent_review": {
+    "review_id": "review.4A9YS62RHV353KPM4RK93BY59P",
+    "target_revision": "evt.01M205ZD3CA8WY70GJHMWP947G",
+    "completion_revision": "evt.01M206BABSRQBZYD9VC34KYFGZ",
+    "verdict": "approved",
+    "scope": "source judgment; not task acceptance or live qualification"
+  },
+  "green_contract": {
+    "command": "make check",
+    "exit_code": 0,
+    "work": {
+      "passed": 132
+    },
+    "gallery": {
+      "passed": 27
+    },
+    "python": {
+      "passed": 2103,
+      "skipped": 13,
+      "warnings": 2,
+      "seconds": 868.93
+    },
+    "python_version": "3.14.5",
+    "node_version": "24.20.0",
+    "limits": "12 intentionally withheld automatic-governance paths and one CI-only environment check skipped locally"
+  },
+  "wheel": {
+    "filename": "agent_commons-0.1.0-py3-none-any.whl",
+    "sha256": "3ee9995e05e7277e959e184b11d9bdaefbfe952e5cf09b4bf046db87ae38705a",
+    "bytes": 2086004,
+    "build": "uv build --wheel",
+    "installation": "uv tool install with mcp,ui extras and constraints exported from uv.lock",
+    "isolated_browser": {
+      "passed": true,
+      "steps": [
+        "Authenticated Work opened",
+        "Created Beta through the UI",
+        "Created a task in Beta",
+        "Alpha draft preserved and Beta task isolated",
+        "Renamed Beta through project actions",
+        "Archived and restored Beta without losing its task",
+        "Uncertain task retry settles after Alpha to Beta to Alpha",
+        "Russian narrow viewport has no horizontal page overflow",
+        "Imported a synthetic screen and published a Design Package in Beta",
+        "Gallery and return link preserve Beta identity",
+        "Alpha Gallery remains empty after publishing in Beta",
+        "Every observed tracker SSE connection is explicitly project-scoped"
+      ],
+      "provider_calls": 0
+    }
+  },
+  "cleanup": {
+    "previewed_and_removed": [
+      "build/",
+      ".pytest_cache/",
+      ".ruff_cache/"
+    ],
+    "preserved": [
+      "canonical history",
+      "review provenance",
+      "packaged runtime assets",
+      "dependency environments"
+    ]
+  },
+  "security": {
+    "new_public_evidence_secret_pattern_scan": "no matches; synthetic screenshots visually inspected",
+    "private_source_or_provider_output_persisted_in_public_evidence": false
+  },
+  "boundaries": {
+    "l1": "open",
+    "r2": "open",
+    "fable_assessment": "awaiting separate file-scoped permission",
+    "live_canary": "not run; awaiting separate authorization",
+    "remote_ci": "verify on the associated pull request and main run; local evidence is not CI attestation"
+  }
+}

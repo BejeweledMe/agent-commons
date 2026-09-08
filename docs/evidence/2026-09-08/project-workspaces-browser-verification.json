@@ -1,0 +1,56 @@
+{
+  "schema": "agent_commons.project_workspace_browser_verification.v1",
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "source_manifest": "docs/evidence/2026-09-08/project-workspaces-final-source-manifest.json",
+  "source_manifest_sha256": "2acd1c56321425eda70ea671e9ab2f746dab34115889dff8d27cc3d424874aaf",
+  "result": "passed",
+  "verifier": "implementation lead; not independent browser review",
+  "browser": {
+    "engine": "Chromium",
+    "playwright": "1.62.1",
+    "desktop_viewport": [
+      1440,
+      1080
+    ],
+    "narrow_viewport": [
+      390,
+      844
+    ]
+  },
+  "harness_sha256": "5c4f0eb18773cc7e6dcd27d3afdc17deda896cd7b50c6cc9035d0a57303b5eb1",
+  "verified": [
+    "Authenticated Work opened using a fresh one-use exchange in memory",
+    "Created Beta through UI without a configured provider",
+    "Created a task in Beta; Alpha draft survives switching and Beta task is absent in Alpha",
+    "Renamed, archived and restored Beta without deleting its task",
+    "Injected one failed task POST in Alpha; original-key retry after Alpha to Beta to Alpha completed and cleared busy state",
+    "Russian 390px viewport has no document-level horizontal overflow",
+    "Imported synthetic PNG and published Design Package in Beta",
+    "Gallery backlink retains Beta; Alpha Gallery stays empty",
+    "Every observed tracker SSE connection uses an explicit project-qualified path"
+  ],
+  "not_verified": [
+    "Live provider qualification or quota consumption",
+    "Host-crash provider reattachment",
+    "Four-model council including Fable",
+    "Production user data or deployed service state"
+  ],
+  "screenshots": [
+    {
+      "path": "docs/evidence/2026-09-08/projects-beta.png",
+      "sha256": "edca4c13b96a8a5507247a1eb6ce59aa892099da09da7aa1cd62eb000abf3028",
+      "data": "synthetic isolated project fixture"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/projects-mobile-ru.png",
+      "sha256": "0fcdf4103e60c4ef455d25b65edb5fd093e08e3cc90c839a1951dabbe1ae685c",
+      "data": "synthetic isolated project fixture"
+    },
+    {
+      "path": "docs/evidence/2026-09-08/projects-gallery-beta.png",
+      "sha256": "c620b037a55c0fe6fb9f6bbdf7927b596630cb2516926a13879bb836c4ca30ff",
+      "data": "synthetic isolated project fixture"
+    }
+  ],
+  "privacy": "Fresh temporary workspaces and synthetic task/screen data. No authentication code, private configuration, provider output or test transcript is retained in this artifact."
+}

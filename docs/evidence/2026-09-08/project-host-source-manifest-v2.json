@@ -1,0 +1,42 @@
+{
+  "baseline": "605c0d7c9c5965c0a8303550056d07ce63afa697",
+  "scope": "project-host-source-manifest-v2 after changes-required review; independent re-review pending",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_host.py",
+      "sha256": "35a2b24a749e916ae5426a18e2ae75228d005a473d8f097d6d50c17032ef18a8"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "63864b6e95117db8e11c0361e9f03aaa75281bdbf4f9d42e585461dd1d2254ab"
+    },
+    {
+      "path": "src/agent_commons/ui/context.py",
+      "sha256": "b4917a6720240b5c4f60b6072989724f1c2858c74a94c1c0ba1208405dae77a5"
+    },
+    {
+      "path": "src/agent_commons/ui/session_owner.py",
+      "sha256": "b0f05aeb780b9750087d15d0393c084f7ef6eb7b47783f42e0755aa7fd02adbc"
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "50dcd92955a538a29fd5838e53277a946782a7c4358f035178b471c1f17be737"
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "sha256": "73c5ca4f86bccaa385eb6dc2b2eee8a653dab40419e20bc1c4e24cff1e26645a"
+    },
+    {
+      "path": "tests/ui/test_project_host.py",
+      "sha256": "bdf23615be37a6a526c79f62d13c7e7eecd86a9aa28403f3a448d0d024d19d3d"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "c989863b4ad99322aed0ce27a8d1c9ea43ac39941fcb403c538f8e2a3feef287"
+    },
+    {
+      "path": "tests/cli/test_ui_command.py",
+      "sha256": "889067630da29ecf480d641f65880a3b08f04f5e02a29531399514c98d2a15ff"
+    }
+  ]
+}

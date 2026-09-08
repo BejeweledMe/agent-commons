@@ -48,6 +48,7 @@ code { overflow-wrap: anywhere; }
 
 h1 { font-size: clamp(1.3rem, 2vw, 1.8rem); margin-bottom: 3px; }
 .gallery-subtitle { color: #b9c6dd; font-size: 0.9rem; margin-bottom: 0; }
+.gallery-backlink { color: #b7d2ff; display: inline-block; font-size: .84rem; margin-top: 7px; }
 .locale-switcher { display: flex; gap: 5px; }
 
 .locale-button, .icon-button, .screen-card-action {
@@ -279,9 +280,12 @@ h1 { font-size: clamp(1.3rem, 2vw, 1.8rem); margin-bottom: 3px; }
   .inspector-details { border-left: 0; border-top: 1px solid #33415d; overflow: visible; }
 }
 /* Image imports are explicit authoring actions, separate from publication. */
-.screen-import { margin-block: 1.5rem; padding: 1rem; border: 1px solid var(--border, #dce2e8); border-radius: .75rem; background: var(--surface, #fff); }
-.screen-import h3 { margin-top: 0; }
+.screen-import { background: #131f35; border: 1px solid #435678; border-radius: .75rem; margin-block: 1.5rem; padding: 1rem; }
+.screen-import h3 { color: #e5edfb; margin-top: 0; }
 .screen-import form { display: grid; gap: .6rem; max-width: 42rem; }
-.screen-import input { min-width: 0; width: 100%; padding: .65rem; border: 1px solid var(--border, #dce2e8); border-radius: .4rem; font: inherit; }
-.screen-import button { justify-self: start; min-height: 2.5rem; padding: .6rem 1rem; font: inherit; }
-.screen-import [role="alert"] { color: var(--danger, #a12828); }
+.screen-import label { color: #c5d1e6; font-weight: 650; }
+.screen-import input { background: #0b1425; border: 1px solid #617391; border-radius: .4rem; color: #f1f5f9; font: inherit; min-width: 0; padding: .65rem; width: 100%; }
+.screen-import input:focus-visible, .screen-import button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.screen-import button { background: #284991; border: 1px solid #7898dd; border-radius: 7px; color: #fff; cursor: pointer; font: inherit; justify-self: start; min-height: 2.5rem; padding: .6rem 1rem; }
+.screen-import button:disabled { cursor: not-allowed; opacity: .55; }
+.screen-import [role="alert"] { color: #ffb4b4; }
