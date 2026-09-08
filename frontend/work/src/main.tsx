@@ -633,6 +633,14 @@ function WorkApp(): ReactElement {
       return true;
     } catch (error: unknown) {
       if (stillCurrent() && !(error instanceof DOMException && error.name === "AbortError")) {
+        if (action === "runtime" && error instanceof ApiProblem
+          && error.status === 409 && error.apiError?.code === "setup_configured") {
+          // This definite refusal happens before any configuration write. A
+          // previous successful write's refresh may have been cancelled above;
+          // replace that read without replaying setup or inventing success.
+          void refreshAfterConfirmed(action, api, null, projectId);
+          return false;
+        }
         // The retry retains the original immutable project client and input
         // closure. It may only run after this same project is visible again.
         recordActionError(action, error, () => {
@@ -648,7 +656,7 @@ function WorkApp(): ReactElement {
   async function refreshAfterConfirmed(
     action: string,
     api: WorkApi,
-    notice: MessageKey,
+    notice: MessageKey | null,
     projectId: string | null
   ): Promise<boolean> {
     if (routeRef.current.projectId !== projectId) return false;

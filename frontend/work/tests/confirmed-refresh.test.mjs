@@ -16,6 +16,9 @@ const bind = new Function('dependencies', `const { routeRef, projectSelectionRef
 const projectSource = readFileSync(resolve(root, 'src/projectWorkspace.ts'), 'utf8');
 const readClass = projectSource.slice(projectSource.indexOf('export class ProjectReadRequest'), projectSource.indexOf('/** Drafts live'));
 const ProjectReadRequest = new Function(stripTypeScriptTypes(readClass.replace('export class', 'class')) + '; return ProjectReadRequest;')();
+const apiSource = readFileSync(resolve(root, 'src/api.ts'), 'utf8');
+const problemClass = apiSource.slice(apiSource.indexOf('export class ApiProblem'), apiSource.indexOf('function isObject'));
+const ApiProblem = new Function(stripTypeScriptTypes(problemClass.replace('export class', 'class')) + '; return ApiProblem;')();
 function deferred() { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return {promise,resolve,reject}; }
 function fixture() {
   let generation=0, active=null, state={kind:'ready',data:'initial',notice:null};
@@ -24,8 +27,8 @@ function fixture() {
     setActiveAction:(v)=>{active=v;},clearActionError:(a)=>{delete errors[a];},
     recordActionError:(a,error,retry)=>{errors[a]={kind:'mutation',error,retry};},
     recordRefreshError:(a,error,retry)=>{errors[a]={kind:'refresh',error,retry};},
-    setState:(v)=>{state=typeof v==='function'?v(state):v;},ApiProblem:class extends Error {}});
-  return {...api,errors,reads,get active(){return active;},get state(){return state;}, switchProject(id){generation++;routeRef.current.projectId=id;active=null;state={kind:'ready',data:id,notice:null};}};
+    setState:(v)=>{state=typeof v==='function'?v(state):v;},ApiProblem});
+  return {...api,errors,reads,get active(){return active;},get state(){return state;}, checking(){state={kind:'checking'};}, switchProject(id){generation++;routeRef.current.projectId=id;active=null;state={kind:'ready',data:id,notice:null};}};
 }
 test('confirmed write resolves and clears busy while its workspace read is still pending', async()=>{
   const f=fixture(), read=deferred();let settled=false, posts=0;
@@ -64,4 +67,40 @@ for(const phase of ['write','read'])test(`A to B switch during ${phase} ignores 
 test('an older confirmed read cannot overwrite a newer explicit workspace read',async()=>{
   const f=fixture(), read=deferred();void f.perform('role',{load:()=>read.promise},async()=>{},'created');await tick();
   f.reads.begin();read.resolve('old');await tick();assert.equal(f.state.data,'initial');
+});
+test('already-configured refusal replaces the cancelled confirmed refresh without replaying setup',async()=>{
+  const f=fixture(), oldRead=deferred(), freshRead=deferred();let posts=0, reads=0;
+  const client={load:()=>++reads===1?oldRead.promise:freshRead.promise};
+  const work=async()=>{if(++posts===2)throw new ApiProblem(409,{code:'setup_configured'});};
+  assert.equal(await f.perform('runtime',client,work,'configured'),true);
+  assert.equal(await f.perform('runtime',client,work,'configured'),false);
+  oldRead.resolve('setup_unconfigured');await tick();assert.equal(f.state.data,'initial');
+  freshRead.resolve('setup_configured');await tick();
+  assert.equal(f.state.data,'setup_configured');assert.equal(f.state.notice,'configured');
+  assert.equal(posts,2);assert.equal(reads,2);assert.equal(f.errors.runtime,undefined);
+});
+test('already-configured recovery failure retains success and retries only its read',async()=>{
+  const f=fixture(), oldRead=deferred();let posts=0, reads=0;
+  const client={load:async()=>{reads++;if(reads===1)return oldRead.promise;if(reads===2)throw new TypeError('offline');return 'setup_configured';}};
+  const work=async()=>{if(++posts===2)throw new ApiProblem(409,{code:'setup_configured'});};
+  await f.perform('runtime',client,work,'configured');await f.perform('runtime',client,work,'configured');await tick();
+  assert.equal(f.errors.runtime.kind,'refresh');assert.equal(f.state.notice,'configured');
+  f.errors.runtime.retry();await tick();oldRead.resolve('old');await tick();
+  assert.equal(posts,2);assert.equal(reads,3);assert.equal(f.state.data,'setup_configured');
+});
+test('a refused first setup invents no success notice while replacing a checking snapshot',async()=>{
+  const f=fixture(), read=deferred();
+  assert.equal(await f.perform('runtime',{load:()=>read.promise},async()=>{throw new ApiProblem(409,{code:'setup_configured'});},'configured'),false);
+  f.checking();read.resolve('setup_configured');await tick();
+  assert.equal(f.state.notice,null);assert.equal(f.errors.runtime,undefined);
+});
+test('late already-configured recovery cannot publish into another project',async()=>{
+  const f=fixture(), read=deferred();
+  await f.perform('runtime',{load:()=>read.promise},async()=>{throw new ApiProblem(409,{code:'setup_configured'});},'configured');
+  f.switchProject('B');read.resolve('A-configured');await tick();assert.equal(f.state.data,'B');assert.equal(f.state.notice,null);
+});
+test('a different runtime refusal remains a mutation error',async()=>{
+  const f=fixture();let reads=0;
+  await f.perform('runtime',{load:async()=>{reads++;}},async()=>{throw new ApiProblem(409,{code:'setup_unconfigured'});},'configured');
+  assert.equal(f.errors.runtime.kind,'mutation');assert.equal(reads,0);
 });

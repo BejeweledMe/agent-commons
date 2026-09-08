@@ -1,0 +1,63 @@
+{
+  "schema": "agent_commons.audit.exact_source.v1",
+  "checkpoint_date": "2026-09-09",
+  "base_head": "405d8c690d3c7e33fedb63828db9d30e6a6185e9",
+  "scope": "Complete corrective delta against immutable base commit; this manifest excludes itself. Unchanged bytes are inherited from the base.",
+  "parent_source_manifest": {
+    "path": "docs/evidence/2026-09-08/project-native-final-source-manifest.json",
+    "sha256": "ed1eeea12802af184fddaf4ed2867cbadcec9347068a0575e3b7212460656e84"
+  },
+  "python_source_sha256": "88531e7f103f226cd653af465ceac9d8264f0b9e38d939e808cb41079e0ddf61",
+  "files": [
+    {
+      "path": "docs/agent-platform-implementation-program.md",
+      "state": "present",
+      "sha256": "20bb3185046b2891624b57c0b6fc8d64ef3937b960e447bc2214c5a8d122f805"
+    },
+    {
+      "path": "docs/audits/2026-09-09-project-native-review-delivery.md",
+      "state": "present",
+      "sha256": "38418300d4c0401a1a26a85dda5a1753889856972fbc61cb94ed6b34915116b4"
+    },
+    {
+      "path": "docs/project-native-collaboration-implementation-plan.md",
+      "state": "present",
+      "sha256": "8ee8e30f02630ddb91812c08f9e1feda21c1d9518f8b149a605b4cd2453dd4bf"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "state": "present",
+      "sha256": "3ceca77b409e05ef279fa54304d2a307a154245f8c5d15fa37a9e49352262dbd"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "state": "present",
+      "sha256": "04244ab4e461461133803adf5a7dc4389bf6b2fc8b1e5056c432273b6d3e756e"
+    },
+    {
+      "path": "src/agent_commons/runtime/message_delivery.py",
+      "state": "present",
+      "sha256": "1cea1d8f3f71cf98a4909bafa5202170cd6f56f117ac5f8540332f4285bbff20"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DV06NGBp.js",
+      "state": "present",
+      "sha256": "af20f419af50af02a7f4eed7c7b3bd557cd65fffa78fd90bb0d394e33c9a008c"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-cJnL5_T-.js",
+      "state": "deleted",
+      "sha256": null
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "state": "present",
+      "sha256": "43b57c83bf5b8c87292b377c4b8d6cee1bdea51f9fce74b2624bb31cef7992cd"
+    },
+    {
+      "path": "tests/runtime/test_message_delivery.py",
+      "state": "present",
+      "sha256": "9d81cfab61e68bffab04ba737a99212ed25566ab67eff0df0292f4041e38d75b"
+    }
+  ]
+}

@@ -100,12 +100,16 @@ class MessageDeliveryStore:
             with _PROCESS_GUARD:
                 process_lock = _PROCESS_LOCKS.setdefault(key, threading.Lock())
             with process_lock:
-                descriptor = os.open(
-                    "receipts.lock",
-                    os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
-                    0o600,
-                    dir_fd=folder,
-                )
+                flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK
+                try:
+                    descriptor = os.open(
+                        "receipts.lock", flags | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=folder
+                    )
+                except FileExistsError:
+                    # Concurrent first writers must not use the shared
+                    # create-or-open path. Never recreate a vanished lock or
+                    # retry other errors against a potentially changed root.
+                    descriptor = os.open("receipts.lock", flags, dir_fd=folder)
                 try:
                     info = os.fstat(descriptor)
                     if not _regular(info):

@@ -217,11 +217,21 @@ def test_invalid_operations_rejected(store, kwargs):
 def test_processes_preserve_all_updates(store):
     import subprocess
     import sys
+    import time
 
-    program = """import sys
+    barrier = store.root.parent.parent / "start-barrier"
+    barrier.mkdir()
+    program = """import sys, time
 from pathlib import Path
 from agent_commons.runtime.message_delivery import MessageDeliveryStore
 store = MessageDeliveryStore(Path(sys.argv[1]), 'workspace')
+barrier = Path(sys.argv[3])
+(barrier / ('ready-' + sys.argv[2])).touch()
+deadline = time.monotonic() + 20
+while not (barrier / 'go').exists():
+    if time.monotonic() >= deadline:
+        raise TimeoutError('parent did not release the first-write barrier')
+    time.sleep(0.001)
 for number in range(int(sys.argv[2]) * 5, int(sys.argv[2]) * 5 + 5):
     store.record('thread.one', 'message.one', 'delegation.one',
                  attachment_id='attachment.' + f'{number:032x}')
@@ -230,7 +240,7 @@ for number in range(int(sys.argv[2]) * 5, int(sys.argv[2]) * 5 + 5):
     try:
         for number in range(4):
             child = subprocess.Popen(
-                [sys.executable, "-", str(store.root.parent.parent), str(number)],
+                [sys.executable, "-", str(store.root.parent.parent), str(number), str(barrier)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
@@ -239,6 +249,12 @@ for number in range(int(sys.argv[2]) * 5, int(sys.argv[2]) * 5 + 5):
             child.stdin.write(program.encode())
             child.stdin.close()
             child.stdin = None
+        deadline = time.monotonic() + 20
+        while len(list(barrier.glob("ready-*"))) != 4:
+            assert time.monotonic() < deadline, "workers did not reach the first-write barrier"
+            assert all(child.poll() is None for child in children), "worker failed before barrier"
+            time.sleep(0.001)
+        (barrier / "go").touch()
         for child in children:
             _, error = child.communicate(timeout=20)
             assert child.returncode == 0, error.decode()
@@ -248,3 +264,43 @@ for number in range(int(sys.argv[2]) * 5, int(sys.argv[2]) * 5 + 5):
                 child.kill()
             child.wait()
     assert len(store.show(*IDS)["attachments"]) == 20
+
+
+def test_lock_creation_is_exclusive_and_existing_open_cannot_create(store, monkeypatch):
+    real_open = os.open
+    lock_flags = []
+
+    def observe(path, flags, *args, **kwargs):
+        if path == "receipts.lock":
+            lock_flags.append(flags)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(delivery.os, "open", observe)
+    store.record(*IDS)
+    store.record(*IDS)
+    assert len(lock_flags) == 3
+    assert all(flags & os.O_EXCL and flags & os.O_CREAT for flags in lock_flags[:2])
+    assert not lock_flags[-1] & (os.O_EXCL | os.O_CREAT)
+    assert all(flags & os.O_NOFOLLOW and flags & os.O_NONBLOCK for flags in lock_flags)
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_missing_lock_open_fails_closed_without_retry(store, monkeypatch, existing):
+    if existing:
+        store.record(*IDS)
+    real_open = os.open
+    calls = []
+
+    def fail_missing(path, flags, *args, **kwargs):
+        if path == "receipts.lock":
+            calls.append(flags)
+            if existing and flags & os.O_EXCL:
+                return real_open(path, flags, *args, **kwargs)
+            raise FileNotFoundError("injected missing lock")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(delivery.os, "open", fail_missing)
+    with pytest.raises(IntegrityError) as refusal:
+        store.record(*IDS)
+    assert isinstance(refusal.value.__cause__, FileNotFoundError)
+    assert len(calls) == (2 if existing else 1)

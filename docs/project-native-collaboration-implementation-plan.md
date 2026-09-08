@@ -13,6 +13,13 @@ owns the latest verification and remaining delivery gates. Checkpoints below
 retain their historical source boundaries. Implementation or live qualification
 does not by itself close a canonical task or approve this branch.
 
+2026-09-09 review handoff: all nine implementation tasks are now submitted to
+independent `review`, with explicit operator authorization; none was accepted.
+The state table below remains a historical implementation checkpoint. Current
+review bindings, the subsequent runtime-refresh correction and open delivery
+gates are recorded in the
+[review and delivery checkpoint](audits/2026-09-09-project-native-review-delivery.md).
+
 ## Work graph and ownership
 
 ```mermaid
