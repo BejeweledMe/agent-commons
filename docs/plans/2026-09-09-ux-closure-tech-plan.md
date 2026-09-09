@@ -670,7 +670,9 @@ WP-15.3 (лимит для проверочных запусков), комми�
    его source fingerprint с checkout (`mcp_tool_contract_failed` при
    расхождении). После backend-пакета координатор переустанавливает tool по
    `docs/TROUBLESHOOTING.md` («Updating an exact source checkout»):
-   `uv tool install -q --force --reinstall-package agent-commons --python <.python-version> '.[mcp]'`,
+   `uv tool install -q --force --reinstall-package agent-commons --python <.python-version> '.[mcp,ui]'`
+   (именно с extra `ui`: сервис владельца на 8787 запускается из того же tool и
+   без `ui` не стартует),
    затем canary нужных профилей. Запущенный UI-сервис на 8787 после этого
    работает на старом коде до перезапуска; перезапуск делает владелец.
 9. **Бюджет попыток на сессию.** `OperatorLimits.parent_provider_units = 4`
