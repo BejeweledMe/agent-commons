@@ -1,7 +1,8 @@
 import { ProjectCreation, type FolderPurpose, type FolderSelection } from "./projectCreation.js";
 import "./projectCreation.css";
 import { ConversationButton, ConversationWorkspace } from "./components/ConversationPanel.js";
-import { ConversationSessions } from "./conversationState.js";
+import { ConversationSessions, prepareRunTaskId } from "./conversationState.js";
+import type { ConversationScope } from "./conversationApi.js";
 import "./conversation.css";
 import { OutputsButton, OutputsWorkspace } from "./components/OutputsPanel.js";
 import "./outputs.css";
@@ -16,18 +17,21 @@ import { AppHeader } from "./components/AppHeader";
 import { ProjectSidebar } from "./components/ProjectSidebar";
 import { FailurePanel } from "./components/FailurePanel";
 import { LibrarySection } from "./components/LibrarySection";
+import { BlueprintApplyOutcomePanel } from "./components/WorkBlueprintsSection.js";
+import { blueprintApplyOutcome, type BlueprintApplyIntent } from "./blueprintApplyOutcome.js";
 import { TaskComposer } from "./components/TaskComposer";
 import { LaunchRecoveryPanel } from "./components/LaunchRecoveryPanel";
-import { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, type LaunchIntent } from "./launchIntentState.js";
+import { DEFAULT_RUN_LIMIT_MINUTES, MAX_RUN_LIMIT_MINUTES, MIN_RUN_LIMIT_MINUTES, freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitSeconds, type LaunchIntent, type RunDraft } from "./launchIntentState.js";
 import { taskDependencyCatalog } from "./taskDependencyState.js";
 import type { TrackerViewState } from "./trackerState.js";
 import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkRoute } from "./appRouteState";
 import { ProjectDraftStore, ProjectReadRequest, ProjectRegistryApi, ProjectSelection, type ProjectInspection, type ProjectList } from "./projectWorkspace.js";
+import { providerReadinessLines, railSetupLabelKey, railSetupState } from "./setupReadiness.js";
 import { TrackerSection } from "./components/TrackerSection";
 import { WorkflowCard } from "./components/WorkflowCard";
 import { SpecializationPicker } from "./components/SpecializationPicker.js";
 import { LibraryApi } from "./libraryApi.js";
-import { sameLibraryRef, type LibraryRef, type LibraryRole, type LibraryState } from "./libraryTypes.js";
+import { sameLibraryRef, type BlueprintApplication, type LibraryRef, type LibraryRole, type LibraryState } from "./libraryTypes.js";
 import { TaskGraphApi } from "./taskGraphApi.js";
 import type {
   ContextPackOption,
@@ -69,12 +73,6 @@ type TaskDraft = {
   dependencyIds: readonly string[];
 };
 
-type RunDraft = {
-  agentId: string;
-  taskId: string;
-  contextPackKey: string;
-  designPackageKey: string;
-};
 type FormErrors = ReadonlySet<string>;
 type ActionError = { failure: Failure; retry: () => void; uncertain: boolean; retryKind: "mutation" | "refresh" };
 type ProjectTransient = {
@@ -91,7 +89,7 @@ type ProjectTransient = {
 
 const emptyRole: RoleDraft = { fromPresetId: "", name: "", profileId: "", rationale: "", contextMode: "fresh", provider: "", model: "", modelMode: "profile", specializationRef: null, specializationName: "" };
 const emptyTask: TaskDraft = { title: "", description: "", criteria: "", dependencyIds: [] };
-const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "", designPackageKey: "" };
+const emptyRun: RunDraft = { agentId: "", taskId: "", contextPackKey: "", designPackageKey: "", limitMinutes: String(DEFAULT_RUN_LIMIT_MINUTES) };
 
 function contextPackKey(option: ContextPackOption): string {
   return `${option.contextPackId}@${option.revision}`;
@@ -194,14 +192,17 @@ function failureFrom(error: unknown, text: (key: MessageKey) => string): Failure
   };
 }
 
-function setupLabel(state: string, text: (key: MessageKey) => string): string {
-  const keys: Readonly<Record<string, MessageKey>> = {
-    setup_not_a_repository: "setup_not_repository",
-    setup_uninitialized: "setup_uninitialized",
-    setup_unconfigured: "setup_unconfigured",
-    setup_configured: "setup_configured"
-  };
-  return text(keys[state] ?? "not_configured");
+// The route refuses a mistyped or out-of-range limit with a typed 422; the
+// launch coordinator refuses the same bound on its own path with the code in
+// the message. Either way the reason belongs beside the control, not in the
+// generic failure panel.
+const RUN_LIMIT_REFUSAL_CODE = "invalid_wall_time_seconds";
+
+function isRunLimitRefusal(problem: ApiProblem | null): boolean {
+  const apiError = problem?.apiError ?? null;
+  if (apiError === null || apiError.message === "") return false;
+  // Typed code only: the route names the refusal, and message text never drives UI.
+  return apiError.code === RUN_LIMIT_REFUSAL_CODE;
 }
 
 function validation(errors: readonly string[], field: string): boolean {
@@ -223,7 +224,6 @@ function WorkApp(): ReactElement {
   const [actionErrors, setActionErrors] = useState<Record<string, ActionError>>({});
   const newTaskButton = useRef<HTMLButtonElement>(null);
   const navigationRevision = useRef(0);
-  const renderedNavigationRevision = navigationRevision.current;
   const [locale, setLocale] = useState<Locale>("en");
   const [state, setState] = useState<AppState>({ kind: "checking" });
   const [activeAction, setActiveAction] = useState<string | null>(null);
@@ -236,6 +236,10 @@ function WorkApp(): ReactElement {
   const [roleErrors, setRoleErrors] = useState<FormErrors>(new Set());
   const [taskErrors, setTaskErrors] = useState<FormErrors>(new Set());
   const [runErrors, setRunErrors] = useState<FormErrors>(new Set());
+  // The server's own reason for refusing the limit, shown verbatim next to the
+  // control and tied to the exact attempt it refused, so it can never be read
+  // as a verdict on another draft. The typed draft is never reset by a refusal.
+  const [runLimitRefusal, setRunLimitRefusal] = useState<{ taskId: string; limitMinutes: string } | null>(null);
   const [showFullProjectPath, setShowFullProjectPath] = useState(false);
   const [configurationConfirmationOpen, setConfigurationConfirmationOpen] = useState(false);
   const [pendingLaunch, setPendingLaunch] = useState<LaunchIntent | null>(null);
@@ -257,6 +261,9 @@ function WorkApp(): ReactElement {
   const [libraryState, setLibraryState] = useState<LibraryState>({ kind: "loading" });
   const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [lastHiredRole, setLastHiredRole] = useState<{ id: string; name: string } | null>(null);
+  // RAM only, and never a canonical fact: the applied mapping is kept so the
+  // outcome can be read against a later tracker snapshot rather than guessed.
+  const [appliedBlueprint, setAppliedBlueprint] = useState<BlueprintApplication | null>(null);
   const taskRetryIdentity = useRef(new ContextPackRetryIdentity());
   const projectTransientRef = useRef(new ProjectDraftStore<ProjectTransient>());
   const currentTransientRef = useRef<Omit<ProjectTransient, "pendingLaunch" | "pendingLaunchRetry" | "taskRetry">>({
@@ -357,6 +364,33 @@ function WorkApp(): ReactElement {
         setRun((current) => current.taskId === taskId && !current.agentId ? { ...current, agentId: suggested } : current);
       }).catch(() => { /* The optional hint never replaces an explicit role choice. */ });
     }
+  }
+
+  // A conversation cannot start a run. This only opens Prepare run for the task
+  // the conversation is about — the selected task for an agent or project scope —
+  // or returns to Work when no task is in hand. It never issues a request.
+  function prepareRunForConversation(scope: ConversationScope): void {
+    const taskId = prepareRunTaskId(scope, routeRef.current.taskId);
+    if (taskId) prepareLaunch(taskId);
+    else navigate({ view: "work", composer: false });
+  }
+
+  // Applying a blueprint creates roles and tasks only. Both offered intents
+  // navigate; neither issues a launch. Prepare run is prefilled with the exact
+  // task a refreshed snapshot confirmed, never with a position in the mapping.
+  function followBlueprintIntent(intent: BlueprintApplyIntent): void {
+    setAppliedBlueprint(null);
+    if (intent.kind === "prepare_run") {
+      prepareLaunch(intent.taskId);
+      if (!pendingLaunchRef.current) {
+        setRun((current) => current.taskId === intent.taskId && !current.agentId
+          ? { ...current, agentId: intent.agentId } : current);
+      }
+      return;
+    }
+    setSearch("");
+    setLaunchOpen(false);
+    navigate({ view: "work", filter: "all", taskId: intent.taskId, composer: false });
   }
 
   useEffect(() => {
@@ -571,6 +605,7 @@ function WorkApp(): ReactElement {
     setRunErrors(transient.runErrors);
     setTrackerObservation({ kind: "loading" });
     setLaunchOpen(false);
+    setAppliedBlueprint(null);
     return transient.selectedTaskId;
   }
 
@@ -883,6 +918,13 @@ function WorkApp(): ReactElement {
       (option) => designPackageKey(option) === run.designPackageKey
     );
     const profileId = selectedRole?.profileId;
+    // The control's min/max is convenience only, so the value is re-derived from
+    // the typed draft here as well: no request leaves without a valid limit.
+    const wallTimeSeconds = runLimitSeconds(run.limitMinutes);
+    if (wallTimeSeconds === null) {
+      setRunErrors((current) => new Set([...current, "run-limit"]));
+      return;
+    }
     const authStatus = state.data.providerAuth.find((status) => status.profileId === profileId);
     const key = crypto.randomUUID();
     const generation = projectSelectionRef.current.currentGeneration();
@@ -893,7 +935,8 @@ function WorkApp(): ReactElement {
       contextPackId: selectedPack?.contextPackId ?? null,
       contextPackRevision: selectedPack?.revision ?? null,
       designPackageId: selectedDesignPackage?.designPackageId ?? null,
-      designPackageRevision: selectedDesignPackage?.revision ?? null
+      designPackageRevision: selectedDesignPackage?.revision ?? null,
+      wallTimeSeconds
     };
     const intent = freezeLaunchIntent({ key, input, draft: run,
       taskTitle: dependencies.tasks.find((task) => task.id === run.taskId)?.title
@@ -908,6 +951,7 @@ function WorkApp(): ReactElement {
         && routeRef.current.projectId === projectId;
       setActiveAction("start-run");
       clearActionError("start-run");
+      setRunLimitRefusal(null);
       const controller = new AbortController();
       try {
         await api.startRun(intent.input, intent.key, controller.signal);
@@ -923,6 +967,11 @@ function WorkApp(): ReactElement {
         const problem = error instanceof ApiProblem ? error : null;
         setPendingLaunch(intent);
         pendingLaunchRetry.current = execute;
+        // A refused limit is reported by the server, in the server's words, and
+        // leaves the entered minutes untouched in the in-memory draft.
+        if (isRunLimitRefusal(problem)) {
+          setRunLimitRefusal({ taskId: intent.draft.taskId, limitMinutes: intent.draft.limitMinutes });
+        }
         if (profileId !== undefined && ["provider_auth_required", "provider_auth_unknown", "credential_store_unavailable"].includes(problem?.apiError?.code ?? "")) {
           try {
             const status = await api.providerAuthStatus(profileId, controller.signal);
@@ -1007,6 +1056,7 @@ function WorkApp(): ReactElement {
     const errors = [
       ...(run.agentId ? [] : ["agent"]),
       ...(run.taskId ? [] : ["task"]),
+      ...(runLimitSeconds(run.limitMinutes) === null ? ["run-limit"] : []),
       ...(selectedRole?.contextMode === "accumulated" && selectedPack === undefined
         ? ["context-pack"]
         : []),
@@ -1071,6 +1121,10 @@ function WorkApp(): ReactElement {
     && guidance?.nextActionKey === "configure_runtime";
   const selectedRole = roleOptions.find((option) => option.id === run.agentId);
   const pendingLaunchVisible = pendingLaunch !== null && launchIntentIsVisible(pendingLaunch, route.taskId, run);
+  // The refused reason stays with the exact value that was refused, so editing
+  // the minutes or moving to another task retires it without a reset.
+  const runLimitRefused = runLimitRefusal !== null
+    && runLimitRefusal.taskId === run.taskId && runLimitRefusal.limitMinutes === run.limitMinutes;
   const selectedProfileId = pendingLaunchVisible ? pendingLaunch?.profileId ?? undefined : selectedRole?.profileId;
   const selectedTeamTask = trackerObservation.kind === "ready" ? trackerObservation.snapshot.tasks.find((task) => task.taskId === route.taskId) : undefined;
   const selectedAvailability = data.providerAvailability.find(
@@ -1097,13 +1151,14 @@ function WorkApp(): ReactElement {
 
   const workspaceInitialized = !["setup_uninitialized", "setup_not_a_repository"].includes(data.setup.state);
   return (
-    <ConversationWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId} locale={locale} writesEnabled={workspaceInitialized && data.meta.writesEnabled} sessions={conversationSessions.current}>
+    <ConversationWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId} locale={locale} writesEnabled={workspaceInitialized && data.meta.writesEnabled} sessions={conversationSessions.current} onPrepareRun={prepareRunForConversation}>
     <OutputsWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId}
       revision={trackerObservation.kind === "ready" ? trackerObservation.snapshot.sourceRevision : null} locale={locale}>
     <main className="work-app">
       <aside className="app-rail" aria-label={text("shell_navigation")}>
         <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}
           currentProjectId={route.projectId}
+          currentProjectPath={data.meta.repo}
           legacy={legacyProjectHost}
           locale={locale}
           projects={projectList}
@@ -1121,7 +1176,7 @@ function WorkApp(): ReactElement {
             {text(`shell_nav_${view}`)}
           </a>)}
         </nav>
-        <div className="rail-status"><span className="status-dot" aria-hidden="true" />{setupLabel(data.setup.state, text)}</div>
+        <div className="rail-status"><span className="status-dot" aria-hidden="true" data-state={railSetupState(data.setup.state)} />{text(railSetupLabelKey(data.setup.state))}</div>
         <p className="small-copy rail-help">{text("shell_local_workspace")}</p>
       </aside>
       <div className="app-content">
@@ -1288,6 +1343,25 @@ function WorkApp(): ReactElement {
                 ) : selectedRole?.contextMode === "fresh" ? (
                   <p className="small-copy">{text("context_fresh_run_help")}</p>
                 ) : null}
+                <label htmlFor="run-limit">{text("run_limit_field")}</label>
+                <input
+                  aria-describedby={["run-limit-help",
+                    ...(validation([...runErrors], "run-limit") ? ["run-limit-error"] : []),
+                    ...(runLimitRefused ? ["run-limit-refusal"] : [])].join(" ")}
+                  aria-invalid={validation([...runErrors], "run-limit") || runLimitRefused}
+                  className="launch-limit-minutes"
+                  id="run-limit"
+                  inputMode="numeric"
+                  max={MAX_RUN_LIMIT_MINUTES}
+                  min={MIN_RUN_LIMIT_MINUTES}
+                  onChange={(event) => setRun({ ...run, limitMinutes: event.target.value })}
+                  step={1}
+                  type="number"
+                  value={run.limitMinutes}
+                />
+                <p className="small-copy" id="run-limit-help">{text("run_limit_help")}</p>
+                {validation([...runErrors], "run-limit") ? <p className="field-error" id="run-limit-error">{text("form_error_run_limit")}</p> : null}
+                {runLimitRefused ? <p className="field-error" id="run-limit-refusal" role="alert">{text("run_limit_server_refusal")} {text("form_error_run_limit")}</p> : null}
                 {validation([...runErrors], "provider-availability") ? <p className="field-error">{text("form_error_provider_availability")}</p> : null}
                 <button className="button button-primary" disabled={!environmentReady || selectedAvailability?.launchable !== true || pendingLaunch !== null} type="submit">{activeAction === "start-run" ? text("working") : text("start_run")}</button>
               </fieldset>
@@ -1381,15 +1455,15 @@ function WorkApp(): ReactElement {
           </WorkflowCard>
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
+            {appliedBlueprint ? <BlueprintApplyOutcomePanel text={text} onIntent={followBlueprintIntent}
+              outcome={blueprintApplyOutcome(appliedBlueprint, trackerObservation)} /> : null}
             {workspaceInitialized ? <LibrarySection key={route.projectId ?? "legacy"} api={apiRef.current} text={text} writesEnabled={data.meta.writesEnabled}
               libraryApi={libraryApiRef.current} libraryState={libraryState} onRefreshLibrary={() => setLibraryRefresh((current) => current + 1)} onChooseRole={(selected) => chooseSpecialization(selected, true)}
               profiles={profileOptions} locale={locale} projectId={route.projectId} onBlueprintApplied={(application) => {
                 if (!projectSelectionRef.current.isCurrent(renderedProjectGeneration) || routeRef.current.projectId !== renderedProjectId) return;
-                const first = application.tasks[0];
-                if (first && navigationRevision.current === renderedNavigationRevision && routeRef.current.view === "library") {
-                  navigate({ view: "work", taskId: first.taskId }); setLaunchOpen(false);
-                  if (!pendingLaunchRef.current) setRun({ ...emptyRun, taskId: first.taskId, agentId: first.agentId });
-                }
+                // The server created roles and tasks and started nothing. Read
+                // the refreshed snapshot before offering any next step.
+                setAppliedBlueprint(application);
                 void refresh();
               }}
               tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })}
@@ -1482,14 +1556,28 @@ function WorkApp(): ReactElement {
                     <strong>{availability.profileId}</strong> — {availability.provider}
                     {availability.model === null ? "" : ` / ${availability.model}`}
                   </p>
-                  <p className="small-copy">
-                    {text("provider_availability_install_label")}: {availability.installationState}. {text("provider_availability_init_label")}: {availability.initializationState}. {text("provider_availability_qualification_label")}: {availability.qualification.state}. {text("provider_availability_auth_label")}: {availability.authentication.state}.
-                  </p>
+                  <ul className="provider-readiness">
+                    {providerReadinessLines(availability).map((line) => (
+                      <li key={line.stage} data-state={line.tone}>
+                        <span className="provider-readiness-stage">{text(line.labelKey)}</span>
+                        <span className="provider-readiness-value">{text(line.valueKey)}</span>
+                      </li>
+                    ))}
+                  </ul>
                   <p className={availability.launchable ? "small-copy" : "field-error"}>
                     {availability.launchable
                       ? text("provider_availability_launchable")
                       : text(availabilityRefusalMessage[availability.refusal?.code ?? "provider_authentication_unconfirmed"])}
                   </p>
+                  <details className="provider-readiness-technical">
+                    <summary>{text("provider_readiness_technical")}</summary>
+                    <ul className="small-copy">
+                      {providerReadinessLines(availability).map((line) => (
+                        <li key={line.stage}><code>{line.stage}</code>: <code>{line.code}</code></li>
+                      ))}
+                      <li><code>refusal</code>: <code>{availability.refusal?.code ?? "none"}</code></li>
+                    </ul>
+                  </details>
                   <ul className="small-copy">
                     {availability.capabilityRefusals.map((refusal) => (
                       <li key={refusal.code}>{text(capabilityRefusalMessage[refusal.code])}</li>

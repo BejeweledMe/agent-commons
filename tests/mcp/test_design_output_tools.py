@@ -140,6 +140,7 @@ def test_generated_image_appears_for_exact_task_and_agent_without_completing_tas
             "producer_delegation_id",
             "delegation_revision",
             "historical_preview_verified",
+            "review_state",
             "recorded_at",
             "media_type",
             "classification",

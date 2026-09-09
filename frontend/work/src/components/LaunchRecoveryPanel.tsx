@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { LaunchIntent } from "../launchIntentState.js";
+import { attemptLimitText, type LaunchIntent } from "../launchIntentState.js";
 import type { MessageKey } from "../i18n";
 
 export function LaunchRecoveryPanel({ intent, visible, busy, uncertain, failureCode, onRestore, onRetry, onEdit, text }: {
@@ -23,6 +23,7 @@ export function LaunchRecoveryPanel({ intent, visible, busy, uncertain, failureC
         <div><dt>{text("tracker_role_label")}</dt><dd><code>{intent.input.agentId}</code></dd></div>
         <div><dt>{text("context_mode")}</dt><dd>{intent.draft.contextPackKey ? <code>{intent.draft.contextPackKey}</code> : text("context_fresh")}</dd></div>
         <div><dt>{text("select_design_package")}</dt><dd><code>{intent.draft.designPackageKey || "—"}</code></dd></div>
+        <div><dt>{text("run_limit_label")}</dt><dd>{attemptLimitText(intent.input.wallTimeSeconds, text)}</dd></div>
         {failureCode ? <div><dt>{text("shell_failure_code")}</dt><dd><code>{failureCode}</code></dd></div> : null}
       </dl>
     </details>

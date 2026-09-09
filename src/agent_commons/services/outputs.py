@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal, Protocol, get_args
 
 from agent_commons.core.ids import is_typed_id
+from agent_commons.domain.chronology import chronological_key
 from agent_commons.domain.design_packages import DesignPackageRecord, ScreenBinding
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.runtime.live_previews import LivePreview, LivePreviewRegistry
@@ -26,8 +27,16 @@ from agent_commons.services.generated_outputs import producer_for_task, validate
 
 ScopeKind = Literal["task", "agent"]
 OutputState = Literal["unchecked", "ready", "stale", "unavailable"]
+# Additive and independent of ``OutputState``: how the producing task's own
+# review stands, never how fresh or viewable this image is.
+ReviewState = Literal["awaiting", "approved", "returned"]
 VersionSelection = Literal["latest", "all"]
 MAX_OUTPUTS = 64
+_REVIEW_STATES: Mapping[str, ReviewState] = {
+    "requested": "awaiting",
+    "approved": "approved",
+    "changes_requested": "returned",
+}
 _SAFE_CLASSIFICATIONS = frozenset({"public", "internal"})
 _SAFE_MEDIA = frozenset({"image/png", "image/jpeg"})
 _STALE_PREVIEW_CODES = frozenset(
@@ -98,6 +107,7 @@ class ImageOutput:
     kind: Literal["design_image", "artifact_image"] = "design_image"
     delegation_revision: str | None = None
     historical_preview_verified: bool = False
+    review_state: ReviewState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,11 +261,13 @@ class OutputReads:
             latest_by_series: dict[str, str] = {}
             for item in items:
                 latest_by_series.setdefault(item.series_id, item.output_id)
+            reviews = _reviews_by_task(snapshot)
             items = [
                 replace(
                     item,
                     version_count=versions_by_series[item.series_id],
                     latest=item.output_id == latest_by_series[item.series_id],
+                    review_state=reviews.get(item.task_id),
                 )
                 for item in items
                 if selected == "all" or item.output_id == latest_by_series[item.series_id]
@@ -420,6 +432,41 @@ class OutputReads:
         if preview.revision != item.content_revision or preview.media_type != item.media_type:
             return replace(item, state="stale", reason="verified_preview_changed")
         return replace(item, state="ready", width=preview.width, height=preview.height)
+
+
+def _reviews_by_task(snapshot: ProjectSnapshot) -> dict[str, ReviewState]:
+    """Map each producing task to its newest current review, from canonical state.
+
+    Review standing is read from the review projection only. Output freshness
+    never implies it, and a review the projection marks stale for the current
+    target revision reports nothing rather than an outdated verdict.
+    """
+
+    newest: dict[str, tuple[Any, ReviewState]] = {}
+    for identifier, review in snapshot.reviews.items():
+        target = review.get("target_ref")
+        if not isinstance(target, Mapping) or target.get("kind") != "task":
+            continue
+        task_id = target.get("id")
+        if not isinstance(task_id, str) or task_id not in snapshot.tasks:
+            continue
+        if review.get("stale") is True:
+            continue
+        state = _REVIEW_STATES.get(str(review.get("state")))
+        if state is None:
+            continue
+        try:
+            ordering = chronological_key(
+                review.get("recorded_at"),
+                review.get("id") or review.get("review_id") or identifier,
+            )
+        except Exception:
+            # One malformed review must not close an otherwise readable scope.
+            continue
+        current = newest.get(task_id)
+        if current is None or ordering > current[0]:
+            newest[task_id] = (ordering, state)
+    return {task_id: state for task_id, (_, state) in newest.items()}
 
 
 def _exact(record: Mapping[str, Any] | None, revision: str) -> bool:

@@ -1,9 +1,9 @@
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { WorkApi } from "../api.js";
 import type { Locale } from "../i18n.js";
-import { OutputsApi, presentCurrent } from "../outputsApi.js";
+import { OutputsApi, outputStatus, presentCurrent, reviewLabel } from "../outputsApi.js";
 import { outputText } from "../outputsStrings.js";
-import { canViewImage, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions } from "../outputsTypes.js";
+import { canViewImage, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions, type ReviewState } from "../outputsTypes.js";
 
 type Selection = { owner: OutputsApi; projectId: string | null; scope: OutputScope; title: string; opener: HTMLButtonElement };
 type OutputContext = { api: OutputsApi; locale: Locale; revision: string; open: (scope: OutputScope, title: string, opener: HTMLButtonElement) => void };
@@ -98,7 +98,8 @@ export function OutputsPanel({ api, scope, title, locale, revision, onClose }: {
       <button type="button" className="button button-secondary button-inline" aria-pressed={versions === "all"} onClick={() => setVersions("all")}>{text("history")}</button>
     </div><button type="button" className="button button-secondary button-inline" onClick={() => setAttempt((value) => value + 1)}>{text("refresh")}</button></div>
     {current === null ? <p role="status">{text("loading")}</p> : current.kind === "error" ? <p role="alert">{text("failed")}</p> : current.value.items.length === 0 ? <p role="status">{text("empty")}</p> : <ul className="outputs-list">{current.value.items.map((item) => item.kind === "live_preview" ? <LivePreviewCard key={item.outputId} item={item} locale={locale} now={now} uiOrigin={window.location.origin} /> : <li key={item.outputId}>
-      <h3>{item.title}</h3><p className="outputs-status" data-state={item.state}>{text(item.state)}</p>
+      <h3>{item.title}</h3><p className="outputs-status" data-status={outputStatus(item, now)}>{text(outputStatus(item, now))}</p>
+      <ReviewStateLine state={item.reviewState} locale={locale} />
       <p className="small-copy">{text(item.latest ? "current" : "previous")} · {item.versionCount} {text("versions")}</p>
       <ImagePreviewAction item={item} locale={locale} onOpen={() => void openImage(item)} />
       {currentPreview?.outputId !== item.outputId ? null : currentPreview.kind === "loading" ? <p role="status">{text("imageLoading")}</p> : currentPreview.kind === "error" ? <p role="alert">{text("imageFailed")}</p> : currentPreview.kind === "ready" ? <img className="outputs-image" src={currentPreview.url} alt={item.title} width={item.width ?? undefined} height={item.height ?? undefined} /> : null}
@@ -107,13 +108,19 @@ export function OutputsPanel({ api, scope, title, locale, revision, onClose }: {
 }
 
 
+/** A review label is rendered only when the server actually reported one. */
+export function ReviewStateLine({ state, locale }: { state: ReviewState | null; locale: Locale }): ReactElement | null {
+  const label = reviewLabel(state);
+  return label === null ? null : <p className="outputs-review" data-review={state}>{outputText(locale, label)}</p>;
+}
+
 export function LivePreviewCard({ item, locale, now, uiOrigin }: { item: LiveOutput; locale: Locale; now: number; uiOrigin: string }): ReactElement {
   const text = (key: Parameters<typeof outputText>[1]): string => outputText(locale, key);
   const href = liveNavigation(item, now, uiOrigin);
-  const state = now >= item.expiresAt && item.state !== "stale" ? "expired" : item.state;
+  const status = outputStatus(item, now);
   const date = (value: number): string => new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "short", timeStyle: "medium" }).format(new Date(value));
   return <li><p className="small-copy">{text("live")}</p><h3>{item.title}</h3>
-    <p className="outputs-status" data-state={state}>{text(state)}</p><p>{text("reachability")}</p>
+    <p className="outputs-status" data-status={status}>{text(status)}</p><p>{text("reachability")}</p>
     <p><code>{item.origin}</code></p><p className="small-copy">{text("published")}: {date(item.publishedAt)} · {text("expires")}: {date(item.expiresAt)}</p>
     {href ? <a className="button button-secondary button-inline" href={href} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" onClick={(event) => { if (!liveNavigation(item, Date.now(), window.location.origin)) event.preventDefault(); }}>{text("openLive")}</a> : null}
   </li>;
@@ -121,6 +128,6 @@ export function LivePreviewCard({ item, locale, now, uiOrigin }: { item: LiveOut
 
 export function ImagePreviewAction({ item, locale, onOpen }: { item: ImageOutput; locale: Locale; onOpen: () => void }): ReactElement {
   const text = (key: Parameters<typeof outputText>[1]): string => outputText(locale, key);
-  return <>{item.historicalPreviewVerified ? <p>{text("historicalHelp")}</p> : item.state !== "ready" ? <p>{text(item.state === "stale" ? "staleHelp" : "unavailableHelp")}</p> : null}
+  return <>{item.historicalPreviewVerified ? <p>{text("historicalHelp")}</p> : item.state !== "ready" ? <p>{text(item.state === "unavailable" ? "unavailableHelp" : item.state === "stale" ? "earlierHelp" : "uncheckedHelp")}</p> : null}
     {canViewImage(item) ? <button type="button" className="button button-secondary button-inline" onClick={onOpen}>{text(item.historicalPreviewVerified ? "viewHistorical" : "view")}</button> : null}</>;
 }

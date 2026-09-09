@@ -4,6 +4,7 @@ import { type ReactElement, type ReactNode, useEffect, useState } from "react";
 import type { WorkApi } from "../api";
 import type { TaskDetail, TrackerRun, TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
+import { attemptLimitText } from "../launchIntentState.js";
 import { loadTaskDetailState, type TaskDetailState } from "../trackerState.js";
 import { readinessUnconfirmed, stateLabel, type StateDomain } from "../taskPresentation.js";
 
@@ -123,6 +124,8 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
           <strong>{run.roleName ?? text("inspector_unassigned")}</strong>
           <TaskState domain="run" value={run.phase} text={text} plain />
           <p className="small-copy">{run.provider ?? "—"} · {date(run.finishedAt ?? run.updatedAt ?? run.startedAt)}</p>
+          {/* The recorded limit only. A run whose delegation carries none says so. */}
+          <p className="small-copy inspector-run-limit">{`${text("run_limit_label")}: ${attemptLimitText(run.wallTimeSeconds, text)}`}</p>
           <details key={`${task.taskId}:${run.delegationId}`} className="inspector-technical"><summary>{text("inspector_run_details")}</summary>
             <dl><div><dt>{text("tracker_attempt_label")}</dt><dd><code>{run.attemptId ?? "—"}</code></dd></div>
               <div><dt>{text("tracker_profile_label")}</dt><dd><code>{run.profileId ?? "—"}</code></dd></div>

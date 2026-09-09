@@ -66,6 +66,7 @@ function snapshot() {
       updated_at: "2026-08-31T00:00:10Z",
       finished_at: null,
       duration_seconds: 10,
+      wall_time_seconds: 900,
       awaits_human: false,
       next_action: "wait_for_run",
       freshness: "fresh",
@@ -99,6 +100,7 @@ test("tracker parser owns a safe exact projection", () => {
   assert.equal(parsed.truncated, false);
   assert.equal(parsed.tasks[0].provider, "claude");
   assert.equal(parsed.runs[0].durationSeconds, 10);
+  assert.equal(parsed.runs[0].wallTimeSeconds, 900);
   assert.deepEqual(parsed.tasks[0].gaps, ["stale_review"]);
   assert.deepEqual(parsed.gaps, ["review_evidence_missing"]);
   const rendered = JSON.stringify(parsed);
@@ -171,4 +173,18 @@ test("tracker keeps a newer stream snapshot across initial request outcomes", ()
   const older = apiModule.parseTrackerSnapshot(olderInput);
   assert.equal(trackerStateModule.trackerLoadSucceeded(ready, older), ready);
   assert.equal(trackerStateModule.trackerLoadSucceeded(ready, streamSnapshot), ready);
+});
+
+test("a run's wall-time limit is additive: absent or null reads as not provided, never a default", () => {
+  const legacy = snapshot();
+  delete legacy.runs[0].wall_time_seconds;
+  assert.equal(apiModule.parseTrackerSnapshot(legacy).runs[0].wallTimeSeconds, null);
+
+  const unknown = snapshot();
+  unknown.runs[0].wall_time_seconds = null;
+  assert.equal(apiModule.parseTrackerSnapshot(unknown).runs[0].wallTimeSeconds, null);
+
+  const malformed = snapshot();
+  malformed.runs[0].wall_time_seconds = "600";
+  assert.throws(() => apiModule.parseTrackerSnapshot(malformed));
 });

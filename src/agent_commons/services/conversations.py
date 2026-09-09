@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from agent_commons.domain.conversations import conversation_scope, validate_scope_exists
+from agent_commons.domain.states import LIVE_WORKER_DELEGATION_STATES
 from agent_commons.errors import (
     IdempotencyConflictError,
     LifecycleConflictError,
@@ -144,7 +145,85 @@ class Conversations:
             "state": str(thread["state"]),
             "audience": "all_project_agents" if scope["kind"] == "project" else scope["kind"],
             "message_count": len(thread.get("messages", [])),
+            "recipient_availability": Conversations._recipient_availability(
+                conversation_scope(scope), snapshot, observed_revision=str(thread["revision"])
+            ),
         }
+
+    @staticmethod
+    def _recipient_availability(
+        scope: Mapping[str, str], snapshot: Any, *, observed_revision: str
+    ) -> dict[str, str | None]:
+        """Return a conservative, snapshot-local view of the conversation recipient.
+
+        A conversation read must not join a second mutable tracker read: both the
+        recipient selection and its live delegation state come from ``snapshot``.
+        If replay has reported a partial/stale view, absence cannot establish that
+        an agent is inactive.
+        """
+
+        agent_id = Conversations._recipient_agent_id(scope, snapshot)
+        result: dict[str, str | None] = {
+            "state": "unknown",
+            "agent_id": agent_id,
+            "active_delegation_id": None,
+            "observed_revision": observed_revision,
+        }
+        if agent_id is None or not Conversations._snapshot_is_complete(snapshot):
+            return result
+        for delegation_id, delegation in snapshot.delegations.items():
+            if delegation.get("state") not in LIVE_WORKER_DELEGATION_STATES:
+                continue
+            target = delegation.get("target_ref")
+            targets_agent = (
+                isinstance(target, Mapping)
+                and target.get("kind") == "agent"
+                and target.get("id") == agent_id
+            )
+            if targets_agent or delegation.get("agent_id") == agent_id:
+                return {
+                    "state": "active",
+                    "agent_id": agent_id,
+                    "active_delegation_id": str(delegation_id),
+                    "observed_revision": observed_revision,
+                }
+        return {**result, "state": "inactive"}
+
+    @staticmethod
+    def _recipient_agent_id(scope: Mapping[str, str], snapshot: Any) -> str | None:
+        if scope["kind"] == "agent":
+            agent_id = scope["id"]
+            return agent_id if agent_id in snapshot.agents else None
+        if scope["kind"] != "task":
+            return None
+        task = snapshot.tasks.get(scope["id"])
+        if task is None:
+            return None
+        extensions = task.get("extensions")
+        candidates = {
+            value
+            for value in (
+                task.get("assigned_agent_id"),
+                task.get("agent_id"),
+                extensions.get("suggested_agent_id") if isinstance(extensions, Mapping) else None,
+            )
+            if isinstance(value, str) and value in snapshot.agents
+        }
+        return next(iter(candidates)) if len(candidates) == 1 else None
+
+    @staticmethod
+    def _snapshot_is_complete(snapshot: Any) -> bool:
+        """Whether absence of a live delegation may be read as "inactive".
+
+        ``ProjectSnapshot`` signals an incomplete replay through ``issues``
+        (projection failures) and ``stale_refs`` (references whose target did
+        not resolve); it carries no other completeness flag. Either signal makes
+        the recipient state ``unknown`` rather than ``inactive``.
+        """
+
+        return not bool(getattr(snapshot, "issues", ())) and not bool(
+            getattr(snapshot, "stale_refs", ())
+        )
 
     def messages(
         self,

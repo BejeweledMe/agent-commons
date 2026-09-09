@@ -1,0 +1,139 @@
+{
+  "wave": 1,
+  "programme": "ux-closure",
+  "recorded_at": "2026-09-09",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "packages": {
+    "WP-06": {
+      "task": "task.3RTW2XSB6F610G73EXJV3H7F7P",
+      "delegation": "delegation.0SV2WBHRF4223N45V57SHT0YB6",
+      "review": "review.73FEZH7BNHEKNFPKWH7PZX3BKA"
+    },
+    "WP-05": {
+      "task": "task.003S27535KNR48TDD88VJE5E5H",
+      "delegation": "delegation.208JFQEZTB8HTNJZXBCH12F88C",
+      "review": "review.23S36M27JMJWQKM5HGDVGRT8P7"
+    },
+    "WP-03": {
+      "task": "task.3AHJQ4CS705Z5H0F7C26GN0T2X",
+      "delegation": "delegation.6D26160CNSKZ6W98M9P3PERA6M",
+      "review": "review.39X8J1AF56NN69DAMD3JSZX7RG"
+    },
+    "WP-04.1": {
+      "task": "task.5BHC8X35V3EQ9S8AM2GPT742PA",
+      "delegation": "delegation.5EZP6YJASK8ZS7E7K068506AA2",
+      "review": "review.0T5SRJZRJS65Z42VX98HY60Q38"
+    },
+    "WP-04.2": {
+      "task": "task.60E8AFJB3YZF000M6PYF3K96PT",
+      "delegation": "delegation.2PM52JAD07NXN59GV1CAYWEAGV",
+      "review": "review.2FNFK5GS46G25019VFKKXX3T61"
+    },
+    "WP-15.1": {
+      "task": "task.32FJY7ERS66ZHNSXFZS73BZ2MA",
+      "delegation": "delegation.5CKPXV03VH8M1CYK8CK4FQVGVJ",
+      "review": "review.70BTBGGZZAAPNBTM3ZCZ006CE0"
+    },
+    "WP-15.2": {
+      "task": "task.1KDSVG1EPXJMGGW5J7RERAQ1BA",
+      "delegation": "delegation.67G0Y0TJZ4NSD0SPPWS7XVQAT9",
+      "review": "review.352C3WXMSJF387GTNQW4NZFEJ5"
+    }
+  },
+  "packaged_asset": [
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-B4eoiP0p.css",
+      "sha256": "d2bc22ceee9674874b4147408e139c47bb7e7cdb1297865bab4b874134ff0afa"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-dVBmrCqt.js",
+      "sha256": "ca6fccc8b0c8f523671f247251fdd1ee983fc2fc79b525ee2abd3a303e3220be"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "80497c5f1e1253077e7ed2999d7f6be2b857d526efb4774257a9d5c5e3789093"
+    }
+  ],
+  "asset_build": {
+    "command": "npm ci --ignore-scripts --prefix frontend/work && npm run build --prefix frontend/work",
+    "node": "v24.20.0 (/opt/homebrew/opt/node@24, keg-only, owner-approved)",
+    "previous_bundle": "work-DV06NGBp.js",
+    "new_bundle": "work-dVBmrCqt.js",
+    "integrator": "coordinator session.adde32acb0f84f46a53e92dadadb9e21 (plan J.10)"
+  },
+  "make_check": {
+    "result": "green",
+    "python": "2613 passed, 13 skipped (documented), 0 failed",
+    "frontend_work": "263 passed",
+    "node_version_check": "Node 24.20.0 matches .node-version",
+    "run_seconds": 1052
+  },
+  "coordinator_fixes_after_first_make_check": [
+    "tests/domain/test_work_state.py fixture gained wall_time_seconds=None; RunView validates wall_time_seconds as positive int or None",
+    "tests/mcp/test_design_output_tools.py expected wire keys gained review_state",
+    "main.tsx recognises the run-limit refusal by typed code only and renders the localized bound instead of server message text (tests/ui/test_work_app_contract.py contract)"
+  ],
+  "not_done": [
+    "git commit/push (owner command required)",
+    "browser visual check recorded separately",
+    "docs/evidence and docs/plans/handoffs still untracked"
+  ],
+  "changed_paths_in_tree": [
+    "frontend/work/src/api.ts",
+    "frontend/work/src/components/ConversationPanel.tsx",
+    "frontend/work/src/components/LaunchRecoveryPanel.tsx",
+    "frontend/work/src/components/OutputsPanel.tsx",
+    "frontend/work/src/components/ProjectSidebar.tsx",
+    "frontend/work/src/components/TaskInspector.tsx",
+    "frontend/work/src/components/WorkBlueprintsSection.tsx",
+    "frontend/work/src/contracts.ts",
+    "frontend/work/src/conversation.css",
+    "frontend/work/src/conversationApi.ts",
+    "frontend/work/src/conversationState.ts",
+    "frontend/work/src/conversationStrings.ts",
+    "frontend/work/src/i18n.json",
+    "frontend/work/src/launchIntentState.ts",
+    "frontend/work/src/main.tsx",
+    "frontend/work/src/outputs.css",
+    "frontend/work/src/outputsApi.ts",
+    "frontend/work/src/outputsStrings.ts",
+    "frontend/work/src/outputsTypes.ts",
+    "frontend/work/src/styles.css",
+    "frontend/work/tests/conversations.test.mjs",
+    "frontend/work/tests/outputs.test.mjs",
+    "frontend/work/tests/project-workspace.test.mjs",
+    "frontend/work/tests/provider-availability.test.mjs",
+    "frontend/work/tests/task-inspector.test.mjs",
+    "frontend/work/tests/tracker-parser.test.mjs",
+    "frontend/work/tests/work-library.test.mjs",
+    "frontend/work/tests/work-shell-recovery.test.mjs",
+    "frontend/work/tests/work-shell.test.mjs",
+    "src/agent_commons/domain/work_state.py",
+    "src/agent_commons/services/conversations.py",
+    "src/agent_commons/services/outputs.py",
+    "src/agent_commons/services/work_metrics.py",
+    "src/agent_commons/ui/launch.py",
+    "src/agent_commons/ui/output_routes.py",
+    "src/agent_commons/ui/server.py",
+    "src/agent_commons/ui/static/work/assets/work-BuAI-tN9.css",
+    "src/agent_commons/ui/static/work/assets/work-DV06NGBp.js",
+    "src/agent_commons/ui/static/work/index.html",
+    "src/agent_commons/ui/tracker_dtos.py",
+    "src/agent_commons/ui/tracker_reads.py",
+    "tests/domain/test_work_state.py",
+    "tests/mcp/test_design_output_tools.py",
+    "tests/services/test_conversations.py",
+    "tests/services/test_outputs.py",
+    "tests/ui/test_conversation_routes.py",
+    "tests/ui/test_launch.py",
+    "tests/ui/test_output_routes.py",
+    "tests/ui/test_tracker_reads.py",
+    "docs/evidence/2026-09-09/",
+    "frontend/work/src/blueprintApplyOutcome.ts",
+    "frontend/work/src/components/ProjectArchiveDialog.tsx",
+    "frontend/work/src/projectArchive.ts",
+    "frontend/work/src/setupReadiness.ts",
+    "src/agent_commons/ui/static/work/assets/work-B4eoiP0p.css",
+    "src/agent_commons/ui/static/work/assets/work-dVBmrCqt.js"
+  ]
+}

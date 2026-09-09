@@ -223,6 +223,7 @@ def build_tracker_snapshot(
             updated_at=run.updated_at,
             finished_at=run.finished_at,
             duration_seconds=run.duration_seconds,
+            wall_time_seconds=run.wall_time_seconds,
             awaits_human=run.awaits_human,
             next_action=run.next_action.value,
             freshness=run.freshness.value,

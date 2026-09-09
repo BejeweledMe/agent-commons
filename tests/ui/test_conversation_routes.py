@@ -102,6 +102,40 @@ def test_real_message_pagination_and_task_scope(writable, writable_client):
     )
 
 
+def test_conversation_read_adds_recipient_availability_from_one_snapshot(
+    writable, writable_client, monkeypatch
+):
+    task = writable.writer().create_task(
+        title="Scoped", description="One recipient", acceptance_criteria=("Read scope",)
+    )
+    thread = ensure(writable_client, {"kind": "task", "id": task["entity_ref"]["id"]}, "task-open")
+    manager = writable.manager()
+    original = type(manager).snapshot
+    reads = 0
+
+    def counted(self):
+        nonlocal reads
+        reads += 1
+        return original(self)
+
+    monkeypatch.setattr(type(manager), "snapshot", counted)
+    response = writable_client.get(
+        BASE,
+        params={"scope_kind": "task", "scope_id": task["entity_ref"]["id"]},
+        headers=authorized(),
+    )
+    assert response.status_code == 200
+    conversation = response.json()["conversations"][0]
+    assert conversation["thread_id"] == thread["thread_id"]
+    assert conversation["recipient_availability"] == {
+        "state": "unknown",
+        "agent_id": None,
+        "active_delegation_id": None,
+        "observed_revision": conversation["revision"],
+    }
+    assert reads == 1
+
+
 @pytest.mark.parametrize(
     "method,path",
     [

@@ -274,6 +274,7 @@ class RunView:
     updated_at: str | None
     finished_at: str | None
     duration_seconds: int | None
+    wall_time_seconds: int | None
     awaits_human: bool
     blocking_dependencies: tuple[str, ...]
     next_action: NextAction
@@ -313,6 +314,13 @@ class RunView:
                 raise ValueError("attempt_number must be positive")
         if self.duration_seconds is not None:
             _non_negative_int(self.duration_seconds, "duration_seconds")
+        if self.wall_time_seconds is not None:
+            # Only an explicitly recorded, positive limit is a limit; a missing
+            # one stays None and is never replaced by a default on the read side.
+            if type(self.wall_time_seconds) is not int:
+                raise TypeError("wall_time_seconds must be an int or None")
+            if self.wall_time_seconds < 1:
+                raise ValueError("wall_time_seconds must be positive")
         if type(self.awaits_human) is not bool:
             raise TypeError("awaits_human must be a bool")
         started = _timestamp(self.started_at, "started_at")

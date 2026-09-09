@@ -1,0 +1,61 @@
+{
+  "work_package": "WP-03",
+  "task": "task.3AHJQ4CS705Z5H0F7C26GN0T2X",
+  "delegation": "delegation.6D26160CNSKZ6W98M9P3PERA6M",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "frontend/work/src/projectArchive.ts",
+      "sha256": "d76d223bd95966b5b0c97e28d053494b0e14e950c7ac18e80ce212e7564bb22a"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectArchiveDialog.tsx",
+      "sha256": "94822cd157c93f0f69d6eb01cb1e3d2a0931c2a9a7c579b5a379b87d4e6ef634"
+    },
+    {
+      "path": "frontend/work/src/setupReadiness.ts",
+      "sha256": "4f1e3cdaea8db4771f2e680210e6d3c9b77becc6aaad04fb73e9df966006373f"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectSidebar.tsx",
+      "sha256": "b13579199d659f8af1fe20c23d938824c1ca6c129be4b64fc1f4cb65c0e9abb2"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "382be2c04129f1cea351f475b25488eeda207e33284c9b5a0ac99193734d3448"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "b8ace04abb75fc521c49c688a3714d5ff8a2f9dcdc13019ba35348d6984a188d"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "f2f0b1f00a45334b18b69245c7d1b0dd95dbfcf9637cb7a619119b9159771483"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "191d59fcc088c11d4276367cfe3c7cb99f0edecba11f7209911a1c5ebed12909"
+    },
+    {
+      "path": "frontend/work/tests/provider-availability.test.mjs",
+      "sha256": "6a581a1aa9700c7393480f8ed76aad45677b8873f2a1a8d430a969f95ee527d5"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "9543e0b9a30ae8036d9fb33f1a8316b9e08d9a4ef4024bad2129d16758907682"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "249 passed, 0 failed (node --test frontend/work/tests/*.test.mjs; tree also contains accepted WP-06 and WP-05)",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt; wave-1 integrator",
+    "screenshots": "not taken"
+  },
+  "notes": [
+    "main.tsx, i18n.json and styles.css hashes include earlier accepted WP-06 changes",
+    "plan A.1 premise corrected by worker: project DTO does not expose folder paths; dialog shows the path only for the open project",
+    "new raw hex colours for status-dot states follow the existing styles.css pattern; tokenisation is WP-13"
+  ]
+}

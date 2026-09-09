@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, symlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
@@ -13,10 +13,11 @@ const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-outputs-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled, resolve(root, "src/components/OutputsPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const load = (path) => import(pathToFileURL(resolve(compiled, path)).href);
-const { OutputsApi, presentCurrent } = await load("outputsApi.js");
+const { OutputsApi, outputStatus, presentCurrent, reviewLabel } = await load("outputsApi.js");
 const { parseOutputList, parseOutputSummary, OutputsError, canViewImage } = await load("outputsTypes.js");
+const { outputText } = await load("outputsStrings.js");
 const { WorkApi } = await load("api.js");
-const { OutputsAction, ImagePreviewAction } = await load("components/OutputsPanel.js");
+const { OutputsAction, ImagePreviewAction, ReviewStateLine } = await load("components/OutputsPanel.js");
 const id = (kind, n = "0") => `${kind}.${n.repeat(26)}`;
 const scope = { kind: "task", id: id("task") };
 const agentScope = { kind: "agent", id: id("agent") };
@@ -144,7 +145,7 @@ test("live navigation expires locally and never links to the control server or a
   assert.match(markup, /Publisher reports ready/); assert.match(markup, /Reachability has not been checked/);
   assert.match(markup, /target="_blank"/); assert.match(markup, /rel="noopener noreferrer"/); assert.doesNotMatch(markup, /iframe|<img/);
   const expired = renderToStaticMarkup(createElement(LivePreviewCard, { item, locale: "ru", now: item.expiresAt, uiOrigin: "http://127.0.0.1:8080" }));
-  assert.match(expired, /Срок истёк/); assert.doesNotMatch(expired, /href=/);
+  assert.match(expired, /Просмотр истёк/); assert.doesNotMatch(expired, /href=/);
 });
 
 test("summary cache expires without canonical changes so runtime advertisements become discoverable", async () => {
@@ -211,4 +212,87 @@ test("verified task history renders a recorded-image action without implying cur
   assert.doesNotMatch(markup,/cannot be previewed|Ready to view/);
   const refused = renderToStaticMarkup(createElement(ImagePreviewAction,{item:{...item,historicalPreviewVerified:false},locale:"en",onOpen(){}}));
   assert.doesNotMatch(refused,/<button/);
+  assert.match(renderToStaticMarkup(createElement(ImagePreviewAction,{item:{...item,historicalPreviewVerified:false},locale:"en",onOpen(){}})),/earlier recorded version/);
+});
+
+
+const first = (rows, selection = scope, versions = "latest") => parseOutputList(list(rows, selection, versions), selection, versions).items[0];
+const historical = () => generatedRow({ state: "stale", reason: "producer_task_revision_changed", historical_preview_verified: true, width: null, height: null });
+
+test("status labels separate a latest result, a viewable earlier version, and an unusable one", () => {
+  assert.equal(outputStatus(first([row()]), 0), "latestResult");
+  assert.equal(outputStatus(first([row({ latest: false })], scope, "all"), 0), "earlierViewable");
+  assert.equal(outputStatus(first([historical()]), 0), "earlierViewable");
+  assert.equal(outputStatus(first([row({ state: "stale", reason: "package_revision_superseded", width: null, height: null })]), 0), "earlierVersion");
+  assert.equal(outputStatus(first([row({ state: "unavailable", reason: "output_preview_unsupported", width: null, height: null })]), 0), "previewUnavailable");
+  assert.equal(outputStatus(first([row({ state: "unchecked", reason: null, width: null, height: null })]), 0), "previewNotVerified");
+  // A historical result never borrows the latest label, in either language.
+  const item = first([historical()]);
+  for (const locale of ["en", "ru"]) {
+    const markup = renderToStaticMarkup(createElement("p", null, outputText(locale, outputStatus(item, 0))));
+    assert.notEqual(outputStatus(item, 0), "latestResult");
+    assert.doesNotMatch(markup, /Out of date|Устарело/);
+  }
+  assert.equal(outputText("en", outputStatus(item, 0)), "Earlier version (viewable)");
+  assert.equal(outputText("ru", outputStatus(item, 0)), "Прежняя версия (можно посмотреть)");
+});
+
+test("live preview status separates local expiry, a reported-unavailable address, and history", () => {
+  const ready = first([liveRow()]);
+  assert.equal(outputStatus(ready, ready.publishedAt + 10_000), "reported_ready");
+  assert.equal(outputStatus(ready, ready.expiresAt), "previewExpired");
+  assert.equal(outputStatus(first([liveRow({ reported_state: "starting", state: "starting", url: null })]), 0), "starting");
+  assert.equal(outputStatus(first([liveRow({ reported_state: "unavailable", state: "unavailable", url: null })]), 0), "addressUnavailable");
+  const stale = first([liveRow({ state: "stale", url: null })]);
+  assert.equal(outputStatus(stale, stale.expiresAt + 60_000), "earlierVersion");
+  assert.equal(outputText("en", "previewExpired"), "Preview expired");
+  assert.equal(outputText("ru", "addressUnavailable"), "Адрес недоступен");
+});
+
+test("every status and review label has distinct non-empty copy in both languages", () => {
+  const labels = ["latestResult", "earlierViewable", "earlierVersion", "previewExpired", "addressUnavailable", "previewNotVerified", "previewUnavailable", "reviewAwaiting", "reviewApproved", "reviewReturned"];
+  for (const locale of ["en", "ru"]) {
+    const seen = labels.map((key) => outputText(locale, key));
+    for (const value of seen) assert.equal(typeof value === "string" && value.length > 0, true);
+    assert.equal(new Set(seen).size, labels.length);
+    assert.equal(seen.some((value) => /Out of date|Устарело/.test(value)), false);
+  }
+  assert.equal(outputText("en", "reviewAwaiting"), "Awaiting check");
+  assert.equal(outputText("ru", "reviewAwaiting"), "Ждёт проверки");
+  assert.equal(outputText("en", "reviewApproved"), "Check approved");
+  assert.equal(outputText("ru", "reviewReturned"), "Возвращено с замечаниями");
+});
+
+test("review state is read from the server field only; absent, null and unknown stay neutral", () => {
+  const parsed = (overrides) => first([row(overrides)]).reviewState;
+  assert.equal(parsed({}), null);
+  assert.equal(parsed({ review_state: null }), null);
+  for (const unknown of ["under_review", "accepted", "", 7, true, {}]) assert.equal(parsed({ review_state: unknown }), null);
+  for (const state of ["awaiting", "approved", "returned"]) assert.equal(parsed({ review_state: state }), state);
+  assert.equal(first([generatedRow({ review_state: "approved" })]).reviewState, "approved");
+  // Freshness never manufactures a verdict, and unknown keys stay refused.
+  assert.equal(parsed({ state: "stale", reason: "producer_task_revision_changed", width: null, height: null }), null);
+  assert.equal(first([historical()]).reviewState, null);
+  assert.throws(() => parseOutputList(list([row({ review_verdict: "approved" })]), scope, "latest"), OutputsError);
+  assert.equal(reviewLabel(null), null);
+  assert.deepEqual(["awaiting", "approved", "returned"].map(reviewLabel), ["reviewAwaiting", "reviewApproved", "reviewReturned"]);
+});
+
+test("a review label renders in both languages only when the server reported one", () => {
+  assert.equal(renderToStaticMarkup(createElement(ReviewStateLine, { state: null, locale: "en" })), "");
+  assert.equal(renderToStaticMarkup(createElement(ReviewStateLine, { state: null, locale: "ru" })), "");
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "en" })), /Awaiting check/);
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "ru" })), /Ждёт проверки/);
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "returned", locale: "en" })), /Returned with comments/);
+  const approved = renderToStaticMarkup(createElement(ReviewStateLine, { state: "approved", locale: "ru" }));
+  assert.match(approved, /Проверка одобрена/);
+  assert.match(approved, /class="outputs-review"/);
+  assert.doesNotMatch(approved, /style=/);
+});
+
+test("output styles stay class-based and reserve green for acceptance elsewhere", () => {
+  const css = readFileSync(resolve(root, "src/outputs.css"), "utf8");
+  assert.match(css, /\.outputs-review/);
+  assert.doesNotMatch(css, /green|#0f0|#00ff00/i);
+  assert.doesNotMatch(readFileSync(resolve(root, "src/components/OutputsPanel.tsx"), "utf8"), /style=\{/);
 });

@@ -38,6 +38,7 @@ def _run(**changes: object) -> RunView:
         "updated_at": "2026-08-30T10:00:10Z",
         "finished_at": None,
         "duration_seconds": 10,
+        "wall_time_seconds": None,
         "awaits_human": False,
         "blocking_dependencies": (),
         "next_action": NextAction.WAIT_FOR_RUN,

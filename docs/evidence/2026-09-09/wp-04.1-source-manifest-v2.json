@@ -1,0 +1,30 @@
+{
+  "work_package": "WP-04.1",
+  "revision_note": "v2 after review.10EXC4D5GQ5XZG0SH2V078CW8B changes_requested",
+  "task": "task.5BHC8X35V3EQ9S8AM2GPT742PA",
+  "delegation": "delegation.5EZP6YJASK8ZS7E7K068506AA2",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "src/agent_commons/services/conversations.py",
+      "sha256": "ffc79154ef3e6bee34d5921d34cd14b288f493713219a9463b36d3af18441140"
+    },
+    {
+      "path": "tests/services/test_conversations.py",
+      "sha256": "13d4c94ee7bf68274b20f22a33a4ce4b67d5596156790bea9da62759865475c4"
+    },
+    {
+      "path": "tests/ui/test_conversation_routes.py",
+      "sha256": "97f0237aabbeda1732bfdd77d28fec6e44c6a24fa2f363c2793ac4970e1b5068"
+    }
+  ],
+  "verification": {
+    "pytest": "74 passed (uv run python -m pytest tests/services/test_conversations.py tests/ui/test_conversation_routes.py)",
+    "ruff": "check and format clean"
+  },
+  "notes": [
+    "Fix authored by the coordinator (claims held by the coordinator session): _snapshot_is_complete now reads only the real ProjectSnapshot signals issues and stale_refs, with a docstring; tests drive unknown through ProjectionIssue and stale_refs and through a real ProjectSnapshot instance",
+    "Reviewer minor notes (assigned_agent_id probe, observed_revision semantics) left unchanged as non-blocking"
+  ]
+}

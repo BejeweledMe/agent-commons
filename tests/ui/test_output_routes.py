@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 
 from agent_commons.ui.output_routes import register_output_routes
-from tests.services.test_outputs import AGENT, _bound
+from tests.services.test_outputs import AGENT, REVIEW, _bound, review
 
 
 def _client(factory):  # type: ignore[no-untyped-def]
@@ -55,6 +55,58 @@ def test_routes_require_auth_and_return_scoped_allowlisted_dtos(tmp_path: Path) 
     assert result.headers["Cache-Control"] == "no-store"
     assert result.headers["X-Content-Type-Options"] == "nosniff"
     assert client.post("/api/outputs", headers=headers).status_code == 405
+
+
+def test_review_state_is_additive_nullable_and_leaves_the_rest_of_the_shape_intact(
+    tmp_path: Path,
+) -> None:
+    manager, package, _ = _bound(tmp_path)
+    client = _client(lambda: manager)
+    query = {"scope_kind": "agent", "scope_id": AGENT}
+    headers = {"X-Session": "allowed"}
+    absent = client.get("/api/outputs", params=query, headers=headers).json()["items"][0]
+    assert absent["review_state"] is None
+    assert set(absent) == {
+        "kind",
+        "output_id",
+        "series_id",
+        "title",
+        "package_id",
+        "package_revision",
+        "screen_id",
+        "artifact_id",
+        "artifact_revision",
+        "content_revision",
+        "task_id",
+        "task_revision",
+        "producer_session_id",
+        "producer_agent_id",
+        "producer_delegation_id",
+        "recorded_at",
+        "media_type",
+        "classification",
+        "state",
+        "reason",
+        "review_state",
+        "latest",
+        "version_count",
+        "width",
+        "height",
+    }
+    task_id = package.draft.screens[0].producer_task_binding.identifier
+    manager.value.reviews[REVIEW] = review(task_id, "requested")
+    present = client.get("/api/outputs", params=query, headers=headers).json()["items"][0]
+    assert present["review_state"] == "awaiting"
+    assert present["state"] == absent["state"] == "ready"
+    assert {key: value for key, value in present.items() if key != "review_state"} == {
+        key: value for key, value in absent.items() if key != "review_state"
+    }
+    summary = client.get("/api/outputs/summary", params=query, headers=headers).json()
+    assert "review_state" not in summary and summary["counts"] == {
+        "unchecked": 1,
+        "stale": 0,
+        "unavailable": 0,
+    }
 
 
 def test_missing_and_invalid_queries_are_closed(tmp_path: Path) -> None:

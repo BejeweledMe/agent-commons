@@ -1,0 +1,48 @@
+{
+  "work_package": "WP-04.2",
+  "task": "task.60E8AFJB3YZF000M6PYF3K96PT",
+  "delegation": "delegation.2PM52JAD07NXN59GV1CAYWEAGV",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "frontend/work/src/components/ConversationPanel.tsx",
+      "sha256": "c863aa8bd4ddcf5cdeed71febe1c8be8497317e4a948f308dcb9c73e6af6af27"
+    },
+    {
+      "path": "frontend/work/src/conversationState.ts",
+      "sha256": "2de23df8831e633714308109d1ac911c687b77ea060f542defc2374b190b81af"
+    },
+    {
+      "path": "frontend/work/src/conversationApi.ts",
+      "sha256": "48a6d9143c9b09199a09f8ab9d0e75b9cd8884450c34187b680c44aaa733bc15"
+    },
+    {
+      "path": "frontend/work/src/conversationStrings.ts",
+      "sha256": "ff6ea4bd2871729e8f230626a07af75caa18621e5ac66cc2b0ee2f07c8fce0a1"
+    },
+    {
+      "path": "frontend/work/src/conversation.css",
+      "sha256": "9ecb7c9ed21beca51bc58a30e0516ce9bac9d80a47ac1c9209e31567dcad260b"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "903e14c572b9e379d5c2e0b61d21173c76ebf4f9df2b2dc7d060d51ce64114db"
+    },
+    {
+      "path": "frontend/work/tests/conversations.test.mjs",
+      "sha256": "23db618ea2c97b2d9e3ce9a0a481bc3a2af8a5d652e1e364bbcbfcac4e29bdb3"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "254 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt",
+    "screenshots": "not taken"
+  },
+  "notes": [
+    "main.tsx hash includes earlier accepted WP-06 and WP-03 changes",
+    "worker sandbox refused command execution; coordinator ran verification"
+  ]
+}

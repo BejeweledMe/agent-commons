@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import type { WorkApi } from "../api.js";
 import type { Locale } from "../i18n.js";
-import { ConversationApi, scopeKey, type Attachment, type ConversationScope } from "../conversationApi.js";
-import { ConversationObjectUrl, ConversationSessions, ConversationSession } from "../conversationState.js";
+import { ConversationApi, deliverySteps, scopeKey, UNKNOWN_AVAILABILITY, type Attachment, type AvailabilityState, type ConversationScope, type Delivery, type RecipientAvailability } from "../conversationApi.js";
+import { ConversationDraftGuard, ConversationObjectUrl, ConversationSessions, ConversationSession } from "../conversationState.js";
 import { conversationText } from "../conversationStrings.js";
 
+const availabilityCopy = { active: "availabilityActive", inactive: "availabilityInactive", unknown: "availabilityUnknown" } as const satisfies Record<AvailabilityState, string>;
 type Selection = { scope: ConversationScope; title: string; opener: HTMLButtonElement };
 type Workspace = { locale: Locale; open: (selection: Selection) => void };
 const Context = createContext<Workspace | null>(null);
@@ -13,13 +14,21 @@ export function ConversationButton({ scope, title }: { scope: ConversationScope;
   const text = conversationText(workspace.locale);
   return <button type="button" className="button button-secondary button-inline conversation-entry" aria-haspopup="dialog" aria-label={`${text.for} ${title}`} onClick={(event) => workspace.open({ scope, title, opener: event.currentTarget })}>{text.conversation}</button>;
 }
-export function ConversationWorkspace({ api, projectId, locale, writesEnabled, sessions, children }: { api: WorkApi; projectId: string | null; locale: Locale; writesEnabled: boolean; sessions: ConversationSessions; children: ReactNode }) {
+export function ConversationWorkspace({ api, projectId, locale, writesEnabled, sessions, onPrepareRun, children }: { api: WorkApi; projectId: string | null; locale: Locale; writesEnabled: boolean; sessions: ConversationSessions; onPrepareRun?: (scope: ConversationScope) => void; children: ReactNode }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const transport = useMemo(() => new ConversationApi(api), [api]);
   const close = () => { const opener = selection?.opener; setSelection(null); if (opener?.isConnected) opener.focus(); };
-  return <Context.Provider value={{ locale, open: setSelection }}>{children}{selection ? <ConversationDialog key={`${projectId}/${scopeKey(selection.scope)}`} api={transport} session={sessions.get(projectId ?? "legacy", selection.scope, transport)} scope={selection.scope} title={selection.title} locale={locale} writable={writesEnabled} onClose={close} /> : null}</Context.Provider>;
+  // One handler for every session's RAM draft, armed only while something is unsent.
+  useEffect(() => {
+    const guard = new ConversationDraftGuard(window, sessions);
+    guard.sync();
+    const unsubscribe = sessions.subscribe(guard.sync);
+    return () => { unsubscribe(); guard.release(); };
+  }, [sessions]);
+  const prepare = onPrepareRun ? (scope: ConversationScope) => { close(); onPrepareRun(scope); } : undefined;
+  return <Context.Provider value={{ locale, open: setSelection }}>{children}{selection ? <ConversationDialog key={`${projectId}/${scopeKey(selection.scope)}`} api={transport} session={sessions.get(projectId ?? "legacy", selection.scope, transport)} scope={selection.scope} title={selection.title} locale={locale} writable={writesEnabled} onClose={close} onPrepareRun={prepare} /> : null}</Context.Provider>;
 }
-function ConversationDialog({ api, session, scope, title, locale, writable, onClose }: { api: ConversationApi; session: ConversationSession; scope: ConversationScope; title: string; locale: Locale; writable: boolean; onClose: () => void }) {
+function ConversationDialog({ api, session, scope, title, locale, writable, onClose, onPrepareRun }: { api: ConversationApi; session: ConversationSession; scope: ConversationScope; title: string; locale: Locale; writable: boolean; onClose: () => void; onPrepareRun?: (scope: ConversationScope) => void }) {
   const ref = useRef<HTMLDialogElement>(null), heading = useId(), inputId = useId(), hintId = useId();
   const snapshot = useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   const [visible, setVisible] = useState(100), [archiveId, setArchiveId] = useState<string | null>(null);
@@ -34,8 +43,13 @@ function ConversationDialog({ api, session, scope, title, locale, writable, onCl
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => { if (dialog?.open) dialog.close(); }; }, []);
   useEffect(() => { let disposed = false, timer: ReturnType<typeof setTimeout>; const poll = async () => { await session.connect(writable); if (!disposed) timer = setTimeout(poll, 4000); }; void poll(); return () => { disposed = true; clearTimeout(timer); }; }, [session, writable]);
   const thread = history.conversation?.thread_id;
+  // Read-only: absence stays unknown, and Prepare run only navigates and prefills.
+  const availability = snapshot.conversation?.recipient_availability ?? UNKNOWN_AVAILABILITY;
   return <dialog className="conversation-dialog" ref={ref} aria-labelledby={heading} onCancel={(event) => { event.preventDefault(); onClose(); }}>
-    <header className="conversation-header"><div><h2 id={heading}>{text.for} {title}</h2><p>{text[scope.kind]}</p></div><button type="button" className="button button-secondary" onClick={onClose}>{text.close}</button></header>
+    <header className="conversation-header"><div>
+      <h2 id={heading}>{text.for} {title}</h2><p>{text[scope.kind]}</p>
+      <AvailabilityChip availability={availability} locale={locale} onPrepareRun={onPrepareRun ? () => onPrepareRun(scope) : undefined} />
+    </div><button type="button" className="button button-secondary" onClick={onClose}>{text.close}</button></header>
     {snapshot.archives.some((item) => item.thread_id !== snapshot.conversation?.thread_id) ? <label className="conversation-history-picker">{text.history}<select value={archiveId ?? ""} onChange={(event) => setArchiveId(event.target.value || null)}><option value="">{text.current}</option>{snapshot.archives.filter((item) => item.thread_id !== snapshot.conversation?.thread_id).map((item, index) => <option key={item.thread_id} value={item.thread_id}>{text.closed} {index + 1} · {item.message_count}</option>)}</select></label> : null}
     <div className="conversation-history">
       {history.loading ? <p role="status">{text.loading}</p> : null}
@@ -50,7 +64,10 @@ function ConversationDialog({ api, session, scope, title, locale, writable, onCl
           {message.reply_to_message_id ? <small>{text.replying}</small> : null}
           {message.body ? <p className="conversation-body">{message.body}</p> : null}
           {thread && message.attachments.length ? <ul className="conversation-attachments">{message.attachments.map((item) => <li key={item.attachment_id}><BoundAttachment api={api} thread={thread} message={message.message_id} item={item} locale={locale} /></li>)}</ul> : null}
-          <footer><span className={`conversation-delivery conversation-delivery-${message.delivery.state}`}>{text[message.delivery.state]}</span>{message.delivery.recipients.length ? <span>{message.delivery.read_confirmed ? text.readConfirmed : text.noRead}</span> : null}{canWrite ? <button type="button" className="button button-secondary button-inline" disabled={locked} onClick={() => session.setReply(message.message_id)}>{text.reply}</button> : null}</footer>
+          <footer>
+            <DeliveryStepper delivery={message.delivery} locale={locale} />
+            {canWrite ? <button type="button" className="button button-secondary button-inline" disabled={locked} onClick={() => session.setReply(message.message_id)}>{text.reply}</button> : null}
+          </footer>
         </li>)}
       </ol>
     </div>
@@ -73,6 +90,34 @@ function ConversationDialog({ api, session, scope, title, locale, writable, onCl
       <div className="conversation-compose-actions"><label className="conversation-file-label">{text.attach}<input type="file" multiple disabled={!canWrite || locked} onChange={(event) => { session.addFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }} /></label><button className="button button-primary" type="submit" disabled={!canWrite || (snapshot.sendState !== "uncertain" && !session.canSend)}>{snapshot.sendState === "sending" ? text.sending : snapshot.sendState === "uncertain" ? text.retrySend : text.send}</button></div>
     </form> : <p className="conversation-hint">{text.closedNotice}</p>}
   </dialog>;
+}
+/**
+ * Reads the server's conservative availability. The secondary action is a
+ * navigation intent only: it opens Prepare run for this conversation's task and
+ * never asks the server to start anything.
+ */
+export function AvailabilityChip({ availability, locale, onPrepareRun }: { availability: RecipientAvailability; locale: Locale; onPrepareRun?: () => void }): ReactElement {
+  const text = conversationText(locale);
+  return <div className={`conversation-availability conversation-availability-${availability.state}`}>
+    <p><span aria-hidden="true" className="conversation-availability-icon" />{text[availabilityCopy[availability.state]]}</p>
+    {availability.state !== "active" && onPrepareRun ? <button type="button" className="button button-secondary button-inline conversation-prepare" onClick={onPrepareRun}>{text.prepareRun}</button> : null}
+  </div>;
+}
+/**
+ * The five recorded delivery states as an ordered list. Only a step the server
+ * reported is marked reached, and the acknowledgement line states plainly when
+ * no reading was confirmed. Delivery is never acceptance.
+ */
+export function DeliveryStepper({ delivery, locale }: { delivery: Delivery; locale: Locale }): ReactElement {
+  const text = conversationText(locale);
+  return <>
+    <ol className={`conversation-delivery conversation-delivery-${delivery.state}`} aria-label={text.deliveryProgress}>
+      {deliverySteps(delivery).map((step) => <li key={step.state} className={`conversation-delivery-step${step.reached ? " conversation-delivery-step-reached" : ""}${step.current ? " conversation-delivery-step-current" : ""}`} aria-current={step.current ? "step" : undefined}>
+        <span aria-hidden="true" className="conversation-delivery-mark" />{text[step.state]} <span className="visually-hidden">{step.reached ? text.stepDone : text.stepPending}</span>
+      </li>)}
+    </ol>
+    <span className="conversation-delivery-read">{delivery.read_confirmed ? text.readConfirmed : text.noRead}</span>
+  </>;
 }
 function formatBytes(size: number): string { return size >= 1_000_000 ? `${(size / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(size / 1000))} KB`; }
 function LocalImage({ file, name, locale }: { file: Blob; name: string; locale: Locale }) {

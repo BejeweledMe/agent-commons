@@ -8,15 +8,18 @@ import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const compiled = mkdtempSync(resolve(tmpdir(), "commons-project-workspace-"));
-execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--outDir", compiled, resolve(root, "src/api.ts"), resolve(root, "src/appRouteState.ts"), resolve(root, "src/projectWorkspace.ts")], { cwd: root });
+execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--outDir", compiled, resolve(root, "src/api.ts"), resolve(root, "src/appRouteState.ts"), resolve(root, "src/projectWorkspace.ts"), resolve(root, "src/projectArchive.ts")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const workspace = await import(pathToFileURL(resolve(compiled, "projectWorkspace.js")));
 const apiModule = await import(pathToFileURL(resolve(compiled, "api.js")));
 const routes = await import(pathToFileURL(resolve(compiled, "appRouteState.js")));
+const { ProjectArchiveConfirmation } = await import(pathToFileURL(resolve(compiled, "projectArchive.js")));
 const apiSource = readFileSync(resolve(root, "src/api.ts"), "utf8");
 const shellSource = readFileSync(resolve(root, "src/main.tsx"), "utf8");
 const contextSource = readFileSync(resolve(root, "src/components/ContextPacksSection.tsx"), "utf8");
 const blueprintSource = readFileSync(resolve(root, "src/components/WorkBlueprintsSection.tsx"), "utf8");
+const sidebarSource = readFileSync(resolve(root, "src/components/ProjectSidebar.tsx"), "utf8");
+const archiveDialogSource = readFileSync(resolve(root, "src/components/ProjectArchiveDialog.tsx"), "utf8");
 
 const projectA = `project.${"a".repeat(32)}`;
 const projectB = `project.${"b".repeat(32)}`;
@@ -148,6 +151,77 @@ test("the shell clears the old project view before a scoped load and pins async 
   assert.match(shellSource, /if \(!stillCurrent\(\)\) return;[\s\S]*replaceProviderStatus\(status\)/);
   assert.match(shellSource, /const projectId = routeRef\.current\.projectId;[\s\S]*const submit = async[\s\S]*if \(routeRef\.current\.projectId !== projectId\) return;[\s\S]*const generation = projectSelectionRef\.current\.currentGeneration\(\)/);
   assert.match(shellSource, /navigate\(\{ projectId, taskId: selectedTaskId, composer: false \}\)/);
+});
+
+function archiveRequest() {
+  return { projectId: projectA, revision: registryRevision, name: "Alpha", path: "/Users/owner/Projects/alpha" };
+}
+
+test("cancelling the archive question issues no request and hands focus back to its trigger", async () => {
+  const confirmation = new ProjectArchiveConfirmation();
+  const requests = [];
+  confirmation.ask(archiveRequest());
+  assert.equal(confirmation.snapshot().open, true);
+  assert.equal(confirmation.snapshot().request.name, "Alpha");
+  assert.equal(confirmation.snapshot().request.path, "/Users/owner/Projects/alpha");
+  assert.equal(confirmation.snapshot().request.projectId, projectA, "the trigger to refocus is named by the question");
+  // The dialog's Cancel button and its Escape handler share this one path.
+  confirmation.cancel();
+  assert.deepEqual(confirmation.snapshot(), { open: false, request: null, busy: false });
+  assert.equal(await confirmation.confirm((request) => { requests.push(request); return Promise.resolve(true); }), false);
+  assert.deepEqual(requests, [], "cancel must never reach the update request");
+});
+
+test("confirming archives once even when the button is clicked twice", async () => {
+  const confirmation = new ProjectArchiveConfirmation();
+  const requests = [];
+  let release;
+  const inFlight = new Promise((resolve) => { release = resolve; });
+  const archive = (request) => { requests.push(request); return inFlight; };
+  confirmation.ask(archiveRequest());
+  const first = confirmation.confirm(archive);
+  const second = confirmation.confirm(archive);
+  assert.equal(confirmation.snapshot().busy, true);
+  release(true);
+  assert.deepEqual([await first, await second], [true, false]);
+  assert.equal(requests.length, 1, "a repeated confirm must not issue a second request");
+  assert.deepEqual(requests[0], archiveRequest());
+  assert.deepEqual(confirmation.snapshot(), { open: false, request: null, busy: false });
+});
+
+test("a refused archive keeps the question open without asking again", async () => {
+  const confirmation = new ProjectArchiveConfirmation();
+  let calls = 0;
+  confirmation.ask(archiveRequest());
+  assert.equal(await confirmation.confirm(async () => { calls += 1; return false; }), false);
+  assert.equal(confirmation.snapshot().open, true);
+  assert.equal(confirmation.snapshot().busy, false);
+  assert.equal(calls, 1);
+  await assert.rejects(confirmation.confirm(async () => { throw new Error("host refused"); }));
+  assert.equal(confirmation.snapshot().open, true, "an uncertain archive stays answerable");
+  confirmation.cancel();
+  assert.equal(confirmation.snapshot().open, false);
+});
+
+test("nothing is archived before the question is asked", async () => {
+  const confirmation = new ProjectArchiveConfirmation();
+  let calls = 0;
+  assert.equal(await confirmation.confirm(async () => { calls += 1; return true; }), false);
+  assert.equal(calls, 0);
+});
+
+test("the archive question is the only archive path and restore stays direct", () => {
+  assert.match(sidebarSource, /archive\.ask\(\{ projectId: project\.id, revision: project\.revision, name: project\.name, path: project\.id === currentProjectId \? currentProjectPath \?\? null : null \}\)/);
+  assert.match(sidebarSource, /if \(project\.archived\) \{ void update\(project\.id, project\.revision, \{ name: project\.name, archived: false \}\); return; \}/);
+  assert.match(sidebarSource, /archiveTriggers\.current\.get\(projectId\)\?\.focus\(\)/);
+  assert.match(sidebarSource, /<summary ref=\{\(node\) => \{ archiveTriggers\.current\.set\(project\.id, node\); \}\}/);
+  assert.doesNotMatch(sidebarSource, /archived: !project\.archived/);
+  assert.match(archiveDialogSource, /onCancel=\{\(event\) => \{ event\.preventDefault\(\); dismiss\(\); \}\}/);
+  assert.match(archiveDialogSource, /dialog\.current\?\.showModal\(\); cancelButton\.current\?\.focus\(\);/);
+  assert.match(archiveDialogSource, /aria-describedby=\{description\} aria-labelledby=\{heading\}/);
+  assert.match(archiveDialogSource, /confirmation\.cancel\(\);\s*if \(projectId !== null\) onClose\(projectId\);/);
+  assert.match(archiveDialogSource, /confirmation\.confirm\(onArchive\)\.then\(\(archived\) => \{ if \(archived\) onClose\(target\.projectId\); \}\)/);
+  assert.match(shellSource, /currentProjectPath=\{data\.meta\.repo\}/);
 });
 
 test("Library editors retain RAM-only drafts and exact uncertain retry identities by project", () => {

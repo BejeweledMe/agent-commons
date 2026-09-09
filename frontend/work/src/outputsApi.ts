@@ -1,5 +1,26 @@
 import type { WorkApi } from "./api.js";
-import { OutputsError, canViewImage, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions } from "./outputsTypes.js";
+import { OutputsError, canViewImage, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type LiveOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions, type ReviewState } from "./outputsTypes.js";
+import type { OutputMessage } from "./outputsStrings.js";
+
+export type OutputStatus = Extract<OutputMessage, "latestResult" | "earlierViewable" | "earlierVersion" | "previewExpired" | "addressUnavailable" | "previewNotVerified" | "previewUnavailable" | "starting" | "reported_ready">;
+/** Presentation only: a display label for facts the server already decided.
+ *  A historical result stays historical; nothing here promotes it to current. */
+export function outputStatus(item: ImageOutput | LiveOutput, now: number): OutputStatus {
+  if (item.kind === "live_preview") {
+    if (item.state === "stale") return "earlierVersion";
+    if (item.state === "expired") return "previewExpired";
+    if (now >= item.expiresAt) return "previewExpired";
+    if (item.state === "unavailable") return "addressUnavailable";
+    return item.state;
+  }
+  if (canViewImage(item)) return item.state === "ready" && item.latest ? "latestResult" : "earlierViewable";
+  if (item.state === "unchecked") return "previewNotVerified";
+  if (item.state === "unavailable") return "previewUnavailable";
+  return "earlierVersion";
+}
+const REVIEW_LABELS = { awaiting: "reviewAwaiting", approved: "reviewApproved", returned: "reviewReturned" } as const;
+/** Only a server-supplied review state produces a review label; freshness never does. */
+export function reviewLabel(state: ReviewState | null): OutputMessage | null { return state === null ? null : REVIEW_LABELS[state]; }
 
 type Transport = Pick<WorkApi, "readOutputs" | "readOutputImage">;
 export class OutputsApi {

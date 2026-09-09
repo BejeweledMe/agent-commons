@@ -13,11 +13,11 @@ const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-conversations-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM,DOM.Iterable", "--jsx", "react-jsx", "--outDir", compiled, resolve(root, "src/components/ConversationPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const load = (file) => import(pathToFileURL(resolve(compiled, file)).href);
-const { ConversationApi, parseAttachment, parseConversation, parseMessage, parseDraft, parseDelivery, validateFiles } = await load("conversationApi.js");
-const { ConversationSession, ConversationSessions, ConversationObjectUrl } = await load("conversationState.js");
+const { ConversationApi, parseAttachment, parseConversation, parseMessage, parseDraft, parseDelivery, parseRecipientAvailability, deliverySteps, validateFiles, UNKNOWN_AVAILABILITY } = await load("conversationApi.js");
+const { ConversationSession, ConversationSessions, ConversationDraftGuard, ConversationObjectUrl, prepareRunTaskId, sessionHasUnsentDraft } = await load("conversationState.js");
 const { conversationPath, attachmentPath, boundedAttachmentBlob } = await load("conversationTransport.js");
 const { WorkApi, ApiProblem } = await load("api.js");
-const { ConversationButton, ConversationWorkspace } = await load("components/ConversationPanel.js");
+const { AvailabilityChip, ConversationButton, ConversationWorkspace, DeliveryStepper } = await load("components/ConversationPanel.js");
 const { conversationText } = await load("conversationStrings.js");
 const id = (kind, n="0") => `${kind}.${n.repeat(26)}`;
 const opaque = (kind,n="a") => `${kind}.${n.repeat(32)}`;
@@ -215,7 +215,7 @@ test("history transport only accepts a single bounded direction and validates cu
 });
 test("both languages explain bounded history and expired uploads without fabricated read receipts",()=>{
  for(const locale of ["en","ru"]){for(const name of ["expired","historyPartial","historyLimited","closedNotice","olderError"])assert.ok(conversationText(locale)[name].length>10);}
- const source=readFileSync(resolve(root,"src/components/ConversationPanel.tsx"),"utf8");assert.match(source,/message.delivery.recipients.length \? <span>/);assert.match(source,/canWrite = !archiveId/);
+ const source=readFileSync(resolve(root,"src/components/ConversationPanel.tsx"),"utf8");assert.match(source,/<DeliveryStepper delivery=\{message\.delivery\} locale=\{locale\} \/>/);assert.match(source,/delivery\.read_confirmed \? text\.readConfirmed : text\.noRead/);assert.match(source,/canWrite = !archiveId/);
 });
 
 test("actual WorkApi carries only approved history cursors inside its immutable project",async()=>{
@@ -226,4 +226,143 @@ test("actual WorkApi carries only approved history cursors inside its immutable 
   await assert.rejects(work.requestConversation(`/conversations/${id("thread")}/messages?tail=true&after=${id("message")}`,{method:"GET",signal:signal()}));
   assert.equal(calls.length,2);assert.match(calls[0].url,/project\.a+\/conversations\/thread\..*\/messages\?tail=true$/);assert.match(calls[1].url,/\?before=message\./);assert.equal(calls[0].init.redirect,"error");
  }finally {globalThis.fetch=previous;}
+});
+
+const unloadTarget = () => { const handlers=[]; return { handlers,
+ addEventListener(type,handler){handlers.push({type,handler});},
+ removeEventListener(type,handler){const index=handlers.findIndex(entry=>entry.type===type&&entry.handler===handler);if(index>=0)handlers.splice(index,1);} }; };
+
+test("one beforeunload handler is armed only while text, a reply or attachments are unsent",async()=>{
+ const target=unloadTarget(),bank=new ConversationSessions(),first=fixture(),second=fixture();
+ const guard=new ConversationDraftGuard(target,bank),unsubscribe=bank.subscribe(guard.sync);guard.sync();
+ const session=bank.get("A",scope,first.api);
+ assert.equal(target.handlers.length,0);assert.equal(guard.armed,false);
+ session.setText("   ");assert.equal(target.handlers.length,0);
+ session.setText("Unsent prose");assert.equal(target.handlers.length,1);assert.equal(target.handlers[0].type,"beforeunload");assert.equal(guard.armed,true);
+ const event={prevented:false,returnValue:null,preventDefault(){this.prevented=true;}};
+ target.handlers[0].handler(event);assert.equal(event.prevented,true);assert.equal(event.returnValue,"");
+ session.setText("");assert.equal(target.handlers.length,0);
+ session.setReply(id("message"));assert.equal(target.handlers.length,1);
+ session.setReply(null);assert.equal(target.handlers.length,0);
+ await session.connect(true);assert.equal(target.handlers.length,0);
+ session.addFiles([new File(["abc"],"note.txt")]);await tick();
+ assert.equal(target.handlers.length,1);assert.equal(session.snapshot().uploads.length,1);
+ const other=bank.get("B",scope,second.api);other.setText("Another project draft");
+ assert.equal(target.handlers.length,1);
+ await session.remove(session.snapshot().uploads[0].id);
+ assert.equal(session.snapshot().uploads.length,0);assert.equal(target.handlers.length,1);
+ assert.equal(sessionHasUnsentDraft(other.snapshot()),true);
+ other.setText("");assert.equal(target.handlers.length,0);
+ other.setText("Back");assert.equal(target.handlers.length,1);
+ unsubscribe();guard.release();assert.equal(target.handlers.length,0);assert.equal(guard.armed,false);
+ for(const file of ["conversationState.ts","conversationApi.ts","components/ConversationPanel.tsx"])
+  assert.doesNotMatch(readFileSync(resolve(root,"src",file),"utf8"),/localStorage|sessionStorage|indexedDB|document\.cookie/);
+});
+
+test("recipient availability is additive and every doubtful shape reads as unknown",()=>{
+ const unknown={state:"unknown",agent_id:null,active_delegation_id:null,observed_revision:null};
+ assert.deepEqual(parseConversation(conversation(),scope).recipient_availability,unknown);
+ assert.deepEqual({...UNKNOWN_AVAILABILITY},unknown);
+ const active={state:"active",agent_id:id("agent"),active_delegation_id:id("delegation"),observed_revision:id("evt")};
+ const inactive={state:"inactive",agent_id:id("agent"),active_delegation_id:null,observed_revision:id("evt")};
+ assert.deepEqual(parseConversation(conversation({recipient_availability:active}),scope).recipient_availability,active);
+ assert.deepEqual(parseConversation(conversation({recipient_availability:inactive}),scope).recipient_availability,inactive);
+ assert.deepEqual(parseConversation(conversation({recipient_availability:{...unknown,agent_id:id("agent"),observed_revision:id("evt")}}),scope).recipient_availability,
+  {state:"unknown",agent_id:id("agent"),active_delegation_id:null,observed_revision:id("evt")});
+ for(const patch of [undefined,null,"active",[],{},{state:"busy"},{...active,state:"idle"},{...active,agent_id:null},{...active,active_delegation_id:null},
+  {...inactive,active_delegation_id:id("delegation")},{...inactive,agent_id:"agent.not-an-id"},{...inactive,agent_id:12},{...active,observed_revision:id("evt","1")},
+  {...active,observed_revision:"evt.stale"},
+  // Incomplete freshness or shape never yields an active/inactive assertion.
+  {...active,observed_revision:null},(({observed_revision,...rest})=>rest)(active),{...inactive,observed_revision:null},(({observed_revision,...rest})=>rest)(inactive),
+  (({active_delegation_id,...rest})=>rest)(inactive),(({active_delegation_id,...rest})=>rest)(active)])
+  assert.deepEqual(parseConversation(conversation({recipient_availability:patch}),scope).recipient_availability,unknown,JSON.stringify(patch??null));
+ assert.equal(parseRecipientAvailability(active).state,"active");
+ assert.equal(parseRecipientAvailability(active,id("evt","1")).state,"unknown");
+ assert.equal(parseRecipientAvailability({...inactive,observed_revision:null}).state,"unknown");
+ assert.equal(parseRecipientAvailability({...active,observed_revision:null}).state,"unknown");
+ assert.deepEqual(parseRecipientAvailability({state:"unknown",agent_id:id("agent"),active_delegation_id:null,observed_revision:null}),{state:"unknown",agent_id:id("agent"),active_delegation_id:null,observed_revision:null});
+});
+
+const findElement=(node,type)=>{
+ if(!node||typeof node!=="object")return null;
+ if(Array.isArray(node)){for(const child of node){const found=findElement(child,type);if(found)return found;}return null;}
+ if(node.type===type)return node;
+ return node.props?findElement(node.props.children,type):null;
+};
+
+test("Prepare run only navigates and prefills, and no scope issues a request",async()=>{
+ const previous=globalThis.fetch,requests=[],prepared=[];
+ globalThis.fetch=async(...args)=>{requests.push(args);throw Error("a conversation must not write");};
+ try{
+  for(const state of ["inactive","unknown"]){
+   const chip=AvailabilityChip({availability:{state,agent_id:null,active_delegation_id:null,observed_revision:null},locale:"en",onPrepareRun:()=>prepared.push(state)});
+   const button=findElement(chip,"button");assert.ok(button,state);button.props.onClick();
+  }
+  const active=AvailabilityChip({availability:{state:"active",agent_id:id("agent"),active_delegation_id:id("delegation"),observed_revision:id("evt")},locale:"en",onPrepareRun:()=>prepared.push("active")});
+  assert.equal(findElement(active,"button"),null);
+  const readonly=AvailabilityChip({availability:UNKNOWN_AVAILABILITY,locale:"ru"});
+  assert.equal(findElement(readonly,"button"),null);
+ }finally{globalThis.fetch=previous;}
+ assert.deepEqual(prepared,["inactive","unknown"]);
+ assert.equal(requests.length,0);
+ assert.equal(prepareRunTaskId(scope,null),scope.id);
+ assert.equal(prepareRunTaskId(scope,id("task","1")),scope.id);
+ assert.equal(prepareRunTaskId({kind:"agent",id:id("agent")},id("task","1")),id("task","1"));
+ assert.equal(prepareRunTaskId({kind:"agent",id:id("agent")},null),null);
+ assert.equal(prepareRunTaskId({kind:"project"},id("task","1")),id("task","1"));
+ assert.equal(prepareRunTaskId({kind:"project"},null),null);
+ const main=readFileSync(resolve(root,"src/main.tsx"),"utf8");
+ const body=main.match(/function prepareRunForConversation[\s\S]*?\n {2}\}/)[0];
+ assert.match(body,/prepareRunTaskId\(scope, routeRef\.current\.taskId\)/);
+ assert.match(body,/prepareLaunch\(taskId\)/);
+ assert.match(body,/navigate\(\{ view: "work", composer: false \}\)/);
+ assert.doesNotMatch(body,/api|fetch|await|POST/);
+ assert.match(main,/onPrepareRun=\{prepareRunForConversation\}/);
+});
+
+test("delivery is an ordered stepper in both locales and never fabricates a read receipt",()=>{
+ const order=["recorded","queued","fetched","acknowledged","answered"],reached={recorded:1,queued:2,fetched:3,acknowledged:4,answered:4};
+ for(const locale of ["en","ru"]){
+  const text=conversationText(locale);
+  for(const state of order){
+   const confirmed=state==="acknowledged";
+   const delivery=parseDelivery({state,read_confirmed:confirmed,recipients:[]});
+   const markup=renderToStaticMarkup(createElement(DeliveryStepper,{delivery,locale}));
+   assert.match(markup,new RegExp(`<ol class="conversation-delivery conversation-delivery-${state}"`));
+   assert.ok(markup.includes(text.deliveryProgress));
+   assert.equal((markup.match(/<li /g)||[]).length,5,state);
+   assert.equal((markup.match(/aria-current="step"/g)||[]).length,1,state);
+   assert.equal((markup.match(/conversation-delivery-step-reached/g)||[]).length,reached[state],`${locale} ${state}`);
+   assert.equal((markup.match(/conversation-delivery-step-current/g)||[]).length,1,state);
+   for(const step of order)assert.ok(markup.includes(text[step]),`${locale} ${state} ${step}`);
+   assert.ok(markup.includes(confirmed?text.readConfirmed:text.noRead));
+   assert.ok(markup.includes(text.stepDone)&&markup.includes(text.stepPending),`${locale} ${state}`);
+   const acknowledgedStep=markup.split("<li ").slice(1).find(part=>part.includes(text.acknowledged));
+   assert.equal(acknowledgedStep.includes("conversation-delivery-step-reached"),confirmed,`${locale} ${state}`);
+  }
+ }
+ const answered=parseDelivery({state:"answered",read_confirmed:false,recipients:[{agent_id:id("agent"),state:"fetched",fetched_at:"2026-09-09T00:00:00Z",acknowledged_at:null}]});
+ assert.deepEqual(deliverySteps(answered).map(step=>step.reached),[true,true,true,false,true]);
+ assert.deepEqual(deliverySteps(answered).map(step=>step.current),[false,false,false,false,true]);
+ assert.deepEqual(deliverySteps(parseDelivery({state:"recorded",read_confirmed:false,recipients:[]})).map(step=>step.reached),[true,false,false,false,false]);
+ assert.ok(renderToStaticMarkup(createElement(DeliveryStepper,{delivery:answered,locale:"en"})).includes(conversationText("en").noRead));
+});
+
+test("availability and stepper copy exists in EN and RU with the same keys",()=>{
+ const en=conversationText("en"),ru=conversationText("ru");
+ assert.deepEqual(Object.keys(en),Object.keys(ru));
+ for(const locale of ["en","ru"]){
+  const text=conversationText(locale);
+  for(const name of ["availabilityActive","availabilityInactive","availabilityUnknown","prepareRun","deliveryProgress","stepDone","stepPending","noRead"])assert.ok(text[name].length>1,`${locale} ${name}`);
+  for(const [state,key] of [["active","availabilityActive"],["inactive","availabilityInactive"],["unknown","availabilityUnknown"]]){
+   const markup=renderToStaticMarkup(createElement(AvailabilityChip,{availability:{state,agent_id:null,active_delegation_id:null,observed_revision:null},locale,onPrepareRun(){}}));
+   assert.ok(markup.includes(text[key]),`${locale} ${state}`);
+   assert.match(markup,new RegExp(`class="conversation-availability conversation-availability-${state}"`));
+   assert.match(markup,/aria-hidden="true" class="conversation-availability-icon"/);
+   assert.equal(markup.includes(text.prepareRun),state!=="active",`${locale} ${state}`);
+  }
+ }
+ const styles=readFileSync(resolve(root,"src/conversation.css"),"utf8");
+ for(const name of ["conversation-availability","conversation-availability-icon","conversation-prepare","conversation-delivery-step","conversation-delivery-mark","conversation-delivery-read"])assert.ok(styles.includes(`.${name}`),name);
+ assert.doesNotMatch(readFileSync(resolve(root,"src/components/ConversationPanel.tsx"),"utf8"),/style=\{\{/);
 });

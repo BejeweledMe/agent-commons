@@ -1275,6 +1275,9 @@ function parseTrackerRun(value: unknown): TrackerRun {
     updatedAt: trackerNullableTimestampAt(value, "updated_at"),
     finishedAt: trackerNullableTimestampAt(value, "finished_at"),
     durationSeconds: nullableNumberAt(value, "duration_seconds"),
+    // Additive field: a payload from a server that predates it is still valid
+    // and reads as "limit not provided", never as a default.
+    wallTimeSeconds: "wall_time_seconds" in value ? nullableNumberAt(value, "wall_time_seconds") : null,
     awaitsHuman: requiredBooleanAt(value, "awaits_human"),
     nextAction: trackerEnumAt(value, "next_action", TRACKER_NEXT_ACTIONS),
     freshness: trackerEnumAt(value, "freshness", TRACKER_FRESHNESS_STATES),
@@ -1910,6 +1913,7 @@ export class WorkApi {
       contextPackRevision: string | null;
       designPackageId: string | null;
       designPackageRevision: string | null;
+      wallTimeSeconds: number;
     },
     idempotencyKey: string,
     signal: AbortSignal
@@ -1919,6 +1923,7 @@ export class WorkApi {
       {
         agent_id: input.agentId,
         task_id: input.taskId,
+        wall_time_seconds: input.wallTimeSeconds,
         ...(input.contextPackId === null ? {} : {
           context_pack_id: input.contextPackId,
           context_pack_revision: input.contextPackRevision

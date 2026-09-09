@@ -1,0 +1,31 @@
+{
+  "work_package": "WP-04.1",
+  "task": "task.5BHC8X35V3EQ9S8AM2GPT742PA",
+  "delegation": "delegation.5EZP6YJASK8ZS7E7K068506AA2",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "src/agent_commons/services/conversations.py",
+      "sha256": "a41ebbd2f980d962f7705436a64d4f3f63c609272d40d2798962bc6139654ed8"
+    },
+    {
+      "path": "tests/services/test_conversations.py",
+      "sha256": "7da48bbdfd953b6c2f555031ff3d18ac8e291c72ac147e36f386d3dda66920fb"
+    },
+    {
+      "path": "tests/ui/test_conversation_routes.py",
+      "sha256": "97f0237aabbeda1732bfdd77d28fec6e44c6a24fa2f363c2793ac4970e1b5068"
+    }
+  ],
+  "verification": {
+    "pytest": "73 passed (uv run python -m pytest tests/services/test_conversations.py tests/ui/test_conversation_routes.py)",
+    "ruff": "check and format clean",
+    "frontend": "not affected",
+    "packaged_asset": "not rebuilt"
+  },
+  "notes": [
+    "src/agent_commons/ui/conversation_routes.py unchanged: the route passes the service view dict through, so the additive field reaches the wire",
+    "first Terra attempt (delegation.6CSJBTFSJ494THFZTYJPFYPYBX) stopped needs_operator without changes because the brief did not state that claims were transferred and the CLI is unusable in the sandbox; brief amended"
+  ]
+}

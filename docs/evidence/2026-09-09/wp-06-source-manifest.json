@@ -1,0 +1,41 @@
+{
+  "work_package": "WP-06",
+  "task": "task.3RTW2XSB6F610G73EXJV3H7F7P",
+  "delegation": "delegation.0SV2WBHRF4223N45V57SHT0YB6",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "sha256": "94581b102ad83a3669fb82fad6199a29916bf09e1d262ed96d509fa97195dfbd"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "b199a2e9e226164e9c2b8369292daae9ce04dad79e48e50f2c7096dd1fc07e95"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "4efbf3e50f5495c2ec94c9814ca9432e069218f1bdbe252d5aa40b85b521517f"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "60c853d4f8f2bcda757a838e79eb29863c2670a093064b3fcb3a2baef9dc2e6d"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "cd7ae048b5fd4123cfe7ac6225c14042d587cfea1576ec77156f4e47a17891ae"
+    },
+    {
+      "path": "frontend/work/src/blueprintApplyOutcome.ts",
+      "sha256": "15f9f5b0b7a002d21922807f57a14bcf704498f9d98a467afd19c1432cb3747b"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "230 passed, 0 failed (node --test frontend/work/tests/*.test.mjs)",
+    "pytest": "19 passed (uv run python -m pytest tests/ui/test_custom_library_blueprints.py)",
+    "tsc": "exit 0 (npx tsc --noEmit -p frontend/work)",
+    "packaged_asset": "not rebuilt; wave-1 integrator rebuilds src/agent_commons/ui/static/work",
+    "screenshots": "not taken; coordinator visual check pending asset rebuild"
+  },
+  "worker_report": "delegation ended needs_operator because its sandbox refused node/uv/npx; coordinator ran the verification"
+}

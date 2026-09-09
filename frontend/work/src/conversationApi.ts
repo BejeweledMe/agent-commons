@@ -1,8 +1,11 @@
 import { ApiProblem, type WorkApi } from "./api.js";
 export type ConversationScope = Readonly<{ kind: "project" } | { kind: "task" | "agent"; id: string }>;
 export type Attachment = Readonly<{ attachment_id: string; display_name: string; media_type: string; size_bytes: number; digest: string; category: "image" | "file" }>;
-export type Conversation = Readonly<{ thread_id: string; revision: string; scope: ConversationScope; subject: string; state: "open" | "resolved"; audience: "all_project_agents" | "task" | "agent"; message_count: number }>;
+export type AvailabilityState = "active" | "inactive" | "unknown";
+export type RecipientAvailability = Readonly<{ state: AvailabilityState; agent_id: string | null; active_delegation_id: string | null; observed_revision: string | null }>;
+export type Conversation = Readonly<{ thread_id: string; revision: string; scope: ConversationScope; subject: string; state: "open" | "resolved"; audience: "all_project_agents" | "task" | "agent"; message_count: number; recipient_availability: RecipientAvailability }>;
 export type DeliveryState = "recorded" | "queued" | "fetched" | "acknowledged" | "answered";
+export const DELIVERY_ORDER = ["recorded", "queued", "fetched", "acknowledged", "answered"] as const;
 export type Delivery = Readonly<{ state: DeliveryState; read_confirmed: boolean; recipients: readonly { agent_id: string | null; state: "queued" | "fetched" | "acknowledged"; acknowledged_at: string | null; fetched_at: string | null }[] }>;
 export type Message = Readonly<{ message_id: string; body: string; attachments: readonly Attachment[]; recorded_at: string; reply_to_message_id: string | null; author: { kind: "operator" | "agent" | "unknown"; agent_id: string | null; name: string | null }; delivery: Delivery }>;
 export type Draft = Readonly<{ draft_id: string; state: "ready" | "binding" | "bound"; attachments: readonly Attachment[]; expires_at: number; message_id: string | null }>;
@@ -28,14 +31,49 @@ function attachments(value: unknown): Attachment[] {
   if (new Set(result.map((item) => item.attachment_id)).size !== result.length || result.filter((item) => item.category === "image").length > 10 || result.filter((item) => item.category === "file").length > 10) return invalid();
   return result;
 }
+export const UNKNOWN_AVAILABILITY: RecipientAvailability = Object.freeze({ state: "unknown", agent_id: null, active_delegation_id: null, observed_revision: null } as const);
+/**
+ * Additive and conservative. A missing, malformed, partially typed or stale
+ * object reads as `unknown`; absence never establishes that an agent is idle,
+ * and no branch here can invent an active run.
+ */
+export function parseRecipientAvailability(value: unknown, revision?: string): RecipientAvailability {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return UNKNOWN_AVAILABILITY;
+  const row = value as Record<string, unknown>;
+  const optional = (input: unknown, kind: string): string | null | undefined => {
+    if (input === null || input === undefined) return null;
+    return typeof input === "string" && new RegExp(`^${kind}\\.[0-9A-HJKMNP-TV-Z]{26}$`).test(input) ? input : undefined;
+  };
+  const agent = optional(row.agent_id, "agent"), delegation = optional(row.active_delegation_id, "delegation"), observed = optional(row.observed_revision, "evt");
+  if (agent === undefined || delegation === undefined || observed === undefined) return UNKNOWN_AVAILABILITY;
+  if (revision !== undefined && observed !== null && observed !== revision) return UNKNOWN_AVAILABILITY;
+  // An assertion of activity or idleness needs its freshness proven: without an
+  // observed revision the shape is incomplete and reads as unknown. Idleness also
+  // needs the delegation slot to be explicitly empty, not merely omitted.
+  if (row.state === "active" && agent !== null && delegation !== null && observed !== null) return { state: "active", agent_id: agent, active_delegation_id: delegation, observed_revision: observed };
+  if (row.state === "inactive" && agent !== null && "active_delegation_id" in row && delegation === null && observed !== null) return { state: "inactive", agent_id: agent, active_delegation_id: null, observed_revision: observed };
+  if (row.state === "unknown") return { state: "unknown", agent_id: agent, active_delegation_id: null, observed_revision: observed };
+  return UNKNOWN_AVAILABILITY;
+}
 export function parseConversation(value: unknown, expectedScope?: ConversationScope): Conversation {
   const row = object(value), scope = parseScope(row.scope);
   if ((expectedScope && scopeKey(scope) !== scopeKey(expectedScope)) || (row.state !== "open" && row.state !== "resolved") || row.audience !== (scope.kind === "project" ? "all_project_agents" : scope.kind)) return invalid();
-  return { thread_id: conversationId(row.thread_id, "thread"), revision: conversationId(row.revision, "evt"), scope, subject: text(row.subject, 2048), state: row.state, audience: row.audience as Conversation["audience"], message_count: integer(row.message_count, 0, 1_000_000) };
+  const revision = conversationId(row.revision, "evt");
+  return { thread_id: conversationId(row.thread_id, "thread"), revision, scope, subject: text(row.subject, 2048), state: row.state, audience: row.audience as Conversation["audience"], message_count: integer(row.message_count, 0, 1_000_000), recipient_availability: parseRecipientAvailability(row.recipient_availability, revision) };
+}
+export type DeliveryStep = Readonly<{ state: DeliveryState; reached: boolean; current: boolean }>;
+/**
+ * Ordered progress of one recorded message. A step is only reached when the
+ * server reported it: an answered message whose reading was never acknowledged
+ * leaves that step unreached, so no marker can stand in for a read receipt.
+ */
+export function deliverySteps(delivery: Delivery): readonly DeliveryStep[] {
+  const index = DELIVERY_ORDER.indexOf(delivery.state);
+  return DELIVERY_ORDER.map((state, position) => ({ state, current: position === index, reached: position <= index && (state !== "acknowledged" || delivery.read_confirmed) }));
 }
 export function parseDelivery(value: unknown): Delivery {
   const row = object(value);
-  if (!["recorded", "queued", "fetched", "acknowledged", "answered"].includes(String(row.state)) || typeof row.read_confirmed !== "boolean") return invalid();
+  if (!(DELIVERY_ORDER as readonly string[]).includes(String(row.state)) || typeof row.read_confirmed !== "boolean") return invalid();
   const recipients = array(row.recipients ?? [], 128).map((value) => { const recipient = object(value); if (recipient.state !== "queued" && recipient.state !== "fetched" && recipient.state !== "acknowledged") return invalid(); const fetched = recipient.fetched_at === null ? null : timestamp(recipient.fetched_at), acknowledged = recipient.acknowledged_at === null ? null : timestamp(recipient.acknowledged_at); if ((recipient.state === "queued" && (fetched || acknowledged)) || (recipient.state === "fetched" && (!fetched || acknowledged)) || (recipient.state === "acknowledged" && (!fetched || !acknowledged))) return invalid(); return { agent_id: recipient.agent_id === null ? null : conversationId(recipient.agent_id, "agent"), state: recipient.state as "queued" | "fetched" | "acknowledged", fetched_at: fetched, acknowledged_at: acknowledged }; });
   if ((row.read_confirmed && row.state !== "acknowledged" && row.state !== "answered") || (row.state === "acknowledged" && !row.read_confirmed)) return invalid();
   return { state: row.state as DeliveryState, read_confirmed: row.read_confirmed, recipients };

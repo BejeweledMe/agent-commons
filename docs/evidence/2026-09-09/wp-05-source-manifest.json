@@ -1,0 +1,60 @@
+{
+  "work_package": "WP-05",
+  "task": "task.003S27535KNR48TDD88VJE5E5H",
+  "delegation": "delegation.208JFQEZTB8HTNJZXBCH12F88C",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "src/agent_commons/services/outputs.py",
+      "sha256": "aa1f05c3014ab1329522b7dd38d610904bf32472e363025b997e6b9209a1dd54"
+    },
+    {
+      "path": "src/agent_commons/ui/output_routes.py",
+      "sha256": "dab2b8390dd428785f47d8d83fb5af3fbaa77b9f3c790b68658ddb7b869ccaf5"
+    },
+    {
+      "path": "frontend/work/src/outputsTypes.ts",
+      "sha256": "72bad4e7643cb0f641345bca925be1916178e7c64185c8776cd8f6eb5eabbda4"
+    },
+    {
+      "path": "frontend/work/src/outputsApi.ts",
+      "sha256": "a0ee9a6bddd2add9f8da404c60ffb967b481996a718eceb39d768a33daf2a6e4"
+    },
+    {
+      "path": "frontend/work/src/outputsStrings.ts",
+      "sha256": "d7817458544ad79e73cbe1694d4c67525732d164933dc0f49a5bbaa80945220e"
+    },
+    {
+      "path": "frontend/work/src/components/OutputsPanel.tsx",
+      "sha256": "5964f152f138ae9ea1d51df8bf09d499e744494a994dc3c5198c13331c1dd3ea"
+    },
+    {
+      "path": "frontend/work/src/outputs.css",
+      "sha256": "1f781f65d338c4d369176243d2b4f6096656a08227b6ca6c96ea8b8ea4f5b31b"
+    },
+    {
+      "path": "frontend/work/tests/outputs.test.mjs",
+      "sha256": "7a42e08e946a818e04b4e43ff0503aa694e7a61d80ebedb05adc4f775583f1c8"
+    },
+    {
+      "path": "tests/services/test_outputs.py",
+      "sha256": "150b7e077719b8ccba35bcdd0586f60dea314bb1e06a0d5de126126e2e9a5ae6"
+    },
+    {
+      "path": "tests/ui/test_output_routes.py",
+      "sha256": "dacb455bab1ff1bb9eedae889ce5de514c33547bf420078e2e13f07ecbc112c2"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "236 passed, 0 failed (node --test frontend/work/tests/*.test.mjs; includes WP-06 changes still in tree)",
+    "pytest": "34 passed (uv run python -m pytest tests/services/test_outputs.py tests/ui/test_output_routes.py)",
+    "tsc": "exit 0",
+    "packaged_asset": "not rebuilt; wave-1 integrator",
+    "screenshots": "not taken"
+  },
+  "notes": [
+    "outputsTypes.ts was changed although not in the original claim set; coordinator accepts it as in-scope parser change",
+    "worker sandbox refused command execution; coordinator ran verification"
+  ]
+}
