@@ -1,6 +1,10 @@
 import { BlueprintAuthoring } from "./BlueprintAuthoring.js";
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { ApiProblem } from "../api.js";
+import {
+  blueprintPlanIntent, blueprintStartIntent,
+  type BlueprintApplyIntent, type BlueprintApplyOutcome
+} from "../blueprintApplyOutcome.js";
 import type { Profile } from "../contracts.js";
 import { blueprintBriefIsValid, type LibraryApi } from "../libraryApi.js";
 import { selectBlueprintProfile, type BlueprintRuntimeChoice } from "../libraryEditorState.js";
@@ -108,7 +112,27 @@ export function WorkBlueprintsSection({ api, profiles, locale, text, writesEnabl
         {invalid ? <p className="field-error" role="alert">{text("blueprints_invalid")}</p> : null}<p className="small-copy">{text("blueprints_apply_help")}</p><button type="submit" className="button button-primary">{text(status === "applying" ? "working" : "blueprints_apply")}</button>
       </fieldset></form>
       {status === "refused" || status === "uncertain" ? <div className="notice" role="alert"><p>{text(status === "uncertain" ? "blueprints_uncertain" : "blueprints_refused")}</p><code>{code}</code>{intent ? <button type="button" className="button button-secondary" disabled={!writesEnabled} onClick={() => void execute(intent)}>{text("blueprints_retry")}</button> : null}</div> : null}
-      {result ? <div className="notice" role="status"><p>{text("blueprints_created")}: {result.roles.length} {text("blueprints_roles_count")} · {result.tasks.length} {text("blueprints_tasks_count")}</p><button type="button" className="button button-primary" onClick={() => onApplied(result)}>{text("blueprints_open_work")}</button></div> : null}
     </div> : null}
   </section>;
+}
+
+// The apply outcome is rendered by the shell, which owns the refreshed tracker
+// snapshot, navigation and the Prepare run draft. It receives no client, so the
+// only effects reachable from a finished apply are the two returned intents.
+export function BlueprintApplyOutcomePanel({ outcome, text, onIntent }: {
+  outcome: BlueprintApplyOutcome; text: (key: MessageKey) => string;
+  onIntent: (intent: BlueprintApplyIntent) => void;
+}): ReactElement {
+  const start = blueprintStartIntent(outcome);
+  return <div className="blueprint-apply-result notice" role="status">
+    <h3>{text("blueprints_applied_title")}</h3>
+    <p>{text("blueprints_created")}: {outcome.roleCount} {text("blueprints_roles_count")} · {outcome.taskCount} {text("blueprints_tasks_count")}</p>
+    <p>{text("blueprints_applied_not_started")}</p>
+    <div className="blueprint-apply-actions">
+      {start ? <button type="button" className="button button-primary" onClick={() => onIntent(start)}>{text("blueprints_applied_start")}</button> : null}
+      <button type="button" className="button button-secondary" onClick={() => onIntent(blueprintPlanIntent(outcome))}>{text("blueprints_applied_view_plan")}</button>
+    </div>
+    <p className="small-copy">{text(start ? "blueprints_applied_start_help"
+      : outcome.nextAction === "no_ready_task" ? "blueprints_applied_no_ready" : "blueprints_applied_unconfirmed")}</p>
+  </div>;
 }

@@ -14,7 +14,8 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), [
   "--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler",
   "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled,
   resolve(root, "src/contextSourcePicker.ts"), resolve(root, "src/contextPackFormState.ts"),
-  resolve(root, "src/starterPackPresentation.ts"), resolve(root, "src/components/LibrarySection.tsx")
+  resolve(root, "src/starterPackPresentation.ts"), resolve(root, "src/blueprintApplyOutcome.ts"),
+  resolve(root, "src/components/LibrarySection.tsx")
 ], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const load = (path) => import(pathToFileURL(resolve(compiled, path)).href);
@@ -26,6 +27,8 @@ const { StarterPackCard } = await load("components/StarterPacksSection.js");
 const { LibrarySection } = await load("components/LibrarySection.js");
 const { ContextPackNewButton } = await load("components/ContextPacksSection.js");
 const { ContextPackRetryIdentity } = await load("contextPackEditorState.js");
+const { blueprintApplyOutcome, blueprintPlanIntent, blueprintStartIntent } = await load("blueprintApplyOutcome.js");
+const { BlueprintApplyOutcomePanel } = await load("components/WorkBlueprintsSection.js");
 const messages = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
 const id = (kind, tail = "1") => `${kind}.${"0".repeat(25)}${tail}`;
 const ref = (kind, tail = "1", revision = "1") => ({ kind, id: id(kind, tail), revision: id("evt", revision) });
@@ -228,6 +231,144 @@ test("recipe viewing renders deny permissions and localized roles without invoki
   assert.ok(html.includes(messages.ru.recipe_permissions));
   assert.ok(html.includes("claude-independent-reviewer"));
   assert.match(html, /<button class="button button-primary" disabled=""/);
+});
+
+function trackerTask(tail, overrides = {}) {
+  return {
+    taskId: id("task", tail), title: `Created task ${tail}`, taskState: "ready", readiness: "ready",
+    dependencyTaskIds: [], blockingDependencyIds: [], ownerSessionId: null, roleName: null,
+    suggestedAgentId: null, suggestedRoleName: null, suggestedProvider: null, provider: null,
+    profileId: null, phase: null, awaitsHuman: false, nextAction: "start_ready_work",
+    freshness: "fresh", evidenceState: "complete", gaps: [], ...overrides
+  };
+}
+
+function trackerReady(tasks) {
+  return { kind: "ready", connection: "connected", snapshot: {
+    schema: "agent-commons.tracker.v1", sequence: 4, sourceRevision: null, truncated: false,
+    state: "ready", tasks, edges: [], runs: [], attention: [],
+    capacity: { state: "available", active: 0, limit: null, queued: 0, queueCapacity: null },
+    freshness: { generatedAt: "2026-09-09T09:00:00Z", sourceUpdatedAt: null, state: "fresh", resumeGap: false },
+    gaps: []
+  } };
+}
+
+// The server returns the mapping in blueprint order, not in execution order:
+// the leading node here depends on the trailing one.
+const blockedFirst = { blueprintId: "web-app",
+  roles: [{ slotId: "lead", agentId: id("agent", "A") }, { slotId: "design", agentId: id("agent", "B") }],
+  tasks: [{ nodeId: "integration", taskId: id("task", "1"), agentId: id("agent", "A") },
+    { nodeId: "experience", taskId: id("task", "2"), agentId: id("agent", "B") }] };
+const waitingTask = trackerTask("1", { taskState: "blocked", readiness: "blocked", dependencyTaskIds: [id("task", "2")], blockingDependencyIds: [id("task", "2")], nextAction: "resolve_dependencies" });
+
+function collectButtons(node, found = []) {
+  if (node === null || node === undefined || typeof node !== "object") return found;
+  if (Array.isArray(node)) { for (const child of node) collectButtons(child, found); return found; }
+  if (node.type === "button") found.push(node);
+  collectButtons(node.props?.children, found);
+  return found;
+}
+
+test("apply outcome starts the confirmed ready task, never the first element of the returned mapping", () => {
+  const outcome = blueprintApplyOutcome(blockedFirst, trackerReady([waitingTask, trackerTask("2")]));
+  assert.equal(outcome.nextAction, "start_ready_task");
+  assert.notEqual(outcome.start.taskId, blockedFirst.tasks[0].taskId);
+  assert.deepEqual(outcome.start, { taskId: id("task", "2"), agentId: id("agent", "B") });
+  assert.deepEqual(outcome.createdTaskIds, [id("task", "1"), id("task", "2")]);
+  assert.equal(outcome.roleCount, 2);
+  assert.equal(outcome.taskCount, 2);
+  // Readiness comes from the refreshed snapshot alone: the same mapping read
+  // against a snapshot where only the leading task is ready selects that one.
+  const reversed = blueprintApplyOutcome(blockedFirst, trackerReady([trackerTask("1"),
+    trackerTask("2", { taskState: "blocked", readiness: "blocked", blockingDependencyIds: [id("task", "1")] })]));
+  assert.deepEqual(reversed.start, { taskId: id("task", "1"), agentId: id("agent", "A") });
+});
+
+test("apply outcome reports blocked, unobserved and empty mappings without inventing a startable task", () => {
+  const allBlocked = trackerReady([waitingTask, trackerTask("2", { taskState: "blocked", readiness: "blocked", blockingDependencyIds: [id("task", "1")] })]);
+  assert.deepEqual(blueprintApplyOutcome(blockedFirst, allBlocked), {
+    roleCount: 2, taskCount: 2, createdTaskIds: [id("task", "1"), id("task", "2")], start: null, nextAction: "no_ready_task"
+  });
+  const empty = blueprintApplyOutcome({ blueprintId: "web-app", roles: [], tasks: [] }, allBlocked);
+  assert.equal(empty.nextAction, "no_ready_task");
+  assert.equal(empty.start, null);
+  // Unknown stays unknown: a loading or failed tracker, a snapshot that has not
+  // observed every created task, and an unconfirmed readiness are not "blocked".
+  for (const tracker of [{ kind: "loading" }, { kind: "failure" },
+    trackerReady([trackerTask("2")]),
+    trackerReady([waitingTask, trackerTask("2", { readiness: "unknown" })]),
+    trackerReady([waitingTask, trackerTask("2", { freshness: "stale" })])]) {
+    const outcome = blueprintApplyOutcome(blockedFirst, tracker);
+    assert.equal(outcome.nextAction, "unconfirmed");
+    assert.equal(outcome.start, null);
+    assert.equal(blueprintStartIntent(outcome), null);
+  }
+});
+
+test("a finished apply can only navigate: its surface holds no client and offers no launch", () => {
+  const outcome = blueprintApplyOutcome(blockedFirst, trackerReady([waitingTask, trackerTask("2")]));
+  const recorded = [];
+  const props = { outcome, text: (key) => messages.en[key], onIntent: (intent) => recorded.push(intent) };
+  assert.deepEqual(Object.keys(props).sort(), ["onIntent", "outcome", "text"]);
+  const rendered = collectButtons(BlueprintApplyOutcomePanel(props));
+  assert.equal(rendered.length, 2);
+  for (const button of rendered) button.props.onClick();
+  assert.deepEqual(recorded, [
+    { kind: "prepare_run", taskId: id("task", "2"), agentId: id("agent", "B") },
+    { kind: "view_plan", taskId: id("task", "1") }
+  ]);
+  assert.deepEqual([...new Set(recorded.map((intent) => intent.kind))].sort(), ["prepare_run", "view_plan"]);
+  assert.deepEqual(blueprintPlanIntent(outcome), { kind: "view_plan", taskId: id("task", "1") });
+  const blocked = blueprintApplyOutcome(blockedFirst, trackerReady([waitingTask,
+    trackerTask("2", { taskState: "blocked", readiness: "blocked", blockingDependencyIds: [id("task", "1")] })]));
+  const fallback = [];
+  const only = collectButtons(BlueprintApplyOutcomePanel({ ...props, outcome: blocked, onIntent: (intent) => fallback.push(intent) }));
+  assert.equal(only.length, 1);
+  only[0].props.onClick();
+  assert.deepEqual(fallback, [{ kind: "view_plan", taskId: id("task", "1") }]);
+});
+
+for (const locale of ["en", "ru"]) {
+  test(`${locale} apply result separates created roles and tasks from a started run`, () => {
+    const text = (key) => messages[locale][key];
+    const ready = blueprintApplyOutcome(blockedFirst, trackerReady([waitingTask, trackerTask("2")]));
+    const render = (outcome) => renderToStaticMarkup(createElement(BlueprintApplyOutcomePanel, { outcome, text, onIntent: () => {} })).replaceAll("<!-- -->", "");
+    const html = render(ready);
+    assert.ok(html.includes(text("blueprints_applied_title")));
+    assert.ok(html.includes(text("blueprints_applied_not_started")));
+    assert.ok(html.includes(`${text("blueprints_created")}: 2 ${text("blueprints_roles_count")}`));
+    assert.ok(html.includes(`2 ${text("blueprints_tasks_count")}`));
+    assert.ok(html.includes(text("blueprints_applied_start")));
+    assert.ok(html.includes(text("blueprints_applied_start_help")));
+    assert.ok(html.includes(text("blueprints_applied_view_plan")));
+    assert.doesNotMatch(html, / style="/);
+    assert.match(html, /role="status"/);
+    for (const key of ["blueprints_applied_title", "blueprints_applied_not_started", "blueprints_applied_start",
+      "blueprints_applied_start_help", "blueprints_applied_view_plan", "blueprints_applied_no_ready",
+      "blueprints_applied_unconfirmed"]) {
+      assert.equal(typeof messages.en[key], "string");
+      assert.equal(typeof messages.ru[key], "string");
+      assert.notEqual(messages.en[key], messages.ru[key]);
+    }
+    for (const [outcome, key] of [
+      [blueprintApplyOutcome(blockedFirst, trackerReady([waitingTask, trackerTask("2", { taskState: "blocked", readiness: "blocked", blockingDependencyIds: [id("task", "1")] })])), "blueprints_applied_no_ready"],
+      [blueprintApplyOutcome(blockedFirst, { kind: "loading" }), "blueprints_applied_unconfirmed"]
+    ]) {
+      const fallback = render(outcome);
+      assert.ok(fallback.includes(text(key)));
+      assert.ok(fallback.includes(text("blueprints_applied_not_started")));
+      assert.ok(!fallback.includes(text("blueprints_applied_start")));
+      assert.ok(fallback.includes(text("blueprints_applied_view_plan")));
+    }
+  });
+}
+
+test("apply copy names creation and the absent run in both locales", () => {
+  assert.match(messages.en.blueprints_applied_not_started, /No run has started/);
+  assert.match(messages.en.blueprints_applied_not_started, /creates roles and tasks only/);
+  assert.match(messages.ru.blueprints_applied_not_started, /Ни один прогон не запущен/);
+  assert.match(messages.ru.blueprints_applied_not_started, /только роли и задачи/);
+  assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages.ru).sort());
 });
 
 for (const kind of ["publish", "revise"]) {

@@ -43,6 +43,7 @@ from agent_commons.ui.context import (
 from agent_commons.ui.conversation_routes import register_conversation_routes
 from agent_commons.ui.gallery_routes import register_gallery_routes
 from agent_commons.ui.gallery_upload import register_gallery_upload
+from agent_commons.ui.launch import MAX_WALL_TIME_SECONDS, MIN_WALL_TIME_SECONDS
 from agent_commons.ui.library_blueprints import register_blueprint_reads, register_blueprint_writes
 from agent_commons.ui.library_routes import register_library_routes
 from agent_commons.ui.output_routes import register_output_routes
@@ -1336,12 +1337,27 @@ def _register_launch(router: _RouteGroup, context: UIContext) -> None:
             # not a generic conflict, to offer setup instead of a retry.
             return _error(409, "launch_not_configured", LAUNCH_NOT_CONFIGURED)
         body = await _json_body(request)
+        # The wire-level bound is checked here so an out-of-range or mistyped
+        # limit is a typed 422 for the form; the coordinator re-validates the
+        # same bound on its own path, so the route is never the only guard.
+        wall_time_seconds = body.get("wall_time_seconds")
+        if wall_time_seconds is not None and (
+            isinstance(wall_time_seconds, bool)
+            or not isinstance(wall_time_seconds, int)
+            or not MIN_WALL_TIME_SECONDS <= wall_time_seconds <= MAX_WALL_TIME_SECONDS
+        ):
+            return _error(
+                422,
+                "invalid_wall_time_seconds",
+                f"wall_time_seconds must be an integer between {MIN_WALL_TIME_SECONDS} "
+                f"and {MAX_WALL_TIME_SECONDS}",
+            )
         return await _guarded(
             context.run_role_on_task,
             context,
             agent_id=str(body.get("agent_id", "")),
             task_id=str(body.get("task_id", "")),
-            wall_time_seconds=body.get("wall_time_seconds"),
+            wall_time_seconds=wall_time_seconds,
             idempotency_key=body.get("idempotency_key"),
             context_pack_id=body.get("context_pack_id"),
             context_pack_revision=body.get("context_pack_revision"),

@@ -4,6 +4,7 @@ import pytest
 
 from agent_commons.domain.conversations import attachment_refs, conversation_scope
 from agent_commons.domain.revisions import structural_correction_changes
+from agent_commons.domain.snapshot import ProjectionIssue, ProjectSnapshot
 from agent_commons.errors import IdempotencyConflictError, LifecycleConflictError, ValidationError
 from agent_commons.services.conversations import Conversations
 from agent_commons.services.manager import CommonsManager
@@ -105,6 +106,90 @@ def test_agent_reply_is_not_queued_back_to_its_author(manager):
     assert delivery["state"] == "queued"
     assert [item["agent_id"] for item in delivery["recipients"]] == [peer["agent_id"]]
     assert delivery["read_confirmed"] is False
+
+
+def test_recipient_availability_is_derived_from_the_conversation_snapshot(manager):
+    from types import SimpleNamespace
+
+    agent_id = "agent." + "1" * 26
+    task_id = "task." + "1" * 26
+    delegation_id = "delegation." + "1" * 26
+    thread = {
+        "id": "thread." + "1" * 26,
+        "revision": "evt." + "1" * 26,
+        "conversation_scope": {"kind": "task", "id": task_id},
+        "subject": "Scoped",
+        "state": "open",
+        "messages": [],
+    }
+    snapshot = SimpleNamespace(
+        agents={agent_id: {"id": agent_id}},
+        tasks={task_id: {"id": task_id, "extensions": {"suggested_agent_id": agent_id}}},
+        delegations={
+            delegation_id: {
+                "state": "active",
+                "agent_id": agent_id,
+                "target_ref": {"kind": "task", "id": task_id},
+            }
+        },
+        issues=[],
+        stale_refs=set(),
+    )
+    availability = Conversations._thread(thread, snapshot)["recipient_availability"]
+    assert availability == {
+        "state": "active",
+        "agent_id": agent_id,
+        "active_delegation_id": delegation_id,
+        "observed_revision": thread["revision"],
+    }
+    snapshot.delegations.clear()
+    assert Conversations._thread(thread, snapshot)["recipient_availability"]["state"] == "inactive"
+    unknown = {
+        "state": "unknown",
+        "agent_id": agent_id,
+        "active_delegation_id": None,
+        "observed_revision": thread["revision"],
+    }
+    # The two completeness signals a real ProjectSnapshot carries: a projection
+    # issue, or a reference that did not resolve. Either must read as unknown,
+    # never as inactive, even though no live delegation is present.
+    snapshot.issues = [
+        ProjectionIssue(code="replay_gap", severity="error", message="missing event")
+    ]
+    assert Conversations._thread(thread, snapshot)["recipient_availability"] == unknown
+    snapshot.issues = []
+    snapshot.stale_refs = {("delegation", "delegation." + "9" * 26)}
+    assert Conversations._thread(thread, snapshot)["recipient_availability"] == unknown
+
+
+def test_snapshot_completeness_uses_real_project_snapshot_fields():
+    snapshot = ProjectSnapshot()
+    assert Conversations._snapshot_is_complete(snapshot) is True
+    snapshot.issues.append(ProjectionIssue(code="replay_gap", severity="error", message="gap"))
+    assert Conversations._snapshot_is_complete(snapshot) is False
+    snapshot.issues.clear()
+    snapshot.stale_refs.add(("task", "task." + "9" * 26))
+    assert Conversations._snapshot_is_complete(snapshot) is False
+
+
+def test_recipient_availability_is_unknown_without_one_recipient(manager):
+    from types import SimpleNamespace
+
+    thread = {
+        "id": "thread." + "1" * 26,
+        "revision": "evt." + "1" * 26,
+        "conversation_scope": {"kind": "project"},
+        "subject": "Project",
+        "state": "open",
+        "messages": [],
+    }
+    snapshot = SimpleNamespace(agents={}, tasks={}, delegations={}, issues=[], stale_refs=set())
+    assert Conversations._thread(thread, snapshot)["recipient_availability"] == {
+        "state": "unknown",
+        "agent_id": None,
+        "active_delegation_id": None,
+        "observed_revision": thread["revision"],
+    }
 
 
 @pytest.mark.parametrize(

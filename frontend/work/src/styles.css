@@ -18,15 +18,15 @@
 }
 
 
-:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-primary {
+:is(.conversation-dialog, .project-create-dialog, .project-archive-dialog, .outputs-dialog) .button-primary {
   background: var(--button-primary);
   border-color: var(--accent);
   color: #ffffff;
 }
-:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-primary:hover:not(:disabled) {
+:is(.conversation-dialog, .project-create-dialog, .project-archive-dialog, .outputs-dialog) .button-primary:hover:not(:disabled) {
   background: var(--button-primary-hover);
 }
-:is(.conversation-dialog, .project-create-dialog, .outputs-dialog) .button-secondary {
+:is(.conversation-dialog, .project-create-dialog, .project-archive-dialog, .outputs-dialog) .button-secondary {
   background: var(--surface-subtle);
   border-color: var(--border-control);
   color: var(--text-primary);
@@ -1056,13 +1056,25 @@ code { overflow-wrap: anywhere; font-size: 12px; color: #bdd2fb; }
 .project-dialog-header h2 { font-size: 1.25rem; }
 .icon-close { background: transparent; border: 0; color: #e8edf5; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 .project-dialog input[type="radio"] { display: inline-block; margin-right: 7px; width: auto; }
+.project-archive-body { padding: 22px; }
+.project-archive-body h2 { font-size: 1.25rem; margin-bottom: 12px; }
+.project-archive-name { font-weight: 600; margin-bottom: 4px; }
+.project-archive-path { margin-bottom: 12px; overflow-wrap: anywhere; }
+.project-archive-path code { color: #b8c9e6; font-size: .8rem; }
+.project-archive-body .button-row { margin-top: 20px; }
 .project-empty-app { align-items: start; display: flex; justify-content: center; padding: 48px 16px; }
 .project-empty-app .project-sidebar { background: #142137; border: 1px solid #354b6e; border-radius: 12px; margin: 0; max-width: 580px; padding: 22px; width: 100%; }
 .primary-navigation a { border-radius: 8px; padding: 11px 16px; color: #bbc9df; text-decoration: none; min-height: 44px; font-weight: 550; }
 .primary-navigation a:hover { background: #232b37; }
 .primary-navigation a[aria-current="page"] { background: #21385e; color: #e8f0ff; box-shadow: inset 3px 0 #88b2ff; }
 .rail-status { display: flex; gap: 8px; align-items: center; margin-top: auto; padding-top: 36px; font-size: 13px; color: #a9b8d1; }
+/* The rail text states the setup; the dot only duplicates it, and the
+   configured state stays blue because green is reserved for acceptance. */
 .status-dot { width: 6px; height: 6px; background: #8aa2c7; border-radius: 50%; flex: 0 0 auto; }
+.status-dot[data-state="configured"] { background: #7fa8ff; }
+.status-dot[data-state="needs_setup"] { background: #d9a441; }
+.status-dot[data-state="not_repository"] { background: #e29a9f; }
+.status-dot[data-state="unknown"] { background: #8aa2c7; }
 .rail-help { font-size: 12px; margin: 8px 0 0; }
 .app-content { min-width: 0; }
 .app-header { background: transparent; border: 0; padding: 28px 32px 12px; align-items: center; min-height: 88px; }
@@ -1088,6 +1100,8 @@ code { overflow-wrap: anywhere; font-size: 12px; color: #bdd2fb; }
 .launch-composer .workflow-card-header { display: none; }
 .launch-task-title { font-size: 16px; font-weight: 600; }
 .launch-composer .notice-link + .notice-link { margin-left: 16px; }
+.launch-limit-minutes { max-width: 148px; }
+.inspector-run-limit { margin-top: 4px; }
 input, select, textarea { border-color: #3c506e; background: #121820; }
 input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; }
 label { font-size: 14px; font-weight: 550; }
@@ -1097,6 +1111,14 @@ label { font-size: 14px; font-weight: 550; }
 .settings-section .provider-availability { max-width: 840px; }
 .provider-availability-item { padding: 16px 0; border-top: 1px solid #293b56; }
 .provider-availability-item p { margin-bottom: 8px; }
+.provider-readiness { list-style: none; margin: 0 0 8px; padding: 0; }
+.provider-readiness li { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; padding: 3px 0; }
+.provider-readiness-stage { color: #a9b8d1; min-width: 148px; }
+.provider-readiness-value { color: #dbe4f2; }
+.provider-readiness li[data-state="attention"] .provider-readiness-value { color: #e6b98d; }
+.provider-readiness li[data-state="unknown"] .provider-readiness-value { color: #a9b8d1; }
+.provider-readiness-technical summary { color: #a9b8d1; font-size: 13px; }
+.provider-readiness-technical ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .settings-panel .legacy-link { margin: 0 20px 12px 0; }
 .team-role-list { list-style: none; padding: 0; margin: 0 0 24px; max-width: 840px; }
 .team-role-list li { background: #1a2029; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; margin-bottom: 8px; border-radius: 8px; }
@@ -1288,3 +1310,9 @@ label { font-size: 14px; font-weight: 550; }
 .blueprint-definition-editor .blueprint-dependencies { margin: 16px 0; }
 .blueprint-definition-editor .blueprint-dependencies label { display: flex; align-items: center; gap: 8px; }
 .blueprint-definition-editor .blueprint-dependencies input { display: inline; width: auto; }
+
+/* What a finished blueprint application created, and the two ways forward. */
+.blueprint-apply-result { max-width: 608px; margin-bottom: 24px; }
+.blueprint-apply-result h3 { margin: 0 0 8px; font-size: 1rem; }
+.blueprint-apply-result .small-copy { margin: 0; }
+.blueprint-apply-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }

@@ -14,7 +14,7 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--targe
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const moduleAt = (path) => import(pathToFileURL(resolve(compiled, path)));
 const { WorkApi } = await moduleAt("api.js");
-const { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft } = await moduleAt("launchIntentState.js");
+const { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitSeconds } = await moduleAt("launchIntentState.js");
 const { taskDependencyCatalog } = await moduleAt("taskDependencyState.js");
 const { LaunchRecoveryPanel } = await moduleAt("components/LaunchRecoveryPanel.js");
 const { TaskComposer } = await moduleAt("components/TaskComposer.js");
@@ -26,15 +26,15 @@ const api = () => Object.assign(new WorkApi(), { apiBase: "/api/aaaaaaaaaaaaaaaa
 const json = (payload) => ({ ok: true, status: 200, json: async () => payload });
 function intentFixture() {
   return freezeLaunchIntent({ key: "original-A-key", taskTitle: "Original task A", roleName: "Original role A", profileId: "claude-builder",
-    draft: { taskId: taskA, agentId: roleA, contextPackKey: `${id("context_pack")}@${id("evt")}`, designPackageKey: `${id("design_package")}@${id("evt", 1)}` },
-    input: { taskId: taskA, agentId: roleA, contextPackId: id("context_pack"), contextPackRevision: id("evt"), designPackageId: id("design_package"), designPackageRevision: id("evt", 1) } });
+    draft: { taskId: taskA, agentId: roleA, contextPackKey: `${id("context_pack")}@${id("evt")}`, designPackageKey: `${id("design_package")}@${id("evt", 1)}`, limitMinutes: "25" },
+    input: { taskId: taskA, agentId: roleA, contextPackId: id("context_pack"), contextPackRevision: id("evt"), designPackageId: id("design_package"), designPackageRevision: id("evt", 1), wallTimeSeconds: 1500 } });
 }
 for (const locale of ["en", "ru"]) {
   test(`${locale}: unknown A launch survives selection B; recovery names A and exposes restore rather than a misleading retry`, async () => {
     const intent = intentFixture(), client = api(), sent = [];
     globalThis.fetch = async (_url, init) => { sent.push(init.body); if (sent.length === 1) throw new TypeError("Response lost after commit"); return json({ created: false }); };
     await assert.rejects(client.startRun(intent.input, intent.key, new AbortController().signal));
-    const draftB = { taskId: taskB, agentId: roleB, contextPackKey: "", designPackageKey: "" };
+    const draftB = { taskId: taskB, agentId: roleB, contextPackKey: "", designPackageKey: "", limitMinutes: "10" };
     assert.equal(launchIntentIsVisible(intent, taskB, draftB), false);
     const props = { intent, visible: false, busy: false, uncertain: true, failureCode: "request_unavailable", onRestore() {}, onRetry() {}, onEdit() {}, text: (key) => strings[locale][key] };
     const markup = renderToStaticMarkup(createElement(LaunchRecoveryPanel, props));
@@ -55,8 +55,40 @@ for (const locale of ["en", "ru"]) {
     assert.equal(JSON.parse(sent[1]).idempotency_key, intent.key);
     assert.equal(JSON.parse(sent[1]).context_pack_revision, id("evt"));
     assert.equal(JSON.parse(sent[1]).design_package_revision, id("evt", 1));
+    assert.equal(JSON.parse(sent[1]).wall_time_seconds, 1500);
+  });
+
+  test(`${locale}: the frozen intent carries the chosen limit through restore and retry, and names it in recovery`, () => {
+    const intent = intentFixture();
+    // Restore returns the exact minutes the operator typed, not the form default.
+    assert.equal(restoreLaunchDraft(intent).limitMinutes, "25");
+    assert.equal(runLimitSeconds(restoreLaunchDraft(intent).limitMinutes), intent.input.wallTimeSeconds);
+    // A different limit is a different draft: retry would re-send the original.
+    assert.equal(launchIntentIsVisible(intent, taskA, restoreLaunchDraft(intent)), true);
+    assert.equal(launchIntentIsVisible(intent, taskA, { ...restoreLaunchDraft(intent), limitMinutes: "30" }), false);
+    const markup = renderToStaticMarkup(createElement(LaunchRecoveryPanel, { intent, visible: true, busy: false, uncertain: false,
+      failureCode: "invalid_wall_time_seconds", onRestore() {}, onRetry() {}, onEdit() {}, text: (key) => strings[locale][key] }));
+    assert.ok(markup.includes(strings[locale].run_limit_label));
+    assert.ok(markup.includes(`25 ${strings[locale].run_limit_minutes}`));
+    assert.equal(markup.includes(strings[locale].run_limit_absent), false);
   });
 }
+
+test("a launch request always states the limit it was given and refuses an unusable one before the network", async () => {
+  const bodies = [];
+  globalThis.fetch = async (_url, init) => { bodies.push(JSON.parse(init.body)); return json({ launched: true }); };
+  const client = api();
+  await client.startRun({ ...intentFixture().input, wallTimeSeconds: 60 }, "at-the-lower-bound", new AbortController().signal);
+  await client.startRun({ ...intentFixture().input, wallTimeSeconds: 3600 }, "at-the-upper-bound", new AbortController().signal);
+  assert.deepEqual(bodies.map((body) => body.wall_time_seconds), [60, 3600]);
+
+  assert.deepEqual([1, 10, 60].map((minutes) => runLimitSeconds(String(minutes))), [60, 600, 3600]);
+  for (const typed of ["", " ", "0", "61", "600", "10.5", "-5", "+10", "1e1", "ten", "1,5"]) {
+    assert.equal(runLimitSeconds(typed), null, typed);
+  }
+  assert.equal(runLimitSeconds(" 10 "), 600, "surrounding whitespace is not a different number");
+  assert.equal(bodies.length, 2, "no unusable limit reached the network");
+});
 function trackerWire() {
   return { schema: "agent-commons.tracker.v1", sequence: 1, source_revision: `sha256:${"0".repeat(64)}`, truncated: false, state: "ready",
     tasks: ["accepted", "completed"].map((task_state, n) => ({ task_id: id("task", n), title: `${task_state} prerequisite`, task_state, readiness: "complete", dependency_task_ids: [], blocking_dependency_ids: [], owner_session_id: null, role_name: null, provider: null, profile_id: null, phase: null, awaits_human: false, next_action: "none", freshness: "fresh", evidence_state: "complete", gaps: [] })),

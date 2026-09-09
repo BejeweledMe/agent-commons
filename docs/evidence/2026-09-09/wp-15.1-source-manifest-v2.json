@@ -1,0 +1,64 @@
+{
+  "work_package": "WP-15.1",
+  "revision_note": "v2 after review.1QQBJ0GK2S7MAZRGQWWK4BY1KM changes_requested",
+  "task": "task.32FJY7ERS66ZHNSXFZS73BZ2MA",
+  "delegation": "delegation.5CKPXV03VH8M1CYK8CK4FQVGVJ",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "c717adb44d87d6e18a6a47f70525533dad1b6f4143a6ba8c5f8ce82ed1e1c08f"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "947bbb81f2c65f748aca1da4bef9f1eb9950d2e6c00546ef8384c30991b9942c"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_dtos.py",
+      "sha256": "7fe758ddf524bd3559f72b5d5bff7d2653a741f05209624762368be444dee100"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "a54c28ad0a5a5d13e99a24ceb0e7a45a4de3b54296486ae638f198f4adea4047"
+    },
+    {
+      "path": "src/agent_commons/domain/work_state.py",
+      "sha256": "a16779396e6eb091f7996ba9ee8ba5962f0955a11b884609238d9071fd1ae9f1"
+    },
+    {
+      "path": "src/agent_commons/services/work_metrics.py",
+      "sha256": "06e543b8660b62ca8fe50d78d54fba8537a95f74397c92bcedd7cebe07f3daa7"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "0bec53c01f46c9912ed19d60d69467aa1d89176944efdba7ae263cc70f98c921"
+    },
+    {
+      "path": "tests/ui/test_tracker_reads.py",
+      "sha256": "cbd6dc7e4e0104f46ea2d102444d7e222683ffd04032a29424ea1f90165f0d5e"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "533df539d146632bbaba59649b516cd4245d61268e4cadcf28582621b70c0bd4"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "a032b32d837947097892f9f370d54471ff3d823d19a1d7d379fd4bf9d9317476"
+    },
+    {
+      "path": "frontend/work/tests/tracker-parser.test.mjs",
+      "sha256": "02c63b8dfe9c7eeba914a822792ba6e406a2aa0f9818f31c5c6d9eac9fbf72bb"
+    }
+  ],
+  "verification": {
+    "pytest": "39 passed (uv run python -m pytest tests/ui/test_launch.py tests/ui/test_tracker_reads.py)",
+    "ruff": "check and format clean",
+    "frontend_node_test": "255 passed",
+    "tsc": "exit 0"
+  },
+  "notes": [
+    "Coordinator fixes: parser treats an absent wall_time_seconds key as null (legacy payloads parse) with present/absent/null/malformed tests; tracker read test for a delegation without recorded limits => null; idempotency test (same key + different limit => 409 conflict, same key + same limit => replay of the same delegation); MIN/MAX_WALL_TIME_SECONDS shared between launch.py and the route",
+    "Acceptance criterion about the check-run (canary) DTO is deferred to follow-up WP-15.3 by coordinator decision; the UI renders \"limit not provided\" for check runs until then"
+  ]
+}

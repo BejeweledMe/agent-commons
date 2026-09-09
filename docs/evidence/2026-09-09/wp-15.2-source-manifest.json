@@ -1,0 +1,60 @@
+{
+  "work_package": "WP-15.2",
+  "task": "task.1KDSVG1EPXJMGGW5J7RERAQ1BA",
+  "delegation": "delegation.67G0Y0TJZ4NSD0SPPWS7XVQAT9",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "frontend/work/src/launchIntentState.ts",
+      "sha256": "c8656d48f2223ad43b20231a04ebede118079b4f7cac6995e7e4765f13bd1ba8"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "1b8561f9488becd2ba452c3c51290dc3512112408e952605b7b5776ff29d9f23"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "b50bac4e2d368f6ce23aed6f96f8bd4065817884dd2b9fcb8705e15d124e0a43"
+    },
+    {
+      "path": "frontend/work/src/components/LaunchRecoveryPanel.tsx",
+      "sha256": "24757147ca3dd868df9f194e964aa44fb3313a9ccd146977d86e71968cd73a47"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "d6ae220ca79490d51cf668c01856e0f24b2385a651d7f6e05417c7b32fe227ad"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "5856c3e7237d3557e477de1df7f01de30dd5d1bde21dadcbfaf7fb0ad24a4b69"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "429f63e83c3491432e2e2ad0578d8623d051dc28e905297271d9c6062ee7aad1"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "b09e082a5fb23ff6746b06b8d0d4b9dea79b00e4e55402e14acdd8d8f1d199d9"
+    },
+    {
+      "path": "frontend/work/tests/work-shell-recovery.test.mjs",
+      "sha256": "064edd527bb133f2735bf677470c7db0c64d815b7b02e047b77e90975fc654ca"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "cdbffdac1788614d289686dca3939f091ca190fd19b1a1eb0229afb278e58c60"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "263 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken"
+  },
+  "notes": [
+    "main.tsx, api.ts, i18n.json and styles.css hashes include earlier accepted wave-1 changes",
+    "worker sandbox refused command execution; coordinator ran verification"
+  ]
+}

@@ -857,3 +857,103 @@ def test_thread_start_failure_finalizes_the_requested_delegation_and_releases_ad
     assert len(records) == 1 and records[0]["state"] == "needs_operator"
     assert not context._launch_coordinator._launch_threads
     assert admission.acquire(blocking=False)
+
+
+@pytest.mark.parametrize("value", [True, "600", 59.5, 59, 3601, 0, -1])
+def test_launch_refuses_a_mistyped_or_out_of_range_wall_time_with_a_typed_422(
+    workspace: dict[str, Any], value: Any
+) -> None:
+    """The form gets one stable code and the bounds; nothing is recorded."""
+
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": fixture["role_id"],
+                "task_id": fixture["task_id"],
+                "wall_time_seconds": value,
+            },
+            headers=authorized(),
+        )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "invalid_wall_time_seconds"
+    assert "60" in response.json()["error"]["message"]
+    assert "3600" in response.json()["error"]["message"]
+    assert tuple(fixture["manager"].snapshot().delegations.values()) == ()
+
+
+@pytest.mark.parametrize("value", [60, 3600])
+def test_launch_records_the_accepted_wall_time_at_both_bounds(
+    workspace: dict[str, Any], value: int
+) -> None:
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    with _client(context) as client:
+        response = client.post(
+            "/api/delegations",
+            json={
+                "agent_id": fixture["role_id"],
+                "task_id": fixture["task_id"],
+                "wall_time_seconds": value,
+            },
+            headers=authorized(),
+        )
+    assert response.status_code == 200, response.text
+    context.await_launches()
+    run = context.runs()[0]
+    assert run["limits"]["wall_time_seconds"] == value
+    records = tuple(fixture["manager"].snapshot().delegations.values())
+    assert records[0]["limits"]["wall_time_seconds"] == value
+
+
+def test_launch_coordinator_rejects_a_boolean_wall_time_even_without_the_route(
+    workspace: dict[str, Any],
+) -> None:
+    """The route is not the only guard: the coordinator re-validates the bound."""
+
+    from agent_commons.errors import ValidationError
+
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    with pytest.raises(ValidationError, match="invalid_wall_time_seconds"):
+        context.run_role_on_task(
+            agent_id=fixture["role_id"],
+            task_id=fixture["task_id"],
+            wall_time_seconds=True,
+        )
+    assert tuple(fixture["manager"].snapshot().delegations.values()) == ()
+
+
+def test_launch_idempotency_key_replays_an_identical_limit_and_conflicts_on_a_different_one(
+    workspace: dict[str, Any],
+) -> None:
+    """The recorded limit is part of the operation identity, not a free retry knob."""
+
+    fixture = _launch_workspace(workspace)
+    context: UIContext = fixture["context"]
+    body = {
+        "agent_id": fixture["role_id"],
+        "task_id": fixture["task_id"],
+        "wall_time_seconds": 900,
+        "idempotency_key": "launch-limit-identity",
+    }
+    with _client(context) as client:
+        first = client.post("/api/delegations", json=body, headers=authorized())
+        assert first.status_code == 200, first.text
+        context.await_launches()
+        conflicting = client.post(
+            "/api/delegations",
+            json={**body, "wall_time_seconds": 1200},
+            headers=authorized(),
+        )
+        replay = client.post("/api/delegations", json=body, headers=authorized())
+        context.await_launches()
+    assert conflicting.status_code == 409, conflicting.text
+    assert "dempotency" in conflicting.json()["error"]["code"]
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["delegation_id"] == first.json()["delegation_id"]
+    records = tuple(fixture["manager"].snapshot().delegations.values())
+    assert len(records) == 1
+    assert records[0]["limits"]["wall_time_seconds"] == 900

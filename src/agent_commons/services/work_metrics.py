@@ -404,6 +404,7 @@ def _run_view(
         updated_at=updated_at,
         finished_at=finished_at,
         duration_seconds=duration,
+        wall_time_seconds=_delegation_wall_time_seconds(delegation),
         awaits_human=awaits_human,
         blocking_dependencies=dependencies,
         next_action=next_action,
@@ -411,6 +412,16 @@ def _run_view(
         evidence_state=evidence_state,
         missing_fields=tuple(sorted(set(missing))),
     )
+
+
+def _delegation_wall_time_seconds(delegation: Mapping[str, Any]) -> int | None:
+    """Read only an explicitly recorded limit; legacy delegations remain unknown."""
+
+    limits = delegation.get("limits")
+    if not isinstance(limits, Mapping):
+        return None
+    value = limits.get("wall_time_seconds")
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _run_next_action(

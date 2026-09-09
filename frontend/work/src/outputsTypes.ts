@@ -1,12 +1,14 @@
 export type OutputScope = Readonly<{ kind: "task" | "agent"; id: string }>;
 export type OutputVersions = "latest" | "all";
 export type OutputState = "unchecked" | "ready" | "stale" | "unavailable";
+/** Server-derived review standing of the producing task; never inferred here. */
+export type ReviewState = "awaiting" | "approved" | "returned";
 export type ImageOutput = Readonly<{
   kind: "design_image" | "artifact_image";
   outputId: string; title: string; artifactId: string; contentRevision: string;
   state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg";
   latest: boolean; versionCount: number; width: number | null; height: number | null;
-  historicalPreviewVerified?: boolean;
+  historicalPreviewVerified?: boolean; reviewState: ReviewState | null;
 }>;
 export type OutputList = Readonly<{ scope: OutputScope; versions: OutputVersions; items: readonly (ImageOutput | LiveOutput)[] }>;
 export type OutputSummary = Readonly<{ scope: OutputScope; total: number; unchecked: number; stale: number; unavailable: number }>;
@@ -25,8 +27,13 @@ const REASONS = new Set([
 ]);
 function fail(): never { throw new OutputsError(); }
 function object(value: unknown): Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : fail(); }
-function keys(value: Record<string, unknown>, expected: string): void {
-  const names = expected.split(" "); if (Object.keys(value).length !== names.length || names.some((name) => !(name in value))) fail();
+function keys(value: Record<string, unknown>, expected: string, optional = ""): void {
+  const names = expected.split(" "), allowed = new Set(optional ? [...names, ...optional.split(" ")] : names);
+  if (names.some((name) => !(name in value)) || Object.keys(value).some((name) => !allowed.has(name))) fail();
+}
+/** An older server, a null, or a value this build does not know all mean "no review label". */
+function reviewState(value: unknown): ReviewState | null {
+  return value === "awaiting" || value === "approved" || value === "returned" ? value : null;
 }
 function id(value: unknown, kind: string): string { return typeof value === "string" && new RegExp(`^${kind}\\.${ID}$`).test(value) ? value : fail(); }
 function count(value: unknown): number { return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : fail(); }
@@ -57,11 +64,11 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
       seen.add(live.outputId); return live;
     }
     if (item.kind === "design_image") {
-      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height");
+      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state");
       const packageId = id(item.package_id, "design_package"), packageRevision = id(item.package_revision, "evt"), screenId = id(item.screen_id, "screen");
       if (item.output_id !== `${packageId}@${packageRevision}:${screenId}` || item.series_id !== `${packageId}:${screenId}`) fail();
     } else if (item.kind === "artifact_image") {
-      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified");
+      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state");
       if (item.output_id !== `${id(item.artifact_id, "artifact")}@${id(item.artifact_revision, "evt")}` || typeof item.series_id !== "string" || !/^generated\.[a-f0-9]{64}$/.test(item.series_id)) fail();
       if (typeof item.historical_preview_verified !== "boolean" || (item.historical_preview_verified && (item.state !== "stale" || item.reason !== "producer_task_revision_changed"))) fail();
       id(item.delegation_revision, "evt"); id(item.producer_agent_id, "agent"); id(item.producer_delegation_id, "delegation");
@@ -86,7 +93,8 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
     seen.add(item.output_id as string);
     return { kind: item.kind, outputId: item.output_id as string, title: text(item.title), artifactId: id(item.artifact_id, "artifact"), contentRevision: item.content_revision,
       state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type, latest: item.latest,
-      versionCount, width, height, historicalPreviewVerified: item.kind === "artifact_image" && item.historical_preview_verified === true };
+      versionCount, width, height, historicalPreviewVerified: item.kind === "artifact_image" && item.historical_preview_verified === true,
+      reviewState: reviewState(item.review_state) };
   });
   return { scope, versions, items };
 }

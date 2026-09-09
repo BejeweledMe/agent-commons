@@ -15,6 +15,28 @@ AGENT = "agent." + "1" * 26
 OTHER_AGENT = "agent." + "2" * 26
 CHILD = "session." + "3" * 26
 RUN = "delegation." + "4" * 26
+REVIEW = "review." + "5" * 26
+
+
+def review(
+    task_id: str,
+    state: str,
+    *,
+    identifier: str = REVIEW,
+    recorded_at: str = "2026-09-08T00:00:00Z",
+    stale: bool = False,
+) -> dict[str, Any]:
+    """One projected review row shaped like the canonical review projection."""
+
+    return {
+        "id": identifier,
+        "review_id": identifier,
+        "state": state,
+        "stale": stale,
+        "target_ref": {"kind": "task", "id": task_id},
+        "target_revision": "evt." + "1" * 26,
+        "recorded_at": recorded_at,
+    }
 
 
 class SnapshotManager:
@@ -251,6 +273,77 @@ def test_projection_fault_is_closed(tmp_path: Path) -> None:
         OutputReads(manager).summary("agent", AGENT)
     assert exc.value.code == "outputs_unavailable"
     assert "sensitive" not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        ("requested", "awaiting"),
+        ("approved", "approved"),
+        ("changes_requested", "returned"),
+        ("abstained", None),
+    ],
+)
+def test_review_state_is_joined_from_the_task_review_projection(
+    tmp_path: Path, state: str, expected: str | None
+) -> None:
+    manager, package, _ = _bound(tmp_path)
+    task_id = package.draft.screens[0].producer_task_binding.identifier
+    manager.value.reviews[REVIEW] = review(task_id, state)
+    item = OutputReads(manager).list("task", task_id).items[0]
+    assert item.state == "ready"
+    assert item.review_state == expected
+
+
+def test_absent_or_stale_review_reports_no_review_state(tmp_path: Path) -> None:
+    manager, package, _ = _bound(tmp_path)
+    task_id = package.draft.screens[0].producer_task_binding.identifier
+    assert OutputReads(manager).list("task", task_id).items[0].review_state is None
+    manager.value.reviews[REVIEW] = review(task_id, "approved", stale=True)
+    assert OutputReads(manager).list("task", task_id).items[0].review_state is None
+    assert OutputReads(manager).summary("task", task_id).total == 1
+
+
+def test_newest_current_review_wins_and_never_follows_output_freshness(tmp_path: Path) -> None:
+    manager, package, _ = _bound(tmp_path)
+    task_id = package.draft.screens[0].producer_task_binding.identifier
+    newer = "review." + "6" * 26
+    manager.value.reviews[REVIEW] = review(
+        task_id, "changes_requested", recorded_at="2026-09-07T00:00:00Z"
+    )
+    manager.value.reviews[newer] = review(
+        task_id, "approved", identifier=newer, recorded_at="2026-09-08T00:00:00Z"
+    )
+    assert OutputReads(manager).list("task", task_id).items[0].review_state == "approved"
+    # Another task's review never reaches this scope.
+    manager.value.reviews.clear()
+    manager.value.reviews[REVIEW] = review(
+        package.draft.screens[1].producer_task_binding.identifier, "approved"
+    )
+    assert OutputReads(manager).list("task", task_id).items[0].review_state is None
+    # A stale image is not a verdict: freshness must not invent one either way.
+    manager.value.reviews[REVIEW] = review(task_id, "requested")
+    task = dict(manager.value.tasks[task_id])
+    task["effective_revision"] = "evt." + "8" * 26
+    manager.value.tasks[task_id] = task
+    stale = OutputReads(manager).list("task", task_id).items[0]
+    assert stale.state == "stale"
+    assert stale.reason == "producer_task_revision_changed"
+    assert stale.review_state == "awaiting"
+
+
+def test_malformed_or_foreign_review_rows_never_close_the_scope(tmp_path: Path) -> None:
+    manager, package, _ = _bound(tmp_path)
+    task_id = package.draft.screens[0].producer_task_binding.identifier
+    broken = review(task_id, "approved", identifier="review.broken")
+    broken["recorded_at"] = "not an instant"
+    manager.value.reviews["review.broken"] = broken
+    artifact_review = review(task_id, "approved", identifier="review." + "7" * 26)
+    artifact_review["target_ref"] = {"kind": "artifact", "id": "artifact." + "7" * 26}
+    manager.value.reviews[artifact_review["id"]] = artifact_review
+    item = OutputReads(manager).list("task", task_id).items[0]
+    assert item.state == "ready"
+    assert item.review_state is None
 
 
 def test_latest_agent_output_survives_replacement_by_another_producer(tmp_path: Path) -> None:

@@ -1,0 +1,45 @@
+{
+  "work_package": "WP-04.2",
+  "revision_note": "v2 after review.6W1M64SEZERAMVP0E9TTWQWS3S changes_requested",
+  "task": "task.60E8AFJB3YZF000M6PYF3K96PT",
+  "delegation": "delegation.2PM52JAD07NXN59GV1CAYWEAGV",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "frontend/work/src/components/ConversationPanel.tsx",
+      "sha256": "c863aa8bd4ddcf5cdeed71febe1c8be8497317e4a948f308dcb9c73e6af6af27"
+    },
+    {
+      "path": "frontend/work/src/conversationState.ts",
+      "sha256": "2de23df8831e633714308109d1ac911c687b77ea060f542defc2374b190b81af"
+    },
+    {
+      "path": "frontend/work/src/conversationApi.ts",
+      "sha256": "f2aebcbe32c6aa3cabcf1c9d7a829e93efa5728858136bed3eab3221a62298a8"
+    },
+    {
+      "path": "frontend/work/src/conversationStrings.ts",
+      "sha256": "ff6ea4bd2871729e8f230626a07af75caa18621e5ac66cc2b0ee2f07c8fce0a1"
+    },
+    {
+      "path": "frontend/work/src/conversation.css",
+      "sha256": "9ecb7c9ed21beca51bc58a30e0516ce9bac9d80a47ac1c9209e31567dcad260b"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "903e14c572b9e379d5c2e0b61d21173c76ebf4f9df2b2dc7d060d51ce64114db"
+    },
+    {
+      "path": "frontend/work/tests/conversations.test.mjs",
+      "sha256": "912b8a60372b31a2b6fa55cc7ad8be743a95c0a28f04222fa924f95764add614"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "254 passed, 0 failed",
+    "tsc": "exit 0"
+  },
+  "notes": [
+    "Fix authored by the coordinator: parseRecipientAvailability now yields unknown when observed_revision is omitted or null for active/inactive, and when active_delegation_id is omitted for inactive; tests extended with six incomplete shapes"
+  ]
+}

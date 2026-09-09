@@ -1,5 +1,5 @@
 import { ApiProblem } from "./api.js";
-import { fileCategory, scopeKey, validateFiles, type Attachment, type Conversation, type ConversationApi, type ConversationScope, type Draft, type FileProblem, type Message, type SendIntent } from "./conversationApi.js";
+import { fileCategory, scopeKey, validateFiles, UNKNOWN_AVAILABILITY, type Attachment, type Conversation, type ConversationApi, type ConversationScope, type Draft, type FileProblem, type Message, type SendIntent } from "./conversationApi.js";
 
 type Transport = Pick<ConversationApi, "list" | "ensure" | "messages" | "draft" | "upload" | "remove" | "send">;
 export type Upload = Readonly<{ id: string; key: string; file: File; category: "image" | "file"; attachment?: Attachment; state: "queued" | "uploading" | "ready" | "uncertain" | "rejected" | "removing" | "remove_uncertain" }>;
@@ -148,7 +148,8 @@ export class ConversationSession {
       const result = await this.api.send(conversation.thread_id, intent, signal());
       // The POST is authoritative. Clear its retry identity before any fallible read.
       this.generation++; this.draft = null;
-      this.set({ text: "", reply: null, uploads: [], intent: null, sendState: "recorded", conversation: { ...this.value.conversation!, revision: result.revision }, readError: false, fileProblem: null });
+      // The locally advanced revision outdates the observed availability; the following read restores it.
+      this.set({ text: "", reply: null, uploads: [], intent: null, sendState: "recorded", conversation: { ...this.value.conversation!, revision: result.revision, recipient_availability: UNKNOWN_AVAILABILITY }, readError: false, fileProblem: null });
       const pending = this.read; if (pending) await pending;
       await this.refresh();
     } catch (error) {
@@ -167,10 +168,44 @@ export class ConversationSession {
     }
   }
 }
+/**
+ * The task a conversation's Prepare run action points at: its own task for a
+ * task scope, otherwise the task already selected in Work. `null` means there
+ * is nothing to prefill and the caller only navigates. No scope starts a run.
+ */
+export function prepareRunTaskId(scope: ConversationScope, selectedTaskId: string | null): string | null {
+  return scope.kind === "task" ? scope.id : selectedTaskId;
+}
+/** Unsent work an operator would lose: prose, a chosen reply target, or attachments. */
+export function sessionHasUnsentDraft(snapshot: ConversationSnapshot): boolean {
+  return snapshot.text.trim().length > 0 || snapshot.reply !== null || snapshot.uploads.length > 0;
+}
 /** Owned by the mounted Work application, independent of project/dialog selection. */
 export class ConversationSessions {
   private sessions = new Map<string, ConversationSession>();
-  get(project: string, scope: ConversationScope, api: Transport): ConversationSession { const id = `${project}/${scopeKey(scope)}`; let session = this.sessions.get(id); if (!session) { session = new ConversationSession(api, scope); this.sessions.set(id, session); } return session; }
+  private listeners = new Set<() => void>();
+  get(project: string, scope: ConversationScope, api: Transport): ConversationSession { const id = `${project}/${scopeKey(scope)}`; let session = this.sessions.get(id); if (!session) { session = new ConversationSession(api, scope); session.subscribe(() => { for (const listener of this.listeners) listener(); }); this.sessions.set(id, session); } return session; }
+  subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
+  /** Every open session, not only the one a dialog is showing. */
+  hasUnsentDraft = (): boolean => [...this.sessions.values()].some((session) => sessionHasUnsentDraft(session.snapshot()));
+}
+type UnloadTarget = Pick<Window, "addEventListener" | "removeEventListener">;
+/**
+ * One `beforeunload` handler for the whole workspace, registered only while an
+ * unsent draft exists and removed the moment the last one is gone. The draft
+ * itself is never persisted: a reload deliberately loses it.
+ */
+export class ConversationDraftGuard {
+  private handler: ((event: BeforeUnloadEvent) => void) | null = null;
+  constructor(private readonly target: UnloadTarget, private readonly drafts: Pick<ConversationSessions, "hasUnsentDraft">) {}
+  get armed(): boolean { return this.handler !== null; }
+  sync = (): void => {
+    if (!this.drafts.hasUnsentDraft()) return this.release();
+    if (this.handler) return;
+    this.handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    this.target.addEventListener("beforeunload", this.handler);
+  };
+  release = (): void => { if (this.handler) { this.target.removeEventListener("beforeunload", this.handler); this.handler = null; } };
 }
 /** A single owner prevents leaked or reused URLs when a preview closes or changes. */
 export class ConversationObjectUrl {

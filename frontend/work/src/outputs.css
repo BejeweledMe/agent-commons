@@ -9,6 +9,10 @@
 .outputs-list > li { padding: 20px; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 12px; }
 .outputs-list h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
 .outputs-status { font-weight: 650; margin-bottom: 8px; }
-.outputs-status[data-state="stale"], .outputs-status[data-state="unavailable"] { color: var(--text-warning); }
+/* Attention only where an address or a preview is actually unusable. A viewable
+   earlier version and a pending check stay neutral; no state here is accepted. */
+.outputs-status[data-status="earlierVersion"], .outputs-status[data-status="previewUnavailable"],
+.outputs-status[data-status="previewExpired"], .outputs-status[data-status="addressUnavailable"] { color: var(--text-warning); }
+.outputs-review { font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
 .outputs-image { display: block; width: auto; max-width: 100%; height: auto; max-height: 70dvh; object-fit: contain; margin-top: 16px; }
 @media (max-width: 600px) { .outputs-dialog { padding: 16px; } .outputs-heading, .outputs-toolbar { flex-direction: column; } .outputs-list > li { padding: 12px; } }

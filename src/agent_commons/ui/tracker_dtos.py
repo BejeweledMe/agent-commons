@@ -57,6 +57,7 @@ class TrackerRunPayload(TypedDict):
     updated_at: str | None
     finished_at: str | None
     duration_seconds: int | None
+    wall_time_seconds: int | None
     awaits_human: bool
     next_action: str
     freshness: str
@@ -188,6 +189,7 @@ class TrackerRunDTO:
     updated_at: str | None
     finished_at: str | None
     duration_seconds: int | None
+    wall_time_seconds: int | None
     awaits_human: bool
     next_action: str
     freshness: str
@@ -208,6 +210,7 @@ class TrackerRunDTO:
             "updated_at": self.updated_at,
             "finished_at": self.finished_at,
             "duration_seconds": self.duration_seconds,
+            "wall_time_seconds": self.wall_time_seconds,
             "awaits_human": self.awaits_human,
             "next_action": self.next_action,
             "freshness": self.freshness,

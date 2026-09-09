@@ -95,6 +95,9 @@ def _image_wire(item: ImageOutput) -> dict[str, object]:
         "classification": item.classification,
         "state": item.state,
         "reason": item.reason,
+        # Additive nullable review standing of the producing task. Absent server
+        # knowledge is null, never an implied "awaiting" or an implied approval.
+        "review_state": item.review_state,
         "latest": item.latest,
         "version_count": item.version_count,
         "width": item.width,

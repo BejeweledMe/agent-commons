@@ -37,6 +37,9 @@ if TYPE_CHECKING:
 
 _LOG = logging.getLogger("agent_commons.ui")
 
+MIN_WALL_TIME_SECONDS: Final = 60
+MAX_WALL_TIME_SECONDS: Final = 3600
+
 #: The one wording for "this panel cannot launch yet", shared by the direct-call
 #: refusal here and the typed ``launch_not_configured`` HTTP refusal in
 #: `ui.server`, so the two can never drift into two explanations of one state.
@@ -212,8 +215,18 @@ class UILaunchCoordinator:
         if not context.launch_enabled:
             raise ConfigurationError(LAUNCH_NOT_CONFIGURED)
         limits = self._DEFAULT_RUN_LIMITS.to_payload()
-        if request.wall_time_seconds:
-            limits["wall_time_seconds"] = int(request.wall_time_seconds)
+        if request.wall_time_seconds is not None:
+            wall_time_seconds = request.wall_time_seconds
+            if isinstance(wall_time_seconds, bool) or not isinstance(wall_time_seconds, int):
+                raise ValidationError(
+                    "invalid_wall_time_seconds: wall_time_seconds must be an integer "
+                    "between 60 and 3600"
+                )
+            if not MIN_WALL_TIME_SECONDS <= wall_time_seconds <= MAX_WALL_TIME_SECONDS:
+                raise ValidationError(
+                    "invalid_wall_time_seconds: wall_time_seconds must be between 60 and 3600"
+                )
+            limits["wall_time_seconds"] = wall_time_seconds
         if context._session_owner is not None:
             context._session_owner.ensure_run_ttl(int(limits["wall_time_seconds"]))
         writer = context.writer()

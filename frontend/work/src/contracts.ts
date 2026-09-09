@@ -384,6 +384,7 @@ export type TrackerRun = {
   updatedAt: string | null;
   finishedAt: string | null;
   durationSeconds: number | null;
+  wallTimeSeconds: number | null;
   awaitsHuman: boolean;
   nextAction: string;
   freshness: string;

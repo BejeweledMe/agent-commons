@@ -14,7 +14,20 @@
 .conversation-message time{margin-left:auto}
 .conversation-message footer{margin-top:12px}
 .conversation-body{white-space:pre-wrap;line-height:1.55;margin:12px 0}
-.conversation-delivery{border:1px solid var(--border);padding:3px 7px;border-radius:6px;font-weight:600}
+.conversation-delivery{list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0;padding:0;flex-basis:100%}
+.conversation-delivery-step{display:flex;align-items:center;gap:5px;color:var(--text-muted)}
+.conversation-delivery-step+.conversation-delivery-step::before{content:"→";color:var(--text-muted);margin-right:5px}
+.conversation-delivery-mark{width:8px;height:8px;border-radius:50%;border:1px solid var(--border-control);flex:none}
+.conversation-delivery-step-reached{color:var(--text-primary)}
+.conversation-delivery-step-reached .conversation-delivery-mark{background:var(--text-primary);border-color:var(--text-primary)}
+.conversation-delivery-step-current{font-weight:600}
+.conversation-delivery-read{flex-basis:100%}
+.conversation-availability{margin-top:10px}
+.conversation-availability p{display:flex;align-items:center;gap:6px}
+.conversation-availability-icon{width:9px;height:9px;border-radius:50%;border:1px solid var(--border-control);flex:none}
+.conversation-availability-active .conversation-availability-icon{background:var(--text-primary);border-color:var(--text-primary)}
+.conversation-availability-unknown .conversation-availability-icon{border-style:dashed}
+.conversation-prepare{margin-top:8px}
 .conversation-composer{margin:0;padding:18px 28px 24px;border-top:1px solid var(--border);overflow:auto;max-height:50dvh}
 .conversation-composer>label{margin:0}
 .conversation-composer textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:72px;max-height:200px;margin:8px 0;padding:12px;font:inherit;border:1px solid var(--border-control);border-radius:8px;background:var(--surface-input);color:var(--text-primary)}

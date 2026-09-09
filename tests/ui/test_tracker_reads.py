@@ -86,6 +86,7 @@ def _snapshot(*, delegation_state: str = "active") -> ProjectSnapshot:
         "target_ref": {"kind": "task", "id": "task.build"},
         "target_profile": "claude-builder",
         "agent_id": "agent.builder",
+        "limits": {"wall_time_seconds": 900},
     }
     return snapshot
 
@@ -145,6 +146,7 @@ def test_tracker_composes_focused_dag_run_timeline_and_observed_capacity() -> No
     assert run["profile_id"] == "claude-builder"
     assert run["phase"] == "running"
     assert run["duration_seconds"] == 30
+    assert run["wall_time_seconds"] == 900
     build_title = next(task["title"] for task in wire["tasks"] if task["task_id"] == "task.build")
     assert "\x00" not in build_title
 
@@ -280,3 +282,24 @@ def test_dto_returns_fresh_wire_containers() -> None:
     assert second["tasks"]
     assert "tampered" not in second["gaps"]
     assert "secret stderr" not in repr(asdict(dto))
+
+
+def test_a_delegation_without_a_recorded_limit_reads_as_no_limit_not_the_default() -> None:
+    """Only an explicitly recorded limit is reported; legacy runs stay null."""
+
+    snapshot = _snapshot()
+    legacy = dict(snapshot.delegations["delegation.1"])
+    del legacy["limits"]
+    snapshot.delegations["delegation.1"] = legacy  # type: ignore[assignment]
+    dto = build_tracker_snapshot(
+        snapshot,
+        [_attempt()],
+        generated_at=NOW,
+        sequence=8,
+        focus_task_ids=["task.next"],
+        capacity=CAPACITY,
+        graph=_graph(),
+    )
+    run = dto.to_wire()["runs"][0]
+    assert run["wall_time_seconds"] is None
+    assert run["duration_seconds"] == 30

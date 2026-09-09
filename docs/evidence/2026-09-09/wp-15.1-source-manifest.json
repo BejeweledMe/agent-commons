@@ -1,0 +1,64 @@
+{
+  "work_package": "WP-15.1",
+  "task": "task.32FJY7ERS66ZHNSXFZS73BZ2MA",
+  "delegation": "delegation.5CKPXV03VH8M1CYK8CK4FQVGVJ",
+  "base_commit": "39459cc5ab051765e8eb559d71798c8256f2c81b",
+  "recorded_at": "2026-09-09",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "b6f31a0f3e30487984074e3d0a3eb4d6793d52b73bc6722ccf49914bde3dc92f"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "7c6cc4708c138f3b3bfa7c658ef25b26cfb40ea7dcb156fea5c1c91f9dbaaaa9"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_dtos.py",
+      "sha256": "7fe758ddf524bd3559f72b5d5bff7d2653a741f05209624762368be444dee100"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "a54c28ad0a5a5d13e99a24ceb0e7a45a4de3b54296486ae638f198f4adea4047"
+    },
+    {
+      "path": "src/agent_commons/domain/work_state.py",
+      "sha256": "a16779396e6eb091f7996ba9ee8ba5962f0955a11b884609238d9071fd1ae9f1"
+    },
+    {
+      "path": "src/agent_commons/services/work_metrics.py",
+      "sha256": "06e543b8660b62ca8fe50d78d54fba8537a95f74397c92bcedd7cebe07f3daa7"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "cdc4346667aaef2a9098aabe4b55cf567f5bb9951dfa16cead58b9d3133d6d78"
+    },
+    {
+      "path": "tests/ui/test_tracker_reads.py",
+      "sha256": "fcac7591a182a9544410e1293c66f83bc2ce7b87334ab9bacf24b0f9801f808e"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "bae61104682973a5506b07479b98d2a975681163c397dc161929917558c93084"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "a032b32d837947097892f9f370d54471ff3d823d19a1d7d379fd4bf9d9317476"
+    },
+    {
+      "path": "frontend/work/tests/tracker-parser.test.mjs",
+      "sha256": "f568c8a5bf10591c35127b59c7860ff9ff4e18f236b50f7469803c40dec2834d"
+    }
+  ],
+  "verification": {
+    "pytest": "37 passed (uv run python -m pytest tests/ui/test_launch.py tests/ui/test_tracker_reads.py)",
+    "ruff": "check and format clean",
+    "frontend_node_test": "254 passed",
+    "tsc": "exit 0"
+  },
+  "notes": [
+    "Terra changed domain/work_state.py and services/work_metrics.py (RunView.wall_time_seconds from recorded delegation limits) outside the claimed paths; coordinator accepts them as the correct source of the factual value",
+    "Coordinator amendments before review: (1) restored the shared _guarded route helper in server.py and moved the typed 422 for wall_time_seconds to a pre-check in the route, so other refusals keep their codes and safe_next_actions; (2) wrapped an over-long line in launch.py; (3) added 10 launch tests (bool/string/fraction/59/3601/0/-1 => 422 with no delegation recorded; 60 and 3600 accepted and recorded; coordinator-level bool rejection)",
+    "Check-run (canary) DTO does not carry wall_time_seconds in this revision; the UI shows \"limit not provided\" for it (WP-15.2)"
+  ]
+}

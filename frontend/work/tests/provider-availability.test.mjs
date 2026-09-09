@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
@@ -13,11 +13,14 @@ execFileSync(
   [
     "--ignoreConfig", "--target", "ES2022", "--module", "ESNext",
     "--moduleResolution", "Bundler", "--lib", "ES2022,DOM",
-    "--outDir", compiled, resolve(root, "src/api.ts")
+    "--outDir", compiled, resolve(root, "src/api.ts"), resolve(root, "src/setupReadiness.ts")
   ],
   { cwd: root }
 );
 const api = await import(pathToFileURL(resolve(compiled, "api.js")).href);
+const { providerReadinessLines } = await import(pathToFileURL(resolve(compiled, "setupReadiness.js")).href);
+const messages = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
+const shellSource = readFileSync(resolve(root, "src/main.tsx"), "utf8");
 
 function availability() {
   return {
@@ -262,4 +265,101 @@ test("skill projection refusal is present if and only if skills are unavailable"
     (item) => item.code !== "provider_skill_projection_unavailable"
   );
   assert.throws(() => api.parseProviderAvailabilityList([withoutSkills]));
+});
+
+function readiness(overrides = {}) {
+  return {
+    installationState: "installed",
+    initializationState: "ready",
+    qualification: {
+      state: "qualified", freshness: "current", fingerprint: "a".repeat(64), checkedAt: "2026-08-31T12:00:00Z"
+    },
+    authentication: { state: "ready", freshness: "fresh" },
+    ...overrides
+  };
+}
+
+const PROVIDER_FIRST_LEVEL_KEYS = Object.keys(messages.en).filter(
+  (key) => key.startsWith("provider_readiness_") || key.startsWith("provider_availability_")
+);
+
+test("provider readiness reads as four stages in the order a run needs them", () => {
+  const lines = providerReadinessLines(readiness());
+  assert.deepEqual(lines.map((line) => line.stage), ["installation", "initialization", "check_run", "sign_in"]);
+  assert.deepEqual(lines.map((line) => line.valueKey), [
+    "provider_readiness_installed",
+    "provider_readiness_initialized",
+    "provider_readiness_check_passed",
+    "provider_readiness_signed_in"
+  ]);
+  assert.deepEqual(lines.map((line) => line.tone), ["ok", "ok", "ok", "ok"]);
+  assert.deepEqual(lines.map((line) => line.code), ["installed", "ready", "qualified/current", "ready/fresh"]);
+  assert.deepEqual(lines.map((line) => line.labelKey), [
+    "provider_availability_install_label",
+    "provider_availability_init_label",
+    "provider_availability_qualification_label",
+    "provider_availability_auth_label"
+  ]);
+});
+
+test("every canonical readiness value has one closed human reading", () => {
+  const cases = [
+    [readiness({ installationState: "unavailable" }), 0, "provider_readiness_not_installed", "attention"],
+    [readiness({ initializationState: "failed" }), 1, "provider_readiness_initialization_failed", "attention"],
+    [readiness({ initializationState: "passed_unqualified" }), 1, "provider_readiness_initialization_incomplete", "attention"],
+    [readiness({ initializationState: "not_checked" }), 1, "provider_readiness_unchecked", "unknown"],
+    [readiness({ qualification: { state: "required", freshness: "missing", fingerprint: null, checkedAt: null } }), 2, "provider_readiness_check_required", "attention"],
+    [readiness({ qualification: { state: "failed", freshness: "invalid", fingerprint: null, checkedAt: null } }), 2, "provider_readiness_check_failed", "attention"],
+    [readiness({ qualification: { state: "qualified", freshness: "invalid", fingerprint: null, checkedAt: null } }), 2, "provider_readiness_check_outdated", "attention"],
+    [readiness({ authentication: { state: "authentication_required", freshness: "fresh" } }), 3, "provider_readiness_sign_in_required", "attention"],
+    [readiness({ authentication: { state: "ready", freshness: "stale" } }), 3, "provider_readiness_sign_in_unconfirmed", "attention"],
+    [readiness({ authentication: { state: "failed", freshness: "fresh" } }), 3, "provider_readiness_sign_in_unconfirmed", "attention"],
+    [readiness({ authentication: { state: "unsupported", freshness: "fresh" } }), 3, "provider_readiness_sign_in_not_required", "ok"],
+    [readiness({ authentication: { state: "not_checked", freshness: "unknown" } }), 3, "provider_readiness_unchecked", "unknown"]
+  ];
+  for (const [input, index, valueKey, tone] of cases) {
+    const line = providerReadinessLines(input)[index];
+    assert.equal(line.valueKey, valueKey);
+    assert.equal(line.tone, tone);
+    for (const locale of ["en", "ru"]) {
+      assert.ok(messages[locale][valueKey].trim(), `${valueKey} needs ${locale} copy`);
+    }
+  }
+});
+
+test("the readable line keeps the canonical value only as a technical code", () => {
+  const refused = readiness({
+    qualification: { state: "required", freshness: "missing", fingerprint: null, checkedAt: null },
+    authentication: { state: "authentication_required", freshness: "fresh" }
+  });
+  const lines = providerReadinessLines(refused);
+  assert.deepEqual(lines.map((line) => line.code), [
+    "installed", "ready", "required/missing", "authentication_required/fresh"
+  ]);
+  for (const line of lines) {
+    for (const locale of ["en", "ru"]) {
+      assert.doesNotMatch(messages[locale][line.valueKey], /_/, "a readable line never prints a canonical code");
+    }
+  }
+});
+
+test("first-level provider copy drops protocol jargon and names the check run in both locales", () => {
+  for (const key of PROVIDER_FIRST_LEVEL_KEYS) {
+    assert.ok(messages.ru[key].trim(), `${key} needs Russian copy`);
+    assert.doesNotMatch(messages.en[key], /canary|probe|qualification/i);
+    assert.doesNotMatch(messages.ru[key], /canary|канар|qualification|квалифик/i);
+    assert.doesNotMatch(messages.en[key], /\d/, "no factual time limit is shown before WP-15");
+    assert.doesNotMatch(messages.ru[key], /\d/, "no factual time limit is shown before WP-15");
+  }
+  assert.equal(messages.en.provider_availability_qualification_label, "Check run");
+  assert.equal(messages.ru.provider_availability_qualification_label, "Проверочный запуск");
+  assert.match(messages.en.provider_readiness_check_required, /check run/i);
+  assert.match(messages.ru.provider_readiness_check_required, /проверочный запуск/i);
+});
+
+test("the settings surface renders one line per stage and hides codes behind technical details", () => {
+  assert.match(shellSource, /<ul className="provider-readiness">[\s\S]*providerReadinessLines\(availability\)\.map\(\(line\) => \([\s\S]*text\(line\.labelKey\)[\s\S]*text\(line\.valueKey\)/);
+  assert.match(shellSource, /<details className="provider-readiness-technical">[\s\S]*text\("provider_readiness_technical"\)[\s\S]*<code>\{line\.code\}<\/code>[\s\S]*availability\.refusal\?\.code \?\? "none"/);
+  assert.doesNotMatch(shellSource, /text\("provider_availability_install_label"\)\}: \{availability\.installationState\}/);
+  assert.doesNotMatch(shellSource, /freshForSeconds/);
 });

@@ -403,3 +403,45 @@ for (const locale of ["en", "ru"]) test(`${locale}: primary task status uses pro
   assert.ok(unknown.includes(text("tracker_gloss_policy_unknown")));
   assert.ok(unknown.includes(text("tracker_gloss_unknown")));
 });
+
+const run = (overrides = {}) => ({ delegationId: `delegation.${"0".repeat(26)}`, taskId, agentId: null, roleName: "Builder",
+  provider: "claude", profileId: "claude-builder", phase: "succeeded", attemptId: null, attemptNumber: 1,
+  startedAt: "2026-09-09T10:00:00Z", updatedAt: "2026-09-09T10:05:00Z", finishedAt: "2026-09-09T10:05:00Z",
+  durationSeconds: 300, wallTimeSeconds: null, awaitsHuman: false, nextAction: "none", freshness: "fresh", evidenceState: "complete", ...overrides });
+
+for (const locale of ["en", "ru"]) {
+  test(`${locale}: a run row states the recorded attempt limit and says so when the delegation carries none`, () => {
+    const text = (key) => messages[locale][key];
+    const render = (runs) => renderToStaticMarkup(TaskInspectorContent({ task: task(), tasks: [], runs, sourceRevision: revision, locale, text,
+      actionsCurrent: true, writesEnabled: true, onSelectTask: () => {}, onLaunchTask: () => {},
+      detailState: { kind: "failure", taskId }, onRefresh: () => {} }));
+
+    const recorded = render([run({ wallTimeSeconds: 900 })]);
+    assert.ok(recorded.includes(`${text("run_limit_label")}: 15 ${text("run_limit_minutes")}`));
+    assert.equal(recorded.includes(text("run_limit_absent")), false);
+
+    // A legacy or canary run whose DTO carries no limit is never given one.
+    for (const missing of [null, undefined, 0, -60, "600", 12.5]) {
+      const absent = render([run({ wallTimeSeconds: missing })]);
+      assert.ok(absent.includes(`${text("run_limit_label")}: ${text("run_limit_absent")}`), String(missing));
+      assert.equal(absent.includes(`10 ${text("run_limit_minutes")}`), false, String(missing));
+      assert.equal(absent.includes("600"), false, String(missing));
+    }
+
+    // A limit that is not whole minutes is reported exactly, never rounded.
+    assert.ok(render([run({ wallTimeSeconds: 90 })]).includes(`${text("run_limit_label")}: 90 ${text("run_limit_seconds")}`));
+  });
+}
+
+test("the attempt limit reading exists in both locales and never reuses the duration wording", () => {
+  for (const key of ["run_limit_label", "run_limit_minutes", "run_limit_seconds", "run_limit_absent"]) {
+    assert.equal(typeof messages.en[key], "string", key);
+    assert.equal(typeof messages.ru[key], "string", key);
+    assert.notEqual(messages.en[key], "");
+    assert.notEqual(messages.ru[key], "");
+  }
+  assert.equal(messages.en.run_limit_label, "Attempt limit");
+  assert.equal(messages.ru.run_limit_label, "Лимит попытки");
+  assert.equal(messages.en.run_limit_absent, "Limit not provided");
+  assert.equal(messages.ru.run_limit_absent, "Лимит не предоставлен");
+});
