@@ -36,6 +36,7 @@ contract test. The status written in each ADR remains the detailed record.
 | [0017](0017-project-scoped-service-host.md) | Proposed | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery; branch implementation authorized. |
 | [0018](0018-role-connections-and-execution-modes.md) | Proposed | Future role connection, API/local, SGR and conversation contracts; no runtime capability or live qualification claimed. |
 | [0019](0019-project-native-collaboration-and-outputs.md) | Accepted direction, implementation open | Compact project shell, grouped reusable library, producer-scoped outputs, private message attachments and truthful human/agent delivery; current program is on the self-improvement branch. |
+| [0020](0020-project-board-home.md) | Accepted by the owner, implemented | A project opens on its infinite board: roles as cards, agent links as edges, departments as frames; the task tracker is a separate tab; the arrangement is operational state behind `/api/board`, never canonical. |
 
 ## How the two records fit together
 

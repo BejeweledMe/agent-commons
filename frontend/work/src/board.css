@@ -1,0 +1,59 @@
+/* The project board (ADR 0020). React Flow's own stylesheet is imported as a file
+   beside this one; everything here is class-based, nothing inline. */
+.board-section { display: flex; flex-direction: column; min-height: 0; height: calc(100dvh - 120px); }
+.board-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.board-toolbar .small-copy { flex: 1 1 320px; margin: 0; }
+.board-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.board-status { font-size: 13px; color: var(--text-muted); min-height: 18px; margin: 0 0 8px; }
+.board-body { display: flex; flex: 1 1 auto; min-height: 480px; gap: 16px; }
+.board-canvas { flex: 1 1 auto; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: #0f141b; position: relative; }
+.board-canvas .react-flow__background { opacity: 0.6; }
+.board-canvas .react-flow__attribution { display: none; }
+.board-canvas .react-flow__controls { background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 8px; box-shadow: none; }
+.board-canvas .react-flow__controls button { background: var(--surface-subtle); border-bottom: 1px solid var(--border); fill: var(--text-primary); }
+.board-canvas .react-flow__minimap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.board-panel { flex: 0 0 380px; max-width: 380px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 16px; }
+.board-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.board-panel-header h2 { margin: 0; font-size: 18px; }
+.board-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--text-muted); pointer-events: none; }
+.board-empty p { max-width: 36ch; }
+
+/* Role card */
+.board-role { width: 264px; min-height: 140px; box-sizing: border-box; background: var(--surface-subtle); border: 1px solid var(--border-control); border-radius: 12px; padding: 12px 14px; color: var(--text-primary); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.board-role[data-activity="running"] { border-color: #7fa8ff; }
+.board-role[data-activity="attention"] { border-color: var(--text-warning); background: var(--surface-warning); }
+.board-role[data-activity="queued"] { border-style: dashed; }
+.board-role-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.board-role-name { font-weight: 650; font-size: 14px; overflow-wrap: anywhere; }
+.board-role-activity { font-size: 12px; white-space: nowrap; color: var(--text-muted); }
+.board-role[data-activity="attention"] .board-role-activity { color: var(--text-warning); font-weight: 600; }
+.board-role-meta { margin: 0; color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.board-role-meta code { font-size: 11px; }
+.board-role-tasks { margin: 0; font-size: 12px; }
+.board-role-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.board-role-actions .button, .board-role-actions .conversation-entry, .board-role-actions .outputs-entry { min-height: 28px; padding: 2px 8px; font-size: 12px; }
+.board-role .react-flow__handle { width: 12px; height: 12px; background: var(--accent); border: 2px solid var(--surface); }
+.board-role .react-flow__handle-top { top: -7px; }
+.board-role .react-flow__handle-bottom { bottom: -7px; }
+
+/* Department frame */
+.board-frame { box-sizing: border-box; width: 100%; height: 100%; border: 1px dashed var(--border-control); border-radius: 16px; background: rgb(32 40 51 / 45%); }
+.board-frame-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; cursor: grab; }
+.board-frame-title { font-weight: 650; font-size: 14px; color: var(--text-primary); background: transparent; border: 0; padding: 0; min-width: 0; flex: 1 1 auto; }
+.board-frame-title:focus { outline: 2px solid var(--accent); border-radius: 4px; }
+.board-frame-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.board-frame-remove { font-size: 12px; }
+
+/* Edges */
+.board-canvas .react-flow__edge-path { stroke: var(--border-control); stroke-width: 1.5; }
+.board-canvas .react-flow__edge.board-edge-link .react-flow__edge-path { stroke: var(--accent); stroke-dasharray: 6 4; }
+.board-canvas .react-flow__edge.board-edge-reports .react-flow__edge-path { stroke: var(--text-muted); }
+.board-canvas .react-flow__edge-textbg { fill: var(--surface); }
+.board-canvas .react-flow__edge-text { fill: var(--text-muted); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .board-body { flex-direction: column; }
+  .board-panel { flex-basis: auto; max-width: none; }
+  .board-section { height: auto; }
+  .board-canvas { min-height: 420px; }
+}

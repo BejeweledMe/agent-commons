@@ -25,22 +25,28 @@ const mainSource = readFileSync(resolve(root, "src/main.tsx"), "utf8");
 const id = `task.${"0".repeat(26)}`;
 
 test("route roundtrip preserves task, canonical filter, Library tab and composer across refresh/back", () => {
-  for (const view of ["work", "team", "library", "settings"]) {
-    const state = { projectId: null, view, taskId: id, filter: "accepted", libraryTab: "context", composer: true };
+  for (const view of ["board", "work", "library", "settings"]) {
+    const state = { projectId: null, view, taskId: id, agentId: null, filter: "accepted", libraryTab: "context", composer: true };
     const href = workRouteHref(state);
     assert.deepEqual(parseWorkRoute(new URL(href, "http://localhost").search), state);
   }
   assert.equal(parseWorkRoute(`?task=${id}`).taskId, id, "route parsing must not guess whether a selected task still exists");
   for (const libraryTab of ["roles", "skills", "blueprints", "context"]) {
-    const state = { projectId: null, view: "library", taskId: id, filter: "all", libraryTab, composer: false };
+    const state = { projectId: null, view: "library", taskId: id, agentId: null, filter: "all", libraryTab, composer: false };
     assert.deepEqual(parseWorkRoute(new URL(workRouteHref(state), "http://localhost").search), state);
   }
   assert.equal(parseWorkRoute("?view=library&tab=templates").libraryTab, "blueprints", "legacy template links still open project templates");
+  assert.equal(parseWorkRoute("?view=team").view, "board", "task-first Agents links open the board");
+  assert.equal(parseWorkRoute("").view, "board", "a project opens on its board");
+  const agent = `agent.${"0".repeat(26)}`;
+  assert.equal(parseWorkRoute(`?view=work&agent=${agent}`).agentId, agent);
+  assert.equal(parseWorkRoute("?view=work&agent=agent.nope").agentId, null);
+  assert.equal(workRouteHref({ projectId: null, view: "work", taskId: null, agentId: agent, filter: "all", libraryTab: "roles", composer: false }), `/work?view=work&agent=${agent}`);
 });
 test("auth URL scrub preserves only approved navigation and never search/draft or exchange material", () => {
   const href = sanitizedWorkLocation("/work", `?view=library&tab=design&task=${id}&filter=review&q=private+search&token=secret&description=draft&c=exchange`);
-  assert.equal(href, `/work?task=${id}&filter=review`);
-  assert.deepEqual(parseWorkRoute("?view=admin&task=../../other&filter=finished&tab=secret&new=run"), { projectId: null, view: "work", taskId: null, filter: "all", libraryTab: "roles", composer: false });
+  assert.equal(href, `/work?view=work&task=${id}&filter=review`);
+  assert.deepEqual(parseWorkRoute("?view=admin&task=../../other&filter=finished&tab=secret&new=run"), { projectId: null, view: "board", taskId: null, agentId: null, filter: "all", libraryTab: "roles", composer: false });
 });
 test("shortcuts ignore editable controls", () => {
   class Element { constructor(editable) { this.editable = editable; } closest() { return this.editable ? this : null; } }
@@ -179,9 +185,11 @@ test("an unusable minutes value is refused locally and a refused one is refused 
   }
 });
 
-test("project shell copy names Agents clearly and keeps Context guidance plain in both languages", () => {
-  assert.equal(messages.en.shell_nav_team, "Agents");
-  assert.equal(messages.ru.shell_nav_team, "Агенты");
+test("project shell copy names the Board and Tasks tabs clearly and keeps Context guidance plain in both languages", () => {
+  assert.equal(messages.en.shell_nav_board, "Board");
+  assert.equal(messages.ru.shell_nav_board, "Доска");
+  assert.equal(messages.en.shell_nav_work, "Tasks");
+  assert.equal(messages.ru.shell_nav_work, "Задачи");
   assert.doesNotMatch(messages.en.context_packs_intro, /revision|canonical|bounded/i);
   assert.doesNotMatch(messages.ru.context_packs_intro, /ревизи|канонич|огранич/i);
 });

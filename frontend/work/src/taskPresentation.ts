@@ -54,11 +54,17 @@ export function taskObservationCurrent(snapshot: TrackerSnapshot, task: TrackerT
     && task.freshness === "fresh"
     && !readinessUnconfirmed(task);
 }
-export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter, search: string): readonly TrackerTask[] {
+export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter, search: string, agentId: string | null = null): readonly TrackerTask[] {
   const attentionIds = new Set(snapshot.attention.map((item) => item.taskId));
   const query = search.trim().toLocaleLowerCase();
+  // A role's tasks: those suggested for it plus those any of its runs acted on.
+  const roleTaskIds = agentId === null ? null : new Set([
+    ...snapshot.tasks.filter((task) => task.suggestedAgentId === agentId).map((task) => task.taskId),
+    ...snapshot.runs.filter((run) => run.agentId === agentId && run.taskId !== null).map((run) => run.taskId as string)
+  ]);
   return snapshot.tasks.filter((task) => (filter === "all"
     || (filter === "attention" ? task.awaitsHuman || attentionIds.has(task.taskId) : task.taskState === filter))
+    && (roleTaskIds === null || roleTaskIds.has(task.taskId))
     && (!query || [task.title, task.roleName ?? "", task.taskId].some((value) => value.toLocaleLowerCase().includes(query))));
 }
 

@@ -24,6 +24,9 @@ type Props = {
   filter: TaskFilter;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: TaskFilter) => void;
+  /** Narrow the tracker to one role's tasks (navigation state from the board). */
+  agentId?: string | null;
+  onClearAgent?: () => void;
 };
 type TrackerTaskActionName = "request_review" | "accept_task" | "reopen_task";
 type TaskActionIntent = Readonly<{ action: TrackerTaskActionName; taskId: string; value: string | readonly string[]; key: string }>;
@@ -55,7 +58,7 @@ function trackerActionFailure(error: unknown): { code: string; safeNextActions: 
   };
 }
 
-export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange }: Props): ReactElement {
+export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange, agentId = null, onClearAgent }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
   const [taskView, setTaskView] = useState<"graph" | "list">("graph");
   const [editorEntries, setEditorEntries] = useState<TaskEditorEntries>({});
@@ -99,7 +102,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
   }, [api]);
   useEffect(() => { onObservation?.(state); }, [state, onObservation]);
   const tasks = state.kind === "ready" ? state.snapshot.tasks : [];
-  const visibleTasks = state.kind === "ready" ? filterTrackerTasks(state.snapshot, filter, search) : [];
+  const visibleTasks = state.kind === "ready" ? filterTrackerTasks(state.snapshot, filter, search, agentId) : [];
   const selectedTask = tasks.find((task) => task.taskId === selectedTaskId) ?? null;
   const actionsCurrent = writesEnabled && state.kind === "ready" && selectedTask !== null
     && taskObservationCurrent(state.snapshot, selectedTask)
@@ -298,6 +301,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
       <div className="tracker-connection" role="status">{text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}</div>
       <button type="button" className="button button-secondary button-inline" onClick={() => void load(new AbortController().signal)}>{text("task_view_refresh")}</button>
     </div>
+    {agentId !== null ? <p className="notice tracker-agent-filter" role="status">{text("tracker_agent_filter")}: <strong>{(state.kind === "ready" ? state.snapshot.tasks.find((task) => task.suggestedAgentId === agentId)?.suggestedRoleName ?? state.snapshot.runs.find((run) => run.agentId === agentId)?.roleName : null) ?? agentId}</strong>{onClearAgent ? <button type="button" className="notice-link" onClick={onClearAgent}>{text("tracker_agent_filter_clear")}</button> : null}</p> : null}
     <div className="task-view-filters" role="group" aria-label={text("task_view_filter")}>
       {PRIMARY_FILTERS.map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => onFilterChange(value)}>{text(taskFilterLabel[value])}</button>)}
       <label className="task-more-filter" htmlFor="task-more-filter">

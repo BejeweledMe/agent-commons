@@ -202,3 +202,28 @@ generated config; it never receives a YAML fragment or a path from the browser.
 - The bulk of the enforcement lives in `tests/ui/test_stream_and_packaging.py`
   with the rest of `tests/ui/` beside it; grep for the test names quoted
   above to find the exact assertions.
+
+## The project board (ADR 0020)
+
+- A project opens on its board. Role cards are standing `agent` records that are
+  neither templates nor retired; edges are `agent_link` records and
+  `reports_to` provenance from the `/api/graph` projection. The canvas never
+  draws a relation the ledger does not hold: dragging a port opens a link
+  through `POST /api/agent-links`, and the edge appears only after the graph is
+  re-read.
+- Positions and department frames are the operator's arrangement: operational
+  state behind `GET/POST /api/board`, stored under the state root, never a
+  canonical fact, never in browser storage. A lost arrangement costs an
+  auto-layout. Replacing it is compare-and-swap on the stored revision; a
+  `board_revision_conflict` is shown, not retried blindly.
+- A department frame groups roles on the board; it is not a canonical Team.
+  Applying a blueprint creates its roles and tasks and frames them once;
+  nothing starts until a task is launched. Runs from different departments
+  queue through the broker: the board says "queued", never "running", for a
+  run that has not started.
+- Every card action is an existing operation or a navigation: Conversation and
+  Results are scoped to the agent, Tasks opens the tracker narrowed by
+  `?agent=`, Give a task opens the existing Prepare run for the selected task.
+- React Flow's stylesheet ships as a file (CSP `style-src 'self'`); board
+  styling is class-based. Role activity is text plus a data attribute; green
+  is still reserved for acceptance.

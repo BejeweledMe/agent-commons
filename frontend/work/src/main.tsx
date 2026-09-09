@@ -6,6 +6,9 @@ import type { ConversationScope } from "./conversationApi.js";
 import "./conversation.css";
 import { OutputsButton, OutputsWorkspace } from "./components/OutputsPanel.js";
 import "./outputs.css";
+import "@xyflow/react/dist/style.css";
+import "./board.css";
+import { ProjectBoard } from "./components/ProjectBoard.js";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -264,6 +267,11 @@ function WorkApp(): ReactElement {
   // RAM only, and never a canonical fact: the applied mapping is kept so the
   // outcome can be read against a later tracker snapshot rather than guessed.
   const [appliedBlueprint, setAppliedBlueprint] = useState<BlueprintApplication | null>(null);
+  // Board shell state (ADR 0020): the hire panel toggle, a re-read trigger for the
+  // role graph after confirmed writes, and the application the board frames next.
+  const [hireOpen, setHireOpen] = useState(false);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
+  const [pendingApplication, setPendingApplication] = useState<{ application: BlueprintApplication; title: string } | null>(null);
   const taskRetryIdentity = useRef(new ContextPackRetryIdentity());
   const projectTransientRef = useRef(new ProjectDraftStore<ProjectTransient>());
   const currentTransientRef = useRef<Omit<ProjectTransient, "pendingLaunch" | "pendingLaunchRetry" | "taskRetry">>({
@@ -300,7 +308,7 @@ function WorkApp(): ReactElement {
     setRole((current) => ({ ...current, fromPresetId: "", specializationRef: selected?.ref ?? null,
       specializationName: selected?.name ?? "", name: current.name || selected?.name || "",
       rationale: current.rationale || selected?.description || "" }));
-    if (showTeam) navigate({ view: "team" });
+    if (showTeam) { setHireOpen(true); navigate({ view: "board" }); }
   }
 
 
@@ -556,6 +564,7 @@ function WorkApp(): ReactElement {
   async function refresh(): Promise<void> {
     clearActionError("refresh");
     await load();
+    setBoardRefreshKey((current) => current + 1);
   }
 
   function selectProject(projectId: string): void {
@@ -606,6 +615,8 @@ function WorkApp(): ReactElement {
     setTrackerObservation({ kind: "loading" });
     setLaunchOpen(false);
     setAppliedBlueprint(null);
+    setPendingApplication(null);
+    setHireOpen(false);
     return transient.selectedTaskId;
   }
 
@@ -1169,7 +1180,7 @@ function WorkApp(): ReactElement {
           onUpdate={updateProject}
         />
         <nav className="primary-navigation">
-          {(["work", "team", "library", "settings"] as const).map((view) => <a key={view}
+          {(["board", "work", "library", "settings"] as const).map((view) => <a key={view}
             aria-current={route.view === view ? "page" : undefined}
             href={workRouteHref({ ...route, view })}
             onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view }); } }}>
@@ -1206,7 +1217,7 @@ function WorkApp(): ReactElement {
           <WorkflowCard ready={false} title={text("step_run")}>
             <p className="small-copy">{text("shell_launch_help")}</p>
             <p className="launch-task-title">{taskOptions.find((option) => option.id === run.taskId)?.title ?? run.taskId}</p>
-            <button className="notice-link" type="button" onClick={() => navigate({ view: "team" })}>{text("shell_choose_team")}</button>
+            <button className="notice-link" type="button" onClick={() => { setHireOpen(true); navigate({ view: "board" }); }}>{text("shell_choose_team")}</button>
             {selectedAvailability && !selectedAvailability.launchable ? <p className="field-error" role="status">{text(availabilityRefusalMessage[selectedAvailability.refusal?.code ?? "provider_authentication_unconfirmed"])}</p> : null}
             {selectedRole && selectedAvailability === undefined ? <p className="field-error" role="status">{text("provider_availability_unavailable")}</p> : null}
             <button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_open_settings")}</button>
@@ -1371,14 +1382,24 @@ function WorkApp(): ReactElement {
             </div>
             {workspaceInitialized ? <TrackerSection api={apiRef.current} locale={locale} text={text} writesEnabled={data.meta.writesEnabled} onObservation={setTrackerObservation}
               selectedTaskId={route.taskId} onSelectTask={selectTask} onLaunchTask={prepareLaunch}
-              search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })} /> : null}
+              search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })}
+              agentId={route.agentId} onClearAgent={() => navigate({ agentId: null })} /> : null}
           </section>
-          <section hidden={route.view !== "team"} aria-label={text("shell_nav_team")} className="team-section">
-            <div className="workspace-toolbar"><p className="small-copy">{text("shell_team_intro")}</p><button className="button button-secondary button-inline" type="button" onClick={() => navigate({ view: "library", libraryTab: "blueprints" })}>{text("shell_browse_recipes")}</button></div>
-            <div className="team-task-target" role="status">
-              <p className="small-copy">{text("shell_team_target")}</p>
-              <strong>{selectedTeamTask?.title ?? text(route.taskId ? "shell_team_target_unavailable" : "shell_team_select_task")}</strong>
-            </div>
+          <section hidden={route.view !== "board"} aria-label={text("shell_nav_board")} className="board-view">
+            {workspaceInitialized ? <ProjectBoard api={renderedProjectApi} locale={locale} text={text} roles={roleOptions} tracker={trackerObservation}
+              writesEnabled={data.meta.writesEnabled && configured} refreshKey={boardRefreshKey} selectedTaskId={route.taskId}
+              onOpenTasks={(agentId) => navigate({ view: "work", agentId, composer: false })}
+              onGiveTask={(agentId) => {
+                const taskId = route.taskId;
+                if (taskId === null) { navigate({ view: "work", agentId, composer: false }); return; }
+                prepareLaunch(taskId);
+                if (pendingLaunchRef.current?.input.taskId !== taskId) setRun((current) => ({ ...current, agentId }));
+                navigate({ view: "work", composer: false });
+              }}
+              onAddDepartment={() => navigate({ view: "library", libraryTab: "blueprints" })}
+              pendingApplication={pendingApplication} onApplicationPlaced={() => setPendingApplication(null)}
+              hireOpen={hireOpen} onHireOpenChange={setHireOpen}
+              hirePanel={<>
             {lastHiredRole ? <p className="notice" role="status">{text("created_role")}: <strong>{lastHiredRole.name}</strong>{route.taskId ? <button type="button" className="notice-link" onClick={() => { if (route.taskId) { prepareLaunch(route.taskId); if (!pendingLaunchRef.current) setRun((current) => ({ ...current, agentId: lastHiredRole.id })); } }}>{text("shell_use_role")}</button> : null}</p> : null}
             <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
               <OutputsButton scope={{ kind: "agent", id: option.id }} title={option.name} />
@@ -1453,6 +1474,7 @@ function WorkApp(): ReactElement {
             </form>
             {actionFeedback("create-role")}
           </WorkflowCard>
+              </>} /> : <div className="notice setup-notice" role="status"><p>{text("workspace_needs_setup")}</p><button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_nav_settings")}</button></div>}
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
             {appliedBlueprint ? <BlueprintApplyOutcomePanel text={text} onIntent={followBlueprintIntent}
@@ -1464,6 +1486,7 @@ function WorkApp(): ReactElement {
                 // The server created roles and tasks and started nothing. Read
                 // the refreshed snapshot before offering any next step.
                 setAppliedBlueprint(application);
+                setPendingApplication({ application, title: application.blueprintId });
                 void refresh();
               }}
               tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })}
@@ -1473,7 +1496,7 @@ function WorkApp(): ReactElement {
                   setState((current) => current.kind === "ready" ? { ...current, data: updated } : current);
                 }
               }}
-              onChooseTeam={() => navigate({ view: "team" })} /> : <p>{text("workspace_needs_setup")}</p>}
+              onChooseTeam={() => { setHireOpen(true); navigate({ view: "board" }); }} /> : <p>{text("workspace_needs_setup")}</p>}
           </section>
           <section hidden={route.view !== "settings"} aria-label={text("shell_nav_settings")} className="settings-section">
           <WorkflowCard ready={environmentReady} title={text("step_environment")}>

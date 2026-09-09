@@ -35,6 +35,7 @@ from agent_commons.runtime.live_previews import LivePreviewRegistry
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
 from agent_commons.services.design_authoring import publish_from_selection, revise_from_selection
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
+from agent_commons.ui.board_layout import BoardLayoutStore, register_board_routes
 from agent_commons.ui.context import (
     LAUNCH_NOT_CONFIGURED,
     PANEL_ALREADY_OPEN_ACTIONS,
@@ -156,6 +157,9 @@ MUTATING_ROUTES = (
 #: Authentication and read-only registration still seal this operational surface.
 PRIVATE_COLLABORATION_ROUTES = (
     ("POST", "/api/outputs/live-previews"),
+    # The project board arrangement (ADR 0020): positions and department frames,
+    # operational state under the state root, never a canonical fact.
+    ("POST", "/api/board"),
     ("POST", "/api/conversations/{thread_id}/drafts"),
     ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments"),
     ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments/{attachment_id}/remove"),
@@ -612,6 +616,21 @@ def create_app(
         writer_factory=context.writer,
         authorize_publish=lambda: context.writer(),
         write_dependencies=reads_workspace,
+        register_writes=context.operator_panel and not read_only,
+    )
+
+    def board_layout_store() -> BoardLayoutStore:
+        manager = context.manager()
+        return BoardLayoutStore(
+            collaboration_state_root(manager),
+            project_root=manager.repo_root,
+            workspace_id=manager.workspace_id,
+        )
+
+    register_board_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        store_factory=board_layout_store,
         register_writes=context.operator_panel and not read_only,
     )
 
