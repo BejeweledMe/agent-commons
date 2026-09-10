@@ -13,7 +13,6 @@ from typing import Any
 from conftest import PORT, authorized
 from fastapi.testclient import TestClient
 
-from agent_commons.integrations.starter_packs import STARTER_PACK_ALLOWED_SKILL_REFS
 from agent_commons.runtime import (
     AttemptStore,
     DesignPackageBindingStore,
@@ -29,6 +28,14 @@ from agent_commons.ui.context import UIContext
 from agent_commons.ui.server import create_app
 from agent_commons.ui.tracker_reads import build_tracker_snapshot
 from agent_commons.ui.tracker_routes import MAX_TRACKER_FRAME_BYTES, tracker_events
+
+PACKAGED_WORKFLOW_SKILL_REFS = (
+    "commons-start",
+    "commons-coordinate",
+    "commons-share",
+    "commons-review",
+    "commons-record",
+)
 
 SCREEN_ID = "screen." + "0" * 25 + "1"
 
@@ -191,7 +198,7 @@ def _work_context(
                         "description": "packaged Agent Commons test skill",
                         "instruction": f"Use packaged skill {skill_id}.",
                     }
-                    for skill_id in sorted(STARTER_PACK_ALLOWED_SKILL_REFS)
+                    for skill_id in sorted(PACKAGED_WORKFLOW_SKILL_REFS)
                 ],
                 "tools": [],
             },
@@ -495,33 +502,48 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
         )
         assert claude_available["launchable"] is True
 
+        plan = next(
+            item
+            for item in client.get("/api/library/blueprints", headers=authorized()).json()[
+                "blueprints"
+            ]
+            if item["id"] == "feature-delivery"
+        )
         applied = client.post(
-            "/api/work/starter-packs/starter.feature-delivery.mock/blueprints/"
-            "feature-delivery/apply",
-            json={"confirmed": True, "idempotency_key": "j1-starter-pack"},
-            headers=authorized(),
-        )
-        assert applied.status_code == 200, applied.text
-        template = next(
-            role for role in applied.json()["roles"] if role["source_role_id"] == "implementer"
-        )
-        hired = client.post(
-            "/api/agents",
+            "/api/library/blueprints/feature-delivery/apply",
             json={
-                "name": "J1 implementer",
-                "rationale": "execute only dependency-ready scoped tasks",
-                "from_preset_id": template["agent_id"],
-                "idempotency_key": "j1-hire-implementer",
+                "title": "Feature delivery",
+                "brief": "Implement and independently review one bounded change.",
+                "locale": "en",
+                "expected_version": plan["version"],
+                "idempotency_key": "j1-feature-delivery",
+                "bindings": [
+                    {
+                        "slot_id": slot["id"],
+                        "profile_id": "claude-builder",
+                        "model": None,
+                        "name": slot["name"],
+                    }
+                    for slot in plan["slots"]
+                ],
             },
             headers=authorized(),
         )
-        assert hired.status_code == 200, hired.text
-        role_id = str(hired.json()["entity_ref"]["id"])
+        assert applied.status_code == 200, applied.text
+        role_id = str(
+            next(
+                row["agent_id"]
+                for row in applied.json()["roles"]
+                if row["slot_id"] == "delivery-tech-lead"
+            )
+        )
         role = manager.get_agent(role_id)
         assert role["template"] is False
         assert role["profile_id"] == "claude-builder"
-        assert tuple(role["skills"]) == tuple(template["skills"])
-        assert {"commons-start", "commons-coordinate", "commons-record"} <= set(role["skills"])
+        # A specialization agent carries no runtime skills (domain rule); the workflow
+        # skill is mandated by the delegation instruction at launch instead.
+        assert list(role.get("skills", [])) == []
+        assert role["specialization_ref"]["id"] == "delivery-tech-lead"
 
         unresolved = _create_task(client, title="Unresolved prerequisite")
         blocked = _create_task(
@@ -676,10 +698,11 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
         assert manager.get_delegation(launched.json()["delegation_id"])["state"] == "succeeded"
         assert runner.invocations
         stdin = runner.invocations[-1].stdin.decode("utf-8")
-        assert "Provider-projected packaged skills" in stdin
-        assert "commons-start" in stdin
-        assert "commons-coordinate" in stdin
-        assert "commons-record" in stdin
+        # A specialization agent carries no runtime skills, so no packaged skill
+        # bundle is projected; the delegation instruction itself mandates the
+        # workflow entry skill for every launched worker.
+        assert "Provider-projected packaged skills" not in stdin
+        assert "use commons-start" in stdin
 
         reconnect_gap = _frame_payload(
             _drive_tracker_frame(source, resume_after=succeeded_payload["sequence"] + 10)
@@ -800,7 +823,6 @@ def test_integrated_work_operator_journey_is_truthful_and_review_gated(
             missing_availability,
             availability,
             applied.json(),
-            hired.json(),
             tracker,
             refused_launch.json(),
             launch_payload,

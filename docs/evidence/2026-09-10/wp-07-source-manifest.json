@@ -1,0 +1,54 @@
+{
+  "work_package": "WP-07",
+  "task": "task.35A1RZJPHAMB954YP2DPD6NAPD",
+  "delegation": "delegation.670XA5PP26C1MGR3C2P31H0W2V",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "af2a66afb9083bad855922398e692c632538eb649335c6c73be62e3408711cc1"
+    },
+    {
+      "path": "frontend/work/src/mutationRegistry.ts",
+      "sha256": "4ece81c3c727498a0ba869785e3fa0da7c46af127b40432ed376619c65b221f9"
+    },
+    {
+      "path": "frontend/work/src/components/MutationFeedback.tsx",
+      "sha256": "577f2778dc1a3d9fa7c286741161d72098eef67b2b9c61688f95afc248b2e0bc"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "cce950de252e2c66813d192a6ccf585eec01169e86927fac639f80e385d4c8a6"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "9bfc074a79f9ac3f443cc4a7faab48ff586afda6668490f1ee34ce6240ba014d"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "999bdff8071b9f63325877e3f87bbee4d010976121ece820855841d7bfc9686e"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "d5ff10111a96904b2501155a6d9eb8be402457ccaa01687724811ba595836027"
+    },
+    {
+      "path": "frontend/work/tests/mutation-registry.test.mjs",
+      "sha256": "46392ba123e7183e13a5faaba97feae6214491ddd34181999f2c9b2dad1f464e"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "298 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken; browser check deferred to the wave-end asset integration"
+  },
+  "notes": [
+    "Worker sandbox refused node/tsc; coordinator ran both gates",
+    "MutationFeedback.tsx is a new component outside the original claim set, claimed afterwards (claim.6c67ac99d46347598adaa6422ee5042c); TaskComposer.tsx was claimed but not changed",
+    "i18n.json and styles.css hashes include the accepted WP-14, WP-02 and WP-02.2 changes",
+    "2 s / 8 s thresholds are presentation hints per owner decision 8.7, not performance assertions"
+  ]
+}

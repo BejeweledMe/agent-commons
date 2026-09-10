@@ -1,0 +1,63 @@
+{
+  "work_package": "WP-14",
+  "task": "task.7YK7EV8NJ8P8K3F7789PMDVVM5",
+  "delegation": "delegation.7JJYWE92A5ME2T4GBTKAX2NDQE",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/components/SkillGroups.tsx",
+      "sha256": "06e7783281aab7ec2c203e54a411008ad15680ce4ead222a5a9c69942710048e"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintDefinitionEditor.tsx",
+      "sha256": "9c4a0bb5b64da675519a1e48248874cc16e248c4937187ed1a034fd8a21700f1"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintAuthoring.tsx",
+      "sha256": "b89e1a8add33199da8983491b0696fe34978c3be2065dd99e2795c70b7640942"
+    },
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "sha256": "c0fd0db50c5bfd97610958e37744935fa404dcd89f9fb799edac418e72627bad"
+    },
+    {
+      "path": "frontend/work/src/libraryAuthoringState.ts",
+      "sha256": "e0a8b67dd596a51a0c245d8bb4c67b583cfe4295770f85de016fa8cd95a2cb07"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "074e9dd55cc86715f63a0e0636866a4345090e80689e132d0857030dee83b8ee"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "83f7f80147447a7bc5abcfaeb25aec9722bcc91b98f3c9da829309d1d1a907f4"
+    },
+    {
+      "path": "frontend/work/tests/library-authoring.test.mjs",
+      "sha256": "2deaab07b6bb851c96dc00cfc215aebea53cc98aacd70b00dc353120e28a4fb0"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "80aa1745f9af7e05052391d7335694062000a701e9c19cb955c4854b9be1d80f"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "0d4786af7246e2a77a0909fb39ce6aea72e18afc90316632529ac4961b4103c6"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "275 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only); bundle-parity test expected to fail until the wave-end asset rebuild",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken"
+  },
+  "notes": [
+    "Run 1 (delegation.654P0M1BVB5EH25WXHNYYVFVWK) stopped after 5 minutes on the provider usage limit with a partial checkpoint; run 2 finished on top of it",
+    "Worker sandbox refused node/tsc; coordinator ran both gates",
+    "Coordinator fixed four test assertions written by the worker: React renders maxLength (case) and the shared bilingual fixture now legitimately reads as a legacy record, so validation tests start from single-text drafts",
+    "WorkBlueprintsSection.tsx was touched outside the original claim set (removal of the locale prop) and claimed afterwards (claim.82cb3cbfaed74c34a911d471203d64e2)",
+    "Three unused keys removed from i18n.json in both locales: library_name_en, library_name_ru, library_text_language"
+  ]
+}

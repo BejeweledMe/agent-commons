@@ -51,14 +51,16 @@ class MetadataFile:
         if not path.exists() and not path.is_symlink():
             return {"schema": self.schema, **{key: {} for key in self.empty}, "receipts": {}}
         value = self.store._read(path, MAX_SIDECAR_BYTES)
+        allowed = {"schema", "receipts", *self.empty}
         if (
             not isinstance(value, dict)
-            or set(value) != {"schema", "receipts", *self.empty}
+            or not {"schema", "receipts"} <= set(value) <= allowed
             or value["schema"] != self.schema
-            or any(not isinstance(value[key], dict) for key in (*self.empty, "receipts"))
+            or any(not isinstance(value[key], dict) for key in (set(value) - {"schema"}))
             or len(value["receipts"]) > MAX_OPERATIONS
         ):
             _refuse("Library metadata storage is invalid.", "library_storage_refused", 409)
+        value = {**{key: {} for key in self.empty}, **value}
         for key, receipt in value["receipts"].items():
             expected(key)
             if not isinstance(receipt, dict) or set(receipt) != {"request", "result"}:
@@ -138,28 +140,51 @@ class SkillOrganization:
             store,
             "skill-organization.json",
             "agent_commons.skill-organization-state.v1",
-            {"groups": {}, "assignments": {}},
+            {"groups": {}, "assignments": {}, "archived": {}},
         )
 
     def _catalog(self, state: dict[str, Any], skills: list[dict[str, Any]]) -> dict[str, Any]:
         if len(state["groups"]) > 128 or len(state["assignments"]) > 600:
             _refuse("Library organization exceeds its limits.")
         groups = [
-            {"id": key, "name": {"en": names[0], "ru": names[1]}, "source": "builtin"}
+            {
+                "id": key,
+                "name": {"en": names[0], "ru": names[1]},
+                "source": "builtin",
+                "archived": False,
+            }
             for key, names in _GROUPS.items()
         ]
+        archived = state["archived"]
+        if not isinstance(archived, dict):
+            _refuse("Library skill organization is invalid.")
         for key, name in sorted(state["groups"].items()):
             identifier(key)
             if key in _GROUPS:
                 _refuse("Built-in groups cannot be replaced.")
-            groups.append({"id": key, "name": translated(name, 800), "source": "custom"})
+            if key in archived and archived[key] is not True:
+                _refuse("Library skill organization is invalid.")
+            groups.append(
+                {
+                    "id": key,
+                    "name": translated(name, 800),
+                    "source": "custom",
+                    "archived": archived.get(key, False),
+                }
+            )
+        if set(archived) - set(state["groups"]):
+            _refuse("Library skill organization is invalid.")
         group_ids = {group["id"] for group in groups}
         for key, group_id in state["assignments"].items():
             parts = key.split(":")
             if len(parts) != 2 or parts[0] not in ("builtin", "custom"):
                 _refuse("Library skill organization is invalid.")
             identifier(parts[1])
-            if type(group_id) is not str or group_id not in group_ids:
+            if (
+                type(group_id) is not str
+                or group_id not in group_ids
+                or archived.get(group_id, False)
+            ):
                 _refuse("Library skill group is unavailable.")
         assignments = []
         defaults = {skill: group for group, names in _DEFAULTS.items() for skill in names.split()}
@@ -207,6 +232,8 @@ class SkillOrganization:
                 key = identifier(body["id"])
                 if key in _GROUPS:
                     _refuse("Built-in groups are immutable.")
+                if state["archived"].get(key, False):
+                    _refuse("Library group is unavailable.")
                 state["groups"][key] = translated(body["name"], 800)
             else:
                 skill = body["skill"]
@@ -218,9 +245,65 @@ class SkillOrganization:
                 ):
                     _refuse("Library skill is unavailable.")
                 group_id = identifier(body["group_id"])
-                if not any(row["id"] == group_id for row in current["groups"]):
+                if not any(
+                    row["id"] == group_id and not row["archived"] for row in current["groups"]
+                ):
                     _refuse("Library group is unavailable.")
                 state["assignments"][f"{skill['source']}:{skill['id']}"] = group_id
+            return self._catalog(state, skills)
+
+        return self.file.mutate(request, body["idempotency_key"], change)
+
+    def archive(self, group_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        group_id = identifier(group_id)
+        fields = {"expected_revision", "archived", "idempotency_key"}
+        if (
+            set(body) not in (fields, fields | {"move_to_group_id"})
+            or type(body["archived"]) is not bool
+        ):
+            _refuse("Library organization archive has an invalid shape.")
+        expected(body["expected_revision"])
+        move_to = body.get("move_to_group_id")
+        if move_to is not None:
+            move_to = identifier(move_to)
+        request = {
+            "operation": "archive",
+            "group_id": group_id,
+            **{key: value for key, value in body.items() if key != "idempotency_key"},
+        }
+
+        def change(state: dict[str, Any]) -> dict[str, Any]:
+            skills = self.store.catalog()["skills"]
+            current = self._catalog(state, skills)
+            if current["revision"] != body["expected_revision"]:
+                _refuse(
+                    "Library organization changed. Reload before saving.",
+                    "library_revision_conflict",
+                    409,
+                )
+            if group_id in _GROUPS:
+                _refuse("Built-in groups are immutable.")
+            if group_id not in state["groups"]:
+                _refuse("Library group is unavailable.")
+            if not body["archived"]:
+                if not state["archived"].get(group_id, False):
+                    return current
+                state["archived"].pop(group_id, None)
+                return self._catalog(state, skills)
+            if state["archived"].get(group_id, False):
+                return current
+            members = [key for key, value in state["assignments"].items() if value == group_id]
+            if move_to is not None and not any(
+                row["id"] == move_to and not row["archived"] and move_to != group_id
+                for row in current["groups"]
+            ):
+                _refuse("Library group is unavailable.")
+            if members and move_to is None:
+                _refuse("Library group has members; choose a group to move them to.")
+            if move_to is not None:
+                for key in members:
+                    state["assignments"][key] = move_to
+            state["archived"][group_id] = True
             return self._catalog(state, skills)
 
         return self.file.mutate(request, body["idempotency_key"], change)

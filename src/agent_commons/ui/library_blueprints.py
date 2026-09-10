@@ -1,4 +1,8 @@
-"""Five small, explicit workflow plans over service-owned specializations."""
+"""Seven small, explicit workflow plans over service-owned specializations.
+
+Five original plans plus the two migrated from the former Starter Packs on
+2026-09-10 (``feature-delivery`` and ``product-discovery``).
+"""
 
 from __future__ import annotations
 
@@ -261,6 +265,56 @@ def _definitions() -> list[dict[str, Any]]:
                     "sre-engineer",
                     "regression",
                     "security",
+                ),
+            ],
+        },
+        {
+            "id": "feature-delivery",
+            "name": _text("Feature delivery", "Реализация функции"),
+            "description": _text(
+                "Plan, implement, then independently review a bounded change. "
+                "Suggested profiles: claude-builder and claude-independent-reviewer.",
+                "Спланировать, реализовать и независимо проверить ограниченное изменение. "
+                "Рекомендуемые профили: claude-builder и claude-independent-reviewer.",
+            ),
+            "tasks": [
+                _node(
+                    "implementer",
+                    "Implement the scoped change",
+                    "Реализовать согласованное изменение",
+                    "delivery-tech-lead",
+                ),
+                _node(
+                    "independent-reviewer",
+                    "Independently review the change",
+                    "Независимо проверить изменение",
+                    "qa-engineer",
+                    "implementer",
+                ),
+            ],
+        },
+        {
+            "id": "product-discovery",
+            "name": _text("Product discovery", "Продуктовое исследование"),
+            "description": _text(
+                "Gather evidence, then review a recommendation before an owner decides. "
+                "Suggested profiles: claude-builder and claude-independent-reviewer.",
+                "Собрать доказательства, затем проверить рекомендацию до решения владельца. "
+                "Рекомендуемые профили: claude-builder и claude-independent-reviewer.",
+            ),
+            "tasks": [
+                _node(
+                    "researcher",
+                    "Research the product question",
+                    "Исследовать продуктовый вопрос",
+                    "product-manager",
+                ),
+                _node(
+                    "product-reviewer",
+                    "Review the evidence and recommendation",
+                    "Проверить доказательства и рекомендацию",
+                    "strategy-advisor",
+                    "researcher",
                 ),
             ],
         },

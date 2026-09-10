@@ -319,7 +319,8 @@ def test_builtin_hashes_keep_the_pre_metadata_identity_formula(tmp_path):
     plans = blueprint_catalog(LibraryStore(tmp_path / "library"), include_custom=False)[
         "blueprints"
     ]
-    assert len(plans) == 5
+    # Five original built-ins plus the two migrated from the former Starter Packs.
+    assert len(plans) == 7
     for plan in plans:
         original_payload = {
             key: value

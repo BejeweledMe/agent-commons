@@ -19,7 +19,6 @@ from typing import Any
 import pytest
 
 from agent_commons.errors import ConfigurationError
-from agent_commons.integrations.starter_packs import STARTER_PACK_ALLOWED_SKILL_REFS
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -42,6 +41,14 @@ from tests.ui.conftest import (
     authorized,
     expected_surface,
     mutating_surface,
+)
+
+PACKAGED_WORKFLOW_SKILL_REFS = (
+    "commons-start",
+    "commons-coordinate",
+    "commons-share",
+    "commons-review",
+    "commons-record",
 )
 
 #: Every field the run surface publishes, exactly.  Asserted as an equality so a
@@ -240,7 +247,7 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
                         "description": "packaged Agent Commons test skill",
                         "instruction": f"Use packaged skill {skill_id}.",
                     }
-                    for skill_id in sorted(STARTER_PACK_ALLOWED_SKILL_REFS)
+                    for skill_id in sorted(PACKAGED_WORKFLOW_SKILL_REFS)
                 ],
                 "tools": [],
             },
@@ -394,37 +401,48 @@ def test_the_panel_launches_a_role_on_a_task_end_to_end(
     assert delegation["agent_id"] == fixture["role_id"]
 
 
-def test_applied_starter_pack_template_can_be_hired_and_launched(
+def test_applied_feature_delivery_blueprint_can_be_launched(
     workspace: dict[str, Any],
 ) -> None:
-    """A Starter Pack role is a canonical preset, not a launch-only shortcut."""
+    """A migrated built-in workflow role remains launchable."""
 
     fixture = _launch_workspace(workspace)
     context: UIContext = fixture["context"]
 
     with _client(context) as client:
+        plan = next(
+            item
+            for item in client.get("/api/library/blueprints", headers=authorized()).json()[
+                "blueprints"
+            ]
+            if item["id"] == "feature-delivery"
+        )
         applied = client.post(
-            "/api/work/starter-packs/starter.feature-delivery.mock/blueprints/"
-            "feature-delivery/apply",
-            json={"confirmed": True, "idempotency_key": "launch-starter-pack-apply"},
-            headers=authorized(),
-        )
-        assert applied.status_code == 200, applied.text
-        template = next(
-            role for role in applied.json()["roles"] if role["source_role_id"] == "implementer"
-        )
-        hired = client.post(
-            "/api/agents",
+            "/api/library/blueprints/feature-delivery/apply",
             json={
-                "name": "Feature implementer",
-                "rationale": "hire the Starter Pack preset for this task",
-                "from_preset_id": template["agent_id"],
-                "idempotency_key": "launch-starter-pack-hire",
+                "title": "Feature delivery",
+                "brief": "Implement and independently review one bounded change.",
+                "locale": "en",
+                "expected_version": plan["version"],
+                "idempotency_key": "launch-feature-delivery",
+                "bindings": [
+                    {
+                        "slot_id": slot["id"],
+                        "profile_id": "claude-builder",
+                        "model": None,
+                        "name": slot["name"],
+                    }
+                    for slot in plan["slots"]
+                ],
             },
             headers=authorized(),
         )
-        assert hired.status_code == 200, hired.text
-        agent_id = hired.json()["entity_ref"]["id"]
+        assert applied.status_code == 200, applied.text
+        agent_id = next(
+            row["agent_id"]
+            for row in applied.json()["roles"]
+            if row["slot_id"] == "delivery-tech-lead"
+        )
         launched = client.post(
             "/api/delegations",
             json={"agent_id": agent_id, "task_id": fixture["task_id"]},

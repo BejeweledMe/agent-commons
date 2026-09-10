@@ -133,7 +133,7 @@ export function parseBlueprintApplication(value: unknown, expectedId: string): B
 export function parseSkillOrganization(value: unknown, skills?: readonly LibraryItem[]): SkillOrganization {
   const raw = object(value);
   if (raw.schema !== "agent_commons.skill-organization.v1" || typeof raw.revision !== "string" || !digest.test(raw.revision)) return fail();
-  const groups = list(raw.groups, 136).map((value) => { const group = object(value); if (group.source !== "builtin" && group.source !== "custom") return fail(); return { id: identifier(group.id), name: translated(group.name), source: group.source as "builtin" | "custom" }; });
+  const groups = list(raw.groups, 136).map((value) => { const group = object(value); if ((group.source !== "builtin" && group.source !== "custom") || (group.archived !== undefined && typeof group.archived !== "boolean")) return fail(); return { id: identifier(group.id), name: translated(group.name), source: group.source as "builtin" | "custom", archived: group.archived ?? false }; });
   if (new Set(groups.map((group) => group.id)).size !== groups.length) return fail();
   const assignments = list(raw.assignments, 600).map((value) => { const item = object(value); if ((item.source !== "builtin" && item.source !== "custom") || !groups.some((group) => group.id === item.group_id)) return fail(); return { source: item.source as "builtin" | "custom", id: identifier(item.id), group_id: identifier(item.group_id) }; });
   const identities = new Set(assignments.map((item) => `${item.source}:${item.id}`));
@@ -181,6 +181,11 @@ export class LibraryApi {
   async moveSkill(input: { skill: { source: "builtin" | "custom"; id: string }; group_id: string; expected_revision: string }, key: string, signal: AbortSignal): Promise<SkillOrganization> {
     identifier(input.skill.id); identifier(input.group_id);
     return parseSkillOrganization(await this.api.requestData("/library/organization/move", { method: "POST", signal, body: { ...input, idempotency_key: key } }));
+  }
+  async archiveSkillGroup(id: string, input: { expected_revision: string; archived: boolean; move_to_group_id?: string }, key: string, signal: AbortSignal): Promise<SkillOrganization> {
+    identifier(id);
+    if (input.move_to_group_id !== undefined) identifier(input.move_to_group_id);
+    return parseSkillOrganization(await this.api.requestData(`/library/organization/groups/${id}/archive`, { method: "POST", signal, body: { ...input, idempotency_key: key } }));
   }
   async saveBlueprint(input: BlueprintSave, key: string, signal: AbortSignal): Promise<WorkBlueprint> {
     identifier(input.id);

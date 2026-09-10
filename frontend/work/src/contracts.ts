@@ -273,59 +273,6 @@ export type WorkspaceData = {
   providerAvailability: readonly ProviderAvailability[];
 };
 
-export type StarterPackSourceKind = "bundled";
-
-export type StarterPackContextMode = "fresh";
-
-export type StarterPackRole = {
-  id: string;
-  name: string;
-  purpose: string;
-  profileId: string;
-  contextMode: StarterPackContextMode;
-  skills: readonly string[];
-};
-
-export type StarterPackBlueprint = {
-  id: string;
-  title: string;
-  summary: string;
-  roles: readonly StarterPackRole[];
-};
-
-export type StarterPack = {
-  id: string;
-  version: string;
-  title: string;
-  summary: string;
-  sourceKind: StarterPackSourceKind;
-  example: true;
-  blueprints: readonly StarterPackBlueprint[];
-};
-
-export type StarterPackCatalog = {
-  packs: readonly StarterPack[];
-};
-
-export type AppliedStarterPackRole = {
-  sourceRoleId: string;
-  agentId: string;
-  revision: string;
-  name: string;
-  profileId: string;
-  contextMode: StarterPackContextMode;
-  template: true;
-  grants: Readonly<Record<string, "deny">>;
-  skills: readonly string[];
-};
-
-export type StarterPackApplyResult = {
-  packId: string;
-  blueprintId: string;
-  applied: true;
-  roles: readonly AppliedStarterPackRole[];
-};
-
 export type Failure = {
   code: string;
   title: string;

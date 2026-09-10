@@ -1,0 +1,81 @@
+{
+  "work_package": "WP-16.1",
+  "task": "task.4KB6R9GK67FZB6Q2ZBHN9NWWCP",
+  "delegation": "delegation.2AK3M88JGRQZMZ7CAAXYCQVVE6",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/library_blueprints.py",
+      "sha256": "6ff5892221778a5d8b23901d3fa6e3fc0643016006198072aa09f419547c4586"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "1de90af28fc718e62c76091b96a67c31e481536da0e4b72b8101b99952e66c4d"
+    },
+    {
+      "path": "src/agent_commons/ui/actions.py",
+      "sha256": "2c5692ba74cb787812a56a8ac7175746a215b340d99afc0906f18c6fbac1a1b4"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "9b86c7bc3ca4a785693525667a1ae0c393b5d24105947c62563c3bf1cc5606f2"
+    },
+    {
+      "path": "tests/ui/test_starter_pack_migration.py",
+      "sha256": "1e397e5c0120617fa846cd5a9005c8c54cd7d8fb40bd061b75b50e8d3b913f09"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "e655ade8841eeee15fd6c85afc8787fc79c79254db4a44e91187e83033996395"
+    },
+    {
+      "path": "tests/ui/test_work_operator_journey.py",
+      "sha256": "4c0968331e343e32534cf94af0fb9ced70915d9ed186b44789ce5f5c7fc2503d"
+    },
+    {
+      "path": "tests/ui/test_readonly_invariant.py",
+      "sha256": "4ff97c34ed8cd7a2b52eaecae67b7a60117541747671accc180969f6a2773d20"
+    },
+    {
+      "path": "tests/ui/test_custom_library_blueprints.py",
+      "sha256": "f2027f4f422434326432d68697c7d7e98d03cbf939e81ad2c0b950c82cb69ebb"
+    },
+    {
+      "path": "tests/ui/test_library_blueprints.py",
+      "sha256": "ea9195872152fa4b8a5c288d3740b57ac7d58ef4ae66925cec16c887d449385d"
+    },
+    {
+      "path": "tests/ui/test_profile_choice_and_link_offer.py",
+      "sha256": "435ba2c79a151a57d338575e839f9d5993e2d817b04cfe6d1ce3bcab7f723511"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "sha256": "75f4aa7a7bb9e4e24732d0ddfe7c4df6471726666ee0219c9775a86d161135f4"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "sha256": "fbbb00dfc8b92802e81ceab6952810d5993787d23542f12f6e4aab316dc271da"
+    },
+    {
+      "path": "docs/current-product-and-architecture.md",
+      "sha256": "59ebbc7e08ad37801b0c4449c34723e2ac75cc1137fee6544f7041ab897c4b93"
+    }
+  ],
+  "verification": {
+    "pytest_named": "tests/ui/test_starter_pack_migration.py + test_launch.py + test_work_operator_journey.py + test_readonly_invariant.py + test_custom_library_blueprints.py + test_library_routes.py + test_library_blueprints.py: 87 passed",
+    "pytest_full": "tests (except benchmarks): 2582 passed, 13 skipped, 1 failed = test_work_app_contract bundle-parity, expected until the wave-end asset rebuild",
+    "ruff": "check and format clean for src and tests",
+    "import": "python -c import agent_commons.ui.server ok",
+    "grep": "no starter mention left in src except the unrelated word in domain/lifecycle.py; tests mention the former packs only in the migration docstring and comments",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "Deleted (not hashable, absent from the file list): src/agent_commons/integrations/starter_packs/{__init__,bundled,manifest}.py, src/agent_commons/ui/{starter_packs,starter_pack_routes,starter_pack_dtos}.py, src/agent_commons/resources/starter_packs/** (registry, two manifests, two payloads), tests/integrations/test_starter_packs.py, tests/ui/test_starter_pack_routes.py, tests/ui/test_work_starter_packs_ui.py",
+    "Run 1 (delegation.61JZ22ZFDCH8FWANGWWD9J6AAC) stopped without changes on the skill-ref parity question; run 2 delivered the migration and removal and exited input_needed asking the coordinator to run pytest",
+    "Coordinator reverted the worker relaxation of domain/roles.py validate_specialization_selection and of resources/schemas/domain/agent.v2.schema.json (specialization agents carry no runtime skills; the delegation instruction mandates commons-start), removed the per-slot runtime-skills injection from apply, restated the parity test on specializations and counts, adapted the journey test launch assertion, updated the built-in blueprint count (7) and the mutating-route count (27)",
+    "Role mapping: implementer -> delivery-tech-lead, independent-reviewer -> qa-engineer, researcher -> product-manager, product-reviewer -> strategy-advisor (existing built-in roles, no new packaging)",
+    "Extra paths touched outside the claim set and claimed afterwards: tests/ui/test_library_blueprints.py, tests/ui/test_profile_choice_and_link_offer.py (claim.444109a9843c4ee8b302b63c1282e440)",
+    "The uv tool was reinstalled after removing a stale build/ tree that kept shipping the deleted modules; all four profiles re-qualified"
+  ]
+}

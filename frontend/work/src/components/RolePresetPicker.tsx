@@ -22,7 +22,7 @@ export function RolePresetPicker({ presets, value, onChange, text }: {
       </select>
       <p className="small-copy" id="role-preset-help">{text("role_preset_help")}</p>
       {selected ? <p className="small-copy" role="status">
-        {text("starter_packs_skills_label")}: {selected.skills.map((skill) => (
+        {text("library_skills")}: {selected.skills.map((skill) => (
           <code key={skill} className="skill-chip">{skill}</code>
         ))}
       </p> : null}

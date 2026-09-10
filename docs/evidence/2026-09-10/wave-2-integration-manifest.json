@@ -1,0 +1,285 @@
+{
+  "work_package": "WAVE-2",
+  "task": "wave-2",
+  "delegation": "coordinator",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "benchmarks/benchmark_work_mutation.py",
+      "sha256": "2fb9eddb8e779abf1d9cf554a414e012522d48e4d3cd1002db218a4068253917"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "851d531b8d604d1edc2ae05533f1ea1d457a72db92fac5d374c2553c974a9417"
+    },
+    {
+      "path": "docs/adr/0021-objective-blueprint-application-provenance.md",
+      "sha256": "621329b95fdbf237520d472a75c31830acce47d239854cbcd943a83fd80bea52"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "1f6f60a49a5a08f48017aeb95917e3702aebba75d09fbb1930ac985ed18d11ff"
+    },
+    {
+      "path": "docs/current-product-and-architecture.md",
+      "sha256": "59ebbc7e08ad37801b0c4449c34723e2ac75cc1137fee6544f7041ab897c4b93"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-02-source-manifest.json",
+      "sha256": "5222fe06e93b319e43f97e6b943b17c2859192df58a565b72e540034ca6db7cd"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-02.2-source-manifest-v2.json",
+      "sha256": "de287cd7514d88943d314c8790a0a45064b52a6cf9355b2b3ce9d1a875949ae5"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-02.2-source-manifest.json",
+      "sha256": "498573d1469ba678a58970b6aa250c9dd74446b5e219bc6f31024947e2d2d5e6"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-07-source-manifest-v2.json",
+      "sha256": "8ea1a86c267621a8a3fa4f849d2f11ae3c69c2971e42eb627f0aa3e1f40336e5"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-07-source-manifest-v3.json",
+      "sha256": "15cdcf5cca5e36899797d1762f4226a7aeed547cef8001d3e07a1fb6e15282bc"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-07-source-manifest.json",
+      "sha256": "4a846a14a214aa8d1138824c0bdcad4dc13418ff62245dbf1ba55fbb7fc24102"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-08-source-manifest.json",
+      "sha256": "46f88f8e588c9ed2f8d3ea8b9f754c64068c89c99354bb66fd41cd9f053bd968"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-11.1-source-manifest-v2.json",
+      "sha256": "2ebf608560cee23e82ade78c1d67d0bbc7d2c863573750da1af38bd0e6c175aa"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-11.1-source-manifest.json",
+      "sha256": "4fe86e96243520fe266898e399e991611b4066b895fea8238e87518965a70d81"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-14-source-manifest.json",
+      "sha256": "99f5c83be435615c18309de5286832a27984d3c1437872dae734775d86b33580"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-16.1-source-manifest-v2.json",
+      "sha256": "df097efee31df99d4cf2788624b53878e375d2289095ffa73d4dbe4941d33bcc"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-16.1-source-manifest.json",
+      "sha256": "e0068cb2e6434d9e2ea56068efd48ab05d5b9eddda1cff9a4fe939c37a4dc1aa"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-16.2-source-manifest.json",
+      "sha256": "977ca79817fc1101599e7d90e21d1db8a21d318abffddccefe931f1389d07702"
+    },
+    {
+      "path": "docs/performance/2026-09-10-mutation-baseline.md",
+      "sha256": "656e0b429d305cc94cbf9ac90a61261b2974ea520a667f8db7b48733fbf57168"
+    },
+    {
+      "path": "docs/plans/2026-09-09-ux-closure-tech-plan.md",
+      "sha256": "27386cff3c69cd62344ca6f0f0a2a62cfe64d74be25655396f58fa64e2fb6f64"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "sha256": "10f5989977b9949ede45aa9753f82603347ee032b809e06789648899cb93fa14"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "sha256": "8e8be156666a52d180d115b65d7ae12864281180c048c63b09c97ac995246615"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "3e0e44c304a0ae870458221e2e991db39678493b36226c8f0a9baa103bb123e8"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintAuthoring.tsx",
+      "sha256": "b89e1a8add33199da8983491b0696fe34978c3be2065dd99e2795c70b7640942"
+    },
+    {
+      "path": "frontend/work/src/components/BlueprintDefinitionEditor.tsx",
+      "sha256": "9c4a0bb5b64da675519a1e48248874cc16e248c4937187ed1a034fd8a21700f1"
+    },
+    {
+      "path": "frontend/work/src/components/LibrarySection.tsx",
+      "sha256": "72e86b9929918489b1e7eaee182f39694327a279fb5260e6ad17d4a5c95201c4"
+    },
+    {
+      "path": "frontend/work/src/components/MutationFeedback.tsx",
+      "sha256": "279f010df4878ddac1aab61583e4cb7a955408f5241d9d483b13363099f06674"
+    },
+    {
+      "path": "frontend/work/src/components/RolePresetPicker.tsx",
+      "sha256": "00d50676d2b062da7159a21d9e0d1a935e27dc3ccb436defc21b3ad0f6ca5ddf"
+    },
+    {
+      "path": "frontend/work/src/components/SkillGroups.tsx",
+      "sha256": "9fd665949d32f3d6d921b3a91246b186e7a57df7361913e431935a266a75e45f"
+    },
+    {
+      "path": "frontend/work/src/components/WorkBlueprintsSection.tsx",
+      "sha256": "c0fd0db50c5bfd97610958e37744935fa404dcd89f9fb799edac418e72627bad"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "6a91a660d798aafc54eb59bce9a51c619eba7398412971bd879ab5eb72fae20b"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "cde56fa910727689a329642d1126da97ea789c6ba7b2294a88c4e7024dd36e42"
+    },
+    {
+      "path": "frontend/work/src/libraryApi.ts",
+      "sha256": "20e2178b13f103cb7f8815057c292f7c15d19f9e67782034c0ad0bbf07fa7c39"
+    },
+    {
+      "path": "frontend/work/src/libraryAuthoringState.ts",
+      "sha256": "f5521ab8dffb31ff1d874ffc15930387fe99294445e355af113d763e900ed9a4"
+    },
+    {
+      "path": "frontend/work/src/libraryTypes.ts",
+      "sha256": "c9801f7afde32895456ad9ccb14740f06610d015e7540973de2fc9d5c5073b37"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "13fd226998895e9553a1c587c3a3989cdf4d9234896a7622444fc2da931788b8"
+    },
+    {
+      "path": "frontend/work/src/mutationFocus.ts",
+      "sha256": "42d0d1cce961f0d13ebdd8c37dde048ec675d60a6b9d1bb671085e286d97f969"
+    },
+    {
+      "path": "frontend/work/src/mutationRegistry.ts",
+      "sha256": "6b5a3c385db846eac64981526258269e2ded60cc9c12112cd65ff4c582613482"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "c56d31a9d6895b8bb623bca9275a2905d8f28bf928c3b8aa6ebd221783ce795a"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "999bdff8071b9f63325877e3f87bbee4d010976121ece820855841d7bfc9686e"
+    },
+    {
+      "path": "frontend/work/tests/library-authoring.test.mjs",
+      "sha256": "79dc17e15d514f063220dde9fc436cd34eeafc4d04246630bad16ac0bb27be71"
+    },
+    {
+      "path": "frontend/work/tests/mutation-registry.test.mjs",
+      "sha256": "82fe532956b42869d6abf567de7c25dc7d250abff12913cd6cac1f5cc567fb2d"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "fd55b9b8a2666863790cee7aadceeff12408a0b36e03f4e1e95670aedafdc8f3"
+    },
+    {
+      "path": "frontend/work/tests/service-library.test.mjs",
+      "sha256": "71b47889fb752b79471e10024ade2f3e91a91ecb2d2f386e4f7dd9d951f7897f"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "f0ed2aacb7e095e0e0d260ffb99f865c8b7eb16e5457b70c9b41c6a7438dba52"
+    },
+    {
+      "path": "frontend/work/tests/work-recovery-presets.test.mjs",
+      "sha256": "db0fe6d7705431ee58caa69307ec47d043dc18c83a857a967ac3a61721b0d131"
+    },
+    {
+      "path": "frontend/work/tests/work-shell-recovery.test.mjs",
+      "sha256": "790dba982c0323bc420eed788cdbfe59cca4521b8c6eebb8105b232b97370483"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "9b86c7bc3ca4a785693525667a1ae0c393b5d24105947c62563c3bf1cc5606f2"
+    },
+    {
+      "path": "src/agent_commons/library_organization.py",
+      "sha256": "294482d9f89bd3dd6f2df4ced2d5350ca9fda308a6a832276e26075083900d1e"
+    },
+    {
+      "path": "src/agent_commons/ui/actions.py",
+      "sha256": "2c5692ba74cb787812a56a8ac7175746a215b340d99afc0906f18c6fbac1a1b4"
+    },
+    {
+      "path": "src/agent_commons/ui/library_blueprints.py",
+      "sha256": "789787a5ce6d7cca15700b5643bdcb0ea721a63ded127cb584aecb415004c7da"
+    },
+    {
+      "path": "src/agent_commons/ui/library_routes.py",
+      "sha256": "49cfd1baee6a22627bc901d60faab28291dd7d05f57fd60411b03f75f4849908"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "1de90af28fc718e62c76091b96a67c31e481536da0e4b72b8101b99952e66c4d"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DQKgHjnE.js",
+      "sha256": "504f9f90886853133c9a469a9560a27f8db8a96092eabb1a193f277a62da38b2"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-Dw4mpzRm.css",
+      "sha256": "b98eab92b56444cd0b70256071581b1ba0f304ebf922020d18f282639e77bf7a"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "7f68c1ea70a3a35ef37420272fdad8977fde814c8e821ead9b5b7eea922badfe"
+    },
+    {
+      "path": "tests/benchmarks/test_work_mutation_latency.py",
+      "sha256": "91104c83c1c28f53ce0ca9b382df914026b543233eb38ee438b4f3c413ff3fb0"
+    },
+    {
+      "path": "tests/services/test_library_organization.py",
+      "sha256": "0ffd7955ce20c774c7b4b1f8f8582e45e45ea2e6d1344482d726aaf3cc3a99cc"
+    },
+    {
+      "path": "tests/ui/test_custom_library_blueprints.py",
+      "sha256": "f2027f4f422434326432d68697c7d7e98d03cbf939e81ad2c0b950c82cb69ebb"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "e655ade8841eeee15fd6c85afc8787fc79c79254db4a44e91187e83033996395"
+    },
+    {
+      "path": "tests/ui/test_library_blueprints.py",
+      "sha256": "ea9195872152fa4b8a5c288d3740b57ac7d58ef4ae66925cec16c887d449385d"
+    },
+    {
+      "path": "tests/ui/test_profile_choice_and_link_offer.py",
+      "sha256": "435ba2c79a151a57d338575e839f9d5993e2d817b04cfe6d1ce3bcab7f723511"
+    },
+    {
+      "path": "tests/ui/test_readonly_invariant.py",
+      "sha256": "4ff97c34ed8cd7a2b52eaecae67b7a60117541747671accc180969f6a2773d20"
+    },
+    {
+      "path": "tests/ui/test_skill_group_archive.py",
+      "sha256": "f47a1bc84ac66cd92c2afc1c04477be6bd63220864deb2b7485566085599ab35"
+    },
+    {
+      "path": "tests/ui/test_starter_pack_migration.py",
+      "sha256": "a99302c2e9aafc59cb23caaef7f5cb5c13964d1ceacc82edb2e53940b819750c"
+    },
+    {
+      "path": "tests/ui/test_work_operator_journey.py",
+      "sha256": "4c0968331e343e32534cf94af0fb9ced70915d9ed186b44789ce5f5c7fc2503d"
+    }
+  ],
+  "verification": {
+    "make_check": "2617 passed, 14 skipped, 2 warnings in 17:24 (Python); Work frontend 297 passed; shell 27 passed; node 24.20.0",
+    "asset": "src/agent_commons/ui/static/work rebuilt by the coordinator on Node 24: work-DQKgHjnE.js, work-Dw4mpzRm.css",
+    "browser": "demo workspace on 127.0.0.1:8792 with the wave-2 code: Library without Starter Packs, Blueprints 7 incl. Feature delivery and Product discovery, single-field group form, archive/restore flow with server-driven hiding and focus fallback verified at DOM level (pane hidden, no screenshots)",
+    "tool": "uv tool reinstalled from the checkout after removing the stale build/ tree; all four profiles re-qualified"
+  },
+  "notes": [
+    "Accepted packages: WP-08, WP-14, WP-02, WP-02.2, WP-07, WP-16.1, WP-11.1 (ADR 0021 proposed; owner acceptance pending), WP-16.2; per-package manifests beside this file",
+    "WP-11.2 not started: blocked on the owner accepting ADR 0021",
+    "Deleted files are not hashable and are listed in the per-package manifests (Starter Pack backend, resources, tests, frontend section and presentation module; previous asset bundle work-CY5SIhMx.js / work-BIY0myP0.css)",
+    "Commit, push, PR and merge wait for the owner command"
+  ]
+}

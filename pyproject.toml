@@ -91,7 +91,6 @@ agent_commons = [
   "resources/schemas/**/*.json",
   "resources/skills/**/*",
   "resources/library/**/*",
-  "resources/starter_packs/**/*",
   "resources/templates/**/*",
   "ui/static/**/*",
 ]

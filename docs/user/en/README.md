@@ -225,7 +225,7 @@ to launch or accept work.
 
 ### Reuse templates, context and design
 
-Open **Library** for 30 specializations, 45 grouped skills and five built-in
+Open **Library** for 30 specializations, 45 grouped skills and seven built-in
 blueprints. Create or update methods, role definitions and custom blueprints in
 the UI. A blueprint creates roles and tasks from your project brief; launching
 remains explicit. The **Context** tab holds project background and constraints.
@@ -294,10 +294,10 @@ Gallery and the legacy panel for specialized views. Projects can be created
 and switched in the sidebar. Automatic task scheduling and provider conversation
 resume are not implemented. A successful local test does not qualify a live provider.
 
-Library includes a Starter Packs examples section with two bundled mock
-packs. Viewing examples changes nothing. Applying a blueprint requires explicit
-confirmation and creates ordinary role templates with deny-by-default grants. It
-does not change runtime profiles, download external skills, or start a run.
+Library includes built-in **Feature delivery** and **Product discovery**
+blueprints. Applying a blueprint creates the selected roles and their task graph
+with deny-by-default grants. It does not change runtime profiles, download
+external skills, or start a run.
 
 The product records coordination and decisions. It does not itself grant
 permission to commit, push, deploy, publish, contact people, or perform other

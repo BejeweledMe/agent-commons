@@ -35,7 +35,15 @@ def private_library(writable, tmp_path):
 
 @pytest.mark.parametrize(
     "identifier",
-    ["web-app", "mobile-app", "telegram-mini-app", "grounded-ai-assistant", "improve-service"],
+    [
+        "web-app",
+        "mobile-app",
+        "telegram-mini-app",
+        "grounded-ai-assistant",
+        "improve-service",
+        "feature-delivery",
+        "product-discovery",
+    ],
 )
 def test_each_blueprint_creates_exact_roles_and_dependency_graph_without_launch(
     writable, identifier

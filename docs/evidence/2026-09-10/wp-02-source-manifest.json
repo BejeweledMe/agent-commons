@@ -1,0 +1,58 @@
+{
+  "work_package": "WP-02",
+  "task": "task.45PD34CX9NAZMDBHS724A5N46J",
+  "delegation": "delegation.6MWRWW6KS86VZFAZYWQY2ZAC25",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "src/agent_commons/library_organization.py",
+      "sha256": "294482d9f89bd3dd6f2df4ced2d5350ca9fda308a6a832276e26075083900d1e"
+    },
+    {
+      "path": "src/agent_commons/ui/library_routes.py",
+      "sha256": "49cfd1baee6a22627bc901d60faab28291dd7d05f57fd60411b03f75f4849908"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "a78551a2f42ab8cf41da03aadbed8a7cc19640d56cc4139367ee1f693e2cd677"
+    },
+    {
+      "path": "tests/services/test_library_organization.py",
+      "sha256": "0ffd7955ce20c774c7b4b1f8f8582e45e45ea2e6d1344482d726aaf3cc3a99cc"
+    },
+    {
+      "path": "tests/ui/test_skill_group_archive.py",
+      "sha256": "f47a1bc84ac66cd92c2afc1c04477be6bd63220864deb2b7485566085599ab35"
+    },
+    {
+      "path": "frontend/work/src/libraryApi.ts",
+      "sha256": "20e2178b13f103cb7f8815057c292f7c15d19f9e67782034c0ad0bbf07fa7c39"
+    },
+    {
+      "path": "frontend/work/src/libraryTypes.ts",
+      "sha256": "c9801f7afde32895456ad9ccb14740f06610d015e7540973de2fc9d5c5073b37"
+    },
+    {
+      "path": "frontend/work/tests/library-authoring.test.mjs",
+      "sha256": "e7bf4b7ad29c208a23f22192dcc99670e33a304c099ea5d8393632abc4a5a164"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "851d531b8d604d1edc2ae05533f1ea1d457a72db92fac5d374c2553c974a9417"
+    }
+  ],
+  "verification": {
+    "pytest": "tests/services/test_library_organization.py + tests/ui/test_custom_library_blueprints.py: 23 passed; tests/ui/test_readonly_invariant.py + test_first_run_wiring.py + test_catalog_editing.py: 53 passed; tests/ui/test_skill_group_archive.py: 1 passed",
+    "ruff": "check and format clean for src and tests",
+    "frontend_node_test": "276 passed, 0 failed",
+    "tsc": "exit 0",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "Terra (codex-builder) delivered the service, storage compatibility, route, allowlist entry, client parser/type/API and contract paragraph plus two service tests; its sandbox could not run uv so the coordinator ran all gates",
+    "Coordinator added the missing HTTP route test tests/ui/test_skill_group_archive.py (non-empty archive needs a target, atomic move, stale 409, move into archived 422, restore, read-only refusal, built-in refusal) and the frontend parser test for the archived flag in library-authoring.test.mjs",
+    "library-authoring.test.mjs, work-library.test.mjs and docs/FRONTEND_CONTRACT.md hashes also include the accepted WP-14 changes",
+    "Read-only panel answers 405 (not 404) on the four-segment archive path because the GET detail route shadows it; still a refusal, recorded in the test"
+  ]
+}

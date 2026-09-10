@@ -123,16 +123,9 @@ for (const locale of ["en", "ru"]) {
     let roles = [];
     let hired;
     let launched;
+    roles = [preset];
     globalThis.fetch = async (url, init) => {
       const body = JSON.parse(init.body);
-      if (url.endsWith("/apply")) {
-        roles = [preset];
-        return response({ applied: true, pack_id: "software-team", blueprint_id: "delivery", roles: [{
-          source_role_id: "implementer", agent_id: presetId, revision,
-          name: preset.name, profile_id: preset.profile_id, context_mode: "fresh", template: true,
-          skills: preset.skills, grants: preset.grants
-        }] });
-      }
       if (url.endsWith("/agents")) {
         assert.equal(body.from_preset_id, presetId);
         assert.equal("skills" in body, false, "server inherits the canonical preset's skills");
@@ -148,7 +141,6 @@ for (const locale of ["en", "ru"]) {
     };
     const client = api();
     const signal = new AbortController().signal;
-    await client.applyStarterPackBlueprint("software-team", "delivery", "apply", signal);
     const options = catalog().presets;
     assert.equal(JSON.stringify(options).includes("private_metadata"), false);
     let draft = { name: "My typed name", rationale: "My typed purpose", profileId: "", contextMode: "fresh", fromPresetId: "" };
