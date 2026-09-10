@@ -154,6 +154,45 @@ test("the shell clears the old project view before a scoped load and pins async 
   assert.match(shellSource, /navigate\(\{ projectId, taskId: selectedTaskId, composer: false \}\)/);
 });
 
+test("a write blocks the writes that share the server lock and leaves reading and navigation open", () => {
+  // Writes: every control that issues a request waits for the one in flight.
+  assert.match(shellSource, /const writeInFlight = projectMutations\.length > 0;/);
+  assert.match(shellSource, /busy=\{writeInFlight\}/, "the task composer waits for the write in flight");
+  assert.match(shellSource, /<fieldset disabled=\{!data\.meta\.writesEnabled \|\| writeInFlight \|\| pendingLaunchVisible\}>/);
+  assert.match(shellSource, /<fieldset disabled=\{!configured \|\| !data\.meta\.writesEnabled \|\| writeInFlight\}>/);
+  assert.match(shellSource, /disabled=\{writeInFlight \|\| !data\.meta\.writesEnabled\}/);
+  assert.equal(shellSource.match(/\{writeInFlight \? text\("working"\)/g).length, 4,
+    "a blocked write control keeps saying it is working");
+
+  // Reads and navigation: neither the tab links, the task list, the search box,
+  // the Library nor a status refresh has any reason to consult a write.
+  const readControls = [
+    /<a className="legacy-link" href="\/">\{text\("open_legacy_panel"\)\}<\/a>[^\n]*?<button className="button button-secondary" onClick=\{\(\) => void refresh\(\)\}/,
+    /className="button button-secondary"\n\s+onClick=\{\(\) => void refresh\(\)\}\n\s+type="button"\n\s+>\n\s+\{text\("check_again"\)\}/,
+    /<button className="button button-secondary" onClick=\{\(\) => setConfigurationConfirmationOpen\(false\)\} type="button">/
+  ];
+  for (const control of readControls) assert.match(shellSource, control);
+  assert.match(shellSource, /<button className="button button-secondary button-inline" type="button" disabled=\{!selectedTeamTask \|\| !data\.meta\.writesEnabled\}/,
+    "opening Prepare run issues nothing and stays available");
+  assert.match(shellSource, /disabled=\{actionError\.retryKind === "mutation" && writeInFlight\}/,
+    "retrying a failed read is a read");
+  const navigation = shellSource.slice(shellSource.indexOf('<nav className="primary-navigation">'), shellSource.indexOf('<div className="rail-status">'));
+  const toolbar = shellSource.slice(shellSource.indexOf("<TrackerSection"), shellSource.indexOf("onClearAgent"));
+  const library = shellSource.slice(shellSource.indexOf("<LibrarySection"), shellSource.indexOf("onTabChange"));
+  for (const region of [navigation, toolbar, library]) assert.ok(region.length > 0, "the read region under test was found");
+  assert.doesNotMatch(navigation, /writeInFlight|disabled/, "tab navigation is never taken away by a write");
+  assert.doesNotMatch(toolbar, /writeInFlight/, "task selection, search and filters keep reading during a write");
+  assert.doesNotMatch(library, /writeInFlight/, "the Library is not gated by an unrelated write");
+});
+
+test("each write surface can say whether the wait is its own", () => {
+  for (const surface of ["tasks", "roles", "launch", "setup", "provider-auth"]) {
+    assert.match(shellSource, new RegExp(`<MutationFeedback entries=\\{projectMutations\\} surface="${surface}" text=\\{text\\} />`));
+  }
+  assert.match(shellSource, /mutationsRef\.current\.inFlight\(route\.projectId\)/,
+    "only this project's writes gate this project's surfaces");
+});
+
 function archiveRequest() {
   return { projectId: projectA, revision: registryRevision, name: "Alpha", path: "/Users/owner/Projects/alpha" };
 }

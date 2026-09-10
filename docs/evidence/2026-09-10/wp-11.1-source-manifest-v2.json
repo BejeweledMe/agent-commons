@@ -1,0 +1,26 @@
+{
+  "work_package": "WP-11.1",
+  "task": "task.3Q8RP7D6SWY4QHATWX7B31PTEH",
+  "delegation": "delegation.61WF3D8TJ405BNMNRW997N5R5A",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "docs/adr/0021-objective-blueprint-application-provenance.md",
+      "sha256": "621329b95fdbf237520d472a75c31830acce47d239854cbcd943a83fd80bea52"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "1f6f60a49a5a08f48017aeb95917e3702aebba75d09fbb1930ac985ed18d11ff"
+    }
+  ],
+  "verification": {
+    "pytest": "tests/contract/test_documentation_map.py passes",
+    "ruff": "not applicable (docs only)",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "v2 after review.6WVZ0PS5G7KC62Z35JEN1BXQWB (changes_requested): coordinator edits only in the ADR text: application_id is now normatively a namespaced SHA-256 digest of the apply idempotency identity (section 10 defers only the namespace string, ULID removed); a manually joined task keeps its immutable objective_id, the join requires it to be null or equal to the application objective, and the tracker DTO objective_id is defined as a derived presentation field (task field, else the application objective through the join); added the ledger-level no-downgrade consequence per ADR 0009 and an explicit refusal of a canonical Team entity closing ADR 0020 open item",
+    "Docs-only package; owner acceptance of the ADR is required before WP-11.2"
+  ]
+}

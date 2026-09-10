@@ -1,0 +1,75 @@
+{
+  "work_package": "WP-16.2",
+  "task": "task.50GNGDY63WB86K4J3HDS64WGP0",
+  "delegation": "delegation.41T1J95PRDY0KA69ZJVCPXVBXQ",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "6a91a660d798aafc54eb59bce9a51c619eba7398412971bd879ab5eb72fae20b"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "3e0e44c304a0ae870458221e2e991db39678493b36226c8f0a9baa103bb123e8"
+    },
+    {
+      "path": "frontend/work/src/components/LibrarySection.tsx",
+      "sha256": "72e86b9929918489b1e7eaee182f39694327a279fb5260e6ad17d4a5c95201c4"
+    },
+    {
+      "path": "frontend/work/src/components/RolePresetPicker.tsx",
+      "sha256": "00d50676d2b062da7159a21d9e0d1a935e27dc3ccb436defc21b3ad0f6ca5ddf"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "13fd226998895e9553a1c587c3a3989cdf4d9234896a7622444fc2da931788b8"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "cde56fa910727689a329642d1126da97ea789c6ba7b2294a88c4e7024dd36e42"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "c56d31a9d6895b8bb623bca9275a2905d8f28bf928c3b8aa6ebd221783ce795a"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "f0ed2aacb7e095e0e0d260ffb99f865c8b7eb16e5457b70c9b41c6a7438dba52"
+    },
+    {
+      "path": "frontend/work/tests/work-recovery-presets.test.mjs",
+      "sha256": "db0fe6d7705431ee58caa69307ec47d043dc18c83a857a967ac3a61721b0d131"
+    },
+    {
+      "path": "frontend/work/tests/work-shell-recovery.test.mjs",
+      "sha256": "790dba982c0323bc420eed788cdbfe59cca4521b8c6eebb8105b232b97370483"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "851d531b8d604d1edc2ae05533f1ea1d457a72db92fac5d374c2553c974a9417"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "sha256": "10f5989977b9949ede45aa9753f82603347ee032b809e06789648899cb93fa14"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "sha256": "8e8be156666a52d180d115b65d7ae12864281180c048c63b09c97ac995246615"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "297 passed, 0 failed",
+    "tsc": "exit 0",
+    "grep": "no starter mention left in frontend/work/src, frontend/work/tests, docs/FRONTEND_CONTRACT.md or docs/user",
+    "pytest": "not applicable (frontend-only); bundle-parity test expected to fail until the wave-end asset rebuild",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken; browser check deferred to the wave-end asset integration"
+  },
+  "notes": [
+    "Deleted (not hashable): frontend/work/src/components/StarterPacksSection.tsx, frontend/work/src/starterPackPresentation.ts",
+    "Grok (grok-builder) again exited 0 without a terminal tool call despite the explicit last-step instruction (delegation ended needs_operator); the coordinator verified the deletion and ran both gates",
+    "First launch was refused at provider qualification (stale Grok receipt after a backend edit); Grok was re-qualified and the same delegation launched with a new launch key",
+    "i18n.json, styles.css and main.tsx hashes include the accepted WP-14, WP-02, WP-02.2 and WP-07 changes; work-library.test.mjs and library-authoring.test.mjs include WP-14/WP-02/WP-02.2 changes"
+  ]
+}

@@ -49,6 +49,11 @@
 .library-editor fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
 .library-editor label { display: block; margin-top: 14px; }
 .library-editor input, .library-editor select, .library-editor textarea { display: block; width: 100%; }
+.legacy-text-conflict { margin: 12px 0; border: 1px solid #b58b3a; border-radius: 10px; padding: 12px 14px; background: #1d2536; }
+.legacy-text-option { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; padding: 8px 0; border-top: 1px solid #354256; }
+.legacy-text-option:first-of-type { border-top: 0; }
+.legacy-text-option .button { flex: none; margin-left: auto; }
+.legacy-text-value { flex: 1 1 240px; min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .library-route-editor { padding: 12px 0; border-bottom: 1px solid #354256; }
 .library-instruction-input, .library-source-text { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.85rem; line-height: 1.6; }
 .library-source-text { background: #101821; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; max-height: 480px; border-radius: 8px; }
@@ -497,154 +502,6 @@ fieldset .button {
   padding-left: 22px;
 }
 
-.starter-packs-section {
-  background: #121f35;
-  border: 1px solid #384e72;
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.starter-packs-header {
-  align-items: center;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.starter-packs-header h2 {
-  font-size: 1.12rem;
-  margin-bottom: 0;
-}
-
-.example-badge {
-  background: #34305a;
-  border: 1px solid #8b80c8;
-  border-radius: 999px;
-  color: #e6dfff;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  padding: 4px 11px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.starter-pack-card {
-  background: #0f1a2e;
-  border: 1px solid #33486c;
-  border-radius: 10px;
-  margin-top: 16px;
-  padding: 18px;
-}
-
-.starter-pack-header {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.starter-pack-header h3 {
-  font-size: 1.02rem;
-  margin-bottom: 0;
-}
-
-.starter-pack-meta,
-.starter-pack-role-meta {
-  color: #9db1d1;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.starter-pack-meta {
-  margin-bottom: 8px;
-}
-
-.starter-pack-blueprint {
-  border-top: 1px solid #2c3f5f;
-  margin-top: 14px;
-  padding-top: 14px;
-}
-
-.starter-pack-blueprint h4 {
-  font-size: 0.96rem;
-  margin: 0 0 6px;
-}
-
-.starter-pack-roles-label {
-  color: #9ec1ff;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  margin: 12px 0 8px;
-  text-transform: uppercase;
-}
-
-.starter-pack-role-list {
-  display: grid;
-  gap: 10px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.starter-pack-role {
-  background: #121f35;
-  border: 1px solid #33486c;
-  border-radius: 8px;
-  padding: 12px 14px;
-}
-
-.starter-pack-role-name {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.starter-pack-role-meta {
-  margin: 6px 0 0;
-}
-
-.starter-pack-skills {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  vertical-align: baseline;
-}
-
-.starter-pack-apply {
-  align-items: flex-start;
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.starter-pack-confirm {
-  align-items: flex-start;
-  color: #c9d7ed;
-  display: flex;
-  gap: 9px;
-  line-height: 1.45;
-}
-
-.starter-pack-confirm input {
-  margin-top: 3px;
-}
-
-.starter-pack-result {
-  margin-top: 4px;
-}
-
-.starter-pack-applied-list {
-  display: grid;
-  gap: 8px;
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-}
-
 .skill-chip {
   background: #1e304e;
   border: 1px solid #52698c;
@@ -1017,11 +874,11 @@ summary { cursor: pointer; min-height: 40px; padding: 8px 0; color: #b9c8e2; }
 summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid #92b8ff; outline-offset: 3px; }
 code { overflow-wrap: anywhere; font-size: 12px; color: #bdd2fb; }
 .small-copy { font-size: 14px; line-height: 1.5; color: #a9b8d1; }
-.eyebrow, .project-label, .provider-auth-severity, .starter-pack-roles-label, .example-badge,
+.eyebrow, .project-label, .provider-auth-severity,
 .tracker-summary dt, .tracker-detail-list dt, .tracker-run-meta dt {
   text-transform: none; letter-spacing: normal; font-size: 13px; font-weight: 500;
 }
-.project-name, .dependency-option span, .starter-pack-meta, .starter-pack-role-meta,
+.project-name, .dependency-option span,
 .tracker-summary dd, .tracker-detail-list dd, .tracker-run-meta dd, .tracker-task-title, .tracker-edge-list li { overflow-wrap: normal; }
 .work-app:not(.work-app-centered) { display: grid; grid-template-columns: 240px minmax(0, 1fr); }
 .app-rail { background: #161b23; min-height: 100vh; position: sticky; top: 0; height: 100vh; padding: 28px 20px; display: flex; flex-direction: column; }
@@ -1176,11 +1033,7 @@ label { font-size: 14px; font-weight: 550; }
 .library-tab-count { margin-left: .5em; font-size: .78em; opacity: .85; }
 .library-tabs button[aria-current="page"], .library-tabs button[aria-selected="true"], .library-tabs button[aria-pressed="true"] { background: #21385e; border-color: #5778a6; color: #e8edf5; }
 .library-panel { min-width: 0; }
-.context-packs-section, .starter-packs-section { background: transparent; border: 0; padding: 0; margin-top: 0; }
-.starter-pack-card { background: #1a2029; border: 0; padding: 24px; margin-top: 16px; max-width: 960px; }
-.starter-pack-blueprint { border-color: #2b3d59; }
-.starter-pack-apply { max-width: 560px; }
-.starter-pack-confirm { font-weight: 400; }
+.context-packs-section { background: transparent; border: 0; padding: 0; margin-top: 0; }
 .recipe-preview { margin-top: 12px; }
 .context-pack-form { background: #1a2029; border: 0; border-radius: 12px; padding: 24px; max-width: 608px; }
 .context-editor-mode { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -1218,7 +1071,7 @@ label { font-size: 14px; font-weight: 550; }
   .workspace-toolbar { align-items: start; gap: 12px; flex-wrap: wrap; }
   .workspace-toolbar p { max-width: 100%; }
   .workspace-toolbar-actions { flex-wrap: wrap; margin-left: 0; justify-content: flex-start; max-width: 100%; }
-  .workflow-card, .task-composer, .launch-composer, .settings-panel, .provider-availability, .task-inspector, .context-pack-form, .starter-pack-card { padding: 18px; }
+  .workflow-card, .task-composer, .launch-composer, .settings-panel, .provider-availability, .task-inspector, .context-pack-form { padding: 18px; }
   .tracker-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .team-role-list li { align-items: start; flex-direction: column; }
 }
@@ -1266,10 +1119,7 @@ label { font-size: 14px; font-weight: 550; }
 .inspector-disclosure > summary h3 { display: inline; font-size: 14px; font-weight: 600; }
 .inspector-disclosure > summary { color: #c4cfdf; }
 .inspector-evidence-state { padding-top: 4px; }
-.inspector-prose, .inspector-criteria li, .task-state, .starter-pack-role-meta { overflow-wrap: anywhere; }
-.starter-pack-card > p, .starter-packs-section > p, .starter-pack-blueprint > p { max-width: 68ch; }
-.starter-pack-role { background: transparent; border: 0; border-top: 1px solid #354050; border-radius: 0; padding: 16px 0; }
-.starter-pack-role-list { gap: 0; }
+.inspector-prose, .inspector-criteria li, .task-state { overflow-wrap: anywhere; }
 .context-source-tools { margin: 16px 0 24px; }
 .context-source-tools > .button { width: auto; }
 .context-source-tools > p { margin: 8px 0 0; max-width: 60ch; }
@@ -1303,6 +1153,17 @@ label { font-size: 14px; font-weight: 550; }
 .skill-group-body .library-catalog-grid { max-height: none; overflow: visible; margin-top: 12px; }
 .skill-move-label { display: grid; gap: 6px; margin-top: 14px; font-size: .85rem; }
 .skill-move-label select { max-width: 100%; }
+.skill-group-body .notice-link + .notice-link { margin-left: 16px; }
+.skill-group-archive { margin-top: 12px; padding: 16px; border: 1px solid #526789; border-radius: 10px; background: #182333; }
+.skill-group-archive p { margin: 0 0 12px; }
+.skill-group-archive label { display: grid; gap: 6px; margin: 0 0 14px; font-size: .85rem; }
+.skill-group-archive select { max-width: 100%; }
+.library-group-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+.skill-groups-archived { border: 1px solid #354256; border-radius: 10px; margin: 20px 0 12px; background: #18202b; }
+.skill-groups-archived > summary { cursor: pointer; padding: 16px; font-weight: 600; }
+.skill-groups-archived > summary .library-tab-count { margin-left: 10px; }
+.skill-groups-archived-body { padding: 0 16px 16px; display: grid; gap: 12px; }
+.skill-groups-archived-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
 .blueprint-authoring { margin-bottom: 16px; }
 .blueprint-archive-toggle { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
 .blueprint-definition-row { padding: 16px; margin: 16px 0; border: 1px solid #354256; border-radius: 8px; }
@@ -1316,3 +1177,12 @@ label { font-size: 14px; font-weight: 550; }
 .blueprint-apply-result h3 { margin: 0 0 8px; font-size: 1rem; }
 .blueprint-apply-result .small-copy { margin: 0; }
 .blueprint-apply-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+
+/* A write in progress, and why a neighbouring write surface is unavailable.
+   Deliberately not green: nothing here says a write succeeded. */
+.mutation-feedback { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 12px 0 0; max-width: 608px; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+.mutation-feedback-elapsed { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-primary); }
+.mutation-feedback-hint { color: var(--text-muted); }
+.mutation-feedback-blocked { border-left: 3px solid var(--border-control); padding-left: 12px; }
+.mutation-feedback:empty { margin: 0; }
+.mutation-feedback:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }

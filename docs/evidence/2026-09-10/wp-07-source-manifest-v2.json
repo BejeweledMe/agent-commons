@@ -1,0 +1,55 @@
+{
+  "work_package": "WP-07",
+  "task": "task.35A1RZJPHAMB954YP2DPD6NAPD",
+  "delegation": "delegation.670XA5PP26C1MGR3C2P31H0W2V",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "af2a66afb9083bad855922398e692c632538eb649335c6c73be62e3408711cc1"
+    },
+    {
+      "path": "frontend/work/src/mutationRegistry.ts",
+      "sha256": "4ece81c3c727498a0ba869785e3fa0da7c46af127b40432ed376619c65b221f9"
+    },
+    {
+      "path": "frontend/work/src/components/MutationFeedback.tsx",
+      "sha256": "b1c08d9509fbbf337ddccd7746a82a6d937b22e9907ba803fd847cd2f23fa5bd"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "cce950de252e2c66813d192a6ccf585eec01169e86927fac639f80e385d4c8a6"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "1e16a5f8a10c338754a6a461dfc9be316cbc271c390b63f1e54e4b520bae3137"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "999bdff8071b9f63325877e3f87bbee4d010976121ece820855841d7bfc9686e"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "d5ff10111a96904b2501155a6d9eb8be402457ccaa01687724811ba595836027"
+    },
+    {
+      "path": "frontend/work/tests/mutation-registry.test.mjs",
+      "sha256": "98e653f7b57eda1262861a05404c355c327f060ff29179bec25379563fe8cdb1"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "298 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken; browser check deferred to the wave-end asset integration"
+  },
+  "notes": [
+    "v2 after review.2V7K5MEHNXEK4EGC8W2BM3XQ1K (changes_requested): the coordinator moved the per-second counter out of the live region (aria-hidden) so role=status holds only the hint copy that changes at the 2 s and 8 s transitions, and added focus management: the feedback container (tabIndex -1) takes focus dropped by the disabled initiating control and gives it back to that control when the write ends and it is enabled again; tests pin one live region with hint-only content and the hidden counter",
+    "Worker sandbox refused node/tsc; coordinator ran both gates",
+    "MutationFeedback.tsx is a new component outside the original claim set, claimed afterwards (claim.6c67ac99d46347598adaa6422ee5042c); TaskComposer.tsx was claimed but not changed",
+    "i18n.json and styles.css hashes include the accepted WP-14, WP-02 and WP-02.2 changes",
+    "2 s / 8 s thresholds are presentation hints per owner decision 8.7, not performance assertions"
+  ]
+}

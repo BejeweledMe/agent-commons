@@ -149,6 +149,14 @@ def register_library_routes(
             request, lambda body: SkillOrganization(store_factory()).save("move", body)
         )
 
+    @routes.post("/api/library/organization/groups/{id}/archive", dependencies=write_dependencies)
+    async def organization_group_archive(id: str, request: Request) -> Response:
+        from agent_commons.library_organization import SkillOrganization
+
+        return await metadata_edit(
+            request, lambda body: SkillOrganization(store_factory()).archive(id, body)
+        )
+
     @routes.post("/api/library/blueprints/custom", dependencies=write_dependencies)
     async def blueprint_save(request: Request) -> Response:
         from agent_commons.library_blueprint_store import BlueprintStore

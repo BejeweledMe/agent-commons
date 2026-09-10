@@ -69,7 +69,6 @@ from agent_commons.ui.setup import (
     SetupError,
     missing_workspace_state,
 )
-from agent_commons.ui.starter_pack_routes import register_starter_pack_routes
 from agent_commons.ui.task_edit_routes import register_task_edit_reads, register_task_edit_writes
 from agent_commons.ui.tracker_reads import ObservedTrackerSource
 from agent_commons.ui.tracker_routes import register_tracker_routes
@@ -148,7 +147,6 @@ MUTATING_ROUTES = (
     ("POST", "/api/tasks/{task_id}/review-request"),
     ("POST", "/api/tasks/{task_id}/accept"),
     ("POST", "/api/tasks/{task_id}/reopen"),
-    ("POST", "/api/work/starter-packs/{pack_id}/blueprints/{blueprint_id}/apply"),
     ("POST", "/api/work/context-packs"),
     ("POST", "/api/work/context-packs/{context_pack_id}/revisions"),
 )
@@ -176,6 +174,7 @@ CATALOG_ROUTES = (
     # canonical event stream, like the legacy catalogue editing routes below.
     ("POST", "/api/library/{kind}"),
     ("POST", "/api/library/organization/groups"),
+    ("POST", "/api/library/organization/groups/{id}/archive"),
     ("POST", "/api/library/organization/move"),
     ("POST", "/api/library/blueprints/custom"),
     ("POST", "/api/library/blueprints/custom/{id}/archive"),
@@ -831,11 +830,6 @@ def create_app(
                 [exc.remediation],
             )
 
-    # The bundled examples contain no workspace data, but the existing Work
-    # contract reserves all data reads for initialized projects.  After first
-    # run, the route gives the normal role screen a non-empty example catalogue.
-    register_starter_pack_routes(api_routes, dependencies=reads_workspace)
-
     @api_routes.get("/api/setup/preflight", dependencies=reads_workspace)
     async def setup_preflight() -> Response:
         try:
@@ -1007,19 +1001,6 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             expected_revision=expected_revision,
             draft=body["draft"],
             idempotency_key=body["idempotency_key"],
-        )
-
-    @router.post("/api/work/starter-packs/{pack_id}/blueprints/{blueprint_id}/apply")
-    async def apply_starter_pack_blueprint(
-        pack_id: str, blueprint_id: str, request: Request
-    ) -> Response:
-        body = await _body(request)
-        return await _record(
-            context.apply_starter_pack_blueprint,
-            pack_id=pack_id,
-            blueprint_id=blueprint_id,
-            confirmed=body.get("confirmed") is True,
-            idempotency_key=body.get("idempotency_key"),
         )
 
     @router.post("/api/operations/{operation_id}/answer")

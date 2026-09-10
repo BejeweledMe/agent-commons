@@ -72,7 +72,7 @@ export type BlueprintApplication = Readonly<{
 
 export type SkillOrganization = Readonly<{
   schema: "agent_commons.skill-organization.v1"; revision: string;
-  groups: readonly { id: string; name: BlueprintText; source: "builtin" | "custom" }[];
+  groups: readonly { id: string; name: BlueprintText; source: "builtin" | "custom"; archived: boolean }[];
   assignments: readonly { source: "builtin" | "custom"; id: string; group_id: string }[];
 }>;
 export type BlueprintDefinition = Pick<WorkBlueprint, "name" | "description" | "slots" | "tasks">;

@@ -1,0 +1,26 @@
+{
+  "work_package": "WP-11.1",
+  "task": "task.3Q8RP7D6SWY4QHATWX7B31PTEH",
+  "delegation": "delegation.61WF3D8TJ405BNMNRW997N5R5A",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "docs/adr/0021-objective-blueprint-application-provenance.md",
+      "sha256": "f5d7d038522a09cb9d147a91e96a3bb0cc9e8d33c978ac5bcd3c9405f7d0897d"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "1f6f60a49a5a08f48017aeb95917e3702aebba75d09fbb1930ac985ed18d11ff"
+    }
+  ],
+  "verification": {
+    "pytest": "tests -k adr: ADR index tests pass (see console)",
+    "ruff": "not applicable (docs only)",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "Docs-only package: ADR 0021 (Russian, ten sections of plan outline H) and its index row",
+    "Coordinator note for the owner: the ADR status is proposed; owner acceptance is required before WP-11.2 starts; the ULID-based application id default is deterministic on retry only through the stored idempotency receipt, which the ADR states"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "work_package": "WP-07",
+  "task": "task.35A1RZJPHAMB954YP2DPD6NAPD",
+  "delegation": "delegation.670XA5PP26C1MGR3C2P31H0W2V",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "359b76f4bfed9e144c3f3a159b1bd3a59c127299629c0490ff03e2e41ff9410a"
+    },
+    {
+      "path": "frontend/work/src/mutationRegistry.ts",
+      "sha256": "6b5a3c385db846eac64981526258269e2ded60cc9c12112cd65ff4c582613482"
+    },
+    {
+      "path": "frontend/work/src/mutationFocus.ts",
+      "sha256": "42d0d1cce961f0d13ebdd8c37dde048ec675d60a6b9d1bb671085e286d97f969"
+    },
+    {
+      "path": "frontend/work/src/components/MutationFeedback.tsx",
+      "sha256": "279f010df4878ddac1aab61583e4cb7a955408f5241d9d483b13363099f06674"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "cce950de252e2c66813d192a6ccf585eec01169e86927fac639f80e385d4c8a6"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "1e16a5f8a10c338754a6a461dfc9be316cbc271c390b63f1e54e4b520bae3137"
+    },
+    {
+      "path": "frontend/work/tests/confirmed-refresh.test.mjs",
+      "sha256": "999bdff8071b9f63325877e3f87bbee4d010976121ece820855841d7bfc9686e"
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "d5ff10111a96904b2501155a6d9eb8be402457ccaa01687724811ba595836027"
+    },
+    {
+      "path": "frontend/work/tests/mutation-registry.test.mjs",
+      "sha256": "82fe532956b42869d6abf567de7c25dc7d250abff12913cd6cac1f5cc567fb2d"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "299 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken; browser check deferred to the wave-end asset integration"
+  },
+  "notes": [
+    "v3 after review.7R1QPGD4V9JX67P67D6DET2TS5 (changes_requested on focus restoration): the shell now passes document.activeElement to registry.begin() at all four write paths, before the write disables the control; the handle carries it as an opaque initiator; a new pure module mutationFocus.ts decides focusOnWriteStart (container takes focus only when it was dropped to the body) and focusOnWriteEnd (the initiating control gets focus back only when focus still sits on the body or the feedback container and the control is connected, enabled and not inside a disabled fieldset); MutationFeedback applies those decisions; a behavioural test with fake elements covers transfer, restoration, deliberate moves elsewhere, unmounted/disabled/fieldset-disabled controls and the no-initiator case",
+    "v2 changes retained: per-second counter aria-hidden, one role=status per surface holding hint copy only",
+    "Worker sandbox refused node/tsc; coordinator ran both gates",
+    "MutationFeedback.tsx and mutationFocus.ts are outside the original claim set and were claimed afterwards (claim.6c67ac99d46347598adaa6422ee5042c, claim.97f71f49fa3749c69b5026839637e68c); TaskComposer.tsx was claimed but not changed",
+    "i18n.json and styles.css hashes include the accepted WP-14, WP-02 and WP-02.2 changes"
+  ]
+}

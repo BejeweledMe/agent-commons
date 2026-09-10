@@ -13,7 +13,8 @@
 
 **Дополнение 2026-09-06:** [независимый аудит текущей границы
 `329d2f3`](audits/2026-09-06-total-plan-work-adr-prd-review.md) подтверждает
-реализацию Context Packs, Gallery, Starter Pack Apply, J1 и G6 после этого снимка.
+реализацию Context Packs, Gallery, J1 и G6 после этого снимка. Starter Pack Apply
+удалён 2026-09-10 в пользу встроенных схем Library.
 J1/G6 имеют exact acceptance, но L1 live qualification и R2 release остаются
 открытыми; audit также выявил P1 в review evidence и runtime privacy/provenance.
 Исторические статусы таблицы ниже сохранены и не описывают текущий checkout.

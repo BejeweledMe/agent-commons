@@ -23,6 +23,8 @@ import { LibrarySection } from "./components/LibrarySection";
 import { BlueprintApplyOutcomePanel } from "./components/WorkBlueprintsSection.js";
 import { blueprintApplyOutcome, type BlueprintApplyIntent } from "./blueprintApplyOutcome.js";
 import { TaskComposer } from "./components/TaskComposer";
+import { MutationFeedback } from "./components/MutationFeedback.js";
+import { MutationRegistry, mutationSurface } from "./mutationRegistry.js";
 import { LaunchRecoveryPanel } from "./components/LaunchRecoveryPanel";
 import { DEFAULT_RUN_LIMIT_MINUTES, MAX_RUN_LIMIT_MINUTES, MIN_RUN_LIMIT_MINUTES, freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitSeconds, type LaunchIntent, type RunDraft } from "./launchIntentState.js";
 import { taskDependencyCatalog } from "./taskDependencyState.js";
@@ -229,7 +231,9 @@ function WorkApp(): ReactElement {
   const navigationRevision = useRef(0);
   const [locale, setLocale] = useState<Locale>("en");
   const [state, setState] = useState<AppState>({ kind: "checking" });
-  const [activeAction, setActiveAction] = useState<string | null>(null);
+  // In-flight writes, per project and surface. A write gates writes, not reading.
+  const mutationsRef = useRef(new MutationRegistry());
+  const [mutationRevision, setMutationRevision] = useState(0);
   const [role, setRole] = useState<RoleDraft>(emptyRole);
   const [task, setTask] = useState<TaskDraft>(emptyTask);
   const [run, setRun] = useState<RunDraft>(emptyRun);
@@ -282,6 +286,18 @@ function WorkApp(): ReactElement {
   const pendingLaunchRetry = useRef<(() => Promise<void>) | null>(null);
   const launchSelectionVersion = useRef(0);
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
+
+  useEffect(() => mutationsRef.current.subscribe(() => setMutationRevision((current) => current + 1)), []);
+  // Recomputed whenever the registry publishes, while the handles themselves stay
+  // identical, so an unrelated render never restarts a running duration timer.
+  const projectMutations = useMemo(
+    () => mutationsRef.current.inFlight(route.projectId),
+    [mutationRevision, route.projectId]
+  );
+  // One server write lock: any write in this project gates the other writes, and
+  // nothing else. Navigation, task selection, search, reading and refresh do not
+  // consult it, so a slow ledger write no longer freezes the whole application.
+  const writeInFlight = projectMutations.length > 0;
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -450,7 +466,8 @@ function WorkApp(): ReactElement {
       <h3>{actionError.failure.title}</h3>
       <p>{text(actionError.retryKind === "refresh" ? "shell_refresh_retry_help" : "shell_retry_help")}</p>
       <p>{actionError.failure.nextStep}</p>
-      <button className="button button-secondary button-inline" disabled={activeAction !== null} onClick={actionError.retry} type="button">{text(actionError.retryKind === "refresh" ? "refresh_status" : "shell_retry_original")}</button>
+      {/* Retrying a failed follow-up read is a read: it never waits on a write. */}
+      <button className="button button-secondary button-inline" disabled={actionError.retryKind === "mutation" && writeInFlight} onClick={actionError.retry} type="button">{text(actionError.retryKind === "refresh" ? "refresh_status" : "shell_retry_original")}</button>
       <details><summary>{text("shell_technical_details")}</summary><code>{actionError.failure.code}</code>
         <ul>{actionError.failure.safeNextActions.map((item) => <li key={item}>{item}</li>)}</ul>
       </details>
@@ -606,7 +623,8 @@ function WorkApp(): ReactElement {
     // The route effect owns the next scoped read and will replace this shell.
     setState({ kind: "checking" });
     setLibraryState({ kind: "loading" });
-    setActiveAction(null);
+    // A write started in the other project stays recorded under that project.
+    // It gates that project's writes when it is opened again, and gates nothing here.
     setActionErrors(transient.actionErrors);
     setLastHiredRole(transient.lastHiredRole);
     setRoleErrors(transient.roleErrors);
@@ -663,7 +681,7 @@ function WorkApp(): ReactElement {
     const generation = projectSelectionRef.current.currentGeneration();
     const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(generation)
       && routeRef.current.projectId === projectId;
-    setActiveAction(action);
+    const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface(action), operation: action }, typeof document === "undefined" ? null : document.activeElement);
     clearActionError(action);
     // A snapshot started before this write must not publish after it.
     readRequestRef.current.abort();
@@ -674,7 +692,7 @@ function WorkApp(): ReactElement {
       // The mutation is now authoritative. End its busy phase and retain the
       // confirmed outcome while the follow-up read catches the snapshot up.
       setState((current) => current.kind === "ready" ? { ...current, notice } : current);
-      setActiveAction(null);
+      mutationsRef.current.end(handle);
       void refreshAfterConfirmed(action, api, notice, projectId);
       return true;
     } catch (error: unknown) {
@@ -695,7 +713,9 @@ function WorkApp(): ReactElement {
       }
       return false;
     } finally {
-      if (stillCurrent()) setActiveAction(null);
+      // Retired unconditionally: the entry belongs to its own project, so a
+      // switch away must not leave that project holding a write forever.
+      mutationsRef.current.end(handle);
     }
   }
 
@@ -795,7 +815,7 @@ function WorkApp(): ReactElement {
       const generation = projectSelectionRef.current.currentGeneration();
       const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(generation)
         && routeRef.current.projectId === projectId;
-      setActiveAction("create-task");
+      const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface("create-task"), operation: "create-task" }, typeof document === "undefined" ? null : document.activeElement);
       clearActionError("create-task");
       try {
         const result = await api.createTask(input, new AbortController().signal, idempotencyKey);
@@ -812,7 +832,7 @@ function WorkApp(): ReactElement {
       } catch (error: unknown) {
         if (!stillCurrent()) return;
         recordActionError("create-task", error, () => void submit());
-      } finally { if (stillCurrent()) setActiveAction(null); }
+      } finally { mutationsRef.current.end(handle); }
     };
     void submit();
   }
@@ -909,7 +929,7 @@ function WorkApp(): ReactElement {
   }
 
   function editRefusedLaunch(): void {
-    if (actionErrors["start-run"]?.uncertain || activeAction !== null) return;
+    if (actionErrors["start-run"]?.uncertain || writeInFlight) return;
     restorePendingLaunch();
     pendingLaunchRef.current = null;
     pendingLaunchRetry.current = null;
@@ -960,7 +980,7 @@ function WorkApp(): ReactElement {
       if (routeRef.current.projectId !== projectId) return;
       const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(attemptGeneration)
         && routeRef.current.projectId === projectId;
-      setActiveAction("start-run");
+      const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface("start-run"), operation: "start-run" }, typeof document === "undefined" ? null : document.activeElement);
       clearActionError("start-run");
       setRunLimitRefusal(null);
       const controller = new AbortController();
@@ -998,7 +1018,7 @@ function WorkApp(): ReactElement {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           recordActionError("start-run", error, () => void execute());
         }
-      } finally { if (stillCurrent()) setActiveAction(null); }
+      } finally { mutationsRef.current.end(handle); }
     };
     pendingLaunchRetry.current = execute;
     if (profileId !== undefined && (authStatus?.blocksLaunch === true || state.data.providerAuthErrors.includes(profileId))) {
@@ -1014,8 +1034,10 @@ function WorkApp(): ReactElement {
     action: "login" | "cancel" | "check"
   ): Promise<void> {
     const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
     const api = apiRef.current;
-    setActiveAction(`provider-auth-${action}`);
+    const operation = `provider-auth-${action}`;
+    const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface(operation), operation }, typeof document === "undefined" ? null : document.activeElement);
     const controller = new AbortController();
     try {
       const status = await api.providerAuthAction(profileId, action, controller.signal);
@@ -1039,7 +1061,7 @@ function WorkApp(): ReactElement {
         focusAuthRecovery();
       }
     } finally {
-      if (projectSelectionRef.current.isCurrent(generation)) setActiveAction(null);
+      mutationsRef.current.end(handle);
     }
   }
 
@@ -1204,11 +1226,12 @@ function WorkApp(): ReactElement {
             </div>
             {!configured ? <div className="notice setup-notice" role="status"><p>{text(workspaceInitialized ? "shell_provider_setup_later" : "workspace_needs_setup")}</p><button className="notice-link" onClick={() => navigate({ view: "settings" })} type="button">{text("shell_open_settings")}</button></div> : null}
             <div hidden={!route.composer}>
-              <TaskComposer draft={task} onChange={setTask} submitBlocked={actionErrors["create-task"]?.uncertain === true} errors={taskErrors} busy={activeAction !== null} writesEnabled={workspaceInitialized && data.meta.writesEnabled} tasks={dependencies.tasks} dependencyStatus={dependencies.status} onSubmit={submitTask} onClose={closeComposer} onDependency={setTaskDependency} text={text} />
+              <TaskComposer draft={task} onChange={setTask} submitBlocked={actionErrors["create-task"]?.uncertain === true} errors={taskErrors} busy={writeInFlight} writesEnabled={workspaceInitialized && data.meta.writesEnabled} tasks={dependencies.tasks} dependencyStatus={dependencies.status} onSubmit={submitTask} onClose={closeComposer} onDependency={setTaskDependency} text={text} />
+              <MutationFeedback entries={projectMutations} surface="tasks" text={text} />
               {actionFeedback("create-task")}
             </div>
             {pendingLaunch !== null ? <LaunchRecoveryPanel intent={pendingLaunch}
-              visible={pendingLaunchVisible && launchOpen} busy={activeAction !== null || !data.meta.writesEnabled}
+              visible={pendingLaunchVisible && launchOpen} busy={writeInFlight || !data.meta.writesEnabled}
               uncertain={actionErrors["start-run"]?.uncertain === true}
               failureCode={actionErrors["start-run"]?.failure.code ?? null}
               onRestore={restorePendingLaunch} onRetry={retryPendingLaunch} onEdit={editRefusedLaunch} text={text} /> : null}
@@ -1250,7 +1273,7 @@ function WorkApp(): ReactElement {
                   {visibleAuth?.actionIds.includes("authenticate") ? (
                     <button
                       className="button button-primary"
-                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      disabled={writeInFlight || !data.meta.writesEnabled}
                       onClick={() => void runProviderAuthAction(visibleAuth.profileId, "login")}
                       type="button"
                     >
@@ -1260,7 +1283,7 @@ function WorkApp(): ReactElement {
                   {visibleAuth?.actionIds.includes("cancel_authentication") ? (
                     <button
                       className="button button-secondary button-inline"
-                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      disabled={writeInFlight || !data.meta.writesEnabled}
                       onClick={() => void runProviderAuthAction(visibleAuth.profileId, "cancel")}
                       type="button"
                     >
@@ -1270,7 +1293,7 @@ function WorkApp(): ReactElement {
                   {(visibleAuth?.actionIds.includes("check_again") || authStatusUnavailable) && authActionProfileId !== undefined ? (
                     <button
                       className="button button-secondary button-inline"
-                      disabled={activeAction !== null || !data.meta.writesEnabled}
+                      disabled={writeInFlight || !data.meta.writesEnabled}
                       onClick={() => void runProviderAuthAction(authActionProfileId, "check")}
                       type="button"
                     >
@@ -1280,7 +1303,7 @@ function WorkApp(): ReactElement {
                   {pendingLaunchVisible && visibleAuth?.state === "ready" ? (
                     <button
                       className="button button-primary"
-                      disabled={activeAction !== null}
+                      disabled={writeInFlight}
                       onClick={retryPendingLaunch}
                       type="button"
                     >
@@ -1288,6 +1311,7 @@ function WorkApp(): ReactElement {
                     </button>
                   ) : null}
                 </div>
+                <MutationFeedback entries={projectMutations} surface="provider-auth" text={text} />
                 <p className="small-copy">{text("provider_auth_new_run_only")}</p>
               </section>
             ) : null}
@@ -1298,7 +1322,7 @@ function WorkApp(): ReactElement {
               </div>
             ) : null}
             <form noValidate onSubmit={submitRun}>
-              <fieldset disabled={!data.meta.writesEnabled || activeAction !== null || pendingLaunchVisible}>
+              <fieldset disabled={!data.meta.writesEnabled || writeInFlight || pendingLaunchVisible}>
                 <label htmlFor="run-role">{text("select_role")}</label>
                 <select aria-invalid={validation([...runErrors], "agent")} id="run-role" onChange={(event) => { ++launchSelectionVersion.current; setRun({ ...run, agentId: event.target.value, contextPackKey: "", designPackageKey: "" }); }} value={run.agentId}>
                   <option value="">{text("select_role")}</option>
@@ -1374,9 +1398,10 @@ function WorkApp(): ReactElement {
                 {validation([...runErrors], "run-limit") ? <p className="field-error" id="run-limit-error">{text("form_error_run_limit")}</p> : null}
                 {runLimitRefused ? <p className="field-error" id="run-limit-refusal" role="alert">{text("run_limit_server_refusal")} {text("form_error_run_limit")}</p> : null}
                 {validation([...runErrors], "provider-availability") ? <p className="field-error">{text("form_error_provider_availability")}</p> : null}
-                <button className="button button-primary" disabled={!environmentReady || selectedAvailability?.launchable !== true || pendingLaunch !== null} type="submit">{activeAction === "start-run" ? text("working") : text("start_run")}</button>
+                <button className="button button-primary" disabled={!environmentReady || selectedAvailability?.launchable !== true || pendingLaunch !== null} type="submit">{writeInFlight ? text("working") : text("start_run")}</button>
               </fieldset>
             </form>
+            <MutationFeedback entries={projectMutations} surface="launch" text={text} />
 
           </WorkflowCard>
             </div>
@@ -1406,14 +1431,16 @@ function WorkApp(): ReactElement {
             <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
               <OutputsButton scope={{ kind: "agent", id: option.id }} title={option.name} />
               <ConversationButton scope={{ kind: "agent", id: option.id }} title={option.name} />
-              <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled || activeAction !== null}
+              {/* Opens Prepare run for the selected task and issues nothing, so a
+                  write elsewhere never takes this away. */}
+              <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled}
                 onClick={() => { if (!selectedTeamTask) return; prepareLaunch(selectedTeamTask.taskId); if (pendingLaunchRef.current?.input.taskId !== selectedTeamTask.taskId) setRun((current) => ({ ...current, agentId: option.id })); }}>{text("shell_use_role")}</button>
             </li>)}</ul>
             {roleOptions.length === 0 ? <p className="empty-guidance">{text("shell_no_active_roles")}</p> : null}
           <WorkflowCard ready={roleOptions.length > 0} title={text("step_role")}>
             <p className="small-copy">{text("role_help")}</p>
             <form id="hire-role-form" noValidate onSubmit={submitRole}>
-              <fieldset disabled={!configured || !data.meta.writesEnabled || activeAction !== null}>
+              <fieldset disabled={!configured || !data.meta.writesEnabled || writeInFlight}>
                 <SpecializationPicker library={libraryState} value={role.specializationRef} selectedName={role.specializationName} text={text} onChange={(selected) => chooseSpecialization(selected)} onRefresh={() => setLibraryRefresh((current) => current + 1)} />
                 {roleErrors.has("specialization") ? <p className="field-error">{text("library_selection_unavailable")}</p> : null}
                 <details className="role-legacy-presets"><summary>{text("role_legacy_presets")}</summary>
@@ -1471,9 +1498,10 @@ function WorkApp(): ReactElement {
                   <option value="fresh">{text("context_fresh")}</option>
                   <option value="accumulated">{text("context_accumulated")}</option>
                 </select>
-                <button className="button button-primary" disabled={actionErrors["create-role"]?.uncertain === true} type="submit">{activeAction === "create-role" ? text("working") : text("create_role")}</button>
+                <button className="button button-primary" disabled={actionErrors["create-role"]?.uncertain === true} type="submit">{writeInFlight ? text("working") : text("create_role")}</button>
               </fieldset>
             </form>
+            <MutationFeedback entries={projectMutations} surface="roles" text={text} />
             {actionFeedback("create-role")}
           </WorkflowCard>
               </>} /> : route.view === "board" ? <div className="notice setup-notice" role="status"><p>{text("workspace_needs_setup")}</p><button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_nav_settings")}</button></div> : null}
@@ -1491,14 +1519,7 @@ function WorkApp(): ReactElement {
                 setPendingApplication({ application, title: application.blueprintId });
                 void refresh();
               }}
-              tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })}
-              onApplied={async () => {
-                const updated = await renderedProjectApi.load(new AbortController().signal);
-                if (projectSelectionRef.current.isCurrent(renderedProjectGeneration) && routeRef.current.projectId === renderedProjectId) {
-                  setState((current) => current.kind === "ready" ? { ...current, data: updated } : current);
-                }
-              }}
-              onChooseTeam={() => { setHireOpen(true); navigate({ view: "board" }); }} /> : <p>{text("workspace_needs_setup")}</p>}
+              tab={route.libraryTab} onTabChange={(libraryTab) => navigate({ libraryTab })} /> : <p>{text("workspace_needs_setup")}</p>}
           </section>
           <section hidden={route.view !== "settings"} aria-label={text("shell_nav_settings")} className="settings-section">
           <WorkflowCard ready={environmentReady} title={text("step_environment")}>
@@ -1512,9 +1533,9 @@ function WorkApp(): ReactElement {
                       <p>{text("guidance_missing_tools")} <strong>{guidance.tools.join(", ")}</strong></p>
                     ) : null}
                     <p>{text(guidanceActionMessage[guidance.nextActionKey])}</p>
+                    {/* Checking again only reads the environment. */}
                     <button
                       className="button button-secondary"
-                      disabled={activeAction !== null}
                       onClick={() => void refresh()}
                       type="button"
                     >
@@ -1526,17 +1547,17 @@ function WorkApp(): ReactElement {
                   {data.setup.state === "setup_uninitialized" ? (
                   <button
                     className="button button-primary"
-                    disabled={activeAction !== null}
+                    disabled={writeInFlight}
                     onClick={() => { const api = apiRef.current; void perform("initialize", api, (signal) => api.setup("initialize", signal), "action_complete"); }}
                     type="button"
                   >
-                    {activeAction === "initialize" ? text("working") : text("initialize_workspace")}
+                    {writeInFlight ? text("working") : text("initialize_workspace")}
                   </button>
                   ) : null}
                   {canConfigureRuntime ? (
                   <button
                     className="button button-primary"
-                    disabled={activeAction !== null}
+                    disabled={writeInFlight}
                     onClick={() => setConfigurationConfirmationOpen(true)}
                     type="button"
                   >
@@ -1556,10 +1577,11 @@ function WorkApp(): ReactElement {
                     <p id="configuration-confirmation-details">{text("configuration_confirmation_write")}</p>
                     <p>{text("configuration_confirmation_non_actions")}</p>
                     <div className="button-row">
-                      <button className="button button-primary" disabled={activeAction !== null} onClick={confirmRuntimeConfiguration} type="button">
-                        {activeAction === "runtime" ? text("working") : text("configuration_confirmation_confirm")}
+                      <button className="button button-primary" disabled={writeInFlight} onClick={confirmRuntimeConfiguration} type="button">
+                        {writeInFlight ? text("working") : text("configuration_confirmation_confirm")}
                       </button>
-                      <button className="button button-secondary" disabled={activeAction !== null} onClick={() => setConfigurationConfirmationOpen(false)} type="button">
+                      {/* Dismissing the question writes nothing and stays answerable. */}
+                      <button className="button button-secondary" onClick={() => setConfigurationConfirmationOpen(false)} type="button">
                         {text("configuration_confirmation_cancel")}
                       </button>
                     </div>
@@ -1567,6 +1589,7 @@ function WorkApp(): ReactElement {
                 ) : null}
               </>
             ) : null}
+            <MutationFeedback entries={projectMutations} surface="setup" text={text} />
             {actionFeedback("initialize")}
             {actionFeedback("runtime")}
           </WorkflowCard>
@@ -1611,7 +1634,7 @@ function WorkApp(): ReactElement {
                 </article>
               ))}
             </section>
-            <div className="settings-panel"><h2>{text("shell_diagnostics")}</h2><p className="small-copy">{text("legacy_panel_help")}</p><a className="legacy-link" href="/">{text("open_legacy_panel")}</a><button className="button button-secondary" disabled={activeAction !== null} onClick={() => void refresh()} type="button">{text("refresh_status")}</button></div>
+            <div className="settings-panel"><h2>{text("shell_diagnostics")}</h2><p className="small-copy">{text("legacy_panel_help")}</p><a className="legacy-link" href="/">{text("open_legacy_panel")}</a>{/* Reading the current status never waits on a write. */}<button className="button button-secondary" onClick={() => void refresh()} type="button">{text("refresh_status")}</button></div>
           </section>
         </div>
       </div>

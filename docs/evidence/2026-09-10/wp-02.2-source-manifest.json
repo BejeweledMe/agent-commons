@@ -1,0 +1,45 @@
+{
+  "work_package": "WP-02.2",
+  "task": "task.35SXKTWB4RCR8JWV8YGC0Q25B0",
+  "delegation": "delegation.1BBHJ3F67KC0HHYRCXD7X4KHYN",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "frontend/work/src/components/SkillGroups.tsx",
+      "sha256": "e97ad6b6917e2c3cca7d8a0c930f6cb470617eb7b36b40cdece23db4720be400"
+    },
+    {
+      "path": "frontend/work/src/libraryAuthoringState.ts",
+      "sha256": "f5521ab8dffb31ff1d874ffc15930387fe99294445e355af113d763e900ed9a4"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "01224706bb44309eae4c1970338db24eb23522da23c51d46ca91d3e6796d1679"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "3feb35f44a316beff62c881bcd47ee0c09ff3456f157e2e653de67e40bf36c67"
+    },
+    {
+      "path": "frontend/work/tests/library-authoring.test.mjs",
+      "sha256": "4a284742596ced5c4f1f808fdfff31eab4b8f96bd7b5e5a2e91c566ce779b8e4"
+    },
+    {
+      "path": "frontend/work/tests/work-library.test.mjs",
+      "sha256": "80aa1745f9af7e05052391d7335694062000a701e9c19cb955c4854b9be1d80f"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "282 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend-only)",
+    "packaged_asset": "not rebuilt yet (wave integration next)",
+    "screenshots": "not taken; browser check deferred to the wave-end asset integration"
+  },
+  "notes": [
+    "Worker sandbox refused node/tsc; coordinator ran both gates",
+    "i18n.json, styles.css and library-authoring.test.mjs hashes include the accepted WP-14 and WP-02 changes",
+    "New styles use raw hex values like the surrounding file; token consolidation is WP-13"
+  ]
+}

@@ -200,7 +200,7 @@ for (const locale of ["en", "ru"]) {
     assert.ok(section.includes(text("library_new_role")));
     assert.ok(section.includes(text("library_choose_team")));
     assert.equal(section.includes("Read the task and use the appropriate method."), false);
-    const library = renderToStaticMarkup(createElement(LibrarySection, { tab: "blueprints", onTabChange() {}, api: {}, libraryApi: {}, libraryState: { kind: "ready", catalog: catalog() }, onRefreshLibrary() {}, onChooseRole() {}, onApplied: async () => {}, onChooseTeam() {}, onBlueprintApplied() {}, text, locale, writesEnabled: true }));
+    const library = renderToStaticMarkup(createElement(LibrarySection, { tab: "blueprints", onTabChange() {}, api: {}, libraryApi: {}, libraryState: { kind: "ready", catalog: catalog() }, onRefreshLibrary() {}, onChooseRole() {}, onBlueprintApplied() {}, text, locale, writesEnabled: true }));
     assert.equal((library.match(/role="tabpanel"/g) ?? []).length, 4);
     assert.ok(library.includes('aria-labelledby="library-tab-blueprints" class="library-panel" id="library-panel-blueprints"'));
     assert.ok(library.includes('aria-labelledby="library-tab-roles" class="library-panel" hidden=""'));

@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const compiled = mkdtempSync(resolve(tmpdir(), "commons-shell-recovery-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled,
-  ...["api.ts", "launchIntentState.ts", "taskDependencyState.ts", "components/LaunchRecoveryPanel.tsx", "components/TaskComposer.tsx", "components/StarterPacksSection.tsx"].map((path) => resolve(root, "src", path))], { cwd: root });
+  ...["api.ts", "launchIntentState.ts", "taskDependencyState.ts", "components/LaunchRecoveryPanel.tsx", "components/TaskComposer.tsx"].map((path) => resolve(root, "src", path))], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const moduleAt = (path) => import(pathToFileURL(resolve(compiled, path)));
 const { WorkApi } = await moduleAt("api.js");
@@ -18,7 +18,6 @@ const { freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitS
 const { taskDependencyCatalog } = await moduleAt("taskDependencyState.js");
 const { LaunchRecoveryPanel } = await moduleAt("components/LaunchRecoveryPanel.js");
 const { TaskComposer } = await moduleAt("components/TaskComposer.js");
-const { StarterPackCard } = await moduleAt("components/StarterPacksSection.js");
 const strings = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
 const id = (kind, n = 0) => `${kind}.${"0".repeat(25)}${n}`;
 const taskA = id("task"), taskB = id("task", 1), roleA = id("agent"), roleB = id("agent", 1);
@@ -111,12 +110,4 @@ test("actual tracker API supplies accepted/completed prerequisites to composer a
   assert.equal(requests.some((request) => request.url.endsWith("/launch")), false, "dependency catalog does not misuse launch eligibility");
   assert.equal(taskDependencyCatalog({ kind: "ready", snapshot: { ...snapshot, truncated: true }, connection: "connected" }).status, "partial");
   assert.equal(taskDependencyCatalog({ kind: "failure" }).status, "unavailable");
-});
-test("recipe title deduplication preserves multiple distinct blueprint labels", () => {
-  const pack = { id: "custom", version: "1", title: "Shared title", summary: "Recipe", sourceKind: "bundled", example: true,
-    blueprints: [{ id: "first", title: "Shared title", summary: "Steps", roles: [] }] };
-  const render = (pack) => renderToStaticMarkup(createElement(StarterPackCard, { pack, text: (key) => strings.en[key], applyState: { kind: "idle" }, confirmed: {}, writesEnabled: false, onApply() {}, onConfirm() {} }));
-  assert.equal((render(pack).match(/<h[34][^>]*>Shared title<\/h[34]>/g) ?? []).length, 1);
-  const multiple = render({ ...pack, blueprints: [...pack.blueprints, { id: "second", title: "Different recipe", summary: "Other steps", roles: [] }] });
-  assert.match(multiple, /<h4>Shared title<\/h4>/); assert.match(multiple, /<h4>Different recipe<\/h4>/);
 });

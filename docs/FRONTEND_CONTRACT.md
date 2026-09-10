@@ -128,6 +128,19 @@ the legacy asset; Work is a separate compiled React application.
   input off screen.
   (`test_switching_language_repaints_every_surface_the_panel_paints_itself`,
   `test_a_language_switch_keeps_a_half_typed_acceptance`)
+- Built-in catalog copy is authored and rendered in EN and RU. User-authored
+  names, descriptions and task text — custom skill groups, custom blueprints,
+  their task titles, descriptions and acceptance criteria — are entered ONCE in
+  whatever language the author writes, stored without translation and rendered
+  byte-for-byte under either locale. Duplicating that one value into the `{en,
+  ru}` slots the persisted schema keeps is storage plumbing, not a second
+  authoring requirement: the authoring UI shows one field per value and never
+  asks for a translation. A record whose two slots already differ was written
+  by the old two-field editor; it is shown as both stored texts with an
+  explicit choice, and saving is blocked until one is chosen — never merged,
+  never silently overwritten.
+  (`frontend/work/tests/library-authoring.test.mjs`,
+  `frontend/work/tests/work-library.test.mjs`)
 
 ## Vocabulary is law
 
@@ -147,6 +160,11 @@ the legacy asset; Work is a separate compiled React application.
   (`test_every_guide_deep_link_lands_on_a_heading_that_actually_exists`)
 
 ## A registered route is not a usable route
+
+The library `skill_organization.groups` DTO includes `archived: true` for archived
+custom groups. Clients may offer restore, but must never offer archived groups as
+move targets. Archive and restore are server-authoritative, revision-bound edits;
+clients must not optimistically hide a group before the returned catalog confirms it.
 
 A writing panel registers its whole canonical non-`GET` surface
 unconditionally — the union of `MUTATING_ROUTES`, `CATALOG_ROUTES`,

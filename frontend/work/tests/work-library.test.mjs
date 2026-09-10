@@ -14,16 +14,15 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), [
   "--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler",
   "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled,
   resolve(root, "src/contextSourcePicker.ts"), resolve(root, "src/contextPackFormState.ts"),
-  resolve(root, "src/starterPackPresentation.ts"), resolve(root, "src/blueprintApplyOutcome.ts"),
+  resolve(root, "src/blueprintApplyOutcome.ts"),
   resolve(root, "src/components/LibrarySection.tsx")
 ], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const load = (path) => import(pathToFileURL(resolve(compiled, path)).href);
 const { exactSourceKey, sourceSelectionState, sourceChoices, chooseExactSource, updateSourceDisplayMemory } = await load("contextSourcePicker.js");
 const { formFromDraft, draftFromForm, parseAdvancedDraft, parseExactReference, snapshotSaveOperation } = await load("contextPackFormState.js");
-const { starterPackPresentation } = await load("starterPackPresentation.js");
+const { parseWorkBlueprints } = await load("libraryApi.js");
 const { ContextSourcePicker } = await load("components/ContextSourcePicker.js");
-const { StarterPackCard } = await load("components/StarterPacksSection.js");
 const { LibrarySection } = await load("components/LibrarySection.js");
 const { ContextPackNewButton } = await load("components/ContextPacksSection.js");
 const { ContextPackRetryIdentity } = await load("contextPackEditorState.js");
@@ -182,7 +181,7 @@ for (const locale of ["en", "ru"]) {
   test(`${locale} Library keeps every editor mounted and identifies its selected URL-owned tab`, () => {
     for (const tab of ["roles", "skills", "blueprints", "context"]) {
       const html = renderToStaticMarkup(createElement(LibrarySection, {
-        tab, onTabChange: () => {}, api: {}, text, writesEnabled: false, onApplied: async () => {}, onChooseTeam: () => {}
+        tab, onTabChange: () => {}, api: {}, text, writesEnabled: false
       }));
       assert.doesNotMatch(html, /<h1|aria-labelledby="library-title"/);
       assert.equal((html.match(/role="tabpanel"/g) ?? []).length, 4);
@@ -195,42 +194,54 @@ for (const locale of ["en", "ru"]) {
   });
 }
 
-function packFixture() {
-  const manifest = JSON.parse(readFileSync(resolve(root, "../../src/agent_commons/resources/starter_packs/feature-delivery.mock.json"), "utf8"));
-  return { id: manifest.id, version: manifest.version, title: manifest.title, summary: manifest.summary, sourceKind: "bundled", example: true,
-    blueprints: manifest.blueprints.map((blueprint) => ({ ...blueprint, roles: blueprint.roles.map((role) => ({
-      id: role.id, name: role.name, purpose: role.purpose, profileId: role.profile_id, contextMode: "fresh", skills: role.skill_refs
-    })) })) };
+function catalogFixture() {
+  const version = "a".repeat(64);
+  const role = (id) => ({ kind: "role", source: "builtin", id, version });
+  const bilingual = (en, ru) => ({ en, ru });
+  const task = (id, title, slotId, dependsOn = []) => ({
+    id, title: bilingual(title.en, title.ru), description: bilingual(title.en, title.ru),
+    acceptance_criteria: { en: ["Done"], ru: ["Готово"] }, depends_on: dependsOn, slot_id: slotId
+  });
+  return parseWorkBlueprints({
+    schema: "agent_commons.library-blueprints.v1",
+    blueprints: [
+      {
+        id: "feature-delivery", version, source: "builtin",
+        name: bilingual("Feature delivery", "Реализация функции"),
+        description: bilingual("Plan, implement, then independently review a bounded change.", "Спланировать, реализовать и независимо проверить ограниченное изменение."),
+        slots: [{ id: "implementer", name: "Implementer", role_ref: role("delivery-tech-lead") }],
+        tasks: [task("implementer", { en: "Implement the scoped change", ru: "Реализовать согласованное изменение" }, "implementer")]
+      },
+      {
+        id: "product-discovery", version, source: "builtin",
+        name: bilingual("Product discovery", "Продуктовое исследование"),
+        description: bilingual("Gather evidence, then review a recommendation before an owner decides.", "Собрать доказательства, затем проверить рекомендацию до решения владельца."),
+        slots: [{ id: "researcher", name: "Researcher", role_ref: role("product-manager") }],
+        tasks: [task("researcher", { en: "Research the product question", ru: "Исследовать продуктовый вопрос" }, "researcher")]
+      }
+    ]
+  });
 }
 
-test("localized recipe presentation preserves canonical identities, configuration and unknown metadata", () => {
-  const original = packFixture();
-  const before = JSON.stringify(original);
-  const translated = starterPackPresentation(original, (key) => messages.ru[key]);
-  assert.notEqual(translated.title, original.title);
-  assert.equal(translated.id, original.id);
-  assert.equal(translated.blueprints[0].id, original.blueprints[0].id);
-  assert.deepEqual(translated.blueprints[0].roles.map(({ id, profileId, contextMode, skills }) => ({ id, profileId, contextMode, skills })), original.blueprints[0].roles.map(({ id, profileId, contextMode, skills }) => ({ id, profileId, contextMode, skills })));
-  assert.equal(JSON.stringify(original), before);
-  for (const patch of [{ id: "custom.recipe" }, { version: "0.2.0" }]) {
-    const unknown = { ...original, ...patch };
-    assert.equal(starterPackPresentation(unknown, (key) => messages.ru[key]), unknown);
-  }
-});
-
-test("recipe viewing renders deny permissions and localized roles without invoking application", () => {
-  let writes = 0;
-  const pack = packFixture();
-  const html = renderToStaticMarkup(createElement(StarterPackCard, {
-    pack, text: (key) => messages.ru[key], applyState: { kind: "idle" }, confirmed: {},
-    onApply: () => { writes += 1; }, onConfirm: () => {}, onChooseTeam: () => {}, writesEnabled: true
+test("Library lists the built-in blueprints feature-delivery and product-discovery by name", () => {
+  const catalog = catalogFixture();
+  assert.deepEqual(catalog.map((item) => item.id), ["feature-delivery", "product-discovery"]);
+  assert.equal(catalog[0].name.en, "Feature delivery");
+  assert.equal(catalog[1].name.en, "Product discovery");
+  const html = renderToStaticMarkup(createElement(LibrarySection, {
+    tab: "blueprints", onTabChange: () => {}, api: {}, text: (key) => messages.en[key], writesEnabled: false,
+    libraryApi: { blueprints: async () => catalog }, libraryState: { kind: "ready", catalog: { roles: [], skills: [], editingEnabled: false } },
+    onRefreshLibrary: () => {}, onChooseRole: () => {}, onBlueprintApplied: () => {}, locale: "en"
   }));
-  assert.equal(writes, 0);
-  assert.ok(html.includes(messages.ru.recipe_implementer_name));
-  assert.ok(html.includes(messages.ru.recipe_independent_reviewer_name));
-  assert.ok(html.includes(messages.ru.recipe_permissions));
-  assert.ok(html.includes("claude-independent-reviewer"));
-  assert.match(html, /<button class="button button-primary" disabled=""/);
+  assert.ok(html.includes(messages.en.blueprints_title));
+  const absent = ["sta", "rter"].join("");
+  assert.equal(html.toLowerCase().includes(absent), false);
+  for (const locale of ["en", "ru"]) {
+    for (const [key, value] of Object.entries(messages[locale])) {
+      assert.equal(key.toLowerCase().includes(absent), false, key);
+      assert.equal(String(value).toLowerCase().includes(absent), false, `${locale}.${key}`);
+    }
+  }
 });
 
 function trackerTask(tail, overrides = {}) {
@@ -369,6 +380,23 @@ test("apply copy names creation and the absent run in both locales", () => {
   assert.match(messages.ru.blueprints_applied_not_started, /Ни один прогон не запущен/);
   assert.match(messages.ru.blueprints_applied_not_started, /только роли и задачи/);
   assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages.ru).sort());
+});
+
+test("library authoring copy asks for one text per value and never for a translation", () => {
+  for (const key of ["library_text_single_help", "library_legacy_conflict", "library_legacy_use", "library_legacy_required"]) {
+    for (const locale of ["en", "ru"]) assert.ok(messages[locale][key]?.trim(), `${locale}.${key}`);
+    assert.notEqual(messages.en[key], messages.ru[key]);
+  }
+  for (const key of ["library_name_en", "library_name_ru", "library_text_language"]) {
+    assert.equal(messages.en[key], undefined, key);
+    assert.equal(messages.ru[key], undefined, key);
+  }
+  for (const key of ["library_group_invalid", "library_blueprint_error_text", "library_blueprint_definition_help"]) {
+    assert.doesNotMatch(messages.en[key], /both languages|English and Russian/i, key);
+    assert.doesNotMatch(messages.ru[key], /на двух языках|на английском и русском/i, key);
+  }
+  assert.match(messages.en.library_text_single_help, /never translated/);
+  assert.match(messages.ru.library_text_single_help, /никогда не переводится/);
 });
 
 for (const kind of ["publish", "revise"]) {

@@ -1,0 +1,31 @@
+{
+  "work_package": "WP-08",
+  "task": "task.6Q4A7HE1QVX4VQKBBSNS8CRZA4",
+  "delegation": "delegation.0D8JZM8GWHXJRV3C2QPYVR3WV8",
+  "base_commit": "0e1146e649a774544c39a202db3ab5d6b7e7b7f1",
+  "recorded_at": "2026-09-10",
+  "files": [
+    {
+      "path": "benchmarks/benchmark_work_mutation.py",
+      "sha256": "2fb9eddb8e779abf1d9cf554a414e012522d48e4d3cd1002db218a4068253917"
+    },
+    {
+      "path": "tests/benchmarks/test_work_mutation_latency.py",
+      "sha256": "91104c83c1c28f53ce0ca9b382df914026b543233eb38ee438b4f3c413ff3fb0"
+    },
+    {
+      "path": "docs/performance/2026-09-10-mutation-baseline.md",
+      "sha256": "656e0b429d305cc94cbf9ac90a61261b2974ea520a667f8db7b48733fbf57168"
+    }
+  ],
+  "verification": {
+    "pytest": "tests/benchmarks/test_work_mutation_latency.py: 2 passed, 1 skipped (large fixture opt-in)",
+    "ruff": "check and format clean for benchmarks and tests/benchmarks",
+    "benchmark_runs": "coordinator ran the delivered tool on Apple M2 Max: small 300-task profile repeats=5, then small repeats=2 plus large (3206 events, 350 manifests) with AGENT_COMMONS_LARGE_BENCHMARK=1 --write-docs",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "Grok worker (grok-builder) wrote the benchmark and the test but exited without a terminal tool call; delegation ended needs_operator (finding.1JSG1HQJZXP0EHGRH1NE6RJ82S); the coordinator generated the report with the delivered tool and fixed one sentence in the renderer to name the measured fixture instead of always saying large",
+    "Measurement only: no optimisation implemented, no p50/p95 target set; warm task_create median 4.4 s on the 300-task fixture and 33 s on the 3206-event fixture, 62-64% in canonical_reads_validation"
+  ]
+}

@@ -651,6 +651,62 @@ parser); три падения первого `make check` устранены (f
 WP-15.3 (лимит для проверочных запусков), коммит и push по команде владельца,
 перезапуск сервиса 8787 владельцем.
 
+## M. Статус волны 2 (начата 10 сентября 2026)
+
+Порядок после ADR 0020: WP-08 → WP-14 → WP-02 → WP-02.2 (UI архива групп,
+Opus) → WP-07 → WP-16.1 → WP-16.2 → WP-11.1 → WP-11.2; интеграция asset —
+координатор в конце волны.
+
+| Пакет | Исполнитель | Review | Итог |
+|---|---|---|---|
+| WP-08 baseline латентности записи | Grok | Astra, changes_requested (манифест не был привязан к ревизии) → approved (v2) | принят |
+| WP-14 один ввод user-authored текста | Opus | Astra, approved | принят (run 1 оборвался на лимите провайдера, run 2 добил checkpoint; 275 тестов, tsc чисто; `wp-14-source-manifest.json`) |
+| WP-02 архив/восстановление группы навыков (сервер) | Terra | Claude, approved (6 non-blocking notes) | принят; координатор дописал HTTP-тест маршрута и тест парсера; 77 python + 276 Work тестов, ruff/tsc чисто; `wp-02-source-manifest.json` |
+| WP-02.2 архив группы в UI | Opus | Astra, changes_requested (фокус после restore последней группы) → approved (v2) | принят; 282 Work тестов, tsc чисто; `wp-02.2-source-manifest-v2.json` |
+| WP-07 scoped mutation feedback | Opus | Astra, changes_requested ×2 (live region; надёжный возврат фокуса с тестом) → approved (v3) | принят; координатор: счётчик aria-hidden, инициирующий контрол захватывается в begin(), чистый `mutationFocus.ts` с поведенческим тестом; 299 Work тестов, tsc чисто; `wp-07-source-manifest-v3.json` |
+| WP-16.1 миграция Starter Packs в built-in blueprints, удаление backend | Terra | Claude: changes_requested (verdict доставлен текстом — координатор писал в ledger во время review) → approved (v2) | принят; run 1: needs_operator; run 2: миграция и удаление (роли → delivery-tech-lead, qa-engineer, product-manager, strategy-advisor); координатор откатил ослабление доменного правила и схемы agent.v2, поправил 4 теста, добавил route-surface no-write тест, исправил счётчик «семь built-in»; 2582 full pytest, ruff чисто; `wp-16.1-source-manifest-v2.json` |
+| WP-16.2 удаление Starter Packs из Work app | Grok | Astra, approved | принят; Grok снова вышел без терминального вызова (finding.4Y9BWC5ZHK1GHZFCEQ8VGZ8V7Q); координатор проверил: упоминаний starter нет, 297 Work тестов, tsc чисто; `wp-16.2-source-manifest.json` |
+| WP-11.2 canonical objective/application (реализация) | Terra | — | **заблокирован до принятия ADR 0021 владельцем** |
+| WP-11.1 ADR 0021 objective/application provenance | Terra | Claude, changes_requested (детерминированный id vs ULID; objective присоединённой вручную задачи) → approved (v2) | принят; ADR написан Terra, правки текста координатора; статус ADR «предложено» — **нужно принятие владельцем до WP-11.2**; `wp-11.1-source-manifest-v2.json` |
+
+WP-08: Grok написал `benchmarks/benchmark_work_mutation.py` и
+`tests/benchmarks/test_work_mutation_latency.py`, но завершил процесс без
+терминального вызова (`needs_operator`, finding.1JSG1HQJZXP0EHGRH1NE6RJ82S);
+отчёт `docs/performance/2026-09-10-mutation-baseline.md` сгенерирован
+координатором поставленным инструментом на машине владельца. Evidence:
+`docs/evidence/2026-09-10/wp-08-source-manifest.json`
+(artifact.4WNFN9T4G4M62XE3VJQ48GMS0W). Результат измерения: warm `task_create`
+медиана 4,4 с на 300 задачах/420 событиях и 33 с на 3206 событиях; 62–64 % —
+`canonical_reads_validation` (двойной полный проход по ledger на каждую запись).
+Целевые p50/p95 не зафиксированы — ждут решения владельца `ux/latency-thresholds`.
+Урок процесса: манифест обязан быть привязан `--artifact-ref` и к `task complete`,
+и к `task submit`; brief для Grok обязан заканчиваться явным требованием вызвать
+терминальный инструмент.
+
+Замечания reviewer-а по WP-02 (не блокирующие, переносятся): старые receipts
+без поля `archived` при replay возвращают тело со старой revision (следующая
+запись получит 409 и перезагрузку — fail-safe); `move_to_group_id: null`
+трактуется как отсутствие, а не как ошибка формы; в тестах нет архива пустой
+группы, replay idempotency-key и проверки одного receipt; клиентский парсер не
+запрещает assignment на архивную группу (WP-02.2 добавляет клиентскую защиту);
+архивные группы продолжают занимать лимит 128; до WP-02.2 существующие
+компоненты показывают архивные группы как обычные, сервер отказывает 422.
+
+Интеграция волны 2 (10 сентября, вечер): asset пересобран координатором на
+Node 24 (`work-DQKgHjnE.js`, `work-Dw4mpzRm.css`), tool переустановлен. Проверка в
+реальном браузере на demo-workspace (порт 8792, код волны 2): вкладка Library без
+Starter Packs, `Blueprints 7` с «Feature delivery» и «Product discovery»; форма
+новой группы — один ввод названия (кириллица сохранена как есть); архив пустой
+группы через подтверждение, группа уходит из списка и из всех select только по
+ответу сервера, раздел «Archived groups 1», Restore возвращает группу, фокус
+после restore последней группы — на корне раздела (persistent fallback).
+Полный `make check` на Node 24 зелёный: 2617 python (14 документированных
+пропусков), 297 Work, 27 shell; evidence
+`docs/evidence/2026-09-10/wave-2-integration-manifest.json`
+(artifact.2W6EYEDHVEQT86R48T5WTXF8D1, 66 файлов). Открыто: принятие ADR 0021
+владельцем (WP-11.2), коммит/PR/merge по команде владельца, перезапуск
+сервиса 8787 после merge, WP-15.3.
+
 ## J. Поправки координатора (Claude Fable) к раунду 2
 
 Внесены 9 сентября 2026 после разбора v2; Астра с ними не спорила, третий раунд
