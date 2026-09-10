@@ -44,7 +44,8 @@ export function workRouteHref(route: WorkRoute): string {
   if (route.projectId !== null) query.set("project", route.projectId);
   if (route.view !== "board") query.set("view", route.view);
   if (route.taskId !== null) query.set("task", route.taskId);
-  if (route.agentId !== null) query.set("agent", route.agentId);
+  // The role filter belongs to the tracker; other views do not carry it forward.
+  if (route.agentId !== null && route.view === "work") query.set("agent", route.agentId);
   if (route.filter !== "all") query.set("filter", route.filter);
   if (route.libraryTab !== "roles") query.set("tab", route.libraryTab);
   if (route.composer) query.set("new", "task");

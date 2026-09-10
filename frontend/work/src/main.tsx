@@ -1386,7 +1386,9 @@ function WorkApp(): ReactElement {
               agentId={route.agentId} onClearAgent={() => navigate({ agentId: null })} /> : null}
           </section>
           <section hidden={route.view !== "board"} aria-label={text("shell_nav_board")} className="board-view">
-            {workspaceInitialized ? <ProjectBoard api={renderedProjectApi} locale={locale} text={text} roles={roleOptions} tracker={trackerObservation}
+            {/* Mounted only while visible: React Flow measures its viewport on mount, and a
+                board fitted inside a hidden section would come back as a dot in the corner. */}
+            {route.view === "board" && workspaceInitialized ? <ProjectBoard api={renderedProjectApi} locale={locale} text={text} roles={roleOptions} tracker={trackerObservation}
               writesEnabled={data.meta.writesEnabled && configured} refreshKey={boardRefreshKey} selectedTaskId={route.taskId}
               onOpenTasks={(agentId) => navigate({ view: "work", agentId, composer: false })}
               onGiveTask={(agentId) => {
@@ -1474,7 +1476,7 @@ function WorkApp(): ReactElement {
             </form>
             {actionFeedback("create-role")}
           </WorkflowCard>
-              </>} /> : <div className="notice setup-notice" role="status"><p>{text("workspace_needs_setup")}</p><button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_nav_settings")}</button></div>}
+              </>} /> : route.view === "board" ? <div className="notice setup-notice" role="status"><p>{text("workspace_needs_setup")}</p><button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_nav_settings")}</button></div> : null}
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
             {appliedBlueprint ? <BlueprintApplyOutcomePanel text={text} onIntent={followBlueprintIntent}
