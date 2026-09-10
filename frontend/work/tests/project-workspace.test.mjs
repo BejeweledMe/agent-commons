@@ -101,9 +101,10 @@ test("returning to A retains its exact RAM-only uncertain intent without exposin
 });
 
 test("Back/Forward-safe route carries only the opaque project identity", () => {
-  const state = routes.parseWorkRoute(`?project=${projectA}&view=team&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
+  const state = routes.parseWorkRoute(`?project=${projectA}&view=work&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
   assert.equal(state.projectId, projectA);
-  assert.equal(routes.workRouteHref(state), `/work?project=${projectA}&view=team&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
+  assert.equal(routes.workRouteHref(state), `/work?project=${projectA}&view=work&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
+  assert.equal(routes.parseWorkRoute(`?project=${projectA}&view=team`).view, "board", "old Agents links land on the project board");
   assert.equal(routes.sanitizedWorkLocation("/work", `?project=${projectA}&brief=private&path=%2Fsecret`), `/work?project=${projectA}`);
 });
 

@@ -1975,6 +1975,30 @@ export class WorkApi {
     );
   }
 
+  /** The workspace graph projection; the board keeps only its role structure. */
+  async readGraph(signal: AbortSignal): Promise<unknown> {
+    return this.get("/graph", signal);
+  }
+
+  /** The operator's board arrangement for this project: operational state, never a canonical fact. */
+  async readBoardLayout(signal: AbortSignal): Promise<unknown> {
+    return this.get("/board", signal);
+  }
+
+  async writeBoardLayout(body: JsonObject, signal: AbortSignal): Promise<unknown> {
+    return this.post("/board", body, signal);
+  }
+
+  /** Open a recorded link between two standing roles; the ledger, not the canvas, holds the edge. */
+  async openAgentLink(input: { fromAgentId: string; toAgentId: string; allowedAction: "ask" | "delegate"; reason: string }, signal: AbortSignal, idempotencyKey = crypto.randomUUID()): Promise<unknown> {
+    const agent = /^agent\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
+    if (!agent.test(input.fromAgentId) || !agent.test(input.toAgentId) || input.fromAgentId === input.toAgentId) throw new ApiProblem(400, null);
+    return this.post("/agent-links", {
+      from_agent_id: input.fromAgentId, to_agent_id: input.toAgentId, allowed_action: input.allowedAction,
+      reason: input.reason, idempotency_key: idempotencyKey
+    }, signal);
+  }
+
   async readOutputs(kind: "task" | "agent", id: string, versions: "latest" | "all", summary: boolean, signal: AbortSignal): Promise<unknown> {
     if ((kind !== "task" && kind !== "agent") || !new RegExp(`^${kind}\\.[0-7][0-9A-HJKMNP-TV-Z]{25}$`).test(id)
       || (versions !== "latest" && versions !== "all")) throw new ApiProblem(400, null);
