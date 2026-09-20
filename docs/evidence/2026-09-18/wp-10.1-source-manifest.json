@@ -1,0 +1,33 @@
+{
+  "work_package": "WP-10.1",
+  "task": "task.53Q243VDZCN0ZTR1AJE331CMDK",
+  "delegation": "delegation.16JRY0K7419T0TMSPYREEDFAKM",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/reads.py",
+      "sha256": "9cca21ce2be7b7452f5a9219176bf4ddfd64380be2d0a4230f3c0dee5b612581"
+    },
+    {
+      "path": "tests/ui/test_task_entity_findings.py",
+      "sha256": "4888ce0ad9899a8c0e37bdbebee52df290123b010f6ef86536cb133e8693ce8f"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "70944c40f90e360f41b72b982622768ced4ac911891c4bd567e7212c7602c634"
+    }
+  ],
+  "verification": {
+    "pytest": "31 passed (tests/ui/test_task_entity_findings.py, test_readonly_invariant.py, test_tracker_reads.py, test_task_join_route.py)",
+    "ruff": "check and format clean after the coordinator reformatted two long test signatures",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "shape": "GET /api/entities/task/{id} record.findings = [{id, title (summary bounded to 256 bytes), severity, state}] in projection order, always present (empty list when none), capped at 50 with findings_truncated=true beyond",
+    "selection": "findings whose evidence_refs bind {kind: task, id}; pure helper findings_for_task in ui/reads.py",
+    "read_only": "the default UI test client is the read-only panel, so every test already runs against it",
+    "coordinator_fix": "ruff format on the new test file only",
+    "packaged_asset": "untouched"
+  }
+}

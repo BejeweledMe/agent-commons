@@ -268,6 +268,12 @@ not consume it, and the panel says so. Anyone holding the bearer token writes
 as the operator session the panel opened for itself, and the startup banner
 says so.
 
+Manual task-to-application joins are a narrower exception: the domain requires
+the active session's explicit `task:join_application` capability before it
+appends the audit event. The UI's operator-owned session carries that capability;
+read-only panels and ordinary sessions do not gain it merely by rendering or
+selecting an application.
+
 Catalogue editing is a **second, separate** privilege from recording a role: it
 lets the panel add and remove skills and tools, which changes what delegated
 runs are told to do — a different magnitude than recording a role, and folding
@@ -478,6 +484,10 @@ offending value, so it would carry call arguments. These files are
 private (0700 directories, 0600 files) and never enter canonical events or
 telemetry. OpenTelemetry remains metadata-only. Export endpoints and credentials
 are operator configuration and never ledger data.
+
+The opt-in UI instrumentation store is non-canonical, local-only operational
+state: it retains only closed-vocabulary coarse counters under the resolved
+state root and has no export, upload, or transmission path.
 
 ### Provider and protocol drift
 

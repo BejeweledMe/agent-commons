@@ -83,6 +83,7 @@ from .threads import ThreadCommands
 
 PAYLOAD_SCHEMAS = {
     "objective": "commons.payload.objective.v1",
+    "blueprint_application": "commons.payload.blueprint_application.v1",
     "task": "commons.payload.task.v1",
     "thread": "commons.payload.thread.v1",
     "artifact": "commons.payload.artifact.v1",
@@ -985,8 +986,11 @@ class CommonsManager(
         except KeyError as exc:
             raise ValidationError(f"no canonical payload schema for {event_type}") from exc
         specialized_hire = event_type == "agent.created" and "specialization_ref" in payload_value
+        task_creation_v2 = event_type == "task.created" and "objective_id" in payload_value
         if specialized_hire:
             payload_schema = "commons.payload.agent.v2"
+        if task_creation_v2:
+            payload_schema = "commons.payload.task.v2"
         conversation_write = family == "thread" and any(
             field in payload_value
             for field in ("conversation_scope", "attachments", "reply_to_message_id")

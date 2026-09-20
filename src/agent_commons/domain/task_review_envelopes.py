@@ -39,6 +39,7 @@ class TaskPayload(TypedDict):
     changes: NotRequired[TaskChangesPayload]
     priority: NotRequired[str]
     dependencies: NotRequired[list[str]]
+    objective_id: NotRequired[str | None]
     expected_revision: NotRequired[str]
     owner_session_id: NotRequired[str]
     reason: NotRequired[str]
@@ -151,6 +152,8 @@ class TaskEnvelope(EventEnvelope):
     changes: TaskChanges | None
     priority: str | None
     dependencies: tuple[str, ...] | None
+    objective_id: str | None
+    has_objective_id: bool
     expected_revision: str | None
     owner_session_id: str | None
     reason: str | None
@@ -177,6 +180,8 @@ class TaskEnvelope(EventEnvelope):
             payload["priority"] = self.priority
         if self.dependencies is not None:
             payload["dependencies"] = list(self.dependencies)
+        if self.has_objective_id:
+            payload["objective_id"] = self.objective_id
         if self.expected_revision is not None:
             payload["expected_revision"] = self.expected_revision
         if self.owner_session_id is not None:
@@ -252,7 +257,11 @@ def parse_task_review_envelope(
     """
 
     if event_type in _TASK_EVENT_TYPES:
-        _validate_family_payload(event_type, payload, "commons.payload.task.v1")
+        _validate_family_payload(
+            event_type,
+            payload,
+            "commons.payload.task.v2" if "objective_id" in payload else "commons.payload.task.v1",
+        )
         return TaskEnvelope(
             event_type=cast(TaskEventType, event_type),
             task_id=_required_string(payload, "task_id"),
@@ -262,6 +271,8 @@ def parse_task_review_envelope(
             changes=_optional_task_changes(payload),
             priority=_optional_string(payload, "priority"),
             dependencies=_optional_string_tuple(payload, "dependencies"),
+            objective_id=_optional_string(payload, "objective_id"),
+            has_objective_id="objective_id" in payload,
             expected_revision=_optional_string(payload, "expected_revision"),
             owner_session_id=_optional_string(payload, "owner_session_id"),
             reason=_optional_string(payload, "reason"),

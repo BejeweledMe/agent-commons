@@ -196,6 +196,8 @@ def build_tracker_snapshot(
             freshness=node.freshness.value,
             evidence_state=node.evidence_state.value,
             gaps=tuple(gap.value for gap in node.gaps),
+            objective_id=_objective_id(snapshot, snapshot.tasks.get(node.task_id)),
+            application_id=_application_id(snapshot.tasks.get(node.task_id)),
             **_suggested_role(snapshot, node.task_id),
         )
         for node in plan.nodes
@@ -421,6 +423,28 @@ def _task_title(task: object) -> str:
     if not isinstance(title, str):
         return ""
     return truncate_utf8("".join(character for character in title if ord(character) >= 32), 300)
+
+
+def _objective_id(snapshot: ProjectSnapshot, task: object) -> str | None:
+    value = task.get("objective_id") if isinstance(task, Mapping) else None
+    if isinstance(value, str) and is_typed_id(value, "objective"):
+        return value
+    application_id = _application_id(task)
+    # Application provenance provides the effective objective for tasks that
+    # were created without a task-local objective.
+    application = snapshot.applications.get(application_id) if application_id is not None else None
+    candidate = application.get("objective_id") if application is not None else None
+    return candidate if isinstance(candidate, str) and is_typed_id(candidate, "objective") else None
+
+
+# An application id is a namespaced digest (ADR 0021), not a ULID, so the
+# generic typed-id check would reject every real value.
+_APPLICATION_ID = re.compile(r"^application\.[a-f0-9]{64}$")
+
+
+def _application_id(task: object) -> str | None:
+    value = task.get("application_id") if isinstance(task, Mapping) else None
+    return value if isinstance(value, str) and _APPLICATION_ID.fullmatch(value) else None
 
 
 def _suggested_role(snapshot: ProjectSnapshot, task_id: str) -> dict[str, str]:

@@ -1,14 +1,14 @@
-import { OutputsButton } from "./OutputsPanel.js";
 import { type KeyboardEvent, type ReactElement, useEffect, useRef, useState } from "react";
-import { ApiProblem, type WorkApi } from "../api";
+import { ApiProblem, requestOutcome, type WorkApi } from "../api";
+import { recordInstrumentation } from "../instrumentation.js";
+import type { TasksView } from "../appRouteState.js";
 import type { TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
-import { filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, trackerCapacityOnlyGap, type TaskFilter } from "../taskPresentation.js";
+import { bucketTasksForNow, filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, trackerCapacityOnlyGap, type NowBuckets, type TaskFilter } from "../taskPresentation.js";
 import { trackerLoadFailed, trackerLoadSucceeded, trackerStreamSucceeded, type TrackerViewState } from "../trackerState.js";
-import { TaskInspector, TaskState } from "./TaskInspector.js";
-import { TaskGraph } from "./TaskGraph.js";
+import { TaskInspector, TaskState, type RenderedTask } from "./TaskInspector.js";
+import { TaskViews } from "./TaskViews.js";
 import { TaskEditor, type TaskEditorEntries } from "./TaskEditor.js";
-import { taskGraphText } from "../taskGraphStrings.js";
 import "../taskGraph.css";
 
 type Props = {
@@ -24,12 +24,16 @@ type Props = {
   filter: TaskFilter;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: TaskFilter) => void;
+  /** Which of Now / Map / All tasks is open; presentation route state only. */
+  tasksView: TasksView;
+  onTasksViewChange: (value: TasksView) => void;
   /** Narrow the tracker to one role's tasks (navigation state from the board). */
   agentId?: string | null;
   onClearAgent?: () => void;
 };
 type TrackerTaskActionName = "request_review" | "accept_task" | "reopen_task";
-type TaskActionIntent = Readonly<{ action: TrackerTaskActionName; taskId: string; value: string | readonly string[]; key: string }>;
+/** `expectedRevision` is the revision the inspector rendered when the intent was formed; accept and return post exactly it. */
+type TaskActionIntent = Readonly<{ action: TrackerTaskActionName; taskId: string; value: string | readonly string[]; key: string; expectedRevision: string | null }>;
 type TrackerActionState =
   | { kind: "idle" }
   | { kind: "submitting"; action: TrackerTaskActionName }
@@ -39,6 +43,7 @@ type TaskActionDraft = { reviewCriteria: string; acceptSummary: string; reopenRe
 const PRIMARY_FILTERS: readonly TaskFilter[] = ["all", "attention", "active"];
 const MORE_FILTERS = TASK_FILTERS.filter((value) => !PRIMARY_FILTERS.includes(value));
 const emptyDraft: TaskActionDraft = { reviewCriteria: "", acceptSummary: "", reopenReason: "", reopenConfirmed: false };
+const emptyBuckets: NowBuckets = { needs_you: [], in_progress: [], next: [], settled: [] };
 function criteriaLines(value: string): readonly string[] {
   return value.split("\n").map((item) => item.trim()).filter((item) => item.length > 0);
 }
@@ -58,9 +63,8 @@ function trackerActionFailure(error: unknown): { code: string; safeNextActions: 
   };
 }
 
-export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange, agentId = null, onClearAgent }: Props): ReactElement {
+export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange, tasksView, onTasksViewChange, agentId = null, onClearAgent }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
-  const [taskView, setTaskView] = useState<"graph" | "list">("graph");
   const [editorEntries, setEditorEntries] = useState<TaskEditorEntries>({});
   const selectedTaskRef = useRef(selectedTaskId);
   selectedTaskRef.current = selectedTaskId;
@@ -103,6 +107,11 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
   useEffect(() => { onObservation?.(state); }, [state, onObservation]);
   const tasks = state.kind === "ready" ? state.snapshot.tasks : [];
   const visibleTasks = state.kind === "ready" ? filterTrackerTasks(state.snapshot, filter, search, agentId) : [];
+  const buckets = state.kind === "ready" ? bucketTasksForNow(state.snapshot, agentId) : emptyBuckets;
+  // Keyboard order follows what the open view actually shows, column by column.
+  const navigableTasks: readonly TrackerTask[] = tasksView === "now"
+    ? [...buckets.needs_you, ...buckets.in_progress, ...buckets.next]
+    : visibleTasks;
   const selectedTask = tasks.find((task) => task.taskId === selectedTaskId) ?? null;
   const actionsCurrent = writesEnabled && state.kind === "ready" && selectedTask !== null
     && taskObservationCurrent(state.snapshot, selectedTask)
@@ -118,17 +127,17 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
     }
   }
   function moveTaskFocus(event: KeyboardEvent<HTMLButtonElement>, taskId: string): void {
-    if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key) || visibleTasks.length === 0) return;
+    if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key) || navigableTasks.length === 0) return;
     event.preventDefault();
-    const current = visibleTasks.findIndex((task) => task.taskId === taskId);
-    const next = event.key === "Home" ? 0 : event.key === "End" ? visibleTasks.length - 1
-      : event.key === "ArrowDown" || event.key === "ArrowRight" ? (current + 1) % visibleTasks.length
-        : (current - 1 + visibleTasks.length) % visibleTasks.length;
-    const nextId = visibleTasks[next].taskId;
+    const current = navigableTasks.findIndex((task) => task.taskId === taskId);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? navigableTasks.length - 1
+      : event.key === "ArrowDown" || event.key === "ArrowRight" ? (current + 1) % navigableTasks.length
+        : (current - 1 + navigableTasks.length) % navigableTasks.length;
+    const nextId = navigableTasks[next].taskId;
     selectTask(nextId);
     taskButtons.current.get(nextId)?.focus();
   }
-  function taskActionIntent(action: TrackerTaskActionName, task: TrackerTask): TaskActionIntent {
+  function taskActionIntent(action: TrackerTaskActionName, task: TrackerTask, expectedRevision: string | null): TaskActionIntent {
     const value = action === "request_review" ? criteriaLines(reviewCriteria)
       : action === "accept_task" ? acceptSummary.trim() : reopenReason.trim();
     const signature = JSON.stringify([action, task.taskId, value]);
@@ -137,38 +146,50 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
       key = `tracker-${action}-${crypto.randomUUID()}`;
       actionKeys.current.set(signature, key);
     }
-    return { action, taskId: task.taskId, value, key };
+    return { action, taskId: task.taskId, value, key, expectedRevision };
   }
 
-  async function performTaskAction(action: TrackerTaskActionName, task: TrackerTask): Promise<void> {
-    await performTaskIntent(taskActionIntent(action, task));
+  async function performTaskAction(action: TrackerTaskActionName, task: TrackerTask, expectedRevision: string | null): Promise<void> {
+    await performTaskIntent(taskActionIntent(action, task, expectedRevision));
   }
 
   async function performTaskIntent(intent: TaskActionIntent): Promise<void> {
     const signal = new AbortController().signal;
-    const { action, taskId, value, key } = intent;
+    const { action, taskId, value, key, expectedRevision } = intent;
     setTaskActionState(taskId, { kind: "submitting", action });
+    const started = performance.now();
     try {
       if (action === "request_review") {
         await api.requestTaskReview(taskId, value as readonly string[], key, signal);
+      } else if (expectedRevision === null) {
+        // Nothing was rendered to accept or return: refuse here rather than
+        // fetch a revision the person has not seen.
+        throw new ApiProblem(409, {
+          code: "tracker_task_revision_unavailable",
+          message: "the task detail has not been rendered yet",
+          safeNextActions: ["Wait for the task detail to load, then retry."]
+        });
       } else if (action === "accept_task") {
-        await api.acceptTask(taskId, value as string, key, signal);
+        await api.acceptTask(taskId, value as string, key, signal, expectedRevision);
       } else {
-        await api.reopenTask(taskId, value as string, key, signal);
+        await api.reopenTask(taskId, value as string, key, signal, expectedRevision);
       }
       const snapshot = await api.loadTracker(signal);
       setState((current) => trackerLoadSucceeded(current, snapshot));
       actionKeys.current.delete(JSON.stringify([action, taskId, value]));
       api.forgetTaskWrite(key);
       setTaskActionState(taskId, { kind: "success", message: "tracker_action_success" });
+      // Which action it was is not recorded: only that a task action finished.
+      recordInstrumentation("task_action", "confirmed", performance.now() - started);
     } catch (error: unknown) {
+      recordInstrumentation("task_action", requestOutcome(error), performance.now() - started);
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setTaskActionState(taskId, { kind: "error", intent, ...trackerActionFailure(error) });
       }
     }
   }
 
-  function trackerTaskActions(task: TrackerTask): ReactElement | null {
+  function trackerTaskActions(task: TrackerTask, renderedRevision: string | null): ReactElement | null {
     const hasCanonicalAction = task.nextAction === "request_review"
       || task.nextAction === "accept_task"
       || task.nextAction === "revise_work";
@@ -196,7 +217,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
             <button
               className="button button-primary"
               disabled={busy}
-              onClick={() => void performTaskAction("request_review", task)}
+              onClick={() => void performTaskAction("request_review", task, renderedRevision)}
               type="button"
             >
               {submitting("request_review") ? text("working") : text("tracker_request_review_action")}
@@ -219,7 +240,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
             <button
               className="button button-primary"
               disabled={busy || acceptSummary.trim().length === 0}
-              onClick={() => void performTaskAction("accept_task", task)}
+              onClick={() => void performTaskAction("accept_task", task, renderedRevision)}
               type="button"
             >
               {submitting("accept_task") ? text("working") : text("tracker_accept_action")}
@@ -251,7 +272,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
             <button
               className="button button-primary"
               disabled={busy || reopenReason.trim().length === 0 || !reopenConfirmed}
-              onClick={() => void performTaskAction("reopen_task", task)}
+              onClick={() => void performTaskAction("reopen_task", task, renderedRevision)}
               type="button"
             >
               {submitting("reopen_task") ? text("working") : text("tracker_reopen_action")}
@@ -296,13 +317,15 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
   const stale = snapshot.state === "stale" || snapshot.freshness.state === "stale" || snapshot.freshness.resumeGap || state.connection === "disconnected";
   return <section className="tracker-section work-tracker" aria-label={text("tracker_title")}>
     <div className="task-view-toolbar">
-      <div className="task-search-field"><label htmlFor="task-view-search">{text("task_view_search")}</label>
-      <input id="task-view-search" ref={searchField} type="search" value={search} maxLength={200} onChange={(event) => onSearchChange(event.target.value)} /></div>
+      {/* Search and the status filters belong to Map and All tasks; the Now
+          columns are the filter, so no inert control is offered there. */}
+      {tasksView === "now" ? null : <div className="task-search-field"><label htmlFor="task-view-search">{text("task_view_search")}</label>
+      <input id="task-view-search" ref={searchField} type="search" value={search} maxLength={200} onChange={(event) => onSearchChange(event.target.value)} /></div>}
       <div className="tracker-connection" role="status">{text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}</div>
       <button type="button" className="button button-secondary button-inline" onClick={() => void load(new AbortController().signal)}>{text("task_view_refresh")}</button>
     </div>
     {agentId !== null ? <p className="notice tracker-agent-filter" role="status">{text("tracker_agent_filter")}: <strong>{(state.kind === "ready" ? state.snapshot.tasks.find((task) => task.suggestedAgentId === agentId)?.suggestedRoleName ?? state.snapshot.runs.find((run) => run.agentId === agentId)?.roleName : null) ?? agentId}</strong>{onClearAgent ? <button type="button" className="notice-link" onClick={onClearAgent}>{text("tracker_agent_filter_clear")}</button> : null}</p> : null}
-    <div className="task-view-filters" role="group" aria-label={text("task_view_filter")}>
+    {tasksView === "now" ? null : <div className="task-view-filters" role="group" aria-label={text("task_view_filter")}>
       {PRIMARY_FILTERS.map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => onFilterChange(value)}>{text(taskFilterLabel[value])}</button>)}
       <label className="task-more-filter" htmlFor="task-more-filter">
         <span className="visually-hidden">{text("task_view_more_status")}</span>
@@ -312,34 +335,18 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
           {MORE_FILTERS.map((value) => <option key={value} value={value}>{text(taskFilterLabel[value])}</option>)}
         </select>
       </label>
-    </div>
+    </div>}
     {stale ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_stale_title")}</strong><p>{text(snapshot.freshness.resumeGap ? "tracker_resume_gap" : "tracker_stale_next")}</p></div> : null}
     {(snapshot.state === "partial" && !trackerCapacityOnlyGap(snapshot)) || snapshot.truncated ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_partial_title")}</strong><p>{text("tracker_partial_next")}</p></div> : null}
     {snapshot.state === "error" ? <div className="tracker-state tracker-state-error" role="alert"><strong>{text("tracker_projection_error_title")}</strong><p>{text("tracker_projection_error_next")}</p></div> : null}
     {snapshot.state === "loading" ? <p role="status">{text("tracker_loading")}</p> : null}
     <div className={`task-workspace${selectedTaskId !== null ? " task-workspace-selected" : ""}`}>
       <section className="task-list-pane" aria-labelledby="task-list-title">
-        <h2 id="task-list-title">{text("tracker_title")} <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${visibleTasks.length}/${tasks.length}`}>{visibleTasks.length}/{tasks.length}</span></h2>
-        <div className="task-graph-switch" role="group" aria-label={taskGraphText(locale, "graph")}>
-          <button type="button" className="button button-secondary" aria-pressed={taskView === "graph"} onClick={() => setTaskView("graph")}>{taskGraphText(locale, "graph")}</button>
-          <button type="button" className="button button-secondary" aria-pressed={taskView === "list"} onClick={() => setTaskView("list")}>{taskGraphText(locale, "list")}</button>
-        </div>
-        {taskView === "graph" ? <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={selectTask} locale={locale} /> : null}
-        {taskView === "graph" && visibleTasks.length !== tasks.length ? <p className="small-copy">{taskGraphText(locale, "filtered")}</p> : null}
-        <p className="visually-hidden" id="tracker-keyboard-help">{text("tracker_keyboard_help")}</p>
-        {snapshot.state === "empty" ? <p>{text("tracker_empty")}</p> : visibleTasks.length === 0 && tasks.length > 0 ? <div><p>{text("task_view_empty_filter")}</p><button className="button button-secondary" type="button" onClick={() => { onSearchChange(""); onFilterChange("all"); }}>{text("task_view_clear_filter")}</button></div> : null}
-        <ul className={`task-list${taskView === "graph" ? " graph-fallback-list" : ""}`} aria-describedby="tracker-keyboard-help">
-          {visibleTasks.map((task) => <li key={task.taskId}>
-            <button className={`task-row-button${task.taskId === selectedTaskId ? " selected" : ""}${task.awaitsHuman ? " attention" : ""}`}
-              aria-pressed={task.taskId === selectedTaskId} type="button" onClick={() => selectTask(task.taskId)} onKeyDown={(event) => moveTaskFocus(event, task.taskId)}
-              ref={(element) => { if (element) taskButtons.current.set(task.taskId, element); else taskButtons.current.delete(task.taskId); }}>
-              <span className="task-row-title">{task.title || task.taskId}</span>
-              <span className="task-row-meta"><span><span className="task-domain-label">{text("tracker_task_label")}: </span><TaskState domain="task" value={task.taskState} text={text} /></span><span className="task-row-role">{task.roleName ?? text("inspector_unassigned")}</span></span>
-              <span className="task-row-readiness"><span className="task-domain-label">{text("tracker_readiness_label")}: </span><TaskState domain="readiness" value={task.readiness} text={text} /></span>
-            </button>
-            <OutputsButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} />
-          </li>)}
-        </ul>
+        <h2 id="task-list-title">{text("tracker_title")} <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${navigableTasks.length}/${tasks.length}`}>{navigableTasks.length}/{tasks.length}</span></h2>
+        <TaskViews view={tasksView} onViewChange={onTasksViewChange} snapshot={snapshot} visibleTasks={visibleTasks} buckets={buckets}
+          selectedTaskId={selectedTaskId} locale={locale} text={text} onSelectTask={selectTask} onTaskKeyDown={moveTaskFocus}
+          registerTaskButton={(taskId, element) => { if (element) taskButtons.current.set(taskId, element); else taskButtons.current.delete(taskId); }}
+          onClearFilters={() => { onSearchChange(""); onFilterChange("all"); }} />
       </section>
       {selectedTaskId === null ? <div className="task-inspector task-inspector-empty"><p>{text("task_view_no_selection")}</p></div>
         : <div onKeyDown={(event) => {
@@ -347,13 +354,14 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
         }}>
           {selectedTask === null ? <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-missing-title"><header className="inspector-header"><h2 id="inspector-missing-title">{text("inspector_missing")}</h2><button type="button" className="button button-secondary" onClick={() => selectTask(null)}>{text("inspector_close")}</button></header><p>{text("inspector_missing_help")}</p><details className="inspector-technical"><summary>{text("inspector_technical")}</summary><code>{selectedTaskId}</code></details></section>
             : <TaskInspector api={api} task={selectedTask} tasks={tasks} runs={snapshot.runs} sourceRevision={snapshot.sourceRevision} locale={locale} text={text} actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={selectTask} onLaunchTask={onLaunchTask}>
-              {trackerTaskActions(selectedTask)}
+              {({ revision }: RenderedTask) => <>{trackerTaskActions(selectedTask, revision)}
               <TaskEditor api={api} task={selectedTask} tasks={tasks} sourceRevision={snapshot.sourceRevision} locale={locale}
                 entries={editorEntries} setEntries={setEditorEntries}
                 writesEnabled={writesEnabled} actionsCurrent={actionsCurrent} onSelectTask={(id) => {
                   if (selectedTaskRef.current === selectedTask.taskId) selectTask(id);
                 }}
                 onChanged={() => void load(new AbortController().signal)} />
+            </>}
             </TaskInspector>}
         </div>}
     </div>

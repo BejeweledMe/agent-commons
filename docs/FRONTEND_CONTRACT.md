@@ -208,6 +208,12 @@ generated config; it never receives a YAML fragment or a path from the browser.
   stderr, or tool arguments. Incomplete stderr is withheld, including historical
   tails marked truncated; truncation and redaction remain visible. A fragment
   without its original secret markers is not evidence that its content is safe.
+- `GET /api/workers/eligibility` is server truth for specialization hiring.
+  A missing or stale input is `unknown`, therefore unselectable; capability
+  chips are informative descriptions, never permissions or an authorization.
+- Provider availability `qualification.wall_time_seconds` is additive and
+  nullable. Clients must render "not provided" when it is null rather than
+  inventing a default.
 
 ## Testing the asset
 
@@ -242,6 +248,18 @@ generated config; it never receives a YAML fragment or a path from the browser.
 - Every card action is an existing operation or a navigation: Conversation and
   Results are scoped to the agent, Tasks opens the tracker narrowed by
   `?agent=`, Give a task opens the existing Prepare run for the selected task.
+- Tracker task rows may carry nullable `objective_id` (the effective objective,
+  including inherited blueprint provenance) and `application_id`. Missing or
+  null remains unknown; these additive fields never authorize a UI action.
+- A task record carries the findings bound to it as server truth; the decision
+  card lists their count and never hides them.
 - React Flow's stylesheet ships as a file (CSP `style-src 'self'`); board
   styling is class-based. Role activity is text plus a data attribute; green
   is still reserved for acceptance.
+
+## Local instrumentation privacy
+
+UI instrumentation collection is off by default. Its schema rejects content,
+paths, and identifiers; its bounded counter bytes live only under the resolved
+state root with bounded retention. The UI has no export or transmit action.
+Disabling stops writes immediately, and Clear deletes only this local store.

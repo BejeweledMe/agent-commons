@@ -9,6 +9,7 @@ from agent_commons.errors import LifecycleConflictError, ValidationError
 
 from .agent_projection import apply_agent_record
 from .agent_role_envelopes import AgentEnvelope, AgentLinkEnvelope, AgentReconfiguredEnvelope
+from .application_projection import apply_application_record
 from .artifact_projection import apply_artifact_record
 from .chronology import chronological_key
 from .collections import collection_for
@@ -332,6 +333,39 @@ def _apply_effective_event(
         )
     elif event_type == "objective.closed":
         apply_objective_record(snapshot.objectives, str(payload["objective_id"]), event, "closed")
+    elif event_type == "blueprint_application.created":
+        application_id = str(payload["application_id"])
+        apply_application_record(snapshot.applications, application_id, event)
+        for task_id in payload["created_task_ids"]:
+            task = snapshot.tasks.get(str(task_id))
+            if task is not None:
+                apply_task_record(
+                    snapshot.tasks,
+                    str(task_id),
+                    {**event, "payload": {**task.to_dict(), "application_id": application_id}},
+                    str(task["state"]),
+                )
+    elif event_type == "blueprint_application.task_joined":
+        application_id = str(payload["application_id"])
+        current = snapshot.applications[application_id]
+        current_data = current.to_dict()
+        task_id = str(payload["task_id"])
+        joined_payload = {
+            **current_data,
+            "created_task_ids": [*current_data["created_task_ids"], task_id],
+        }
+        apply_application_record(
+            snapshot.applications,
+            application_id,
+            {**event, "payload": joined_payload},
+        )
+        task = snapshot.tasks[task_id]
+        apply_task_record(
+            snapshot.tasks,
+            task_id,
+            {**event, "payload": {**task.to_dict(), "application_id": application_id}},
+            str(task["state"]),
+        )
     elif event_type == "task.revised":
         if not isinstance(typed_envelope, TaskEnvelope):
             raise ValidationError(f"missing typed task envelope for {event_type}")

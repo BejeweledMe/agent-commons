@@ -249,6 +249,7 @@ def test_builder_canary_proves_scoped_terminal_flow_and_records_receipt(
     assert receipt.static_preflight is True
     assert receipt.initialization_probe is True
     assert receipt.behavioral_canary is True
+    assert receipt.wall_time_seconds == 60
 
 
 def test_claude_root_session_can_qualify_a_codex_builder(tmp_path: Path) -> None:

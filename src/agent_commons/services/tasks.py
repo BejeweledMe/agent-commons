@@ -32,11 +32,16 @@ class TaskCommands:
         priority: str = "normal",
         dependencies: Sequence[str] = (),
         suggested_agent_id: str | None = None,
+        objective_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("task.created", idempotency_key)
         task_id = self._new_entity_id("task", "task.created", key)
         dependency_ids = _optional_list(dependencies, "dependencies")
+        if objective_id is not None:
+            objective = self.snapshot().objectives.get(objective_id)
+            if objective is None or objective.get("state") != "active":
+                raise LifecycleConflictError("objective must exist and be active")
         subject = {"kind": "task", "id": task_id}
         relations = [
             self._relation(subject, "depends_on", {"kind": "task", "id": dependency})
@@ -56,6 +61,7 @@ class TaskCommands:
                 "acceptance_criteria": _nonempty_list(acceptance_criteria, "acceptance_criteria"),
                 "priority": priority,
                 "dependencies": dependency_ids,
+                "objective_id": objective_id,
                 **suggestion,
             },
             idempotency_key=key,
@@ -65,6 +71,44 @@ class TaskCommands:
 
     def list_tasks(self, *, state: str | None = None) -> list[dict[str, Any]]:
         return self._list("task", state=state)
+
+    def join_task_to_application(
+        self,
+        task_id: str,
+        application_id: str,
+        expected_revision: str,
+        *,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Append auditable provenance for one existing task.
+
+        The application revision is the compare-and-swap boundary: task
+        membership is mutable only through this append-only join event.
+        """
+
+        # Joining an unrelated task is an explicit operator exception, not a
+        # consequence of being allowed to view or select an application.  Keep
+        # this at the domain boundary so CLI and HTTP callers fail before an
+        # event can be appended.
+        self.sessions.require_active(
+            self._active_session().session_id,
+            capability="task:join_application",
+        )
+
+        return self.record_event(
+            "blueprint_application.task_joined",
+            {
+                "application_id": application_id,
+                "task_id": task_id,
+                "expected_revision": expected_revision,
+                "reason": reason,
+            },
+            idempotency_key=self._idempotency_key(
+                "blueprint_application.task_joined", idempotency_key
+            ),
+            tags=("blueprint_application", "task"),
+        )
 
     def revise_task(
         self,

@@ -128,6 +128,7 @@ class ProviderAvailability:
     qualification_freshness: Literal["current", "missing", "invalid"]
     qualification_fingerprint: str | None
     qualification_checked_at: str | None
+    qualification_wall_time_seconds: int | None
     auth_state: str
     auth_freshness: Literal["fresh", "stale", "unknown"]
     launchable: bool
@@ -147,6 +148,7 @@ class ProviderAvailability:
                 "freshness": self.qualification_freshness,
                 "fingerprint": self.qualification_fingerprint,
                 "checked_at": self.qualification_checked_at,
+                "wall_time_seconds": self.qualification_wall_time_seconds,
             },
             "authentication": {
                 "state": self.auth_state,
@@ -265,6 +267,7 @@ class ProviderAvailabilityService:
         qualification_freshness: Literal["current", "missing", "invalid"] = "missing"
         fingerprint: str | None = None
         checked_at: str | None = None
+        wall_time_seconds: int | None = None
         refusal: ProviderAvailabilityRefusal | None = None
         try:
             qualification = self.qualifications.status(
@@ -298,6 +301,7 @@ class ProviderAvailabilityService:
             qualification_freshness = "current"
             fingerprint = qualification.fingerprint
             checked_at = qualification.checked_at
+            wall_time_seconds = qualification.wall_time_seconds
         elif qualification.code is ProviderRefusalCode.PROVIDER_QUALIFICATION_REQUIRED:
             refusal = ProviderAvailabilityRefusal.create(
                 AvailabilityRefusalCode.QUALIFICATION_REQUIRED
@@ -317,6 +321,7 @@ class ProviderAvailabilityService:
             if receipt is not None and receipt.fingerprint == current_fingerprint:
                 qualification_freshness = "current"
                 checked_at = receipt.checked_at
+                wall_time_seconds = receipt.wall_time_seconds
                 initialization_state = (
                     "passed_unqualified" if receipt.initialization_probe else "failed"
                 )
@@ -359,6 +364,7 @@ class ProviderAvailabilityService:
             qualification_freshness=qualification_freshness,
             qualification_fingerprint=fingerprint,
             qualification_checked_at=checked_at,
+            qualification_wall_time_seconds=wall_time_seconds,
             auth_state=auth_state,
             auth_freshness=auth_freshness,
             launchable=launchable,

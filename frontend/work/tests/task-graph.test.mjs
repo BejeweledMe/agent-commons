@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, symlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
@@ -12,18 +12,22 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-task-graph-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), [
   "--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler",
-  "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled,
-  ...["taskGraph.ts", "taskGraphApi.ts", "taskEditorState.ts", "trackerState.ts", "components/TaskGraph.tsx", "components/TaskEditor.tsx"].map((file) => resolve(root, "src", file))
+  "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--resolveJsonModule", "--allowSyntheticDefaultImports", "--outDir", compiled,
+  ...["taskGraph.ts", "taskGraphApi.ts", "taskEditorState.ts", "taskPresentation.ts", "trackerState.ts", "components/TaskGraph.tsx", "components/TaskEditor.tsx", "components/TaskViews.tsx"].map((file) => resolve(root, "src", file))
 ], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
+copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (file) => import(pathToFileURL(resolve(compiled, file + ".js")).href);
-const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, NODE_HEIGHT } = await load("taskGraph");
+const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, MAX_GRAPH_TASKS, NODE_HEIGHT } = await load("taskGraph");
 const { TaskGraphApi, parseTaskEditDetail } = await load("taskGraphApi");
 const { taskEditorDraft, observeTaskEditorDraft, editorInput } = await load("taskEditorState");
+const { bucketTasksForNow, filterTrackerTasks, NOW_COLUMNS } = await load("taskPresentation");
 const { trackerStreamSucceeded } = await load("trackerState");
 const { TaskGraph } = await load("components/TaskGraph");
 const { TaskEditor } = await load("components/TaskEditor");
+const { TaskViews } = await load("components/TaskViews");
 const { parseTrackerSnapshot } = await load("api");
+const messages = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
 const taskId = `task.${"0".repeat(26)}`;
 const otherId = `task.${"1".repeat(26)}`;
 const thirdId = `task.${"2".repeat(26)}`;
@@ -34,6 +38,25 @@ const edge = (from, to, prerequisiteMissing = false) => ({ prerequisiteTaskId: f
 const detail = () => ({ schema: "agent-commons.ui.task-edit.v1", task_id: taskId, revision, title: "Original task", description: "Complete original description", acceptance_criteria: ["Criterion"], dependencies: [], state: "ready", editable: true, cancellable: true, refusal_code: null });
 const success = (action = "revised") => ({ schema: "agent-commons.ui.task-edit-result.v1", task_id: taskId, revision: newer, action });
 const signal = () => new AbortController().signal;
+const snapshotOf = (tasks, overrides = {}) => ({
+  schema: "agent-commons.tracker.v1", sequence: 1, sourceRevision: `sha256:${"0".repeat(64)}`, truncated: false, state: "ready",
+  tasks, edges: [], runs: [], attention: [],
+  capacity: { state: "available", active: 0, limit: 4, queued: 0, queueCapacity: 8 },
+  freshness: { generatedAt: "2026-09-18T00:00:00Z", sourceUpdatedAt: "2026-09-18T00:00:00Z", state: "fresh", resumeGap: false },
+  focusTaskIds: [], criticalPathTaskIds: [], criticalPathBasis: "dependency_depth_only", criticalPathPredictive: false, gaps: [],
+  ...overrides
+});
+const GROUPS = [...NOW_COLUMNS, "settled"];
+const groupOf = (snapshot, id, agentId = null) => {
+  const buckets = bucketTasksForNow(snapshot, agentId);
+  return GROUPS.find((group) => buckets[group].some((item) => item.taskId === id)) ?? null;
+};
+const viewProps = (view, snapshot, overrides = {}) => ({
+  view, onViewChange() {}, snapshot, visibleTasks: snapshot.tasks, buckets: bucketTasksForNow(snapshot, null),
+  selectedTaskId: null, locale: "en", text: (key) => messages.en[key], onSelectTask() {}, onTaskKeyDown() {},
+  registerTaskButton() {}, onClearFilters() {}, ...overrides
+});
+const occurrences = (html, pattern) => (html.match(pattern) ?? []).length;
 
 test("real dependency edges lay out top to bottom, remain deterministic, and focus connected tasks", () => {
   const tasks = [task(), task(otherId, [taskId]), task(thirdId)];
@@ -66,7 +89,9 @@ test("accepted, completed and running are separate facts with status text and ic
   assert.equal(graphTaskState(task(taskId, [otherId], { blockingDependencyIds: [otherId] })), "queued");
   assert.notEqual(GRAPH_ICONS.accepted, GRAPH_ICONS.completed);
   const css = readFileSync(resolve(root, "src/taskGraph.css"), "utf8");
-  assert.match(css, /#1f9d55/); assert.match(css, /#137a40/); assert.match(css, /double/);
+  // Accepted and completed nodes wear the status-accepted tokens, never a raw green.
+  assert.match(css, /\[data-graph-state="accepted"\][^{]*\{ background:var\(--status-accepted-surface\); color:var\(--status-accepted-text\); border-color:var\(--status-accepted\);/);
+  assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b/, "no raw colour in the graph stylesheet"); assert.match(css, /double/);
   for (const locale of ["en", "ru"]) {
     const html = renderToStaticMarkup(createElement(TaskGraph, { tasks: [task(taskId, [], { title: "<script>unsafe</script>", roleName: "Frontender", provider: "claude", phase: "running" })], edges: [], selectedTaskId: taskId, onSelectTask() {}, locale }));
     assert.match(html, /Frontender · claude/); assert.match(html, /running/);
@@ -104,12 +129,15 @@ test("tracker suggestion parser requires a complete bounded metadata triple", ()
   ]) assert.throws(() => parseTrackerSnapshot(withHint(invalid)));
 });
 
-test("completed node white text has at least 4.5 to 1 contrast", () => {
-  const css = readFileSync(resolve(root, "src/taskGraph.css"), "utf8");
-  const color = css.match(/\[data-graph-state="completed"\][^{]*\{ background:#([0-9a-f]{6}); color:#fff/)[1];
-  const linear = [0, 2, 4].map((index) => parseInt(color.slice(index, index + 2), 16) / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-  const luminance = linear.reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-  assert.ok(1.05 / (luminance + 0.05) >= 4.5);
+test("completed node text has at least 4.5 to 1 contrast on its status surface", () => {
+  // The node reads its colours from the :root tokens; resolve them and measure the pair.
+  const rootCss = readFileSync(resolve(root, "src/styles.css"), "utf8");
+  const token = (name) => rootCss.match(new RegExp(`--${name}:\\s*#([0-9a-fA-F]{6})`))[1];
+  const luminance = (hex) => [0, 2, 4].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255)
+    .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const text = luminance(token("status-accepted-text")), surface = luminance(token("status-accepted-surface"));
+  assert.ok((Math.max(text, surface) + 0.05) / (Math.min(text, surface) + 0.05) >= 4.5);
 });
 
 test("editor owns complete bounded fields and refuses contradictory permissions", () => {
@@ -194,4 +222,109 @@ test("an inspector remount can recover a retained unknown-outcome edit with its 
   assert.match(owner, /useState<TaskEditorEntries>/);
   assert.match(owner, /entries=\{editorEntries\} setEntries=\{setEditorEntries\}/);
   assert.match(owner, /selectedTaskRef\.current === selectedTask\.taskId/);
+});
+
+const TASK_STATES = ["ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"];
+const READINESS = ["ready", "blocked", "terminal_dependency_failure", "policy_unknown", "in_progress", "human_attention", "complete", "cancelled", "unknown"];
+const RUN_PHASES = [null, "requested", "reserved", "launching", "running", "cancellation_requested", "input_needed", "succeeded", "failed", "cancelled", "timed_out", "needs_operator", "unknown"];
+
+test("Now buckets partition every task state, readiness and run phase into exactly one group", () => {
+  const fixture = [];
+  for (const taskState of TASK_STATES) for (const readiness of READINESS) for (const phase of RUN_PHASES) for (const awaitsHuman of [false, true]) {
+    fixture.push(task(`task.${fixture.length}`, [], { taskState, readiness, phase, awaitsHuman }));
+  }
+  const snapshot = snapshotOf(fixture);
+  const buckets = bucketTasksForNow(snapshot, null);
+  const placed = GROUPS.flatMap((group) => buckets[group].map((item) => item.taskId));
+  assert.equal(placed.length, fixture.length, "no task is dropped");
+  assert.equal(new Set(placed).size, fixture.length, "and none is counted twice");
+  assert.deepEqual(NOW_COLUMNS, ["needs_you", "in_progress", "next"], "the column order is fixed");
+  assert.deepEqual(bucketTasksForNow(snapshot, null), buckets, "bucketing is pure and deterministic");
+  for (const group of GROUPS) {
+    const positions = buckets[group].map((item) => fixture.findIndex((entry) => entry.taskId === item.taskId));
+    assert.deepEqual(positions, [...positions].sort((a, b) => a - b), `${group} keeps the snapshot order`);
+  }
+});
+
+test("Now columns answer the owner's three questions and keep finished work out of them", () => {
+  const at = (overrides, extra = {}) => groupOf(snapshotOf([task(taskId, [], overrides)], extra), taskId);
+  assert.equal(at({ awaitsHuman: true }), "needs_you");
+  assert.equal(at({ taskState: "review" }), "needs_you");
+  assert.equal(at({ taskState: "completed" }), "needs_you");
+  for (const phase of ["input_needed", "needs_operator", "failed", "timed_out"]) assert.equal(at({ phase }), "needs_you", phase);
+  assert.equal(at({}, { attention: [{ kind: "review", itemId: "review.1", taskId, reasonCode: "review_requested", nextAction: "accept_task" }] }), "needs_you");
+  assert.equal(at({ taskState: "active" }), "in_progress");
+  for (const phase of ["requested", "reserved", "launching", "running", "cancellation_requested"]) assert.equal(at({ phase }), "in_progress", phase);
+  for (const taskState of ["ready", "assigned"]) assert.equal(at({ taskState }), "next", taskState);
+  assert.equal(at({ taskState: "blocked", readiness: "blocked", blockingDependencyIds: [otherId] }), "next");
+  // Accepted and cancelled work is finished: no column claims it, so the Now
+  // view never shows it and green stays with acceptance in "All tasks" alone.
+  for (const taskState of ["accepted", "cancelled"]) {
+    assert.equal(at({ taskState }), "settled", taskState);
+    assert.equal(at({ taskState, awaitsHuman: true, phase: "failed" }), "settled", `${taskState} stays settled`);
+  }
+});
+
+test("the role filter narrows the Now columns exactly as it narrows the full list", () => {
+  const agentId = `agent.${"0".repeat(26)}`;
+  const snapshot = snapshotOf([task(taskId, [], { suggestedAgentId: agentId }), task(otherId, [], { taskState: "active" }), task(thirdId)], {
+    runs: [{ delegationId: "delegation.1", taskId: otherId, agentId, roleName: "Builder", provider: "claude", profileId: "claude-builder",
+      phase: "running", attemptId: null, attemptNumber: 1, startedAt: null, updatedAt: null, finishedAt: null, durationSeconds: null,
+      wallTimeSeconds: null, awaitsHuman: false, nextAction: "wait_for_run", freshness: "fresh", evidenceState: "complete" }]
+  });
+  const buckets = bucketTasksForNow(snapshot, agentId);
+  assert.deepEqual(GROUPS.flatMap((group) => buckets[group].map((item) => item.taskId)).sort(), [taskId, otherId]);
+  assert.deepEqual(filterTrackerTasks(snapshot, "all", "", agentId).map((item) => item.taskId).sort(), [taskId, otherId]);
+  assert.equal(groupOf(snapshot, thirdId, agentId), null, "another role's task is outside every column");
+});
+
+test("each Tasks view has one render path and the graph capacity is decided before mount", () => {
+  // Every column is populated, so an empty column can never hide a missing list.
+  // Ids must be ULID-shaped: the task list renders an OutputsButton per row and its scope parser rejects anything else.
+  const many = Array.from({ length: 300 }, (_, index) => task(`task.${String(index).padStart(26, "0")}`, [], { taskState: ["ready", "active", "review"][index % 3] }));
+  assert.ok(many.length > MAX_GRAPH_TASKS);
+  const large = snapshotOf(many);
+  const now = renderToStaticMarkup(createElement(TaskViews, viewProps("now", large)));
+  assert.equal(occurrences(now, /class="task-list"/g), 0);
+  assert.equal(occurrences(now, /class="task-graph"/g), 0);
+  assert.equal(occurrences(now, /class="now-column-list"/g), 3, "three columns, one list each");
+  const map = renderToStaticMarkup(createElement(TaskViews, viewProps("map", large)));
+  assert.equal(occurrences(map, /class="task-graph"/g), 0, "over capacity the graph is never mounted");
+  assert.equal(occurrences(map, /class="task-list"/g), 1, "and the list replaces it instead of joining it");
+  assert.ok(map.includes(messages.en["task_graph.graphLimit"]));
+  const graph = renderToStaticMarkup(createElement(TaskViews, viewProps("map", snapshotOf(many.slice(0, 4)))));
+  assert.equal(occurrences(graph, /class="task-graph"/g), 1);
+  assert.equal(occurrences(graph, /class="task-list"/g), 0, "under capacity the graph is the only render path");
+  const all = renderToStaticMarkup(createElement(TaskViews, viewProps("all", large)));
+  assert.equal(occurrences(all, /class="task-list"/g), 1);
+  assert.equal(occurrences(all, /class="task-graph"/g), 0);
+  assert.equal(occurrences(all, /class="now-column-list"/g), 0);
+  const filtered = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("all", large), visibleTasks: [] }));
+  assert.equal(occurrences(filtered, /class="task-list"/g), 0);
+  assert.ok(filtered.includes(messages.en.task_view_clear_filter));
+});
+
+test("the three views are one accessible tab strip with EN and RU copy for every column", () => {
+  for (const locale of ["en", "ru"]) {
+    const text = (key) => messages[locale][key];
+    const html = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("now", snapshotOf([task()])), locale, text }));
+    assert.match(html, /role="tablist"/);
+    assert.equal(occurrences(html, /role="tab"/g), 3);
+    assert.equal(occurrences(html, /aria-selected="true"/g), 1);
+    assert.equal(occurrences(html, /tabindex="-1"/g), 2, "one tab stop for the whole strip");
+    assert.match(html, /role="tabpanel"/);
+    assert.match(html, /aria-labelledby="task-view-tab-now"/);
+    assert.match(html, /aria-controls="task-view-panel"/);
+    for (const key of ["task_view_tabs_label", "task_view_tab_now", "task_view_tab_map", "task_view_tab_all",
+      "task_view_now_needs_you", "task_view_now_in_progress", "task_view_now_next", "tracker_keyboard_help"]) {
+      assert.ok(html.includes(messages[locale][key]), `${locale}.${key}`);
+    }
+    const empty = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("now", snapshotOf([])), locale, text }));
+    for (const key of ["task_view_now_needs_you_empty", "task_view_now_in_progress_empty", "task_view_now_next_empty"]) {
+      assert.ok(empty.includes(messages[locale][key]), `${locale}.${key}`);
+    }
+    const settled = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("now", snapshotOf([task(taskId, [], { taskState: "accepted" })])), locale, text }));
+    assert.ok(settled.includes(messages[locale].task_view_now_settled), `${locale} names where finished work stays`);
+    assert.doesNotMatch(settled, /class="now-column-list"/, "an accepted task is in no column");
+  }
 });

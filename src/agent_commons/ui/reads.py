@@ -30,6 +30,7 @@ from agent_commons.services.delegation_runtime import load_runtime_configuration
 from agent_commons.services.design_gallery import DesignGalleryReads, GalleryReadRefusal
 from agent_commons.services.provider_availability import ProviderAvailabilityService
 from agent_commons.services.roles import role_model
+from agent_commons.services.worker_eligibility import WorkerEligibilityService
 from agent_commons.ui.actions import SETUP_SUPPORT_BINARY_UNRESOLVED
 from agent_commons.ui.context_pack_dtos import (
     context_pack_catalog_payload,
@@ -83,6 +84,36 @@ def _attention_json(value: object) -> JsonValue:
     return cast(JsonValue, value)
 
 
+def findings_for_task(snapshot: Any, task_id: str) -> list[dict[str, object]]:
+    """Return the bounded finding summary list projected for one task."""
+
+    findings: list[dict[str, object]] = []
+    for finding in snapshot.findings.values():
+        evidence_refs = finding.get("evidence_refs", [])
+        if not any(
+            isinstance(evidence, Mapping)
+            and isinstance(evidence.get("ref"), Mapping)
+            and evidence["ref"].get("kind") == "task"
+            and evidence["ref"].get("id") == task_id
+            for evidence in evidence_refs
+        ):
+            continue
+        summary = finding.get("summary")
+        findings.append(
+            {
+                "id": finding.finding_id,
+                "title": (
+                    cast(str, bounded_copy(summary, max_text_bytes=256))
+                    if isinstance(summary, str)
+                    else None
+                ),
+                "severity": finding.get("severity"),
+                "state": finding.state,
+            }
+        )
+    return findings
+
+
 class UIReads:
     """Read-only UI models, layered over ``UIContext``'s shared state."""
 
@@ -95,7 +126,6 @@ class UIReads:
         """Join closed capabilities and current operational provider observations."""
 
         config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
-        manager = self.manager()
         auth_by_profile: dict[str, Mapping[str, Any]] = {}
         for profile_id in config.profiles.profile_ids:
             try:
@@ -104,6 +134,13 @@ class UIReads:
                 )
             except Exception:  # noqa: BLE001 - availability collapses provider detail
                 continue
+        return self._provider_availability_service().list(auth_by_profile=auth_by_profile)
+
+    def _provider_availability_service(self) -> ProviderAvailabilityService:
+        """Build the one provider-truth service shared by hiring reads and writes."""
+
+        config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        manager = self.manager()
         return ProviderAvailabilityService(
             config.profiles,
             workspace_root=self.repo,
@@ -112,7 +149,25 @@ class UIReads:
                 read_only=True,
             ),
             limits=config.limits,
-        ).list(auth_by_profile=auth_by_profile)
+        )
+
+    def worker_eligibility(self, *, specialization: object) -> dict[str, object]:
+        """Return fail-closed, specialization-specific worker choices."""
+
+        config = load_runtime_configuration(self._profile_config, workspace_root=self.repo)
+        auth_by_profile: dict[str, Mapping[str, Any]] = {}
+        for profile_id in config.profiles.profile_ids:
+            try:
+                auth_by_profile[profile_id.value] = self._launch_coordinator.provider_auth_status(
+                    profile_id.value
+                )
+            except Exception:  # availability stays unknown when an observation is absent
+                continue
+        return WorkerEligibilityService(
+            config.profiles,
+            availability=self._provider_availability_service(),
+            library=self.library_store(),
+        ).payload(specialization, auth_by_profile=auth_by_profile)
 
     def work_context_packs(self) -> dict[str, Any]:
         """Return current Context Pack revisions through Work's narrow DTO."""
@@ -674,5 +729,14 @@ class UIReads:
             if entity_id not in manager.snapshot().agents:
                 return None
             return bounded_copy(manager.get_agent(entity_id))
-        record = getattr(manager.snapshot(), attribute).get(entity_id)
-        return None if record is None else bounded_copy(record)
+        snapshot = manager.snapshot()
+        record = getattr(snapshot, attribute).get(entity_id)
+        if record is None:
+            return None
+        result = bounded_copy(record)
+        if kind == "task":
+            findings = findings_for_task(snapshot, entity_id)
+            result["findings"] = findings[:50]
+            if len(findings) > 50:
+                result["findings_truncated"] = True
+        return result

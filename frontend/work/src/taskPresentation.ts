@@ -54,18 +54,73 @@ export function taskObservationCurrent(snapshot: TrackerSnapshot, task: TrackerT
     && task.freshness === "fresh"
     && !readinessUnconfirmed(task);
 }
-export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter, search: string, agentId: string | null = null): readonly TrackerTask[] {
-  const attentionIds = new Set(snapshot.attention.map((item) => item.taskId));
-  const query = search.trim().toLocaleLowerCase();
-  // A role's tasks: those suggested for it plus those any of its runs acted on.
-  const roleTaskIds = agentId === null ? null : new Set([
+/** A role's tasks: those suggested for it plus those any of its runs acted on. */
+function agentTaskIds(snapshot: TrackerSnapshot, agentId: string | null): ReadonlySet<string> | null {
+  if (agentId === null) return null;
+  return new Set([
     ...snapshot.tasks.filter((task) => task.suggestedAgentId === agentId).map((task) => task.taskId),
     ...snapshot.runs.filter((run) => run.agentId === agentId && run.taskId !== null).map((run) => run.taskId as string)
   ]);
+}
+
+export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter, search: string, agentId: string | null = null): readonly TrackerTask[] {
+  const attentionIds = new Set(snapshot.attention.map((item) => item.taskId));
+  const query = search.trim().toLocaleLowerCase();
+  const roleTaskIds = agentTaskIds(snapshot, agentId);
   return snapshot.tasks.filter((task) => (filter === "all"
     || (filter === "attention" ? task.awaitsHuman || attentionIds.has(task.taskId) : task.taskState === filter))
     && (roleTaskIds === null || roleTaskIds.has(task.taskId))
     && (!query || [task.title, task.roleName ?? "", task.taskId].some((value) => value.toLocaleLowerCase().includes(query))));
+}
+
+// The «Сейчас» / Now view. Three fixed columns answer one question each: what is
+// waiting for the person, what is moving, what comes next. The owner's column
+// definitions (plan section D, 8.1) say nothing about finished work, so accepted
+// and cancelled tasks are kept out of the columns and stay in "All tasks";
+// `settled` names them so the partition below is still total over the snapshot.
+export type NowColumn = "needs_you" | "in_progress" | "next";
+export const NOW_COLUMNS: readonly NowColumn[] = ["needs_you", "in_progress", "next"];
+export const nowColumnLabel: Readonly<Record<NowColumn, MessageKey>> = {
+  needs_you: "task_view_now_needs_you", in_progress: "task_view_now_in_progress", next: "task_view_now_next"
+};
+export const nowColumnEmpty: Readonly<Record<NowColumn, MessageKey>> = {
+  needs_you: "task_view_now_needs_you_empty", in_progress: "task_view_now_in_progress_empty", next: "task_view_now_next_empty"
+};
+export type NowBuckets = Readonly<Record<NowColumn, readonly TrackerTask[]>> & {
+  /** Accepted and cancelled work: nothing is waiting now, so no column claims it. */
+  readonly settled: readonly TrackerTask[];
+};
+/** Canonical task states that are finished: they leave the Now columns entirely. */
+const SETTLED_TASK_STATES: readonly string[] = ["accepted", "cancelled"];
+/** Canonical task states whose next step is a human decision. */
+const HUMAN_TASK_STATES: readonly string[] = ["completed", "review"];
+/** Run phases that stopped and cannot continue without the person. */
+const HUMAN_RUN_PHASES: readonly string[] = ["input_needed", "needs_operator", "failed", "timed_out"];
+/** Run phases that are queued or moving; neither needs the person right now. */
+const BUSY_RUN_PHASES: readonly string[] = ["requested", "reserved", "launching", "running", "cancellation_requested"];
+
+/**
+ * Partition the snapshot's tasks for the Now view. Pure and deterministic: the
+ * first matching rule wins, so every task lands in exactly one group, and each
+ * group keeps the snapshot's own task order.
+ */
+export function bucketTasksForNow(snapshot: TrackerSnapshot, agentId: string | null = null): NowBuckets {
+  const attentionIds = new Set(snapshot.attention.map((item) => item.taskId));
+  const roleTaskIds = agentTaskIds(snapshot, agentId);
+  const needsYou: TrackerTask[] = [];
+  const inProgress: TrackerTask[] = [];
+  const next: TrackerTask[] = [];
+  const settled: TrackerTask[] = [];
+  for (const task of snapshot.tasks) {
+    if (roleTaskIds !== null && !roleTaskIds.has(task.taskId)) continue;
+    const phase = task.phase ?? "";
+    if (SETTLED_TASK_STATES.includes(task.taskState)) settled.push(task);
+    else if (task.awaitsHuman || attentionIds.has(task.taskId)
+      || HUMAN_TASK_STATES.includes(task.taskState) || HUMAN_RUN_PHASES.includes(phase)) needsYou.push(task);
+    else if (task.taskState === "active" || BUSY_RUN_PHASES.includes(phase)) inProgress.push(task);
+    else next.push(task);
+  }
+  return { needs_you: needsYou, in_progress: inProgress, next, settled };
 }
 
 /** Optional capacity telemetry does not imply missing task or run evidence. */

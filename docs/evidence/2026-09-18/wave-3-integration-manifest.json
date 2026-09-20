@@ -1,0 +1,70 @@
+{
+  "work_package": "wave-3-integration",
+  "task": "(wave)",
+  "delegation": "(coordinator)",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "ef44dc7cba236541d1c580483288dcb6a08d536fa72c2f0847a0fdd8dac4dad5"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "953e23c8bf1b901451dc53ff2532930e83c193059e3745177e9be7d038ef2a49"
+    },
+    {
+      "path": "frontend/work/tests/provider-availability.test.mjs",
+      "sha256": "25c22f8bc848a1362429f9fac081bf3377dd6bcca6a7db75e500b29342b31275"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "686dca274251dae46c25bac2cb613de7be9ad654130448e4ee72137be087c777"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "188f3b0962779fb9fe255a6feffa89746bb7908516b1e3e76d168eddf23cbbef"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-BDBpIY-A.css",
+      "sha256": "aff17d229eadfd8fff7658d7f850531d0499f77cbf4f3f324d1d07e8582dd225"
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DDX9P5kE.js",
+      "sha256": "a3c7f882195ce0cc8189ff40c5e02d69270c84e855e620c1f0e3af4c34a7c1fb"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "364 passed, 0 failed (node 24)",
+    "pytest_asset_freshness": "tests/ui/test_work_app_contract.py 17 passed",
+    "asset_build": "npm run build --prefix frontend/work on Node 24.20.0",
+    "browser_pass": "demo workspace on 127.0.0.1:8792: Tasks Now/Map/All, decision card with findings (0) and closed Details, hire flow with WorkerPicker (unknown workers, chips, Advanced), Settings instrumentation section (read-only and configured states); no visual regression found",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "integration_fixes": [
+      "frontend/work/src/api.ts + contracts.ts: the provider-availability parser accepts the additive qualification.wall_time_seconds (int 30..1800 or null; absent = not provided) and exposes qualification.wallTimeSeconds; without it every availability read failed after WP-15.3 (finding.017DAFGEF4NS1Z66Z5YE4N0NYV)",
+      "frontend/work/tests/provider-availability.test.mjs: both DTO shapes and refusal of bad values",
+      "frontend/work/src/i18n.json: role_help (EN/RU) reworded for the role-first hire flow (specialization first, confirmed worker, provider and model under Advanced) \u2014 the old text still described the profile-first form"
+    ],
+    "observations_not_fixed": [
+      "built-in specialization option labels render in Russian while the UI locale is EN (library catalog copy; predates wave 3; to triage)"
+    ],
+    "packaged_asset": "src/agent_commons/ui/static/work rebuilt twice (after WP-13.2 and after the copy fix); freshness contract green",
+    "accepted_packages": [
+      "WP-13.1",
+      "WP-09",
+      "WP-10",
+      "WP-10.1",
+      "WP-12.1",
+      "WP-12.2",
+      "WP-17.1",
+      "WP-17.2",
+      "WP-15.3"
+    ],
+    "under_review": [
+      "WP-13.2"
+    ]
+  }
+}

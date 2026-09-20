@@ -1,0 +1,56 @@
+{
+  "work_package": "WP-15.3",
+  "task": "task.73NYGXH0NPR7DDQAXVEHNQXZZQ",
+  "delegation": "delegation.1ZSHMVYVF64873X2CN0J39QV0B",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "src/agent_commons/runtime/provider_qualification.py",
+      "sha256": "1e0839dcfeeee445e873352623086939efd0417792172f783b416ac4483472de"
+    },
+    {
+      "path": "src/agent_commons/services/provider_canary.py",
+      "sha256": "3361f2138613ee0d93642df8ae2431528070f0afae9d269add5a477dcf775b93"
+    },
+    {
+      "path": "src/agent_commons/services/provider_availability.py",
+      "sha256": "8e53f6e02964518b3290e8707803c76d0b86be2e297e98a63a9a0109b17f1d13"
+    },
+    {
+      "path": "tests/runtime/test_provider_qualification.py",
+      "sha256": "0f6416106213f4eec74b6131667c21162a6c61f2e831262bcbbe5346974d9f29"
+    },
+    {
+      "path": "tests/runtime/test_provider_canary.py",
+      "sha256": "e13d7491fba8eadfa7afee8bfe4f7181542ef7ce5f9b496fae408becd2496623"
+    },
+    {
+      "path": "tests/services/test_provider_availability.py",
+      "sha256": "26881b2c6654bc9fc64ab70860c3042f29970c2de05a20c5f390ec0d4635030d"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "c97dc379a137b070721d5b3eff3e1f84668374458156606f0bd8822a61dbb6c5"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "c597b566ed7c68c93fc22e6edb73f7858f343bb5f55ef7d6bc79c0764f858421"
+    }
+  ],
+  "verification": {
+    "pytest": "230 passed (tests/runtime tests/services tests/ui/test_launch.py -k qualification or availability or canary or launch)",
+    "ruff": "check and format clean after the coordinator formatted two files",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "grok_exit": "the worker exited without commons_report_outcome (finding.7WEDARP2X3JXJ2E57JSQ499BPC); the coordinator generated this report",
+    "coordinator_fixes": [
+      "provider_qualification.py: a } closing the ProviderQualification(...) constructor call replaced by )",
+      "ruff format on test_provider_qualification.py and provider_qualification.py"
+    ],
+    "shape": "ProviderQualification.wall_time_seconds: int | None (30..1800 when present), in as_dict, reader accepts receipts with or without the key (optional key set), schema string and fingerprint formula unchanged; the canary passes the wall_time_seconds it used to every receipt write; ProviderAvailability qualification block carries wall_time_seconds int|null",
+    "docs": "FRONTEND_CONTRACT.md: the field is additive and nullable; clients render not provided rather than a default",
+    "frontend": "untouched; packaged asset untouched"
+  }
+}

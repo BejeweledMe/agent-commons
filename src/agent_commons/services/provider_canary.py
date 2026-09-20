@@ -219,6 +219,7 @@ def _run_compatibility_canary(
                     initialization_probe=False,
                     behavioral_canary=False,
                     provider_version=provider_version,
+                    wall_time_seconds=wall_time_seconds,
                 )
             return report
 
@@ -246,6 +247,7 @@ def _run_compatibility_canary(
                     initialization_probe=False,
                     behavioral_canary=False,
                     provider_version=provider_version,
+                    wall_time_seconds=wall_time_seconds,
                 )
             return report
 
@@ -384,6 +386,7 @@ def _run_compatibility_canary(
                     initialization_probe=True,
                     behavioral_canary=False,
                     provider_version=provider_version,
+                    wall_time_seconds=wall_time_seconds,
                 )
             return report
         joined = next(
@@ -471,6 +474,7 @@ def _run_compatibility_canary(
                 initialization_probe=True,
                 behavioral_canary=ok,
                 provider_version=provider_version,
+                wall_time_seconds=wall_time_seconds,
             )
         return report
 

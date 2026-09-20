@@ -1,0 +1,68 @@
+{
+  "work_package": "WP-13.2",
+  "task": "task.0Z7YVE12JXWZJ15J2DF2BRCBAC",
+  "delegation": "delegation.3WZCSCQMKFFCYSHPV4PHATQGC7",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "dee151008807fa3edc314f18da495d68c770eeede7476597e711a23fbb5bcc6c"
+    },
+    {
+      "path": "frontend/work/src/board.css",
+      "sha256": "7f5773baf961bb1904e5e49ce9cccf69fa3e9bf86179cb85aa894095fefc4542"
+    },
+    {
+      "path": "frontend/work/src/conversation.css",
+      "sha256": "c4322275882e3c6e3e4b633b72f0e551c377680829e94a82d4862ac2ba51cefe"
+    },
+    {
+      "path": "frontend/work/src/outputs.css",
+      "sha256": "1f781f65d338c4d369176243d2b4f6096656a08227b6ca6c96ea8b8ea4f5b31b"
+    },
+    {
+      "path": "frontend/work/src/projectCreation.css",
+      "sha256": "fc12df71bfef127f1c8680ff64821963bce574140cd7bbab310d2fcf5473bade"
+    },
+    {
+      "path": "frontend/work/src/taskGraph.css",
+      "sha256": "c9ba32219a62145ab712bed57fe2924469c3639a1c86197f18dda12dca8dd445"
+    },
+    {
+      "path": "frontend/work/tests/style-tokens.test.mjs",
+      "sha256": "7718203b767796e160e11fd1342e9b972140f5934f4470ccdcec7b75e6f7da63"
+    },
+    {
+      "path": "frontend/work/tests/contrast.test.mjs",
+      "sha256": "d7070104c351390ed279054fc3d666c7adb658c5e5bab38142e8d8f79fd9a192"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "c17217e6f8f753fc629c6091e1629c54245aa2e7b9b89a46967927489363ed41"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "090a3071fa680f3f7a1a96000b3e4866fc4fe96befdb1a64d7a6fd92f244032f"
+    },
+    {
+      "path": "frontend/work/design/color-inventory.json",
+      "sha256": "c5e69a6ec73123b4ff9192779bbc2157eac05e3f27672e90739fe6310076fb1b"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "363 passed, 0 failed (node 24)",
+    "run_by": "coordinator; the worker sandbox refuses node"
+  },
+  "notes": {
+    "scope": "CSS only: 47 semantic/scale tokens in the first :root of styles.css (surface-1..3, text-1..3, border-1..2, status attention/active/accepted/error with surface/text/border variants, accent, text-on-accent, space-1..7, type-1..6, shadow-dialog); legacy token names alias the set; raw hex outside :root now 0 in all five stylesheets (was 226/2/1/0/0); style-tokens ratchet pinned at 0; new contrast.test.mjs asserts WCAG AA from the declared values",
+    "visible_side_effects": [
+      "default border moved from #455873 (2.60:1 on surface-1) to #52698c (3.33:1), so hairline dividers are slightly lighter",
+      "button-primary:hover now uses --button-primary-hover (darker) instead of the lighter #5b86d6",
+      "board frame fill expressed as color-mix(in srgb, var(--surface-3) 45%, transparent)"
+    ],
+    "coordinator_review": "no .ts/.tsx drift against the newest accepted manifests (24 files checked); two tests outside the allowed set updated only because they asserted pre-token hex (work-shell status-dot rules, task-inspector accepted-green placement) with intent preserved; color-inventory.json updated to record the applied state while keeping the WP-13.1 hex record",
+    "packaged_asset": "rebuilt by the coordinator on Node 24 after this run (wave-end integration); not part of this manifest"
+  }
+}

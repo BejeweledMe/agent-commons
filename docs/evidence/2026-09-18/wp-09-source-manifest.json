@@ -1,0 +1,70 @@
+{
+  "work_package": "WP-09",
+  "task": "task.0DAF8ZNJF8FN11GXC0ATJGTBV6",
+  "delegation": "delegation.5RGVZ6AZ8KAF7QS4CPS14TQ6H1",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-18",
+  "files": [
+    {
+      "path": "frontend/work/src/components/TaskViews.tsx",
+      "sha256": "114cf175dbe08cc3bc5ff56350a6a50b89332bf370a0c0b56e3efac0f77f7b82"
+    },
+    {
+      "path": "frontend/work/src/appRouteState.ts",
+      "sha256": "5a7ccde9e29d013d8daf8cc81377e871c6f60fafe416faa5f00933d3fab1ac76"
+    },
+    {
+      "path": "frontend/work/src/taskPresentation.ts",
+      "sha256": "698198eb8079d2b7e9935884a01d989ceec0369c9a86675c8f6076411655c31f"
+    },
+    {
+      "path": "frontend/work/src/components/TrackerSection.tsx",
+      "sha256": "a635e142a7b0f7312ea2714d2f94ead3efd7e69754d971b2929dd6013d5f2834"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "444a989c30cecfa6df0b7acec536a69d43b881c9731acb10e46e2ba32ec12fde"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "1d5bc11b03008f556594f71e75f47019a773fd5a903c22db99dfba91d2c44088"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "70a301d92b5626cd521bb8c8957ff7085ca9e43c6fecb94e0a5e261bedd5f3b9"
+    },
+    {
+      "path": "frontend/work/src/taskGraph.css",
+      "sha256": "c9ba32219a62145ab712bed57fe2924469c3639a1c86197f18dda12dca8dd445"
+    },
+    {
+      "path": "frontend/work/tests/task-graph.test.mjs",
+      "sha256": "e7d607979a0d63c1613e24056a98a188ce6c8d26ff2ac1eeb4aa11e0f35a50bb"
+    },
+    {
+      "path": "frontend/work/tests/tracker-contract.test.mjs",
+      "sha256": "55985c8fddef8cf098b2dd73cee064b3c1f27abd919da5840912e9d94fcdeed3"
+    },
+    {
+      "path": "frontend/work/tests/tracker-actions.test.mjs",
+      "sha256": "4e6ad282e2a84efc7ee07cc3d850874c20ff4f1976b9b7c86e15a2670ad8cdf2"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "50a0122645aa400c95b93b1c04239b8f1ce07691357f8e05edacbd001586f12f"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "312 passed, 0 failed (node 24)",
+    "run_by": "coordinator; the worker sandbox refuses node"
+  },
+  "notes": {
+    "coordinator_fixes": [
+      "task-graph.test.mjs: sorted expectation in the role-filter test; ULID-shaped ids for the 300-task fixture because the task list renders an OutputsButton per row whose scope parser rejects other ids"
+    ],
+    "interpretation": "accepted and cancelled tasks form a fourth disjoint group `settled` that the Now view names in one line linking to All tasks rather than rendering a column",
+    "new_file_outside_claims": "frontend/work/src/components/TaskViews.tsx (new component; the claimed TrackerSection now mounts it)",
+    "packaged_asset": "src/agent_commons/ui/static/work untouched; rebuilt by the coordinator at wave end"
+  }
+}

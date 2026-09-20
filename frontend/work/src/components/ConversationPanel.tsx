@@ -9,10 +9,12 @@ const availabilityCopy = { active: "availabilityActive", inactive: "availability
 type Selection = { scope: ConversationScope; title: string; opener: HTMLButtonElement };
 type Workspace = { locale: Locale; open: (selection: Selection) => void };
 const Context = createContext<Workspace | null>(null);
-export function ConversationButton({ scope, title }: { scope: ConversationScope; title: string }) {
+// `variant`/`label` let one caller — the decision card, when the next action is
+// answering a worker — present this same entry as that card's primary control.
+export function ConversationButton({ scope, title, variant = "secondary", label }: { scope: ConversationScope; title: string; variant?: "primary" | "secondary"; label?: string }) {
   const workspace = useContext(Context); if (!workspace) return null;
   const text = conversationText(workspace.locale);
-  return <button type="button" className="button button-secondary button-inline conversation-entry" aria-haspopup="dialog" aria-label={`${text.for} ${title}`} onClick={(event) => workspace.open({ scope, title, opener: event.currentTarget })}>{text.conversation}</button>;
+  return <button type="button" className={`button button-${variant} button-inline conversation-entry`} aria-haspopup="dialog" aria-label={label === undefined ? `${text.for} ${title}` : `${label} ${text.for} ${title}`} onClick={(event) => workspace.open({ scope, title, opener: event.currentTarget })}>{label ?? text.conversation}</button>;
 }
 export function ConversationWorkspace({ api, projectId, locale, writesEnabled, sessions, onPrepareRun, children }: { api: WorkApi; projectId: string | null; locale: Locale; writesEnabled: boolean; sessions: ConversationSessions; onPrepareRun?: (scope: ConversationScope) => void; children: ReactNode }) {
   const [selection, setSelection] = useState<Selection | null>(null);

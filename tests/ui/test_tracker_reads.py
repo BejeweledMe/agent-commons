@@ -303,3 +303,92 @@ def test_a_delegation_without_a_recorded_limit_reads_as_no_limit_not_the_default
     run = dto.to_wire()["runs"][0]
     assert run["wall_time_seconds"] is None
     assert run["duration_seconds"] == 30
+
+
+def test_task_payloads_carry_objective_and_application_provenance_or_null(tmp_path) -> None:
+    """ADR 0021: both fields are additive and null whenever they are unknown."""
+
+    from agent_commons.services import CommonsManager
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=())
+    manager = CommonsManager(repo, state_root=tmp_path / "state")
+    session = manager.start_session(
+        stable_instance_id="tracker-provenance-window",
+        principal="operator",
+        client="codex",
+        software="pytest",
+        role="operator",
+        capabilities=("task:join_application",),
+    )
+    manager.session_id = session["session_id"]
+    objective = manager.create_objective(
+        title="Ship the department",
+        description="Why these tasks exist together.",
+        acceptance_criteria=("Every task of the application shows this objective.",),
+        idempotency_key="tracker-objective",
+    )
+    objective_id = str(objective["entity_ref"]["id"])
+    stamped = manager.create_task(
+        title="Created with the application",
+        description="Carries its own objective.",
+        acceptance_criteria=("It reports the objective it was created with.",),
+        objective_id=objective_id,
+        idempotency_key="tracker-stamped",
+    )
+    inheriting = manager.create_task(
+        title="Joined later",
+        description="Attached to the application by the operator.",
+        acceptance_criteria=("It inherits the application objective.",),
+        idempotency_key="tracker-inheriting",
+    )
+    unrelated = manager.create_task(
+        title="Outside any application",
+        description="Neither field is known for this task.",
+        acceptance_criteria=("Both fields are null.",),
+        idempotency_key="tracker-unrelated",
+    )
+    application_id = "application." + ("f" * 64)
+    application = manager.record_event(
+        "blueprint_application.created",
+        {
+            "application_id": application_id,
+            "blueprint": {"id": "test", "version": "1", "revision": "1"},
+            "objective_id": objective_id,
+            "created_task_ids": [str(stamped["entity_ref"]["id"])],
+            "created_agent_ids": [],
+            "created_role_refs": [],
+        },
+        idempotency_key="tracker-application",
+    )
+    manager.join_task_to_application(
+        str(inheriting["entity_ref"]["id"]),
+        application_id,
+        str(application["event_id"]),
+        reason="It belongs to this department.",
+        idempotency_key="tracker-join",
+    )
+
+    wire = build_tracker_snapshot(
+        manager.snapshot(),
+        [],
+        generated_at=NOW,
+        sequence=1,
+        focus_task_ids=[],
+        capacity=CAPACITY,
+        graph=_graph(),
+    ).to_wire()
+    payloads = {task["task_id"]: task for task in wire["tasks"]}
+
+    created = payloads[str(stamped["entity_ref"]["id"])]
+    assert created["objective_id"] == objective_id
+    assert created["application_id"] == application_id
+
+    joined = payloads[str(inheriting["entity_ref"]["id"])]
+    assert joined["application_id"] == application_id
+    assert joined["objective_id"] == objective_id, "the application objective is inherited"
+
+    outside = payloads[str(unrelated["entity_ref"]["id"])]
+    assert outside["objective_id"] is None
+    assert outside["application_id"] is None

@@ -1,0 +1,82 @@
+{
+  "work_package": "WP-13.1",
+  "task": "task.4MGXJMAFSV3D41H7TSKR63X2VH",
+  "delegation": "delegation.2SEBHEM0P0DVA0X7PBTM8T74XC",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-11",
+  "files": [
+    {
+      "path": "frontend/work/design/color-inventory.json",
+      "sha256": "2d0c296486ea64aaf2581ba8263a7a5682857db3c0396d14c130324cc1039dc6"
+    },
+    {
+      "path": "frontend/work/src/conversationStrings.ts",
+      "sha256": "449c16074872cc7b0fb28e9fbb0d39992f905f48f8b6697622a6a20458917ca5"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "d1c0a57c3aada09369b0d6ce9ed6588f1bb12fc14ded982941c04471d8d71437"
+    },
+    {
+      "path": "frontend/work/src/i18n.ts",
+      "sha256": "824bebf3421b5480d04605048c6e9b709978cd966efd5127685da5fafb2aa009"
+    },
+    {
+      "path": "frontend/work/src/outputsStrings.ts",
+      "sha256": "70fc05b4040bcb85350ab2f4a6655f772433c30be14e5d59835a3539f56f8f52"
+    },
+    {
+      "path": "frontend/work/src/projectCreationStrings.ts",
+      "sha256": "b417863aba5355f96968cc505097aeac0c49c3c68b96b24e5e7be57b8068e50f"
+    },
+    {
+      "path": "frontend/work/src/taskGraphStrings.ts",
+      "sha256": "1c4e995c7e81072ac822fcde12a73e19b6b90d670d152dba0bd85de52f851ec7"
+    },
+    {
+      "path": "frontend/work/tests/conversations.test.mjs",
+      "sha256": "efc572baef190a4fa643ba0296295a702d20292425483c153c06d1687b9521a0"
+    },
+    {
+      "path": "frontend/work/tests/i18n-registry.test.mjs",
+      "sha256": "947995f45ff771b79b53cd277a5bc52b8576bf205262fa8bf4213dd5ccf05c8f"
+    },
+    {
+      "path": "frontend/work/tests/outputs.test.mjs",
+      "sha256": "a8c3c831a95fa4d52924fde99ffb16b819a72123ef356c2f2c40c2e1878d00a4"
+    },
+    {
+      "path": "frontend/work/tests/project-creation.test.mjs",
+      "sha256": "a357864de43413cab6b12bb97e0cb8224fc78fc54016723e013414db40b1a887"
+    },
+    {
+      "path": "frontend/work/tests/side-registry-snapshot.json",
+      "sha256": "d3f555449c2896e256e2d623952ae5a4af5fc8a545668c1f52b5016ac4e52733"
+    },
+    {
+      "path": "frontend/work/tests/style-tokens.test.mjs",
+      "sha256": "683ce7c417d34a43977614fc6e0c39b94c6c07d2dc1f0c31dc17402c8031b7ca"
+    },
+    {
+      "path": "frontend/work/tests/task-graph.test.mjs",
+      "sha256": "4c3e707a78d7801dfd33ddfd42031b6f30e407358dd12cfe4c2c182d6f729456"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "37e44915ec0e024502160b9486e2021e4159348820be9ddd41ba020f04f08a3a"
+    }
+  ],
+  "verification": {
+    "frontend_node_test": "304 passed, 0 failed",
+    "tsc": "exit 0",
+    "pytest": "not applicable (frontend and design inventory only)",
+    "packaged_asset": "not rebuilt yet (wave integration at the end of wave 3)",
+    "screenshots": "not applicable (no visual change)"
+  },
+  "notes": [
+    "Mechanical checkpoint for WP-13.2: 202 keys moved into i18n.json under namespace prefixes (conversation 69, outputs 38, project_creation 36, task_graph 59; 933 keys per locale), the four side modules remain thin shims, and frontend/work/tests/side-registry-snapshot.json pins every moved string byte for byte.",
+    "No copy, colour, spacing or layout changed; src/agent_commons and the packaged asset were not touched.",
+    "Inventory frontend/work/design/color-inventory.json proposes semantic tokens and scale values for WP-13.2; the ratchet test records raw hex outside :root as styles.css 226, board.css 2, conversation.css 1, outputs.css 0, projectCreation.css 0.",
+    "Grok's first launch was refused because its sign-in probe timed out under load (provider_auth_unknown); a canary retry with nothing else running passed and the same delegation was launched with a new launch key."
+  ]
+}
