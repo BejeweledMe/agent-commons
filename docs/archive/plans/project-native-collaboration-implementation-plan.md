@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-09-09   Archived: 2026-09-18
+Contract: ../../adr/0019-project-native-collaboration-and-outputs.md
+Superseded by: none (completed)
+Source boundary: `e08488f392936c43d35f1013d6468fe45fa89b00`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Project-native collaboration implementation plan
 
 Date: 2026-09-08. Branch: `codex/service-self-improvement`.
@@ -6,9 +16,9 @@ Working tree already contains the documented self-improvement repairs; preserve
 them. Doctor at entry: healthy, zero integrity issues, 136 advisory warnings.
 No release or exact-review completion is implied by this plan.
 
-Product contract: [ADR 0019](adr/0019-project-native-collaboration-and-outputs.md).
+Product contract: [ADR 0019](../../adr/0019-project-native-collaboration-and-outputs.md).
 This is the active implementation sequence for the operator's latest UX request.
-The [current validation record](audits/2026-09-08-project-native-collaboration-validation.md)
+The [current validation record](../../audits/2026-09-08-project-native-collaboration-validation.md)
 owns the latest verification and remaining delivery gates. Checkpoints below
 retain their historical source boundaries. Implementation or live qualification
 does not by itself close a canonical task or approve this branch.
@@ -18,7 +28,7 @@ independent `review`, with explicit operator authorization; none was accepted.
 The state table below remains a historical implementation checkpoint. Current
 review bindings, the subsequent runtime-refresh correction and open delivery
 gates are recorded in the
-[review and delivery checkpoint](audits/2026-09-09-project-native-review-delivery.md).
+[review and delivery checkpoint](../../audits/2026-09-09-project-native-review-delivery.md).
 
 ## Work graph and ownership
 
@@ -84,7 +94,7 @@ The prior dirty-tree boundary passed 139 Work, 27 Gallery and 2107 Python tests
 Prior actual Claude review ended `needs_operator` because of a now-repaired
 task/review revision bug; it did not approve the change. Prior Codex builder
 timed out after leaving a partial diff. See the
-[dogfood audit](audits/2026-09-08-service-self-improvement-dogfood.md).
+[dogfood audit](../../audits/2026-09-08-service-self-improvement-dogfood.md).
 
 Entry risks at the original boundary: Grok argv privacy, ambiguous media/run
 delivery, cross-producer result mixing, slow populated projections and missing
@@ -126,7 +136,7 @@ Grok builder, Codex builder, Claude builder and Claude reviewer all passed real
 isolated canaries at source SHA-256
 `6e592ada489a01fa677922ff530fedaeb616bee2a899d498111c1a1a1b78729c`.
 Each recorded one terminal completion, zero terminal rejections and a closed
-child. [Safe evidence](evidence/2026-09-08/project-native-provider-canaries.json).
+child. [Safe evidence](../../evidence/2026-09-08/project-native-provider-canaries.json).
 This proves the Grok fixed stdin endpoint works on this host; it does not close
 Linux L1, media delivery or product acceptance.
 
@@ -313,7 +323,7 @@ the message. Claude generation ended `needs_operator`; Grok strict label scoring
 remains non-passing. These are separate observations, not blanket provider
 qualification or proof that Claude/Grok can run build commands.
 
-[Post-review evidence](evidence/2026-09-08/project-native-post-review-checkpoint.json)
+[Post-review evidence](../../evidence/2026-09-08/project-native-post-review-checkpoint.json)
 retains the bounded outcomes. Search-coverage, decoder, live-preview lifetime and
 historical artifact-image corrections follow the f35 checkpoint. Their final
 source fingerprint, full gate, installation and independent review must be
@@ -328,6 +338,6 @@ skips), six fresh Codex/Claude/Grok canaries, exact clean-wheel installation and
 independent frontend rebuild. Actual browser verified preview navigation after
 delegation success and historical image viewing after task completion. Installed
 custom groups and Blueprint version editing also passed. See the
-[final evidence](evidence/2026-09-08/project-native-final-validation.json).
+[final evidence](../../evidence/2026-09-08/project-native-final-validation.json).
 Exact independent review and task acceptance remain pending at this checkpoint;
 provider native-command limits and Linux L1/release R2 remain open.

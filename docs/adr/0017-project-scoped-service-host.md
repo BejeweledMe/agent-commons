@@ -4,7 +4,7 @@
 independent implementation review and release evidence pending.
 
 **Baseline:** `605c0d7c9c5965c0a8303550056d07ce63afa697`.
-**Delivery:** [execution plan](../project-workspace-ux-plan.md).
+**Delivery:** [execution plan](../archive/plans/project-workspace-ux-plan.md).
 
 ## Problem and decision
 

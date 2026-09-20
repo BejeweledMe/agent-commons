@@ -16,8 +16,8 @@ recovery и broker-операции legacy-адаптерами, пока C2 н�
 протестирует один service/Python successor. C2 начинается только после полного
 C0 exit, A8 и выбора одной семьи владельцем; UI, MCP и CLI затем должны быть
 тонкими адаптерами одного сервиса, а не повторно реализовывать бизнес-логику.
-См. [architecture implementation plan](../architecture-improvement-implementation-plan.md#phase-c1c2--replace-dependencies-through-services-not-another-monolith)
-и [C0 inventory](../cli-migration-inventory.md#4-required-characterization-and-parity-gates).
+См. [architecture implementation plan](../archive/plans/architecture-improvement-implementation-plan.md#phase-c1c2--replace-dependencies-through-services-not-another-monolith)
+и [C0 inventory](../archive/plans/cli-migration-inventory.md#4-required-characterization-and-parity-gates).
 
 Это согласуется с целевой картой аудита:
 
@@ -139,7 +139,7 @@ MCP/UI adapters are future work, not implied by this document.
 
 1. **C0 full exit:** golden command/help/output/error fixtures and recovery
    drills must be independently evidenced. The current inventory is expressly
-   only a baseline, not the exit ([C0 status](../cli-migration-inventory.md#5-c0-exit-and-next-owner-gates)).
+   only a baseline, not the exit ([C0 status](../archive/plans/cli-migration-inventory.md#5-c0-exit-and-next-owner-gates)).
 2. **A8:** thematic collaborators and narrow consumer Protocols must exist;
    C2 must not add a new method to the retiring manager facade.
 3. **Owner decision below:** select family A and its authority/parity envelope.

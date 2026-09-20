@@ -19,7 +19,7 @@ and separate browser drafts. Existing service skills, specializations and five
 blueprints remain shared definitions with project-local instances. API/local
 models, SGR and conversations remain a future wave under ADR 0018.
 
-References: [execution plan](../project-workspace-ux-plan.md),
+References: [execution plan](../archive/plans/project-workspace-ux-plan.md),
 [ADR 0017](../adr/0017-project-scoped-service-host.md),
 [ADR 0018](../adr/0018-role-connections-and-execution-modes.md).
 

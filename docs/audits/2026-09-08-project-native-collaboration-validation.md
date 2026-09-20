@@ -123,7 +123,7 @@ External/live verification:
 
 [ADR 0019](../adr/0019-project-native-collaboration-and-outputs.md) records the
 accepted product direction and new storage/cache/provisional-output contracts.
-[Implementation graph](../project-native-collaboration-implementation-plan.md)
+[Implementation graph](../archive/plans/project-native-collaboration-implementation-plan.md)
 tracks R0–R7 and exact task IDs. The primary implementation program now reflects
 the installed checkpoint and successful fresh Claude runs. EN/RU service-library
 guides and FRONTEND_CONTRACT describe current reusable Library and scoped Results.

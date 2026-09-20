@@ -30,14 +30,15 @@ contract test. The status written in each ADR remains the detailed record.
 | [0011](0011-hierarchical-delegation-closure.md) | Proposed | H0 semantic contract; no write path is authorized by this ADR. |
 | [0012](0012-context-packs.md) | Accepted for C1 semantic slice | Canonical revisioned Context Packs and their bounded compiler contract. |
 | [0013](0013-design-packages.md) | Accepted for G1 semantic slice | Canonical revisioned Design Packages with exact screen provenance; Gallery API and UI remain subsequent work. |
-| [0014](0014-task-first-workspace-ux.md) | Proposed | Task-first Work workspace, domain-specific UI state, explicit execution and bounded exact-source discovery; branch implementation authorized, verification pending. |
-| [0015](0015-browser-native-visual-refinement.md) | Proposed | Council-guided browser refinement: native status selection, persistent recovery focus, inspector disclosures and readable exact Context sources; bounded branch implementation authorized. |
-| [0016](0016-service-library-and-live-workspace.md) | Proposed | Service-owned professional skills and specializations, editable library, five workflow blueprints, live task graph and browser Gallery; implementation authorized. |
-| [0017](0017-project-scoped-service-host.md) | Proposed | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery; branch implementation authorized. |
+| [0014](0014-task-first-workspace-ux.md) | Proposed in text; implemented and merged (PR #5, 2026-09-07) | Task-first Work workspace, domain-specific UI state, explicit execution and bounded exact-source discovery. |
+| [0015](0015-browser-native-visual-refinement.md) | Proposed in text; implemented and merged (2026-09-07) | Council-guided browser refinement: native status selection, persistent recovery focus, inspector disclosures and readable exact Context sources. |
+| [0016](0016-service-library-and-live-workspace.md) | Implemented (scoped independent review 2026-09-07) | Service-owned professional skills and specializations, editable library, built-in blueprints (seven after wave 2), live task graph and browser Gallery. |
+| [0017](0017-project-scoped-service-host.md) | Proposed in text; implemented and merged (PR #8, 2026-09-08) | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery. |
 | [0018](0018-role-connections-and-execution-modes.md) | Proposed | Future role connection, API/local, SGR and conversation contracts; no runtime capability or live qualification claimed. |
 | [0019](0019-project-native-collaboration-and-outputs.md) | Accepted direction, implementation open | Compact project shell, grouped reusable library, producer-scoped outputs, private message attachments and truthful human/agent delivery; current program is on the self-improvement branch. |
 | [0020](0020-project-board-home.md) | Accepted by the owner, implemented | A project opens on its infinite board: roles as cards, agent links as edges, departments as frames; the task tracker is a separate tab; the arrangement is operational state behind `/api/board`, never canonical. |
-| [0021](0021-objective-blueprint-application-provenance.md) | Accepted 2026-09-11 | Canonical objective links and immutable blueprint-application provenance; board frames may reference an application but remain operational state. |
+| [0021](0021-objective-blueprint-application-provenance.md) | Accepted 2026-09-11; implemented in wave 3 (WP-11.2) | Canonical objective links and immutable blueprint-application provenance; board frames may reference an application but remain operational state. |
+| [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
 
 ## How the two records fit together
 

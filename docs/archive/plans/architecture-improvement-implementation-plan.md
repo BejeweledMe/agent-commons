@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-08-25   Archived: 2026-09-18
+Contract: ../../adr/0014-task-first-workspace-ux.md, ../../adr/0015-browser-native-visual-refinement.md
+Superseded by: none (completed)
+Source boundary: `4844fdb`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Техплан: управляемая петля работы поверх ledger
 
 **Document category:** `historical-plan`
@@ -12,22 +22,22 @@ evidence и exact-revision review.
 
 **Checkpoint 2026-09-06:** состояние после J1/G6, explicit L1 release blocker,
 новые implementation findings и следующий checklist находятся в
-[независимом аудите `329d2f3`](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+[независимом аудите `329d2f3`](../../audits/2026-09-06-total-plan-work-adr-prd-review.md).
 Он не превращает исторические метрики этого плана в текущие KPI и не утверждает
 реализацию proposed ADR 0011.
 
-Последующий [remediation checkpoint](audits/2026-09-06-audit-remediation.md)
+Последующий [remediation checkpoint](../../audits/2026-09-06-audit-remediation.md)
 отделяет проверенные uncommitted fixes от baseline, live qualification и release.
 
-**Продолжение UX 2026-09-07:** [ADR 0014](adr/0014-task-first-workspace-ux.md)
+**Продолжение UX 2026-09-07:** [ADR 0014](../../adr/0014-task-first-workspace-ux.md)
 и [task-first implementation graph](task-first-workspace-implementation-plan.md)
 задают отдельный branch increment под лидом Astra после визуальной оценки Opus.
-[Проверенный branch checkpoint](audits/2026-09-07-task-first-pivot-verification.md)
+[Проверенный branch checkpoint](../../audits/2026-09-07-task-first-pivot-verification.md)
 содержит full green gate и exact evidence. Этот increment сохраняет ledger/CLI
 и не закрывает L1/R2 или историческую программу целиком.
 
-Последующее [браузерное уточнение ADR 0015](adr/0015-browser-native-visual-refinement.md)
-имеет собственный [проверенный checkpoint](audits/2026-09-07-browser-visual-refinement.md),
+Последующее [браузерное уточнение ADR 0015](../../adr/0015-browser-native-visual-refinement.md)
+имеет собственный [проверенный checkpoint](../../audits/2026-09-07-browser-visual-refinement.md),
 новые хеши, скриншоты и полный gate Work94/Gallery22/Python1976. Это ограниченная
 реализация выводов дизайн-консилиума, без продвижения приёмки или live qualification.
 
@@ -38,7 +48,7 @@ evidence и exact-revision review.
 **Входы синтеза:** только предоставленные владельцем
 `codex_architecture_improvement_review.md` и
 `claude_architecture_improvement_review.md`, а также три свежих
-assessment-отчёта в [`docs/reviews/`](reviews/). Входные review остаются
+assessment-отчёта в [`docs/reviews/`](../../reviews/). Входные review остаются
 пользовательскими рабочими материалами и не включаются этим планом в историю
 репозитория. Ограничения взяты из действующего аудита кода и
 утверждённой программы

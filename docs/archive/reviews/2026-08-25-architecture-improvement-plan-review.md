@@ -22,7 +22,7 @@
 
 План включает CLI в A4 и в новые product surfaces: `cli/work.py`, read-only
 `work health`, затем `task next --dry-run` ([план, строки 159, 194–206,
-473](../architecture-improvement-implementation-plan.md)). Условие «no
+473](../plans/architecture-improvement-implementation-plan.md)). Условие «no
 root-CLI growth» не меняет того, что это новые команды и новое поведение.
 
 Это противоречит активному accepted
@@ -40,10 +40,10 @@ CLI всё же нужен позднее, поставить явный owner s
 
 В графе `D2` подписан как `finalisation trust envelope` и ведёт в W4, а `D3`
 как `dependency unlock / authority / admission` ведёт в W5
-([план, строки 117–128](../architecture-improvement-implementation-plan.md)).
+([план, строки 117–128](../plans/architecture-improvement-implementation-plan.md)).
 Но decision register определяет `D2` как reviewer routing/independence, `D3`
 как finalisation trust envelope и `D4` как dependency unlock
-([план, строки 357–364](../architecture-improvement-implementation-plan.md)).
+([план, строки 357–364](../plans/architecture-improvement-implementation-plan.md)).
 Из-за этого граф не делает D2 prerequisite W3, хотя prose требует D1+D2
 (строка 268), и может быть прочитан как разрешающий W4 без D3 — security-owner
 gate для parent finalisation.
@@ -55,18 +55,18 @@ Mermaid, с теми же подписями, что в decision register. До 
 ## Подтверждённое без finding
 
 - План явно запрещает рост `CommonsManager`, root CLI, `build_server`,
-  `UIContext` и legacy static UI ([строки 85–98](../architecture-improvement-implementation-plan.md)); это соответствует A3–A8 facade constraints при
+  `UIContext` и legacy static UI ([строки 85–98](../plans/architecture-improvement-implementation-plan.md)); это соответствует A3–A8 facade constraints при
   исправлении CLI-конфликта выше.
 - Он отделяет derived reads от canonical truth и требует отдельного
   owner-authorised schema/event/replay/migration project для новой семантики
-  ([строки 72–84, 352–372](../architecture-improvement-implementation-plan.md)).
+  ([строки 72–84, 352–372](../plans/architecture-improvement-implementation-plan.md)).
   Не обнаружено скрытой persisted-semantics миграции в A3–A8.
 - `TaskReadiness` верно остаётся поздним чистым advisory predicate, без DAG
   engine, automatic take/start/delegation или зависимости review-pairing repair
-  ([строки 100–105, 170–175, 311–329](../architecture-improvement-implementation-plan.md)).
+  ([строки 100–105, 170–175, 311–329](../plans/architecture-improvement-implementation-plan.md)).
 - Context Pack / Gallery не понижены: F1/F2 остаются на принятом пути, а F3/F4
   сохраняют отдельный после-A8 semantic/migration gate и approved preview scope
-  ([строки 441–460](../architecture-improvement-implementation-plan.md)); это
+  ([строки 441–460](../plans/architecture-improvement-implementation-plan.md)); это
   согласуется с accepted decisions `decision.2ASFCETB9SMAXTVQ5PXRFJYRXW`,
   `decision.0A252PQN9QH7HZCBF4ZDF8BR8X` и
   `decision.50RSN30Q2Q1QW7QYHXX4BZJDHQ`.

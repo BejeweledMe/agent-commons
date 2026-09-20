@@ -1,5 +1,20 @@
 # ADR 0021: Каноническая цель и provenance применения blueprint
 
+> **English summary.** A new task carries a nullable, immutable `objective_id`.
+> Every successful blueprint application writes one immutable canonical
+> `blueprint_application` record: a deterministic `application_id` derived from
+> the apply idempotency identity, the exact blueprint id/version/revision, the
+> objective, the ordered created task ids and the created agent refs. An
+> existing task joins an application only through a separate revision-bound
+> manual join event with an audit reason, and only when its own objective is
+> null or equal to the application's. Tracker DTOs gain additive
+> `objective_id` (effective, inherited from the application when the task's
+> own is null) and `application_id`; missing or unknown values are treated as
+> unknown, never as a negative statement. Retries return the same mapping and
+> never create a second application. Accepted by the owner on 2026-09-11
+> (decision scope `ux/wave-objective-provenance`); implemented in wave 3 as
+> WP-11.2.
+
 - Дата: 10 сентября 2026
 - Статус: принято владельцем 11 сентября 2026 (decision scope
   `ux/wave-objective-provenance`, decision.66658SW7S23Z1ZN5RVDS5471XD) после двух

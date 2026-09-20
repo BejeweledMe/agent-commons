@@ -2,7 +2,7 @@
 
 Status: historical self-improvement checkpoint, retained at its original paths.
 The [project-native validation](2026-09-08-project-native-collaboration-validation.md)
-and [active implementation plan](../project-native-collaboration-implementation-plan.md)
+and [active implementation plan](../archive/plans/project-native-collaboration-implementation-plan.md)
 supersede the current-status and permission requests below. The original failures,
 reviews, source hashes and remaining-gate checklist are preserved as evidence of
 that checkpoint, not instructions to request authorization again.

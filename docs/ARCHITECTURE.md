@@ -2,12 +2,21 @@
 
 ## Product boundary
 
-Agent Commons is a shared operating space for agents working on one project. It
-combines a blackboard, work board, review room, and durable project memory. The
-file-ledger core does not launch models or decide that agreement between models
-is truth. An optional local runtime may execute a bounded delegation through an
-operator-allowlisted provider profile; that execution never changes the core's
-truth or external-authority rules.
+Agent Commons is a local web application in which a person runs a product
+through a team of AI agents, backed by a shared operating space the agents use
+for one project (see [PRODUCT.md](PRODUCT.md) for positioning and the
+glossary). The core combines a blackboard, work board, review room, and durable
+project memory. The file-ledger core does not launch models or decide that
+agreement between models is truth. An optional local runtime may execute a
+bounded delegation through an operator-allowlisted provider profile; that
+execution never changes the core's truth or external-authority rules.
+
+Three adapters sit over the same `CommonsManager`: the local UI (the compiled
+Work application at `/work`, the Gallery at `/gallery`, and a FastAPI server
+that owns sessions, project contexts and typed refusals), the CLI, and the
+scoped MCP server for worker sessions. Layering inside the package is
+`cli, mcp → ui → services → domain / runtime → core, storage`; `domain` and
+`storage` never import upward.
 
 Four information layers remain distinct:
 
@@ -22,7 +31,8 @@ verification is a reproducible fact. Model count does not confer authority.
 
 ## Deployment topology
 
-MVP-0 supports several processes on one shared filesystem. A managed project has:
+The current release supports several processes on one shared filesystem. A
+managed project has:
 
 ```text
 .agent-commons/
@@ -30,7 +40,7 @@ MVP-0 supports several processes on one shared filesystem. A managed project has
 ├── ONBOARDING.md
 ├── events/
 ├── manifests/
-├── blobs/                # reserved; raw capture is disabled in MVP-0
+├── blobs/                # reserved; raw capture is disabled
 └── cache/                 # rebuildable and ignored
 ```
 
@@ -58,14 +68,15 @@ Outside a Git checkout, the same operational layout falls back to
 from version control.
 
 Canonical event and manifest files are immutable and Git-friendly. Thread
-messages are `thread.replied` events; MVP-0 has no separate message store.
+messages are `thread.replied` events; there is no separate message store.
 SQLite is a disposable projection and is never authoritative. Normal reads
 currently replay the canonical ledger; writes defer index maintenance, while
 `doctor` verifies/synchronizes it and `index rebuild` reconstructs it. Projection
 work counters make event/correction/fixed-point cost visible. Remote
 multi-host coordination, authentication, notifications, scheduling, and agent
-launching are outside MVP-0. MVP-2 may add an optional same-host broker and MCP
-adapter without making either mandatory for ledger use.
+launching are outside the core. The optional same-host broker and the MCP
+adapter exist today without being mandatory for ledger use
+([ADR 0004](adr/0004-optional-local-delegation-runtime.md)).
 
 Canonical history belongs to one checkout. Cooperating windows on the same work
 therefore point at the same project root. Linked Git worktrees share operational
@@ -170,8 +181,7 @@ and graceful session close refuses requester-owned non-terminal delegations.
 Task assignment is durable history; a claim is only a temporary coordination
 lease. `task.completed` means the author considers the work complete,
 `task.submitted` moves it to review, and acceptance is a distinct governance
-transition requiring a current independent approval as an MVP-0 protocol
-invariant. The task projection accumulates work-author sessions from take,
+transition requiring a current independent approval as a protocol invariant. The task projection accumulates work-author sessions from take,
 start, block, unblock, and complete transitions. Submission does not replace
 that authorship history, and an independent review cannot be completed by any
 session in the accumulated set.
@@ -251,7 +261,8 @@ artifacts are referenced and hashed by default, not copied automatically.
 
 Local identity is coordination metadata, not cryptographic authentication. A
 session is registered explicitly with software/model-family, role, capabilities,
-and a stable instance identity. MVP-0 does not enforce operator authorization:
+and a stable instance identity. The local release does not enforce operator
+authorization:
 roles and capabilities coordinate work but cannot prove authority, and a model
 name never grants it.
 
@@ -292,7 +303,7 @@ target and revision.
 
 ## Extension boundary
 
-MVP-0 ships one universal software-collaboration domain. Internal registries allow
+The product ships one universal software-collaboration domain. Internal registries allow
 additional schemas and projections, but a public plugin ABI is deferred until a
 second non-trivial domain validates the boundary. Existing specialist workflows
 remain independent and may later become optional domain packs.

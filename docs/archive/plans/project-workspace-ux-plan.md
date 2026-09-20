@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-09-08   Archived: 2026-09-18
+Contract: ../../adr/README.md (ADR 0005, 0014, 0016-0018)
+Superseded by: none (completed)
+Source boundary: `87cfe486800f204918a713f598f524bda62fdcdd`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Проекты как верхний уровень Agent Commons
 
 Статус: реализация из `codex/project-workspaces-program` слита через PR #8
@@ -5,9 +15,9 @@
 independent review; полный `make check` и двухпроектный browser journey пройдены,
 проверенный wheel установлен. PR CI прошёл; последующий main CI выявил старую
 ошибку PID-fixture, исправление и точная проверка описаны в
-[отчёте](audits/2026-09-08-project-workspaces-verification.md#post-merge-ci-follow-up-process-identity-fixture).
+[отчёте](../../audits/2026-09-08-project-workspaces-verification.md#post-merge-ci-follow-up-process-identity-fixture).
 L1/R2 остаются открытыми. Владелец: implementation lead. Архитектурный контракт —
-[ADR 0017](adr/0017-project-scoped-service-host.md); live-запуски требуют отдельного
+[ADR 0017](../../adr/0017-project-scoped-service-host.md); live-запуски требуют отдельного
 явного разрешения.
 
 ## Пользовательский результат и основание
@@ -21,13 +31,13 @@ L1/R2 остаются открытыми. Владелец: implementation lead
 `605c0d7c9c5965c0a8303550056d07ce63afa697`. Это evidence потребности одного
 оператора, а не исследование массового спроса. Детали ниже — проектное
 предложение (`external extension`); результаты реализации и проверки находятся в
-[отчёте](audits/2026-09-08-project-workspaces-verification.md).
+[отчёте](../../audits/2026-09-08-project-workspaces-verification.md).
 
 На исходном baseline `UIContext` привязан к одному `repo`; CLI создаёт одного
 `ProjectSessionOwner`, а `frontend/work/src/main.tsx` показывает название проекта
-как подпись. [ADR 0014](adr/0014-task-first-workspace-ux.md) прямо откладывает
-multi-project switch. [ADR 0005](adr/0005-state-root-isolation.md) уже задаёт
-изоляцию state root, а [ADR 0016](adr/0016-service-library-and-live-workspace.md)
+как подпись. [ADR 0014](../../adr/0014-task-first-workspace-ux.md) прямо откладывает
+multi-project switch. [ADR 0005](../../adr/0005-state-root-isolation.md) уже задаёт
+изоляцию state root, а [ADR 0016](../../adr/0016-service-library-and-live-workspace.md)
 разделяет общую библиотеку и экземпляры ролей проекта. Их контракты сохраняются.
 
 ## Навигация и принадлежность данных
@@ -95,7 +105,7 @@ Linked worktrees одного workspace не становятся новыми �
 Подключение того же workspace повторно не должно дублировать проект или writer.
 Новый проект не создаётся копированием operational state либо immutable ledger.
 
-[ADR 0017](adr/0017-project-scoped-service-host.md) выбирает единый локальный host
+[ADR 0017](../../adr/0017-project-scoped-service-host.md) выбирает единый локальный host
 с изолированными project contexts. Проектный launcher с отдельными UI-процессами
 остаётся альтернативой при доказанной потребности в независимой crash boundary.
 Выбранный вариант требует доказать маршрутизацию и жизненный цикл. Отдельные вкладки
@@ -167,7 +177,7 @@ flowchart TD
 | 5. Браузерный UX | Terra C, `task.2FQ0VW24V2J0866GM5G8WKT2VR`; исправления `task.7D9HNAQ60G192XA1ECKRR64DGY` | Scoped review v3/v4 одобрил callback/retry/SSE исправления. Финальный browser journey из 12 шагов пройден, включая публикацию Design Package и отсутствие чужих задач/экранов. |
 | 6. Интеграция и выпуск | Astra lead, `task.5K83Z3A8EC62Q04W69MXSXQ691` | Green contract, exact independent source review, browser journey и установленный wheel проверены. Git delivery требует green PR/main CI; не является L1 qualification. |
 | 7. Реальный Codex canary | Operator authorization + lead | Одна попытка до 300 секунд ещё не запущена: auto-review требует отдельного разрешения. Это предел теста, не всех рабочих задач. |
-| 8. API/local/SGR | Будущая волна, [ADR 0018](adr/0018-role-connections-and-execution-modes.md) | Зафиксированы структура, граф и gates. Исходный запрос на будущее сохраняется; работающие API-режимы сейчас не заявляются. |
+| 8. API/local/SGR | Будущая волна, [ADR 0018](../../adr/0018-role-connections-and-execution-modes.md) | Зафиксированы структура, граф и gates. Исходный запрос на будущее сохраняется; работающие API-режимы сейчас не заявляются. |
 
 Исполнители запущены через встроенную collaboration-среду Codex с запрошенной
 моделью `gpt-5.6-terra`; это не проверка Commons broker. Модель совета —
@@ -194,6 +204,6 @@ flowchart TD
 - [x] Cleanup подтверждённых временных/generated дублей и merged-ветки;
   canonical history, чужие изменения и значимые evidence сохранены.
 
-API/local/SGR — отдельное [будущее направление](ROADMAP.md#future-role-connections-sgr-and-conversations),
+API/local/SGR — отдельное [будущее направление](../../ROADMAP.md#future-role-connections-sgr-and-conversations),
 не prerequisite для проектного UX. L1/R2 и явное разрешение live canaries
 остаются самостоятельными gates.

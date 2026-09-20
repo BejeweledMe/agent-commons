@@ -13,71 +13,39 @@ That onboarding document is the single canonical guidance contract for every
 agent client. This managed block adds no client-specific workflow policy.
 <!-- agent-commons:managed:end -->
 
-## Engineering standards
+## Where the rules live
 
-Every rule below was paid for by a real incident in this repository. They are
-not preferences; treat them as part of the definition of done.
+- **Engineering standards** — `make check` as the one green contract, versions
+  pinned in files, commit style, the frontend rebuild path, the single asset
+  integrator per wave, and the documentation rules — are written once in
+  [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Frontend laws** for the Work and Gallery applications are in
+  [docs/FRONTEND_CONTRACT.md](docs/FRONTEND_CONTRACT.md).
+- **What the product is and what its words mean** is in
+  [docs/PRODUCT.md](docs/PRODUCT.md); the current plans are in
+  [docs/plans/](docs/plans/); the documentation map with the owner of every
+  topic is [docs/README.md](docs/README.md).
 
-### The green contract
+This file deliberately does not duplicate them.
 
-- `make check` is the one definition of "the tree is green": `ruff check .`,
-  `ruff format --check .`, and the full pytest suite, all through
-  `uv run --locked`. CI calls exactly this target. Never substitute a subset —
-  a narrower local ritual (`ruff check src/ tests/`) once kept CI red for four
-  days while every laptop believed the branch was clean.
-- `make sync` (`uv sync --locked --extra test`) builds the environment. Do not
-  `pip install` into the venv; it is uv-managed and carries no pip.
-- A push is finished when CI is green, not when the push command returns.
-  Watch it: `gh run list --limit 1`, then `gh run watch <id> --exit-status`.
-
-### Versions live in files, not in memory
-
-- Tool versions come from `uv.lock`, `.python-version`, and `.node-version` —
-  never from whatever is on PATH or whatever is newest. Changing a version is
-  a deliberate, visible commit that updates the file and survives `make check`.
-- `ruff` is pinned (`>=0.16,<0.17`) and `[tool.ruff] required-version` makes a
-  stray binary refuse to run rather than format differently. When a floating
-  pin and a formatter major met in August 2026, CI and the laptops disagreed
-  about which files even existed.
-- Node runs the UI behaviour harnesses. In CI its absence is a test failure
-  (`tests/test_ci_environment.py`), not a skip: a skipped harness is lost
-  coverage that a green matrix would hide.
-
-### Commits and history
-
-- Classic commit messages: a lower-case-free imperative summary line, a body
-  that explains why, no `Co-Authored-By` and no AI-attribution trailers.
-- One concern per commit; run `make check` before each one.
-
-### The UI asset
-
-- `src/agent_commons/ui/static/index.html` is a single ~7000-line file edited
-  by ONE agent at a time. Take the workspace claim
-  (`path:src/agent_commons/ui/static/index.html`) before touching it.
-- Its design laws — CSP-safe DOM, the two-language string table, the
-  vocabulary glossary, canonical values never translated — are written in
-  `docs/FRONTEND_CONTRACT.md` and enforced by the test suite. Read the
-  contract before editing the asset; the tests will otherwise teach it to you
-  one failure at a time.
-
-### Tool caveats that have burned sessions before
-
-- Some environments wrap `grep` with ignore-file behaviour that silently skips
-  `index.html`. Use `command grep` and run a positive control (search for a
-  string you know is present) before trusting any "no matches" answer.
-- Scripts fed to node must travel over stdin, not as an argv element: Linux
-  enforces a 128 KiB per-argument ceiling and the embedded STRINGS table is
-  already past it. A stdin program finds its first user argument at
-  `process.argv[2]`.
-- Tests must never ASSUME a hardcoded pid is dead or free: GitHub's macOS
-  runners keep a live daemon at pid 123, and a liveness probe will honestly
-  report it alive. Where deadness matters, spawn and reap a child and use its
-  pid. A pid stored as inert metadata (a recorded ProcessResult, a fixture
-  field nothing probes) is fine.
-
-### The workspace CLI
+## Caveats that have burned agent sessions before
 
 - Inside this repository use the in-repo CLI — `uv run agent-commons …` or
   `.venv/bin/python -m agent_commons …` — so the code that reads the ledger is
   the code of this checkout. A globally installed `agent-commons` from another
   checkout can be older and misread a newer ledger as broken.
+- One writable worker per checkout. Take the workspace claim for the paths you
+  edit; while another session's review runs, keep the checkout quiet: no file
+  edits and no ledger writes until the review finalizes.
+- Some environments wrap `grep` with ignore-file behaviour that silently skips
+  large or generated files. Use `command grep` and run a positive control
+  (search for a string you know is present) before trusting any "no matches".
+- Scripts fed to node must travel over stdin, not as an argv element: Linux
+  enforces a 128 KiB per-argument ceiling. A stdin program finds its first user
+  argument at `process.argv[2]`.
+- Tests must never assume a hardcoded pid is dead or free: GitHub's macOS
+  runners keep a live daemon at pid 123. Where deadness matters, spawn and reap
+  a child and use its pid.
+- After any change under `src/agent_commons/**`, reinstall the uv tool the
+  workers' MCP comes from (`rm -rf build` first; setuptools copies a stale
+  `build/lib` tree into the wheel) and re-canary the profile that runs next.

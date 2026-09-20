@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-09-09   Archived: 2026-09-18
+Contract: none
+Superseded by: docs/plans/2026-09-18-consolidation-and-wave-4-plan.md
+Source boundary: `39459cc`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Agent Commons: план улучшения UX, дизайна и исправления дефектов
 
 Дата: 9 сентября 2026. Язык: русский.

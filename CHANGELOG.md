@@ -3,8 +3,208 @@
 All notable changes are documented here. This project follows Semantic
 Versioning once a stable release line is declared.
 
+**How this file is maintained.** Every merged pull request adds an entry under
+`## Unreleased`, newest first. A completed plan contributes exactly one summary
+line here and then moves to `docs/archive/plans/`, linked from that line.
+Counts of tests are never recorded in this file; they live in the evidence
+manifests under `docs/evidence/`, bound to the revision they were measured on.
+This file is the structured history the repository keeps instead of retaining
+finished plans at the top level.
+
 ## Unreleased
 
+- **The second dogfooding wave: measured write latency, one name field,
+  archivable skill groups, and no more Starter Packs.** Before any latency
+  target is declared, there is now a measurement: warm `task_create` has a
+  median of 4.4 s on a 300-task ledger (420 events) and 33 s at 3206 events,
+  and 62–64 % of that time is `canonical_reads_validation` — a full double
+  pass over the ledger on every single write. No p50/p95 gate is asserted
+  until the owner sets one against these numbers
+  ([baseline](docs/performance/2026-09-10-mutation-baseline.md)).
+  User-authored text is entered once, in one field, and stored exactly as
+  typed, so a Russian name is a name rather than a locale key. A skill group
+  can be archived and restored: an empty group goes directly, a non-empty one
+  must name the target group and moves its skills atomically, revision-bound
+  with typed 409/422 rather than optimistic client state. Mutation feedback is
+  scoped to `{project, surface, operation}` instead of one global "busy" flag,
+  so reading and navigating stay available while a write is in flight; the 2 s
+  and 8 s notes a slow write shows are presentation hints, not a performance
+  promise. Starter Packs are gone — their content moved into the built-in
+  blueprints, and the backend surface and the Work screens were removed with
+  them. Finally, a canonical objective and blueprint-application provenance
+  were decided and accepted on 2026-09-11
+  ([ADR 0021](docs/adr/0021-objective-blueprint-application-provenance.md)):
+  each successful blueprint application will record one immutable
+  `blueprint_application` naming the exact blueprint version and the tasks and
+  roles it created, so a department is recoverable after a reload or a retry.
+  The implementation of that record is still open work.
+- **A project opens on its board.** The home screen of a project is an
+  infinite canvas again, as the original product intent described it. Hired
+  roles are cards carrying name, specialization, provider and model, the state
+  of their current run, a task count and whether they are waiting on a person,
+  with Conversation, Results, Tasks and "Give a task" on each card. Edges are
+  `agent_link` records: dragging a port from one card to another opens a real
+  link through the existing route, and an arrow that has no ledger record
+  behind it is never drawn. Applying a blueprint from the board draws a
+  department frame around the roles and tasks that application created, and
+  roles can be dragged between frames. Frames and node positions are
+  deliberately operational layout — per-project JSON under the state root
+  behind `GET/PUT /api/board`, compare-and-swap on revision — not canonical
+  truth, and the decision says so rather than promoting a drawing to a record.
+  The task tracker becomes its own Tasks tab with a per-role filter, hiring
+  moved into the board's side panel, the Agents tab is retired, and the old
+  `view=team` route redirects to the board
+  ([ADR 0020](docs/adr/0020-project-board-home.md)).
+- **The first dogfooding wave answered what a returning operator hits first.**
+  Applying a blueprint no longer looks like it started working: the
+  confirmation states that roles and tasks were created and that zero runs
+  started, and the primary action opens Prepare run for the first task the
+  server confirms is ready. Output labels stop over-promising — latest,
+  historical, expired and unavailable are distinguished, and a separate
+  additive `review_state` (`awaiting`, `approved`, `returned`, or absent)
+  carries review status instead of the panel inferring it from staleness.
+  Archiving a project asks for confirmation naming the project and its
+  unchanged path, because archiving never touches the folder, and readiness is
+  said in words rather than signalled by a colour. A conversation now shows
+  whether its recipient is actually reachable: `recipient_availability` is
+  joined from one server snapshot, and missing, partial or stale data reports
+  `unknown` rather than claiming inactive. The five delivery states became a
+  stepper that is not mistaken for acceptance, and unsent text or attachments
+  are guarded before a page is left. A run's time limit is editable —
+  `wall_time_seconds`, between 60 and 3600 seconds, enforced by the server and
+  shown where the run is prepared.
+- **A project gets its own conversations, library and results.** The shell
+  becomes a compact sidebar with one search field, one create-or-connect
+  action and an ellipsis beside each project, with every action attached to
+  the subject it acts on. Built-in skills sit in named collapsible groups with
+  counts and grouped search instead of one flat catalogue. Custom blueprints
+  are persistent versioned definitions with slots, exact specialization
+  references and a validated acyclic task graph, and applying one uses an
+  exact version. Results appear on a task or a hired agent only when the
+  server reports accessible outputs, scoped to the producer that actually made
+  them — ownership is never inferred from a later assignee or from who last
+  revised the task. Conversations accept attachments (up to 10 images and 10
+  other files per message, 15 MB each) stored in private service-owned storage
+  outside the repository, the ledger and the webroot, referenced canonically
+  by opaque identity, digest and verified media type, with no operator path in
+  the record. A running frontend preview is a different kind of output from an
+  image, and an untrusted preview is served on a separate origin that never
+  receives Commons authentication
+  ([ADR 0019](docs/adr/0019-project-native-collaboration-and-outputs.md)).
+- **One service host, many isolated projects.** Projects are created or
+  connected from the sidebar by typed path, with a native folder chooser where
+  the host supports one. Each project owns its team, task graph, Gallery,
+  Context Packs and run history, while installed skills, specializations and
+  blueprints stay service-wide. The host keeps a separate project context and
+  session owner per project rather than repointing one shared context, so
+  switching projects cannot stop a running launch or show another project's
+  draft or response. A private registry — outside every delegated repository,
+  its state root and the service library — holds an opaque `project.<32 hex>`
+  identity, the workspace id, a verified checkout and state binding, an
+  archive flag and bounded receipts, with a default capacity of 64 and no
+  briefs, credentials or provider configuration in it. Archiving or removing a
+  project never deletes its folder, and public list DTOs omit filesystem paths
+  ([ADR 0017](docs/adr/0017-project-scoped-service-host.md)).
+- **A freshly installed service already knows 45 skills.** The library ships
+  45 professional skills, 30 specialization definitions and — after the second
+  dogfooding wave — seven built-in blueprints: web-app, mobile-app,
+  telegram-mini-app, grounded-ai-assistant, improve-service, feature-delivery
+  and product-discovery. Skills and role definitions are added and edited in
+  the browser rather than in a YAML file, several named instances of one
+  specialization can be hired with independently chosen providers and models,
+  a dependency graph of tasks is created and adjusted in the panel, and a
+  selected task is launched from it and its run inspected. Design screens can
+  be imported and assembled into exact Design Packages. The separation is the
+  point: a skill version is a service-owned method with its allowed resource
+  closure, a specialization describes responsibility and entry method, and an
+  instance is what a project hires — definitions, instances and executions
+  stay three different things. Console setup becomes the exception rather than
+  the way in
+  ([ADR 0016](docs/adr/0016-service-library-and-live-workspace.md)).
+- **Work opens on the work.** In the measured baseline the task tracker began
+  at y=5822 of a 5986-pixel page, behind setup, role creation, launch and a
+  full context editor, so a returning operator could not see their own work
+  without scrolling past everything they had already done. The workspace is
+  reorganised around tasks: task creation comes first, launching is
+  contextual, and the library and settings sit behind the work itself. The
+  inspector leads with task state, readiness, blocker, responsible role and
+  the next safe action, keeping goal, criteria, empty summaries, run history
+  and technical identity behind native disclosure that survives routine
+  updates. Three primary filters — all, attention, active — sit beside a
+  labelled select for the remaining seven states, with all ten query values
+  and URL addressing preserved. The visual pass that followed keeps the dark
+  palette and system fonts, reserves blue for action, selection and focus,
+  amber for attention and red for refusal, and keeps task state, readiness,
+  evidence, freshness, review and acceptance as separate domains, each with
+  its canonical value and an EN/RU gloss. The team surface this increment left
+  unresolved was answered later by the board
+  ([ADR 0014](docs/adr/0014-task-first-workspace-ux.md),
+  [ADR 0015](docs/adr/0015-browser-native-visual-refinement.md)).
+- **Repository guidance shrank, and cleanup learned its own scope.** Current
+  work routes through one implementation programme, roadmap direction is
+  separated from historical evidence, and two unregistered historical inputs
+  moved into `docs/archive/` byte-for-byte rather than being rewritten or
+  dropped. `make clean` is preview-first with a fixed generated-output scope
+  and refuses tracked files, case aliases and symlink roots; canonical state,
+  registered proof and the shipped UI asset are never in its reach (#6).
+- **Context and design become canonical, revisioned objects.** A Context Pack
+  is a canonical entity (`context_pack.created` / `context_pack.revised`)
+  whose revision is a full snapshot rather than a patch: every fact carries at
+  least one exact revision-bound canonical source, and publishing v2 cannot
+  mutate v1. An accumulated-context run therefore has a reproducible baseline
+  that inherits no provider transcript, credential or authority from another
+  run. Design Packages do the same for screens — an ordered list of bindings,
+  each naming the exact artifact revision, its `sha256:` content revision and
+  the exact producing task revision, with a preview marked safe only after the
+  verified reader has proved the current bytes below every descriptor, hash,
+  pixel and media-type limit. A Design Package can then be bound to a launch,
+  so a run is told exactly which screens it is working from instead of
+  guessing from whatever is on disk
+  ([ADR 0012](docs/adr/0012-context-packs.md),
+  [ADR 0013](docs/adr/0013-design-packages.md)).
+- **Grok Build joins Codex and Claude Code as a third local provider.**
+  Allowlisted builder and independent-reviewer profiles run through the same
+  runtime, authentication, qualification, `init`, panel and documentation
+  paths as the other two. The installed CLI's real headless flags are used
+  rather than invented ones; project MCP configuration is managed by the
+  service with fixed environment isolation and a fail-closed inspect probe, so
+  MCP servers already active on the operator's machine cannot quietly widen
+  what a worker may do. Instructions reach the process through a fixed stdin
+  endpoint — never process arguments, never a prompt file on disk — and a
+  failure there must not silently restore either. Terminal MCP rules were
+  hardened after the canary runs: a Grok process that exits without calling a
+  terminal tool is reported as needing an operator rather than counted as a
+  result. What this does not settle is live qualification. **L1 — Linux
+  receipt scope, a green doctor, and six-profile live qualification on an
+  exact source, provider and host boundary — remains unproven, and R2 release
+  evidence remains open.** A green canary on one macOS machine is neither of
+  them, and nothing below should be read as claiming otherwise.
+- **A provider process that exits is no longer read as work that succeeded.**
+  Launch planning moves behind adapters that build an exact, validated,
+  immutable launch plan, and the execution-host binding boundary refuses
+  mutable duck-typed substitutes instead of accepting anything with the right
+  attribute names. Admission to the local execution host is authenticated and
+  owner-only: each request binds to an immutable launch identity and leaves a
+  crash-safe, exactly-once operational receipt that carries no provider-private
+  material and no canonical lifecycle state. Qualification canaries check an
+  exact provider, model and source boundary, diagnostics are bounded to what
+  can be said safely, and the panel gained a recovery flow for a provider whose
+  authentication has lapsed instead of presenting the failure as a broken run.
+  A process exit is an observation about a process; the canonical outcome still
+  has to be written by the run itself.
+- **Documentation consolidation, 18 September 2026.** `docs/PRODUCT.md`
+  becomes the single owner of positioning, the target user and the EN/RU
+  glossary, so a product fact has one home instead of being restated in five
+  documents that drift apart. Sixteen completed plans and eleven review and
+  audit reports move under `docs/archive/plans/` and `docs/archive/reviews/`
+  with a status stamp and byte-identical contents; the top level keeps only
+  what is active. Evidence gains a written retention policy — what belongs
+  under `docs/evidence/`, in what form, and when a dated directory closes.
+  Retiring the legacy panel in favour of Work is decided in principle, with
+  ADR 0022 still to be written and the redirect and test removal still to be
+  done. See the
+  [plan](docs/plans/2026-09-18-consolidation-and-wave-4-plan.md) and the
+  [audit](docs/audits/2026-09-18-repository-and-documentation-audit.md).
 - **The terminal step disappears: `git clone … && make sync && agent-commons
   ui` is now the whole bootstrap.** Reaching a working panel used to mean
   opening a terminal four times — `init`, `session start`, `ui` with three
@@ -14,7 +214,9 @@ Versioning once a stable release line is declared.
   longer refuses; it serves a first-run screen that creates the project here
   (the same initializer `agent-commons init` runs, not a second one), finds
   `claude`/`codex` on `PATH` and writes an operator runtime config for
-  whichever it found. If it finds neither, it says run functionality is
+  whichever it found. Since Grok Build was added as a third local provider,
+  that scan covers `claude`, `codex` and `grok`, and the case below is none of
+  the three. If it finds none of them, it says run functionality is
   unavailable and directs the operator to install a subscribed CLI before
   looking again. The panel opens, renews on a 15-minute heartbeat, and closes an
   operator session of its own — nobody runs `session start` for it, and an

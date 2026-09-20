@@ -991,7 +991,7 @@ revision-bound evidence, explicit truth promotion. Этого как перво�
 3. **Учёт попыток — на делегацию, не на поддерево.** Глубокое дерево жжёт бюджет
    геометрически, оставаясь в лимитах в каждом узле.
 
-Оформлено в [ADR 0007](adr/0007-multi-level-delegation-and-raised-concurrency.md).
+Оформлено в [ADR 0007](../adr/0007-multi-level-delegation-and-raised-concurrency.md).
 Ключевое из него:
 
 - Три новых монотонных поля `RuntimePolicy` (`max_delegations_total`,

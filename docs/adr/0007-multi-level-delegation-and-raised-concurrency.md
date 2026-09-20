@@ -10,7 +10,7 @@ workflow available to workers.
 ## Context
 
 The visual orchestrator described in
-[the PRD](../visual_multi_agent_orchestrator_prd.md) requires an organization
+[the PRD](../archive/plans/visual_multi_agent_orchestrator_prd.md) requires an organization
 deeper than one delegation level (Product Lead → Tech Lead → Backend) and more
 than two agents running at once. Both are currently blocked by defaults, not by
 mechanism.

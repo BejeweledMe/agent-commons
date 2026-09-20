@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-08-22   Archived: 2026-09-18
+Contract: none
+Superseded by: none (completed)
+Source boundary: see text
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Context Pack и Design Gallery: утверждённая программа реализации
 
 **Статус:** утверждённый техплан; реализация идёт по отдельным structural и

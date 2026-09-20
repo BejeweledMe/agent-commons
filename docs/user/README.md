@@ -14,12 +14,15 @@ Choose a language:
 The guide is for a person using the local interface. It explains the current
 product, not its code or future roadmap:
 
-1. the roles, tasks, runs, reviews, and acceptance you see in the UI;
+1. the agents, tasks, runs, reviews, and acceptance you see in the UI;
 2. the normal team workflow;
-3. setup and safe access to the local panel;
+3. setup and safe access to the local app;
 4. statuses, blockers, and common recovery steps; and
-5. Work, Team, Library and Settings, with Gallery and the full panel for
-   specialized operations and recovery.
+5. the Board, Tasks, Agents, Library and Settings screens of the Work app,
+   with the design Gallery at `/gallery` for design packages.
+
+The older single-file panel is being retired, so this guide no longer sends
+you there. Advanced recovery is an operator task performed from a terminal.
 
 For provider configuration, source installation, API details, or operating the
 product from a terminal, use the technical documentation linked from the

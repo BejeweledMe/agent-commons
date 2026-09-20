@@ -145,7 +145,7 @@ used with the changed source fingerprint; honest delivery states; reviewed wheel
 installation. Linux six-profile L1 and release R2 remain open until their own
 exact evidence exists. Historical successful canaries do not qualify new bytes.
 
-See [implementation graph](../project-native-collaboration-implementation-plan.md).
+See [implementation graph](../archive/plans/project-native-collaboration-implementation-plan.md).
 
 Primary design constraints: [MDN folder picker](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker),
 [OWASP upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html).
