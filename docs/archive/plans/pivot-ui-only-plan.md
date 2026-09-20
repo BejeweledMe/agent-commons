@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-08-19   Archived: 2026-09-18
+Contract: ../../adr/0005-state-root-isolation.md, ../../adr/0007-multi-level-delegation-and-raised-concurrency.md, ../../adr/0008-run-observability-store-withdrawn.md
+Superseded by: none (completed)
+Source boundary: `1c4e570`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Пивот на UI-only: сведённый технический план
 
 **Document category:** `historical-analysis`
@@ -13,7 +23,7 @@ ledger, включая UI как primary surface
 Текущий порядок реализации находится в
 [`agent-platform-implementation-program.md`](agent-platform-implementation-program.md),
 а статусы ADR и способ прочитать canonical decisions — в
-[`adr/README.md`](adr/README.md).
+[`adr/README.md`](../../adr/README.md).
 
 Замер состояния: ветка `codex/code-quality-audit`, HEAD `1c4e570`, рабочее
 дерево чистое, `make check` 832 passed / 13 skipped.

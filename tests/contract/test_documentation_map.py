@@ -7,20 +7,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 DOCS = ROOT / "docs"
-ACTIVE_PROGRAMME = "agent-platform-implementation-program.md"
+ACTIVE_PROGRAMME = "plans/2026-09-18-consolidation-and-wave-4-plan.md"
 ROUTED_DOCUMENTS = (
     DOCS / "README.md",
-    DOCS / "pivot-ui-only-plan.md",
-    DOCS / "architecture-improvement-implementation-plan.md",
-    DOCS / "visual_multi_agent_orchestrator_prd.md",
-    DOCS / "visual_orchestrator_plan.md",
+    DOCS / "adr" / "README.md",
+    DOCS / ACTIVE_PROGRAMME,
 )
-DOCUMENT_CATEGORIES = {
-    "pivot-ui-only-plan.md": "historical-analysis",
-    "architecture-improvement-implementation-plan.md": "historical-plan",
-    "visual_multi_agent_orchestrator_prd.md": "current-product-direction",
-    "visual_orchestrator_plan.md": "current-navigation",
-}
+ARCHIVED_PLANS = DOCS / "archive" / "plans"
+ARCHIVE_STATUSES = ("Status: completed", "Status: superseded")
 
 
 def test_adr_index_covers_every_numbered_record() -> None:
@@ -43,17 +37,32 @@ def _section(text: str, heading: str) -> str:
     return body.split("\n## ", 1)[0]
 
 
-def test_routed_documents_declare_stable_categories_and_active_programme() -> None:
+def test_documentation_map_routes_to_the_active_programme() -> None:
     for document in ROUTED_DOCUMENTS:
-        text = document.read_text(encoding="utf-8")
-        assert ACTIVE_PROGRAMME in text, document
+        assert document.exists(), document
 
-    category_pattern = re.compile(r"(?m)^\*\*Document category:\*\* `([^`]+)`$")
-    for filename, expected_category in DOCUMENT_CATEGORIES.items():
-        text = (DOCS / filename).read_text(encoding="utf-8")
-        match = category_pattern.search(text)
-        assert match is not None, filename
-        assert match.group(1) == expected_category
+    documentation_map = (DOCS / "README.md").read_text(encoding="utf-8")
+    assert ACTIVE_PROGRAMME in documentation_map
+    assert "adr/README.md" in documentation_map
+
+
+def test_archived_plans_declare_a_status_stamp() -> None:
+    archived = sorted(ARCHIVED_PLANS.glob("*.md"))
+    assert archived, ARCHIVED_PLANS
+
+    unstamped: list[str] = []
+    for plan in archived:
+        lines = plan.read_text(encoding="utf-8").splitlines()
+        stamped = (
+            len(lines) > 2
+            and lines[0].strip() == "```"
+            and lines[1].startswith(ARCHIVE_STATUSES)
+            and "```" in lines[2:9]
+        )
+        if not stamped:
+            unstamped.append(str(plan.relative_to(ROOT)))
+
+    assert not unstamped, "archived plans without a status stamp:\n" + "\n".join(unstamped)
 
 
 def test_documentation_map_separates_history_from_current_direction() -> None:
@@ -61,20 +70,28 @@ def test_documentation_map_separates_history_from_current_direction() -> None:
     historical = _section(documentation_map, "Historical plans")
     current = _section(documentation_map, "Current direction summaries")
 
-    assert "pivot-ui-only-plan.md" in historical
-    assert "architecture-improvement-implementation-plan.md" in historical
-    assert "visual_multi_agent_orchestrator_prd.md" not in historical
-    assert "visual_orchestrator_plan.md" not in historical
-    assert "visual_multi_agent_orchestrator_prd.md" in current
-    assert "visual_orchestrator_plan.md" in current
+    assert "docs/archive/plans/" in historical
+
+    top_level = {document.name for document in DOCS.glob("*.md") if document.name != "README.md"}
+    leaked = sorted(name for name in top_level if name in historical)
+    assert not leaked, "historical section points at current top-level documents: " + ", ".join(
+        leaked
+    )
+
+    assert "PRODUCT.md" in current
 
 
-def test_changed_document_links_resolve_inside_the_repository() -> None:
-    documents = (*ROUTED_DOCUMENTS, DOCS / "adr" / "README.md")
+def _markdown_documents() -> list[Path]:
+    documents = sorted(DOCS.rglob("*.md"))
+    documents.extend(sorted(ROOT.glob("*.md")))
+    return documents
+
+
+def test_documentation_links_resolve_inside_the_repository() -> None:
     link_pattern = re.compile(r"\[[^\]]+\]\(([^)\s]+)(?:\s+[^)]*)?\)")
 
     missing: list[str] = []
-    for document in documents:
+    for document in _markdown_documents():
         text = document.read_text(encoding="utf-8")
         for match in link_pattern.finditer(text):
             raw_target = match.group(1).strip("<>")

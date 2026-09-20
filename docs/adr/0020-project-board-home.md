@@ -1,5 +1,17 @@
 # ADR 0020: Доска проекта как главный экран
 
+> **English summary.** A project opens on an infinite board (React Flow):
+> standing agents are cards, `agent_link` records are edges, departments are
+> frames created by blueprint applications. Node positions and frames are
+> operational state behind `GET/POST /api/board` under the state root, never
+> canonical truth and never browser storage. The task tracker is a separate
+> Tasks tab with an `?agent=` filter; the former Agents tab moves into the
+> board's side panel and `view=team` redirects to the board. Nothing on the
+> board advances the canonical lifecycle client-side; green remains reserved
+> for acceptance. Accepted by the owner on 2026-09-09 (decision scope
+> `ux/project-board-home`, replacing `ux/work-home-screen`); implemented and
+> merged on 2026-09-10.
+
 - Дата: 9 сентября 2026
 - Статус: принято владельцем (decision scope `ux/project-board-home`,
   заменяет `ux/work-home-screen` от 9 сентября); реализация в этом же срезе

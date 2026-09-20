@@ -1,3 +1,13 @@
+```
+Status: completed
+Owner: historical
+Opened: 2026-09-07   Archived: 2026-09-18
+Contract: ../../adr/0014-task-first-workspace-ux.md, ../../adr/0015-browser-native-visual-refinement.md
+Superseded by: none (completed)
+Source boundary: `329d2f3920753853ce265536d9d3ceb4e35f1f91`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Task-first workspace implementation plan
 
 **Date:** 2026-09-07. **Status:** task-first increment and subsequent browser visual refinement verified at their separate exact boundaries. No task acceptance or release.
@@ -6,7 +16,7 @@
 audit remediation; preserve those changes independently of the pivot.
 
 The user authorized the task-first UX pivot after an Opus screenshot assessment
-and an Astra architecture review. [ADR 0014](adr/0014-task-first-workspace-ux.md)
+and an Astra architecture review. [ADR 0014](../../adr/0014-task-first-workspace-ux.md)
 is the implementation contract, including its dependency graph and alternatives.
 The lead is Astra; source API and integration evidence are owned by the root
 integrator. No worker may edit another worker's shared file without transfer.
@@ -14,10 +24,10 @@ integrator. No worker may edit another worker's shared file without transfer.
 ## Subsequent browser refinement
 
 The user authorized the design council's bounded follow-up, specified in
-[ADR 0015](adr/0015-browser-native-visual-refinement.md). Three Astra workers
+[ADR 0015](../../adr/0015-browser-native-visual-refinement.md). Three Astra workers
 implement Work/shared styling, inspector disclosures, and Library/Context;
 root integrates browser evidence and the [Figma comparison board](https://www.figma.com/design/5GbVebHulITT4gWLVTmtGh).
-The [new verification report](audits/2026-09-07-browser-visual-refinement.md)
+The [new verification report](../../audits/2026-09-07-browser-visual-refinement.md)
 tracks this delta and its independent review. The checked items, counts and
 exact artifact review below describe the prior frozen task-first increment;
 they are historical evidence, not automatic approval of subsequent source edits.
@@ -96,7 +106,7 @@ flowchart LR
 
 The checked conditions describe implementation and available tests, not canonical
 acceptance. Actual browser Back/forward remains unexercised; its route contract
-is covered hermetically. See the [verification report](audits/2026-09-07-task-first-pivot-verification.md)
+is covered hermetically. See the [verification report](../../audits/2026-09-07-task-first-pivot-verification.md)
 for the exact commands, screenshot limitations and independent review record.
 
 ## Evidence plan
@@ -156,7 +166,7 @@ remains unchanged. Full `make check`: Work 85, Gallery 22, Python 1976 passed;
 13 intentional/local-only Python skips and two existing deprecation warnings.
 No frontend tests were skipped. The first two gate attempts exposed test
 formatting and stale provider-auth assertions; both were corrected and the full
-gate repeated. See [test evidence](evidence/2026-09-07/ux-pivot-test-verification.json).
+gate repeated. See [test evidence](../../evidence/2026-09-07/ux-pivot-test-verification.json).
 
 Independent review caught malformed bitmap dimensions in the first browser
 artifact. JPEG extensions/dimensions were corrected without changing image

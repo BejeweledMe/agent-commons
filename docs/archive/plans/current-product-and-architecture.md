@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-08-24   Archived: 2026-09-18
+Contract: ../../adr/README.md (ADR 0001-0005, 0014-0018)
+Superseded by: docs/PRODUCT.md
+Source boundary: `f998e33`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Agent Commons: снимок продукта и архитектуры
 
 **Статус:** исторический baseline snapshot, а не live release dashboard.
@@ -8,18 +18,18 @@
 **Назначение страницы:** дать человеку, новому участнику команды или новому агенту одну
 честную карту продукта на указанной границе: какую проблему он решает, что тогда работало,
 как это было устроено и что было согласовано, но ещё не являлось функциональностью. Для
-текущего статуса используйте [карту документации](README.md), исходный код, тесты и текущую
+текущего статуса используйте [карту документации](../../README.md), исходный код, тесты и текущую
 ревизию Git.
 
 **Дополнение 2026-09-06:** [независимый аудит текущей границы
-`329d2f3`](audits/2026-09-06-total-plan-work-adr-prd-review.md) подтверждает
+`329d2f3`](../../audits/2026-09-06-total-plan-work-adr-prd-review.md) подтверждает
 реализацию Context Packs, Gallery, J1 и G6 после этого снимка. Starter Pack Apply
 удалён 2026-09-10 в пользу встроенных схем Library.
 J1/G6 имеют exact acceptance, но L1 live qualification и R2 release остаются
 открытыми; audit также выявил P1 в review evidence и runtime privacy/provenance.
 Исторические статусы таблицы ниже сохранены и не описывают текущий checkout.
 
-После аудита подготовлены [проверенные uncommitted fixes](audits/2026-09-06-audit-remediation.md)
+После аудита подготовлены [проверенные uncommitted fixes](../../audits/2026-09-06-audit-remediation.md)
 для review evidence, source/privacy gates и Work recovery/preset hire. Полный
 green gate и scoped review пройдены; live qualification, acceptance и release
 этим не подтверждаются.
@@ -27,34 +37,34 @@ green gate и scoped review пройдены; live qualification, acceptance и 
 **Дополнение 2026-09-07:** отдельная ветка `codex/task-first-ux-pivot`
 реализует Work / Team / Library / Settings, task-first создание, инспектор,
 выбор точных источников и локальное восстановление. Совместный дизайн с Opus
-и Astra, границы и проверки заданы [ADR 0014](adr/0014-task-first-workspace-ux.md)
+и Astra, границы и проверки заданы [ADR 0014](../../adr/0014-task-first-workspace-ux.md)
 и [планом с графом работ](task-first-workspace-implementation-plan.md).
 Реализация прошла полный `make check` (Work85, Gallery22, Python1976);
-[итоговый отчёт](audits/2026-09-07-task-first-pivot-verification.md) отделяет
+[итоговый отчёт](../../audits/2026-09-07-task-first-pivot-verification.md) отделяет
 exact source review и синтетическую браузерную проверку от live qualification
 и приёмки. Историческая таблица ниже остаётся снимком августа, а не списком
 функций ветки.
 
-**Визуальное уточнение:** по [ADR 0015](adr/0015-browser-native-visual-refinement.md)
+**Визуальное уточнение:** по [ADR 0015](../../adr/0015-browser-native-visual-refinement.md)
 три Astra-агента внедрили нативные фильтры, устойчивые раскрытия инспектора
-и читаемые точные источники Context. [Новый отчёт](audits/2026-09-07-browser-visual-refinement.md)
+и читаемые точные источники Context. [Новый отчёт](../../audits/2026-09-07-browser-visual-refinement.md)
 фиксирует браузерные проверки, Figma до/после и полный gate Work94/Gallery22/
 Python1976. Предыдущие хеши и результаты остаются историческими.
 
-**Библиотека сервиса и живой граф:** [ADR 0016](adr/0016-service-library-and-live-workspace.md)
+**Библиотека сервиса и живой граф:** [ADR 0016](../../adr/0016-service-library-and-live-workspace.md)
 добавляет 45 встроенных профессиональных навыков, 30 специализаций с независимым
 выбором провайдера, редакторы, пять блюпринтов с описанием продукта, правку графа
-задач и импорт экранов в Gallery. [Проверка текущего изменения](audits/2026-09-07-service-library-verification.md)
+задач и импорт экранов в Gallery. [Проверка текущего изменения](../../audits/2026-09-07-service-library-verification.md)
 отделяет установленный пакет и локальные сценарии от L1/live qualification.
 
-**Проекты, 2026-09-08:** [ADR 0017](adr/0017-project-scoped-service-host.md) и
+**Проекты, 2026-09-08:** [ADR 0017](../../adr/0017-project-scoped-service-host.md) и
 [план реализации](project-workspace-ux-plan.md) добавляют отдельные проекты в
 левую панель: создание/подключение, имена и архив, собственные Work/Gallery,
 writer sessions и потоки обновлений при общей библиотеке сервиса. Реализация
 прошла полный локальный gate, независимый source review и браузерную проверку
 установленного wheel; evidence и границы Git delivery / L1 находятся в
-[отчёте проверки](audits/2026-09-08-project-workspaces-verification.md).
-[ADR 0018](adr/0018-role-connections-and-execution-modes.md) отдельно фиксирует
+[отчёте проверки](../../audits/2026-09-08-project-workspaces-verification.md).
+[ADR 0018](../../adr/0018-role-connections-and-execution-modes.md) отдельно фиксирует
 будущие API/local/SGR/conversational режимы и не заявляет их реализацию.
 
 Это описание опирается на исходный код, тесты, документацию и реестр решений в этом
@@ -84,7 +94,7 @@ writer sessions и потоки обновлений при общей библ�
 Главное ограничение текущей версии: это **локальный, однопользовательский, файловый продукт**.
 Он не заменяет Git, CI, issue tracker, систему учётных записей или человека, который даёт
 разрешение на внешний эффект. Подробнее — в [видении](VISION.md),
-[архитектуре](ARCHITECTURE.md) и [threat model](THREAT_MODEL.md).
+[архитектуре](../../ARCHITECTURE.md) и [threat model](../../THREAT_MODEL.md).
 
 ## Что уже есть, что выполняется, что запланировано
 
@@ -134,7 +144,7 @@ flowchart LR
 
 Схема описывает governance-цикл, а не обязательную бюрократию для каждого небольшого
 изменения. В `light` режиме работа может честно закончиться на `completed`; `accepted` всегда
-требует актуального независимого approval. См. [протокол](PROTOCOL.md) и
+требует актуального независимого approval. См. [протокол](../../PROTOCOL.md) и
 `decision.2FFQCGQKQ21VS1MQHNFCQEZWKJ` в реестре решений.
 
 ## Продуктовая модель: не чат и не автономная фабрика агентов
@@ -151,8 +161,8 @@ Agent Commons сохраняет **ключевые проверяемые фа�
 
 Сообщение, согласие нескольких моделей или завершение provider-процесса не перепрыгивают между
 этими слоями. Такой принцип сохраняет полезное несогласие и не позволяет модели самой выдать
-себе полномочие. Основание: [VISION.md](VISION.md), [ARCHITECTURE.md](ARCHITECTURE.md) и
-[ADR 0002](adr/0002-explicit-truth-promotion.md).
+себе полномочие. Основание: [VISION.md](VISION.md), [ARCHITECTURE.md](../../ARCHITECTURE.md) и
+[ADR 0002](../../adr/0002-explicit-truth-promotion.md).
 
 ### Ключевые сущности и их состояние
 
@@ -200,10 +210,10 @@ stateDiagram-v2
   запуск. Их намеренно не объединяют, чтобы роль не маскировала зависимость reviewer-а от автора.
 
 Полная таблица переходов и правила stale evidence находятся в
-[архитектуре](ARCHITECTURE.md#lifecycle-invariants) и в доменных модулях
-[`domain/lifecycle.py`](../src/agent_commons/domain/lifecycle.py),
-[`domain/transitions.py`](../src/agent_commons/domain/transitions.py) и
-[`domain/projection.py`](../src/agent_commons/domain/projection.py).
+[архитектуре](../../ARCHITECTURE.md#lifecycle-invariants) и в доменных модулях
+[`domain/lifecycle.py`](../../../src/agent_commons/domain/lifecycle.py),
+[`domain/transitions.py`](../../../src/agent_commons/domain/transitions.py) и
+[`domain/projection.py`](../../../src/agent_commons/domain/projection.py).
 
 ## Как система устроена
 
@@ -247,10 +257,10 @@ flowchart TB
 **Одна бизнес-граница.** CLI, UI и MCP не записывают собственные варианты сущностей: они
 проходят через `CommonsManager` и его тематические command-модули. Именно здесь проверяются
 schemas, политика безопасности, exact-revision CAS, lifecycle и idempotency. Код:
-[`services/manager.py`](../src/agent_commons/services/manager.py),
-[`cli/__init__.py`](../src/agent_commons/cli/__init__.py),
-[`mcp/server.py`](../src/agent_commons/mcp/server.py) и
-[`ui/server.py`](../src/agent_commons/ui/server.py).
+[`services/manager.py`](../../../src/agent_commons/services/manager.py),
+[`cli/__init__.py`](../../../src/agent_commons/cli/__init__.py),
+[`mcp/server.py`](../../../src/agent_commons/mcp/server.py) и
+[`ui/server.py`](../../../src/agent_commons/ui/server.py).
 
 ### Данные: от immutable history к быстрому представлению
 
@@ -283,9 +293,9 @@ sequenceDiagram
 
 `doctor` проверяет canonical history и может синхронизировать disposable SQLite projection;
 `index rebuild` восстанавливает её. Receipt recovery защищает от неясного состояния между
-канонической записью и локальным idempotency receipt. См. [ADR 0001](adr/0001-file-ledger-with-sqlite-projection.md),
-[ADR 0003](adr/0003-ledger-derived-checkout-aware-receipt-recovery.md),
-[`storage/`](../src/agent_commons/storage) и [`index/sqlite.py`](../src/agent_commons/index/sqlite.py).
+канонической записью и локальным idempotency receipt. См. [ADR 0001](../../adr/0001-file-ledger-with-sqlite-projection.md),
+[ADR 0003](../../adr/0003-ledger-derived-checkout-aware-receipt-recovery.md),
+[`storage/`](../../../src/agent_commons/storage) и [`index/sqlite.py`](../../../src/agent_commons/index/sqlite.py).
 
 ### Адаптеры и границы
 
@@ -297,9 +307,9 @@ sequenceDiagram
 | Optional broker | Запускает лишь записанную delegation по allowlisted profile с лимитами и recovery. | Не принимает задачи, review или решения за человека; не становится remote scheduler. |
 
 Публичный CLI-каталог можно увидеть в `agent-commons --help`; его группы реализованы в
-[`src/agent_commons/cli/`](../src/agent_commons/cli). Purpose-specific MCP наборы и ограничения
-worker-а определены в [`mcp/server.py`](../src/agent_commons/mcp/server.py), а контракт запуска —
-в [ADR 0004](adr/0004-optional-local-delegation-runtime.md).
+[`src/agent_commons/cli/`](../../../src/agent_commons/cli). Purpose-specific MCP наборы и ограничения
+worker-а определены в [`mcp/server.py`](../../../src/agent_commons/mcp/server.py), а контракт запуска —
+в [ADR 0004](../../adr/0004-optional-local-delegation-runtime.md).
 
 ## Функциональная карта
 
@@ -312,9 +322,9 @@ worker-а определены в [`mcp/server.py`](../src/agent_commons/mcp/ser
 - State root может задаваться как точный root или как operator-owned base с namespace по
   workspace ID; смешение разных workspace fail-closed.
 
-Источник: [README](../README.md), [QUICKSTART](QUICKSTART.md),
-[ADR 0005](adr/0005-state-root-isolation.md) и
-[`cli/workspace.py`](../src/agent_commons/cli/workspace.py).
+Источник: [README](../../../README.md), [QUICKSTART](../../QUICKSTART.md),
+[ADR 0005](../../adr/0005-state-root-isolation.md) и
+[`cli/workspace.py`](../../../src/agent_commons/cli/workspace.py).
 
 ### 2. Координация и организация команды
 
@@ -325,11 +335,11 @@ worker-а определены в [`mcp/server.py`](../src/agent_commons/mcp/ser
 - Standing roles: name, profile, skills/tools, lineage, lifetime и effective grants; временные
   links между ролями создаются и закрываются как история, не удаляются.
 
-Источник: [USER_WORKFLOWS](USER_WORKFLOWS.md),
-[`services/tasks.py`](../src/agent_commons/services/tasks.py),
-[`services/roles.py`](../src/agent_commons/services/roles.py),
-[`services/threads.py`](../src/agent_commons/services/threads.py) и
-[`services/handoffs.py`](../src/agent_commons/services/handoffs.py).
+Источник: [USER_WORKFLOWS](../../USER_WORKFLOWS.md),
+[`services/tasks.py`](../../../src/agent_commons/services/tasks.py),
+[`services/roles.py`](../../../src/agent_commons/services/roles.py),
+[`services/threads.py`](../../../src/agent_commons/services/threads.py) и
+[`services/handoffs.py`](../../../src/agent_commons/services/handoffs.py).
 
 ### 3. Доказательство результата и принятие решения
 
@@ -341,11 +351,11 @@ worker-а определены в [`mcp/server.py`](../src/agent_commons/mcp/ser
 - При изменении или invalidation evidence связанные judgment/acceptance становятся stale, а не
   исчезают из истории.
 
-Источник: [PROTOCOL](PROTOCOL.md), [ARCHITECTURE](ARCHITECTURE.md#lifecycle-invariants),
-[`services/artifacts.py`](../src/agent_commons/services/artifacts.py),
-[`services/reviews.py`](../src/agent_commons/services/reviews.py),
-[`services/decisions.py`](../src/agent_commons/services/decisions.py) и
-[`domain/revisions.py`](../src/agent_commons/domain/revisions.py).
+Источник: [PROTOCOL](../../PROTOCOL.md), [ARCHITECTURE](../../ARCHITECTURE.md#lifecycle-invariants),
+[`services/artifacts.py`](../../../src/agent_commons/services/artifacts.py),
+[`services/reviews.py`](../../../src/agent_commons/services/reviews.py),
+[`services/decisions.py`](../../../src/agent_commons/services/decisions.py) и
+[`domain/revisions.py`](../../../src/agent_commons/domain/revisions.py).
 
 ### 4. Ограниченная автоматизация
 
@@ -371,9 +381,9 @@ tool arguments не сохраняются.
 поведенческие canary на macOS/Linux, серия hermetic runs и реальные локальные запуски без
 `process_canonical_mismatch`; это закреплено в
 `decision.558YVVEX7D1BTEBERNBPT14XY2` и
-[BROKER_OPERATIONS](BROKER_OPERATIONS.md). Реализация: [`runtime/`](../src/agent_commons/runtime),
-[`services/delegation_runtime.py`](../src/agent_commons/services/delegation_runtime.py) и
-[`mcp/scoped_repo.py`](../src/agent_commons/mcp/scoped_repo.py).
+[BROKER_OPERATIONS](../../BROKER_OPERATIONS.md). Реализация: [`runtime/`](../../../src/agent_commons/runtime),
+[`services/delegation_runtime.py`](../../../src/agent_commons/services/delegation_runtime.py) и
+[`mcp/scoped_repo.py`](../../../src/agent_commons/mcp/scoped_repo.py).
 
 ### 5. Пользовательский интерфейс и безопасные previews
 
@@ -394,28 +404,28 @@ discovery используют typed refusal, а не исчезающие URL: 
 
 Это локальная защита от случайного переиспользования на другой loopback-службе, а не замена
 многопользовательской аутентификации. Реализация и контракт:
-[`ui/security.py`](../src/agent_commons/ui/security.py),
-[`ui/server.py`](../src/agent_commons/ui/server.py) и [FRONTEND_CONTRACT](FRONTEND_CONTRACT.md).
+[`ui/security.py`](../../../src/agent_commons/ui/security.py),
+[`ui/server.py`](../../../src/agent_commons/ui/server.py) и [FRONTEND_CONTRACT](../../FRONTEND_CONTRACT.md).
 
 Безопасный `GET .../artifacts/{id}/preview` не принимает filesystem path. Он разрешает artifact
 через manifest, проверяет текущий источник, тип файла, size/pixel limits, magic bytes и SHA-256;
 разрешены только PNG/JPEG `public`/`internal`. Symlink, stale/replaced file, SVG/HTML, `restricted`,
 PII и secret content fail closed с typed code. Код:
-[`services/artifact_content.py`](../src/agent_commons/services/artifact_content.py),
-[`tests/services/test_artifact_content.py`](../tests/services/test_artifact_content.py) и
-[`tests/ui/test_artifact_preview.py`](../tests/ui/test_artifact_preview.py).
+[`services/artifact_content.py`](../../../src/agent_commons/services/artifact_content.py),
+[`tests/services/test_artifact_content.py`](../../../tests/services/test_artifact_content.py) и
+[`tests/ui/test_artifact_preview.py`](../../../tests/ui/test_artifact_preview.py).
 
 ### 6. Состояние Design Gallery
 
-Первый мигрированный React Flow экран находится в [`frontend/gallery/`](../frontend/gallery) и
-пакуется в [`ui/static/gallery/`](../src/agent_commons/ui/static/gallery). Это отдельное
+Первый мигрированный React Flow экран находится в [`frontend/gallery/`](../../../frontend/gallery) и
+пакуется в [`ui/static/gallery/`](../../../src/agent_commons/ui/static/gallery). Это отдельное
 приложение рядом с legacy single-file panel, с собственным CSP и парной EN/RU локализацией.
 
 Однако Gallery **пока не является доской дизайнов**. `GET /gallery` запускает настоящий React
 shell, затем его backend bootstrap осознанно возвращает `409 gallery_data_unavailable`: опубликованных
 Design Package ещё нет. На canvas нет sample screens, связей, drag/edit, hotspots, feedback или
-выдуманной demo-data. Это проверено в [`tests/ui/test_react_gallery.py`](../tests/ui/test_react_gallery.py)
-и зафиксировано в [FRONTEND_CONTRACT](FRONTEND_CONTRACT.md#incremental-react-flow-migration).
+выдуманной demo-data. Это проверено в [`tests/ui/test_react_gallery.py`](../../../tests/ui/test_react_gallery.py)
+и зафиксировано в [FRONTEND_CONTRACT](../../FRONTEND_CONTRACT.md#incremental-react-flow-migration).
 
 ## Карта модулей
 
@@ -434,8 +444,8 @@ Design Package ещё нет. На canvas нет sample screens, связей, d
 
 Целевая карта намеренно ещё дробнее: после завершения аудита `CommonsManager`, root CLI,
 `mcp/server.py::build_server` и `UIContext` должны остаться тонкими композиционными фасадами, а не
-получать новые feature workflows. См. [structure report](audits/2026-08-18-code-quality/structure-report.md)
-и [audit plan](audits/2026-08-18-code-quality/audit-plan.md).
+получать новые feature workflows. См. [structure report](../../audits/2026-08-18-code-quality/structure-report.md)
+и [audit plan](../../audits/2026-08-18-code-quality/audit-plan.md).
 
 ## Качество, рефакторинг и честный статус технического долга
 
@@ -504,8 +514,8 @@ comment, hotspots, переходы между экранами и визуал�
 | Broker/provider | Allowlisted executable/profile, task binding, limits, child session, scoped tools, fail-closed recovery. | Произвольный command execution, незаметный recursive swarm или готовность broker-а к production. |
 | Artifact preview | Manifest/hash/type/classification checks и no raw filesystem path from browser. | Render arbitrary HTML/SVG, доступ к secret/PII content или полноценный design editor. |
 
-Необходимые ограничения и причины описаны в [THREAT_MODEL](THREAT_MODEL.md),
-[ARCHITECTURE](ARCHITECTURE.md#security-and-trust) и [FRONTEND_CONTRACT](FRONTEND_CONTRACT.md).
+Необходимые ограничения и причины описаны в [THREAT_MODEL](../../THREAT_MODEL.md),
+[ARCHITECTURE](../../ARCHITECTURE.md#security-and-trust) и [FRONTEND_CONTRACT](../../FRONTEND_CONTRACT.md).
 
 ## Зоны ответственности следующей команды
 
@@ -527,13 +537,13 @@ comment, hotspots, переходы между экранами и визуал�
 | Вопрос | Первичный источник |
 | --- | --- |
 | Зачем продукт существует и чем не является | [VISION.md](VISION.md) |
-| Точная модель данных, lifecycle, storage и trust boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Команды и первый ручной workflow | [README](../README.md), [QUICKSTART.md](QUICKSTART.md), [USER_WORKFLOWS.md](USER_WORKFLOWS.md) |
-| Формальное promotion-to-truth поведение | [PROTOCOL.md](PROTOCOL.md), [ADR 0002](adr/0002-explicit-truth-promotion.md) |
-| Broker и evidence gate | [BROKER_OPERATIONS.md](BROKER_OPERATIONS.md), [ADR 0004](adr/0004-optional-local-delegation-runtime.md) |
-| UI/CSP/i18n/session rules | [FRONTEND_CONTRACT.md](FRONTEND_CONTRACT.md), [`ui/`](../src/agent_commons/ui) |
+| Точная модель данных, lifecycle, storage и trust boundaries | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
+| Команды и первый ручной workflow | [README](../../../README.md), [QUICKSTART.md](../../QUICKSTART.md), [USER_WORKFLOWS.md](../../USER_WORKFLOWS.md) |
+| Формальное promotion-to-truth поведение | [PROTOCOL.md](../../PROTOCOL.md), [ADR 0002](../../adr/0002-explicit-truth-promotion.md) |
+| Broker и evidence gate | [BROKER_OPERATIONS.md](../../BROKER_OPERATIONS.md), [ADR 0004](../../adr/0004-optional-local-delegation-runtime.md) |
+| UI/CSP/i18n/session rules | [FRONTEND_CONTRACT.md](../../FRONTEND_CONTRACT.md), [`ui/`](../../../src/agent_commons/ui) |
 | Context Pack / Design Gallery roadmap | [context-pack-gallery-implementation-plan.md](context-pack-gallery-implementation-plan.md) |
-| Текущая архитектурная перестройка | [audit-plan.md](audits/2026-08-18-code-quality/audit-plan.md), [structure-report.md](audits/2026-08-18-code-quality/structure-report.md) |
+| Текущая архитектурная перестройка | [audit-plan.md](../../audits/2026-08-18-code-quality/audit-plan.md), [structure-report.md](../../audits/2026-08-18-code-quality/structure-report.md) |
 
 При обновлении этой страницы следует сначала сверить exact source revision, registry decisions и
 актуальные tests. Новый feature нельзя переносить из раздела «одобренный план» в «работает» только

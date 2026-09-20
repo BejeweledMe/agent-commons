@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-08-09   Archived: 2026-09-18
+Contract: ../../adr/0008-run-observability-store-withdrawn.md
+Superseded by: docs/PRODUCT.md
+Source boundary: see text
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Plan: from coordination core to a usable agent platform
 
 **Document category:** `current-navigation`
@@ -20,7 +30,7 @@ criteria are in
 | Image preview is limited to authorized current PNG/JPEG artifacts | `decision.50RSN30Q2Q1QW7QYHXX4BZJDHQ` |
 | Accepted task truth requires current independent review | `decision.2FFQCGQKQ21VS1MQHNFCQEZWKJ` |
 | Broker remains experimental until its evidence gate passes | `decision.558YVVEX7D1BTEBERNBPT14XY2` |
-| Private RunEventStore is withdrawn | [ADR 0008](adr/0008-run-observability-store-withdrawn.md) |
+| Private RunEventStore is withdrawn | [ADR 0008](../../adr/0008-run-observability-store-withdrawn.md) |
 
 Use `uv run agent-commons decision list` to read current decision states. This
 table is navigation, not a duplicate registry.
@@ -117,6 +127,6 @@ derived data, keeps provider content untrusted and adds new event families only
 through ADR/schema/replay/migration/rollback gates.
 
 See the [PRD summary](visual_multi_agent_orchestrator_prd.md),
-[ADR/decision index](adr/README.md), [architecture](ARCHITECTURE.md),
-[broker operations](BROKER_OPERATIONS.md) and
-[frontend contract](FRONTEND_CONTRACT.md).
+[ADR/decision index](../../adr/README.md), [architecture](../../ARCHITECTURE.md),
+[broker operations](../../BROKER_OPERATIONS.md) and
+[frontend contract](../../FRONTEND_CONTRACT.md).

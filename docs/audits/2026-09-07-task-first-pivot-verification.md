@@ -9,7 +9,7 @@ Earlier audit remediation is retained. No commit or push was performed.
 
 [ADR 0014](../adr/0014-task-first-workspace-ux.md) records the design, API,
 interaction invariants, alternatives, ownership and implementation graph.
-The [delivery checklist](../task-first-workspace-implementation-plan.md) gives
+The [delivery checklist](../archive/plans/task-first-workspace-implementation-plan.md) gives
 Astra, inspector, Library and root integration responsibilities. This report
 supersedes the ADR's frozen design-time “pending verification” header for the
 implementation result; the ADR remains proposed for owner governance.

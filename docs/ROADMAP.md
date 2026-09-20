@@ -1,46 +1,35 @@
 # Roadmap
 
-Agent Commons develops a local application for work by agent teams, backed by
-an immutable shared-filesystem protocol. The [implementation programme](agent-platform-implementation-program.md)
-is the single current-work list and links exact verification boundaries. This
-page records direction; it does not certify shipped or accepted work.
+This page records direction. It does not certify shipped or accepted work, and
+it holds no status, counts or screen lists: what the product is lives in
+[PRODUCT.md](PRODUCT.md), the current backlog in [`docs/plans/`](plans/)
+([consolidation and wave 4](plans/2026-09-18-consolidation-and-wave-4-plan.md),
+[UX closure programme](plans/2026-09-09-ux-closure-tech-plan.md)), accepted
+decisions in the ledger (`uv run agent-commons decision list`), and completed
+plans in [`docs/archive/plans/`](archive/plans/).
 
 ## Release qualification first
 
-L1 remains unproven and R2 release evidence remains open. Resolve the remaining
-Grok transport contract, receipt-scope and provider-host gates; qualify the six
-implemented profiles on the intended source/provider/host boundary with separate
-operator authorization, then obtain independent release review. Earlier successful
-canaries do not override later failures. Retention and stale coordination also
-need explicit owner decisions.
+L1 (live qualification of the six provider profiles on Linux) remains unproven
+and R2 release evidence remains open. Resolve the receipt-scope and
+provider-host gates, qualify the profiles on the intended source/provider/host
+boundary with separate operator authorization, then obtain independent release
+review. Earlier successful canaries do not override later failures. Retention
+and stale coordination need explicit owner decisions; the 2026-09-18 evidence
+policy ([evidence/README.md](evidence/README.md)) covers the repository side.
 
 ## Daily work
 
-Build on Work, Team, Library and Settings, with clear task outcomes, exact context
-sources, independent review and human acceptance. Further work includes inbox
-cursors and acknowledgements, duplicate-work suggestions, stale-work handling,
-large-graph navigation and configuration presets. The service-owned library,
-five blueprints and editable graph are defined in
-[ADR 0016](adr/0016-service-library-and-live-workspace.md), with verification
-separate from L1. Dependency visibility does not imply automatic scheduling.
+Build on the board, the task tracker, agents, the library and settings with
+clear task outcomes, exact context sources, independent review and human
+acceptance. Open directions after the UX closure programme: first-launch
+onboarding, attention outside the open tab, typed refusal text as a system,
+accessibility as a gate, search and saved views, a general undo/restore
+pattern, and a write path fast enough for a populated project. Dependency
+visibility does not imply automatic scheduling.
 
 Summarized workspace exchange and conformance fixtures for additional clients
 remain future work. Keep user guidance focused on available behaviour.
-
-### Project-scoped workspace UX
-
-The operator-requested [project workspace plan](project-workspace-ux-plan.md)
-defines a project list and creation flow: each project owns its team, task graph,
-Gallery, context and run history; skill/specialization/blueprint definitions remain
-service-wide. Creation opens an empty project; an optional blueprint then accepts
-the product brief and creates its team and tasks. Switching projects
-must preserve isolation and background runs. The branch implementation under
-[ADR 0017](adr/0017-project-scoped-service-host.md) has passed scoped independent
-source review, the full local green contract and the two-project browser journey;
-the installed wheel passed the same journey. [Evidence and remaining delivery /
-provider gates](audits/2026-09-08-project-workspaces-verification.md) distinguish
-local implementation from release qualification. It does not depend on future
-API/local-model support.
 
 ## Runtime evolution
 
@@ -70,11 +59,11 @@ direction, not implemented capability or authorization to start API/model work.
 The connection contract and staged task graph are recorded in
 [ADR 0018](adr/0018-role-connections-and-execution-modes.md).
 
-Role creation should keep the specialization and its service-owned skill versions
-independent of the execution connection. A named role selects its connection,
-model and supported execution options separately:
+Agent creation should keep the specialization and its service-owned skill
+versions independent of the execution connection. A named agent selects its
+connection, model and supported execution options separately:
 
-| Connection choice | Planned examples in the role editor | SGR option |
+| Connection choice | Planned examples in the agent editor | SGR option |
 | --- | --- | --- |
 | Subscription CLI | Codex subscription, Claude subscription, Grok subscription | Unavailable in this product mode; explain why in the UI. |
 | Hosted API | Claude API, OpenAI API (working label: “Codex API”), Grok API | Optional, only after the adapter/model proves the required capabilities. |
@@ -96,7 +85,7 @@ expansion remains deferred alongside these choices.
   define whether/how they compose, conversation identity, context retention,
   human input, cancellation and continuation. It must not silently imply that
   today's subscription CLI runs can reattach.
-- **Role editor:** selecting an API/local connection reveals supported advanced
+- **Agent editor:** selecting an API/local connection reveals supported advanced
   options such as “Enable SGR” and schema selection. Changing the connection
   clears incompatible options and explains the change before the next launch.
   Preserve the specialization and exact skill pins; never silently downgrade a

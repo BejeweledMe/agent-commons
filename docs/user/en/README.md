@@ -9,7 +9,7 @@ final decision. It does not make product decisions or accept work for you.
 1. [Understand the workspace](#understand-the-workspace)
 2. [Open the app safely](#open-the-app-safely)
 3. [Set up a workspace and runtime](#set-up-a-workspace-and-runtime)
-4. [Create a role and task](#create-a-role-and-task)
+4. [Create an agent and a task](#create-an-agent-and-a-task)
 5. [Start and follow a run](#start-and-follow-a-run)
 6. [Review and accept completed work](#review-and-accept-completed-work)
 7. [Handle blockers and common problems](#handle-blockers-and-common-problems)
@@ -20,31 +20,39 @@ final decision. It does not make product decisions or accept work for you.
 The product follows one simple chain:
 
 ```text
-Task → choose a role → Run → independent Review → human Acceptance
+Task → choose an agent → Run → independent Review → human Acceptance
 ```
 
-### Role
+A project opens on the **Board**. Every agent you hire is a card, a recorded
+link between two agents is an edge, and applying a blueprint draws its agents
+and tasks inside a department frame. Arranging cards and frames is your own
+layout: it never changes tasks, runs, reviews or acceptance. The task tracker
+lives in the **Tasks** tab.
 
-A **role** is a continuing responsibility in your team: for example, `Backend
-developer`, `Product designer`, or `Independent reviewer`. In **Team**,
+### Agent
+
+An **agent** is a continuing responsibility in your team: for example, `Backend
+developer`, `Product designer`, or `Independent reviewer`. In **Agents**,
 create one with a name, a **Runtime profile**, a short explanation of what it is
-responsible for, and a starting context.
+responsible for, and a starting context. You can also hire one from the side
+panel of the Board. The ledger and its forms call this standing record a
+*role*, so you will still read that word in the UI and in technical details.
 
 Choose **Fresh** for an isolated start. **Accumulated** requires one exact,
 current Context Pack revision when launching. It carries that bounded baseline,
 not the previous provider conversation. This provenance remains visible during
-review. A role is not the same thing as a single attempt to do work.
+review. An agent is not the same thing as a single attempt to do work.
 
 ### Task
 
 A **task** says what should be done and how you will judge the result. In the
 UI it has a title, a description, and **Acceptance criteria**. Write one clear
-result per criterion. Small, testable tasks are easier for a role to complete
-and for a lead to review.
+result per criterion. Small, testable tasks are easier for an agent to
+complete and for a lead to review.
 
 ### Run
 
-A **run** is one bounded attempt by a role to work on one task. Starting a run
+A **run** is one bounded attempt by an agent to work on one task. Starting a run
 uses the local Claude, Codex, or Grok Build provider configured on your computer. It can
 consume your provider account or subscription just as running that provider
 directly would.
@@ -63,11 +71,11 @@ of an older task version cannot be used after you edit the task.
 
 ### Attention and blockers
 
-In **Work**, use **Needs attention** and select a task to see its next step.
-The full panel also marks items that are **waiting on you**. A blocker means an
-agent, run, task, or review cannot continue without a decision or correction.
-Open the item to see the next available action. Do not treat a blocked item as
-finished work.
+In **Tasks**, use **Needs attention** and select a task to see its next step.
+The task inspector marks what is waiting on you. A blocker means an agent, run,
+task, or review cannot continue without a decision or correction. Open the item
+to see the next available action. Do not treat a blocked item as finished
+work.
 
 ## Open the app safely
 
@@ -103,7 +111,7 @@ gallery and run history; installed skill and blueprint definitions are shared.
 Choose **New project**, enter its name and an absolute workspace path, then
 **Check workspace** and **Create project**. Choose the existing-repository option
 to connect a checkout you already have. A new project opens its blueprint
-library; apply a template there or return to **Work** for an empty start.
+library; apply a blueprint there or open the **Board** for an empty start.
 Creating a project does not launch a provider.
 
 Task and Library drafts are kept separately in browser memory while switching.
@@ -125,27 +133,29 @@ initialize or choose a Git repository first, then start the UI again.
 
 ### 2. Configure the runtime
 
-To start a role, the product needs a local provider runtime. Choose **Configure
-runtime** in **Settings** when offered. The setup checks for locally installed
-Claude, Codex, or Grok Build tools and writes only generated configuration.
+To start an agent, the product needs a local provider runtime. Choose
+**Configure runtime** in **Settings** when offered. The setup checks for
+locally installed Claude, Codex, or Grok Build tools and writes only generated
+configuration.
 
 If no provider is available, install and authenticate either provider CLI using
 your own account, then return to the panel and refresh its status. The current
-Settings screen may not say exactly which local requirement is missing; use the
-full panel or the [technical troubleshooting guide](../../TROUBLESHOOTING.md)
-when the next action is unclear.
+Settings screen may not say exactly which local requirement is missing; when
+the next action is unclear, follow the
+[technical troubleshooting guide](../../TROUBLESHOOTING.md) or ask an operator
+to check the runtime from a terminal.
 
 Do not edit generated runtime files through the browser: the current UI does
 not provide a configuration editor. If you maintain a custom setup, use the
 technical operator documentation.
 
-## Create a role and task
+## Create an agent and a task
 
 Start with the task; you can prepare the team before its first run.
 
-### Create a role
+### Create an agent
 
-Open **Team** and its role form:
+Open **Agents** and its hire form, or hire from the Board's side panel:
 
 1. Enter a **Role name**.
 2. Select a **Runtime profile**.
@@ -153,12 +163,12 @@ Open **Team** and its role form:
 4. Choose **Starting context**: **Fresh** or **Accumulated**.
 5. Select **Create role**.
 
-The profile controls how that role can run. If the form says **No runtime
-profiles are available yet**, finish runtime setup before creating a role.
+The profile controls how that agent can run. If the form says **No runtime
+profiles are available yet**, finish runtime setup before hiring.
 
 ### Create a task
 
-Open **Work → New task**:
+Open **Tasks** and choose **New task**:
 
 1. Give the task a short **Task title**.
 2. Explain **What should be done** and any important constraints.
@@ -166,42 +176,42 @@ Open **Work → New task**:
 4. Optionally choose prerequisite tasks.
 5. Select **Create task**. Its details open automatically.
 
-The task is intentionally separate from a role. You can decide which active
-role should work on it when you start a run.
+The task is intentionally separate from the agent. You can decide which active
+agent should work on it when you start a run.
 
 ## Start and follow a run
 
-Select a ready task in **Work**, then **Prepare run**. The task is already
-selected. Choose an active role and a run preset, inspect the budget and any
-Context Pack or Design Package requirements, then explicitly select **Start
-run**. Creating a task never starts a provider. Readiness and dependency checks
-can prevent launch even when the task's recorded state is `ready`.
+Select a ready task in **Tasks**, then **Prepare run**. The task is already
+selected. Choose an active agent and a run preset, set the attempt time limit
+in whole minutes from 1 to 60, inspect the budget and any Context Pack or
+Design Package requirements, then explicitly select **Start run**. Creating a
+task never starts a provider. Readiness and dependency checks can prevent
+launch even when the task's recorded state is `ready`.
 
-The inspector shows the goal, dependencies, run history and next available
-action. **Technical details** exposes exact identifiers and revisions when
-needed. Use the legacy panel for provider input, detailed run recovery and
-advanced record editing.
+The task inspector shows the goal, dependencies, run history and the next
+available action. **Technical details** exposes exact identifiers and revisions
+when needed.
 
-In the full panel, a run can be requested, active, `input_needed`, succeeded,
-failed, timed out, or `needs_operator`. `input_needed` means the run is waiting
-for a human answer. Open **Attention**: when this panel can answer the request,
-answering it resumes the run. If the provider already exited or no answer is
-available, the run becomes `needs_operator`. `needs_operator` means the system
-cannot safely continue on its own. Inspect it before retrying or creating
-another run; it is not a successful result.
+A run can be requested, active, `input_needed`, succeeded, failed, timed out,
+or `needs_operator`. `input_needed` means the run asked a person a question.
+The current headless runtime cannot deliver that answer, so the run ends as
+`needs_operator`. `needs_operator` means the system cannot safely continue on
+its own: inspect the run in the task inspector, fix the cause, and start a new
+run. It is not a successful result.
 
 ## Review and accept completed work
 
-Use the selected task's actions in **Work**; advanced recovery is also available
-in the full panel. Review and acceptance always target an exact task revision.
+Use the selected task's actions in **Tasks**. Review and acceptance always
+target an exact task revision.
 
 1. Open the task after its work is ready.
 2. Select **Request review**. The task now waits for an independent review.
-3. Start or ask an independent reviewer to check that task. The person or role
-   doing the work cannot provide the independent review needed for acceptance.
+3. Start or ask an independent reviewer to check that task. The person or
+   agent doing the work cannot provide the independent review needed for
+   acceptance.
 4. If the verdict is approved and still matches the current task version, open
    the task, write an **Acceptance summary**, then select **Accept exact task
-   revision**. The full panel uses its own acceptance dialog for the same rule.
+   revision**.
 
 If review finds a problem, provide a **Revision reason**, confirm reopening and
 select **Reopen task**. Let the team revise the task or result. Editing a task creates a new version and makes
@@ -226,10 +236,12 @@ to launch or accept work.
 ### Reuse templates, context and design
 
 Open **Library** for 30 specializations, 45 grouped skills and seven built-in
-blueprints. Create or update methods, role definitions and custom blueprints in
-the UI. A blueprint creates roles and tasks from your project brief; launching
-remains explicit. The **Context** tab holds project background and constraints.
-See the [library and task graph guide](service-library.md).
+blueprints. Create or update skills, specializations and custom blueprints in
+the UI; skill groups can be archived and restored. A blueprint creates agents
+and tasks from your project brief and starts nothing; its confirmation leads to
+**Prepare run** for the first ready task. The **Context** tab holds project
+background and constraints. See the
+[library and task graph guide](service-library.md).
 
 In **Context**, use the guided editor for a bounded summary, facts with exact
 source references, decisions and open questions. The source picker shows
@@ -237,27 +249,30 @@ eligible metadata, not source bodies. Refreshing it never upgrades an already
 selected revision. An unavailable or outdated reference must be resolved before
 publication. The advanced editor preserves structured JSON when needed.
 
-Open **Results** on a task or hired agent when accessible outputs exist. Results
-show that producer's images and separate live previews; generated designs are
-not a Library tab. A Design Package is selected explicitly during launch and is
-checked again for freshness and access; merely viewing it does not attach it to
-a task or run.
+Open **Results** on a task or hired agent when accessible outputs exist.
+Results show that producer's images and separate live previews, labelled as the
+latest version, an earlier version, an expired preview, an unavailable address
+or a result awaiting a check; generated designs are not a Library tab. A Design
+Package is selected explicitly during launch and is checked again for freshness
+and access; merely viewing it does not attach it to a task or run.
 
-Use **Conversation** in Work for project messages, or on a task or agent for that
-scope. Sending a message does not start a run or prove that a worker read it.
+Use **Conversation** for project messages, or open it on a task or agent for
+that scope. It shows the recipient's availability and a delivery stepper.
+Sending a message does not start a run or prove that a worker read it.
 See [conversations and results](service-library.md#conversations-and-results)
 for delivery states, private attachments and draft recovery.
 
-### Use the full panel for team operations
+### See the team and change a task
 
-The full panel's **Board** shows your roles, tasks, and their relationships.
-Use **Attention** to triage items waiting for a person, **Runs** to inspect
-attempts, and **Main chat** for a conversation that is not itself a task. Use
-**Role catalogue** to reuse a saved role template. A template makes hiring
-faster; it does not change the local provider configuration.
+The **Board** shows your agents, the links you have recorded between them and
+the department frames a blueprint created. Hire from its side panel and open a
+card to reach that agent's tasks. **Tasks** shows the same work as a dependency
+graph and as a list; its inspector holds run history and the next available
+action. A saved specialization in **Library** makes hiring faster; it does not
+change the local provider configuration.
 
-To change a task, open it and use **Record → Edit task…**. Saving creates a new
-version. The UI warns that prior reviews then become stale, so review the
+To change a task, open it in **Tasks** and use **Edit task**. Saving creates a
+new version. The UI warns that prior reviews then become stale, so review the
 updated task again.
 
 ## Handle blockers and common problems
@@ -267,10 +282,10 @@ updated task again.
 | **This browser session is no longer active** | The one-time local sign-in link was used or expired. | Restart the UI and open the new printed URL once in the intended browser. |
 | **Workspace files have not been created** | This repository has not been initialized for Agent Commons. | Confirm the terminal is in the right Git repository, then select **Initialize workspace**. |
 | **Runtime configuration has not been created** or **The runtime is not ready to start work** | No usable local provider runtime is available. | Configure the runtime; if it remains blocked, install/authenticate Claude, Codex, or Grok Build and refresh status. |
-| **No runtime profiles are available yet** | A configured runtime has no selectable profile. | Use the full panel or technical operator guide to check the runtime configuration. |
-| **waiting on you** | A run, task, review, or question needs a human decision. | Open the linked item and take the next action shown. |
-| `input_needed` | A live run is waiting for an answer from a person. | Open **Attention** and answer it if this panel offers an answer action. If it cannot be answered or the provider has exited, inspect the resulting `needs_operator` item. |
-| `needs_operator` | The system reached an outcome it cannot safely resolve. | Inspect the run and task in the full panel. Do not assume success or blindly retry. |
+| **No runtime profiles are available yet** | A configured runtime has no selectable profile. | Ask an operator to check the runtime configuration with the [troubleshooting guide](../../TROUBLESHOOTING.md). |
+| Waiting on you | A run, task, review, or question needs a human decision. | Open the linked item and take the next action shown. |
+| `input_needed` | A run asked a person a question. | The current runtime cannot deliver an answer, so the run ends as `needs_operator`. Inspect it, then start a new run. |
+| `needs_operator` | The system reached an outcome it cannot safely resolve. | Inspect the run and task in the task inspector. Do not assume success or blindly retry. |
 | Acceptance is refused | The task lacks a current approved independent review, or the task changed after review. | Send the current task version for an independent review, then accept only after approval. |
 
 An action error appears beside its form. For an uncertain outcome, use the
@@ -279,9 +294,10 @@ submit a second independent request merely because the response was lost. A
 confirmed refusal can offer a new attempt after you correct the cause.
 
 If workspace access itself has expired, restart the local UI and use its new
-one-time URL. Use the full panel for advanced recovery. Do not paste
-provider output, prompts, credentials, or the local sign-in URL into a bug
-report.
+one-time URL. Advanced recovery is an operator task performed from a terminal;
+see the [technical troubleshooting guide](../../TROUBLESHOOTING.md). Do not
+paste provider output, prompts, credentials, or the local sign-in URL into a
+bug report.
 
 ## Know the current boundaries
 
@@ -289,15 +305,17 @@ Agent Commons is alpha software for macOS and Linux. It supports local provider
 tools; Windows is not supported. The provider runtime is experimental and may
 require operator action.
 
-This checkout provides **Work**, **Team**, **Library** and **Settings**, with
-Gallery and the legacy panel for specialized views. Projects can be created
-and switched in the sidebar. Automatic task scheduling and provider conversation
-resume are not implemented. A successful local test does not qualify a live provider.
+This checkout provides **Board**, **Tasks**, **Agents**, **Library** and
+**Settings**. The design Gallery remains at `/gallery` for design packages. The
+older single-file panel is being retired, and this guide no longer sends you
+there. Projects can be created and switched in the sidebar. Automatic task
+scheduling and provider conversation resume are not implemented. A successful
+local test does not qualify a live provider.
 
-Library includes built-in **Feature delivery** and **Product discovery**
-blueprints. Applying a blueprint creates the selected roles and their task graph
-with deny-by-default grants. It does not change runtime profiles, download
-external skills, or start a run.
+Library includes seven built-in blueprints, among them **Feature delivery** and
+**Product discovery**. Applying a blueprint creates the selected agents and
+their task graph with deny-by-default grants. It does not change runtime
+profiles, download external skills, or start a run.
 
 The product records coordination and decisions. It does not itself grant
 permission to commit, push, deploy, publish, contact people, or perform other

@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-08-09   Archived: 2026-09-18
+Contract: none
+Superseded by: docs/PRODUCT.md
+Source boundary: see text
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # PRD: Agent Commons as a visual heterogeneous-agent workspace
 
 **Document category:** `current-product-direction`
@@ -100,7 +110,7 @@ Gallery, Work actions, J1 and G6 are now implemented; J1/G6 were accepted agains
 exact review subjects. L1 and R2 remain open, and the new audit identifies runtime
 privacy/provenance and review-independence defects. The browser Starter Pack
 Apply→Hire step is not established by J1's direct API fixture. Use the
-[current audit and checklist](audits/2026-09-06-total-plan-work-adr-prd-review.md)
+[current audit and checklist](../../audits/2026-09-06-total-plan-work-adr-prd-review.md)
 for release claims; preserve the product outcomes and non-goals below.
 
 Coordination core, roles, tasks, dependencies, claims, reviews, evidence,
@@ -124,6 +134,6 @@ reconciled safely.
 - SVG/HTML preview, visual source editing or demo data presented as real;
 - automatic acceptance, self-review or authority expansion through context.
 
-See the [documentation map](README.md), [ADR/decision index](adr/README.md),
-[architecture](ARCHITECTURE.md), [threat model](THREAT_MODEL.md) and
-[frontend contract](FRONTEND_CONTRACT.md) for the governing boundaries.
+See the [documentation map](../../README.md), [ADR/decision index](../../adr/README.md),
+[architecture](../../ARCHITECTURE.md), [threat model](../../THREAT_MODEL.md) and
+[frontend contract](../../FRONTEND_CONTRACT.md) for the governing boundaries.

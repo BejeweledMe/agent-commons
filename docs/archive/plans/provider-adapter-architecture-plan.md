@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-08-31   Archived: 2026-09-18
+Contract: ../../adr/0004-optional-local-delegation-runtime.md
+Superseded by: docs/plans/2026-09-18-consolidation-and-wave-4-plan.md
+Source boundary: `dd65bdb`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # План provider-neutral runtime и provider-specific projections
 
 Статус: design plan, подготовлен 2026-08-29 на `main` `dd65bdb`.
@@ -8,7 +18,7 @@
 реализованы; built-in профилей шесть (Codex/Claude/Grok × builder/reviewer).
 L1 Linux qualification не доказана. Grok instruction transport через argv
 расходится с stdin-only ADR 0004 и требует отдельного решения runtime/security.
-Точные границы и gates: [audit](audits/2026-09-06-total-plan-work-adr-prd-review.md).
+Точные границы и gates: [audit](../../audits/2026-09-06-total-plan-work-adr-prd-review.md).
 
 Этот документ продолжает графы `docs/architecture-improvement-agent-team-plan.md`,
 `docs/architecture-improvement-implementation-plan.md` и ADR 0004. Он не меняет

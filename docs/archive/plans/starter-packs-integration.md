@@ -1,3 +1,13 @@
+```
+Status: superseded
+Owner: historical
+Opened: 2026-08-27   Archived: 2026-09-18
+Contract: none
+Superseded by: docs/plans/2026-09-09-ux-closure-tech-plan.md (WP-16.1/16.2)
+Source boundary: `329d2f3`
+Archive trigger: moved in the 2026-09-18 consolidation (docs/audits/2026-09-18-repository-and-documentation-audit.md 4.B)
+```
+
 # Starter Packs: безопасный путь от примеров к управляемой интеграции
 
 **Checkpoint 2026-09-06 (`329d2f3`):** baseline `e071533` ниже исторический.
@@ -5,7 +15,7 @@
 canonical role templates с `DENY_ALL` и `fresh`; это не запуск provider.
 Внешняя загрузка/materialization остаётся отдельным scope. Work UI ещё не
 предоставляет обещанный hire-from-preset шаг; backend API и J1 fixture его
-поддерживают. См. [audit F07](../audits/2026-09-06-total-plan-work-adr-prd-review.md).
+поддерживают. См. [audit F07](../../audits/2026-09-06-total-plan-work-adr-prd-review.md).
 
 **Статус:** утверждённый продуктовый flow и технический план. Этот документ не
 означает, что внешние skills уже скачиваются, что роли уже созданы или что UI уже
