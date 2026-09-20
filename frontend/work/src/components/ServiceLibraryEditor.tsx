@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactElement, useRef, useState } from "react";
-import { ApiProblem } from "../api.js";
+import { ApiProblem, requestOutcome } from "../api.js";
+import { recordInstrumentation } from "../instrumentation.js";
 import type { LibraryApi } from "../libraryApi.js";
 import type { MessageKey } from "../i18n.js";
 import { freezeLibrarySave, libraryDraftErrors, librarySaveInput, type LibraryDraft, type LibrarySaveIntent } from "../libraryEditorState.js";
@@ -21,8 +22,10 @@ export function ServiceLibraryEditor({ initialDraft, catalog, api, onClose, onSa
     if (executing.current) return;
     executing.current = true;
     setStatus("saving"); setCode("");
-    try { const detail = await api.save(operation.input, operation.key, new AbortController().signal); setStatus("idle"); setIntent(null); onSaved(detail); }
+    const started = performance.now();
+    try { const detail = await api.save(operation.input, operation.key, new AbortController().signal); setStatus("idle"); setIntent(null); recordInstrumentation("library_edit", "confirmed", performance.now() - started); onSaved(detail); }
     catch (error: unknown) {
+      recordInstrumentation("library_edit", requestOutcome(error), performance.now() - started);
       setIntent(operation);
       const problem = error instanceof ApiProblem ? error : null;
       setStatus(problem && problem.status >= 400 && problem.status < 500 ? "refused" : "uncertain");

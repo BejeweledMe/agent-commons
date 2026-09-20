@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +21,7 @@ const { WorkApi, ApiProblem, parseTaskCreateResult, parseTaskDetail, parseContex
 const { stateLabel, filterTrackerTasks, TASK_FILTERS, taskObservationCurrent, trackerCapacityOnlyGap } = await import(pathToFileURL(resolve(compiled, "taskPresentation.js")).href);
 const { loadTaskDetailState } = await import(pathToFileURL(resolve(compiled, "trackerState.js")).href);
 const { TaskInspectorContent, updateDetailPresentation } = await import(pathToFileURL(resolve(compiled, "components/TaskInspector.js")).href);
+const { cardOwnsControl, decisionControl } = await import(pathToFileURL(resolve(compiled, "components/DecisionCard.js")).href);
 const messages = JSON.parse(readFileSync(resolve(root, "src/i18n.json"), "utf8"));
 const taskId = `task.${"0".repeat(26)}`;
 const otherId = `task.${"1".repeat(26)}`;
@@ -65,7 +67,7 @@ test("malformed success after task commit remains retryable with the same frozen
 test("task detail is an owned allowlist with effective revision and exact evidence references", () => {
   const input = detailPayload();
   const result = parseTaskDetail(input, taskId);
-  assert.deepEqual(Object.keys(result).sort(), ["acceptanceCriteria", "description", "evidenceRefs", "revision", "state", "summary", "taskId", "title", "truncated"].sort());
+  assert.deepEqual(Object.keys(result).sort(), ["acceptanceCriteria", "description", "evidenceRefs", "findings", "revision", "state", "summary", "taskId", "title", "truncated"].sort());
   assert.equal(result.revision, nextRevision);
   assert.equal(result.summary, null);
   assert.deepEqual(result.evidenceRefs, [{ kind: "artifact", id: artifactId, revision }]);
@@ -185,7 +187,9 @@ for (const locale of ["en", "ru"]) {
     assert.ok(html.includes(text("inspector_no_runs")));
     assert.equal(html.includes(text("tracker_gloss_complete")), false);
     assert.equal(html.includes(text("tracker_gloss_succeeded")), false);
-    assert.ok(html.indexOf("A concrete goal") < html.indexOf(text("inspector_technical")));
+    // The decision comes first and its technical values sit inside it; the goal
+    // and every supporting disclosure follow the card.
+    assert.ok(html.indexOf("decision-details") < html.indexOf("A concrete goal"));
     assert.equal(html.includes("must not be exposed"), false);
   });
   test(`${locale}: unknown readiness and missing detail stay explicit before technical diagnostics`, () => {
@@ -196,7 +200,7 @@ for (const locale of ["en", "ru"]) {
     const html = renderToStaticMarkup(view);
     assert.ok(html.includes(text("inspector_detail_unavailable")));
     assert.ok(html.includes(text("inspector_readiness_unknown")));
-    assert.ok(html.indexOf(text("inspector_readiness_unknown")) < html.indexOf(text("inspector_technical")));
+    assert.ok(html.indexOf(text("inspector_readiness_unknown")) < html.indexOf("decision-details"));
     assert.ok(html.includes('disabled=""'));
     assert.equal(launched, false);
   });
@@ -396,7 +400,9 @@ for (const locale of ["en", "ru"]) test(`${locale}: primary task status uses pro
   assert.ok(markup.includes('data-value="ready"'));
   const blocked=initiallyVisible(render(task({readiness:"blocked",nextAction:"resolve_dependencies"})));
   assert.ok(blocked.includes(text("task_view_state_ready")));
-  assert.ok(blocked.includes(text("tracker_readiness_label")));
+  // Readiness joins the state in one sentence; only its raw label and value
+  // stay behind the card's details.
+  assert.equal(blocked.includes(text("tracker_readiness_label")),false);
   assert.ok(blocked.includes(text("inspector_readiness_blocked")));
   assert.equal(blocked.includes("resolve_dependencies"),false);
   const unknown=initiallyVisible(render(task({readiness:"policy_unknown",nextAction:"future_action"})));
@@ -444,4 +450,196 @@ test("the attempt limit reading exists in both locales and never reuses the dura
   assert.equal(messages.ru.run_limit_label, "Лимит попытки");
   assert.equal(messages.en.run_limit_absent, "Limit not provided");
   assert.equal(messages.ru.run_limit_absent, "Лимит не предоставлен");
+});
+
+// ---------------------------------------------------------------- DecisionCard
+const findingId = `finding.${"0".repeat(26)}`;
+const objectiveId = `objective.${"0".repeat(26)}`;
+const applicationId = `application.${"0".repeat(26)}`;
+const readyDetail = () => parseTaskDetail(detailPayload(), taskId);
+/** Stand in for the tracker's canonical action panel: one primary button. */
+const actionPanel = (label) => createElement("div", { className: "tracker-actions" },
+  createElement("button", { type: "button", className: "button button-primary" }, label));
+const answerEntry = createElement("button", { type: "button", className: "button button-primary button-inline conversation-entry" }, "Answer");
+function card(current, options = {}) {
+  const { locale = "en", runs = [], detail = readyDetail(), children = null, answerControl = answerEntry,
+    actionsCurrent = true, writesEnabled = true } = options;
+  const text = (key) => { assert.equal(typeof messages[locale][key], "string", key); return messages[locale][key]; };
+  return TaskInspectorContent({ task: current, tasks: [current, task({ taskId: otherId, title: "Resolve source mismatch" })],
+    runs, sourceRevision: revision, locale, text, actionsCurrent, writesEnabled,
+    onSelectTask: () => {}, onLaunchTask: () => {}, detailState: { kind: "ready", taskId, detail },
+    children, answerControl, onRefresh: () => {} });
+}
+
+/** Every observed next action names exactly one control, and only two are the card's own. */
+const NEXT_ACTION_CONTROL = {
+  start_ready_work: "prepare_run", retry_new_run: "prepare_run",
+  answer_operator_request: "answer_worker", accept_task: "accept",
+  revise_work: "return_for_revision", request_review: "request_review",
+  wait_for_run: null, wait_for_review: null, resolve_dependencies: null,
+  inspect_failure: null, inspect_missing_evidence: null, none: null
+};
+const SLOT_CONTROLS = ["accept", "return_for_revision", "request_review"];
+
+test("each next action resolves to one named control, and an unknown action offers none", () => {
+  // The mapping covers the closed canonical set, so a new action cannot slip
+  // through without a decision about its control.
+  const canonical = readFileSync(resolve(root, "src/api.ts"), "utf8")
+    .split("const TRACKER_NEXT_ACTIONS = new Set([")[1].split("]);")[0]
+    .match(/"[a-z_]+"/g).map((value) => value.slice(1, -1));
+  assert.deepEqual(canonical.sort(), Object.keys(NEXT_ACTION_CONTROL).sort());
+  for (const [action, control] of Object.entries(NEXT_ACTION_CONTROL)) {
+    assert.equal(decisionControl(action), control, action);
+    assert.equal(cardOwnsControl(action), control !== null && !SLOT_CONTROLS.includes(control), action);
+  }
+  assert.equal(decisionControl("future_action"), null);
+  assert.equal(cardOwnsControl("future_action"), false);
+});
+
+for (const locale of ["en", "ru"]) {
+  test(`${locale}: the card offers exactly one primary control for every next action`, () => {
+    for (const [action, control] of Object.entries(NEXT_ACTION_CONTROL)) {
+      const markup = renderToStaticMarkup(card(task({ nextAction: action }), { locale,
+        children: SLOT_CONTROLS.includes(control) ? actionPanel(action) : null }));
+      assert.equal((markup.match(/class="button button-primary/g) ?? []).length,
+        control === null ? 0 : 1, `${action} in ${locale}`);
+    }
+  });
+
+  test(`${locale}: the card answers what is happening, who is responsible and what happens next`, () => {
+    const text = (key) => messages[locale][key];
+    const worker = run({ phase: "running", roleName: "Builder" });
+    const asked = run({ phase: "input_needed", roleName: "Builder" });
+    const cases = [
+      { name: "ready", current: task(), runs: [],
+        happening: text("task_view_state_ready"), responsible: text("inspector_unassigned"),
+        next: text("tracker_gloss_start_ready_work") },
+      { name: "active with a run", runs: [worker],
+        current: task({ taskState: "active", readiness: "in_progress", phase: "running", nextAction: "wait_for_run", roleName: "Planner" }),
+        happening: `${text("tracker_gloss_active")} — ${text("inspector_readiness_in_progress")}`,
+        responsible: `Builder — ${text("decision_responsible_running")}`, next: text("tracker_gloss_wait_for_run") },
+      { name: "awaiting human", runs: [asked],
+        current: task({ taskState: "active", readiness: "human_attention", phase: "input_needed", awaitsHuman: true, nextAction: "answer_operator_request" }),
+        happening: `${text("tracker_gloss_active")} — ${text("tracker_gloss_human_attention")}`,
+        responsible: `Builder — ${text("decision_responsible_running")}`, next: text("tracker_gloss_answer_operator_request") },
+      { name: "review", runs: [],
+        current: task({ taskState: "review", readiness: "in_progress", nextAction: "wait_for_review", roleName: "Reviewer" }),
+        happening: `${text("tracker_gloss_review")} — ${text("inspector_readiness_in_progress")}`,
+        responsible: `Reviewer — ${text("decision_responsible_owner")}`, next: text("tracker_gloss_wait_for_review") },
+      { name: "accepted", runs: [],
+        current: task({ taskState: "accepted", readiness: "complete", nextAction: "none" }),
+        happening: `${text("tracker_gloss_accepted")} — ${text("inspector_readiness_complete")}`,
+        responsible: text("inspector_unassigned"), next: text("tracker_gloss_none") },
+      { name: "blocked", runs: [],
+        current: task({ taskState: "blocked", readiness: "blocked", nextAction: "resolve_dependencies", blockingDependencyIds: [otherId] }),
+        happening: `${text("task_view_state_blocked")} — ${text("inspector_readiness_blocked")}`,
+        responsible: text("inspector_unassigned"), next: text("tracker_gloss_resolve_dependencies") }
+    ];
+    for (const item of cases) {
+      const visible = initiallyVisible(card(item.current, { locale, runs: item.runs }));
+      for (const [label, sentence] of [["decision_happening", item.happening],
+        ["decision_responsible", item.responsible], ["decision_next", item.next]]) {
+        assert.ok(visible.includes(text(label)), `${item.name}: ${label}`);
+        assert.ok(visible.includes(sentence), `${item.name}: ${sentence}`);
+      }
+      // The three questions keep their order, and no raw canonical value leaks
+      // into the answers.
+      assert.ok(visible.indexOf(text("decision_happening")) < visible.indexOf(text("decision_responsible")));
+      assert.ok(visible.indexOf(text("decision_responsible")) < visible.indexOf(text("decision_next")));
+      if (item.current.nextAction.includes("_")) assert.equal(visible.includes(item.current.nextAction), false, item.name);
+      assert.equal(visible.includes(item.current.taskId), false, item.name);
+    }
+  });
+
+  test(`${locale}: technical values stay in a details disclosure that starts closed`, () => {
+    const current = task({ objectiveId, applicationId });
+    const view = card(current, { locale, runs: [run({ phase: "running" })] });
+    const visible = initiallyVisible(view);
+    const markup = renderToStaticMarkup(view);
+    const text = (key) => messages[locale][key];
+    assert.ok(visible.includes(text("decision_details")));
+    for (const value of [taskId, nextRevision, objectiveId, applicationId, "start_ready_work", run().delegationId]) {
+      assert.ok(markup.includes(value), value);
+      assert.equal(visible.includes(value), false, value);
+    }
+    assert.equal(/<details[^>]*class="decision-details[^>]*open/.test(markup), false);
+  });
+
+  test(`${locale}: findings are listed with their count and never hidden`, () => {
+    const text = (key) => messages[locale][key];
+    const payload = detailPayload();
+    payload.record.findings = [{ id: findingId, title: "Evidence gap in the run record" }];
+    const detail = parseTaskDetail(payload, taskId);
+    assert.deepEqual(detail.findings, [{ id: findingId, title: "Evidence gap in the run record" }]);
+    const listed = initiallyVisible(card(task(), { locale, detail }));
+    assert.ok(listed.includes(`${text("decision_findings")} (1)`));
+    assert.ok(listed.includes("Evidence gap in the run record"));
+    assert.ok(listed.includes(findingId));
+    // Zero is still stated: an empty count is a fact, not a hidden section.
+    const emptyPayload = detailPayload(); emptyPayload.record.findings = [];
+    const none = initiallyVisible(card(task(), { locale, detail: parseTaskDetail(emptyPayload, taskId) }));
+    assert.ok(none.includes(`${text("decision_findings")} (0)`));
+    assert.ok(none.includes(text("decision_no_findings")));
+    // A record without the key is not "none": the card says the server has not provided them.
+    const unknown = initiallyVisible(card(task(), { locale }));
+    assert.ok(unknown.includes(text("decision_findings_unavailable")));
+    assert.equal(unknown.includes(`${text("decision_findings")} (0)`), false);
+    assert.equal(unknown.includes(text("decision_no_findings")), false);
+  });
+}
+
+test("attached findings are an owned allowlist and a malformed entry is a protocol fault", () => {
+  assert.equal(readyDetail().findings, null, "no findings key means unknown, not an empty list");
+  for (const mutation of [
+    (value) => { value.record.findings = [findingId]; },
+    (value) => { value.record.findings = [{ id: otherId }]; },
+    (value) => { value.record.findings = [{ id: findingId, title: 7 }]; },
+    (value) => { value.record.findings = [{ id: findingId, secret: "must not be exposed" }, "x"]; },
+    (value) => { value.record.findings = "one finding"; }
+  ]) {
+    const value = detailPayload(); mutation(value);
+    assert.throws(() => parseTaskDetail(value, taskId), ApiProblem);
+  }
+  const value = detailPayload();
+  value.record.findings = [{ id: findingId, title: "Kept", extra: "must not be exposed" }];
+  assert.equal(JSON.stringify(parseTaskDetail(value, taskId)).includes("must not be exposed"), false);
+});
+
+test("green marks accepted work and nothing else", () => {
+  for (const state of TASK_FILTERS.filter((value) => !["all", "attention"].includes(value))) {
+    const markup = renderToStaticMarkup(card(task({ taskState: state })));
+    assert.equal(markup.includes('data-accepted="true"'), state === "accepted", state);
+    assert.ok(markup.includes(`data-accepted="${state === "accepted" ? "true" : "false"}"`), state);
+  }
+  // The acceptance palette is declared once, as the status/accepted tokens, and
+  // read by the accepted card alone.
+  const css = readFileSync(resolve(root, "src/styles.css"), "utf8");
+  assert.match(css, /\.decision-card\[data-accepted="true"\] \{/);
+  for (const value of ["#143220", "#72ca8a", "#d9ffe5"]) {
+    assert.equal((css.match(new RegExp(value, "g")) ?? []).length, 1, value);
+  }
+  for (const token of ["--status-accepted-surface", "--status-accepted", "--status-accepted-text"]) {
+    const uses = [...css.matchAll(new RegExp(`var\\(${token}\\)`, "g"))];
+    assert.equal(uses.length, 1, token);
+    assert.ok(uses[0].index > css.indexOf('.decision-card[data-accepted="true"]'), token);
+  }
+  // Styling stays in classes and data attributes; the card carries no inline style.
+  const source = readFileSync(resolve(root, "src/components/DecisionCard.tsx"), "utf8");
+  assert.equal(source.includes("style={"), false);
+});
+
+test("the card renders only from the snapshot the tracker reloaded, with no optimistic state", () => {
+  const tracker = readFileSync(resolve(root, "src/components/TrackerSection.tsx"), "utf8");
+  // Every canonical action reloads the tracker and re-renders from that answer.
+  assert.match(tracker, /await api\.loadTracker\(signal\);\s*\n\s*setState\(\(current\) => trackerLoadSucceeded\(current, snapshot\)\);/);
+  const intent = tracker.slice(tracker.indexOf("async function performTaskIntent"), tracker.indexOf("function trackerTaskActions"));
+  assert.ok(intent.length > 0);
+  // The one re-render an action causes is the server's answer, and the success
+  // reading is only recorded after that reload.
+  assert.equal((intent.match(/setState\(/g) ?? []).length, 1);
+  assert.ok(intent.indexOf("api.loadTracker(signal)") < intent.indexOf('kind: "success"'));
+  assert.match(tracker, /actionsCurrent=\{actionsCurrent\}/);
+  // A refused or uncertain attempt keeps the existing retry / new-attempt path.
+  assert.match(tracker, /tracker_retry_previous_action/);
+  assert.match(tracker, /inspector_new_attempt/);
 });

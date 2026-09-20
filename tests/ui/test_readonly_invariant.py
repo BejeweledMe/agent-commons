@@ -351,6 +351,14 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
             },
         ),
         (
+            f"/api/tasks/{second_task['id']}/application",
+            {
+                "application_id": "application." + "0" * 64,
+                "expected_revision": second_task["revision"],
+                "reason": "sealed route coverage",
+            },
+        ),
+        (
             f"/api/tasks/{second_task['id']}/review-request",
             {"expected_revision": second_task["revision"]},
         ),
@@ -396,6 +404,7 @@ def test_every_mutating_route_dies_without_the_manager_write_path(
         ("POST", "/api/agent-links/{link_id}/close"),
         ("POST", "/api/tasks"),
         ("POST", "/api/tasks/{task_id}/revise"),
+        ("POST", "/api/tasks/{task_id}/application"),
         ("POST", "/api/tasks/{task_id}/review-request"),
         ("POST", "/api/tasks/{task_id}/accept"),
         ("POST", "/api/tasks/{task_id}/reopen"),

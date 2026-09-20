@@ -58,6 +58,7 @@ _RECEIPT_KEYS = frozenset(
         "provider_version",
     }
 )
+_OPTIONAL_RECEIPT_KEYS = frozenset({"wall_time_seconds"})
 _PROBE_KEYS = frozenset(
     {
         "static_preflight",
@@ -202,6 +203,7 @@ class ProviderQualification:
     behavioral_canary: bool
     checked_at: str
     provider_version: str | None = None
+    wall_time_seconds: int | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile_id", BuiltinProfileId(self.profile_id))
@@ -219,6 +221,10 @@ class ProviderQualification:
             or len(self.provider_version.encode("utf-8")) > 128
         ):
             raise IntegrityError("provider qualification version is invalid")
+        if self.wall_time_seconds is not None and (
+            type(self.wall_time_seconds) is not int or not 30 <= self.wall_time_seconds <= 1800
+        ):
+            raise IntegrityError("provider qualification wall time is invalid")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -234,6 +240,7 @@ class ProviderQualification:
             },
             "checked_at": self.checked_at,
             "provider_version": self.provider_version,
+            "wall_time_seconds": self.wall_time_seconds,
         }
 
     def refusal(self) -> TypedRefusal | None:
@@ -265,6 +272,7 @@ class ProviderQualificationStore:
         initialization_probe: bool,
         behavioral_canary: bool,
         provider_version: str | None,
+        wall_time_seconds: int | None = None,
     ) -> ProviderQualification:
         if self.read_only:
             raise ConfigurationError("provider qualification store is read-only")
@@ -278,6 +286,7 @@ class ProviderQualificationStore:
             behavioral_canary=behavioral_canary,
             checked_at=_timestamp(),
             provider_version=provider_version,
+            wall_time_seconds=wall_time_seconds,
         )
         path = self._path(profile.profile_id)
         ensure_private_directory(path.parent, policy=PROVIDER_QUALIFICATION_STORAGE)
@@ -309,7 +318,8 @@ class ProviderQualificationStore:
                 os.close(descriptor)
         if (
             not isinstance(value, Mapping)
-            or frozenset(value) != _RECEIPT_KEYS
+            or not _RECEIPT_KEYS <= frozenset(value)
+            or not frozenset(value) <= (_RECEIPT_KEYS | _OPTIONAL_RECEIPT_KEYS)
             or value.get("schema") != QUALIFICATION_SCHEMA
         ):
             raise IntegrityError("provider qualification receipt has an invalid envelope")
@@ -348,6 +358,7 @@ class ProviderQualificationStore:
                 if value.get("provider_version") is not None
                 else None
             ),
+            wall_time_seconds=value.get("wall_time_seconds"),
         )
 
     def status(

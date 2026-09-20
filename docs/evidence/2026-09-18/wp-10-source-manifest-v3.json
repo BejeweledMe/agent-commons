@@ -1,0 +1,68 @@
+{
+  "work_package": "WP-10",
+  "task": "task.7MC6D9T1VW4T0RRM4MNDBF9YF7",
+  "delegation": "delegation.17QKTQZKB754XVNB16KEFDXJZR",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "frontend/work/src/components/DecisionCard.tsx",
+      "sha256": "d1f3f24f0dae59037780d49ef49ebb43fed4c5a2027bcab8bb8ba9e439ebc8d7"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "b68e3b64cf0a0deb78eae8fb389ac45705992952c4d2a69379e4e58d5eb0d241"
+    },
+    {
+      "path": "frontend/work/src/components/TrackerSection.tsx",
+      "sha256": "4a2dab2358902e39482b35b3409db2d6a442d3fea0f531bbdc0bcbb5dceb52fb"
+    },
+    {
+      "path": "frontend/work/src/components/ConversationPanel.tsx",
+      "sha256": "c99df228e8a910c17ce842c05d274ea3079eec140509699830174b8c24668ba9"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "0f7fc76f12977d5c7f535e53c04b3d5bd94bf6c30cc278e1f1f1219760cf14ba"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "68975fc992e699c039fd1700831669a1ea034b2f9392f87177179e138579ea3e"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "7b6bc26a6b934b12d65c6657ee7e45c91dcc7e744023b97e6748e18b29384403"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "036535b4aefc1a9b8e7d95f3cb8b9793875e7c907dcb0f92e7eedebc9e6272b0"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "0672c3ebdfa9ba7560014e6635e2999a1ebac377b458b152c4f2c8eab2e522af"
+    },
+    {
+      "path": "frontend/work/tests/tracker-actions.test.mjs",
+      "sha256": "3bdc14d66ef382415468d66162ad7030e646e55b6c9a4dd7652a66f12244d905"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "328 passed, 0 failed (node 24)",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "review_round_2": "review.007KBF6KTKN182VYNHS6JC5T6T changes_requested: the fix is sound, a regression test for the failed-intent retry path was missing",
+    "fix": "tracker-actions.test.mjs: for acceptTask and reopenTask, an initial 409 at the rendered revision, then a retry under the same idempotency key while the detail has re-rendered to a newer revision posts a byte-identical body carrying the ORIGINAL rendered revision; only the explicit start-over path (forgetTaskWrite) forms a new body at the re-rendered revision; source pins that the tracker retry replays the stored intent, captures expectedRevision once, never reassigns it and never rebuilds the intent",
+    "previous_manifests": [
+      "artifact.2M15GE3DZ5K5PTYTY31BAB7AAF (v1)",
+      "artifact.2ST1GWD9PQZ7RTCG6B2PQVNYFN (v2)"
+    ],
+    "files_outside_claims": [
+      "frontend/work/src/contracts.ts",
+      "frontend/work/src/api.ts",
+      "frontend/work/src/components/ConversationPanel.tsx"
+    ],
+    "packaged_asset": "untouched; rebuilt at wave end"
+  }
+}

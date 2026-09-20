@@ -1,5 +1,9 @@
 export type WorkView = "board" | "work" | "library" | "settings";
 export type WorkFilter = "all" | "attention" | "ready" | "assigned" | "active" | "blocked" | "completed" | "review" | "accepted" | "cancelled";
+/** Which of the three presentations the Tasks tab shows (ADR 0020, item 6). */
+export type TasksView = "now" | "map" | "all";
+export const TASKS_VIEWS: readonly TasksView[] = ["now", "map", "all"];
+export const DEFAULT_TASKS_VIEW: TasksView = "now";
 export type WorkRoute = {
   projectId: string | null;
   view: WorkView;
@@ -7,6 +11,8 @@ export type WorkRoute = {
   /** A role whose tasks the tracker is narrowed to; navigation state only. */
   agentId: string | null;
   filter: WorkFilter;
+  /** Presentation only: which Tasks-tab view is open, never a canonical task state. */
+  tasksView: TasksView;
   libraryTab: "roles" | "skills" | "blueprints" | "context";
   composer: boolean;
 };
@@ -15,6 +21,8 @@ export type WorkRoute = {
 // links from the task-first period still open the roles, now on the board.
 const views = new Set(["board", "work", "library", "settings"]);
 const filters = new Set(["all", "attention", "ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"]);
+// `tab` belongs to the Library; the Tasks tab carries its own `tasks` parameter.
+const tasksViews = new Set<string>(TASKS_VIEWS);
 const tabs = new Set(["roles", "skills", "blueprints", "context"]);
 const taskId = /^task\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 const agentId = /^agent\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
@@ -34,6 +42,7 @@ export function parseWorkRoute(search: string): WorkRoute {
     taskId: task !== null && taskId.test(task) ? task : null,
     agentId: agent !== null && agentId.test(agent) ? agent : null,
     filter: filters.has(query.get("filter") ?? "") ? query.get("filter") as WorkFilter : "all",
+    tasksView: tasksViews.has(query.get("tasks") ?? "") ? query.get("tasks") as TasksView : DEFAULT_TASKS_VIEW,
     libraryTab: tabs.has(libraryTab ?? "") ? libraryTab as WorkRoute["libraryTab"] : "roles",
     composer: query.get("new") === "task"
   };
@@ -47,6 +56,7 @@ export function workRouteHref(route: WorkRoute): string {
   // The role filter belongs to the tracker; other views do not carry it forward.
   if (route.agentId !== null && route.view === "work") query.set("agent", route.agentId);
   if (route.filter !== "all") query.set("filter", route.filter);
+  if (route.tasksView !== DEFAULT_TASKS_VIEW) query.set("tasks", route.tasksView);
   if (route.libraryTab !== "roles") query.set("tab", route.libraryTab);
   if (route.composer) query.set("new", "task");
   return `/work${query.size ? `?${query}` : ""}`;

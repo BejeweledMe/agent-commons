@@ -1,0 +1,69 @@
+{
+  "work_package": "WP-13.2",
+  "task": "task.0Z7YVE12JXWZJ15J2DF2BRCBAC",
+  "delegation": "delegation.3WZCSCQMKFFCYSHPV4PHATQGC7",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-20",
+  "files": [
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "dee151008807fa3edc314f18da495d68c770eeede7476597e711a23fbb5bcc6c"
+    },
+    {
+      "path": "frontend/work/src/board.css",
+      "sha256": "7f5773baf961bb1904e5e49ce9cccf69fa3e9bf86179cb85aa894095fefc4542"
+    },
+    {
+      "path": "frontend/work/src/conversation.css",
+      "sha256": "c4322275882e3c6e3e4b633b72f0e551c377680829e94a82d4862ac2ba51cefe"
+    },
+    {
+      "path": "frontend/work/src/outputs.css",
+      "sha256": "1f781f65d338c4d369176243d2b4f6096656a08227b6ca6c96ea8b8ea4f5b31b"
+    },
+    {
+      "path": "frontend/work/src/projectCreation.css",
+      "sha256": "fc12df71bfef127f1c8680ff64821963bce574140cd7bbab310d2fcf5473bade"
+    },
+    {
+      "path": "frontend/work/src/taskGraph.css",
+      "sha256": "1b9ef00548361a88bc866ef4400d37144fbfd39da3bda5552065e5182d17ce6b"
+    },
+    {
+      "path": "frontend/work/tests/style-tokens.test.mjs",
+      "sha256": "73b2da41b07cf47854bbd609405099851e39b94a71f8eeb4be9c33342c8fe70a"
+    },
+    {
+      "path": "frontend/work/tests/contrast.test.mjs",
+      "sha256": "d7070104c351390ed279054fc3d666c7adb658c5e5bab38142e8d8f79fd9a192"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "c17217e6f8f753fc629c6091e1629c54245aa2e7b9b89a46967927489363ed41"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "sha256": "090a3071fa680f3f7a1a96000b3e4866fc4fe96befdb1a64d7a6fd92f244032f"
+    },
+    {
+      "path": "frontend/work/tests/task-graph.test.mjs",
+      "sha256": "92ee6e25983fbe86ad78b8504440b77f99ebb215888093ee14c94c0bdebf784f"
+    },
+    {
+      "path": "frontend/work/design/color-inventory.json",
+      "sha256": "20554bd25bb165fcf82beb7d5d9569fc9b5592fcef1683f97307557cf5f81c37"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "364 passed, 0 failed (node 24)",
+    "asset": "rebuilt on Node 24; tests/ui/test_work_app_contract.py 17 passed",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "review_round_1": "review.3KMX93BKA050RVTWAE4N49SN9Q changes_requested: (a) taskGraph.css still carried raw green literals for completed/accepted nodes (the file was outside the ratchet list); (b) the review criterion named 760px/700px breakpoints while styles.css uses 780px/700px \u2014 a criterion error, not a code defect; the round-2 criteria state the real breakpoints",
+    "fix": "taskGraph.css fully tokenised (13 raw colours -> border-1/2, surface-1/2/3, text-1/3, accent, status-accepted-* for completed/accepted nodes, status-attention-* for blocked); taskGraph.css added to the ratchet FILES at 0 and to color-inventory.json; task-graph tests assert the accepted node wears the status-accepted tokens with no raw colour and measure the completed-node contrast from the resolved tokens (12.9:1)",
+    "visible_side_effect": "completed/accepted graph nodes move from a solid mid-green (#137a40) to the dark status-accepted surface with light green text, matching the decision card; blocked nodes use the attention palette",
+    "previous_manifest": "artifact.0KRA4MQHXAA7CGNGY8XVV1R3QR (v1)"
+  }
+}

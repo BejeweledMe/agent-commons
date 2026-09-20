@@ -117,6 +117,7 @@ def writable(workspace: dict[str, Any]) -> UIContext:
         client="claude",
         software="claude-code",
         role="operator",
+        capabilities=("task:join_application",),
     )
     return UIContext(
         workspace["repo"],

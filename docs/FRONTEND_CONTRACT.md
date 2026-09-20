@@ -213,13 +213,22 @@ receive Commons authentication or capabilities.
 - A budget is the cap a run was permitted, never a spend — nothing measures
   consumption, so nothing may display one.
 - Nothing here stores prompts or transcripts. A run surface may show the
-  private attempt store's sanitized stderr diagnostic of at most 4 KiB for an
-  unsuccessful process and bounded terminal-tool rejection reasons drawn from a
-  fixed allowlist of the backend's own refusal strings. It never receives
-  stdout, successful-run stderr, or tool arguments. Truncation and redaction
-  remain visible.
+  private attempt store's sanitized complete stderr diagnostic of at most 4 KiB
+  for an unsuccessful process and bounded terminal-tool rejection reasons drawn
+  from a fixed allowlist of the backend's own refusal strings (anything else
+  arrives as a fixed withheld-details notice). It never receives stdout,
+  successful-run stderr, or tool arguments. Incomplete stderr is withheld,
+  including historical tails marked truncated; truncation and redaction remain
+  visible. A fragment without its original secret markers is not evidence that
+  its content is safe.
 - Automatic updates show observed task/run state without hidden model
   reasoning or invented progress percentages.
+- `GET /api/workers/eligibility` is server truth for specialization hiring.
+  A missing or stale input is `unknown`, therefore unselectable; capability
+  chips are informative descriptions, never permissions or an authorization.
+- Provider availability `qualification.wall_time_seconds` is additive and
+  nullable. Clients must render "not provided" when it is null rather than
+  inventing a default.
 
 ## The project board (ADR 0020)
 
@@ -245,9 +254,18 @@ receive Commons authentication or capabilities.
 - Tracker task rows may carry nullable `objective_id` (the effective objective,
   including inherited blueprint provenance) and `application_id`. Missing or
   null remains unknown; these additive fields never authorize a UI action.
+- A task record carries the findings bound to it as server truth; the decision
+  card lists their count and never hides them.
 - React Flow's stylesheet ships as a file (CSP `style-src 'self'`); board
   styling is class-based. Agent activity is text plus a data attribute; green
   is still reserved for acceptance.
+
+## Local instrumentation privacy
+
+UI instrumentation collection is off by default. Its schema rejects content,
+paths, and identifiers; its bounded counter bytes live only under the resolved
+state root with bounded retention. The UI has no export or transmit action.
+Disabling stops writes immediately, and Clear deletes only this local store.
 
 ## Testing the applications
 

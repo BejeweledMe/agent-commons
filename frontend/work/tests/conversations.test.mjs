@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, symlinkSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, symlinkSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setImmediate as tick } from "node:timers/promises";
@@ -10,8 +10,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-conversations-"));
-execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM,DOM.Iterable", "--jsx", "react-jsx", "--outDir", compiled, resolve(root, "src/components/ConversationPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
+execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM,DOM.Iterable", "--jsx", "react-jsx", "--resolveJsonModule", "--allowSyntheticDefaultImports", "--outDir", compiled, resolve(root, "src/components/ConversationPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
+copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (file) => import(pathToFileURL(resolve(compiled, file)).href);
 const { ConversationApi, parseAttachment, parseConversation, parseMessage, parseDraft, parseDelivery, parseRecipientAvailability, deliverySteps, validateFiles, UNKNOWN_AVAILABILITY } = await load("conversationApi.js");
 const { ConversationSession, ConversationSessions, ConversationDraftGuard, ConversationObjectUrl, prepareRunTaskId, sessionHasUnsentDraft } = await load("conversationState.js");

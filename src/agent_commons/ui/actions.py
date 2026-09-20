@@ -19,6 +19,7 @@ from agent_commons.runtime.model import profile_tool_summary, validate_model_nam
 from agent_commons.services.design_feedback import open_design_feedback
 from agent_commons.services.manager import CommonsManager
 from agent_commons.services.roles import role_model
+from agent_commons.services.worker_eligibility import WorkerIneligibleError
 from agent_commons.ui.context_pack_dtos import context_pack_detail_payload
 from agent_commons.ui.launch import LAUNCH_NOT_CONFIGURED as LAUNCH_NOT_CONFIGURED
 
@@ -364,6 +365,25 @@ class UIActions:
         if fields.get("specialization_ref") is not None:
             if from_preset_id:
                 raise ValidationError("choose a specialization or a legacy preset")
+            eligibility = self.worker_eligibility(specialization=fields["specialization_ref"])
+            selected = next(
+                (
+                    item
+                    for item in eligibility["workers"]
+                    if item["profile_id"] == fields.get("profile_id")
+                ),
+                None,
+            )
+            if selected is None or selected["eligibility"] != "eligible":
+                refusal = (
+                    selected["refusal"]
+                    if selected is not None and selected["refusal"] is not None
+                    else {
+                        "code": "worker_observation_missing",
+                        "remediation": ["refresh_worker_availability"],
+                    }
+                )
+                raise WorkerIneligibleError(refusal=refusal)
             fields["library_store"] = self.library_store()
         if from_preset_id:
             preset = manager.get_agent(from_preset_id)
@@ -460,6 +480,13 @@ class UIActions:
 
         expected_revision = fields.pop("expected_revision")
         return self.writer().revise_task(task_id, expected_revision, **fields)
+
+    def join_task_to_application(self, *, task_id: str, **fields: Any) -> dict[str, Any]:
+        expected_revision = fields.pop("expected_revision")
+        application_id = fields.pop("application_id")
+        return self.writer().join_task_to_application(
+            task_id, application_id, expected_revision, **fields
+        )
 
     _REVIEW_WALK: dict[str, tuple[str, ...]] = {
         "ready": ("start_task", "complete_task", "submit_task"),

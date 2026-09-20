@@ -9,6 +9,7 @@ from .collections import collection_for
 
 if TYPE_CHECKING:
     from .agent_projection import AgentRecord
+    from .application_projection import ApplicationRecord
     from .artifact_projection import ArtifactRecord
     from .context_pack import ContextPackRecord
     from .decision_projection import DecisionRecord
@@ -47,6 +48,7 @@ class ProjectionIssue:
 class ProjectSnapshot:
     workspace_id: str | None = None
     objectives: dict[str, ObjectiveRecord] = field(default_factory=dict)
+    applications: dict[str, ApplicationRecord] = field(default_factory=dict)
     tasks: dict[str, TaskRecord] = field(default_factory=dict)
     threads: dict[str, ThreadRecord] = field(default_factory=dict)
     reviews: dict[str, ReviewRecord] = field(default_factory=dict)
@@ -129,6 +131,8 @@ class ProjectSnapshot:
         # canonical entity family.
         if self.context_packs:
             rendered["context_packs"] = [record.to_dict() for record in self.context_packs.values()]
+        if self.applications:
+            rendered["applications"] = [record.to_dict() for record in self.applications.values()]
         if self.design_packages:
             rendered["design_packages"] = [
                 record.to_dict() for record in self.design_packages.values()

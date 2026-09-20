@@ -1,0 +1,77 @@
+{
+  "work_package": "WP-17.2",
+  "task": "task.3N13VJY72MY0A7DK4RXNKK6JNY",
+  "delegation": "delegation.54T4E42KB5GAJNFF8528X5R5YY",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "frontend/work/src/instrumentation.ts",
+      "sha256": "eda782a1a9e30c08e5ae2f97bd224ec988e4180ca6eb2c5540c091efcd2f3fc5"
+    },
+    {
+      "path": "frontend/work/src/components/InstrumentationSettings.tsx",
+      "sha256": "44fa124fae88e611336e6cc9d35980150cb7a7497c05bbb2b50611f7cdf9ddfe"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "f9942321812ff60ea092e21ce8bb918d2dfa184003fb6a6f7ea492513c4ab5d2"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "a64b9ca5e4fa65def1ed702c4e4c11fa6a89ef4fde6ffdd1f44f4eaae049dae6"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "27cd78520542094344fac7dfc19dbb2dd3f7cbd2204105de580aad0ac0175640"
+    },
+    {
+      "path": "frontend/work/src/components/TrackerSection.tsx",
+      "sha256": "b1be7992cd6176f37251c5a9b1f1101f5f82d7668f81ae4fe5676b77eb668a93"
+    },
+    {
+      "path": "frontend/work/src/components/ProjectBoard.tsx",
+      "sha256": "7310b66c9ab3a8d565fc9e8487ed17a2b7e84ea493bcc50252d3af506f3ea3da"
+    },
+    {
+      "path": "frontend/work/src/components/ServiceLibraryEditor.tsx",
+      "sha256": "cb2673605c9ee1dee3084ddc851a8a5d06a76941ab2d76d826bb7abb6f177838"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "6da33bd82819f56aa59512471c6b4540c42b73ca09bf48236af9a719a5f9fcc6"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "8927563fd20beffb34b33644be18daffa72588ce24d284dced9cf2d622cb968d"
+    },
+    {
+      "path": "frontend/work/tests/instrumentation.test.mjs",
+      "sha256": "2edc01b3e9135241e44f5fa6cb96e41cc0644bdbd2c6859db05b33cfd9c0cf86"
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "c6fe095f2b60a57c6d4fe15acd63b3488e76c41c452e28034f38ba16cb6550ff"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "358 passed, 0 failed (node 24)",
+    "run_by": "coordinator; the worker sandbox refuses node"
+  },
+  "notes": {
+    "coordinator_fixes": [
+      "api.ts: moved requestOutcome below isObject so tests/confirmed-refresh.test.mjs (which slices api.ts from ApiProblem to isObject and evaluates it) sees only the class again",
+      "api.ts: parseInstrumentation pins ui_version to INSTRUMENTATION_UI_VERSION = \"1\" exactly as the server does (Opus's own test expected a different version to be refused)",
+      "i18n.json: EN instrumentation_storage reworded without an apostrophe (React escapes it in static markup, which broke the Settings render test)"
+    ],
+    "emission_points": "task_create and run_start in main.tsx (measured), run_prepare and navigation (local, duration 0), task_action in TrackerSection.performTaskIntent, board_edit in ProjectBoard (layout save, openAgentLink), library_edit in ServiceLibraryEditor.execute \u2014 literal kind/outcome only, outcome derived from abort flag and status via requestOutcome",
+    "files_outside_claims": [
+      "frontend/work/src/components/TrackerSection.tsx",
+      "frontend/work/src/components/ProjectBoard.tsx",
+      "frontend/work/src/components/ServiceLibraryEditor.tsx (emission calls only)"
+    ],
+    "backend": "src/agent_commons untouched",
+    "packaged_asset": "untouched; rebuilt at wave end"
+  }
+}

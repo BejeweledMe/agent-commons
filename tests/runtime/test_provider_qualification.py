@@ -282,3 +282,128 @@ def test_receipt_rejects_impossible_or_noncanonical_utc_timestamp(
     status = store.status(profile, workspace_root=workspace)
     assert isinstance(status, TypedRefusal)
     assert status.code is ProviderRefusalCode.PROVIDER_QUALIFICATION_FAILED
+
+
+def test_wall_time_seconds_round_trips_and_stays_out_of_the_fingerprint(tmp_path: Path) -> None:
+    _provider, profile = _profile(tmp_path)
+    workspace = tmp_path / "workspace"
+    store = ProviderQualificationStore(tmp_path / "state")
+    fingerprint = qualification_fingerprint(profile, workspace_root=workspace)
+
+    receipt = store.record(
+        profile,
+        workspace_root=workspace,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version=None,
+        wall_time_seconds=120,
+    )
+    loaded = store.read(profile.profile_id)
+
+    assert loaded == receipt
+    assert loaded is not None
+    assert loaded.wall_time_seconds == 120
+    assert loaded.as_dict()["wall_time_seconds"] == 120
+    assert loaded.as_dict()["schema"] == "agent_commons.provider_qualification.v1"
+    assert loaded.fingerprint == fingerprint
+    later = store.record(
+        profile,
+        workspace_root=workspace,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version=None,
+        wall_time_seconds=1800,
+    )
+    assert later.fingerprint == fingerprint
+    assert later.wall_time_seconds == 1800
+
+
+def test_prechange_receipt_without_wall_time_loads_as_none(tmp_path: Path) -> None:
+    _provider, profile = _profile(tmp_path)
+    workspace = tmp_path / "workspace"
+    store = ProviderQualificationStore(tmp_path / "state")
+    recorded = store.record(
+        profile,
+        workspace_root=workspace,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version="codex-cli 1.2.3",
+        wall_time_seconds=300,
+    )
+    path = store.root / f"{profile.profile_id.value}.json"
+    prechange = {
+        "schema": "agent_commons.provider_qualification.v1",
+        "profile_id": profile.profile_id.value,
+        "provider": profile.profile_id.provider.value,
+        "fingerprint": recorded.fingerprint,
+        "qualified": True,
+        "probes": {
+            "static_preflight": True,
+            "initialization_probe": True,
+            "behavioral_canary": True,
+        },
+        "checked_at": recorded.checked_at,
+        "provider_version": "codex-cli 1.2.3",
+    }
+    path.write_bytes(strict_state_bytes(prechange))
+
+    loaded = store.read(profile.profile_id)
+    assert loaded is not None
+    assert loaded.wall_time_seconds is None
+    assert loaded.fingerprint == recorded.fingerprint
+    assert loaded.checked_at == recorded.checked_at
+    assert loaded.qualified is True
+    assert loaded.provider_version == "codex-cli 1.2.3"
+    assert "wall_time_seconds" not in json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("wall_time_seconds", (29, 1801, 0, -1, True, "300", 30.0))
+def test_out_of_range_or_mistyped_wall_time_is_refused(
+    tmp_path: Path,
+    wall_time_seconds: object,
+) -> None:
+    _provider, profile = _profile(tmp_path)
+    workspace = tmp_path / "workspace"
+    store = ProviderQualificationStore(tmp_path / "state")
+    store.record(
+        profile,
+        workspace_root=workspace,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version=None,
+        wall_time_seconds=30,
+    )
+    path = store.root / f"{profile.profile_id.value}.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["wall_time_seconds"] = wall_time_seconds
+    path.write_bytes(strict_state_bytes(document))
+
+    with pytest.raises(IntegrityError, match="wall time"):
+        store.read(profile.profile_id)
+
+
+def test_explicit_null_wall_time_loads_as_none(tmp_path: Path) -> None:
+    _provider, profile = _profile(tmp_path)
+    store = ProviderQualificationStore(tmp_path / "state")
+    receipt = store.record(
+        profile,
+        workspace_root=tmp_path / "workspace",
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version=None,
+    )
+    assert receipt.wall_time_seconds is None
+    assert (
+        json.loads((store.root / f"{profile.profile_id.value}.json").read_text(encoding="utf-8"))[
+            "wall_time_seconds"
+        ]
+        is None
+    )
+    loaded = store.read(profile.profile_id)
+    assert loaded is not None
+    assert loaded.wall_time_seconds is None

@@ -73,6 +73,25 @@ EVENT_SPECS: dict[str, EventSpec] = {
     "objective.closed": EventSpec(
         ("objective_id", "expected_revision", "reason"), "objective", "objective_id", "policy"
     ),
+    "blueprint_application.created": EventSpec(
+        (
+            "application_id",
+            "blueprint",
+            "objective_id",
+            "created_task_ids",
+            "created_agent_ids",
+            "created_role_refs",
+        ),
+        "blueprint_application",
+        "application_id",
+        "policy",
+    ),
+    "blueprint_application.task_joined": EventSpec(
+        ("application_id", "task_id", "expected_revision", "reason"),
+        "blueprint_application",
+        "application_id",
+        "policy",
+    ),
     "task.created": EventSpec(
         ("task_id", "title", "description", "acceptance_criteria", "priority"), "task", "task_id"
     ),
@@ -533,6 +552,16 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         if event_type == "thread.replied" and field == "body" and payload.get("attachments"):
             continue
         value = payload[field]
+        if (
+            field == "objective_id"
+            and value is None
+            and event_type
+            in {
+                "task.created",
+                "blueprint_application.created",
+            }
+        ):
+            continue
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(f"{field} must be a non-empty string")
     for field in _STRING_LIST_FIELDS.intersection(payload):

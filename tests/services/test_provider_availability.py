@@ -74,6 +74,7 @@ def test_unified_availability_is_closed_honest_and_codex_has_no_money_claim(
         "freshness": "current",
         "fingerprint": receipt.fingerprint,
         "checked_at": receipt.checked_at,
+        "wall_time_seconds": None,
     }
     assert available["initialization_state"] == "ready"
     assert available["authentication"] == {"state": "ready", "freshness": "fresh"}
@@ -126,6 +127,7 @@ def test_missing_qualification_and_failed_initialization_are_distinct_typed_refu
     assert missing["launchable"] is False
     assert missing["initialization_state"] == "not_checked"
     assert missing["qualification"]["state"] == "required"  # type: ignore[index]
+    assert missing["qualification"]["wall_time_seconds"] is None  # type: ignore[index]
     assert missing["refusal"] == {
         "code": "provider_qualification_required",
         "remediation": ["run_provider_canary"],
@@ -177,6 +179,7 @@ def test_current_behavioral_failure_does_not_relabel_initialization_as_failed(
         "freshness": "current",
         "fingerprint": None,
         "checked_at": failed["qualification"]["checked_at"],  # type: ignore[index]
+        "wall_time_seconds": None,
     }
     assert failed["qualification"]["checked_at"] is not None  # type: ignore[index]
     assert failed["refusal"] == {
@@ -353,6 +356,7 @@ def test_untrusted_builder_fails_same_launch_boundary_as_runtime(
         "freshness": "invalid",
         "fingerprint": None,
         "checked_at": None,
+        "wall_time_seconds": None,
     }
     assert untrusted["launchable"] is False
     assert untrusted["refusal"] == {
@@ -463,3 +467,67 @@ def test_corrupt_or_profile_mismatched_receipt_never_implies_init_ready(tmp_path
     assert invalid["qualification"]["freshness"] == "invalid"  # type: ignore[index]
     assert invalid["initialization_state"] == "not_checked"
     assert invalid["launchable"] is False
+
+
+def test_availability_qualification_carries_wall_time_seconds_or_null(tmp_path: Path) -> None:
+    service, store = _service(tmp_path)
+    profile = service.profiles.get("codex-builder")
+    receipt = store.record(
+        profile,
+        workspace_root=tmp_path,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=True,
+        provider_version="test-provider-v1",
+        wall_time_seconds=90,
+    )
+
+    available = service.describe(
+        "codex-builder",
+        auth={"state": "ready", "freshness": "fresh"},
+    ).to_wire()
+    assert available["qualification"] == {
+        "state": "qualified",
+        "freshness": "current",
+        "fingerprint": receipt.fingerprint,
+        "checked_at": receipt.checked_at,
+        "wall_time_seconds": 90,
+    }
+
+    path = store.root / f"{profile.profile_id.value}.json"
+    prechange = json.loads(path.read_text(encoding="utf-8"))
+    prechange.pop("wall_time_seconds")
+    path.write_bytes(strict_state_bytes(prechange))
+    legacy = service.describe(
+        "codex-builder",
+        auth={"state": "ready", "freshness": "fresh"},
+    ).to_wire()
+    assert legacy["qualification"]["wall_time_seconds"] is None  # type: ignore[index]
+    assert set(legacy["qualification"]) == {  # type: ignore[arg-type]
+        "state",
+        "freshness",
+        "fingerprint",
+        "checked_at",
+        "wall_time_seconds",
+    }
+
+    failed_receipt = store.record(
+        profile,
+        workspace_root=tmp_path,
+        static_preflight=True,
+        initialization_probe=True,
+        behavioral_canary=False,
+        provider_version=None,
+        wall_time_seconds=1800,
+    )
+    failed = service.describe(
+        "codex-builder",
+        auth={"state": "ready", "freshness": "fresh"},
+    ).to_wire()
+    assert failed["qualification"] == {
+        "state": "failed",
+        "freshness": "current",
+        "fingerprint": None,
+        "checked_at": failed_receipt.checked_at,
+        "wall_time_seconds": 1800,
+    }

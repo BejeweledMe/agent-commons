@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-commons:schema:payload:task:v2",
+  "x-schema-name": "commons.payload.task.v2",
+  "x-event-types": ["task.created"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "title", "description", "acceptance_criteria", "priority", "objective_id"],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 512},
+    "description": {"type": "string", "minLength": 1},
+    "acceptance_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "priority": {"enum": ["low", "normal", "high", "critical"]},
+    "dependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"}},
+    "objective_id": {"type": ["string", "null"], "pattern": "^objective\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+    "extensions": {"type": "object"}
+  }
+}

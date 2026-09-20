@@ -1,0 +1,49 @@
+{
+  "work_package": "WP-17.1",
+  "task": "task.3ES48JYNPFGMNJFM06M72PDYMM",
+  "delegation": "delegation.1FDKM7QYTGV4GTEXA9142KKXXE",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/instrumentation.py",
+      "sha256": "08ea527fdb116bcc50fc0c2306910001bb3adfab6c6ecc43f7803ae19ea45319"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "bb830cdca31b2f4d0e2c8fa567d2306a1c9b8b6650e39c9279dfab13968ea724"
+    },
+    {
+      "path": "tests/ui/test_instrumentation.py",
+      "sha256": "c0749e15a58c320bbd884dd2fd024510d4360f746a6bd7423315f859ec9d920f"
+    },
+    {
+      "path": "tests/ui/test_readonly_invariant.py",
+      "sha256": "c2f8b333ca5e0671eb4766e856a38aecb175bb25f9d045f8b2b0b46d34fde718"
+    },
+    {
+      "path": "tests/ui/test_profile_choice_and_link_offer.py",
+      "sha256": "3bd891d44ded13ad0deab4713eb8702ad6b798353b6203c203da9282b3386c3f"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "3b882057f407e3d5ae915acd1b80e4f3aa3bd35bedc5f331c8f71340d9d07dd3"
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "ec4334e591ebad2bee17e5afba44ddf509099be3affb0ea4ad8732413cfd1fd9"
+    }
+  ],
+  "verification": {
+    "pytest": "55 passed (tests/ui/test_instrumentation.py, test_board_layout.py, test_readonly_invariant.py, test_profile_choice_and_link_offer.py)",
+    "ruff": "check and format clean",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "store": "src/agent_commons/ui/instrumentation.py: one JSON file under the resolved collaboration state root, schema agent_commons.instrumentation.v1, enabled default false, closed enums (7 event kinds, 4 outcomes, 4 duration buckets), MAX_INSTRUMENTATION_BYTES 65536, MAX_EVENTS_PER_REQUEST 64, mode 0600, tmp+os.replace, retention window with day-only timestamp, revision = sha256 of the canonical document; imports only hashlib/os/stat/tempfile/fastapi/agent_commons.core.canonical \u2014 no network client",
+    "routes": "GET /api/instrumentation; POST settings/events/clear revision-bound (409 stale, 422 outside the enums, 204 when disabled); the three POSTs added to PRIVATE_COLLABORATION_ROUTES; read-only panel registers no writes",
+    "docs": "FRONTEND_CONTRACT.md section 'Local instrumentation privacy'; THREAT_MODEL.md line on the store as non-canonical local-only operational state",
+    "frontend": "untouched; WP-17.2 (Opus) adds the Settings toggle",
+    "packaged_asset": "untouched"
+  }
+}

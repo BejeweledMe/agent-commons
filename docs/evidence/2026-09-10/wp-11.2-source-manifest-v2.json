@@ -1,0 +1,151 @@
+{
+  "work_package": "WP-11.2",
+  "task": "task.7FNE0994Z9R4BZ99CR0FRVDSPH",
+  "delegation": "delegation.17PVH3CSHJEW6RQ0GK7VE6VFRB",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-11",
+  "files": [
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "7d1afc5d44145699e95c05a5097de1aaae24cb7f455bb640f5fe9c0a1eaa6469"
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "ae8f51ca837aa4f37b777c110a17b1b862c01ff710b859ddcae8e2ff5625eebd"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-11.2-source-manifest-v2.json",
+      "sha256": "210f2f8de0cc89602160da0f391f166ee7e9351fcaa9a43332c91511be4d6d6c"
+    },
+    {
+      "path": "docs/evidence/2026-09-10/wp-11.2-source-manifest.json",
+      "sha256": "c6877e2f42e6bff250136f8cc40ac434c2fa780d4278e8a17deee3d4e7523b84"
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "sha256": "fa5de29bf16130c9a20cda83587ca593da333a6615cd735944e62bb27910ded8"
+    },
+    {
+      "path": "src/agent_commons/domain/application_projection.py",
+      "sha256": "c3d2dd0ca107ee8472ddcc4e5ba6d7da2954af0f2daa5e583b4578e2f45e2e86"
+    },
+    {
+      "path": "src/agent_commons/domain/collections.py",
+      "sha256": "eddc17d86f6c0504f35d0f13d67cea6d043cc58419d04d9d2cb41f0e74941af2"
+    },
+    {
+      "path": "src/agent_commons/domain/lifecycle.py",
+      "sha256": "435be9782e213c9c20091a054d6ef2b235bf63bed6b2562333622afcecd29789"
+    },
+    {
+      "path": "src/agent_commons/domain/projection.py",
+      "sha256": "a32c10193f8d0cce0739bd46e0def9ac0d86e11eb26adb0a00b1e006c4564fae"
+    },
+    {
+      "path": "src/agent_commons/domain/snapshot.py",
+      "sha256": "7ee841a750cd0135a8038696c9cd009e7c4426dd9179a5cbd0a94190a6e4df22"
+    },
+    {
+      "path": "src/agent_commons/domain/task_review_envelopes.py",
+      "sha256": "1476681783922190d7165dc5edd7d1c06c229d95e83cf00c8fb509b628faeb7d"
+    },
+    {
+      "path": "src/agent_commons/domain/validation.py",
+      "sha256": "8d283141cdc3aad53e04c6a64d2c92584cf8e57175d368804027da9a12129201"
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/blueprint-application.v1.schema.json",
+      "sha256": "f7a108a74a80f357c20bad4a829a8980bf9709cf1657407f8b8f77496399eb17"
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/task.v2.schema.json",
+      "sha256": "8b0c110021358b95989bb6e7c58862f3893be4d78f5768a40cb8a008256a4422"
+    },
+    {
+      "path": "src/agent_commons/services/manager.py",
+      "sha256": "0e145d0e9ecd975888dce908d5072ec3b63a26697528df17fc04871d5aac5507"
+    },
+    {
+      "path": "src/agent_commons/services/tasks.py",
+      "sha256": "fc7a764e51b9714521f00e44c8a368fad96af7118a0e911411e9b0bec8c9d27e"
+    },
+    {
+      "path": "src/agent_commons/ui/actions.py",
+      "sha256": "e1467564199fbb204ceb843f93539c104a48aadd0fe9f4415651b21e3dcab931"
+    },
+    {
+      "path": "src/agent_commons/ui/library_blueprints.py",
+      "sha256": "f775ab21adceddf3570b0872ddd3d1bced85172293fc56ea2a11c7bfa3920011"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "62913c889ca14a72d2424b1ec937564bd403b0add20b17b4bbaa74d473a96321"
+    },
+    {
+      "path": "src/agent_commons/ui/session_owner.py",
+      "sha256": "9a4ea39e669ca199b3ce5b27caff12dc8ea353d2df25ade67d137cac815acb3e"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_dtos.py",
+      "sha256": "1c3090c6242a7b675cee2e1549f86e69d8476ee742aa0317863db5292b06e1fc"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "f114e4236b987f5b3b69056b63b9ffb7ba4258b9684d4b71723736b0dc21a03f"
+    },
+    {
+      "path": "tests/domain/test_application_replay.py",
+      "sha256": "afc3a58ab55143b915e54e095f266353ade981a8002c4877a898dc2f9426e8b3"
+    },
+    {
+      "path": "tests/schemas/test_universal_contracts.py",
+      "sha256": "9e0eecf4909343fc329f2678d98df66710d3543af1c6450112975cffd6d15634"
+    },
+    {
+      "path": "tests/services/test_blueprint_application.py",
+      "sha256": "4a61c6a67fd59523419c70c4ef62fa294f1f161ddc8a13dbf5b86bb6ee64bbca"
+    },
+    {
+      "path": "tests/services/test_task_join_application.py",
+      "sha256": "db064d32ae690ceef7e4d9c5b27ce48baf8be89cdd536d64d7c352db4b1fc377"
+    },
+    {
+      "path": "tests/ui/conftest.py",
+      "sha256": "2c9b25f50cec49b645adcc410a42eab54e541f70399bb19ccedb35b37f069b5c"
+    },
+    {
+      "path": "tests/ui/test_profile_choice_and_link_offer.py",
+      "sha256": "3bd891d44ded13ad0deab4713eb8702ad6b798353b6203c203da9282b3386c3f"
+    },
+    {
+      "path": "tests/ui/test_readonly_invariant.py",
+      "sha256": "c2f8b333ca5e0671eb4766e856a38aecb175bb25f9d045f8b2b0b46d34fde718"
+    },
+    {
+      "path": "tests/ui/test_session_owner.py",
+      "sha256": "eac1e157d3c796bef6822e5ddd6e986beb4618181cb6f17523e04384b8c93b52"
+    },
+    {
+      "path": "tests/ui/test_task_join_route.py",
+      "sha256": "ce2913cdb2d7a97b3545cda39992fecd96a41b464106dd229fa2ff668870d968"
+    },
+    {
+      "path": "tests/ui/test_tracker_reads.py",
+      "sha256": "df3baa00ea25050887c416340c999680573b143d288459d5d65bccad0c6f1935"
+    }
+  ],
+  "verification": {
+    "pytest_full": "tests (except benchmarks): 2600 passed, 13 skipped",
+    "pytest_focused_after_format": "the six affected modules rerun after a formatting-only edit: see console",
+    "ruff": "check and format clean for src and tests",
+    "frontend": "not applicable (no frontend change in this package)",
+    "screenshots": "not applicable"
+  },
+  "notes": [
+    "v2 after review.7AW6HSPWJX400K91AE2JKQZ94R (changes_requested on two missing test groups).",
+    "Coordinator added: the five join refusal branches (already joined, stale application revision, empty reason, foreign objective, the 100-task ceiling) each proving the ledger is untouched; the tracker DTO provenance test (created task reports its objective and application, joined task inherits the application objective, unrelated task reports null for both); the apply partial-write/replay test proving one application, not two.",
+    "DEFECT FOUND AND FIXED by the coordinator while writing the DTO test: src/agent_commons/ui/tracker_reads.py validated application ids with is_typed_id, which requires a 26-character ULID suffix, while an application id is 'application.' plus a 64-character digest (ADR 0021, and the pattern the blueprint-application schema itself declares). Every application id therefore failed the check, so the tracker DTO never reported application_id and never inherited the application objective; the domain and the projection were correct. The read now matches the schema pattern and the three cases are pinned.",
+    "Runs 1-3 ended needs_operator with checkpoints; run 4 succeeded. Earlier coordinator additions: the golden replay test and the join route refusal test; the frozen panel identity pin updated for the fixed task:join_application capability, with the one-time transition disclosed (a panel session opened by an older binary no longer deduplicates).",
+    "Extra paths claimed after the runs: src/agent_commons/ui/session_owner.py, tests/ui/conftest.py, tests/ui/test_session_owner.py, tests/ui/test_task_join_route.py."
+  ]
+}
