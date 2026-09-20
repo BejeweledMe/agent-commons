@@ -95,7 +95,7 @@ def panel_session_identity(workspace_id: str) -> dict[str, Any]:
         "client": "agent-commons",
         "software": "agent-commons-ui",
         "role": "operator",
-        "capabilities": (),
+        "capabilities": ("task:join_application",),
         "model_family": None,
         "model": None,
         "source_producer": None,

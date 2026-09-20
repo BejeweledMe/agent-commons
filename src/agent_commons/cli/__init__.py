@@ -761,6 +761,34 @@ def task_list(state: CLIState, state_filter: str | None) -> None:
     state.emit(state.manager().list_tasks(state=state_filter))
 
 
+@task_group.command("join-application")
+@click.argument("task_id")
+@click.argument("application_id")
+@click.option("--expected-revision", required=True)
+@click.option("--reason", required=True)
+@_idem
+@click.pass_obj
+def task_join_application(
+    state: CLIState,
+    task_id: str,
+    application_id: str,
+    expected_revision: str,
+    reason: str,
+    idempotency_key: str | None,
+) -> None:
+    """Join an existing task to a blueprint application with exact CAS."""
+
+    state.emit(
+        state.manager().join_task_to_application(
+            task_id,
+            application_id,
+            expected_revision,
+            reason=reason,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
 @task_group.command("revise")
 @_expected
 @click.option("--changes-json", required=True)

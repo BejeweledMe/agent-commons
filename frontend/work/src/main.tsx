@@ -12,10 +12,10 @@ import { ProjectBoard } from "./components/ProjectBoard.js";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ApiProblem, WorkApi } from "./api";
+import { ApiProblem, WorkApi, requestOutcome } from "./api";
 import { ContextPackRetryIdentity } from "./contextPackEditorState";
 import { RolePresetPicker } from "./components/RolePresetPicker";
-import { chooseRolePreset, chooseRoleProvider, chooseRoleProfile } from "./rolePresetState";
+import { chooseRolePreset, chooseRoleProvider } from "./rolePresetState";
 import { AppHeader } from "./components/AppHeader";
 import { ProjectSidebar } from "./components/ProjectSidebar";
 import { FailurePanel } from "./components/FailurePanel";
@@ -33,21 +33,28 @@ import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkRoute } from "
 import { ProjectDraftStore, ProjectReadRequest, ProjectRegistryApi, ProjectSelection, type ProjectInspection, type ProjectList } from "./projectWorkspace.js";
 import { providerReadinessLines, railSetupLabelKey, railSetupState } from "./setupReadiness.js";
 import { TrackerSection } from "./components/TrackerSection";
+import { InstrumentationSettings } from "./components/InstrumentationSettings.js";
+import { InstrumentationBatcher, recordInstrumentation, setInstrumentationSink, type InstrumentationHint, type InstrumentationPostOutcome } from "./instrumentation.js";
 import { WorkflowCard } from "./components/WorkflowCard";
 import { SpecializationPicker } from "./components/SpecializationPicker.js";
+import { WorkerPicker, type WorkerPickerState } from "./components/WorkerPicker.js";
+import { hireWorkerAllowed } from "./hireGate.js";
 import { LibraryApi } from "./libraryApi.js";
-import { sameLibraryRef, type BlueprintApplication, type LibraryRef, type LibraryRole, type LibraryState } from "./libraryTypes.js";
+import { libraryRefKey, sameLibraryRef, type BlueprintApplication, type LibraryRef, type LibraryRole, type LibraryState } from "./libraryTypes.js";
 import { TaskGraphApi } from "./taskGraphApi.js";
 import type {
   ContextPackOption,
   DesignPackageOption,
   Failure,
+  Instrumentation,
   ProviderAvailabilityRefusalCode,
   ProviderCapabilityRefusalCode,
   ProviderAuthAction,
   ProviderAuthState,
   ProviderAuthStatus,
   SetupGuidanceNextActionKey,
+  WorkerEligibilityEntry,
+  WorkerRefusal,
   WorkspaceData
 } from "./contracts";
 import { type Locale, type MessageKey, translate } from "./i18n";
@@ -267,6 +274,14 @@ function WorkApp(): ReactElement {
   const [legacyProjectHost, setLegacyProjectHost] = useState(false);
   const [libraryState, setLibraryState] = useState<LibraryState>({ kind: "loading" });
   const [libraryRefresh, setLibraryRefresh] = useState(0);
+  // Worker choices are server truth for the exact chosen specialization version.
+  // The key travels with them so a list read for one version is never shown
+  // beside another, and a failed read leaves every worker unknown.
+  const [workers, setWorkers] = useState<{ key: string; state: WorkerPickerState }>({ key: "", state: { kind: "idle" } });
+  const [workerRefresh, setWorkerRefresh] = useState(0);
+  // A hire the server refused: kept in RAM beside the worker step, never a
+  // canonical fact and never a reason to drop the typed draft.
+  const [hireRefusal, setHireRefusal] = useState<{ refusal: WorkerRefusal | null } | null>(null);
   const [lastHiredRole, setLastHiredRole] = useState<{ id: string; name: string } | null>(null);
   // RAM only, and never a canonical fact: the applied mapping is kept so the
   // outcome can be read against a later tracker snapshot rather than guessed.
@@ -282,10 +297,56 @@ function WorkApp(): ReactElement {
     actionErrors: {}, lastHiredRole: null, roleErrors: new Set(), taskErrors: new Set(), runErrors: new Set(), selectedTaskId: null
   });
   currentTransientRef.current = { actionErrors, lastHiredRole, roleErrors, taskErrors, runErrors, selectedTaskId: route.taskId };
+  // Local, opt-in, content-free counters. Server truth for the toggle and the
+  // revision; the client never assumes either, and holds nothing in storage.
+  const [instrumentation, setInstrumentation] = useState<Instrumentation | null>(null);
+  const [instrumentationUnavailable, setInstrumentationUnavailable] = useState(false);
+  const [instrumentationHint, setInstrumentationHint] = useState<InstrumentationHint | null>(null);
+  const [instrumentationBusy, setInstrumentationBusy] = useState(false);
+  const [instrumentationClearAsked, setInstrumentationClearAsked] = useState(false);
+  const [instrumentationRefresh, setInstrumentationRefresh] = useState(0);
   const authPanelRef = useRef<HTMLElement | null>(null);
   const pendingLaunchRetry = useRef<(() => Promise<void>) | null>(null);
   const launchSelectionVersion = useRef(0);
   const text = useMemo(() => (key: MessageKey) => translate(locale, key), [locale]);
+
+  // One batcher for the whole shell. It posts revision-bound batches to this
+  // panel's own API and nowhere else, and is inert until a read says the toggle
+  // is on. A 409 re-reads once and hints; a 422 hints and drops; neither retries.
+  const instrumentationBatcher = useRef<InstrumentationBatcher | null>(null);
+  if (instrumentationBatcher.current === null) {
+    instrumentationBatcher.current = new InstrumentationBatcher({
+      post: async (events, expectedRevision): Promise<InstrumentationPostOutcome> => {
+        try {
+          const next = await apiRef.current.recordInstrumentation(events, expectedRevision, new AbortController().signal);
+          if (next === null) return { kind: "ignored" };
+          setInstrumentation(next);
+          return { kind: "accepted", revision: next.revision };
+        } catch (error: unknown) {
+          const status = error instanceof ApiProblem ? error.status : 0;
+          if (status === 409) return { kind: "stale" };
+          if (status === 400 || status === 422) return { kind: "rejected" };
+          return { kind: "unavailable" };
+        }
+      },
+      onHint: setInstrumentationHint,
+      onReread: () => setInstrumentationRefresh((current) => current + 1)
+    });
+  }
+
+  useEffect(() => {
+    setInstrumentationSink(instrumentationBatcher.current);
+    return () => setInstrumentationSink(null);
+  }, []);
+
+  // Server truth drives the batcher: an answer that says off, or no answer at
+  // all, leaves it inert and empties whatever it was holding.
+  useEffect(() => {
+    const batcher = instrumentationBatcher.current;
+    if (batcher === null) return;
+    batcher.setRevision(instrumentation?.revision ?? null);
+    batcher.setEnabled(instrumentation?.enabled === true);
+  }, [instrumentation]);
 
   useEffect(() => mutationsRef.current.subscribe(() => setMutationRevision((current) => current + 1)), []);
   // Recomputed whenever the registry publishes, while the handles themselves stay
@@ -320,11 +381,121 @@ function WorkApp(): ReactElement {
     return () => controller.abort();
   }, [libraryAccessible, libraryRefresh]);
 
+  const instrumentationReadable = state.kind === "ready";
+  useEffect(() => {
+    if (!instrumentationReadable) return;
+    const controller = new AbortController();
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
+    const stillCurrent = (): boolean => !controller.signal.aborted
+      && projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId;
+    void api.instrumentation(controller.signal).then((value) => {
+      if (!stillCurrent()) return;
+      setInstrumentation(value);
+      setInstrumentationUnavailable(false);
+    }).catch(() => {
+      // Fail closed: an unreadable local store counts nothing and says so.
+      if (!stillCurrent()) return;
+      setInstrumentation(null);
+      setInstrumentationUnavailable(true);
+    });
+    return () => controller.abort();
+  }, [instrumentationReadable, route.projectId, instrumentationRefresh]);
+
+  async function toggleInstrumentation(enabled: boolean): Promise<void> {
+    const current = instrumentation;
+    if (current === null || instrumentationBusy) return;
+    // Emission stops before the request leaves, so switching off can never race
+    // a flush that was already scheduled.
+    if (!enabled) instrumentationBatcher.current?.setEnabled(false);
+    const api = apiRef.current;
+    setInstrumentationBusy(true);
+    setInstrumentationHint(null);
+    try {
+      setInstrumentation(await api.setInstrumentation(enabled, current.revision, new AbortController().signal));
+      setInstrumentationUnavailable(false);
+    } catch (error: unknown) {
+      setInstrumentationHint(error instanceof ApiProblem && error.status === 409 ? "stale" : "rejected");
+      setInstrumentationRefresh((value) => value + 1);
+    } finally {
+      setInstrumentationBusy(false);
+    }
+  }
+
+  async function clearInstrumentation(): Promise<void> {
+    const current = instrumentation;
+    if (current === null || instrumentationBusy) return;
+    const api = apiRef.current;
+    setInstrumentationBusy(true);
+    setInstrumentationHint(null);
+    // Whatever is queued describes counts that are being discarded anyway.
+    instrumentationBatcher.current?.reset();
+    try {
+      await api.clearInstrumentation(current.revision, new AbortController().signal);
+      setInstrumentationClearAsked(false);
+    } catch (error: unknown) {
+      setInstrumentationHint(error instanceof ApiProblem && error.status === 409 ? "stale" : "rejected");
+    } finally {
+      setInstrumentationBusy(false);
+      setInstrumentationRefresh((value) => value + 1);
+    }
+  }
+
+  // Role first: without a chosen specialization there is nothing to ask the
+  // server about, and the worker step stays disabled rather than guessing.
+  const specializationKey = role.specializationRef === null ? "" : libraryRefKey(role.specializationRef);
+  const workersReadable = state.kind === "ready" && state.data.setup.state === "setup_configured";
+  useEffect(() => {
+    if (specializationKey === "" || !workersReadable) {
+      setWorkers({ key: "", state: { kind: "idle" } });
+      return;
+    }
+    const ref = role.specializationRef;
+    if (ref === null) return;
+    const controller = new AbortController();
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
+    const stillCurrent = (): boolean => !controller.signal.aborted
+      && projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId;
+    // A re-read keeps the workers it is refreshing; a different specialization
+    // starts from nothing, because those workers answered another question.
+    setWorkers((current) => ({
+      key: specializationKey,
+      state: { kind: "loading", workers: current.key === specializationKey && current.state.kind !== "idle" ? current.state.workers : [] }
+    }));
+    void api.workerEligibility(ref, controller.signal).then((eligibility) => {
+      if (stillCurrent()) setWorkers({ key: specializationKey, state: { kind: "ready", workers: eligibility.workers } });
+    }).catch(() => {
+      // Fail closed: the workers stay visible, and every one of them unknown.
+      if (stillCurrent()) {
+        setWorkers((current) => ({
+          key: specializationKey,
+          state: { kind: "unavailable", workers: current.key === specializationKey && current.state.kind !== "idle" ? current.state.workers : [] }
+        }));
+      }
+    });
+    return () => controller.abort();
+  }, [specializationKey, workersReadable, workerRefresh]);
+
+  const workerState: WorkerPickerState = workers.key === specializationKey ? workers.state : { kind: "idle" };
+
   function chooseSpecialization(selected: LibraryRole | null, showTeam = false): void {
     setRole((current) => ({ ...current, fromPresetId: "", specializationRef: selected?.ref ?? null,
       specializationName: selected?.name ?? "", name: current.name || selected?.name || "",
-      rationale: current.rationale || selected?.description || "" }));
+      rationale: current.rationale || selected?.description || "",
+      // The worker belonged to the previous question and is not carried over.
+      profileId: "", provider: "", model: "", modelMode: "profile" }));
+    setHireRefusal(null);
     if (showTeam) { setHireOpen(true); navigate({ view: "board" }); }
+  }
+
+  /** The chosen worker also supplies the Advanced defaults: its own provider and model. */
+  function chooseWorker(worker: WorkerEligibilityEntry): void {
+    setHireRefusal(null);
+    setRole((current) => ({ ...current, fromPresetId: "", profileId: worker.profileId,
+      provider: worker.provider, model: "", modelMode: "profile" }));
   }
 
 
@@ -340,6 +511,9 @@ function WorkApp(): ReactElement {
     else if (href !== window.location.pathname + window.location.search) window.history.pushState(null, "", href);
     setRoute(next);
     if (destinationChanged) {
+      // Moving between views completes here and takes no request: the coarse
+      // bucket is the local work only, never a wall-clock reading.
+      recordInstrumentation("navigation", "confirmed", 0);
       const revision = navigationRevision.current;
       window.requestAnimationFrame(() => {
         if (navigationRevision.current === revision) window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -366,6 +540,8 @@ function WorkApp(): ReactElement {
   }
 
   function prepareLaunch(taskId: string): void {
+    // Prepare run opens the composer and issues nothing, so it always completes.
+    recordInstrumentation("run_prepare", "confirmed", 0);
     const selectionVersion = ++launchSelectionVersion.current;
     const generation = projectSelectionRef.current.currentGeneration();
     const projectId = routeRef.current.projectId;
@@ -697,6 +873,15 @@ function WorkApp(): ReactElement {
       return true;
     } catch (error: unknown) {
       if (stillCurrent() && !(error instanceof DOMException && error.name === "AbortError")) {
+        if (action === "create-role" && error instanceof ApiProblem
+          && error.status === 409 && error.apiError?.code === "worker_ineligible") {
+          // A typed refusal, decided before any canonical write. It belongs
+          // beside the worker step with the draft intact, and the eligibility
+          // list is read again rather than reasoned about here.
+          setHireRefusal({ refusal: error.apiError?.refusal ?? null });
+          setWorkerRefresh((current) => current + 1);
+          return false;
+        }
         if (action === "runtime" && error instanceof ApiProblem
           && error.status === 409 && error.apiError?.code === "setup_configured") {
           // This definite refusal happens before any configuration write. A
@@ -749,9 +934,13 @@ function WorkApp(): ReactElement {
   function submitRole(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (actionErrors["create-role"]?.uncertain || state.kind !== "ready" || !state.data.meta.writesEnabled || state.data.setup.state !== "setup_configured") return;
+    setHireRefusal(null);
     const errors = [
       ...(role.name.trim() ? [] : ["name"]),
-      ...(role.profileId && (role.fromPresetId || state.data.catalog?.profiles.some((profile) => profile.id === role.profileId && profile.configured !== false)) ? [] : ["profile"]),
+      // Only a worker the server called eligible in the current read may be
+      // submitted -- a legacy preset included: its profile is checked against
+      // the read for the preset's own specialization, never taken on trust.
+      ...(hireWorkerAllowed(role.profileId, workerState) ? [] : ["worker"]),
       ...(role.rationale.trim() ? [] : ["rationale"]),
       ...(!role.fromPresetId && role.modelMode === "explicit" && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(role.model.trim()) ? ["model"] : []),
       ...(role.specializationRef && (libraryState.kind !== "ready" || !libraryState.catalog.roles.some((item) => sameLibraryRef(item.ref, role.specializationRef))) ? ["specialization"] : [])
@@ -817,8 +1006,10 @@ function WorkApp(): ReactElement {
         && routeRef.current.projectId === projectId;
       const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface("create-task"), operation: "create-task" }, typeof document === "undefined" ? null : document.activeElement);
       clearActionError("create-task");
+      const started = performance.now();
       try {
         const result = await api.createTask(input, new AbortController().signal, idempotencyKey);
+        recordInstrumentation("task_create", "confirmed", performance.now() - started);
         if (!stillCurrent()) return;
         api.forgetTaskWrite(idempotencyKey);
         taskRetryIdentity.current.reset();
@@ -830,6 +1021,7 @@ function WorkApp(): ReactElement {
         setState((current) => current.kind === "ready" ? { ...current, notice: "created_task" } : current);
         void refresh();
       } catch (error: unknown) {
+        recordInstrumentation("task_create", requestOutcome(error), performance.now() - started);
         if (!stillCurrent()) return;
         recordActionError("create-task", error, () => void submit());
       } finally { mutationsRef.current.end(handle); }
@@ -984,8 +1176,10 @@ function WorkApp(): ReactElement {
       clearActionError("start-run");
       setRunLimitRefusal(null);
       const controller = new AbortController();
+      const started = performance.now();
       try {
         await api.startRun(intent.input, intent.key, controller.signal);
+        recordInstrumentation("run_start", "confirmed", performance.now() - started);
         if (!stillCurrent()) return;
         setPendingLaunch(null);
         pendingLaunchRef.current = null;
@@ -994,6 +1188,7 @@ function WorkApp(): ReactElement {
         setState((current) => current.kind === "ready" ? { ...current, notice: "run_started" } : current);
         void refresh();
       } catch (error: unknown) {
+        recordInstrumentation("run_start", requestOutcome(error), performance.now() - started);
         if (!stillCurrent()) return;
         const problem = error instanceof ApiProblem ? error : null;
         setPendingLaunch(intent);
@@ -1141,7 +1336,12 @@ function WorkApp(): ReactElement {
   const selectedHireProfile = profileOptions.find((profile) => profile.id === role.profileId);
   const hireProvider = role.provider || selectedHireProfile?.provider || "";
   const hireProviders = [...new Set(profileOptions.filter((profile) => profile.configured !== false).map((profile) => profile.provider ?? profile.id.split("-")[0]))];
-  const hireProfiles = hireProvider ? profileOptions.filter((profile) => (profile.provider ?? profile.id.split("-")[0]) === hireProvider) : profileOptions;
+  // The Advanced model default is the chosen worker's own model as the server
+  // reported it; the catalog is only a fallback for the legacy preset path.
+  const selectedWorker = workerState.kind === "ready"
+    ? workerState.workers.find((worker) => worker.profileId === role.profileId)
+    : undefined;
+  const selectedWorkerModel = selectedWorker?.model ?? selectedHireProfile?.model ?? null;
   const modelOffers = catalog?.modelOptions?.[hireProvider] ?? [];
   const presetOptions = catalog?.presets ?? [];
   const roleOptions = launch?.roles ?? [];
@@ -1408,6 +1608,7 @@ function WorkApp(): ReactElement {
             {workspaceInitialized ? <TrackerSection api={apiRef.current} locale={locale} text={text} writesEnabled={data.meta.writesEnabled} onObservation={setTrackerObservation}
               selectedTaskId={route.taskId} onSelectTask={selectTask} onLaunchTask={prepareLaunch}
               search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })}
+              tasksView={route.tasksView} onTasksViewChange={(tasksView) => navigate({ tasksView })}
               agentId={route.agentId} onClearAgent={() => navigate({ agentId: null })} /> : null}
           </section>
           <section hidden={route.view !== "board"} aria-label={text("shell_nav_board")} className="board-view">
@@ -1448,9 +1649,19 @@ function WorkApp(): ReactElement {
                   presets={presetOptions}
                   value={role.fromPresetId}
                   text={text}
-                  onChange={(id) => setRole((current) => ({ ...chooseRolePreset(current, id, presetOptions), specializationRef: null, specializationName: "", provider: "" }))}
+                  onChange={(id) => setRole((current) => {
+                    // A preset answers the specialization question with its own
+                    // recorded ref, so the worker step reads eligibility for it;
+                    // a preset without one leaves the step idle and the hire blocked.
+                    const preset = presetOptions.find((candidate) => candidate.id === id);
+                    return { ...chooseRolePreset(current, id, presetOptions), specializationRef: preset?.specializationRef ?? null, specializationName: "", provider: "" };
+                  })}
                 />
                 </details>
+                <WorkerPicker state={workerState} value={role.profileId} refusal={hireRefusal}
+                  invalid={roleErrors.has("worker")} onChange={chooseWorker}
+                  onRetry={() => setWorkerRefresh((current) => current + 1)} text={text} />
+                {profileOptions.length === 0 && configured ? <p className="field-error">{text("no_profiles")}</p> : null}
                 <label htmlFor="role-name">{text("role_name")}</label>
                 <input
                   aria-describedby={validation([...roleErrors], "name") ? "role-name-error" : undefined}
@@ -1461,27 +1672,17 @@ function WorkApp(): ReactElement {
                   value={role.name}
                 />
                 {validation([...roleErrors], "name") ? <p className="field-error" id="role-name-error">{text("form_error_role_name")}</p> : null}
+                {/* Closed by default: provider and model already default to the
+                    chosen worker's own, and stay editable for the rare override. */}
+                <details className="role-advanced"><summary>{text("role_advanced")}</summary>
                 <label htmlFor="role-provider">{text("role_provider")}</label>
                 <select id="role-provider" disabled={role.fromPresetId !== ""} value={hireProvider} onChange={(event) => { const provider = event.currentTarget.value; setRole((current) => chooseRoleProvider(current, provider)); }}>
                   <option value="">{text("role_select_provider")}</option>{hireProviders.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
                 </select>
-                <label htmlFor="role-profile">{text("role_profile")}</label>
-                <select
-                  aria-describedby={validation([...roleErrors], "profile") ? "role-profile-error" : undefined}
-                  aria-invalid={validation([...roleErrors], "profile")}
-                  disabled={role.fromPresetId !== ""}
-                  id="role-profile"
-                  onChange={(event) => { const profileId = event.currentTarget.value; setRole((current) => chooseRoleProfile(current, profileId)); }}
-                  value={role.profileId}
-                >
-                  <option value="">{text("select_profile")}</option>
-                  {hireProfiles.map((profile) => <option key={profile.id} value={profile.id} disabled={profile.configured === false}>{profile.id.endsWith("-independent-reviewer") ? `${text("shell_profile_reviewer")} · ` : profile.id.endsWith("-builder") ? `${text("shell_profile_builder")} · ` : ""}{profile.label}</option>)}
-                </select>
-                {validation([...roleErrors], "profile") ? <p className="field-error" id="role-profile-error">{text("form_error_profile")}</p> : null}
-                {profileOptions.length === 0 && configured ? <p className="field-error">{text("no_profiles")}</p> : null}
                 {!role.fromPresetId ? <><label htmlFor="role-model-mode">{text("role_model")}</label><select id="role-model-mode" value={role.modelMode} onChange={(event) => { const modelMode = event.currentTarget.value as "profile" | "explicit"; setRole((current) => ({ ...current, modelMode })); }}><option value="profile">{text("role_model_profile")}</option><option value="explicit">{text("role_model_explicit")}</option></select>
-                  {role.modelMode === "explicit" ? <><label htmlFor="role-model">{text("role_model")}</label><input id="role-model" list="role-model-offers" value={role.model} aria-invalid={roleErrors.has("model")} aria-describedby="role-model-help" onChange={(event) => { const model = event.currentTarget.value; setRole((current) => ({ ...current, model })); }} /><datalist id="role-model-offers">{modelOffers.map((model) => <option key={model} value={model} />)}</datalist>{roleErrors.has("model") ? <p className="field-error">{text("role_model_error")}</p> : null}</> : <p className="small-copy">{text("role_model_current")} <code>{selectedHireProfile?.model ?? text("role_model_unspecified")}</code></p>}
+                  {role.modelMode === "explicit" ? <><label htmlFor="role-model">{text("role_model")}</label><input id="role-model" list="role-model-offers" value={role.model} aria-invalid={roleErrors.has("model")} aria-describedby="role-model-help" onChange={(event) => { const model = event.currentTarget.value; setRole((current) => ({ ...current, model })); }} /><datalist id="role-model-offers">{modelOffers.map((model) => <option key={model} value={model} />)}</datalist>{roleErrors.has("model") ? <p className="field-error">{text("role_model_error")}</p> : null}</> : <p className="small-copy">{text("role_model_current")} <code>{selectedWorkerModel ?? text("role_model_unspecified")}</code></p>}
                   <p className="small-copy" id="role-model-help">{text("role_model_help")}</p></> : null}
+                </details>
                 <label htmlFor="role-rationale">{text("role_rationale")}</label>
                 <textarea
                   aria-describedby={validation([...roleErrors], "rationale") ? "role-rationale-error" : undefined}
@@ -1634,6 +1835,13 @@ function WorkApp(): ReactElement {
                 </article>
               ))}
             </section>
+            <InstrumentationSettings instrumentation={instrumentation} unavailable={instrumentationUnavailable}
+              busy={instrumentationBusy} writesEnabled={workspaceInitialized && data.meta.writesEnabled}
+              hint={instrumentationHint} clearAsked={instrumentationClearAsked}
+              onToggle={(enabled) => void toggleInstrumentation(enabled)}
+              onAskClear={() => setInstrumentationClearAsked(true)}
+              onCancelClear={() => setInstrumentationClearAsked(false)}
+              onConfirmClear={() => void clearInstrumentation()} text={text} />
             <div className="settings-panel"><h2>{text("shell_diagnostics")}</h2><p className="small-copy">{text("legacy_panel_help")}</p><a className="legacy-link" href="/">{text("open_legacy_panel")}</a>{/* Reading the current status never waits on a write. */}<button className="button button-secondary" onClick={() => void refresh()} type="button">{text("refresh_status")}</button></div>
           </section>
         </div>

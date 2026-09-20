@@ -4,6 +4,7 @@ from __future__ import annotations
 
 COLLECTIONS: dict[str, str] = {
     "objective": "objectives",
+    "blueprint_application": "applications",
     "task": "tasks",
     "thread": "threads",
     "review": "reviews",

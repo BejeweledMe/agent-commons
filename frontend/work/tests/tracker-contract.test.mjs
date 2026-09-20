@@ -20,7 +20,8 @@ test("tracker keeps a closed provider-safe browser contract", () => {
 });
 
 test("tracker renders honest states and keyboard navigation", () => {
-  const component = source("src/components/TrackerSection.tsx");
+  // The tracker owns the surface states; the three task views own the render paths.
+  const component = source("src/components/TrackerSection.tsx") + source("src/components/TaskViews.tsx");
   const trackerState = source("src/trackerState.ts");
   for (const state of ["loading", "empty", "error", "partial", "stale"]) {
     assert.equal(component.includes(`snapshot.state === "${state}"`) || component.includes(`state.kind === "${state}"`), true, state);
@@ -62,6 +63,26 @@ test("tracker task actions use server revisions and canonical routes", () => {
   assert.doesNotMatch(component, /setSelectedTaskId\(.*nextAction/);
 });
 
+test("the Tasks tab keeps one render path per view and no graph-and-list duplication", () => {
+  const views = source("src/components/TaskViews.tsx");
+  const tracker = source("src/components/TrackerSection.tsx");
+  for (const [name, text] of [["TaskViews", views], ["TrackerSection", tracker], ["taskGraph.css", source("src/taskGraph.css")]]) {
+    assert.doesNotMatch(text, /graph-fallback-list/, name);
+  }
+  assert.doesNotMatch(tracker, /<TaskGraph/, "only the Map view mounts the graph");
+  assert.doesNotMatch(tracker, /useState<"graph" \| "list">/, "the view is route state, not component state");
+  assert.match(tracker, /view=\{tasksView\} onViewChange=\{onTasksViewChange\}/);
+  // Capacity is decided before the graph would be mounted, never beside it.
+  assert.match(views, /const overGraphCapacity = visibleTasks\.length > MAX_GRAPH_TASKS;/);
+  assert.equal((views.match(/className="task-list"/g) ?? []).length, 1, "there is one task list in one place");
+  assert.equal((views.match(/<TaskGraph/g) ?? []).length, 1);
+  assert.match(views, /role="tablist"/);
+  assert.match(views, /role="tab"/);
+  assert.match(views, /role="tabpanel"/);
+  assert.match(views, /aria-selected=\{view === value\}/);
+  assert.match(views, /tabIndex=\{view === value \? 0 : -1\}/);
+});
+
 test("tracker locale keys stay paired and actionable", () => {
   const messages = JSON.parse(source("src/i18n.json"));
   assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages.ru).sort());
@@ -77,7 +98,18 @@ test("tracker locale keys stay paired and actionable", () => {
       "tracker_actions_title",
       "tracker_request_review_action",
       "tracker_accept_action",
-      "tracker_reopen_action"
+      "tracker_reopen_action",
+      "task_view_tabs_label",
+      "task_view_tab_now",
+      "task_view_tab_map",
+      "task_view_tab_all",
+      "task_view_now_needs_you",
+      "task_view_now_needs_you_empty",
+      "task_view_now_in_progress",
+      "task_view_now_in_progress_empty",
+      "task_view_now_next",
+      "task_view_now_next_empty",
+      "task_view_now_settled"
     ]) {
       assert.equal(typeof messages[locale][key], "string");
       assert.notEqual(messages[locale][key].trim(), "");

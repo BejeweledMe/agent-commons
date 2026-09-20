@@ -41,6 +41,7 @@ OTHER_AGENT_ID = f"agent.{ULID_1}"
 AGENT_LINK_ID = f"agent_link.{ULID_0}"
 CONTEXT_PACK_ID = f"context_pack.{ULID_0}"
 DESIGN_PACKAGE_ID = f"design_package.{ULID_0}"
+APPLICATION_ID = "application." + "a" * 64
 SCREEN_ID = f"screen.{ULID_0}"
 PARENT_SESSION_ID = "session." + "a" * 32
 CHILD_SESSION_ID = "session." + "b" * 32
@@ -144,6 +145,20 @@ PAYLOADS: dict[str, dict[str, Any]] = {
         "objective_id": OBJECTIVE_ID,
         "expected_revision": EVENT_ID,
         "reason": "accepted",
+    },
+    "blueprint_application.created": {
+        "application_id": APPLICATION_ID,
+        "blueprint": {"id": "product-launch", "version": "a" * 64, "revision": "a" * 64},
+        "objective_id": None,
+        "created_task_ids": [TASK_ID],
+        "created_agent_ids": [AGENT_ID],
+        "created_role_refs": [{"kind": "role", "id": "backend-engineer"}],
+    },
+    "blueprint_application.task_joined": {
+        "application_id": APPLICATION_ID,
+        "task_id": TASK_ID,
+        "expected_revision": EVENT_ID,
+        "reason": "The task was discovered during implementation.",
     },
     "task.created": {
         "task_id": TASK_ID,
@@ -609,6 +624,7 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "agent.link_closed": "open",
         "context_pack.revised": "published",
         "design_package.revised": "published",
+        "blueprint_application.task_joined": "active",
     }
     if event_type == "agent.link_opened":
         for identifier in (AGENT_ID, OTHER_AGENT_ID):
@@ -640,6 +656,7 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "agent_link": "agent_links",
         "context_pack": "context_packs",
         "design_package": "design_packages",
+        "blueprint_application": "applications",
     }[family]
     identifier = str(payload[spec.entity_id_field or f"{family}_id"])
     current: dict[str, Any] = {
@@ -647,6 +664,14 @@ def lifecycle_snapshot(event_type: str, payload: Mapping[str, Any]) -> ProjectSn
         "state": state,
         "revision": EVENT_ID,
     }
+    if event_type == "blueprint_application.task_joined":
+        snapshot.tasks[TASK_ID] = {
+            "id": TASK_ID,
+            "state": "ready",
+            "revision": EVENT_ID,
+            "objective_id": None,
+        }
+        current["created_task_ids"] = []
     if event_type == "review.completed":
         current.update(
             {
@@ -727,6 +752,8 @@ def test_every_event_spec_has_only_its_explicit_complete_payload_families() -> N
         "agent.created": {"commons.payload.agent.v1", "commons.payload.agent.v2"},
         "thread.opened": {"commons.payload.thread.v1", "commons.payload.thread.v2"},
         "thread.replied": {"commons.payload.thread.v1", "commons.payload.thread.v2"},
+        # ADR 0021 (WP-11.2): task.created gained a nullable objective_id in payload v2.
+        "task.created": {"commons.payload.task.v1", "commons.payload.task.v2"},
     }
     for event_type, spec in EVENT_SPECS.items():
         if event_type in versioned_families:

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, symlinkSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, symlinkSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setImmediate as tick } from "node:timers/promises";
@@ -9,7 +9,7 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),".."),out=mkdtempSync(resolve(tmpdir(),"commons-project-create-"));
-execFileSync(resolve(root,"node_modules/.bin/tsc"),["--ignoreConfig","--target","ES2022","--module","ESNext","--moduleResolution","Bundler","--lib","ES2022,DOM,DOM.Iterable","--jsx","react-jsx","--outDir",out,resolve(root,"src/components/ProjectCreateDialog.tsx"),resolve(root,"src/projectWorkspace.ts")],{cwd:root});symlinkSync(resolve(root,"node_modules"),resolve(out,"node_modules"),"dir");
+execFileSync(resolve(root,"node_modules/.bin/tsc"),["--ignoreConfig","--target","ES2022","--module","ESNext","--moduleResolution","Bundler","--lib","ES2022,DOM,DOM.Iterable","--jsx","react-jsx","--resolveJsonModule","--allowSyntheticDefaultImports","--outDir",out,resolve(root,"src/components/ProjectCreateDialog.tsx"),resolve(root,"src/projectWorkspace.ts")],{cwd:root});symlinkSync(resolve(root,"node_modules"),resolve(out,"node_modules"),"dir");copyFileSync(resolve(root,"src/i18n.json"),resolve(out,"i18n.json"));
 const load=file=>import(pathToFileURL(resolve(out,file)).href);
 const {ProjectCreation,parseFolderSelection,validateProjectDraft,targetPath}=await load("projectCreation.js");
 const {ProjectRegistryApi}=await load("projectWorkspace.js");const {ApiProblem,WorkApi}=await load("api.js");const {ProjectCreateDialog}=await load("components/ProjectCreateDialog.js");const {projectCreationText}=await load("projectCreationStrings.js");

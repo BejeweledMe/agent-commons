@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, symlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
@@ -10,8 +10,9 @@ import { createElement } from "react";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-outputs-"));
-execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled, resolve(root, "src/components/OutputsPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
+execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--resolveJsonModule", "--allowSyntheticDefaultImports", "--outDir", compiled, resolve(root, "src/components/OutputsPanel.tsx"), resolve(root, "src/api.ts")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
+copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (path) => import(pathToFileURL(resolve(compiled, path)).href);
 const { OutputsApi, outputStatus, presentCurrent, reviewLabel } = await load("outputsApi.js");
 const { parseOutputList, parseOutputSummary, OutputsError, canViewImage } = await load("outputsTypes.js");

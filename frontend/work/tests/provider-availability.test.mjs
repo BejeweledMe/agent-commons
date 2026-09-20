@@ -363,3 +363,19 @@ test("the settings surface renders one line per stage and hides codes behind tec
   assert.doesNotMatch(shellSource, /text\("provider_availability_install_label"\)\}: \{availability\.installationState\}/);
   assert.doesNotMatch(shellSource, /freshForSeconds/);
 });
+
+test("qualification.wall_time_seconds is additive: absent or null reads as not provided, a bounded integer is kept, anything else is refused", () => {
+  const legacy = availability();
+  delete legacy.qualification.wall_time_seconds;
+  assert.equal(api.parseProviderAvailabilityList([legacy])[0].qualification.wallTimeSeconds, null, "a server that predates the field sends no key");
+  const provided = availability();
+  provided.qualification.wall_time_seconds = 600;
+  assert.equal(api.parseProviderAvailabilityList([provided])[0].qualification.wallTimeSeconds, 600);
+  provided.qualification.wall_time_seconds = null;
+  assert.equal(api.parseProviderAvailabilityList([provided])[0].qualification.wallTimeSeconds, null);
+  for (const bad of [29, 1801, "600", 600.5, true]) {
+    const value = availability();
+    value.qualification.wall_time_seconds = bad;
+    assert.throws(() => api.parseProviderAvailabilityList([value]), (error) => error.status === 502, String(bad));
+  }
+});

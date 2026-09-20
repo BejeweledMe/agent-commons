@@ -4,6 +4,12 @@ export type ApiError = {
   code: string;
   message: string;
   safeNextActions: readonly string[];
+  /**
+   * The typed refusal payload of an answer the server sends without the usual
+   * `error` envelope. `null` means the answer carried no readable refusal, which
+   * is never read as "no reason": the surface stays fail-closed either way.
+   */
+  refusal?: WorkerRefusal | null;
 };
 
 export type SetupStatus = {
@@ -75,6 +81,12 @@ export type TaskOption = {
 
 export type TaskCreateResult = { taskId: string; revision: string };
 
+/** One canonical finding the server attached to this task record. */
+export type TaskFinding = {
+  id: string;
+  title: string | null;
+};
+
 export type TaskDetail = {
   taskId: string;
   revision: string;
@@ -84,6 +96,8 @@ export type TaskDetail = {
   state: string;
   summary: string | null;
   evidenceRefs: readonly RevisionBoundRef[];
+  /** `null` when the record carries no findings key: the server has not said, which is not "none". */
+  findings: readonly TaskFinding[] | null;
   truncated: boolean;
 };
 
@@ -245,6 +259,8 @@ export type ProviderAvailability = {
     freshness: "current" | "missing" | "invalid";
     fingerprint: string | null;
     checkedAt: string | null;
+    /** Additive (WP-15.3): the wall time the canary used; null when the server did not provide it. */
+    wallTimeSeconds: number | null;
   };
   authentication: {
     state: ProviderAuthState | "not_checked";
@@ -255,6 +271,71 @@ export type ProviderAvailability = {
     code: ProviderAvailabilityRefusalCode;
     remediation: readonly string[];
   } | null;
+};
+
+/** Refusal codes the worker-eligibility read model may attach to one worker. */
+export type WorkerEligibilityRefusalCode =
+  | "worker_observation_missing"
+  | "specialization_unavailable"
+  | "review_profile_incompatible"
+  | ProviderAvailabilityRefusalCode;
+
+/** Informative descriptions of a worker. Never a permission or an authorization. */
+export type WorkerCapability =
+  | "tools"
+  | "skills_projection"
+  | "trusted_workspace"
+  | "review_only";
+
+export type WorkerRefusal = {
+  code: WorkerEligibilityRefusalCode;
+  remediation: readonly string[];
+};
+
+export type WorkerEligibilityState = "eligible" | "ineligible" | "unknown";
+
+export type WorkerEligibilityEntry = {
+  profileId: string;
+  provider: "claude" | "codex" | "grok";
+  model: string | null;
+  eligibility: WorkerEligibilityState;
+  /** Exactly the server's reason; `null` only for an eligible worker. */
+  refusal: WorkerRefusal | null;
+  capabilities: readonly WorkerCapability[];
+  observedRevision: string | null;
+};
+
+/**
+ * Server truth for specialization hiring. A missing, stale or unreadable answer
+ * is `unknown`, therefore unselectable; the client never infers eligibility.
+ */
+export type WorkerEligibility = {
+  schema: "agent_commons.worker-eligibility.v1";
+  specialization: import("./libraryTypes.js").LibraryRef | null;
+  workers: readonly WorkerEligibilityEntry[];
+};
+
+/**
+ * Local, content-free usage counters. Every key is one of the closed enums the
+ * server accepts, so a count can never carry an identifier or free text.
+ */
+export type InstrumentationCounters = Readonly<Partial<Record<
+  import("./instrumentation.js").InstrumentationKind,
+  Readonly<Partial<Record<
+    import("./instrumentation.js").InstrumentationOutcome,
+    Readonly<Partial<Record<import("./instrumentation.js").InstrumentationBucket, number>>>
+  >>>
+>>>;
+
+export type Instrumentation = {
+  schema: "agent_commons.instrumentation.v1";
+  /** Server truth for the toggle; the client never assumes it. */
+  enabled: boolean;
+  uiVersion: string;
+  counters: InstrumentationCounters;
+  retention: { windowDays: number; updatedAtDay: string };
+  /** The exact revision every instrumentation write must carry back. */
+  revision: string;
 };
 
 export type WorkspaceMeta = {
@@ -309,6 +390,9 @@ export type TrackerTask = {
   freshness: string;
   evidenceState: string;
   gaps: readonly string[];
+  /** Canonical provenance, shown as raw values in the decision card's details. */
+  objectiveId: string | null;
+  applicationId: string | null;
 };
 
 export type TrackerEdge = {

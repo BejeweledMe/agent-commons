@@ -15,7 +15,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from agent_commons.core.canonical import canonical_sha256
-from agent_commons.errors import CommonsError, ValidationError
+from agent_commons.errors import CommonsError, LifecycleConflictError, ValidationError
 from agent_commons.library import LibraryStore
 from agent_commons.runtime.model import BuiltinProfileId, validate_model_name
 
@@ -367,7 +367,7 @@ def blueprint_catalog(
 
 def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict[str, Any]:
     fields = {"expected_version", "idempotency_key", "title", "brief", "locale", "bindings"}
-    if set(body) != fields:
+    if not fields <= set(body) or set(body) - (fields | {"objective_id"}):
         raise ValidationError("blueprint application has unsupported or missing fields")
     title, key, locale = body["title"], body["idempotency_key"], body["locale"]
     brief = body["brief"]
@@ -412,10 +412,18 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
         store.compose_role(slots[slot]["role_ref"])
         selected[slot] = value
     manager = context.writer()
+    objective_id = body.get("objective_id")
+    if objective_id is not None:
+        objective = manager.snapshot().objectives.get(objective_id)
+        if objective is None or objective.get("state") != "active":
+            raise LifecycleConflictError("objective must exist and be active")
     manager.policy.assert_safe(body, context="blueprint application metadata")
     context.authorize_library_edit()
     BlueprintStore(store).for_apply(identifier, body["expected_version"], retain=True)
     prefix = "blueprint-" + hashlib.sha256(key.encode()).hexdigest()
+    application_id = "application." + canonical_sha256(
+        {"namespace": "application", "idempotency_key": key}
+    )
     intent = canonical_sha256({**body, "bindings": [selected[slot] for slot in slots]})
     roles: dict[str, str] = {}
     tasks: dict[str, str] = {}
@@ -446,14 +454,35 @@ def apply_blueprint(context: Any, identifier: str, body: dict[str, Any]) -> dict
                 acceptance_criteria=tuple(node["acceptance_criteria"][locale]),
                 dependencies=tuple(tasks[key] for key in node["depends_on"]),
                 suggested_agent_id=roles[node["slot_id"]],
+                objective_id=objective_id,
                 idempotency_key=prefix + ":task:" + node["id"],
             )
             tasks[node["id"]] = str(result["entity_ref"]["id"])
+        manager.record_event(
+            "blueprint_application.created",
+            {
+                "application_id": application_id,
+                "blueprint": {
+                    "id": identifier,
+                    "version": plan["version"],
+                    # A retained blueprint is immutable at its exact version;
+                    # that version is the available canonical revision token.
+                    "revision": plan["version"],
+                },
+                "objective_id": objective_id,
+                "created_task_ids": [tasks[node["id"]] for node in plan["tasks"]],
+                "created_agent_ids": list(roles.values()),
+                "created_role_refs": [slots[slot]["role_ref"] for slot in slots],
+            },
+            idempotency_key=prefix + ":application",
+            tags=("blueprint_application",),
+        )
     context.invalidate()
     return {
         "schema": "agent_commons.blueprint-application.v1",
         "state": "created",
         "blueprint_id": identifier,
+        "application_id": application_id,
         "roles": [{"slot_id": slot, "agent_id": agent} for slot, agent in roles.items()],
         "tasks": [
             {

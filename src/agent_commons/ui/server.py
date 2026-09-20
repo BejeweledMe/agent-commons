@@ -34,6 +34,7 @@ from agent_commons.runtime.collaboration_storage import collaboration_state_root
 from agent_commons.runtime.live_previews import LivePreviewRegistry
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
 from agent_commons.services.design_authoring import publish_from_selection, revise_from_selection
+from agent_commons.services.worker_eligibility import WorkerIneligibleError
 from agent_commons.ui import ENTITY_SCHEMA, gallery_static_directory, read_gallery_shell, read_spa
 from agent_commons.ui.board_layout import BoardLayoutStore, register_board_routes
 from agent_commons.ui.context import (
@@ -44,6 +45,7 @@ from agent_commons.ui.context import (
 from agent_commons.ui.conversation_routes import register_conversation_routes
 from agent_commons.ui.gallery_routes import register_gallery_routes
 from agent_commons.ui.gallery_upload import register_gallery_upload
+from agent_commons.ui.instrumentation import InstrumentationStore, register_instrumentation_routes
 from agent_commons.ui.launch import MAX_WALL_TIME_SECONDS, MIN_WALL_TIME_SECONDS
 from agent_commons.ui.library_blueprints import register_blueprint_reads, register_blueprint_writes
 from agent_commons.ui.library_routes import register_library_routes
@@ -144,6 +146,7 @@ MUTATING_ROUTES = (
     ("POST", "/api/agent-links/{link_id}/close"),
     ("POST", "/api/tasks"),
     ("POST", "/api/tasks/{task_id}/revise"),
+    ("POST", "/api/tasks/{task_id}/application"),
     ("POST", "/api/tasks/{task_id}/review-request"),
     ("POST", "/api/tasks/{task_id}/accept"),
     ("POST", "/api/tasks/{task_id}/reopen"),
@@ -158,6 +161,9 @@ PRIVATE_COLLABORATION_ROUTES = (
     # The project board arrangement (ADR 0020): positions and department frames,
     # operational state under the state root, never a canonical fact.
     ("POST", "/api/board"),
+    ("POST", "/api/instrumentation/settings"),
+    ("POST", "/api/instrumentation/events"),
+    ("POST", "/api/instrumentation/clear"),
     ("POST", "/api/conversations/{thread_id}/drafts"),
     ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments"),
     ("POST", "/api/conversations/{thread_id}/drafts/{draft_id}/attachments/{attachment_id}/remove"),
@@ -633,6 +639,21 @@ def create_app(
         register_writes=context.operator_panel and not read_only,
     )
 
+    def instrumentation_store() -> InstrumentationStore:
+        manager = context.manager()
+        return InstrumentationStore(
+            collaboration_state_root(manager),
+            project_root=manager.repo_root,
+            workspace_id=manager.workspace_id,
+        )
+
+    register_instrumentation_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        store_factory=instrumentation_store,
+        register_writes=context.operator_panel and not read_only,
+    )
+
     register_conversation_routes(
         api_routes,
         dependencies=reads_workspace,
@@ -777,6 +798,31 @@ def create_app(
 
         try:
             return JSONResponse(await asyncio.to_thread(context.provider_availability))
+        except CommonsError as exc:
+            return _error(409, getattr(exc, "code", type(exc).__name__), str(exc))
+
+    @api_routes.get("/api/workers/eligibility", dependencies=reads_workspace)
+    async def worker_eligibility(request: Request) -> Response:
+        """Return the server's closed, fail-closed worker choices."""
+
+        specialization = request.query_params.get("specialization")
+        if specialization is None:
+            return _error(400, "invalid_request", "specialization is required")
+        parts = specialization.split("/")
+        if len(parts) != 3 or any(not part for part in parts):
+            return _error(400, "invalid_request", "specialization must be source/id/version")
+        try:
+            return JSONResponse(
+                await asyncio.to_thread(
+                    context.worker_eligibility,
+                    specialization={
+                        "kind": "role",
+                        "source": parts[0],
+                        "id": parts[1],
+                        "version": parts[2],
+                    },
+                )
+            )
         except CommonsError as exc:
             return _error(409, getattr(exc, "code", type(exc).__name__), str(exc))
 
@@ -935,6 +981,8 @@ async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any
 
     try:
         result = await asyncio.to_thread(action, **kwargs)
+    except WorkerIneligibleError as exc:
+        return JSONResponse({"code": "worker_ineligible", "refusal": exc.refusal}, status_code=409)
     except CommonsError as exc:
         # Refusals are the interesting output here: the guard that fired is
         # what the operator needs on the node, not a generic failure.
@@ -1149,6 +1197,18 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             task_id=task_id,
             expected_revision=str(body.get("expected_revision", "")),
             changes=body.get("changes") or {},
+            idempotency_key=body.get("idempotency_key"),
+        )
+
+    @router.post("/api/tasks/{task_id}/application")
+    async def join_task_application(task_id: str, request: Request) -> Response:
+        body = await _body(request)
+        return await _record(
+            context.join_task_to_application,
+            task_id=task_id,
+            application_id=str(body.get("application_id", "")),
+            expected_revision=str(body.get("expected_revision", "")),
+            reason=str(body.get("reason", "")),
             idempotency_key=body.get("idempotency_key"),
         )
 

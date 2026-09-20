@@ -7,12 +7,15 @@ import type {
   ContextSourceOption,
   TaskCreateResult,
   TaskDetail,
+  TaskFinding,
   ContextPackCatalog,
   ContextPackDetail,
   ContextPackDraft,
   ContextPackFact,
   ContextPackReferenceKind,
   DesignPackageOption,
+  Instrumentation,
+  InstrumentationCounters,
   RevisionBoundRef,
   JsonObject,
   LaunchOptions,
@@ -40,11 +43,26 @@ import type {
   TrackerSnapshot,
   TrackerSurfaceState,
   TrackerTask,
+  WorkerCapability,
+  WorkerEligibility,
+  WorkerEligibilityEntry,
+  WorkerEligibilityRefusalCode,
+  WorkerRefusal,
   WorkspaceData,
   WorkspaceMeta
 } from "./contracts";
 import { sanitizedWorkLocation } from "./appRouteState.js";
 import { validateContextPackDraft } from "./contextPackDraftValidation.js";
+import {
+  INSTRUMENTATION_BUCKETS,
+  INSTRUMENTATION_KINDS,
+  INSTRUMENTATION_OUTCOMES,
+  MAX_INSTRUMENTATION_BATCH,
+  failureOutcome,
+  isInstrumentationEvent,
+  type InstrumentationEvent,
+  type InstrumentationOutcome
+} from "./instrumentation.js";
 import type { LibraryRef } from "./libraryTypes.js";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
@@ -149,6 +167,21 @@ const PROVIDER_CAPABILITY_REMEDIATION: Readonly<Record<ProviderCapabilityRefusal
   provider_skill_projection_unavailable: ["remove_skill_requirement", "use_manual_workflow"],
   provider_monetary_budget_unavailable: ["use_provider_unit_budget", "choose_monetary_budget_profile"]
 };
+// The worker-eligibility read model reuses the provider refusals verbatim and
+// adds only the three reasons that belong to hiring for a specialization.
+const WORKER_ELIGIBILITY_REMEDIATION: Readonly<Record<WorkerEligibilityRefusalCode, readonly string[]>> = {
+  ...PROVIDER_AVAILABILITY_REMEDIATION,
+  worker_observation_missing: ["refresh_worker_availability"],
+  specialization_unavailable: ["choose_available_specialization"],
+  review_profile_incompatible: ["choose_builder_profile"]
+};
+const WORKER_CAPABILITIES = new Set<WorkerCapability>([
+  "tools",
+  "skills_projection",
+  "trusted_workspace",
+  "review_only"
+]);
+const MAX_WORKER_ELIGIBILITY_WORKERS = 16;
 const SAFE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
 const SAFE_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{6}))?Z$/;
 const TRACKER_SURFACE_STATES = new Set<TrackerSurfaceState>([
@@ -235,6 +268,17 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * The closed instrumentation outcome of a failed request. Only the abort flag
+ * and the status decide it; no message, code or payload is ever consulted.
+ */
+export function requestOutcome(error: unknown): InstrumentationOutcome {
+  return failureOutcome(
+    error instanceof DOMException && error.name === "AbortError",
+    error instanceof ApiProblem ? error.status : null
+  );
+}
+
 function hasExactKeys(value: JsonObject, keys: readonly string[]): boolean {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
@@ -303,7 +347,21 @@ function requiredBooleanAt(value: JsonObject, key: string): boolean {
 }
 
 function parseApiError(value: unknown): ApiError | null {
-  if (!isObject(value) || !isObject(value.error)) {
+  if (!isObject(value)) {
+    return null;
+  }
+  if (!isObject(value.error)) {
+    // One typed refusal the server answers without the `error` envelope: the
+    // hire route refuses an ineligible worker before any canonical write, and
+    // its refusal payload belongs beside the worker step, not in a failure panel.
+    if (value.code === "worker_ineligible") {
+      return {
+        code: "worker_ineligible",
+        message: "",
+        safeNextActions: [],
+        refusal: parseWorkerRefusal(value.refusal)
+      };
+    }
     return null;
   }
   const error = value.error;
@@ -749,7 +807,9 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
       "mcp", "skills", "resume", "cancellation", "usage_reporting", "sandbox_boundary",
       "budget_units", "context_modes"
     ])
-    || !hasExactKeys(value.qualification, ["state", "freshness", "fingerprint", "checked_at"])
+    // `wall_time_seconds` is additive (WP-15.3): a server that predates it sends no key.
+    || !(hasExactKeys(value.qualification, ["state", "freshness", "fingerprint", "checked_at"])
+      || hasExactKeys(value.qualification, ["state", "freshness", "fingerprint", "checked_at", "wall_time_seconds"]))
     || !hasExactKeys(value.authentication, ["state", "freshness"])) {
     throw new ApiProblem(502, null);
   }
@@ -832,6 +892,8 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
   const qualificationFreshness = value.qualification.freshness;
   const fingerprint = value.qualification.fingerprint;
   const checkedAt = value.qualification.checked_at;
+  // Absent means "not provided", never a default; present must be the server's bounded integer or null.
+  const wallTimeSeconds = value.qualification.wall_time_seconds === undefined ? null : value.qualification.wall_time_seconds;
   const authState = value.authentication.state;
   const authFreshness = value.authentication.freshness;
   if (
@@ -839,6 +901,8 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
     || !["current", "missing", "invalid"].includes(String(qualificationFreshness))
     || (fingerprint !== null && (typeof fingerprint !== "string" || !/^[0-9a-f]{64}$/.test(fingerprint)))
     || (checkedAt !== null && !isCanonicalUtcTimestamp(checkedAt))
+    || (wallTimeSeconds !== null && (typeof wallTimeSeconds !== "number" || !Number.isInteger(wallTimeSeconds)
+      || wallTimeSeconds < 30 || wallTimeSeconds > 1800))
     || !PROVIDER_AVAILABILITY_AUTH_STATES.has(String(authState))
     || !["fresh", "stale", "unknown"].includes(String(authFreshness))
   ) {
@@ -938,7 +1002,8 @@ function parseProviderAvailability(value: unknown): ProviderAvailability {
       state: qualificationState as ProviderAvailability["qualification"]["state"],
       freshness: qualificationFreshness as ProviderAvailability["qualification"]["freshness"],
       fingerprint,
-      checkedAt
+      checkedAt,
+      wallTimeSeconds: wallTimeSeconds as number | null
     },
     authentication: {
       state: authState as ProviderAvailability["authentication"]["state"],
@@ -958,6 +1023,91 @@ export function parseProviderAvailabilityList(value: unknown): readonly Provider
     throw new ApiProblem(502, null);
   }
   return parsed;
+}
+
+/**
+ * One worker refusal, accepted only with the server's own closed code and the
+ * exact remediation tokens that code carries. An unreadable payload is `null`,
+ * which the surface renders as a reason it cannot name -- never as no reason.
+ */
+export function parseWorkerRefusal(value: unknown): WorkerRefusal | null {
+  if (!isObject(value) || !hasExactKeys(value, ["code", "remediation"])
+    || typeof value.code !== "string"
+    || !Object.hasOwn(WORKER_ELIGIBILITY_REMEDIATION, value.code)) {
+    return null;
+  }
+  const code = value.code as WorkerEligibilityRefusalCode;
+  const raw = value.remediation;
+  if (!Array.isArray(raw) || raw.length > 4 || raw.some((item) => typeof item !== "string")
+    || !sameStrings(raw as string[], WORKER_ELIGIBILITY_REMEDIATION[code])) {
+    return null;
+  }
+  return { code, remediation: raw as string[] };
+}
+
+function parseWorkerEligibilityEntry(value: unknown): WorkerEligibilityEntry {
+  if (!isObject(value) || !hasExactKeys(value, [
+    "profile_id", "provider", "model", "eligibility", "refusal", "capabilities", "observed_revision"
+  ])) {
+    throw new ApiProblem(502, null);
+  }
+  const profileId = requiredStringAt(value, "profile_id");
+  const provider = value.provider;
+  const model = value.model;
+  const eligibility = value.eligibility;
+  const capabilities = value.capabilities;
+  const observedRevision = value.observed_revision;
+  if (
+    !PROVIDER_AVAILABILITY_PROFILES.has(profileId)
+    || (provider !== "claude" && provider !== "codex" && provider !== "grok")
+    || provider !== PROVIDER_BY_PROFILE[profileId]
+    || (model !== null && (typeof model !== "string" || !SAFE_MODEL.test(model)))
+    || (eligibility !== "eligible" && eligibility !== "ineligible" && eligibility !== "unknown")
+    || !Array.isArray(capabilities)
+    || capabilities.length > WORKER_CAPABILITIES.size
+    || capabilities.some((item) => typeof item !== "string" || !WORKER_CAPABILITIES.has(item as WorkerCapability))
+    || new Set(capabilities as string[]).size !== capabilities.length
+    || (observedRevision !== null
+      && (typeof observedRevision !== "string" || !/^[0-9a-f]{64}$/.test(observedRevision)))
+  ) {
+    throw new ApiProblem(502, null);
+  }
+  // An eligible worker carries no refusal, and anything the server did not call
+  // eligible must say why. A payload that breaks that pair is not readable.
+  const refusal = value.refusal === null ? null : parseWorkerRefusal(value.refusal);
+  if ((refusal === null) !== (eligibility === "eligible")) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    profileId,
+    provider,
+    model,
+    eligibility,
+    refusal,
+    capabilities: capabilities as WorkerCapability[],
+    observedRevision
+  };
+}
+
+/** The whole closed eligibility answer; anything else leaves the caller with no workers. */
+export function parseWorkerEligibility(value: unknown): WorkerEligibility {
+  if (!isObject(value) || !hasExactKeys(value, ["schema", "specialization", "workers"])
+    || value.schema !== "agent_commons.worker-eligibility.v1") {
+    throw new ApiProblem(502, null);
+  }
+  const raw = value.workers;
+  if (!Array.isArray(raw) || raw.length > MAX_WORKER_ELIGIBILITY_WORKERS) {
+    throw new ApiProblem(502, null);
+  }
+  const workers = raw.map((entry: unknown) => parseWorkerEligibilityEntry(entry));
+  if (new Set(workers.map((worker) => worker.profileId)).size !== workers.length) {
+    throw new ApiProblem(502, null);
+  }
+  return {
+    schema: "agent_commons.worker-eligibility.v1",
+    specialization: roleSpecializationRef(value.specialization),
+    workers
+  };
 }
 
 function requiredStringAt(value: JsonObject, key: string): string {
@@ -1030,6 +1180,10 @@ function trackerIdentifierAt(value: JsonObject, key: string): string {
 
 function trackerNullableIdentifierAt(value: JsonObject, key: string): string | null {
   return value[key] === null ? null : trackerIdentifier(value[key]);
+}
+
+function trackerOptionalIdentifierAt(value: JsonObject, key: string): string | null {
+  return value[key] === undefined ? null : trackerNullableIdentifierAt(value, key);
 }
 
 function trackerIdentifiersAt(value: JsonObject, key: string, maximum: number): readonly string[] {
@@ -1112,7 +1266,10 @@ function parseTrackerTask(value: unknown): TrackerTask {
     nextAction: trackerEnumAt(value, "next_action", TRACKER_NEXT_ACTIONS),
     freshness: trackerEnumAt(value, "freshness", TRACKER_FRESHNESS_STATES),
     evidenceState: trackerEnumAt(value, "evidence_state", TRACKER_EVIDENCE_STATES),
-    gaps: trackerEnumsAt(value, "gaps", 24, TRACKER_GAPS)
+    gaps: trackerEnumsAt(value, "gaps", 24, TRACKER_GAPS),
+    // Provenance is additive and absent from tasks recorded before it existed.
+    objectiveId: trackerOptionalIdentifierAt(value, "objective_id"),
+    applicationId: trackerOptionalIdentifierAt(value, "application_id")
   };
 }
 
@@ -1301,6 +1458,7 @@ async function responsePayload(response: Response): Promise<unknown> {
 }
 
 const TASK_ID = /^task\.[0-9A-HJKMNP-TV-Z]{26}$/;
+const FINDING_ID = /^finding\.[0-9A-HJKMNP-TV-Z]{26}$/;
 const TRUNCATED_TEXT = /…\[truncated\]$/;
 const TRUNCATED_ITEMS = /^\[truncated: \d+ items omitted\]$/;
 
@@ -1363,8 +1521,18 @@ export function parseTaskDetail(value: unknown, taskId: string): TaskDetail {
     }
     return { kind: "artifact", id: raw.ref.id, revision: raw.revision };
   });
+  // Findings the record attaches to this task. They stay visible in the
+  // decision card, so an unreadable entry is a protocol fault, not a silent
+  // omission. A record without the key is `null`: the server has not attached
+  // findings to task records yet, and the card must not read that as "none".
+  const findings = record.findings === undefined ? null : detailArray(record.findings).map((raw): TaskFinding => {
+    if (!isObject(raw) || typeof raw.id !== "string" || !FINDING_ID.test(raw.id)) {
+      throw new ApiProblem(502, null);
+    }
+    return { id: raw.id, title: raw.title === undefined || raw.title === null ? null : detailText(raw.title) };
+  });
   return { taskId, revision, title, description, acceptanceCriteria,
-    state: record.state, summary, evidenceRefs, truncated };
+    state: record.state, summary, evidenceRefs, findings, truncated };
 }
 
 export function parseContextSourceCatalog(value: unknown): ContextSourceCatalog {
@@ -1390,6 +1558,72 @@ export function parseContextSourceCatalog(value: unknown): ContextSourceCatalog 
   });
   if ((sources.length === 0) !== (value.state === "empty")) throw new ApiProblem(502, null);
   return { schema: "agent-commons.ui.context-sources.v1", state: value.state, sources, truncated: value.truncated };
+}
+
+const INSTRUMENTATION_SCHEMA = "agent_commons.instrumentation.v1";
+const INSTRUMENTATION_UI_VERSION = "1";
+const INSTRUMENTATION_REVISION = /^[0-9a-f]{64}$/;
+const INSTRUMENTATION_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Strict by construction: exact keys at every level, and every counter key one
+ * of the closed enums. An answer that carries anything else is not read as a
+ * smaller answer -- it is refused, so no unexpected value ever reaches Settings.
+ */
+export function parseInstrumentation(value: unknown): Instrumentation {
+  if (!isObject(value)
+    || !hasExactKeys(value, ["schema", "enabled", "ui_version", "counters", "retention", "revision"])
+    || value.schema !== INSTRUMENTATION_SCHEMA
+    || typeof value.enabled !== "boolean"
+    // The client understands exactly one UI version of the counters; a different one is not readable.
+    || value.ui_version !== INSTRUMENTATION_UI_VERSION
+    || typeof value.revision !== "string" || !INSTRUMENTATION_REVISION.test(value.revision)) {
+    throw new ApiProblem(502, null);
+  }
+  const retention = value.retention;
+  if (!isObject(retention) || !hasExactKeys(retention, ["window_days", "updated_at_day"])) {
+    throw new ApiProblem(502, null);
+  }
+  const windowDays = retention.window_days;
+  const updatedAtDay = retention.updated_at_day;
+  if (!isSafeNonNegativeInteger(windowDays) || windowDays === 0
+    || typeof updatedAtDay !== "string" || !INSTRUMENTATION_DAY.test(updatedAtDay)) {
+    throw new ApiProblem(502, null);
+  }
+  const rawCounters = value.counters;
+  if (!isObject(rawCounters)) {
+    throw new ApiProblem(502, null);
+  }
+  const counters: Record<string, Record<string, Record<string, number>>> = {};
+  for (const [kind, outcomes] of Object.entries(rawCounters)) {
+    if (!(INSTRUMENTATION_KINDS as readonly string[]).includes(kind) || !isObject(outcomes)) {
+      throw new ApiProblem(502, null);
+    }
+    const byOutcome: Record<string, Record<string, number>> = {};
+    for (const [outcome, buckets] of Object.entries(outcomes)) {
+      if (!(INSTRUMENTATION_OUTCOMES as readonly string[]).includes(outcome) || !isObject(buckets)) {
+        throw new ApiProblem(502, null);
+      }
+      const byBucket: Record<string, number> = {};
+      for (const [bucket, count] of Object.entries(buckets)) {
+        if (!(INSTRUMENTATION_BUCKETS as readonly string[]).includes(bucket)
+          || !isSafeNonNegativeInteger(count)) {
+          throw new ApiProblem(502, null);
+        }
+        byBucket[bucket] = count;
+      }
+      byOutcome[outcome] = byBucket;
+    }
+    counters[kind] = byOutcome;
+  }
+  return {
+    schema: INSTRUMENTATION_SCHEMA,
+    enabled: value.enabled,
+    uiVersion: value.ui_version,
+    counters: counters as InstrumentationCounters,
+    retention: { windowDays, updatedAtDay },
+    revision: value.revision
+  };
 }
 
 export class WorkApi {
@@ -1422,8 +1656,19 @@ export class WorkApi {
     input: JsonObject,
     key: string,
     signal: AbortSignal,
-    taskId?: string
+    taskId?: string,
+    renderedRevision?: string
   ): Promise<unknown> {
+    // A caller that rendered a revision must send exactly that revision: the
+    // server then refuses a stale one instead of the UI acting on an unseen
+    // newer task. A value that is not an event id is refused before any request.
+    if (renderedRevision !== undefined && !EVENT_ID.test(renderedRevision)) {
+      throw new ApiProblem(409, {
+        code: "tracker_task_revision_unavailable",
+        message: "the rendered task revision is not an exact event identifier",
+        safeNextActions: ["Refresh the tracker and select the current task before retrying."]
+      });
+    }
     // Capture semantic input before the first await. A retry owns the exact
     // serialized body, including its original CAS, even after server commit.
     const signature = JSON.stringify([path, input]);
@@ -1434,7 +1679,8 @@ export class WorkApi {
     if (!saved) {
       const owned = JSON.parse(JSON.stringify(input)) as JsonObject;
       const body = (async () => {
-        const revision = taskId === undefined ? undefined : await this.currentTaskRevision(taskId, signal);
+        const revision = renderedRevision !== undefined ? renderedRevision
+          : taskId === undefined ? undefined : await this.currentTaskRevision(taskId, signal);
         return JSON.stringify({
           ...owned,
           ...(revision === undefined ? {} : { expected_revision: revision }),
@@ -1717,6 +1963,28 @@ export class WorkApi {
     return { agentId: result.entity_ref.id };
   }
 
+  /**
+   * Server truth for one exact specialization version. The reference is
+   * serialized exactly as `createRole` sends it, so a hire and its eligibility
+   * read can never be about two different role versions.
+   */
+  async workerEligibility(
+    specializationRef: LibraryRef | null,
+    signal: AbortSignal
+  ): Promise<WorkerEligibility> {
+    let specialization: LibraryRef | null;
+    try {
+      specialization = roleSpecializationRef(specializationRef);
+    } catch {
+      specialization = null;
+    }
+    if (specialization === null) throw new ApiProblem(400, null);
+    const query = new URLSearchParams({
+      specialization: `${specialization.source}/${specialization.id}/${specialization.version}`
+    });
+    return parseWorkerEligibility(await this.get(`/workers/eligibility?${query}`, signal));
+  }
+
   async createTask(
     input: {
       title: string;
@@ -1804,31 +2072,72 @@ export class WorkApi {
     );
   }
 
+  /** Accept at the revision the decision card was rendered from; never a newer, unseen one. */
   async acceptTask(
     taskId: string,
     summary: string,
     idempotencyKey: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    renderedRevision: string
   ): Promise<void> {
     await this.postTaskWrite(
       `/tasks/${encodeURIComponent(taskId)}/accept`,
-      { summary: summary.trim() }, idempotencyKey, signal, taskId
+      { summary: summary.trim() }, idempotencyKey, signal, taskId, renderedRevision
     );
   }
 
+  /** Return for revision at the rendered revision; a stale one is the server's refusal to make. */
   async reopenTask(
     taskId: string,
     reason: string,
     idempotencyKey: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    renderedRevision: string
   ): Promise<void> {
     await this.postTaskWrite(
       `/tasks/${encodeURIComponent(taskId)}/reopen`,
-      { reason: reason.trim() }, idempotencyKey, signal, taskId
+      { reason: reason.trim() }, idempotencyKey, signal, taskId, renderedRevision
     );
   }
 
   /** The workspace graph projection; the board keeps only its role structure. */
+  /** Local counters and the toggle, as the server currently holds them. */
+  async instrumentation(signal: AbortSignal): Promise<Instrumentation> {
+    return parseInstrumentation(await this.get("/instrumentation", signal));
+  }
+
+  async setInstrumentation(enabled: boolean, expectedRevision: string, signal: AbortSignal): Promise<Instrumentation> {
+    return parseInstrumentation(
+      await this.post("/instrumentation/settings", { enabled, expected_revision: expectedRevision }, signal)
+    );
+  }
+
+  /**
+   * Post one allowlisted batch. `null` is the server's 204: it is not recording,
+   * which is an outcome to forget, never an error to retry.
+   */
+  async recordInstrumentation(
+    events: readonly InstrumentationEvent[],
+    expectedRevision: string,
+    signal: AbortSignal
+  ): Promise<Instrumentation | null> {
+    // Checked again here so nothing outside the closed vocabulary can be sent,
+    // whatever a caller believes it is holding.
+    if (events.length === 0 || events.length > MAX_INSTRUMENTATION_BATCH || !events.every(isInstrumentationEvent)) {
+      throw new ApiProblem(400, null);
+    }
+    const body = events.map((event) => ({
+      kind: event.kind, outcome: event.outcome, duration_bucket: event.duration_bucket
+    }));
+    const payload = await this.post("/instrumentation/events", { events: body, expected_revision: expectedRevision }, signal);
+    return payload === null ? null : parseInstrumentation(payload);
+  }
+
+  /** Delete the local counter store. The server answers 204 and nothing else. */
+  async clearInstrumentation(expectedRevision: string, signal: AbortSignal): Promise<void> {
+    await this.post("/instrumentation/clear", { expected_revision: expectedRevision }, signal);
+  }
+
   async readGraph(signal: AbortSignal): Promise<unknown> {
     return this.get("/graph", signal);
   }

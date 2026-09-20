@@ -15,10 +15,12 @@ from collections.abc import Callable
 from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 
 from agent_commons.errors import ConfigurationError
+from agent_commons.library import LibraryStore
 from agent_commons.runtime import (
     Attempt,
     AttemptState,
@@ -344,6 +346,59 @@ def test_work_provider_availability_is_one_closed_redacted_projection(
         "queue_wait_seconds",
     ):
         assert forbidden not in rendered
+
+
+def test_worker_eligibility_is_closed_and_refuses_unknown_hire_before_write(
+    workspace: dict[str, Any],
+) -> None:
+    fixture = _launch_workspace(workspace)
+    ref = LibraryStore().resolve(
+        {
+            "kind": "role",
+            "source": "builtin",
+            "id": "agent-engineer",
+            "version": "2e6b9e73f5d959b6700cad8a77c1ce439083d74e5f1a9aaa917fd5fb6073c699",
+        }
+    )["ref"]
+    specialization = quote("/".join((ref["source"], ref["id"], ref["version"])))
+    before = fixture["manager"].snapshot().agents
+
+    with _client(fixture["context"]) as client:
+        read = client.get(
+            f"/api/workers/eligibility?specialization={specialization}", headers=authorized()
+        )
+        hire = client.post(
+            "/api/agents",
+            json={
+                "name": "Agent engineer",
+                "profile_id": "claude-builder",
+                "rationale": "implements the service",
+                "specialization_ref": ref,
+            },
+            headers=authorized(),
+        )
+
+    assert read.status_code == 200, read.text
+    payload = read.json()
+    assert set(payload) == {"schema", "specialization", "workers"}
+    assert payload["schema"] == "agent_commons.worker-eligibility.v1"
+    assert all(
+        set(worker)
+        == {
+            "profile_id",
+            "provider",
+            "model",
+            "eligibility",
+            "refusal",
+            "capabilities",
+            "observed_revision",
+        }
+        for worker in payload["workers"]
+    )
+    assert {worker["eligibility"] for worker in payload["workers"]} == {"unknown"}
+    assert hire.status_code == 409
+    assert hire.json()["code"] == "worker_ineligible"
+    assert fixture["manager"].snapshot().agents == before
 
 
 def test_the_launch_handler_refuses_without_a_configured_runtime(

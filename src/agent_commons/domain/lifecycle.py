@@ -127,6 +127,9 @@ def validate_transition(
             f"{event_type} is not allowed from {family} state {current.get('state')}"
         )
     if event_type == "task.revised":
+        changes = payload.get("changes")
+        if isinstance(changes, Mapping) and "objective_id" in changes:
+            raise LifecycleConflictError("task.revised cannot change objective_id")
         validate_task_dependency_change(snapshot, payload)
     if event_type == "context_pack.revised":
         _validate_context_pack_bindings(snapshot, payload)
@@ -159,6 +162,18 @@ def validate_transition(
                 f"an independent {target_kind or 'subject'} review cannot be completed "
                 "by a principal that authored the subject: " + ", ".join(sorted(overlap))
             )
+    if event_type == "blueprint_application.task_joined":
+        task = require_entity(snapshot, "task", str(payload.get("task_id", "")))
+        if task.get("application_id") is not None:
+            raise LifecycleConflictError("task already belongs to an application")
+        application_objective = current.get("objective_id")
+        if (
+            task.get("objective_id") is not None
+            and task.get("objective_id") != application_objective
+        ):
+            raise LifecycleConflictError("task objective conflicts with application objective")
+        if len(current.get("created_task_ids", [])) >= 100:
+            raise LifecycleConflictError("application cannot contain more than 100 tasks")
     if event_type == "review.completed":
         bound = _child_delegations(snapshot, actor_session_id)
         if bound and not any(

@@ -1,0 +1,54 @@
+{
+  "work_package": "WP-12.1",
+  "task": "task.74HF1EYQ53M2JX9RMD6JVNZF1P",
+  "delegation": "delegation.31BPHBYQSJHXK8SHKYK8HFFWA5 (run 1, needs_operator after partial implementation) + delegation.3X6X39JNAVB16MTGMBZHVV9JM7 (run 2, tests)",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "src/agent_commons/services/worker_eligibility.py",
+      "sha256": "e52f060c6e60baa4a71537ae229ee3837d04fe0a4e328ee1d3f64942bc79cb75"
+    },
+    {
+      "path": "src/agent_commons/ui/reads.py",
+      "sha256": "766b865b6b1645b64dcd56bf99f4dd0209cffba450f849df07ea5822ccc0b3cc"
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "sha256": "cb7afc81a9f0ee3bf435216b162d7f5acb923d22750c064d7990d7d6cb0911c5"
+    },
+    {
+      "path": "src/agent_commons/ui/actions.py",
+      "sha256": "fb31a23627a52ceed62f5bdd0f8aeb7302ec8570efe4947359d8526bbb284df0"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "f114e4236b987f5b3b69056b63b9ffb7ba4258b9684d4b71723736b0dc21a03f"
+    },
+    {
+      "path": "tests/ui/test_worker_eligibility.py",
+      "sha256": "e1e110d3b41b3017b9bf5fcb4883604e378dd596417347b35a3f9d95982624b9"
+    },
+    {
+      "path": "tests/ui/test_launch.py",
+      "sha256": "c97dc379a137b070721d5b3eff3e1f84668374458156606f0bd8822a61dbb6c5"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "2062092dd53433baa4608298ecf6919dfac14e027e2fd674eec0fb5139e331d1"
+    }
+  ],
+  "verification": {
+    "pytest": "69 passed (tests/ui/test_worker_eligibility.py 9, test_launch.py, test_readonly_invariant.py, test_profile_choice_and_link_offer.py)",
+    "ruff": "check and format clean",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "dto": "GET /api/workers/eligibility?specialization=<source>/<id>/<version> -> agent_commons.worker-eligibility.v1 {schema, specialization|null, workers[{profile_id, provider, model, eligibility eligible|ineligible|unknown, refusal {code, remediation[]}|null, capabilities[], observed_revision}]}",
+    "rules": "unresolvable specialization -> unknown/specialization_unavailable; qualification not current or authentication not fresh -> unknown/worker_observation_missing; independent-reviewer profile on a non-review role -> ineligible/review_profile_incompatible; not launchable -> ineligible with the provider-availability refusal; else eligible",
+    "hire": "actions.create_role refuses an ineligible or unknown profile before any write; route answers 409 {code: worker_ineligible, refusal}",
+    "new_module_outside_claims": "src/agent_commons/services/worker_eligibility.py (the brief named ui/worker_eligibility.py; services is the better home)",
+    "runs": "run 1 exited input_needed with the DTO, route, refusal, docs and one test done; run 2 (checkpoint, tests only) added the nine-test matrix; the intermediate delegation.0QAG3TNATR73WRCFJMGFEPR269 was cancelled after a qualification refusal (stale receipt after run-1 src changes)",
+    "frontend": "untouched; packaged asset untouched"
+  }
+}

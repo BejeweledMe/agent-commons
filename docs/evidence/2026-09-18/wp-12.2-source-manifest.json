@@ -1,0 +1,47 @@
+{
+  "work_package": "WP-12.2",
+  "task": "task.73TM3XTRRTVDJA8TKX4V0BC8P7",
+  "delegation": "delegation.5W16CGA71E6GA4N32SV036G6BN",
+  "base_commit": "43b7d8f1b666dd5b9967f0a2ee78eaa4e5e5643b",
+  "recorded_at": "2026-09-19",
+  "files": [
+    {
+      "path": "frontend/work/src/components/WorkerPicker.tsx",
+      "sha256": "b694aca5b44a17837cb72a106de3c45837c6ab7e77591cbada338d03cc1e13c1"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "3d7e77fc91bdef3fe41c1497920b4a508e01d36ec31ca96073237f9b2c05ac19"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "829a97a9382c674fd5a27c839d7a4800c320f39c9aace46a71d4336d3f9a86b7"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "eb0ee1f69cc38cc1d14201ea695c7e3dc4f025fd09928b8ceae9dfd42feb1622"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "c873959b525e4d103158fbb9ab1b8806ab59211c502021d639673db010a30447"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "d582b60420aea79e0d81a344b701b89c18681052cc85bb330d65b24349528657"
+    },
+    {
+      "path": "frontend/work/tests/worker-eligibility.test.mjs",
+      "sha256": "a21cf94557ff503808180600cd4a1dac2f15746134255856347faa580c01da48"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "339 passed, 0 failed (node 24)",
+    "run_by": "coordinator; the worker sandbox refuses node"
+  },
+  "notes": {
+    "coordinator_review": "parser pins remediation tokens per code exactly (same convention as parseProviderAvailability); a non-eligible worker with an unreadable refusal makes the whole answer unreadable (502) so every worker renders unknown and unselectable \u2014 fail closed, consistent with the contract; client pins the configured profile set as the existing provider-availability parser does",
+    "packaged_asset": "untouched; rebuilt at wave end",
+    "backend": "src/agent_commons untouched"
+  }
+}

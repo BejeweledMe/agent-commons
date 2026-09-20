@@ -3,7 +3,8 @@ import {
   Background, Controls, Handle, MiniMap, Position, ReactFlow, ReactFlowProvider, applyNodeChanges, useReactFlow,
   type Connection, type Edge, type Node, type NodeChange, type NodeProps
 } from "@xyflow/react";
-import { ApiProblem, type WorkApi } from "../api.js";
+import { ApiProblem, requestOutcome, type WorkApi } from "../api.js";
+import { recordInstrumentation } from "../instrumentation.js";
 import type { RoleOption } from "../contracts.js";
 import type { Locale, MessageKey } from "../i18n.js";
 import type { BlueprintApplication } from "../libraryTypes.js";
@@ -118,13 +119,16 @@ function BoardCanvas({ api, text, roles, tracker, writesEnabled, refreshKey, sel
       saveTimer.current = null;
       const controller = new AbortController();
       setStatus("board_saving");
+      const started = performance.now();
       void (async () => {
         try {
           const saved = parseBoardLayout(await api.writeBoardLayout(layoutBody(layoutRef.current), controller.signal));
           // The server revision is the only revision; positions from the reply are what was stored.
           setLayout((current) => ({ ...current, revision: saved.revision }));
           setStatus("board_saved");
+          recordInstrumentation("board_edit", "confirmed", performance.now() - started);
         } catch (error) {
+          recordInstrumentation("board_edit", requestOutcome(error), performance.now() - started);
           if (error instanceof ApiProblem && error.apiError?.code === "board_revision_conflict") setStatus("board_layout_conflict");
           else if (error instanceof ApiProblem || error instanceof BoardError) setStatus("board_layout_save_failed");
           else throw error;
@@ -176,12 +180,15 @@ function BoardCanvas({ api, text, roles, tracker, writesEnabled, refreshKey, sel
   const onConnect = useCallback((connection: Connection) => {
     if (!writesEnabled || !connection.source || !connection.target || connection.source === connection.target) return;
     const controller = new AbortController();
+    const started = performance.now();
     void (async () => {
       try {
         await api.openAgentLink({ fromAgentId: connection.source, toAgentId: connection.target, allowedAction: "ask", reason: text("board_link_reason") }, controller.signal);
         setGraph(parseBoardGraph(await api.readGraph(controller.signal)));
         setStatus("board_link_opened");
+        recordInstrumentation("board_edit", "confirmed", performance.now() - started);
       } catch (error) {
+        recordInstrumentation("board_edit", requestOutcome(error), performance.now() - started);
         if (error instanceof ApiProblem || error instanceof BoardError) setStatus("board_link_failed"); else throw error;
       }
     })();

@@ -32,6 +32,8 @@ class TrackerTaskPayload(TypedDict):
     freshness: str
     evidence_state: str
     gaps: list[str]
+    objective_id: str | None
+    application_id: str | None
     suggested_agent_id: NotRequired[str]
     suggested_role_name: NotRequired[str]
     suggested_provider: NotRequired[str]
@@ -124,6 +126,8 @@ class TrackerTaskDTO:
     freshness: str
     evidence_state: str
     gaps: tuple[str, ...]
+    objective_id: str | None = None
+    application_id: str | None = None
     suggested_agent_id: str | None = None
     suggested_role_name: str | None = None
     suggested_provider: str | None = None
@@ -146,6 +150,8 @@ class TrackerTaskDTO:
             "freshness": self.freshness,
             "evidence_state": self.evidence_state,
             "gaps": list(self.gaps),
+            "objective_id": self.objective_id,
+            "application_id": self.application_id,
             **(
                 {
                     "suggested_agent_id": self.suggested_agent_id,

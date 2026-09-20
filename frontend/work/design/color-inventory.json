@@ -1,0 +1,3767 @@
+{
+  "generated_for": "WP-13.1",
+  "note": "The \"hex\" array below is the WP-13.1 inventory of the stylesheets before WP-13.2, kept as the record of where each colour was used and what it was proposed to become. WP-13.2 applied the target tokens: \"existing_root_tokens\" and \"raw_hex_outside_root\" describe the stylesheets as they are now.",
+  "applied_in": "WP-13.2",
+  "target_tokens": [
+    "surface/1",
+    "surface/2",
+    "surface/3",
+    "text/1",
+    "text/2",
+    "text/3",
+    "border/1",
+    "border/2",
+    "status/attention",
+    "status/active",
+    "status/accepted",
+    "status/error",
+    "accent"
+  ],
+  "spacing_scale": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48
+  ],
+  "type_scale": [
+    12,
+    13,
+    14,
+    16,
+    20,
+    24
+  ],
+  "existing_root_tokens": [
+    {
+      "name": "--surface-1",
+      "value": "#101319"
+    },
+    {
+      "name": "--surface-2",
+      "value": "#1a2029"
+    },
+    {
+      "name": "--surface-3",
+      "value": "#232b37"
+    },
+    {
+      "name": "--text-1",
+      "value": "#e8edf5"
+    },
+    {
+      "name": "--text-2",
+      "value": "#a9b8d1"
+    },
+    {
+      "name": "--text-3",
+      "value": "#889cb9"
+    },
+    {
+      "name": "--border-1",
+      "value": "#52698c"
+    },
+    {
+      "name": "--border-2",
+      "value": "#7184a4"
+    },
+    {
+      "name": "--status-attention",
+      "value": "#e2b85e"
+    },
+    {
+      "name": "--status-attention-surface",
+      "value": "#302919"
+    },
+    {
+      "name": "--status-attention-text",
+      "value": "#ffd89c"
+    },
+    {
+      "name": "--status-active",
+      "value": "#21385e"
+    },
+    {
+      "name": "--status-active-border",
+      "value": "#5778a6"
+    },
+    {
+      "name": "--status-accepted",
+      "value": "#72ca8a"
+    },
+    {
+      "name": "--status-accepted-surface",
+      "value": "#143220"
+    },
+    {
+      "name": "--status-accepted-text",
+      "value": "#d9ffe5"
+    },
+    {
+      "name": "--status-error",
+      "value": "#ff9aa8"
+    },
+    {
+      "name": "--status-error-surface",
+      "value": "#2c202d"
+    },
+    {
+      "name": "--status-error-text",
+      "value": "#ffbdc5"
+    },
+    {
+      "name": "--accent",
+      "value": "#92b8ff"
+    },
+    {
+      "name": "--text-on-accent",
+      "value": "#ffffff"
+    },
+    {
+      "name": "--space-1",
+      "value": "4px"
+    },
+    {
+      "name": "--space-2",
+      "value": "8px"
+    },
+    {
+      "name": "--space-3",
+      "value": "12px"
+    },
+    {
+      "name": "--space-4",
+      "value": "16px"
+    },
+    {
+      "name": "--space-5",
+      "value": "24px"
+    },
+    {
+      "name": "--space-6",
+      "value": "32px"
+    },
+    {
+      "name": "--space-7",
+      "value": "48px"
+    },
+    {
+      "name": "--type-1",
+      "value": "12px"
+    },
+    {
+      "name": "--type-2",
+      "value": "13px"
+    },
+    {
+      "name": "--type-3",
+      "value": "14px"
+    },
+    {
+      "name": "--type-4",
+      "value": "16px"
+    },
+    {
+      "name": "--type-5",
+      "value": "20px"
+    },
+    {
+      "name": "--type-6",
+      "value": "24px"
+    },
+    {
+      "name": "--surface",
+      "value": "var(--surface-2)"
+    },
+    {
+      "name": "--surface-subtle",
+      "value": "var(--surface-3)"
+    },
+    {
+      "name": "--surface-input",
+      "value": "var(--surface-1)"
+    },
+    {
+      "name": "--surface-warning",
+      "value": "var(--status-attention-surface)"
+    },
+    {
+      "name": "--text-primary",
+      "value": "var(--text-1)"
+    },
+    {
+      "name": "--text-muted",
+      "value": "var(--text-2)"
+    },
+    {
+      "name": "--text-warning",
+      "value": "var(--status-attention-text)"
+    },
+    {
+      "name": "--border",
+      "value": "var(--border-1)"
+    },
+    {
+      "name": "--border-control",
+      "value": "var(--border-2)"
+    },
+    {
+      "name": "--button-primary",
+      "value": "#4775c8"
+    },
+    {
+      "name": "--button-primary-hover",
+      "value": "#3f68b1"
+    },
+    {
+      "name": "--dialog-backdrop",
+      "value": "rgb(4 9 18 / 75%)"
+    },
+    {
+      "name": "--shadow-dialog",
+      "value": "rgb(0 0 0 / 20%)"
+    }
+  ],
+  "raw_hex_outside_root": {
+    "styles.css": 0,
+    "board.css": 0,
+    "conversation.css": 0,
+    "outputs.css": 0,
+    "projectCreation.css": 0,
+    "taskGraph.css": 0
+  },
+  "hex": [
+    {
+      "value": "#a9b8d1",
+      "count": 17,
+      "files": {
+        "styles.css": 17
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--text-muted",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".inspector-facts dt",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".inspector-technical dt",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-tabs button",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".locale-button",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".provider-readiness li[data-state=\"unknown\"] .provider-readiness-value",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".provider-readiness-stage",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".provider-readiness-technical summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".rail-status",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".small-copy",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-domain-label",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-inspector-empty",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-list-count",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-meta",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-view-filters button",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-connection",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-diagnostics",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#354256",
+      "count": 8,
+      "files": {
+        "styles.css": 8
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-binding",
+          "property": "border-bottom",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-choice",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-definition-row",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".legacy-text-option",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-entry-card",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-route-editor",
+          "property": "border-bottom",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-group",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-groups-archived",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e8edf5",
+      "count": 8,
+      "files": {
+        "styles.css": 8
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--text-primary",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "color",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-choice",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".icon-close",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-tabs button[aria-current=\"page\"], .library-tabs button[aria-selected=\"true\"], .library-tabs button[aria-pressed=\"true\"]",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-dialog",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-button",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#232b37",
+      "count": 7,
+      "files": {
+        "styles.css": 7
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-secondary",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".context-source-selection",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".primary-navigation a:hover",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-actions summary:hover",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item:hover",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-button:hover",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#1a2029",
+      "count": 6,
+      "files": {
+        "styles.css": 6
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-form",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-inspector",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".team-role-list li",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".team-task-target",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".workflow-card, .task-composer, .launch-composer, .settings-panel, .provider-availability",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#21385e",
+      "count": 6,
+      "files": {
+        "styles.css": 6
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-choice[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-kind-buttons button[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-tabs button[aria-current=\"page\"], .library-tabs button[aria-selected=\"true\"], .library-tabs button[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".primary-navigation a[aria-current=\"page\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item[aria-current=\"page\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-view-filters button[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#18202b",
+      "count": 5,
+      "files": {
+        "styles.css": 5
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-choice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-task-preview li",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-entry-card",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-group",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-groups-archived",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#526789",
+      "count": 5,
+      "files": {
+        "styles.css": 5
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-composer",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-task-preview",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-detail, .library-editor",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".locale-button",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-group-archive",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#b8c9e6",
+      "count": 5,
+      "files": {
+        "styles.css": 5
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".app-intro",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".archived-projects summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-actions summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-archive-path code",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".role-legacy-presets summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#14243c",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-edge-list li",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-run-list > li",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#33486c",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-form",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".context-packs-section",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-actions",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-panel",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#5778a6",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".library-kind-buttons button[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-tabs button[aria-current=\"page\"], .library-tabs button[aria-selected=\"true\"], .library-tabs button[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".specialization-summary",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-view-filters button[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#92b8ff",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--accent",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-choice[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "button:focus-visible,\na:focus-visible,\ninput:focus-visible,\nselect:focus-visible,\ntextarea:focus-visible",
+          "property": "outline",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "summary:focus-visible, [tabindex]:focus-visible",
+          "property": "outline",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#edf3ff",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".app-brand",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "input,\nselect,\ntextarea",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#ffffff",
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":is(.conversation-dialog, .project-create-dialog, .project-archive-dialog, .outputs-dialog) .button-primary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".button-primary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".provider-auth-critical:focus-visible",
+          "property": "outline",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#182333",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".blueprint-defaults",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".library-detail, .library-editor",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-group-archive",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#1e304e",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-secondary",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".skill-chip",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-connection",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#203553",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-more-filter select:has(option:checked:not([value=\"\"]))",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-button[aria-pressed=\"true\"], .task-row-button.selected",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#354050",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".archived-projects",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".inspector-decision",
+          "property": "border-bottom",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-sidebar",
+          "property": "border-bottom",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#668abe",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-more-filter select:has(option:checked:not([value=\"\"]))",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-button[aria-pressed=\"true\"], .task-row-button.selected",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#b3ccff",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".legacy-link",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-path-toggle,\n.notice-link",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-reference",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#b9c8e2",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".empty-guidance",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".small-copy",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d5ac59",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-notice",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".task-row-button.attention, .task-row-button-attention",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-warning, .tracker-attention",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e29a9f",
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".action-failure",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".status-dot[data-state=\"not_repository\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-error",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#0d1829",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".dependency-option",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "input,\nselect,\ntextarea",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#101319",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "background",
+          "count": 2,
+          "in_root": true
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#121820",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--surface-input",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": "input, select, textarea",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#121f35",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".progress-panel,\n.workflow-card,\n.failure-panel,\n.loading-panel",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-section",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#142137",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-dialog",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-empty-app .project-sidebar",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#161b23",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--surface",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".app-rail",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#162b47",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".notice, .workspace-notice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#202833",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--surface-subtle",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-actions-menu",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#20395f",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice:hover,\n.context-pack-choice:focus-visible",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task:hover,\n.tracker-task[aria-pressed=\"true\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#293b56",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".dependency-unconfirmed",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".provider-availability-item",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#2c202d",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".action-failure",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-error",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#2c3c55",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-run-list > li",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".inspector-technical",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#302919",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-notice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-warning, .tracker-attention",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#321923",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".provider-auth-critical",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-error",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#384e72",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".progress-panel,\n.workflow-card,\n.failure-panel,\n.loading-panel",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-section",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#405a82",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#455873",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--border",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-actions-menu",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#4775c8",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--button-primary",
+          "count": 1,
+          "in_root": true
+        },
+        {
+          "file": "styles.css",
+          "selector": ".button-primary",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#526889",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".dependency-option",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "input,\nselect,\ntextarea",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#52698c",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".skill-chip",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-connection",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#7fa8ff",
+      "count": 2,
+      "files": {
+        "styles.css": 1,
+        "board.css": 1
+      },
+      "selectors": [
+        {
+          "file": "board.css",
+          "selector": ".board-role[data-activity=\"running\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".status-dot[data-state=\"configured\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#8aa2c7",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status-dot",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".status-dot[data-state=\"unknown\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#8cb3f1",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-pack-choice:hover,\n.context-pack-choice:focus-visible",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task:hover,\n.tracker-task[aria-pressed=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#9db1d1",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".dependency-option-state",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-summary dt,\n.tracker-detail-list dt,\n.tracker-run-meta dt",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#9ec1ff",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".eyebrow",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".project-label",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#bdd2fb",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-canonical code,\n.tracker-technical,\n.tracker-edge-list code,\n.tracker-detail-list code,\n.tracker-run-meta code",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": "code",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e2b85e",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-warning,\n.tracker-attention",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-task-attention",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#ff9aa8",
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".provider-auth-critical",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        },
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-error",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#0003",
+      "count": 1,
+      "files": {
+        "conversation.css": 1
+      },
+      "selectors": [
+        {
+          "file": "conversation.css",
+          "selector": ".conversation-dialog",
+          "property": "box-shadow",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#0f141b",
+      "count": 1,
+      "files": {
+        "board.css": 1
+      },
+      "selectors": [
+        {
+          "file": "board.css",
+          "selector": ".board-canvas",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#0f1a2e",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-panel",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#101821",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".library-source-text",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#101b30",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-packs-section",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#111c30",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".app-header",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#143220",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/accepted",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#1c3658",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".notice",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#1d2536",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".legacy-text-conflict",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#254869",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status-ready",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#283d5e",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/3",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#2b3d59",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".context-fact-row",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#2d3542",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".task-list > li + li",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#303a48",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-disclosure",
+          "property": "border-top",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#332b1b",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--surface-warning",
+          "count": 1,
+          "in_root": true
+        }
+      ],
+      "proposed_token": "status/attention",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#334766",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".app-header",
+          "property": "border-bottom",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#334b70",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-run-list > li",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#354765",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-secondary",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#354b6e",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-empty-app .project-sidebar",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#382d16",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-warning,\n.tracker-attention",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "surface/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#384454",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".task-more-filter select",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#385ea7",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#3c506e",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": "input, select, textarea",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#3c5275",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#3f68b1",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--button-primary-hover",
+          "count": 1,
+          "in_root": true
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#4e76c3",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-primary",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#526b98",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#52719b",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#5272a4",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item[aria-current=\"page\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#5a739b",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-secondary",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#5b86d6",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-primary:hover:not(:disabled)",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#5b8fc3",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status-ready",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#607baf",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-dialog",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#608cda",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-primary",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#6388bd",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".notice",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#688dbc",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".notice, .workspace-notice",
+          "property": "border-left",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#7184a4",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--border-control",
+          "count": 1,
+          "in_root": true
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#72ca8a",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/accepted",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#889cb9",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-label",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#88b2ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".primary-navigation a[aria-current=\"page\"]",
+          "property": "box-shadow",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/active",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#9eafc7",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item span",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#a8c8ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".locale-button-selected",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#a9c7ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-primary",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "border/2",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#b58b3a",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".legacy-text-conflict",
+          "property": "border",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/attention",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#bbc9df",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".primary-navigation a",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#c4cfdf",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-disclosure > summary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#c7d4e9",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#c9d7ed",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".failure-panel p,\n.failure-panel li",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d0d8e5",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".task-row-role",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d7e4fb",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-panel label,\n.tracker-confirm",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d8e6ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-connection",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d9a441",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status-dot[data-state=\"needs_setup\"]",
+          "property": "background",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d9e7ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".status",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d9e8ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#d9ffe5",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-action-status",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/accepted",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#dae5f5",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-section h3",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#dbe4f2",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".provider-readiness-value",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#dce8ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".locale-button",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e0edff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".notice",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e4edff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".button-secondary",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e6b98d",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".provider-readiness li[data-state=\"attention\"] .provider-readiness-value",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e7d5ac",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".work-tracker > .tracker-state-warning",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#e8f0ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".primary-navigation a[aria-current=\"page\"]",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#eef3ff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".task-view-filters button[aria-pressed=\"true\"]",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "accent",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#f0a3ad",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": "input[aria-invalid=\"true\"],\nselect[aria-invalid=\"true\"],\ntextarea[aria-invalid=\"true\"]",
+          "property": "border-color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#f2deb5",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".inspector-notice",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#ffbdc5",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".field-error",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "status/error",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#ffd89c",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ":root",
+          "property": "--text-warning",
+          "count": 1,
+          "in_root": true
+        }
+      ],
+      "proposed_token": "status/attention",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#fff",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".project-list-item[aria-current=\"page\"]",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    },
+    {
+      "value": "#fff1c7",
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "selectors": [
+        {
+          "file": "styles.css",
+          "selector": ".tracker-state-warning,\n.tracker-attention",
+          "property": "color",
+          "count": 1,
+          "in_root": false
+        }
+      ],
+      "proposed_token": "text/1",
+      "proposal_reason": "Heuristic mapping from luminance, hue and property context for WP-13.2; not applied."
+    }
+  ],
+  "spacing_px": [
+    {
+      "value_px": 8,
+      "count": 71,
+      "files": {
+        "styles.css": 50,
+        "board.css": 8,
+        "conversation.css": 5,
+        "outputs.css": 4,
+        "projectCreation.css": 4
+      },
+      "properties": {
+        "gap": 22,
+        "padding": 14,
+        "margin-bottom": 14,
+        "margin": 15,
+        "padding-top": 1,
+        "margin-left": 1,
+        "margin-top": 4
+      },
+      "nearest_scale": 8
+    },
+    {
+      "value_px": 16,
+      "count": 70,
+      "files": {
+        "styles.css": 60,
+        "board.css": 2,
+        "conversation.css": 3,
+        "outputs.css": 4,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "margin": 13,
+        "padding": 33,
+        "margin-top": 4,
+        "margin-bottom": 4,
+        "gap": 13,
+        "padding-top": 1,
+        "margin-left": 2
+      },
+      "nearest_scale": 16
+    },
+    {
+      "value_px": 12,
+      "count": 68,
+      "files": {
+        "styles.css": 56,
+        "board.css": 3,
+        "conversation.css": 5,
+        "outputs.css": 1,
+        "projectCreation.css": 3
+      },
+      "properties": {
+        "gap": 18,
+        "margin": 15,
+        "padding": 20,
+        "margin-top": 8,
+        "margin-bottom": 5,
+        "padding-top": 1,
+        "padding-left": 1
+      },
+      "nearest_scale": 12
+    },
+    {
+      "value_px": 10,
+      "count": 42,
+      "files": {
+        "styles.css": 27,
+        "conversation.css": 9,
+        "projectCreation.css": 6
+      },
+      "properties": {
+        "margin-bottom": 6,
+        "padding": 12,
+        "gap": 14,
+        "margin": 3,
+        "margin-top": 3,
+        "padding-top": 1,
+        "margin-left": 2,
+        "margin-right": 1
+      },
+      "nearest_scale": 8
+    },
+    {
+      "value_px": 24,
+      "count": 35,
+      "files": {
+        "styles.css": 28,
+        "board.css": 1,
+        "conversation.css": 2,
+        "outputs.css": 1,
+        "projectCreation.css": 3
+      },
+      "properties": {
+        "padding": 16,
+        "margin": 6,
+        "gap": 3,
+        "margin-top": 4,
+        "margin-bottom": 4,
+        "padding-left": 1,
+        "padding-right": 1
+      },
+      "nearest_scale": 24
+    },
+    {
+      "value_px": 20,
+      "count": 27,
+      "files": {
+        "styles.css": 21,
+        "conversation.css": 3,
+        "outputs.css": 2,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "margin-bottom": 5,
+        "margin": 5,
+        "margin-top": 5,
+        "padding-left": 2,
+        "padding": 6,
+        "padding-top": 1,
+        "gap": 2,
+        "padding-bottom": 1
+      },
+      "nearest_scale": 16
+    },
+    {
+      "value_px": 18,
+      "count": 25,
+      "files": {
+        "styles.css": 20,
+        "conversation.css": 3,
+        "projectCreation.css": 2
+      },
+      "properties": {
+        "padding": 12,
+        "padding-left": 1,
+        "gap": 3,
+        "margin-top": 4,
+        "margin": 5
+      },
+      "nearest_scale": 16
+    },
+    {
+      "value_px": 4,
+      "count": 20,
+      "files": {
+        "styles.css": 17,
+        "conversation.css": 2,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "gap": 6,
+        "margin-bottom": 3,
+        "margin-top": 3,
+        "margin": 4,
+        "padding": 2,
+        "padding-top": 2
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 14,
+      "count": 19,
+      "files": {
+        "styles.css": 14,
+        "board.css": 2,
+        "conversation.css": 1,
+        "projectCreation.css": 2
+      },
+      "properties": {
+        "margin-top": 3,
+        "padding": 12,
+        "padding-left": 1,
+        "margin": 3
+      },
+      "nearest_scale": 12
+    },
+    {
+      "value_px": 6,
+      "count": 18,
+      "files": {
+        "styles.css": 12,
+        "board.css": 2,
+        "conversation.css": 3,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "margin": 1,
+        "margin-bottom": 5,
+        "padding": 2,
+        "gap": 10
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 5,
+      "count": 12,
+      "files": {
+        "styles.css": 9,
+        "conversation.css": 2,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "margin-bottom": 2,
+        "gap": 7,
+        "margin-right": 2,
+        "padding": 1
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 22,
+      "count": 9,
+      "files": {
+        "styles.css": 8,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "padding": 6,
+        "padding-left": 1,
+        "margin-top": 1,
+        "margin": 1
+      },
+      "nearest_scale": 24
+    },
+    {
+      "value_px": 7,
+      "count": 8,
+      "files": {
+        "styles.css": 8
+      },
+      "properties": {
+        "margin": 2,
+        "margin-bottom": 1,
+        "padding": 2,
+        "gap": 1,
+        "margin-top": 1,
+        "margin-right": 1
+      },
+      "nearest_scale": 8
+    },
+    {
+      "value_px": 28,
+      "count": 7,
+      "files": {
+        "styles.css": 4,
+        "conversation.css": 3
+      },
+      "properties": {
+        "padding": 6,
+        "margin-bottom": 1
+      },
+      "nearest_scale": 24
+    },
+    {
+      "value_px": 32,
+      "count": 6,
+      "files": {
+        "styles.css": 5,
+        "conversation.css": 1
+      },
+      "properties": {
+        "margin": 2,
+        "padding": 4
+      },
+      "nearest_scale": 32
+    },
+    {
+      "value_px": 3,
+      "count": 4,
+      "files": {
+        "styles.css": 4
+      },
+      "properties": {
+        "padding": 2,
+        "margin-bottom": 1,
+        "margin": 1
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 11,
+      "count": 4,
+      "files": {
+        "styles.css": 3,
+        "projectCreation.css": 1
+      },
+      "properties": {
+        "padding": 4
+      },
+      "nearest_scale": 12
+    },
+    {
+      "value_px": 9,
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "properties": {
+        "padding": 2,
+        "margin-top": 1
+      },
+      "nearest_scale": 8
+    },
+    {
+      "value_px": 56,
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "properties": {
+        "padding": 3
+      },
+      "nearest_scale": 48
+    },
+    {
+      "value_px": -8,
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "properties": {
+        "margin": 2
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": -1,
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "properties": {
+        "margin": 2
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 2,
+      "count": 2,
+      "files": {
+        "styles.css": 1,
+        "board.css": 1
+      },
+      "properties": {
+        "gap": 1,
+        "padding": 1
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 36,
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "properties": {
+        "margin": 1,
+        "padding-top": 1
+      },
+      "nearest_scale": 32
+    },
+    {
+      "value_px": 40,
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "properties": {
+        "margin-bottom": 1,
+        "padding": 1
+      },
+      "nearest_scale": 32
+    },
+    {
+      "value_px": -6,
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "properties": {
+        "margin": 1
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 1,
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "properties": {
+        "padding": 1
+      },
+      "nearest_scale": 4
+    },
+    {
+      "value_px": 48,
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "properties": {
+        "padding": 1
+      },
+      "nearest_scale": 48
+    }
+  ],
+  "typography_px": [
+    {
+      "value_px": 13,
+      "count": 14,
+      "files": {
+        "styles.css": 12,
+        "board.css": 2
+      },
+      "nearest_scale": 13
+    },
+    {
+      "value_px": 12,
+      "count": 9,
+      "files": {
+        "styles.css": 3,
+        "board.css": 6
+      },
+      "nearest_scale": 12
+    },
+    {
+      "value_px": 14,
+      "count": 9,
+      "files": {
+        "styles.css": 7,
+        "board.css": 2
+      },
+      "nearest_scale": 14
+    },
+    {
+      "value_px": 15,
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "nearest_scale": 14
+    },
+    {
+      "value_px": 16,
+      "count": 3,
+      "files": {
+        "styles.css": 3
+      },
+      "nearest_scale": 16
+    },
+    {
+      "value_px": 11,
+      "count": 2,
+      "files": {
+        "board.css": 2
+      },
+      "nearest_scale": 12
+    },
+    {
+      "value_px": 24,
+      "count": 2,
+      "files": {
+        "styles.css": 2
+      },
+      "nearest_scale": 24
+    },
+    {
+      "value_px": 18,
+      "count": 1,
+      "files": {
+        "board.css": 1
+      },
+      "nearest_scale": 16
+    },
+    {
+      "value_px": 20,
+      "count": 1,
+      "files": {
+        "styles.css": 1
+      },
+      "nearest_scale": 20
+    }
+  ]
+}

@@ -80,7 +80,15 @@ def _registry_session(workspace: dict[str, Any], clock: Clock, session_id: str) 
 
 
 def test_the_panel_identity_is_frozen_without_any_varying_field() -> None:
-    """Eternal contract: nothing volatile may ever join this identity."""
+    """Eternal contract: nothing volatile may ever join this identity.
+
+    ``capabilities`` gained ``task:join_application`` on 2026-09-11 (ADR 0021,
+    WP-11.2) so the operator can attach an existing task to a blueprint
+    application from the panel.  It is a constant, not a varying field, so
+    deduplication still holds across restarts; the one-time cost is that a
+    panel session opened by an older binary no longer deduplicates and must
+    end or expire before the next start.
+    """
 
     identity = panel_session_identity("workspace.abc123")
     assert identity == {
@@ -89,7 +97,7 @@ def test_the_panel_identity_is_frozen_without_any_varying_field() -> None:
         "client": "agent-commons",
         "software": "agent-commons-ui",
         "role": "operator",
-        "capabilities": (),
+        "capabilities": ("task:join_application",),
         "model_family": None,
         "model": None,
         "source_producer": None,
