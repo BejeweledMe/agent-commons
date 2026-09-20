@@ -140,6 +140,10 @@ project shell, library, outputs and conversations.
   skill/навык, specialization/специализация, blueprint/шаблон проекта,
   result/результат, review/проверка, acceptance/приёмка, board/доска. No
   transliterations (скилл, тулл, борд, делегац…) in the Russian table.
+  Transition note: several shipped strings still say "role"/«роль» for the
+  hired agent (`Role name`, `role_model_help`, `board_intro`); they are
+  renamed by the wave-4 packages WP-12.2 and WP-23, and no new string may
+  introduce the old word.
 - Canonical values — `deny`/`ask`/`auto`, `fresh`/`accumulated`, states like
   `succeeded`, entity kinds, profile ids — are NEVER translated. They keep the
   ledger's spelling and gain a human gloss beside them, never instead of them.
