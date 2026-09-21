@@ -1,0 +1,18 @@
+[
+  {
+    "title": "BASE · Согласовать исходную версию проекта",
+    "url": "http://127.0.0.1:8794/work?project=project.65114eca26abe86c61d3e7635278126a&view=work&task=task.4D6NW589CTR6XVST3EG1R82CMF&tasks=map&tab=blueprints"
+  },
+  {
+    "title": "TOOL · Ограничить lint, сборку и watch",
+    "url": "http://127.0.0.1:8794/work?project=project.65114eca26abe86c61d3e7635278126a&view=work&task=task.0SMPYBJD8GK27TVRR8S4MV38VK&tasks=map&tab=blueprints"
+  },
+  {
+    "title": "CONFIG · Проверка конфигурации rate limit",
+    "url": "http://127.0.0.1:8794/work?project=project.65114eca26abe86c61d3e7635278126a&view=work&task=task.3Y2TMVZGYKQYPP0J20455HYQYP&tasks=map&tab=blueprints"
+  },
+  {
+    "title": "REASONS · Исключить приватные сигналы из объяснений",
+    "url": "http://127.0.0.1:8794/work?project=project.65114eca26abe86c61d3e7635278126a&view=work&task=task.1EKZHK26DG2FA0BX3GKVZ63XRK&tasks=map&tab=blueprints"
+  }
+]

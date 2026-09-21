@@ -1,0 +1,15 @@
+{
+  "source": "safe tool result, broker canary claude-builder #2",
+  "ok": true,
+  "initialization": "ready",
+  "provider_work_process_started": true,
+  "duration_seconds": 25.024027583000134,
+  "exit_code": 0,
+  "canonical_state": "succeeded",
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "child_session_closed": true,
+  "provider_version": "2.1.257 (Claude Code)",
+  "agent_commons_source_sha256": "b4905a79c9c0f4342878c7af112063a1e2534d4b5f4dd3b0d251164f80010042"
+}
