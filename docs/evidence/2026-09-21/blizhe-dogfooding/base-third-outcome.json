@@ -1,0 +1,20 @@
+{
+  "attempt_id": "attempt.1J7KDA0C6ABV74NQRTF8KXD9YF",
+  "delegation_id": "delegation.2RJ7B05KZGAKDDPBH4VW6NE2PK",
+  "profile_id": "claude-builder",
+  "created_at": "2026-09-21T17:38:12.585788Z",
+  "updated_at": "2026-09-21T17:41:34.338225Z",
+  "elapsed_seconds": 201.752437,
+  "process_state": "succeeded",
+  "exit_code": 0,
+  "canonical_state": "needs_operator",
+  "canonical_reason_code": "runtime_error",
+  "canonical_summary": "probe",
+  "process_canonical_mismatch": true,
+  "terminal_tool_calls": 3,
+  "terminal_tool_rejections": 2,
+  "terminal_tool_completions": 1,
+  "accepted": false,
+  "independent_review_run": false,
+  "source": "Sanitized broker attempts --diagnostic and delegation show; UI conversation read separately."
+}

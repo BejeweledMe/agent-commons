@@ -1,0 +1,49 @@
+{
+  "outcome": "failed",
+  "error_type": "ConfigurationError",
+  "message": "scoped reviewer files must be regular",
+  "elapsed_s": 0.099,
+  "git_paths": 815,
+  "top_level_counts": [
+    [
+      "src",
+      226
+    ],
+    [
+      "archive",
+      206
+    ],
+    [
+      "docs",
+      149
+    ],
+    [
+      ".claude",
+      54
+    ],
+    [
+      "supabase",
+      51
+    ],
+    [
+      ".agent-commons",
+      34
+    ],
+    [
+      "psycologiest",
+      17
+    ],
+    [
+      "TelegramPivotDocs",
+      13
+    ],
+    [
+      "ml_moderation",
+      12
+    ],
+    [
+      "wireframes",
+      12
+    ]
+  ]
+}

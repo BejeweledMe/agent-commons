@@ -1,0 +1,33 @@
+{
+  "utc": "2026-09-21T17:55:43.419493+00:00",
+  "method": "Constructed invocation from installed profile without executing it; no model process and no MCP process started. Role narrowing omitted, so this is a superset of possible MCP allowances, not persisted exact prior argv.",
+  "profile": "claude-builder",
+  "permission_mode": "acceptEdits",
+  "workspace_root": "/Users/dmitrijersov/Desktop/blizhe-webapp",
+  "additional_directory_flag_present": false,
+  "settings_flag_present": false,
+  "setting_sources": "",
+  "session_persistence": false,
+  "allowed_tool_count": 32,
+  "allowed_tools_all_commons_mcp": true,
+  "native_bash_autoapproval_rule_present": false,
+  "disallowed_tools": [
+    "Agent",
+    "WebFetch",
+    "WebSearch"
+  ],
+  "configurable_claude_fields": [
+    "executable",
+    "git_executable",
+    "max_budget_microusd",
+    "mcp_executable",
+    "model",
+    "permission_mode",
+    "trusted_workspace"
+  ],
+  "trusted_workspace": true,
+  "source_sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8",
+  "installed_sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8",
+  "installed_matches_source": true,
+  "runtime_config_sha256": "6c8d83407babc7b7fb9135856933dbd16deb6f128b1cdda1fa03f5ffbacc258d"
+}

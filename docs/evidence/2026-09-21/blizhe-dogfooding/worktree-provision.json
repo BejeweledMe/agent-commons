@@ -1,0 +1,11 @@
+{
+  "utc": "2026-09-21T18:14:50.683839+00:00",
+  "authorization": "User approved operator worktree preparation and up to four sequential project runs BASE/review/TOOL/review.",
+  "path": "/tmp/blizhe-dogfooding-20260921/blizhe-worktree",
+  "realpath": "/private/tmp/blizhe-dogfooding-20260921/blizhe-worktree",
+  "branch": "codex/blizhe-improvement-20260921",
+  "head": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+  "fresh_origin_main": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+  "owner_branch": "main",
+  "owner_head": "cbdcad62052808343feca6a0a84a8b9b9e54976a"
+}

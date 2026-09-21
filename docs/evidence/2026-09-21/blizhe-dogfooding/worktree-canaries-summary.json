@@ -1,0 +1,20 @@
+{
+  "workspace": "workspace.01M32JTG5N6BKFTMZFRARXXWWF",
+  "authorization": "Explicit user approval: two additional canaries plus four project runs",
+  "codex-builder": {
+    "outcome": "succeeded",
+    "canonical_state": "succeeded",
+    "duration_seconds": 75.7066473330051,
+    "terminal_calls": 1,
+    "terminal_completions": 1,
+    "terminal_rejections": 0
+  },
+  "codex-independent-reviewer": {
+    "outcome": "succeeded",
+    "canonical_state": "succeeded",
+    "duration_seconds": 47.90807154099457,
+    "terminal_calls": 1,
+    "terminal_completions": 1,
+    "terminal_rejections": 0
+  }
+}
