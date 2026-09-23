@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -470,6 +471,10 @@ def test_broker_preflight_validates_the_generated_codex_mcp_contract(
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
+    # Implementation preflight now snapshots the selected checkout before any
+    # attempt, so the fixture must be a real Git worktree root.
+    subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+    (repo / "README.md").write_text("example\n", encoding="utf-8")
     CommonsManager.initialize(repo, integrations=(), workspace_name="broker-codex-preflight")
     provider_source = (
         Path(__file__).parents[1] / "fixtures" / "fake_codex_mcp_provider.py"

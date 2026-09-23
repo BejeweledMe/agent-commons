@@ -39,6 +39,7 @@ contract test. The status written in each ADR remains the detailed record.
 | [0020](0020-project-board-home.md) | Accepted by the owner, implemented | A project opens on its infinite board: roles as cards, agent links as edges, departments as frames; the task tracker is a separate tab; the arrangement is operational state behind `/api/board`, never canonical. |
 | [0021](0021-objective-blueprint-application-provenance.md) | Accepted 2026-09-11; implemented in wave 3 (WP-11.2) | Canonical objective links and immutable blueprint-application provenance; board frames may reference an application but remain operational state. |
 | [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
+| [0023](0023-incremental-ledger-validation.md) | Draft proposal | Incremental ledger validation on the canonical write path: byte-identity re-verification and bulk receipt loading replace repeated full revalidation; `doctor` unchanged. |
 
 ## How the two records fit together
 

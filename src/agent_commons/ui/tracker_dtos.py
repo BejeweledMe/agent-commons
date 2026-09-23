@@ -45,6 +45,12 @@ class TrackerEdgePayload(TypedDict):
     prerequisite_missing: bool
 
 
+class TrackerStopReasonPayload(TypedDict):
+    code: str
+    reason: str
+    next_action: str
+
+
 class TrackerRunPayload(TypedDict):
     delegation_id: str
     task_id: str | None
@@ -64,6 +70,7 @@ class TrackerRunPayload(TypedDict):
     next_action: str
     freshness: str
     evidence_state: str
+    stop_reason: TrackerStopReasonPayload | None
 
 
 class TrackerAttentionPayload(TypedDict):
@@ -181,6 +188,27 @@ class TrackerEdgeDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class TrackerStopReasonDTO:
+    """The server's own closed-set explanation of why one run stopped.
+
+    The three fields are written by ``agent_commons.runtime.refusals.StopReason``
+    and are already sanitized and bounded there.  Nothing here is derived from
+    provider output.
+    """
+
+    code: str
+    reason: str
+    next_action: str
+
+    def to_wire(self) -> TrackerStopReasonPayload:
+        return {
+            "code": self.code,
+            "reason": self.reason,
+            "next_action": self.next_action,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class TrackerRunDTO:
     delegation_id: str
     task_id: str | None
@@ -200,6 +228,9 @@ class TrackerRunDTO:
     next_action: str
     freshness: str
     evidence_state: str
+    # Additive and nullable: a run whose canonical summary carries no readable
+    # stop reason reports ``null``, never an invented one.
+    stop_reason: TrackerStopReasonDTO | None = None
 
     def to_wire(self) -> TrackerRunPayload:
         return {
@@ -221,6 +252,7 @@ class TrackerRunDTO:
             "next_action": self.next_action,
             "freshness": self.freshness,
             "evidence_state": self.evidence_state,
+            "stop_reason": None if self.stop_reason is None else self.stop_reason.to_wire(),
         }
 
 

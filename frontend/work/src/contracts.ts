@@ -12,6 +12,19 @@ export type ApiError = {
   refusal?: WorkerRefusal | null;
 };
 
+/**
+ * The server's typed reason a launch was refused before any attempt existed or
+ * a run stopped: exactly `{code, reason, next_action}` from `runtime/refusals.py`.
+ * `code` stays a string because an additive server code must keep its object and
+ * render the neutral sentence; the client never infers one from process output.
+ * `reason` is the server's own bounded, sanitized sentence (at most 256 characters).
+ */
+export type StopReason = {
+  code: string;
+  reason: string;
+  nextAction: string;
+};
+
 export type SetupStatus = {
   state: string;
   launchEnabled: boolean;
@@ -420,6 +433,18 @@ export type TrackerRun = {
   nextAction: string;
   freshness: string;
   evidenceState: string;
+  /**
+   * Additive: the typed stop reason, from the run's own field or decoded from
+   * the bounded canonical summary. `null` means the server said nothing, which
+   * keeps the existing generic copy rather than inventing a reason.
+   */
+  stopReason: StopReason | null;
+  /**
+   * Additive: the bounded, sanitized diagnostic tail the server keeps for an
+   * unsuccessful process. An incomplete tail is withheld, and what remains may
+   * appear only inside a closed disclosure, never in the first layer.
+   */
+  providerDiagnostic: string | null;
 };
 
 export type TrackerAttention = {

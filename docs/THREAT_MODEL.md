@@ -504,6 +504,14 @@ exhaust context. Orientation is scoped and bounded; inboxes are addressed;
 duplicate and stale work is surfaced; threads have explicit resolution states;
 routine logs and private reasoning are excluded.
 
+### Delegated workspace snapshots
+
+Delegated snapshots include only regular files. Symlinks, missing indexed paths,
+gitlinks, directories, and entries beneath nested worktrees are skipped with a
+bounded diagnostic rather than opened. The symlink and foreign-worktree bans
+remain deliberate: skipping preserves a useful safe snapshot without granting a
+worker a path to bytes outside the selected checkout.
+
 ## Residual risks in local deployments
 
 - A process with filesystem write access can bypass the CLI and tamper with

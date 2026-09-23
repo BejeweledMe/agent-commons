@@ -1,0 +1,75 @@
+{
+  "work_package": "WP-40",
+  "task": "task.4B59T4AVWG3ENC3QYKTTXYRFVM",
+  "delegation": "delegation.78ZT1Z5MFPHEMDEKD63031GQM9 (+ delegation.0BSF3HHCFX81VVEZ03M4FB240S, delegation.5SPX38TBG3ME4N73X2Y72NYW36)",
+  "base_commit": "bbc19e8a50e724084654fd5ca0133ce6a8425e94",
+  "recorded_at": "2026-09-23",
+  "files": [
+    {
+      "path": "src/agent_commons/mcp/scoped_repo.py",
+      "sha256": "2ade7e392677c88b2674213a32fcfbb1287105018edd49aeb59877e17ffa9173"
+    },
+    {
+      "path": "src/agent_commons/runtime/refusals.py",
+      "sha256": "07b97d7412f962d8308c29e19fbca3227aae4ef45206943c5291a691b7f9518d"
+    },
+    {
+      "path": "src/agent_commons/runtime/preflight.py",
+      "sha256": "45998f663548d4c1e453ba49e41bdd442215fb66157b1a35f58dda200edfa719"
+    },
+    {
+      "path": "src/agent_commons/runtime/__init__.py",
+      "sha256": "4c6f23f00c8550da096d09e0a291685fb2ec25898647b3067dd0dedd899f1790"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_runtime.py",
+      "sha256": "e21c93763ef51520d3669fc22cbf70974364a100154d8c10735d5a32cfd52c01"
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "sha256": "bd3673016f9954047c8f7806e664814cc22b22721062f7f68dcdd49d33bba37b"
+    },
+    {
+      "path": "tests/mcp/test_scoped_repo_entries.py",
+      "sha256": "8470725a791a66e0efcc799d22c44e09397bbf3344a2d28868f2f114c8cd55a4"
+    },
+    {
+      "path": "tests/runtime/test_preflight.py",
+      "sha256": "03896239ae553aeb88b67a307be8733da38854e7d343234931561c2a63a36c3a"
+    },
+    {
+      "path": "tests/services/test_stop_reason.py",
+      "sha256": "fc964850eff5b01481930ac52e42035795065a0665ae00be5a9ebd2ebb399dd0"
+    },
+    {
+      "path": "tests/cli/test_broker_cli.py",
+      "sha256": "e448864191dc452bf8d1f72bc53c54b6a77a894c52d9184cca65e535f2e29eed"
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "5132a716bde9da2181456b2ffe10c645edb00f7eff61c53971140d39a1cf90f6"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "892615b8d5cc4cdac6a6f1acba4d9f9e345fe19600e4d007df9ca4accfdb100d"
+    }
+  ],
+  "verification": {
+    "pytest": "270 passed, 5 skipped (tests/mcp, tests/runtime/test_preflight.py, test_provider_canary.py, tests/services/test_delegation_manager.py, test_delegation_launch_plan.py, tests/cli/test_broker_cli.py, tests/ui/test_launch.py) plus tests/services/test_stop_reason.py 13 passed",
+    "ruff": "check and format clean",
+    "run_by": "coordinator"
+  },
+  "notes": {
+    "runs": "three Terra runs (delegation.0BSF3HHCFX81VVEZ03M4FB240S UX-19; delegation.5SPX38TBG3ME4N73X2Y72NYW36 refusal types, StopReason encoding, preflight JSON; delegation.78ZT1Z5MFPHEMDEKD63031GQM9 pre-reservation admission and preflight tests); runs 1 and 2 exited with input requests and were continued with narrower checkpoint briefs",
+    "coordinator_fixes": [
+      "runtime/refusals.py: only .agent-commons/ONBOARDING.md is a required control file (AGENTS.md exists only with a client integration; the UI launch fixtures and plain projects have none) — this removed 25 tests/ui/test_launch.py regressions",
+      "tests/runtime/test_preflight.py: the missing-control-file case removes ONBOARDING.md",
+      "tests/cli/test_broker_cli.py: the MCP-contract preflight fixture is now a git worktree root; the not-ok exit code 2 is kept beside the JSON refusal body",
+      "tests/services/test_stop_reason.py added through the qa-engineer preset (13 tests: prefix and closed keys, closed code sets, sanitization, bounds, typed error, runtime summaries for needs_operator and failed; the delegation-level tests assert the marker as a trailing segment of the summary, which is what the runtime writes)"
+    ],
+    "shape": "LaunchRefusal/StopReason {code, reason<=256 sanitized, next_action}; launch codes workspace_snapshot_unreadable | executor_access_missing | provider_mcp_handshake_failed | unknown; stop codes add executor_stopped_by_environment | provider_reported_error; StopReason.summary() = 'stop_reason:' + compact JSON in the bounded delegation summary; admission before reservation: verify_executor_access (symlink root, git worktree root, ONBOARDING.md readable, profile permission_mode/trusted_workspace parity) then ScopedRepoReader construction; ScopedRepoReader skips symlinks, missing indexed paths, directories/gitlinks and nested-worktree entries with snapshot_diagnostic {code, count, examples<=5}",
+    "known_limit": "admission runs only when the checkout has .git (in-memory test ledgers predate the checkout contract)",
+    "frontend": "untouched; WP-41 renders the shapes",
+    "packaged_asset": "untouched"
+  }
+}

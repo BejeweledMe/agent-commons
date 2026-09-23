@@ -34,6 +34,7 @@ import type {
   SetupGuidanceNextActionKey,
   SetupGuidanceTool,
   SetupStatus,
+  StopReason,
   TaskOption,
   TrackerAttention,
   TrackerCapacity,
@@ -64,6 +65,7 @@ import {
   type InstrumentationOutcome
 } from "./instrumentation.js";
 import type { LibraryRef } from "./libraryTypes.js";
+import { LAUNCH_REFUSAL_CODES } from "./stopReason.js";
 
 const API_BASE_STORAGE_KEY = "agent_commons.ui.api_base";
 const API_BASE_PATTERN = /^\/api\/[A-Za-z0-9_-]{32,128}$/;
@@ -1284,6 +1286,108 @@ function parseTrackerEdge(value: unknown): TrackerEdge {
   };
 }
 
+const STOP_REASON_PREFIX = "stop_reason:";
+const STOP_REASON_MAX_CODE = 64;
+const STOP_REASON_MAX_REASON = 256;
+// The refusal an admission error carries states the pre-attempt boundary before
+// the server's own bounded sentence, so the envelope message is longer than the
+// typed field it quotes.
+const STOP_REASON_MAX_MESSAGE = 512;
+const PROVIDER_DIAGNOSTIC_MAX_BYTES = 4096;
+const TAB_CODE = 9;
+const LINE_FEED_CODE = 10;
+const FIRST_PRINTABLE_CODE = 32;
+const DELETE_CODE = 127;
+
+function stopReasonText(value: unknown, maximum: number): string | null {
+  return typeof value === "string" && value !== "" && value.length <= maximum
+    && new TextEncoder().encode(value).length <= maximum
+    && ![...value].some((character) => character.charCodeAt(0) < 32)
+    ? value : null;
+}
+
+/**
+ * The server's `{code, reason, next_action}` refusal or stop reason, exactly
+ * those three keys. Anything else is `null`: the surface then keeps its existing
+ * copy instead of rendering half a reason. Total by design — an additive field
+ * a client cannot read must never discard the whole tracker snapshot.
+ */
+export function parseStopReason(value: unknown): StopReason | null {
+  if (!isObject(value)) {
+    return null;
+  }
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 3 || keys[0] !== "code" || keys[1] !== "next_action" || keys[2] !== "reason") {
+    return null;
+  }
+  const code = stopReasonText(value.code, STOP_REASON_MAX_CODE);
+  const reason = stopReasonText(value.reason, STOP_REASON_MAX_REASON);
+  const nextAction = stopReasonText(value.next_action, STOP_REASON_MAX_REASON);
+  return code === null || reason === null || nextAction === null
+    ? null : { code, reason, nextAction };
+}
+
+/**
+ * The same object decoded from a bounded canonical summary. The server writes
+ * the compact JSON prefixed `stop_reason:`, either as the whole summary or
+ * appended to its prose after one space, and the JSON is the entire remainder.
+ * No other text is read, and nothing is ever inferred from process output.
+ */
+export function parseStopReasonSummary(value: unknown): StopReason | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const appended = value.lastIndexOf(` ${STOP_REASON_PREFIX}`);
+  const start = value.startsWith(STOP_REASON_PREFIX) ? 0 : appended === -1 ? -1 : appended + 1;
+  if (start === -1) {
+    return null;
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(value.slice(start + STOP_REASON_PREFIX.length));
+  } catch {
+    return null;
+  }
+  return parseStopReason(decoded);
+}
+
+/**
+ * The bounded diagnostic tail the private attempt store keeps for a process
+ * that did not succeed. It belongs only inside a closed disclosure, and an
+ * unreadable or oversized value is withheld rather than shortened here.
+ */
+export function parseProviderDiagnostic(value: unknown): string | null {
+  if (typeof value !== "string" || value === ""
+    || new TextEncoder().encode(value).length > PROVIDER_DIAGNOSTIC_MAX_BYTES) {
+    return null;
+  }
+  // Newlines and tabs are the diagnostic's own shape; no other control
+  // character reaches the DOM, and an all-control value is not a diagnostic.
+  const cleaned = [...value].map((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code === TAB_CODE || code === LINE_FEED_CODE
+      || (code >= FIRST_PRINTABLE_CODE && code !== DELETE_CODE) ? character : " ";
+  }).join("");
+  return cleaned.trim() === "" ? null : cleaned;
+}
+
+/**
+ * A launch refusal the server returned before any attempt existed. Only the
+ * closed pre-attempt codes are read; every other failure stays with the
+ * existing failure copy.
+ */
+export function launchRefusalFromError(error: ApiError | null | undefined): StopReason | null {
+  if (!error || !LAUNCH_REFUSAL_CODES.includes(error.code)) {
+    return null;
+  }
+  const reason = stopReasonText(error.message, STOP_REASON_MAX_MESSAGE);
+  if (reason === null) {
+    return null;
+  }
+  const nextAction = stopReasonText(error.safeNextActions[0], STOP_REASON_MAX_REASON) ?? "";
+  return { code: error.code, reason, nextAction };
+}
+
 function parseTrackerRun(value: unknown): TrackerRun {
   if (!isObject(value)) {
     throw new ApiProblem(502, null);
@@ -1308,7 +1412,15 @@ function parseTrackerRun(value: unknown): TrackerRun {
     awaitsHuman: requiredBooleanAt(value, "awaits_human"),
     nextAction: trackerEnumAt(value, "next_action", TRACKER_NEXT_ACTIONS),
     freshness: trackerEnumAt(value, "freshness", TRACKER_FRESHNESS_STATES),
-    evidenceState: trackerEnumAt(value, "evidence_state", TRACKER_EVIDENCE_STATES)
+    evidenceState: trackerEnumAt(value, "evidence_state", TRACKER_EVIDENCE_STATES),
+    // Additive: the typed field first, then the bounded canonical summary the
+    // server encodes the same object into. An unreadable value stays `null`,
+    // which keeps the existing copy instead of failing the whole snapshot.
+    stopReason: parseStopReason(value.stop_reason) ?? parseStopReasonSummary(value.summary),
+    // A tail the server marked incomplete is withheld: a fragment without its
+    // original secret markers is not evidence that its content is safe.
+    providerDiagnostic: value.stderr_diagnostic_tail_truncated === true
+      ? null : parseProviderDiagnostic(value.stderr_diagnostic_tail)
   };
 }
 

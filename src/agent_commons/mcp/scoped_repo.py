@@ -42,10 +42,18 @@ class ScopedRepoReader:
 
     def __init__(self, manager: CommonsManager, *, git_executable: str = "/usr/bin/git") -> None:
         self.manager = manager
-        self.root = manager.repo_root.resolve()
+        configured_root = Path(manager.repo_root).expanduser()
+        if configured_root.is_symlink():
+            raise ConfigurationError("scoped reviewer root must not be a symlink")
+        self.root = configured_root.resolve()
         self.policy = manager.policy
         self.files: dict[str, tuple[str, int]] = {}
         self.registered_files: dict[str, tuple[str, int]] = {}
+        self.snapshot_diagnostic: dict[str, Any] = {
+            "code": "skipped_non_regular_entries",
+            "count": 0,
+            "examples": [],
+        }
         total = 0
         self.git_executable = resolve_trusted_executable(
             git_executable,
@@ -79,6 +87,8 @@ class ScopedRepoReader:
             normalized = Path(relative)
             if _is_outside_review_scope(normalized):
                 continue
+            if self._skip_snapshot_entry(normalized):
+                continue
             try:
                 digest, size = self._digest(normalized)
             except _OversizedScopedFile:
@@ -92,6 +102,40 @@ class ScopedRepoReader:
             if len(self.files) >= 5_000 or total > 64 * 1024 * 1024:
                 raise ConfigurationError("scoped reviewer workspace exceeds safe snapshot limits")
             self.files[normalized.as_posix()] = (digest, size)
+
+    def _skip_snapshot_entry(self, relative: Path) -> bool:
+        """Exclude entries that cannot be safely opened as workspace files.
+
+        ``git ls-files`` may include untracked nested worktrees and indexed
+        paths that disappeared after staging. Classification uses lstat only;
+        it never follows a symlink or opens a foreign worktree.
+        """
+
+        candidate = self.root / relative
+        try:
+            metadata = candidate.lstat()
+        except FileNotFoundError:
+            self._record_skipped_entry(relative)
+            return True
+        if not stat.S_ISREG(metadata.st_mode):
+            self._record_skipped_entry(relative)
+            return True
+        parent = self.root
+        for component in relative.parts[:-1]:
+            parent = parent / component
+            try:
+                (parent / ".git").lstat()
+            except FileNotFoundError:
+                continue
+            self._record_skipped_entry(relative)
+            return True
+        return False
+
+    def _record_skipped_entry(self, relative: Path) -> None:
+        self.snapshot_diagnostic["count"] += 1
+        examples = self.snapshot_diagnostic["examples"]
+        if len(examples) < 5:
+            examples.append(relative.as_posix())
 
     def assert_unchanged(self) -> None:
         """Fail before a canonical result if any visible subject file moved."""
