@@ -229,6 +229,20 @@ receive Commons authentication or capabilities.
 - Provider availability `qualification.wall_time_seconds` is additive and
   nullable. Clients must render "not provided" when it is null rather than
   inventing a default.
+- Launch refusals are a closed UI contract: `workspace_snapshot_unreadable`,
+  `executor_access_missing`, `provider_mcp_handshake_failed`, and `unknown`.
+  Each refusal is rendered with the server-supplied bounded reason and one next
+  action; clients must not infer a different code from process output.
+- A terminal `StopReason` uses the same `{code, reason, next_action}` shape.
+  Its code may additionally be `executor_stopped_by_environment` or
+  `provider_reported_error`; when no additive event field is available the
+  canonical summary carries it as compact JSON prefixed `stop_reason:`.
+- Tracker run rows carry that reason as the additive, nullable `stop_reason`
+  object. The server publishes it only for a run whose own canonical stop
+  transition (`failed`, `timed_out`, `needs_operator`) recorded a readable
+  marker; a missing, malformed, or out-of-set reason is `null`, and a worker's
+  successful-run summary is never read as one. Null keeps the surface's existing
+  copy — it never means "no reason exists" and never authorizes an action.
 
 ## The project board (ADR 0020)
 

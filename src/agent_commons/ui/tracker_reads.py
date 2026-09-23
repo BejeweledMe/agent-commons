@@ -18,6 +18,7 @@ from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.work_state import FreshnessState
 from agent_commons.runtime import AttemptStore
 from agent_commons.runtime.model import BuiltinProfileId
+from agent_commons.runtime.refusals import decode_stop_reason
 from agent_commons.services.execution_plan import MAX_ATTEMPT_INPUTS, build_execution_plan
 from agent_commons.services.work_metrics import build_work_health
 from agent_commons.ui.tracker_dtos import (
@@ -27,6 +28,7 @@ from agent_commons.ui.tracker_dtos import (
     TrackerFreshnessDTO,
     TrackerRunDTO,
     TrackerSnapshotDTO,
+    TrackerStopReasonDTO,
     TrackerSurfaceState,
     TrackerTaskDTO,
 )
@@ -230,6 +232,7 @@ def build_tracker_snapshot(
             next_action=run.next_action.value,
             freshness=run.freshness.value,
             evidence_state=run.evidence_state.value,
+            stop_reason=_stop_reason(snapshot, run.delegation_id),
         )
         for run in health.runs
     )
@@ -445,6 +448,35 @@ _APPLICATION_ID = re.compile(r"^application\.[a-f0-9]{64}$")
 def _application_id(task: object) -> str | None:
     value = task.get("application_id") if isinstance(task, Mapping) else None
     return value if isinstance(value, str) and _APPLICATION_ID.fullmatch(value) else None
+
+
+# The canonical delegation states whose bounded summary is the runtime's own
+# explanation of a stop.  A succeeded or input_needed summary is worker-authored
+# prose, so a marker found there is not read: the tracker never renders a typed
+# server reason for work that did not stop on one of these transitions.
+_STOP_REASON_STATES = frozenset({"failed", "timed_out", "needs_operator"})
+
+
+def _stop_reason(snapshot: ProjectSnapshot, delegation_id: str) -> TrackerStopReasonDTO | None:
+    """Decode the stop reason the delegation's own summary carries, if any.
+
+    Additive and fail-closed: a missing delegation, a state outside the stop
+    transitions, a missing summary, and a malformed or out-of-set marker all
+    read as ``None``.
+    """
+
+    delegation = snapshot.delegations.get(delegation_id)
+    if not isinstance(delegation, Mapping):
+        return None
+    if str(delegation.get("state", "")) not in _STOP_REASON_STATES:
+        return None
+    summary = delegation.get("summary")
+    decoded = decode_stop_reason(summary if isinstance(summary, str) else None)
+    if decoded is None:
+        return None
+    return TrackerStopReasonDTO(
+        code=decoded.code, reason=decoded.reason, next_action=decoded.next_action
+    )
 
 
 def _suggested_role(snapshot: ProjectSnapshot, task_id: str) -> dict[str, str]:

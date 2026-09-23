@@ -5,6 +5,7 @@ from dataclasses import asdict
 import pytest
 
 from agent_commons.domain.snapshot import ProjectSnapshot
+from agent_commons.runtime.refusals import StopReason
 from agent_commons.ui.tracker_reads import build_tracker_snapshot, loading_tracker_snapshot
 
 NOW = "2026-08-30T10:01:00Z"
@@ -147,6 +148,9 @@ def test_tracker_composes_focused_dag_run_timeline_and_observed_capacity() -> No
     assert run["phase"] == "running"
     assert run["duration_seconds"] == 30
     assert run["wall_time_seconds"] == 900
+    # Additive and nullable: the key is always present, and a run whose
+    # delegation recorded no stop reason reports null rather than a guess.
+    assert run["stop_reason"] is None
     build_title = next(task["title"] for task in wire["tasks"] if task["task_id"] == "task.build")
     assert "\x00" not in build_title
 
@@ -303,6 +307,95 @@ def test_a_delegation_without_a_recorded_limit_reads_as_no_limit_not_the_default
     run = dto.to_wire()["runs"][0]
     assert run["wall_time_seconds"] is None
     assert run["duration_seconds"] == 30
+
+
+def _stopped(
+    summary: object,
+    *,
+    delegation_state: str = "failed",
+    attempt_state: str = "failed",
+) -> dict[str, object]:
+    """Build the wire run for one stopped delegation carrying ``summary``."""
+
+    snapshot = _snapshot(delegation_state=delegation_state)
+    delegation = dict(snapshot.delegations["delegation.1"])
+    if summary is None:
+        delegation.pop("summary", None)
+    else:
+        delegation["summary"] = summary
+    snapshot.delegations["delegation.1"] = delegation  # type: ignore[assignment]
+    dto = build_tracker_snapshot(
+        snapshot,
+        [_attempt(state=attempt_state)],
+        generated_at=NOW,
+        sequence=9,
+        capacity=CAPACITY,
+        graph=_graph(),
+    )
+    return dict(dto.to_wire()["runs"][0])
+
+
+_STOP_REASON = StopReason(
+    code="provider_reported_error",
+    reason="The provider reported an error and stopped.",
+    next_action="inspect_provider_diagnostic",
+)
+_STOP_REASON_WIRE = {
+    "code": "provider_reported_error",
+    "reason": "The provider reported an error and stopped.",
+    "next_action": "inspect_provider_diagnostic",
+}
+
+
+def test_a_stopped_run_publishes_the_servers_own_stop_reason_object() -> None:
+    """WP-40 writes the marker as the trailing segment; WP-41 reads this field."""
+
+    appended = _stopped(
+        "The allowlisted provider exited without a canonical successful result. "
+        + _STOP_REASON.summary()
+    )
+    whole = _stopped(_STOP_REASON.summary())
+
+    assert appended["stop_reason"] == _STOP_REASON_WIRE
+    assert whole["stop_reason"] == _STOP_REASON_WIRE
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "The provider exited without a canonical result.",  # no marker at all
+        "stop_reason:{not json",  # the marker with an undecodable payload
+        'stop_reason:{"code":"made_up_code","reason":"r","next_action":"n"}',  # outside the set
+        'stop_reason:{"code":"unknown","reason":"r"}',  # not the closed three keys
+        'stop_reason:{"code":"unknown","reason":"r","next_action":"n","extra":"x"}',
+        'stop_reason:{"code":"unknown","reason":"","next_action":"n"}',  # empty text
+        'stop_reason:["unknown","r","n"]',  # not an object
+        'prose stop_reason :{"code":"unknown"}',  # not the exact marker
+    ],
+)
+def test_a_malformed_or_out_of_set_stop_reason_segment_reads_as_null(summary: str) -> None:
+    """A summary this server cannot read never becomes a half-rendered reason."""
+
+    run = _stopped(summary)
+
+    assert run["stop_reason"] is None
+    assert "made_up_code" not in repr(run)
+
+
+def test_a_run_without_a_summary_reports_no_stop_reason() -> None:
+    run = _stopped(None)
+    non_text = _stopped(["stop_reason:{}"])
+
+    assert run["stop_reason"] is None
+    assert non_text["stop_reason"] is None
+
+
+def test_a_succeeded_summary_is_not_read_as_a_server_stop_reason() -> None:
+    """A worker writes the succeeded summary, so a marker there is not server truth."""
+
+    run = _stopped(_STOP_REASON.summary(), delegation_state="succeeded", attempt_state="succeeded")
+
+    assert run["stop_reason"] is None
 
 
 def test_task_payloads_carry_objective_and_application_provenance_or_null(tmp_path) -> None:

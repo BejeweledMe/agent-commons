@@ -1,0 +1,82 @@
+{
+  "work_package": "WP-41",
+  "task": "task.0AZ82ARW6DVT6TYDB1A1NCD1FW",
+  "delegation": "delegation.1YYKDX0CNR0ZZYX3C8JA6RXV8G (+ backend-builder preset for the DTO)",
+  "base_commit": "bbc19e8a50e724084654fd5ca0133ce6a8425e94",
+  "recorded_at": "2026-09-23",
+  "files": [
+    {
+      "path": "frontend/work/src/stopReason.ts",
+      "sha256": "5a94a7e590f3e331512b595ee4821351e63ddf874bbbf520e79790b96356bc42"
+    },
+    {
+      "path": "frontend/work/src/components/StopReasonNotice.tsx",
+      "sha256": "edbdbd3589096b1d7cdef426bb736b60356befb1c59995ee9f44ee338a6d4854"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "4d37264a4604b29dfede887d00ed4e4da9eba32827f83d54a3618cb3e694c5bc"
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "sha256": "01d5168e3e049e3e996bb4fd46bf47f2fb4b786dddd582863478a0d50f6f4ecd"
+    },
+    {
+      "path": "frontend/work/src/components/DecisionCard.tsx",
+      "sha256": "9965a966826ad2d537a1954076bbdca8c42efcf945f44f107cdc3a31939368cb"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "d806f8529a9551f5dd1fb7cf03d14cc7f88722b8cdb42f46287b796427186c7e"
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "ff4459907b4009f5a89d4a563f0299cc67e1100abf2c18430832545b0e712c6d"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "c315c2e600890206622cec8a0b10661d6a147d331bdec517aaf17b1d2420d26f"
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "d51da6942c4b5465883f8be6c3a374794aefc9b8011971bd6e7da8b54ba2d406"
+    },
+    {
+      "path": "frontend/work/tests/stop-reason.test.mjs",
+      "sha256": "55218f455a98ed392d4e565127a363402afdbd64d6080305618203e9feb3c0ca"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_dtos.py",
+      "sha256": "f302da06c53b0914dd1c138cc5b30046cfe9d3717da2f4c005f7cdf9f1dd1dc3"
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "a13adc038df7a06b419c1f486cb24dcd42ed0c1337f061912b072a31a62af5f7"
+    },
+    {
+      "path": "src/agent_commons/runtime/refusals.py",
+      "sha256": "ea8c88b45873aaa8fe3835448ea1d4d217d4acb9578240ecb23125e1640055dc"
+    },
+    {
+      "path": "tests/ui/test_tracker_reads.py",
+      "sha256": "a929d066ac44fca8fb94c5d88052c9f9099551b6eb7d1f2e7b513b7e3a4d1a6f"
+    },
+    {
+      "path": "tests/services/test_stop_reason.py",
+      "sha256": "c4ea2c34c6843c97b43dd147d0c2f5a24512553ec416d92708e6e787b7530624"
+    }
+  ],
+  "verification": {
+    "tsc_noEmit": "exit 0",
+    "node_test": "389 passed, 0 failed (node 24)",
+    "pytest": "100 passed (tests/ui/test_tracker_reads.py, test_readonly_invariant.py, test_launch.py, tests/services/test_stop_reason.py)",
+    "ruff": "check and format clean",
+    "run_by": "coordinator; the Opus sandbox refuses node"
+  },
+  "notes": {
+    "frontend": "Opus (delegation.1YYKDX0CNR0ZZYX3C8JA6RXV8G): stopReason.ts (closed code and action tables, runInProgress), StopReasonNotice.tsx, total parsers parseStopReason / parseStopReasonSummary / launchRefusalFromError in api.ts, decision card + run history rendering, UX-20 no Prepare run while a run is live, pre-attempt refusal beside the launch control with the draft kept, bounded provider diagnostic only in a closed details, 22 EN/RU keys",
+    "backend_half": "added by the coordinator through the backend-builder preset because the run DTO carried neither stop_reason nor summary (Opus flagged it): TrackerStopReasonDTO / additive nullable stop_reason on TrackerRunDTO, decode_stop_reason() in runtime/refusals.py (total; whole-summary or trailing-segment marker; closed set via StopReason), read only for delegations in failed / timed_out / needs_operator so worker-authored prose is never decoded; tests in tests/ui/test_tracker_reads.py and tests/services/test_stop_reason.py",
+    "assumed_field_names": "stop_reason (now real); stderr_diagnostic_tail(_truncated) on the run DTO is NOT emitted by the server yet, so the provider-diagnostic disclosure stays inert until a later package adds it (documented limit)",
+    "packaged_asset": "untouched; rebuilt at step end"
+  }
+}

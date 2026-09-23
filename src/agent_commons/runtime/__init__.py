@@ -169,6 +169,12 @@ from .provider_qualification import (
     ProviderQualificationStore,
     qualification_fingerprint,
 )
+from .refusals import (
+    LaunchRefusal,
+    StopReason,
+    decode_stop_reason,
+    verify_executor_access,
+)
 from .skill_projection import (
     BUILTIN_SKILL_IDS,
     MAX_PROJECTED_SKILLS,
@@ -367,6 +373,10 @@ __all__ = [
     "open_owner_only_unix_listener",
     "path_identity_sha256",
     "preflight_profile",
+    "LaunchRefusal",
+    "StopReason",
+    "decode_stop_reason",
+    "verify_executor_access",
     "QUALIFICATION_SCHEMA",
     "ProviderQualification",
     "ProviderQualificationStore",

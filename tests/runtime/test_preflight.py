@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_commons.errors import ConfigurationError
 from agent_commons.mcp.server import (
     IMPLEMENTATION_WORKER_TOOL_NAMES,
     INDEPENDENT_REVIEW_WORKER_TOOL_NAMES,
@@ -243,6 +244,93 @@ def test_preflight_is_red_when_real_stdio_handshake_fails(tmp_path: Path) -> Non
     )
     assert result["consumed_delegation_attempt"] is False
     assert result["provider_work_process_started"] is False
+    assert result["refusal"]["code"] == "provider_mcp_handshake_failed"
+
+
+def _implementation_workspace(tmp_path: Path) -> Path:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".agent-commons").mkdir()
+    (tmp_path / "AGENTS.md").write_text("# test\n")
+    (tmp_path / ".agent-commons" / "ONBOARDING.md").write_text("# test\n")
+    return tmp_path
+
+
+def test_implementation_preflight_refuses_missing_executor_control_file(tmp_path: Path) -> None:
+    root = _implementation_workspace(tmp_path)
+    (root / ".agent-commons" / "ONBOARDING.md").unlink()
+
+    result = preflight_profile(
+        _profiles(),
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        workspace_root=root,
+        purpose="implementation",
+        runner=ProbeRunner(),  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert result["refusal"]["code"] == "executor_access_missing"
+    assert result["consumed_delegation_attempt"] is False
+
+
+def test_implementation_preflight_refuses_unreadable_workspace_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _implementation_workspace(tmp_path)
+
+    def fail_snapshot(*args: object, **kwargs: object) -> object:
+        raise ConfigurationError("test snapshot failure")
+
+    monkeypatch.setattr("agent_commons.mcp.scoped_repo.ScopedRepoReader", fail_snapshot)
+    result = preflight_profile(
+        _profiles(),
+        BuiltinProfileId.CLAUDE_INDEPENDENT_REVIEWER,
+        workspace_root=root,
+        purpose="implementation",
+        runner=ProbeRunner(),  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is False
+    assert result["refusal"]["code"] == "workspace_snapshot_unreadable"
+    assert result["consumed_delegation_attempt"] is False
+
+
+def test_implementation_preflight_accepts_a_safe_workspace_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _implementation_workspace(tmp_path)
+
+    class SafeSnapshot:
+        snapshot_diagnostic = {"count": 2}
+
+    monkeypatch.setattr(
+        "agent_commons.mcp.scoped_repo.ScopedRepoReader", lambda *args, **kwargs: SafeSnapshot()
+    )
+    profile_id = BuiltinProfileId.CLAUDE_BUILDER
+    profiles = ProfileRegistry(
+        {
+            profile_id: ClaudeRunnerProfile(
+                profile_id=profile_id,
+                executable="/bin/echo",
+                mcp_executable="/bin/echo",
+                git_executable="/usr/bin/git",
+                permission_mode=ClaudePermissionMode.DONT_ASK,
+                trusted_workspace=True,
+            )
+        }
+    )
+    result = preflight_profile(
+        profiles,
+        profile_id,
+        workspace_root=root,
+        purpose="implementation",
+        runner=ProbeRunner(handshake_tool_names=IMPLEMENTATION_WORKER_TOOL_NAMES),  # type: ignore[arg-type]
+    )
+
+    assert result["ok"] is True
+    assert result["checks"]["workspace_snapshot"] == {
+        "ok": True,
+        "snapshot_diagnostic_count": 2,
+    }
 
 
 def test_preflight_keeps_a_truncated_handshake_distinguishable_from_a_timeout(

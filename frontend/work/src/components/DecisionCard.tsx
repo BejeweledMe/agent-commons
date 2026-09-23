@@ -1,6 +1,9 @@
 import type { ReactElement, ReactNode } from "react";
 import type { TaskDetail, TrackerRun, TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
+import { StopReasonNotice } from "./StopReasonNotice.js";
+import { AWAITING_HUMAN_PHASES, currentStopReason, newestRun, runInProgress, stopReasonAction,
+  stopReasonSentence } from "../stopReason.js";
 import { readinessUnconfirmed, stateLabel, type StateDomain } from "../taskPresentation.js";
 
 type Text = (key: MessageKey) => string;
@@ -71,14 +74,33 @@ type Props = {
   onLaunchTask: (id: string) => void;
   /** The conversation entry used when the next action is answering a worker. */
   answerControl?: ReactNode;
+  /** The inspector's re-read control, offered when the stop reason asks for one. */
+  refreshControl?: ReactNode;
   /** The tracker's canonical accept / return / request review panel. */
   children?: ReactNode;
 };
 
 export function DecisionCard({ task, tasks, runs, detail, locale, text, actionsCurrent, writesEnabled,
-  onSelectTask, onLaunchTask, answerControl = null, children }: Props): ReactElement {
+  onSelectTask, onLaunchTask, answerControl = null, refreshControl = null, children }: Props): ReactElement {
   const control = decisionControl(task.nextAction);
   const live = activeRun(runs);
+  // UX-20: a provider process is on this task, so the card never offers to
+  // prepare another run for it, whatever the projection's next action says.
+  const inProgress = runInProgress(runs);
+  const offersPrepareRun = control === "prepare_run" && inProgress === null;
+  // UX-10/UX-21: the server's own reason for the newest run replaces the generic
+  // "operator action is required" copy; it is never inferred from process output.
+  const stop = currentStopReason(runs);
+  const newest = newestRun(runs);
+  const awaitingHuman = newest !== null && AWAITING_HUMAN_PHASES.includes(newest.phase);
+  const stopControl = stop === null ? null : stopReasonAction(stop.nextAction).control;
+  const stopReasonControl = stopControl === "refresh" ? refreshControl
+    : stopControl === "conversation" && control !== "answer_worker" ? answerControl
+      : stopControl === "prepare_run" && !offersPrepareRun && inProgress === null
+        ? <button className="button button-secondary" type="button"
+          disabled={!actionsCurrent || task.freshness !== "fresh" || readinessUnconfirmed(task)}
+          onClick={() => onLaunchTask(task.taskId)}>{text("inspector_prepare_run")}</button>
+        : null;
   const findings = detail?.findings ?? null;
   const taskName = (id: string): string => tasks.find((item) => item.taskId === id)?.title || id;
   const date = (value: string | null): string => value === null ? "—"
@@ -105,10 +127,17 @@ export function DecisionCard({ task, tasks, runs, detail, locale, text, actionsC
       <span className="decision-sentence">{responsibleText(task, runs, text)}</span>
     </p>
     <div className="decision-line decision-next">
+      {/* The structured reason replaces the generic "operator action is
+          required" copy for a run that stopped on the person; the canonical
+          token itself stays in the details below, so nothing is hidden. */}
       <p><span className="decision-label">{text("decision_next")}: </span>
-        <span className="decision-sentence">{text(stateLabel("action", task.nextAction))}</span></p>
+        <span className="decision-sentence">{stop !== null && awaitingHuman
+          ? text(stopReasonSentence(stop.code)) : text(stateLabel("action", task.nextAction))}</span></p>
+      {stop !== null ? <StopReasonNotice reason={stop} text={text} control={stopReasonControl}
+        showSentence={!awaitingHuman} className="inspector-notice" role="status" /> : null}
       {!actionsCurrent ? <p className="inspector-notice" role="status">{text(writesEnabled ? "inspector_actions_stale" : "inspector_actions_readonly")}</p> : null}
-      {control === "prepare_run" ? <button className="button button-primary" type="button" disabled={!actionsCurrent || task.freshness !== "fresh" || readinessUnconfirmed(task)} onClick={() => onLaunchTask(task.taskId)}>{text("inspector_prepare_run")}</button> : null}
+      {inProgress !== null ? <p className="inspector-notice" role="status">{text("decision_run_in_progress")}</p> : null}
+      {offersPrepareRun ? <button className="button button-primary" type="button" disabled={!actionsCurrent || task.freshness !== "fresh" || readinessUnconfirmed(task)} onClick={() => onLaunchTask(task.taskId)}>{text("inspector_prepare_run")}</button> : null}
       {control === "answer_worker" ? <div className="decision-answer">{answerControl}</div> : null}
       {children}
     </div>

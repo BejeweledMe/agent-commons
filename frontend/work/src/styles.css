@@ -1211,6 +1211,19 @@ label { font-size: var(--type-3); font-weight: 550; }
   color: var(--status-accepted-text);
   padding: var(--space-4);
 }
+/* Why a run stopped: one sentence, the server's own bounded reason, one next
+   action. Neutral text — a stop is never an accepted result, so never green. */
+.stop-reason { margin: var(--space-3) 0; }
+.stop-reason-sentence { margin: 0; }
+.stop-reason-recorded { margin: var(--space-1) 0 0; }
+.stop-reason-action { margin: var(--space-2) 0 0; }
+.stop-reason .button { margin-top: var(--space-2); }
+.launch-refusal { margin: var(--space-3) 0; }
+/* The bounded provider diagnostic stays behind its own closed disclosure. */
+.run-diagnostic { margin-top: var(--space-3); }
+.run-diagnostic > summary { color: var(--text-2); }
+.run-diagnostic-text { background: var(--surface-2); border: 1px solid var(--border-1); border-radius: 6px;
+  color: var(--text-2); font-size: var(--type-1); overflow-x: auto; padding: var(--space-3); white-space: pre-wrap; }
 .inspector-disclosure { border-top: 1px solid var(--border-1); padding-top: var(--space-1); }
 .inspector-disclosure > summary h3 { display: inline; font-size: var(--type-3); font-weight: 600; }
 .inspector-disclosure > summary { color: var(--text-2); }

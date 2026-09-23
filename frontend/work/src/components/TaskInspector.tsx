@@ -1,6 +1,7 @@
 import { ConversationButton } from "./ConversationPanel.js";
 import { DecisionCard, TaskState } from "./DecisionCard.js";
 import { OutputsButton } from "./OutputsPanel.js";
+import { StopReasonNotice } from "./StopReasonNotice.js";
 import { type ReactElement, type ReactNode, useEffect, useState } from "react";
 import type { WorkApi } from "../api";
 import type { TaskDetail, TrackerRun, TrackerTask } from "../contracts";
@@ -86,7 +87,8 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
     </header>
     <DecisionCard task={task} tasks={tasks} runs={taskRuns} detail={detail} locale={locale} text={text}
       actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={onSelectTask}
-      onLaunchTask={onLaunchTask} answerControl={answerControl}>{content}</DecisionCard>
+      onLaunchTask={onLaunchTask} answerControl={answerControl}
+      refreshControl={<button className="button button-secondary" type="button" onClick={onRefresh}>{text("inspector_detail_retry")}</button>}>{content}</DecisionCard>
 
     {detailState.kind === "loading" ? <p className="inspector-section" role="status" aria-live="polite">{text("inspector_detail_loading")}</p>
       : !detailsCurrent ? <div className="inspector-section inspector-notice" role="alert">
@@ -116,6 +118,9 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
           <p className="small-copy">{run.provider ?? "—"} · {date(run.finishedAt ?? run.updatedAt ?? run.startedAt)}</p>
           {/* The recorded limit only. A run whose delegation carries none says so. */}
           <p className="small-copy inspector-run-limit">{`${text("run_limit_label")}: ${attemptLimitText(run.wallTimeSeconds, text)}`}</p>
+          {/* Why this run stopped, in the server's closed terms. The history
+              states the action; the decision card above carries the control. */}
+          {run.stopReason ? <StopReasonNotice reason={run.stopReason} text={text} /> : null}
           <details key={`${task.taskId}:${run.delegationId}`} className="inspector-technical"><summary>{text("inspector_run_details")}</summary>
             <dl><div><dt>{text("tracker_attempt_label")}</dt><dd><code>{run.attemptId ?? "—"}</code></dd></div>
               <div><dt>{text("tracker_profile_label")}</dt><dd><code>{run.profileId ?? "—"}</code></dd></div>
@@ -124,6 +129,12 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
               <div><dt>{text("tracker_evidence_label")}</dt><dd><TaskState domain="evidence" value={run.evidenceState} text={text} /></dd></div>
               <div><dt>{text("tracker_freshness")}</dt><dd><TaskState domain="freshness" value={run.freshness} text={text} /></dd></div>
             </dl>
+            {/* The bounded provider diagnostic, when the server sent one: a
+                closed disclosure inside the technical details, never the first layer. */}
+            {run.providerDiagnostic ? <details className="run-diagnostic"><summary>{text("inspector_run_diagnostic")}</summary>
+              <p className="small-copy">{text("inspector_run_diagnostic_help")}</p>
+              <pre className="run-diagnostic-text">{run.providerDiagnostic}</pre>
+            </details> : null}
           </details>
         </li>)}
       </ol>}

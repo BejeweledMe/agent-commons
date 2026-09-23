@@ -1904,6 +1904,8 @@ def broker_preflight(
         purpose=purpose,
     )
     state.emit(result)
+    # The refusal is in the JSON body; the exit code stays nonzero so scripts and
+    # CI gates keep treating an unqualified runtime as a failure.
     if not result["ok"]:
         raise click.exceptions.Exit(2)
 

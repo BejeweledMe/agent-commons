@@ -72,6 +72,7 @@ from agent_commons.runtime import (
     LaunchPlan,
     LaunchPlanner,
     LaunchPurpose,
+    LaunchRefusal,
     LocalBroker,
     NoopTelemetrySink,
     OpenTelemetrySink,
@@ -92,6 +93,7 @@ from agent_commons.runtime import (
     RunnerProfile,
     RuntimePolicy,
     SafeDiagnostic,
+    StopReason,
     SubprocessRunner,
     TelemetryEvent,
     TelemetryKind,
@@ -106,6 +108,7 @@ from agent_commons.runtime import (
     launch_refusal_error,
     terminate_process_group,
     validate_model_name,
+    verify_executor_access,
 )
 from agent_commons.runtime.demo import DemoRunner, demo_tolerant_profiles
 from agent_commons.runtime.diagnostics import (
@@ -1232,12 +1235,27 @@ class DelegationRuntimeService:
                         "The allowlisted provider exited without a canonical successful result. "
                         f"Safe diagnostic: {attempt.diagnostic_code.value}. {hint}"
                     )
-                ),
+                )
+                + " "
+                + StopReason(
+                    code="provider_reported_error",
+                    reason=hint,
+                    next_action="inspect_provider_diagnostic",
+                ).summary(),
                 idempotency_key=_operation_key(attempt.attempt_id, "failed"),
             )
             return self.manager.get_delegation(str(current["id"]))
 
         invalid_result = attempt.state is AttemptState.SUCCEEDED
+        stop_reason = StopReason(
+            code="unknown",
+            reason=(
+                "The provider exited successfully but did not record a canonical terminal result."
+                if invalid_result
+                else "The operational attempt requires explicit operator inspection."
+            ),
+            next_action="inspect_canonical_outcome",
+        )
         self.manager.mark_delegation_needs_operator(
             str(current["id"]),
             expected,
@@ -1246,7 +1264,9 @@ class DelegationRuntimeService:
                 "The provider exited successfully but did not record a canonical terminal result."
                 if invalid_result
                 else "The operational attempt requires explicit operator inspection."
-            ),
+            )
+            + " "
+            + stop_reason.summary(),
             idempotency_key=_operation_key(attempt.attempt_id, "needs-operator"),
         )
         return self.manager.get_delegation(str(current["id"]))
@@ -1716,6 +1736,31 @@ class DelegationRuntimeService:
             skill_refusal = self.launch_planner.validate_skill_projection(static_validation)
             if skill_refusal is not None:
                 raise launch_refusal_error(skill_refusal)
+            # Test-only in-memory ledgers predate the checkout contract and do
+            # not materialize Git metadata. A real selected worktree always
+            # does, and must be snapshotted before any durable launch binding.
+            if (self.manager.repo_root / ".git").exists():
+                access_refusal = verify_executor_access(
+                    self.manager.repo_root,
+                    profile=profile,
+                    profiles=self.profiles,
+                )
+                if access_refusal is not None:
+                    raise access_refusal.as_error()
+                try:
+                    from agent_commons.mcp.scoped_repo import ScopedRepoReader
+
+                    ScopedRepoReader(
+                        self.manager,
+                        git_executable=profile.git_executable,
+                    )
+                except (ConfigurationError, LifecycleConflictError) as exc:
+                    refusal = LaunchRefusal(
+                        "workspace_snapshot_unreadable",
+                        "The selected checkout could not be snapshotted safely.",
+                        "select_git_worktree",
+                    )
+                    raise refusal.as_error() from exc
             self._assert_provider_qualified(profile)
             # Context resolution and immutable operational binding happen after
             # pure static validation but before crashable probes, child session,

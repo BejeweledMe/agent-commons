@@ -12,7 +12,7 @@ import { ProjectBoard } from "./components/ProjectBoard.js";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ApiProblem, WorkApi, requestOutcome } from "./api";
+import { ApiProblem, WorkApi, launchRefusalFromError, requestOutcome } from "./api";
 import { ContextPackRetryIdentity } from "./contextPackEditorState";
 import { RolePresetPicker } from "./components/RolePresetPicker";
 import { chooseRolePreset, chooseRoleProvider } from "./rolePresetState";
@@ -26,6 +26,7 @@ import { TaskComposer } from "./components/TaskComposer";
 import { MutationFeedback } from "./components/MutationFeedback.js";
 import { MutationRegistry, mutationSurface } from "./mutationRegistry.js";
 import { LaunchRecoveryPanel } from "./components/LaunchRecoveryPanel";
+import { StopReasonNotice } from "./components/StopReasonNotice.js";
 import { DEFAULT_RUN_LIMIT_MINUTES, MAX_RUN_LIMIT_MINUTES, MIN_RUN_LIMIT_MINUTES, freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitSeconds, type LaunchIntent, type RunDraft } from "./launchIntentState.js";
 import { taskDependencyCatalog } from "./taskDependencyState.js";
 import type { TrackerViewState } from "./trackerState.js";
@@ -53,6 +54,7 @@ import type {
   ProviderAuthState,
   ProviderAuthStatus,
   SetupGuidanceNextActionKey,
+  StopReason,
   WorkerEligibilityEntry,
   WorkerRefusal,
   WorkspaceData
@@ -254,6 +256,10 @@ function WorkApp(): ReactElement {
   // control and tied to the exact attempt it refused, so it can never be read
   // as a verdict on another draft. The typed draft is never reset by a refusal.
   const [runLimitRefusal, setRunLimitRefusal] = useState<{ taskId: string; limitMinutes: string } | null>(null);
+  // A launch the server refused before any attempt or child session existed:
+  // no run was created, the typed refusal is rendered beside the control that
+  // asked for it, and the draft stays exactly as it was, in memory only.
+  const [launchRefusal, setLaunchRefusal] = useState<{ taskId: string; refusal: StopReason } | null>(null);
   const [showFullProjectPath, setShowFullProjectPath] = useState(false);
   const [configurationConfirmationOpen, setConfigurationConfirmationOpen] = useState(false);
   const [pendingLaunch, setPendingLaunch] = useState<LaunchIntent | null>(null);
@@ -1175,6 +1181,7 @@ function WorkApp(): ReactElement {
       const handle = mutationsRef.current.begin({ projectId, surface: mutationSurface("start-run"), operation: "start-run" }, typeof document === "undefined" ? null : document.activeElement);
       clearActionError("start-run");
       setRunLimitRefusal(null);
+      setLaunchRefusal(null);
       const controller = new AbortController();
       const started = performance.now();
       try {
@@ -1197,6 +1204,12 @@ function WorkApp(): ReactElement {
         // leaves the entered minutes untouched in the in-memory draft.
         if (isRunLimitRefusal(problem)) {
           setRunLimitRefusal({ taskId: intent.draft.taskId, limitMinutes: intent.draft.limitMinutes });
+        }
+        // A pre-attempt admission refusal: the closed code, the server's bounded
+        // reason and one next action, tied to the task whose draft was refused.
+        const refusal = launchRefusalFromError(problem?.apiError ?? null);
+        if (refusal !== null) {
+          setLaunchRefusal({ taskId: intent.draft.taskId, refusal });
         }
         if (profileId !== undefined && ["provider_auth_required", "provider_auth_unknown", "credential_store_unavailable"].includes(problem?.apiError?.code ?? "")) {
           try {
@@ -1358,6 +1371,10 @@ function WorkApp(): ReactElement {
   // the minutes or moving to another task retires it without a reset.
   const runLimitRefused = runLimitRefusal !== null
     && runLimitRefusal.taskId === run.taskId && runLimitRefusal.limitMinutes === run.limitMinutes;
+  // The refusal belongs to the task it refused; selecting another task retires
+  // it without touching the draft it left untouched in memory.
+  const launchRefused = launchRefusal !== null && launchRefusal.taskId === run.taskId
+    ? launchRefusal.refusal : null;
   const selectedProfileId = pendingLaunchVisible ? pendingLaunch?.profileId ?? undefined : selectedRole?.profileId;
   const selectedTeamTask = trackerObservation.kind === "ready" ? trackerObservation.snapshot.tasks.find((task) => task.taskId === route.taskId) : undefined;
   const selectedAvailability = data.providerAvailability.find(
@@ -1598,6 +1615,10 @@ function WorkApp(): ReactElement {
                 {validation([...runErrors], "run-limit") ? <p className="field-error" id="run-limit-error">{text("form_error_run_limit")}</p> : null}
                 {runLimitRefused ? <p className="field-error" id="run-limit-refusal" role="alert">{text("run_limit_server_refusal")} {text("form_error_run_limit")}</p> : null}
                 {validation([...runErrors], "provider-availability") ? <p className="field-error">{text("form_error_provider_availability")}</p> : null}
+                {launchRefused !== null ? <div className="launch-refusal" role="alert">
+                  <p className="field-error">{text("launch_refused_before_attempt")}</p>
+                  <StopReasonNotice reason={launchRefused} text={text} />
+                </div> : null}
                 <button className="button button-primary" disabled={!environmentReady || selectedAvailability?.launchable !== true || pendingLaunch !== null} type="submit">{writeInFlight ? text("working") : text("start_run")}</button>
               </fieldset>
             </form>

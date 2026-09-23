@@ -8,9 +8,10 @@ import re
 import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
-from agent_commons.errors import ConfigurationError
+from agent_commons.errors import ConfigurationError, LifecycleConflictError
 
 from .diagnostics import (
     DiagnosticCode,
@@ -28,6 +29,8 @@ from .model import (
     ProfileRegistry,
     RunnerInvocation,
 )
+from .policy import RuntimePolicy
+from .refusals import LaunchRefusal, verify_executor_access
 from .source_contract import agent_commons_source_sha256
 from .subprocess_runner import ProcessResult, RunOutcome, SubprocessRunner
 
@@ -298,6 +301,38 @@ def preflight_profile(
     effective_purpose = purpose or (
         "independent_review" if normalized.independent_reviewer else "implementation"
     )
+    # Explicit implementation preflight is the admission simulation used by
+    # the broker/UI.  Keep the historical profile-only default useful for
+    # provider compatibility checks that have no selected checkout yet.
+    if purpose == "implementation":
+        access_refusal = verify_executor_access(root, profile=profile, profiles=profiles)
+        if access_refusal is not None:
+            return _launch_refusal_result(normalized, profile, access_refusal)
+        try:
+            # Import lazily: the MCP package exports its server, which imports
+            # the runtime service that calls preflight during package startup.
+            from agent_commons.mcp.scoped_repo import ScopedRepoReader
+
+            snapshot = ScopedRepoReader(
+                SimpleNamespace(repo_root=root, policy=RuntimePolicy()),
+                git_executable=profile.git_executable,
+            )
+        except (ConfigurationError, LifecycleConflictError):
+            return _launch_refusal_result(
+                normalized,
+                profile,
+                LaunchRefusal(
+                    "workspace_snapshot_unreadable",
+                    "The selected checkout could not be snapshotted safely.",
+                    "select_git_worktree",
+                ),
+            )
+        snapshot_check: dict[str, Any] = {
+            "ok": True,
+            "snapshot_diagnostic_count": int(snapshot.snapshot_diagnostic["count"]),
+        }
+    else:
+        snapshot_check = {}
     try:
         invocation = profile.build_invocation(
             "Agent Commons credential-free compatibility preflight.",
@@ -373,6 +408,7 @@ def preflight_profile(
         missing.extend(flag for flag in required_flags if not _help_has_flag(help_text, flag))
     missing_flags = sorted(missing)
     checks: dict[str, Any] = {
+        **({"workspace_snapshot": snapshot_check} if snapshot_check else {}),
         "provider_help": (
             {"ok": True, "required_flags": "present"}
             if help_probes_succeeded and not missing_flags
@@ -380,7 +416,7 @@ def preflight_profile(
                 **_safe_failure(DiagnosticCode.UNSUPPORTED_PROVIDER_FLAG),
                 "missing_flag_count": len(missing_flags),
             }
-        )
+        ),
     }
 
     try:
@@ -528,12 +564,36 @@ def preflight_profile(
         )
 
     ok = all(bool(check.get("ok")) for check in checks.values())
-    return {
+    result = {
         "profile_id": normalized.value,
         "provider": profile.provider.value,
         "ok": ok,
         "checks": checks,
         "consumed_delegation_attempt": False,
         "provider_help_process_started": help_process_started,
+        "provider_work_process_started": False,
+    }
+    if not bool(checks.get("mcp_handshake", {}).get("ok")):
+        result["refusal"] = LaunchRefusal(
+            "provider_mcp_handshake_failed",
+            "The executor MCP server did not complete initialization.",
+            "repair_mcp_configuration",
+        ).as_dict()
+    return result
+
+
+def _launch_refusal_result(
+    profile_id: BuiltinProfileId, profile: Any, refusal: LaunchRefusal
+) -> dict[str, Any]:
+    """Keep admission failures machine-readable and explicitly pre-spend."""
+
+    return {
+        "profile_id": profile_id.value,
+        "provider": profile.provider.value,
+        "ok": False,
+        "checks": {},
+        "refusal": refusal.as_dict(),
+        "consumed_delegation_attempt": False,
+        "provider_help_process_started": False,
         "provider_work_process_started": False,
     }
