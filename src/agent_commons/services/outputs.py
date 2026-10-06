@@ -15,6 +15,7 @@ from typing import Any, Literal, Protocol, get_args
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.chronology import chronological_key
 from agent_commons.domain.design_packages import DesignPackageRecord, ScreenBinding
+from agent_commons.domain.lifecycle import _delegation_matches_review
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.runtime.live_previews import LivePreview, LivePreviewRegistry
 from agent_commons.services.artifact_content import (
@@ -24,6 +25,7 @@ from agent_commons.services.artifact_content import (
     PreviewRefusalCode,
 )
 from agent_commons.services.generated_outputs import producer_for_task, validated_generated_metadata
+from agent_commons.services.output_content import BUILD_KIND, OutputContentStore
 
 ScopeKind = Literal["task", "agent"]
 OutputState = Literal["unchecked", "ready", "stale", "unavailable"]
@@ -104,10 +106,12 @@ class ImageOutput:
     version_count: int
     width: int | None = None
     height: int | None = None
-    kind: Literal["design_image", "artifact_image"] = "design_image"
+    kind: Literal["design_image", "artifact_image", "static_build"] = "design_image"
     delegation_revision: str | None = None
     historical_preview_verified: bool = False
     review_state: ReviewState | None = None
+    result_review_state: ReviewState | None = None
+    retained: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +161,7 @@ class OutputReads:
         for item in items:
             historical = (
                 isinstance(item, ImageOutput)
-                and item.kind == "artifact_image"
+                and item.kind in {"artifact_image", "static_build"}
                 and item.state == "stale"
                 and item.reason == "producer_task_revision_changed"
             )
@@ -165,7 +169,11 @@ class OutputReads:
                 try:
                     if reader is None:
                         reader = self._reader_factory(self._manager)
-                    checked = self._verify(item, reader)
+                    checked = (
+                        self._verify_build(item)
+                        if item.kind == "static_build"
+                        else self._verify(item, reader)
+                    )
                     item = (
                         replace(item, historical_preview_verified=True)
                         if historical and checked.state == "ready"
@@ -268,6 +276,7 @@ class OutputReads:
                     version_count=versions_by_series[item.series_id],
                     latest=item.output_id == latest_by_series[item.series_id],
                     review_state=reviews.get(item.task_id),
+                    result_review_state=_result_review(snapshot, item),
                 )
                 for item in items
                 if selected == "all" or item.output_id == latest_by_series[item.series_id]
@@ -316,7 +325,10 @@ class OutputReads:
             reason = None
             if not _exact(snapshot.tasks.get(task["id"]), task["revision"]):
                 state, reason = "stale", "producer_task_revision_changed"
-            elif manifest.get("media_type") not in _SAFE_MEDIA:
+            elif (
+                manifest.get("media_type") not in _SAFE_MEDIA
+                and metadata["output_kind"] != BUILD_KIND
+            ):
                 state, reason = "unavailable", "output_preview_unsupported"
             items.append(
                 ImageOutput(
@@ -341,14 +353,17 @@ class OutputReads:
                     reason=reason,
                     latest=True,
                     version_count=1,
-                    kind="artifact_image",
+                    kind="static_build"
+                    if metadata["output_kind"] == BUILD_KIND
+                    else "artifact_image",
+                    retained=metadata.get("retained_content") is not None,
                     delegation_revision=producer["revision"],
                 )
             )
         return items
 
-    @staticmethod
     def _item(
+        self,
         snapshot: ProjectSnapshot,
         package: DesignPackageRecord,
         screen: ScreenBinding,
@@ -390,6 +405,17 @@ class OutputReads:
             state, reason = "stale", "producer_provenance_missing"
         elif not screen.safe_preview_eligible or screen.media_type not in _SAFE_MEDIA:
             state, reason = "unavailable", "output_preview_unsupported"
+        retained = False
+        if artifact is not None and artifact.get("manifest_ref") in snapshot.known_manifest_ids:
+            try:
+                retained = (
+                    self._manager.manifests.get(artifact["manifest_ref"])
+                    .manifest.get("metadata", {})
+                    .get("retained_content")
+                    is not None
+                )
+            except Exception:
+                pass
         series = f"{package.design_package_id}:{screen.screen_id}"
         return ImageOutput(
             output_id=f"{package.design_package_id}@{package.revision}:{screen.screen_id}",
@@ -412,8 +438,40 @@ class OutputReads:
             state=state,
             reason=reason,
             latest=latest,
+            retained=retained,
             version_count=1,
         )
+
+    def read_build(
+        self, scope_kind: str, scope_id: str, artifact_id: str, artifact_revision: str
+    ) -> bytes:
+        listing = self.list(scope_kind, scope_id, versions="all")
+        item = next(
+            (
+                item
+                for item in listing.items
+                if isinstance(item, ImageOutput)
+                and item.kind == "static_build"
+                and item.artifact_id == artifact_id
+                and item.artifact_revision == artifact_revision
+                and (item.state == "ready" or item.historical_preview_verified)
+            ),
+            None,
+        )
+        if item is None:
+            raise OutputReadRefusal(
+                "outputs_unavailable", 409, "Exact build bytes are unavailable."
+            )
+        manifest = self._manager.get_artifact_bundle(artifact_id)["manifest"]
+        return OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
+
+    def _verify_build(self, item: ImageOutput) -> ImageOutput:
+        try:
+            manifest = self._manager.get_artifact_bundle(item.artifact_id)["manifest"]
+            OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
+        except Exception:
+            return replace(item, state="unavailable", reason="output_preview_unavailable")
+        return replace(item, state="ready")
 
     @staticmethod
     def _verify(item: ImageOutput, reader: PreviewReader) -> ImageOutput:
@@ -473,3 +531,39 @@ def _exact(record: Mapping[str, Any] | None, revision: str) -> bool:
     return record is not None and (record.get("effective_revision") or record.get("revision")) == (
         revision
     )
+
+
+def _result_review(snapshot: ProjectSnapshot, item: ImageOutput) -> ReviewState | None:
+    """An artifact-target review is exact; a task review never approves an output."""
+    candidates = []
+    for identifier, review in snapshot.reviews.items():
+        if (
+            review.get("target_ref") != {"kind": "artifact", "id": item.artifact_id}
+            or review.get("target_revision") != item.artifact_revision
+            or review.get("stale") is True
+        ):
+            continue
+        state = _REVIEW_STATES.get(str(review.get("state")))
+        if state == "approved":
+            if review.get("independent") is not True:
+                continue
+            actor = (review.get("actor") or {}).get("session_id")
+            delegated = [
+                delegation
+                for delegation in snapshot.delegations.values()
+                if delegation.get("child_session_id") == actor
+                and delegation.get("purpose") == "independent_review"
+                and _delegation_matches_review(delegation, review)
+            ]
+            if delegated and not any(
+                delegation.get("state") == "succeeded" for delegation in delegated
+            ):
+                continue
+        if state is not None:
+            candidates.append(
+                (
+                    chronological_key(review.get("recorded_at"), review.get("id") or identifier),
+                    state,
+                )
+            )
+    return max(candidates)[1] if candidates else None

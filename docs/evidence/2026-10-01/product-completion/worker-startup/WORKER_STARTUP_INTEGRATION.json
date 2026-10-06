@@ -1,0 +1,30 @@
+{
+  "schema": "commons.incremental-fix-integration.v1",
+  "files": [
+    {
+      "path": "src/agent_commons/services/delegation_instruction.py",
+      "base_sha256": "25117db5e183ff2c99a98a9230eee3811a6bb251859b1e75cd0c17cc6ed8390f",
+      "final_sha256": "60c11909e160a73f976f78b49c7f7d9de2a0e230cf7e4c7f2228cc4240ac0139"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_runtime.py",
+      "base_sha256": "e21c93763ef51520d3669fc22cbf70974364a100154d8c10735d5a32cfd52c01",
+      "final_sha256": "758e73d708732fa22615250ab280e1d825cd2c08bcd67745bb414e8a3ddf3426"
+    },
+    {
+      "path": "tests/runtime/test_delegation_instruction.py",
+      "base_sha256": "cf21e1bcc6403124c72cdedad24b23da35cb981c4ad5005032cd844cd5c01276",
+      "final_sha256": "241c560824780fe57b7858ab318531d76a0579353ea0453e600423810a0fd4fb"
+    },
+    {
+      "path": "tests/services/test_delegation_launch_plan.py",
+      "base_sha256": "0356608bbe7ac23a1f575829e8e11949e7eb81adacc5ff8136677a482ccf8bc0",
+      "final_sha256": "f06065b88f26f9251edd2f4c33d7a9b5b9e0f5f3ef6a273207f4b423ede910da"
+    },
+    {
+      "path": "docs/PROTOCOL.md",
+      "base_sha256": "fce76b56fa2e92fd95a2430a02e171f0bea60d340646fdfd3660be8acd363ec2",
+      "final_sha256": "85932063dcf862863e41f1ce37064d089515265338b1b82b8985dc445958e568"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from typing import Any
 
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.snapshot import ProjectSnapshot
+from agent_commons.services.output_content import BUILD_KIND
 
 OUTPUT_KIND = "task_design_image"
 
@@ -49,8 +50,28 @@ def validated_generated_metadata(
     value = manifest.get("metadata")
     if (
         not isinstance(value, dict)
-        or set(value) != {"output_kind", "output_task", "output_delegation", "series_id", "title"}
-        or value["output_kind"] != OUTPUT_KIND
+        or set(value)
+        not in (
+            {"output_kind", "output_task", "output_delegation", "series_id", "title"},
+            {
+                "output_kind",
+                "output_task",
+                "output_delegation",
+                "series_id",
+                "title",
+                "retained_content",
+            },
+            {
+                "output_kind",
+                "output_task",
+                "output_delegation",
+                "series_id",
+                "title",
+                "retained_content",
+                "build_files",
+            },
+        )
+        or value["output_kind"] not in {OUTPUT_KIND, BUILD_KIND}
     ):
         return None
     task = value["output_task"]
@@ -85,11 +106,54 @@ def validated_generated_metadata(
         or not relative.parts
         or relative.as_posix() != source["path"]
         or any(part.startswith(".") for part in relative.parts)
-        or relative.suffix.lower() not in {".png", ".jpg", ".jpeg"}
+        or (
+            value["output_kind"] == OUTPUT_KIND
+            and relative.suffix.lower() not in {".png", ".jpg", ".jpeg"}
+        )
         or "\\" in source["path"]
         or any(ord(char) < 32 or ord(char) == 127 for char in source["path"])
     ):
         return None
+    retained = value.get("retained_content")
+    if retained is not None and retained != {
+        "revision": manifest.get("revision"),
+        "size_bytes": manifest.get("size_bytes"),
+    }:
+        return None
+    if value["output_kind"] == BUILD_KIND:
+        files = value.get("build_files")
+        if (
+            retained is None
+            or manifest.get("media_type") != "application/zip"
+            or not isinstance(files, list)
+            or not 1 <= len(files) <= 128
+        ):
+            return None
+        paths = set()
+        total = 0
+        for entry in files:
+            if not isinstance(entry, dict) or set(entry) != {"path", "revision", "size_bytes"}:
+                return None
+            name, digest, size = entry["path"], entry["revision"], entry["size_bytes"]
+            if (
+                not isinstance(name, str)
+                or not name
+                or len(name) > 1024
+                or Path(name).is_absolute()
+                or Path(name).as_posix() != name
+                or any(part.startswith(".") for part in Path(name).parts)
+                or "\\" in name
+                or name in paths
+                or not isinstance(digest, str)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+                or type(size) is not int
+                or not 0 <= size <= 10 * 1024 * 1024
+            ):
+                return None
+            paths.add(name)
+            total += size
+        if "index.html" not in paths or total > 20 * 1024 * 1024:
+            return None
     revision = artifact.get("effective_revision") or artifact.get("revision")
     session = snapshot.entity_revision_actor("artifact", artifact["id"], revision)
     producer = producer_for_task(snapshot, session, task["id"], delegations)

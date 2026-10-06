@@ -1,0 +1,199 @@
+{
+  "files": [
+    {
+      "path": "src/agent_commons/ui/output_routes.py",
+      "current_sha256": "dab2b8390dd428785f47d8d83fb5af3fbaa77b9f3c790b68658ddb7b869ccaf5",
+      "incoming_sha256": "b1c3306b0dc156b39edd1caa09126065ac0ac0f6f1ef96557f191f436155d963",
+      "merged_sha256": "b1c3306b0dc156b39edd1caa09126065ac0ac0f6f1ef96557f191f436155d963",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/runtime/model.py",
+      "current_sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8",
+      "incoming_sha256": "994360dbc68368f2d73abcf4ac9e1a392433b56ca8f247684033b606841874e1",
+      "merged_sha256": "994360dbc68368f2d73abcf4ac9e1a392433b56ca8f247684033b606841874e1",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "current_sha256": "3ceb1ab089c81d2f72225f832507d3ba489cfdcc980a94939054a9689190d9b6",
+      "incoming_sha256": "d406df885f7ad158eacd972958d96c0c867a6bef4cb1024d1ad2b50a1ad5c57e",
+      "merged_sha256": "6226b0beb4500cc433d6290c3703f63e99d2518e04c523348b19e8011c26f3ce",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "src/agent_commons/mcp/design_output_tools.py",
+      "current_sha256": "bb19f3e990a8d6eb70dcd6a52fd6a01764e3baad78f1cd36e0984adee2b1911b",
+      "incoming_sha256": "a446df1ebfc925afd1ef749b52ba58af9794dbb96df1fb4b0d3e9861d9bfab04",
+      "merged_sha256": "a446df1ebfc925afd1ef749b52ba58af9794dbb96df1fb4b0d3e9861d9bfab04",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_instruction.py",
+      "current_sha256": "07e1a9df165a4fc04ae96c5eaf21730d9d388b4c1c1d126f46b036f9377b5483",
+      "incoming_sha256": "25117db5e183ff2c99a98a9230eee3811a6bb251859b1e75cd0c17cc6ed8390f",
+      "merged_sha256": "25117db5e183ff2c99a98a9230eee3811a6bb251859b1e75cd0c17cc6ed8390f",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/services/output_content.py",
+      "current_sha256": null,
+      "incoming_sha256": "8c0a0b673c7d5166ffea4ab83abd745298a25ed16c4af55e6b377b7e21c2c8dd",
+      "merged_sha256": "8c0a0b673c7d5166ffea4ab83abd745298a25ed16c4af55e6b377b7e21c2c8dd",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/services/artifact_content.py",
+      "current_sha256": "d472f07086ae7c1cc690e24b56d24dc3f5b7723891db0aa8b1f2cb44f7f741c7",
+      "incoming_sha256": "7068eabe4b55f5e2fe33a717ccc52782af9ea9c4c82441421374b54aa137bd20",
+      "merged_sha256": "7068eabe4b55f5e2fe33a717ccc52782af9ea9c4c82441421374b54aa137bd20",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/services/generated_outputs.py",
+      "current_sha256": "9466dad95a9da737c60f6343cca8fdf09f9ffdc1e245bcbce9cbcc3902fb870e",
+      "incoming_sha256": "a23aec17289b93ec23b7c4d0b56bd18308c7e8029591abb8e41206adfd80d433",
+      "merged_sha256": "a23aec17289b93ec23b7c4d0b56bd18308c7e8029591abb8e41206adfd80d433",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "src/agent_commons/services/outputs.py",
+      "current_sha256": "aa1f05c3014ab1329522b7dd38d610904bf32472e363025b997e6b9209a1dd54",
+      "incoming_sha256": "57e97276363c51b644382d2e882644bc5a1be86c6e41798107f4bedd62a2df0d",
+      "merged_sha256": "57e97276363c51b644382d2e882644bc5a1be86c6e41798107f4bedd62a2df0d",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "frontend/work/tests/outputs.test.mjs",
+      "current_sha256": "d382052364300cd9c4faa4c5eb4c4146fc004f543d324f81886446652daab910",
+      "incoming_sha256": "08ff9c512b8b4ae05baf6fcd4afb79ed2cfe4aa4a29c58dc71673fbc61e34ce6",
+      "merged_sha256": "08ff9c512b8b4ae05baf6fcd4afb79ed2cfe4aa4a29c58dc71673fbc61e34ce6",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "frontend/work/src/outputsTypes.ts",
+      "current_sha256": "88f12851f37a0505c3d0d2addef3a0dd1f91746bc19530b9936b728360ac8c54",
+      "incoming_sha256": "5f160a17ec30dc2c33e3e3988fbe74c1c565061e01e6331d41e0f9a9cec71de3",
+      "merged_sha256": "5f160a17ec30dc2c33e3e3988fbe74c1c565061e01e6331d41e0f9a9cec71de3",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "current_sha256": "33cafa9a37f4ba0efd1af90038395a95afa12d34670c38d0c36b6ddc17fe34c4",
+      "incoming_sha256": "ec065a1e2c692ff9429b7293453cb4c6879a681d4d0ede9253764c69b18e9be3",
+      "merged_sha256": "338b985f5022c8d3c3ca613395797f70557169675c227068978006fd8f4231ae",
+      "mode": "json-three-way"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "current_sha256": "8f8275ce841582c269810f6b97c8243280ab9ce9130d4604e691eb2cf99e5d6a",
+      "incoming_sha256": "66bc13f84a0e55f82399b7287e4b063bdb2fbbc232ba221e032aa779f334f014",
+      "merged_sha256": "ddf5e30a21ec882ce1ccca0f3e067d59c3c5fa3e7fe04c4300becb8b286809fd",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "frontend/work/src/outputsStrings.ts",
+      "current_sha256": "f33d879550f3ed3b99a5d8e5e7ddd3bbed0a015d16a0960f8009fbcc7b568165",
+      "incoming_sha256": "2343a04c86819d75fc291ab38d009984cdc22a0290109f7ec32173965b32681d",
+      "merged_sha256": "2343a04c86819d75fc291ab38d009984cdc22a0290109f7ec32173965b32681d",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "frontend/work/src/outputsApi.ts",
+      "current_sha256": "5b03ca6a5ba9ef1501d722185cc95fe108b65a4290e53713fb7eef89759cbd22",
+      "incoming_sha256": "3e32ce1a7ab54f719e1d0f0938e5ffcbd4d6a8d45c3754a91b86930e919911aa",
+      "merged_sha256": "3e32ce1a7ab54f719e1d0f0938e5ffcbd4d6a8d45c3754a91b86930e919911aa",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "frontend/work/src/components/OutputsPanel.tsx",
+      "current_sha256": "4acb81570b03d5f8bc9b38351abc81b59e456b053e2801232d12b1f58670dc92",
+      "incoming_sha256": "219ead74830db36341c99ed2b682bb6a6ca866a92a02e1a6c4cd7438ac0c1582",
+      "merged_sha256": "219ead74830db36341c99ed2b682bb6a6ca866a92a02e1a6c4cd7438ac0c1582",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "tests/ui/test_output_routes.py",
+      "current_sha256": "dacb455bab1ff1bb9eedae889ce5de514c33547bf420078e2e13f07ecbc112c2",
+      "incoming_sha256": "24221acbf6240b8b12b1a490e30585dd6b6790cc853163c9383a4d4a4678eafa",
+      "merged_sha256": "24221acbf6240b8b12b1a490e30585dd6b6790cc853163c9383a4d4a4678eafa",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "tests/runtime/test_profiles_policy.py",
+      "current_sha256": "67d367eb8ff563565263b7507097d8829fc0c12d9b0a5f97bdb494cad74be0a9",
+      "incoming_sha256": "5e3173a714dd928e8b940518904732ff4bb2ed03e4e05dcdeafe1cc505c58a70",
+      "merged_sha256": "5e3173a714dd928e8b940518904732ff4bb2ed03e4e05dcdeafe1cc505c58a70",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "tests/runtime/test_delegation_instruction.py",
+      "current_sha256": "e6062f872a0e3adade5806b38deb421f2e76c8aa77e54e4c59a9331f18b42773",
+      "incoming_sha256": "cf21e1bcc6403124c72cdedad24b23da35cb981c4ad5005032cd844cd5c01276",
+      "merged_sha256": "cf21e1bcc6403124c72cdedad24b23da35cb981c4ad5005032cd844cd5c01276",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "tests/mcp/test_design_output_tools.py",
+      "current_sha256": "13a54a069f5f17d46eb940af4fdfae881980ee0f21b7f996cd507316b315eb5d",
+      "incoming_sha256": "a62d96b4908b0c5d3c30be7bb912dac77a31138cecf4cc58b1a92be59c70f8b3",
+      "merged_sha256": "a62d96b4908b0c5d3c30be7bb912dac77a31138cecf4cc58b1a92be59c70f8b3",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "tests/mcp/test_worker_scope.py",
+      "current_sha256": "ce32b438dac821c46a0cb0e786eb363e7fd065cb48b35c6c7a43b9086138a4db",
+      "incoming_sha256": "f5c98c4a45113e5b2c95c4afd1a19c8cc233a669df4b68580639e7e29aeee5f2",
+      "merged_sha256": "92aa3f637ef42eb49938ecdbfc246fc17c80960ead9b0afda98d0b2d365aa927",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "current_sha256": "c8390ae2d4bd839393d8ae74cebca26b9e56ba7843b5cfbde0293e5e88fd0076",
+      "incoming_sha256": "32c0b6a002e9cd567c39039989c541cdd27b21a01e68d3067ab4d8699529ea7d",
+      "merged_sha256": "ebe56a187e51cff9223100d4406c4e54ea511ed5afec2b8cb7c866ba32d40197",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "docs/PROTOCOL.md",
+      "current_sha256": "54bd9f69ae7b0cea527947fce1bb365d912dac69bf892f78761bd053c655cfcd",
+      "incoming_sha256": "9584f4cb528ce07a523740e090404f54e3b0b9b70beeaef13ffc72932452fa31",
+      "merged_sha256": "9584f4cb528ce07a523740e090404f54e3b0b9b70beeaef13ffc72932452fa31",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "current_sha256": "e77832f0ae75dba3e452f90e64d9d34fe47bec78134156ca150aaaf70c71321b",
+      "incoming_sha256": "3a9e84293ddf25095eef3e3bd9874aebcf2c638c8306dc59723055184b3386bc",
+      "merged_sha256": "ff04cef04ce527e0d525961808260ef18e805cbb363487e26b7a79e1a243c184",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "docs/adr/0025-retained-worker-results.md",
+      "current_sha256": null,
+      "incoming_sha256": "811acf7bf5b90cadb1ac285f18c0516b89d8385e97a1273571f38db981a0e7f0",
+      "merged_sha256": "811acf7bf5b90cadb1ac285f18c0516b89d8385e97a1273571f38db981a0e7f0",
+      "mode": "unchanged-baseline"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "current_sha256": "2fdecd8d2713c989ed224cd55220dc0bdedfc82c329e0afc284421f68e309a5f",
+      "incoming_sha256": "eb2b8cbed901d8a5d54a99cce7a2c0f747bb59f0aa588bf0f14cd111f5880e33",
+      "merged_sha256": "a3db40b4b2427fa54ad0491e639f80cc413f119f26774d6c9295029da8c1d09d",
+      "mode": "text-three-way"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "current_sha256": "1ec64258fd68fed5f57294b771d17db4b5b6e4c727f1f7b76d9fbd3bc7b03c3d",
+      "incoming_sha256": "cda06217951130ed379322a35ec3c9c9f3caea6179c5b41494694a010194b9d7",
+      "merged_sha256": "e7b344004b9fd3b71cad4eb1ae34ae2038faf96214d5d4786c78fae425ba8e08",
+      "mode": "text-three-way"
+    }
+  ],
+  "conflicts": [
+    "docs/FRONTEND_CONTRACT.md",
+    "docs/adr/README.md",
+    "docs/user/ru/README.md"
+  ],
+  "conflicts_resolved": "Preserved both independent additive documentation sections; locale changes merged by key; shared code merged three-way."
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "agent_commons.linux_gate_availability.v1",
+  "date": "2026-10-01",
+  "current_host": "macOS",
+  "docker_client_present": true,
+  "docker_default_endpoint": "local Unix socket",
+  "docker_daemon_query": "not reachable",
+  "dedicated_l1_host": "No project/Linux matching SSH alias discovered; no known target address in retained sanitized L1 evidence",
+  "canonical_l1_task": "task.2R2FJEWZPD57MHV6GB2ENAEDRP",
+  "gate_requirement": "Separately operator-provisioned authenticated Linux host; six supported release-profile behavioral canaries on exact source/profile/provider versions",
+  "status": "unproven; no target host provisioned or contacted",
+  "limitations": "Local Docker availability is not L1 qualification. No credentials read, transferred, or recorded."
+}

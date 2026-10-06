@@ -63,6 +63,9 @@ _CREDENTIAL_MARKERS = frozenset(
     }
 )
 
+# Start bare keys at token boundaries and consume each token without backtracking.
+# The numeric/punctuation prefix keeps conservative detection of 123password=x
+# while preventing a failed long identifier from being rescanned at every suffix.
 _QUOTED_ASSIGNMENT = re.compile(
     r"""
     (?P<key>
@@ -70,7 +73,7 @@ _QUOTED_ASSIGNMENT = re.compile(
         |
         '(?:\\.|[^'\\\r\n])+'
         |
-        [A-Za-z_][A-Za-z0-9_.-]*
+        (?<![A-Za-z0-9_.-])[0-9.-]*+[A-Za-z_][A-Za-z0-9_.-]*+
     )
     \s*[:=]\s*
     (?P<value>
@@ -84,7 +87,8 @@ _QUOTED_ASSIGNMENT = re.compile(
 
 _UNQUOTED_ASSIGNMENT = re.compile(
     r"""
-    (?P<key>[A-Za-z_][A-Za-z0-9_.-]*)
+    (?<![A-Za-z0-9_.-])[0-9.-]*+
+    (?P<key>[A-Za-z_][A-Za-z0-9_.-]*+)
     \s*[:=]\s*
     (?P<value>[^\s"'`#,}\]]+)
     """,
@@ -324,6 +328,8 @@ class SecurityPolicy:
                 key = match.group("key")
                 if key[:1] in {'"', "'"} and key[-1:] == key[:1]:
                     key = key[1:-1]
+                else:
+                    key = key.lstrip("0123456789.-")
                 if _credential_key(key) and match.group("value")[1:-1].strip():
                     findings.append(
                         SecurityFinding(
@@ -371,6 +377,8 @@ class SecurityPolicy:
                 key = match.group("key")
                 if key[:1] in {'"', "'"} and key[-1:] == key[:1]:
                     key = key[1:-1]
+                else:
+                    key = key.lstrip("0123456789.-")
                 if _credential_key(key) and match.group("value")[1:-1].strip():
                     add(
                         text,

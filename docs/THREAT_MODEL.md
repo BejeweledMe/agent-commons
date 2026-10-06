@@ -413,6 +413,15 @@ anchor detects deletion or byte changes after the first local observation.
 Conflicting receipts, anchors, or active heads are reported and fail closed
 rather than being resolved by timestamp.
 
+For engineering target D-16 (`perf/write-path-target`), a canonical write may
+reuse an in-memory verified ledger view only while it holds the existing
+canonical write lock. Every reuse re-hashes the raw canonical file bytes; any
+new, missing, or changed path is fully schema- and safety-validated again. The
+view is never written to disk, survives no lock release, and never replaces
+validation or the independent full-validation path used by `doctor`.
+Its idempotency receipts are likewise compared once per write with the same
+predicates, using only an in-memory per-call view that is never persisted.
+
 Runtime launch uses a separate fsync-safe attempt journal and one live attempt
 per delegation. A reservation is durable before spawn; canonical start is
 recorded only after the distinct child session and process/provider handle are

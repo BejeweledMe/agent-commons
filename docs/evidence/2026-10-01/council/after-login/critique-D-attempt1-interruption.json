@@ -1,0 +1,19 @@
+{
+  "stage": "all5_peer_critique",
+  "lane": "D",
+  "requested_model": "claude-opus-4-6",
+  "cli_version": "2.1.257",
+  "prompt_sha256": "5863978f6fffb035964b33dacf9021e9f670ddad5a2805687b058d9e48343368",
+  "timeout_seconds": 1200,
+  "status": "interrupted_missing_process",
+  "attempt": 1,
+  "fallback": null,
+  "fresh_context": true,
+  "session_persistence": false,
+  "provider_usage": "unknown_partial_usage",
+  "visible_final": "none",
+  "actual_provider_model_identity": "unknown",
+  "observed_at_utc": "2026-10-01T11:17:41.858137+00:00",
+  "process_absence_confirmed": true,
+  "diagnosis": "Original exec session became inaccessible after coordinator turn returned; host ps found runner and both providers absent. Exact termination cause not reported."
+}

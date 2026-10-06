@@ -1,0 +1,281 @@
+{
+  "files": [
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "base_sha256": "bd3673016f9954047c8f7806e664814cc22b22721062f7f68dcdd49d33bba37b",
+      "sha256": "881a35d430c1397fa6024b1652f11ea3262732817b1e2c7a656a78a743c97569",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/lifecycle.py",
+      "base_sha256": "435be9782e213c9c20091a054d6ef2b235bf63bed6b2562333622afcecd29789",
+      "sha256": "f883c3f4667bef6d7d5efbe4279cf376098defd2384903e29813f2159d3c96b2",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/projection.py",
+      "base_sha256": "a32c10193f8d0cce0739bd46e0def9ac0d86e11eb26adb0a00b1e006c4564fae",
+      "sha256": "966731b45994ddcc34d325fb879d77e5c084ae285edb7e852248716f485e8d3c",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/revisions.py",
+      "base_sha256": "5ece1038587d019668e10674a2266762588980084287408662532b7568e6aef4",
+      "sha256": "c14b569fc9d51cdaeaac97f6d302da54f89fefd0f75898cf0a9e7058e9963392",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/task_edits.py",
+      "base_sha256": "d9f7972db4e0c404be3d493ba75f028931cf1707f1792e28c7a47b77b10987d6",
+      "sha256": "29fb1d3cd605ce134c6350f1cea9386078207d9e9cd8ba8d98315ce9f2a2c5c7",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/task_projection.py",
+      "base_sha256": "1d6f456be56877079fbaafe7d4fc4dcc564b60c72158ec2dd47f405a36809461",
+      "sha256": "e4d1d0292f2c57eb73bd04e7197a36e8e4a7227220a944e4c95105fb1dc50615",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/task_review_envelopes.py",
+      "base_sha256": "1476681783922190d7165dc5edd7d1c06c229d95e83cf00c8fb509b628faeb7d",
+      "sha256": "22c1c0a350bfbd98f1257b7774cf0aec42ad387f4ba78531163b18391551cbbe",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/domain/validation.py",
+      "base_sha256": "8d283141cdc3aad53e04c6a64d2c92584cf8e57175d368804027da9a12129201",
+      "sha256": "d506631f33585447bd176e599acc5bbc9c1fd5d44156efca4bee6e44b55254b0",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "base_sha256": "80e15ed6f0c5db18629736e1fd906af17849454231e27375cf7492bbdf5ccfb5",
+      "sha256": "3ceb1ab089c81d2f72225f832507d3ba489cfdcc980a94939054a9689190d9b6",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/task.v1.schema.json",
+      "base_sha256": "98a5f3b925fb6c6f79ff677270748d007878af9d8022864cf899667f8834b4e1",
+      "sha256": "ea1f08d32d89bc1c2b734ccc68acc24070a37cddd9ae55293d518bcdcd1e0c6c",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/task.v2.schema.json",
+      "base_sha256": "8b0c110021358b95989bb6e7c58862f3893be4d78f5768a40cb8a008256a4422",
+      "sha256": "c2dfbcaf7890eba36b47c0707a03ca7a9cb0605a99028910260fd7b5453edfdc",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/services/tasks.py",
+      "base_sha256": "fc7a764e51b9714521f00e44c8a368fad96af7118a0e911411e9b0bec8c9d27e",
+      "sha256": "0e2e4446f8f09503572403a8ef8cf054f2d1fdfa91aaefa25a8878d9c3c49f0b",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "base_sha256": "bb830cdca31b2f4d0e2c8fa567d2306a1c9b8b6650e39c9279dfab13968ea724",
+      "sha256": "72d522caae5425e71a7fa32f75611fe197c105538309245cb2dcaa0e5272560e",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/ui/task_edit_routes.py",
+      "base_sha256": "767eff403ef81d4a49906fed5b25233fb62c12e9f60b124f58691be0a97aee11",
+      "sha256": "55a143ff3dfb3b35eb71eb3313f7d08b5fdaa86592fa951a58596d860097fd0c",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_dtos.py",
+      "base_sha256": "f302da06c53b0914dd1c138cc5b30046cfe9d3717da2f4c005f7cdf9f1dd1dc3",
+      "sha256": "f37dfb9a4684b0beae20e11504b435440ef8fc484e4b3fae3a3c7f794e334c45",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "base_sha256": "a13adc038df7a06b419c1f486cb24dcd42ed0c1337f061912b072a31a62af5f7",
+      "sha256": "df127afd5ad3b2beb20cdfc1e2356a5063c83b898cfc27653e4433c6dcbf5667",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "base_sha256": "4d37264a4604b29dfede887d00ed4e4da9eba32827f83d54a3618cb3e694c5bc",
+      "sha256": "8f8275ce841582c269810f6b97c8243280ab9ce9130d4604e691eb2cf99e5d6a",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/components/TaskComposer.tsx",
+      "base_sha256": "3cbc829013a72049c2554c9c8c83194de87bbbd7e046859e663abc8d0bf265a9",
+      "sha256": "9e1432d899b8a45464d5ba374971baec57a52b8c828b05e69620ed32c7b4d6d5",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/components/TaskEditor.tsx",
+      "base_sha256": "57e804c7960aafd2873a81cc343e6cd597f3a182c7df25e8730030c562c1f3ef",
+      "sha256": "dfec9cedb9a0cf078c0833ec345a4fdfcfbe6574a2307e2ce555fcd4124420fb",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/components/TaskHierarchy.tsx",
+      "base_sha256": null,
+      "sha256": "ccd199b55f075383282f4ed7c60951a4653738453320142bd14e58cd34a4d3c4",
+      "new": true
+    },
+    {
+      "path": "frontend/work/src/components/TaskViews.tsx",
+      "base_sha256": "a7156f2a29d42718edfd6d5aca2a831baa175e0971d47cfd0e80309ae6dd9a8a",
+      "sha256": "9d66743287f8ecdbd5d941f6b81b3a215088086bee45539430dd148e18139ac4",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/contracts.ts",
+      "base_sha256": "01d5168e3e049e3e996bb4fd46bf47f2fb4b786dddd582863478a0d50f6f4ecd",
+      "sha256": "564921a3c62567994d44b472edc4de62f85e74b5b6271cdabba7a9c390b1bb8b",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "base_sha256": "279daee4fa8df57b6091386fbdf524761938bdb0f9cfd6fedc865f2aa5e86369",
+      "sha256": "33cafa9a37f4ba0efd1af90038395a95afa12d34670c38d0c36b6ddc17fe34c4",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "base_sha256": "7f03d24d20b8a30bd1a14d8b3419dad63c70f9e345c1497544587d01e6ecdcc5",
+      "sha256": "1c08075cee0e5a7195cda98484a2a48414af531dbb0939f55b02e5cc33bb53d0",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/taskEditorState.ts",
+      "base_sha256": "7828a6556867a26074686dac3d73d4e3ca8c577cf6238feaa99285a3839bc983",
+      "sha256": "1e9bffa3836f4d0e82123be1ead93b07d9cecfc52264386d9847b2a67ecb97ae",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/taskGraph.css",
+      "base_sha256": "606adff4afba15562c6131a09cd61a16c8d49a6c2a017c5f902b37a99883e70f",
+      "sha256": "437857d76ab98c281f0139d6945baafda872d029f0ac05afa50d3d03f921ea21",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/taskGraphApi.ts",
+      "base_sha256": "e17c5cdb44b41b0fbec8c0049e8d61de8f285be2f4340a6720922d0a463e481b",
+      "sha256": "86ab42cd49d3c8441ff9d12268da147a7c35d71113a9c22429caf3229f81ccd4",
+      "new": false
+    },
+    {
+      "path": "frontend/work/src/taskHierarchy.ts",
+      "base_sha256": null,
+      "sha256": "51b04f75a4d000bf9b9ac32364d7861dcbff0045bb8e9d5082bea0f13e3aef43",
+      "new": true
+    },
+    {
+      "path": "frontend/work/tests/task-graph.test.mjs",
+      "base_sha256": "1b3a9a64831604b75b9fe062a7efc24b07c1e5e905f65b525b0ff771b62e5512",
+      "sha256": "0a08903db16fdc3a1863f4b1c96a2469bb52676dc0f0afc32821cae6942c66f5",
+      "new": false
+    },
+    {
+      "path": "frontend/work/tests/work-task-create.test.mjs",
+      "base_sha256": "4226078bf7bc910361c024d3e2446c47a12daa7361883389d2aab2cd4f08073a",
+      "sha256": "59605e6bc8a43bb9b2fdaeeb28628f46455b94f759316d802741342fed11f94a",
+      "new": false
+    },
+    {
+      "path": "tests/cli/test_cli.py",
+      "base_sha256": "6eee448c8e0ab9664d3f12468736d59788de97340100cdee67e64da6141f69ff",
+      "sha256": "8f45565d6209dcdc099faeca76f28edbac9992e7ae2135bb752c469bc9cf013a",
+      "new": false
+    },
+    {
+      "path": "tests/domain/test_task_projection.py",
+      "base_sha256": "6f53ccb728daf1ea724d99eb653269860468d22b6063791465218652353e2504",
+      "sha256": "17fb61d32b34c19d960b688c124d4a4d72d2b17968ec26b448ed93502632d886",
+      "new": false
+    },
+    {
+      "path": "tests/domain/test_task_review_envelopes.py",
+      "base_sha256": "7bafbe4ec6cfe3fd496e7e42cd84b649dad64037be015ce2ebe7f7fb61360225",
+      "sha256": "a53ff15331d44764da59ba802cf86b1c65ba0da0835231d9d0b69e34b8b21960",
+      "new": false
+    },
+    {
+      "path": "tests/mcp/test_server.py",
+      "base_sha256": "1088130a3b493aba70d407d4fdc3f6d1f25839e3f1fe9691802972ebc3644043",
+      "sha256": "47b54d12a3fb89dfa1a5ec725153671eda270c0add215c88aa69990c6c9dd39e",
+      "new": false
+    },
+    {
+      "path": "tests/mcp/test_worker_scope.py",
+      "base_sha256": "7e44015abd9f3fb736781c63f9933abd6c8ff867ffe705052dd91774d29aaae8",
+      "sha256": "ce32b438dac821c46a0cb0e786eb363e7fd065cb48b35c6c7a43b9086138a4db",
+      "new": false
+    },
+    {
+      "path": "tests/services/test_manager.py",
+      "base_sha256": "a2bda9d1e3a35c15086729a3a2e731bd46b37bbf8ba19453c35d9d3671b18030",
+      "sha256": "0b54cba58ca7bf02ba8d0756d28cacb2b9a7d21242d2759f3ee6636bfe2c1f7f",
+      "new": false
+    },
+    {
+      "path": "tests/services/test_task_edits.py",
+      "base_sha256": "cde8ef0c8aa964f2c8f23ad5b5b1c95b8d481a100d0b7f373f12239febeba5a4",
+      "sha256": "49c150868be7454ae32a1d78d32deec15e4c2ad1dd95283d07729e0382fbf2ba",
+      "new": false
+    },
+    {
+      "path": "tests/services/test_task_hierarchy_corrections.py",
+      "base_sha256": null,
+      "sha256": "75c5e4cd1df8e6d8ca2ffc36acbd2cdf3d964d0981f1e3bc588d108ada7b2527",
+      "new": true
+    },
+    {
+      "path": "tests/ui/test_task_edit_routes.py",
+      "base_sha256": "c894c4844eec24858a495987b22a0573726a7e0e294079b1267fe293a0938c79",
+      "sha256": "09ae98f811bf6356bd460a8ccab5396280d10c6efe188b8105b55d8290f22aa5",
+      "new": false
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "base_sha256": "034422c7f69ee923784b86d6fb431ad200fbfb071c18846c7a012e307ded9bd5",
+      "sha256": "c8390ae2d4bd839393d8ae74cebca26b9e56ba7843b5cfbde0293e5e88fd0076",
+      "new": false
+    },
+    {
+      "path": "docs/PRODUCT.md",
+      "base_sha256": "17154d796581f48e62a569a0cc38390aca189c403518f9497b37a426d57d9744",
+      "sha256": "d00bea7e60032d31efac2917aff7d98f57b8541dd409831c564152a719d77bec",
+      "new": false
+    },
+    {
+      "path": "docs/adr/0024-explicit-task-hierarchy.md",
+      "base_sha256": null,
+      "sha256": "1f3dec3542ecaadca365d05a0c8d33a8484b7f016a2e59d1a2f03b630cca61c3",
+      "new": true
+    },
+    {
+      "path": "docs/adr/README.md",
+      "base_sha256": "c5d03f76b4a8aaac6a1caa59a622509d6a9fcf6a17cc6ea0a4f8ae984fc8e24d",
+      "sha256": "e77832f0ae75dba3e452f90e64d9d34fe47bec78134156ca150aaaf70c71321b",
+      "new": false
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "base_sha256": "0d7993f44e57fb9a0f29615eeecbed389bf65f0b87f77145b8e4982940189732",
+      "sha256": "1ec64258fd68fed5f57294b771d17db4b5b6e4c727f1f7b76d9fbd3bc7b03c3d",
+      "new": false
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "base_sha256": "393cf3c91986ac8adaf16d653d4f76088d51ac724995bafa7c9d6c2c6048157b",
+      "sha256": "2fdecd8d2713c989ed224cd55220dc0bdedfc82c329e0afc284421f68e309a5f",
+      "new": false
+    }
+  ],
+  "manager_semantics_delta": {
+    "path": "src/agent_commons/services/manager.py",
+    "patch": "g6-manager-semantics.patch",
+    "base_sha256": "36cb00f5742828885e5b297a45125f8a094bd3e830e1e1b418858a801dc62b2a",
+    "sha256": "a950df257bfc88b6ae5adc150c0aa737a4d4a27ec8a999eb18b7e77701b55b89",
+    "base_source": "WP20 overlay already integrated by root"
+  }
+}

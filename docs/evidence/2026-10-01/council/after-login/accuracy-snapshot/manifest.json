@@ -1,0 +1,282 @@
+[
+  {
+    "path": "docs/evidence/2026-10-01/council/README.md",
+    "sha256": "d1e8360588e1775426815e3898da20904dcc28b53989e49984b49e418c57fffe",
+    "bytes": 15234
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/README.md",
+    "sha256": "c98603280b4647782d3bdae6f895fa34c242e45d6d4959d85557a9c3510452cb",
+    "bytes": 15590
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/agent-model-inventory.json",
+    "sha256": "a70aa3de492572ad1e8b942582e9c50a468749324a2cbfea3e521f64d694ace3",
+    "bytes": 2258
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/auth-recovery.json",
+    "sha256": "d07820afbd3c4771d7c6879a5314d74c3d16c7f5a223cf2d9c1779addc1eb205",
+    "bytes": 959
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/common-facts.json",
+    "sha256": "5a8f4feba7bed1144ea6a350b487d88eed1653b6fc29744238aec61dfb8a3768",
+    "bytes": 6522
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-A-all5-provenance.json",
+    "sha256": "3235b25571445b6d2fcec1676c89c70962f3efb96b6be949016118f31611577d",
+    "bytes": 707
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-A-all5.md",
+    "sha256": "e5ace186840c34e176cca41888f1cfd35fb27443e5df4ddac759b3c5a69a2cc2",
+    "bytes": 16064
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-B-all5.md",
+    "sha256": "13c0b0a7f35ea0eb8ef723d9eff36db18f42950f5973ca49af058594ef85c707",
+    "bytes": 14193
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-B-attempt1-interruption.json",
+    "sha256": "0d91f478c250c29bd2bc2943c9d19c3f5e36d6e2f8ee3231a792df16c42664cb",
+    "bytes": 762
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-C-all5-provenance.json",
+    "sha256": "ff4b71cd881bfe2de40bbb00452743ff1f2e2910847ba7b019e1b1b5bdc6dcad",
+    "bytes": 2146
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-C-all5.md",
+    "sha256": "04f285929574cf527db14993a49923d3d8f29059979262cec0057b169a85f163",
+    "bytes": 22041
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-D-all5.md",
+    "sha256": "caaac457cb1b2ef2b36e28cf7a5e90f0683b8f6760c221e6c1c00782650313a4",
+    "bytes": 15910
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-D-attempt1-interruption.json",
+    "sha256": "0d4870d32357831230c3c63e9d971309e9318ab64abcd0d4f4cd9b7bf3198e9f",
+    "bytes": 761
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-E-all5-provenance.json",
+    "sha256": "032084674407ec1681941312c8dd9605822bf0702baec200c77a2329f4db2991",
+    "bytes": 707
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-E-all5.md",
+    "sha256": "bf3b1243f08a0ff688b1a82691da0e798ae8759ae2971805248df621d1dd8dba",
+    "bytes": 16845
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-all5-execution-provenance.json",
+    "sha256": "6adabd231c052d95836e1ac7b5116842bf01d1b32cde5ab2b5649992fd325eb8",
+    "bytes": 4659
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-input-manifest.json",
+    "sha256": "b5225c9e9d583662f74ac76fd43f8e56315d2e9800abe76b92c427a16ca2e787",
+    "bytes": 1158
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/critique-rubric.md",
+    "sha256": "a23916679748c62817e8362d553ff904209faf3bdf5bf295f8f42fa265d57448",
+    "bytes": 2101
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/execution-provenance.json",
+    "sha256": "8c9caf5557dc880feda3ed421b43dce11e5986889d06770d128075a563f37b7e",
+    "bytes": 4133
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/first-B-provenance.json",
+    "sha256": "4afbf8c8e335249cb71b2cf99c76467a5ccee856b45c475f6a74d5254c986973",
+    "bytes": 1501
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/first-C-provenance.json",
+    "sha256": "f7a995c9aba16b95c46e266f7c2a644f8df31f3658a61b5834ec5ea728e7014c",
+    "bytes": 1638
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/first-D-provenance.json",
+    "sha256": "bf88d4862733b8eb37404bc0421c685c2c098d4d0f1764cd37106d040c1ffe07",
+    "bytes": 1474
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/first-answers-manifest.json",
+    "sha256": "3c6e351840fa24b3d03231656d245eb42a4315e0f006bbc3dc232b378bfa76ce",
+    "bytes": 408
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/lane-B.md",
+    "sha256": "0c828928c2ee9b864357f3a8a7e449a89b112fec72df78a5cda5c5936df39533",
+    "bytes": 27261
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/lane-C.md",
+    "sha256": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0",
+    "bytes": 26326
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/lane-D.md",
+    "sha256": "744c4340ee2ef34c0b8e112cd5f1762340e5784d8b672c4b6b0115a5a8d1f1ce",
+    "bytes": 18213
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/wp20-performance-diagnosis.md",
+    "sha256": "2190a436f9f293c8e5002fcbe50eb8f1d6c1e7ba897e9a1e432d0028869b5d18",
+    "bytes": 7785
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/after-login/wp20-profile-aggregate.json",
+    "sha256": "b2df58b92a2ff640eeb10424a318ca72e25cd71dcdc6b5133af1145bc2a30d32",
+    "bytes": 689623
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/brief.md",
+    "sha256": "47b68bf5dec46118a326e2d3cdc0cdeaeb11f9f06f92ef14acf09d7eeb504a35",
+    "bytes": 5464
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-astra-builder-cli01593.json",
+    "sha256": "04cc1762a34c4e9886a456b1b92544171277a773dbe1141c471c8bcfdaa272ba",
+    "bytes": 1628
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-astra-cli01593.json",
+    "sha256": "0f5a349c805bf0b76aad725d4d7783fd3a5dd0bc1c8b1508411cedd36ba323ff",
+    "bytes": 2000
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-astra-diagnostic.json",
+    "sha256": "ad5b6e1a684ea47b4541b99c5bf2d9b188605b374df79dd76fece71777370b64",
+    "bytes": 2754
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-current-operator.json",
+    "sha256": "214087f738edf3bd079cc069ca79211971fc46baa25bb6c9e5a2e513d6bb7e19",
+    "bytes": 1018
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-sol-cli01593-terminal-diagnostic.json",
+    "sha256": "6576fc89376201de5ba5b494f2853eda15ca9ff73ceaadae75a8c1e6f5a16d78",
+    "bytes": 4636
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-sol-cli01593.json",
+    "sha256": "3a388ae1379dc8d41cd251ab5e65f48d0a4d80513ab4f0446a8abc510d31bc0a",
+    "bytes": 2351
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-sol-diagnostic.json",
+    "sha256": "5b302ad3938d6060a5033102ec438306c2222b9994b4f9085711aba2ec68cef1",
+    "bytes": 3016
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/canary-sol.json",
+    "sha256": "b5adda5dceb2d9bbb82214b1d2cd43bd25185b893d7d997ce142de18218914d4",
+    "bytes": 1643
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/candidate-canary-diagnosis.md",
+    "sha256": "e09956450c6ebcd8dc4ab239caaebc74c42862498e4ef43556bbc4a125b65d46",
+    "bytes": 8445
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/critique-A.md",
+    "sha256": "05044121130c3717b667879223e59495700251106d5900a05920639964465734",
+    "bytes": 11800
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/critique-E.md",
+    "sha256": "4fe9c62b66143eeea5f4fb8874a38a31e52fbd6dc3bbb00e63965effd8285515",
+    "bytes": 10981
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/final-review.md",
+    "sha256": "1751b2795897dde88772e640ab7c3dae42674834e8d2d90d7acd555710a89596",
+    "bytes": 6490
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/first-B-failure.json",
+    "sha256": "1be3014a95f678dbc3df593a322ea47e8b1ae2f012d585a3b9de496e4e7cdb67",
+    "bytes": 206
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/first-D-failure.json",
+    "sha256": "88f17e2b53b5e55e1bc95efaa32cc09e9a4e5267ba7fbfaa06efe271116ef5f7",
+    "bytes": 205
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/inventory.md",
+    "sha256": "b5e7fc055aa92a240e772562caf2ed2bebfd3891dec82ac9574887ad6b42b1c0",
+    "bytes": 2676
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/lane-A.md",
+    "sha256": "d7146cb6d500d78949bae0817330cc7e87ac55ebf2324d127b4029289e858d95",
+    "bytes": 28214
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/lane-E.md",
+    "sha256": "0a1ca910040abb4b9705dcbb59cbdf37095332a28215bc16d552603067b02e43",
+    "bytes": 27960
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/preflight-astra-locked.json",
+    "sha256": "722dd1bab60048edb8a8e9215e27a3820aaf6d94e984aa41286af9af70e383ab",
+    "bytes": 599
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/preflight-sol-locked.json",
+    "sha256": "2f7d672134cc8145a0536f081e5e7a8413a46b244d739f89f7c0b15d4713b744",
+    "bytes": 586
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/project-inventory.json",
+    "sha256": "9e2882c95ef65c75c0656dffd10700e4c2dd5ef09ebf637cb6355a5e53f6352b",
+    "bytes": 194465
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/sol-terminal-diagnosis.md",
+    "sha256": "4e9dfa531c924717a1f46cb64f2192f060c4d9c70493f5ce5ab04bf14d93757b",
+    "bytes": 6376
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/source-boundary.json",
+    "sha256": "29aa356ab1f518ea8316660647ec1caf068757ab0f2a95d30f010f332bfd844f",
+    "bytes": 522
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/verification.json",
+    "sha256": "bc98e5954ba8eca22305e060dae14bbb34c7f3a470a3852e96863058e95d7f27",
+    "bytes": 10788
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/wp20-benchmark-summary.json",
+    "sha256": "cb29b6385dd9d6757b8bdeef9dfadbff0ecc1101e486ec5beb9baad124d2ef94",
+    "bytes": 7777
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/wp20-reproduction.json",
+    "sha256": "708636679f82643078508674ce7e7a6b79738390c83cad73ff1d8cc95818a43c",
+    "bytes": 769
+  },
+  {
+    "path": "docs/evidence/2026-10-01/council/wp20-review.md",
+    "sha256": "a17b58d2d2bf1dc428a3eac20b553a7980d8234849735069b0de2d11e8629bd9",
+    "bytes": 8460
+  },
+  {
+    "path": "docs/plans/2026-10-01-gpt6-and-product-completion.md",
+    "sha256": "dac76f7e3fcc32ec57a14819a41b6dad55578e7d801476c1de093c1f1518697f",
+    "bytes": 33196
+  }
+]

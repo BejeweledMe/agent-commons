@@ -5,7 +5,7 @@
 .outputs-heading h2 { margin: 0; overflow-wrap: anywhere; }
 .outputs-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; }
 .outputs-toolbar [aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
-.outputs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.outputs-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
 .outputs-list > li { padding: 20px; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 12px; }
 .outputs-list h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
 .outputs-status { font-weight: 650; margin-bottom: 8px; }
@@ -16,3 +16,18 @@
 .outputs-review { font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
 .outputs-image { display: block; width: auto; max-width: 100%; height: auto; max-height: 70dvh; object-fit: contain; margin-top: 16px; }
 @media (max-width: 600px) { .outputs-dialog { padding: 16px; } .outputs-heading, .outputs-toolbar { flex-direction: column; } .outputs-list > li { padding: 12px; } }
+
+.outputs-list > li { min-width: 0; }
+.outputs-list > li[data-expanded="true"] { grid-column: 1 / -1; }
+.outputs-thumbnail, .outputs-live-cover { aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 16px; text-align: center; }
+.outputs-thumbnail p { padding: 16px; margin: 0; }
+.outputs-thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.outputs-live-cover { color: var(--accent); font-size: 48px; background: var(--surface-subtle); }
+.outputs-attribution { margin-block: 12px; }
+.outputs-attribution p { overflow-wrap: anywhere; }
+.outputs-attribution .notice-link { text-align: start; }
+.outputs-attribution summary, .outputs-address summary { cursor: pointer; font-size: var(--type-1); color: var(--text-muted); }
+.outputs-attribution dl { margin: 8px 0; font-size: var(--type-1); }
+.outputs-attribution dl > div { margin-block: 8px; }
+.outputs-attribution dd { margin: 0; overflow-wrap: anywhere; }
+.outputs-address { margin-block: 12px; overflow-wrap: anywhere; }

@@ -1,0 +1,50 @@
+# Bounded accuracy review of the completed council report
+
+Reviewed 2026-10-01. This is a read-only source/report accuracy check, not another council vote, canonical review, task acceptance, or release certification. No repository, operator, provider, or ledger writes were made. The running product pilot and any subsequent pilot evidence are outside this review.
+
+The main synthesis is supported. I found one actionable status inconsistency in the plan and three smaller documentation/provenance clarifications. None overturns the bounded Astra-first recommendation or establishes product/release readiness.
+
+Controller corrections were rechecked after the initial findings. Findings 1–3 below are resolved: delivered UI features now sit in the plan's confirmed column, the Claude login paragraph is explicitly past tense, and the Grok input manifest is published byte-for-byte from its original temporary copy. The optional attribution clarification in finding 4 remains a low-priority wording improvement. No unresolved material accuracy defect was found in the rechecked report. No new approval is needed for these corrections.
+
+Latest observed hashes:
+
+| File | SHA-256 |
+| --- | --- |
+| `docs/evidence/2026-10-01/council/after-login/README.md` | `444ebb39846c2531cea6801b07fffffe4a6a83007265fba5f89f50c7b821f738` |
+| `docs/plans/2026-10-01-gpt6-and-product-completion.md` | `2b26964070cac1cb59c7b0585b5fb6b47f4945268ee03191fc61934fd8275356` |
+| `docs/evidence/2026-10-01/council/README.md` | `04a2b95b9892ddef28bf6d75e08b8577022aa6504221ba85fac712aeed411ffa` |
+| `docs/evidence/2026-10-01/council/after-login/critique-C-all5-input-manifest.json` | `0362a898db5667b2d1a7247a6173b4dacf055b274ceefc61490aa2bba6319c6f` |
+
+The new diagnostics paragraph is supported by `ui/reads.py:614–624`, `frontend/work/src/api.ts:1422–1423`, `TaskInspector.tsx:134–136`, and the existing `return_for_revision` mapping in `DecisionCard.tsx:24–27`. The new preservation claim also checks out: 68 of the 70 files listed in the prior verification manifest remain byte-identical; the only changed listed files are the plan and historical council README, with none missing. Recomputed Python source SHA-256 is `fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e`. All local Markdown links in the rechecked documents still resolve. These recheck hashes are saved in `accuracy-recheck-hashes.json`.
+
+The findings below retain the initial reviewed wording for traceability; they do not describe the final state after the controller's corrections.
+
+Initial reviewed revisions:
+
+| File | SHA-256 |
+| --- | --- |
+| `docs/evidence/2026-10-01/council/after-login/README.md` | `c98603280b4647782d3bdae6f895fa34c242e45d6d4959d85557a9c3510452cb` |
+| `docs/plans/2026-10-01-gpt6-and-product-completion.md` | `dac76f7e3fcc32ec57a14819a41b6dad55578e7d801476c1de093c1f1518697f` |
+
+The frozen read copies and all 56 captured documentation/evidence hashes are in `accuracy-snapshot/manifest.json` beside this report. Additional inspected input/source hashes are in `accuracy-supplemental-hashes.json`. Line numbers below refer to those copies; the controller may edit the live documents independently.
+
+1. **P2 — make the plan's “remaining” work agree with its delivered increment.** In `docs/plans/2026-10-01-gpt6-and-product-completion.md:50–56`, the Board, Outputs and Task Tracker rows still put persistent gallery entry, visual cards, task navigation, client provenance, focused subgraphs, search and zoom in “Остаток”. Later in the same document, “Измерения и реализованный пакет 1 октября” says G3/G4 were implemented and built, consistent with `verification.json`, the bounded final review, and the completed synthesis. The Runtime row already includes restored authentication, so the table mixes original and current boundaries. The G0/G3/G4 rows at 193/196/197 likewise have no indication that their limited increment already passed checks. Correction: either explicitly label the whole early table as the initial snapshot and move restored auth out of that historical table, or update these three rows to put delivered behavior in the verified column and leave durable bytes/builds, exact-result review and canonical decomposition as remaining. Annotate G0/G3/G4 as implemented/verified within the documented scope, preserving performance and acceptance limits. Do not mark them accepted merely to resolve the wording.
+
+2. **P3 — locally mark the old auth blocker as historical.** `docs/evidence/2026-10-01/council/README.md:145–146` says “готовой браузерной сессии нет. Для продолжения B/D нужен владелец аккаунта.” The opening notice accurately announces restored access, and the composition section is explicitly historical, but this later paragraph is under the CLI 0.159.3 check and uses current tense. Correction: “На первом проходе восстановление входа дошло только до Log in; затем вход восстановлен…” with a link to `after-login/auth-recovery.json` or the completed synthesis. Preserve the original failure evidence. The frozen `common-facts.json` and `verification.json` are historical inputs and should retain their original bytes; the completed synthesis already warns about stale facts.
+
+3. **P3 — publish or qualify the missing Grok input-manifest reference.** `docs/evidence/2026-10-01/council/after-login/critique-C-all5-provenance.json:37` names `critique-C-all5-input-manifest.json`, which is absent beside the provenance file. It exists at `/private/tmp/commons-council-20261001/resumed-council/critique-C-all5-input-manifest.json`. I inspected it: candidate package, facts and rubric hashes agree with the shared manifest. Correction: preserve that small manifest beside the provenance file, or explicitly mark the field as a temporary-run filename and point readers to the published shared manifest. A repository-only reader should not mistake it for an available local file. This does not invalidate the complete Grok final or its verified hash.
+
+4. **P3, optional — separate B's and D's preliminary requirements.** In completed synthesis `after-login/README.md:119–123`, “B/D … общий файловый MCP, React Flow, визуальный фундамент и удаление legacy” compresses distinct positions. B explicitly excluded WP-42 from its package table, supported a real initial run, and placed React Flow after the gallery; D made C6/WP-42 preliminary gates. Their later critiques also converge toward the narrower path. Correction: identify “В первых ответах B…” for general files/qualification and “D…” for C6/WP-42 before the gallery, then note both initially favored React Flow. This preserves dissent more accurately without changing the controller's chosen sequence.
+
+Checks that support the report:
+
+- Read all five original first answers and all five full critiques. They are source-bound audits with disclosed inspection limits. The synthesis corrects the important errors: mixed WP-20 fixture sizes, unsupported Gallery DTO transfer, omission of Sol's successful diagnostic, stale Claude status, unverifiable reasoning flag, and retry-until-success advice. General files, React Flow, ordering, and model roles remain choices rather than consensus-based authority.
+- All five original answer hashes and five final critique hashes match their recorded provenance/manifests. The source manifest hashes to `86481622e733a85b87a9e0f514eadf6497583dd6b6231a9f45fd9952a396eaa8`; the temporary complete critique package hashes to `1443de9751941043acf80aee7d88b4e4e821a7cb903e523f4b63e55a42249957`. Comparing originals with masked copies confirms only identifying text in A/D/E changed; B/C are unchanged.
+- B/D requested and reported primary models match; auxiliary Haiku usage is disclosed. Grok requested `grok-4.7` and reported `grok-4.7-build` in both rounds. Native A/E correctly lack separate provider attestation. Initial B/D critique interruptions, unknown partial usage and unknown interrupted-attempt model identity are retained; successful retry metadata is separate. Grok's full `end_turn` final is preserved without inventing an OS exit code. No spend or model-ranking claim is inferred from these records.
+- All five canary hashes in common facts match the preserved files. Astra builder/reviewer each have 1/1/0 terminal calls/completions/rejections and succeeded; Sol has the disclosed 2/1/1 mismatch followed by a separate 1/1/0 success. Model-null success is not presented as GPT-6 proof.
+- WP-20 diagnostic medians are 13.2078–18.6085 seconds, with two samples per cold/warm operation on 3206 events. The profile contains 6413 EventStore.read_path calls, 24.1403 profiled seconds, and 350 manifests. The source's path-set rebuild explains the 3206+3207 reads. The synthesis correctly keeps small-fixture 2.26 seconds separate and does not promise the proposed patch reaches one second.
+- Targeted immutable-source checks confirm role-model override, profile-ID receipt storage with model-sensitive fingerprint, lack of a Codex profile effort field, Gallery's distinct producer DTO, and the conservative full-rebuild path. The UI and storage success claims match the bounded review and recorded verification; I did not rerun tests, the browser, or providers.
+- All 25 local Markdown links in the completed synthesis, five in the plan, and 28 in the historical index resolve in the main checkout. The JSON manifest issue above is separate from those Markdown links.
+- The plan's cited [Sol model page](https://developers.openai.com/api/docs/models/gpt-6.1-sol) supports its stated coding/cost positioning and need for project comparison. The cited [GPT-6 migration guide](https://developers.openai.com/api/docs/guides/latest-model) supports the bounded future-API discussion of Responses tools and reasoning/sampling parameters; these do not imply a CLI profile effort field.
+
+No source-completeness or full-release overclaim was found in the completed synthesis. Durable builds/image storage, exact-output review, decomposition, performance, authenticated Linux and release evidence remain explicitly open. The final pilot paragraph was treated as an in-progress boundary, not a finding or evidence of success.

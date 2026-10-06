@@ -1,0 +1,9 @@
+{
+  "link": "/opt/homebrew/bin/agent-commons",
+  "target": "/Users/dmitrijersov/.local/share/uv/tools/agent-commons/bin/agent-commons",
+  "prior_path_lookup": null,
+  "after_path_lookup": "/opt/homebrew/bin/agent-commons",
+  "cli_help_passed": true,
+  "existing_files_overwritten": false,
+  "reason": "Installed uv tool was outside inherited worker PATH; expose existing exact-source CLI through existing trusted tools directory."
+}

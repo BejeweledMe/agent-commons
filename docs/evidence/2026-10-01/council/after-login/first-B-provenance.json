@@ -1,0 +1,46 @@
+{
+  "stage": "first",
+  "lane": "B",
+  "requested_model": "claude-fable-5-1",
+  "status": "succeeded",
+  "cli_version": "2.1.257",
+  "session_id": "cc3df2d1-3717-4581-99b4-c18030bf84ca",
+  "returncode": 0,
+  "seconds": 440.857,
+  "result_chars": 17619,
+  "provider_model_usage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 2285,
+      "outputTokens": 25,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.0024100000000000002,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-fable-5-1": {
+      "inputTokens": 1292,
+      "outputTokens": 32265,
+      "cacheReadInputTokens": 2176358,
+      "cacheCreationInputTokens": 282356,
+      "webSearchRequests": 0,
+      "costUSD": 7.817379500000001,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 11197,
+      "canonicalModel": "claude-fable-5-1",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "fresh_context": true,
+  "session_persistence": false,
+  "fallback": null,
+  "prompt_sha256": "4cf2677b1bfad07357b794aa996c7daaf0441c7a4081f0420e01330e75be2c27",
+  "note": "Exact provider final and metadata remain private; full visible answer is preserved separately. Runtime may report auxiliary Haiku usage; it is not an additional council opinion."
+}

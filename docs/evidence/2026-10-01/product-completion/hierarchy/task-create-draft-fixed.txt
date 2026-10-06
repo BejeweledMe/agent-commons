@@ -1,0 +1,18 @@
+(node:41982) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ confirmed creation clears the saved {} draft (5.252542ms)
+✔ confirmed creation clears the saved {"taskKind":"component","parentTaskId":null} draft (0.516041ms)
+✔ confirmed creation clears the saved {"taskKind":"task","parentTaskId":"task.parent"} draft (0.383542ms)
+✔ a late confirmation preserves the newer {"title":"A newer draft"} draft (0.454625ms)
+✔ a late confirmation preserves the newer {"taskKind":"component"} draft (0.516708ms)
+✔ a late confirmation preserves the newer {"parentTaskId":"task.other-parent"} draft (0.421042ms)
+✔ an uncertain creation preserves the draft and does not navigate (0.50475ms)
+✔ confirmation from the previous project cannot clear the current project's draft (0.355083ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 113.179458

@@ -67,6 +67,7 @@ from agent_commons.runtime import (
     DesignPackageBindingResolver,
     DesignPackageBindingStore,
     DiagnosticCode,
+    ExecutableRole,
     InitializationProbe,
     JsonlTelemetrySink,
     LaunchPlan,
@@ -100,12 +101,14 @@ from agent_commons.runtime import (
     TelemetrySink,
     TerminalToolAuditStore,
     TypedRefusal,
+    compile_skill_bundle,
     context_binding_refusal_error,
     default_profile_registry,
     design_package_binding_refusal_error,
     diagnostic_hint,
     diagnostic_safe_next_actions,
     launch_refusal_error,
+    resolve_trusted_executable,
     terminate_process_group,
     validate_model_name,
     verify_executor_access,
@@ -121,10 +124,45 @@ from agent_commons.runtime.provider_auth import provider_auth_refusal
 from agent_commons.storage.opstate import DELEGATION_STORAGE, exclusive_lock
 
 from ..domain.agents import effective_grants
-from .delegation_instruction import DelegationInstructionInput, compose_delegation_instruction
+from .delegation_instruction import (
+    DelegationInstructionInput,
+    DelegationStartupInput,
+    compose_delegation_instruction,
+)
 from .design_gallery import DesignGalleryReads
 from .manager import CommonsManager
 from .roles import role_model
+
+
+def _startup_cli(profile: RunnerProfile, workspace_root: Path) -> str | None:
+    """Use only the paired installed Python console entrypoint, never another PATH CLI."""
+    try:
+        mcp = Path(
+            resolve_trusted_executable(
+                profile.mcp_executable, workspace_root=workspace_root, role=ExecutableRole.MCP
+            )
+        )
+        cli = Path(
+            resolve_trusted_executable(
+                str(mcp.parent / "agent-commons"),
+                workspace_root=workspace_root,
+                role=ExecutableRole.MCP,
+            )
+        )
+        if cli.parent != mcp.parent:
+            return None
+        # The supported wheel installs both entrypoints in one interpreter's
+        # bin directory. Custom wrappers/binaries have no proven CLI pairing.
+        with mcp.open("rb") as stream:
+            mcp_header = stream.readline(4096)
+        with cli.open("rb") as stream:
+            cli_header = stream.readline(4096)
+        if not mcp_header.startswith(b"#!/") or b"python" not in mcp_header.lower():
+            return None
+        return str(cli) if cli_header == mcp_header else None
+    except (ConfigurationError, OSError):
+        return None
+
 
 _TERMINAL_DELEGATION_STATES = {
     "succeeded",
@@ -1061,6 +1099,7 @@ class DelegationRuntimeService:
         delegation: Mapping[str, Any],
         *,
         profile_id: BuiltinProfileId,
+        startup: DelegationStartupInput | None = None,
     ) -> str:
         """Adapt a projected delegation to the typed instruction-composition seam."""
 
@@ -1083,6 +1122,7 @@ class DelegationRuntimeService:
                 budget_unit=str(budget["unit"]),
             ),
             profile_id=profile_id,
+            startup=startup,
         )
 
     def _broker(
@@ -1711,7 +1751,20 @@ class DelegationRuntimeService:
             budget_unit = str(delegation["limits"]["budget"]["unit"])
             parent_policy, child_policy = self._policies(delegation)
             role_tools, role_grants = scope.tools, scope.grants
-            instruction = self._instruction(delegation, profile_id=profile_id)
+            startup = None
+            if (
+                str(delegation["purpose"]) == "implementation"
+                and not profile_id.independent_reviewer
+            ):
+                cli_executable = _startup_cli(profile, self.manager.repo_root)
+                startup = DelegationStartupInput(
+                    repo_root=self.manager.repo_root.resolve(),
+                    state_root=self.manager.paths.state_root.resolve(),
+                    # Reserve an equal-sized identity before creating the child.
+                    child_session_id="session." + "0" * 32,
+                    cli_executable=cli_executable,
+                )
+            instruction = self._instruction(delegation, profile_id=profile_id, startup=startup)
             if scope.library_bundle is not None:
                 instruction += scope.library_bundle.instruction
             launch_plan = LaunchPlan(
@@ -1839,6 +1892,22 @@ class DelegationRuntimeService:
             )
             child_manager.sessions.require_active(child_session_id)
             try:
+                if startup is not None:
+                    startup = replace(startup, child_session_id=child_session_id)
+                    instruction = self._instruction(
+                        delegation, profile_id=profile_id, startup=startup
+                    )
+                    if scope.library_bundle is not None:
+                        instruction += scope.library_bundle.instruction
+                    # Keep the existing validated skill projection and executable
+                    # facts; only the broker-owned child identity is now concrete.
+                    static_validation = replace(
+                        static_validation,
+                        plan=replace(static_validation.plan, instruction=instruction),
+                        instruction=compile_skill_bundle(
+                            instruction, static_validation.skill_bundle
+                        ),
+                    )
                 context_binding = revalidate_bound_inputs()
                 try:
                     validated_launch_plan = self.launch_planner.build(

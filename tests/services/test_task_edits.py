@@ -268,3 +268,167 @@ def test_live_review_subject_also_protects_its_task_from_editor_changes(
             idempotency_key="edit-during-review",
         )
     assert refused.value.code == "task_live_work"
+
+
+def test_explicit_hierarchy_is_independent_and_survives_cancellation(
+    manager: CommonsManager,
+) -> None:
+    parent = manager.create_task(
+        title="Component",
+        description="Planning component",
+        acceptance_criteria=["Reviewed component"],
+        task_kind="component",
+        idempotency_key="component",
+    )
+    pid = parent["entity_ref"]["id"]
+    child = manager.create_task(
+        title="Subtask",
+        description="Work",
+        acceptance_criteria=["Done"],
+        parent_task_id=pid,
+        idempotency_key="child",
+    )
+    cid = child["entity_ref"]["id"]
+    snapshot = manager.snapshot()
+    assert snapshot.tasks[pid]["task_kind"] == "component"
+    assert snapshot.tasks[cid]["parent_task_id"] == pid
+    assert snapshot.tasks[cid]["dependencies"] == []
+    manager.cancel_idle_task(
+        pid, parent["revision"], reason="No longer scheduled", idempotency_key="cancel-component"
+    )
+    assert manager.snapshot().tasks[cid]["parent_task_id"] == pid
+    assert manager.snapshot().tasks[cid]["state"] == "ready"
+    changed = manager.edit_task(
+        cid, child["revision"], changes={"parent_task_id": None}, idempotency_key="detach"
+    )
+    assert manager.snapshot().tasks[cid]["parent_task_id"] is None
+    retry = manager.edit_task(
+        cid, child["revision"], changes={"parent_task_id": None}, idempotency_key="detach"
+    )
+    assert retry["event_id"] == changed["event_id"]
+    with pytest.raises(TaskEditRefusal, match="changed"):
+        manager.edit_task(
+            cid, child["revision"], changes={"parent_task_id": pid}, idempotency_key="stale-parent"
+        )
+
+
+def test_parent_cycles_orphans_and_kind_mutation_fail_at_canonical_boundary(
+    manager: CommonsManager,
+) -> None:
+    first = task(manager, "parent")
+    pid = first["entity_ref"]["id"]
+    child = manager.create_task(
+        title="Child",
+        description="Child",
+        acceptance_criteria=["Done"],
+        parent_task_id=pid,
+        idempotency_key="child",
+    )
+    cid = child["entity_ref"]["id"]
+    for parent, code in [
+        (pid, "task_parent_cycle"),
+        (cid, "task_parent_cycle"),
+        ("task." + "0" * 26, "task_parent_missing"),
+    ]:
+        with pytest.raises(TaskEditRefusal) as refused:
+            manager.revise_task(
+                pid, first["revision"], changes={"parent_task_id": parent}, idempotency_key=parent
+            )
+        assert refused.value.code == code
+    with pytest.raises(TaskEditRefusal):
+        manager.create_task(
+            title="Orphan",
+            description="No parent",
+            acceptance_criteria=["Done"],
+            parent_task_id="task." + "0" * 26,
+            idempotency_key="orphan",
+        )
+    for changes in [{"task_kind": "component"}, {"parent_task_id": 42}]:
+        with pytest.raises(ValidationError):
+            manager.revise_task(
+                pid, first["revision"], changes=changes, idempotency_key=str(changes)
+            )
+    assert manager.snapshot().tasks[pid]["revision"] == first["revision"]
+
+
+def test_hierarchy_completion_and_dependencies_remain_independent(manager: CommonsManager) -> None:
+    parent = task(manager, "parent")
+    pid = parent["entity_ref"]["id"]
+    child = manager.create_task(
+        title="Child",
+        description="Child",
+        acceptance_criteria=["Done"],
+        parent_task_id=pid,
+        dependencies=[pid],
+        idempotency_key="child",
+    )
+    cid = child["entity_ref"]["id"]
+    # Reverse containment is forbidden, but reverse dependency is a different relation.
+    manager.edit_task(
+        cid, child["revision"], changes={"dependencies": []}, idempotency_key="clear-wait"
+    )
+    current = manager.snapshot().tasks[cid]
+    taken = manager.take_task(cid, current["revision"], idempotency_key="take-child")
+    started = manager.start_task(cid, taken["revision"], idempotency_key="start-child")
+    manager.complete_task(
+        cid, started["revision"], summary="Child complete", idempotency_key="done-child"
+    )
+    assert manager.snapshot().tasks[pid]["state"] == "ready"
+    assert manager.snapshot().tasks[pid]["revision"] == parent["revision"]
+    assert manager.snapshot().tasks[cid]["parent_task_id"] == pid
+
+
+def test_hierarchy_cannot_be_smuggled_through_lifecycle_event(manager: CommonsManager) -> None:
+    created = task(manager, "immutable-kind")
+    with pytest.raises(ValidationError, match="Hierarchy fields"):
+        manager.record_event(
+            "task.taken",
+            {
+                "task_id": created["entity_ref"]["id"],
+                "expected_revision": created["revision"],
+                "owner_session_id": manager.session_id,
+                "task_kind": "component",
+            },
+            idempotency_key="smuggle-kind",
+        )
+
+
+@pytest.mark.parametrize("shared_manager", [True, False])
+def test_concurrent_reparenting_cannot_commit_a_cycle(
+    manager: CommonsManager, shared_manager: bool
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    first, second = task(manager, "first"), task(manager, "second")
+    barrier = Barrier(2)
+
+    def move(source: dict, parent: dict) -> str:
+        writer = (
+            manager
+            if shared_manager
+            else CommonsManager(
+                manager.repo_root,
+                state_root=manager.paths.state_root,
+                session_id=manager.session_id,
+            )
+        )
+        barrier.wait(timeout=5)
+        try:
+            writer.edit_task(
+                source["entity_ref"]["id"],
+                source["revision"],
+                changes={"parent_task_id": parent["entity_ref"]["id"]},
+                idempotency_key="move-" + source["entity_ref"]["id"],
+            )
+            return "saved"
+        except TaskEditRefusal as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(move, first, second), pool.submit(move, second, first)]
+        assert sorted(future.result(timeout=10) for future in futures) == [
+            "saved",
+            "task_parent_cycle",
+        ]
+    assert not [issue for issue in manager.snapshot().issues if issue.severity == "error"]

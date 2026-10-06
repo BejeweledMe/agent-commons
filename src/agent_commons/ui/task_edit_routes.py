@@ -26,7 +26,9 @@ TASK_EDIT_SCHEMA = "agent-commons.ui.task-edit.v1"
 TASK_EDIT_RESULT_SCHEMA = "agent-commons.ui.task-edit-result.v1"
 MAX_TASK_EDIT_BYTES = 64 * 1024
 _STATES = EDITABLE_TASK_STATES | {"accepted", "cancelled"}
-_CHANGE_FIELDS = frozenset({"title", "description", "acceptance_criteria", "dependencies"})
+_CHANGE_FIELDS = frozenset(
+    {"title", "description", "acceptance_criteria", "dependencies", "parent_task_id"}
+)
 
 
 def _text(value: object, maximum: int) -> str:
@@ -50,6 +52,11 @@ def _changes(value: object) -> dict[str, Any]:
     if "dependencies" in value:
         validate_task_dependencies(value["dependencies"])
         result["dependencies"] = list(value["dependencies"])
+    if "parent_task_id" in value:
+        parent = value["parent_task_id"]
+        if parent is not None and (type(parent) is not str or not is_typed_id(parent, "task")):
+            raise ValidationError("parent_task_id must be a task ID or null")
+        result["parent_task_id"] = parent
     if len(json.dumps(result, ensure_ascii=False).encode()) > MAX_TASK_EDIT_BYTES:
         raise ValidationError("The task edit exceeds the 64 KiB limit.")
     return result
@@ -83,6 +90,7 @@ def task_edit_detail(manager: CommonsManager, task_id: str) -> dict[str, Any]:
         "task_id": task_id,
         "revision": revision,
         **content,
+        "task_kind": task.get("task_kind", "task"),
         "state": state,
         "editable": state in EDITABLE_TASK_STATES and not live,
         "cancellable": state in CANCELLABLE_TASK_STATES and not live,

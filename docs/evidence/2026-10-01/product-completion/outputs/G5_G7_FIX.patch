@@ -1,0 +1,445 @@
+--- a/src/agent_commons/security/policy.py
++++ b/src/agent_commons/security/policy.py
+@@ -63,6 +63,9 @@
+     }
+ )
+ 
++# Start bare keys at token boundaries and consume each token without backtracking.
++# The numeric/punctuation prefix keeps conservative detection of 123password=x
++# while preventing a failed long identifier from being rescanned at every suffix.
+ _QUOTED_ASSIGNMENT = re.compile(
+     r"""
+     (?P<key>
+@@ -70,7 +73,7 @@
+         |
+         '(?:\\.|[^'\\\r\n])+'
+         |
+-        [A-Za-z_][A-Za-z0-9_.-]*
++        (?<![A-Za-z0-9_.-])[0-9.-]*+[A-Za-z_][A-Za-z0-9_.-]*+
+     )
+     \s*[:=]\s*
+     (?P<value>
+@@ -84,7 +87,8 @@
+ 
+ _UNQUOTED_ASSIGNMENT = re.compile(
+     r"""
+-    (?P<key>[A-Za-z_][A-Za-z0-9_.-]*)
++    (?<![A-Za-z0-9_.-])[0-9.-]*+
++    (?P<key>[A-Za-z_][A-Za-z0-9_.-]*+)
+     \s*[:=]\s*
+     (?P<value>[^\s"'`#,}\]]+)
+     """,
+@@ -324,6 +328,8 @@
+                 key = match.group("key")
+                 if key[:1] in {'"', "'"} and key[-1:] == key[:1]:
+                     key = key[1:-1]
++                else:
++                    key = key.lstrip("0123456789.-")
+                 if _credential_key(key) and match.group("value")[1:-1].strip():
+                     findings.append(
+                         SecurityFinding(
+@@ -371,6 +377,8 @@
+                 key = match.group("key")
+                 if key[:1] in {'"', "'"} and key[-1:] == key[:1]:
+                     key = key[1:-1]
++                else:
++                    key = key.lstrip("0123456789.-")
+                 if _credential_key(key) and match.group("value")[1:-1].strip():
+                     add(
+                         text,
+--- a/src/agent_commons/mcp/server.py
++++ b/src/agent_commons/mcp/server.py
+@@ -9,9 +9,11 @@
+ 
+ import os
+ import time
++from collections import OrderedDict
+ from collections.abc import Callable
+ from functools import wraps
+ from pathlib import Path
++from threading import RLock
+ from typing import Any, Literal, Protocol, TypeVar
+ 
+ from agent_commons.core.refs import parse_ref
+@@ -962,6 +964,12 @@
+ 
+     build_read_ranges: dict[tuple[str, str], list[tuple[int, int]]] = {}
+     completed_build_entries: set[tuple[str, str]] = set()
++    # Cache only policy-checked text from exact immutable entry identities. Every
++    # call still checks the frozen artifact binding and reads/verifies CAS bytes.
++    # Session-local limits bound retained decoded text; eviction never affects CAS.
++    checked_build_text: OrderedDict[tuple[str, str, str], tuple[str, Any, int]] = OrderedDict()
++    checked_build_text_bytes = 0
++    checked_build_text_lock = RLock()
+ 
+     def exact_output_bundle(artifact_id: str) -> dict[str, Any]:
+         if artifact_id not in relevant_artifact_ids() or worker_artifact_bundles is None:
+@@ -1011,6 +1019,8 @@
+         For approval, read every text entry completely (follow next_offset).
+         Asset hashes prove retained bytes, not visual appearance or execution.
+         """
++        nonlocal checked_build_text_bytes
++
+         import hashlib
+         import io
+         import zipfile
+@@ -1063,11 +1073,34 @@
+             body = archive.read(path)
+         if "sha256:" + hashlib.sha256(body).hexdigest() != entry["revision"]:
+             raise IntegrityError("Build entry content changed")
+-        try:
+-            text = body.decode("utf-8")
+-        except UnicodeDecodeError:
+-            raise ValidationError("Build entry is not UTF-8") from None
+-        text, redactions = workspace._review_content(text, context="scoped static build content")
++        cache_key = (artifact_id, str(bundle["artifact"]["manifest_ref"]), entry["revision"])
++        with checked_build_text_lock:
++            cached = checked_build_text.get(cache_key)
++            if cached is None:
++                try:
++                    text = body.decode("utf-8")
++                except UnicodeDecodeError:
++                    raise ValidationError("Build entry is not UTF-8") from None
++                # Scan the whole entry before slicing, including cross-chunk secrets.
++                text, redactions = workspace._review_content(
++                    text, context="scoped static build content"
++                )
++                # Account for redaction disclosures as well as decoded text.
++                weight = len(text.encode("utf-8")) + sum(
++                    256 + sum(len(str(value)) for value in item.values()) for item in redactions
++                )
++                if weight <= 20 * 1024 * 1024:
++                    while checked_build_text and (
++                        len(checked_build_text) >= 128
++                        or checked_build_text_bytes + weight > 20 * 1024 * 1024
++                    ):
++                        _, (_, _, removed) = checked_build_text.popitem(last=False)
++                        checked_build_text_bytes -= removed
++                    checked_build_text[cache_key] = (text, redactions, weight)
++                    checked_build_text_bytes += weight
++            else:
++                text, redactions, _ = cached
++                checked_build_text.move_to_end(cache_key)
+         if offset > len(text):
+             raise ValidationError("Build offset exceeds entry")
+         end = min(offset + limit, len(text))
+--- a/src/agent_commons/mcp/design_output_tools.py
++++ b/src/agent_commons/mcp/design_output_tools.py
+@@ -168,20 +168,40 @@
+                 metadata["retained_content"] = retained
+                 if build:
+                     metadata["build_files"] = build_files
++                content_copied = True
+                 existing = snapshot.artifacts.get(artifact_id)
+                 if existing is not None:
+                     bundle = commons.get_artifact_bundle(artifact_id)
+                     manifest = bundle["manifest"]
+                     old = manifest.get("metadata", {})
++                    legacy_image = (
++                        not build
++                        and isinstance(old, dict)
++                        and set(old)
++                        == {"output_kind", "output_task", "output_delegation", "series_id", "title"}
++                        and all(
++                            isinstance(old.get(field), dict)
++                            and set(old[field]) == {"id", "revision"}
++                            and snapshot.entity_revision_actor(
++                                kind, old[field]["id"], old[field]["revision"]
++                            )
++                            is not None
++                            for field, kind in (
++                                ("output_task", "task"),
++                                ("output_delegation", "delegation"),
++                            )
++                        )
++                    )
+                     if (
+                         manifest.get("revision") != content_revision
++                        or manifest.get("size_bytes") != len(content)
+                         or manifest.get("source") != {"path": source_path}
+                         or manifest.get("media_type") != media_type
+                         or manifest.get("classification") != "internal"
+                         or old.get("title") != title
+                         or old.get("series_id") != metadata["series_id"]
+                         or old.get("output_kind") != output_kind
+-                        or old.get("retained_content") != retained
++                        or (not legacy_image and old.get("retained_content") != retained)
+                         or (build and old.get("build_files") != build_files)
+                         or old.get("output_task", {}).get("id") != target["id"]
+                         or old.get("output_delegation", {}).get("id") != current["id"]
+@@ -195,7 +215,11 @@
+                         raise IdempotencyConflictError(
+                             "Generated image retry differs from its publication."
+                         )
+-                    OutputContentStore(commons).put(content)
++                    # An identical pre-retention retry preserves its historical contract.
++                    # Copying bytes here would silently upgrade immutable metadata.
++                    content_copied = not legacy_image
++                    if content_copied:
++                        OutputContentStore(commons).put(content)
+                     metadata = old
+                     revision = snapshot.entity_revision("artifact", artifact_id)
+                 else:
+@@ -261,7 +285,7 @@
+                     "producer_delegation_id": current["id"],
+                     "delegation_revision": metadata["output_delegation"]["revision"],
+                     "series_id": metadata["series_id"],
+-                    "content_copied": True,
++                    "content_copied": content_copied,
+                 }
+         except IdempotencyConflictError:
+             raise IdempotencyConflictError(
+--- a/tests/security/test_policy.py
++++ b/tests/security/test_policy.py
+@@ -208,3 +208,36 @@
+     start, end, finding = policy.scan_text_lines(key)[0]
+     assert finding.category == "pem_private_key"
+     assert (start, end) == (1, 3), "a block with no END must run to the end of the input"
++
++
++@pytest.mark.parametrize("size", [65_535, 1024 * 1024])
++def test_long_identifier_scanning_has_a_bounded_runtime(size) -> None:
++    # A subprocess deadline also stops a future quadratic regression rather
++    # than allowing the test runner itself to hang on attacker-controlled text.
++    import subprocess
++    import sys
++
++    program = """
++import sys
++from agent_commons.security import SecurityPolicy
++text = 'a' * int(sys.argv[1]) + '😀Жe\\u0301終' + 'b' * 10
++policy = SecurityPolicy()
++assert not policy.scan(text)
++assert not policy.scan_text_lines(text)
++policy.assert_safe(text)
++"""
++    subprocess.run([sys.executable, "-c", program, str(size)], check=True, timeout=5)
++
++
++@pytest.mark.parametrize("prefix", ["", "123", ".-123", "Ж", " "])
++@pytest.mark.parametrize("value", ['"short"', "'short'", "short"])
++def test_assignment_token_boundaries_preserve_credentials(prefix, value) -> None:
++    text = prefix + "password\n = \n" + value
++    assert SecurityPolicy().scan(text)
++    assert SecurityPolicy().scan_text_lines(text)
++
++
++def test_adjacent_identifier_suffix_does_not_create_a_credential() -> None:
++    # The original scanner's greedy key also treated this as one safe key.
++    assert not SecurityPolicy().scan('unrelatedpassword="value"')
++    assert not SecurityPolicy().scan_text_lines('unrelatedpassword="value"')
+--- a/tests/mcp/test_design_output_tools.py
++++ b/tests/mcp/test_design_output_tools.py
+@@ -8,7 +8,7 @@
+ import pytest
+ from PIL import Image
+ 
+-from agent_commons.errors import IdempotencyConflictError, LifecycleConflictError
++from agent_commons.errors import IdempotencyConflictError, IntegrityError, LifecycleConflictError
+ from agent_commons.mcp.design_output_tools import register_design_output_tools
+ from agent_commons.services import CommonsManager
+ from agent_commons.services.outputs import OutputReads
+@@ -772,3 +772,175 @@
+         ctx.build_tool("dist", "Frontend", "frontend-001")
+     assert not ctx.worker.snapshot().artifacts
+     assert not (ctx.worker.paths.state_root / "output-content").exists()
++
++
++def _register_legacy_image(ctx, *, metadata_changes=None, author=None):
++    import hashlib
++
++    from agent_commons.services.generated_outputs import generated_series
++
++    snapshot = ctx.worker.snapshot()
++    metadata = {
++        "output_kind": "task_design_image",
++        "output_task": {"id": ctx.task, "revision": snapshot.entity_revision("task", ctx.task)},
++        "output_delegation": {
++            "id": ctx.run,
++            "revision": snapshot.entity_revision("delegation", ctx.run),
++        },
++        "series_id": generated_series(ctx.run, "outputs/screen.png"),
++        "title": "Homepage",
++    }
++    metadata.update(metadata_changes or {})
++    key = "generated-image-" + hashlib.sha256(f"{ctx.run}:homepage-001".encode()).hexdigest()
++    return (author or ctx.worker).register_artifact(
++        "outputs/screen.png",
++        media_type="image/png",
++        classification="internal",
++        metadata=metadata,
++        idempotency_key=key,
++    )
++
++
++def test_legacy_identical_retry_preserves_metadata_history_without_copying(published_context):
++    ctx = published_context
++    original = _register_legacy_image(ctx)
++    bundle = ctx.worker.get_artifact_bundle(original["entity_ref"]["id"])
++    retry = publish(ctx)
++    assert retry["artifact_id"] == original["entity_ref"]["id"]
++    assert retry["artifact_revision"] == original["revision"]
++    assert retry["content_copied"] is False
++    assert ctx.worker.get_artifact_bundle(retry["artifact_id"]) == bundle
++    assert not (ctx.worker.paths.state_root / "output-content").exists()
++    # A lost-response retry after constructing a new tool/server manager stays identical.
++    functions = {}
++
++    def register(*args, **kwargs):
++        def decorate(function):
++            functions[function.__name__] = function
++            return function
++
++        return decorate
++
++    resumed = CommonsManager(
++        ctx.worker.repo_root,
++        state_root=ctx.worker.paths.state_root,
++        session_id=ctx.worker.session_id,
++    )
++
++    def current():
++        return dict(resumed.snapshot().delegations[ctx.run])
++
++    register_design_output_tools(register, resumed, current, worker_binding=current())
++    assert (
++        functions["commons_publish_design_image"]("outputs/screen.png", "Homepage", "homepage-001")
++        == retry
++    )
++    retained = publish(ctx, idempotency_key="homepage-retained-002")
++    assert retained["artifact_id"] != retry["artifact_id"] and retained["content_copied"]
++    assert ctx.worker.get_artifact_bundle(retry["artifact_id"]) == bundle
++
++
++@pytest.mark.parametrize("change", ["bytes", "title", "source", "producer", "extra", "binding"])
++def test_legacy_retry_still_refuses_changed_intent_or_malformed_provenance(
++    published_context, change
++):
++    ctx = published_context
++    changes = None
++    if change == "producer":
++        snapshot = ctx.parent.snapshot()
++        other = ctx.parent.create_delegation(
++            target_ref={"kind": "task", "id": ctx.task},
++            target_revision=snapshot.entity_revision("task", ctx.task),
++            target_profile="codex-builder",
++            purpose="implementation",
++            on_behalf_of_agent_id=ctx.agent,
++            limits={
++                "max_depth": 0,
++                "wall_time_seconds": 300,
++                "max_attempts": 1,
++                "max_concurrency": 1,
++                "budget": {"unit": "provider_units", "limit": 1},
++            },
++        )
++        changes = {
++            "output_delegation": {"id": other["entity_ref"]["id"], "revision": other["revision"]}
++        }
++    elif change == "extra":
++        changes = {"unexpected": "value"}
++    elif change == "binding":
++        changes = {"output_task": {"id": ctx.task, "revision": "evt.invalid"}}
++    _register_legacy_image(ctx, metadata_changes=changes)
++    args = {}
++    if change == "bytes":
++        Image.new("RGB", (4, 3), (99, 22, 33)).save(ctx.source)
++    elif change == "title":
++        args["title"] = "Changed"
++    elif change == "source":
++        other = ctx.source.with_name("other.png")
++        other.write_bytes(ctx.source.read_bytes())
++        args["source_path"] = "outputs/other.png"
++    with pytest.raises(IdempotencyConflictError):
++        publish(ctx, **args)
++    assert not (ctx.worker.paths.state_root / "output-content").exists()
++
++
++def test_build_unicode_chunks_reuse_checked_text_but_still_verify_bytes(
++    published_context, monkeypatch
++):
++    from agent_commons.mcp.scoped_repo import ScopedRepoReader
++    from agent_commons.services.output_content import OutputContentStore
++
++    ctx = published_context
++    dist = ctx.worker.repo_root / "dist"
++    dist.mkdir()
++    expected = "a" * 65535 + "😀Жe\u0301終" + "b" * 10
++    (dist / "index.html").write_text(expected)
++    output = ctx.build_tool("dist", "Unicode", "unicode-cache-001")
++    reviewer, server, _ = _output_reviewer(ctx, output)
++    calls = []
++    original = ScopedRepoReader._review_content
++
++    def inspect(reader, text, **kwargs):
++        if kwargs.get("context") == "scoped static build content":
++            calls.append(text)
++        return original(reader, text, **kwargs)
++
++    monkeypatch.setattr(ScopedRepoReader, "_review_content", inspect)
++    read = server.tools["commons_read_build_file"]
++    tail = read(output["artifact_id"], "index.html", offset=65536)
++    assert not tail["review_content_complete"]
++    with pytest.raises(LifecycleConflictError, match="evidence is incomplete"):
++        server.tools["commons_finalize_review"]("approved", "Tail only")
++    first = read(output["artifact_id"], "index.html", limit=65536)
++    assert first["content"] + tail["content"] == expected
++    assert first["review_content_complete"] and len(calls) == 1
++    store = OutputContentStore(reviewer)
++    retained = store.root / output["content_revision"].removeprefix("sha256:")
++    retained.write_bytes(b"tampered")
++    with pytest.raises(IntegrityError, match="Retained content is unavailable"):
++        read(output["artifact_id"], "index.html")
++    assert len(calls) == 1
++
++
++def test_build_scan_redacts_cross_chunk_and_cross_line_secret_before_caching(published_context):
++    ctx = published_context
++    dist = ctx.worker.repo_root / "dist"
++    dist.mkdir()
++    raw = "a " * 32765 + '\npassword\n =\n "synthetic-credential"\n' + "tail " * 50
++    (dist / "index.html").write_text(raw)
++    output = ctx.build_tool("dist", "Redaction", "cross-chunk-001")
++    _, server, _ = _output_reviewer(ctx, output)
++    read = server.tools["commons_read_build_file"]
++    first = read(output["artifact_id"], "index.html", limit=65536)
++    assert first["next_offset"] == 65536 and first["redactions"]
++    tail = read(output["artifact_id"], "index.html", offset=first["next_offset"])
++    sanitized = first["content"] + tail["content"]
++    assert "synthetic-credential" not in sanitized and "password" not in sanitized
++    assert sanitized.count("[agent-commons redacted source line]") == 3
++    assert tail["review_content_complete"]
++    assert (
++        server.tools["commons_finalize_review"](
++            "approved", "Inspected policy-redacted text; hidden content and execution not reviewed"
++        )["delegation_outcome"]["event_type"]
++        == "delegation.succeeded"
++    )
+--- a/docs/PROTOCOL.md
++++ b/docs/PROTOCOL.md
+@@ -396,7 +396,10 @@
+ exists. Backup/restore must include this store. Missing/corrupt bytes have an honest
+ unavailable preview. Legacy metadata-only images continue checking original source
+ bytes, and cannot be reconstructed from hashes. New versions need new operation
+-keys; reuse conflicts if content or intent changed.
++keys; reuse conflicts if content or intent changed. An identical retry of the exact
++historical five-field image metadata returns its original artifact/event revision
++with `content_copied: false`; it neither copies bytes nor upgrades ledger history.
++Publishing retained bytes for that image requires a new operation key.
+ 
+ `/api/outputs/builds/{artifact_id}/{artifact_revision}` is an authenticated,
+ project/scoped, exact-version ZIP attachment with `nosniff` and `no-store`; it never
+@@ -414,7 +417,12 @@
+ `commons_read_build_file` inspect only frozen in-scope artifact revisions. The image
+ tool returns actual verified MCP pixels. The build tool verifies the entire retained
+ bundle and requested entry hashes, returns manifest or UTF-8 text chunks of at most
+-65,536 characters, and rejects non-text/unknown entries. All text entries must be
++65,536 characters, and rejects non-text/unknown entries. Whole-entry policy scanning
++precedes slicing, so secrets spanning chunk boundaries remain redacted. A session
++cache reuses checked text only for the frozen manifest/entry digest (at most 128
++entries/20 MiB of text and redaction accounting); each read still verifies the
++current frozen binding, CAS object and entry bytes. Cache eviction removes no
++retained content. All text entries must be
+ read without gaps before artifact evidence satisfies `commons_finalize_review`;
+ manifest-only reads do not. Binary assets have verified hashes but are not rendered
+ by the build-file tool. Evidence coverage is separate from a substantive review:

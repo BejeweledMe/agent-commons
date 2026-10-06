@@ -1,0 +1,35 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_another_thread_waits_for_same_manager_outer_hold _____________
+
+tmp_path = PosixPath('/private/var/folders/s2/41w_xwpx3ys5shf05f13psk40000gn/T/pytest-of-dmitrijersov/pytest-16/test_another_thread_waits_for_0')
+
+    def test_another_thread_waits_for_same_manager_outer_hold(tmp_path: Path) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+    
+        manager = _manager(tmp_path)
+        started = Event()
+        entered = Event()
+    
+        def acquire():
+            started.set()
+            with manager._canonical_write_lock():
+                entered.set()
+                assert manager._write_lock_depth == 1
+    
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with manager._canonical_write_lock():
+                manager._records_and_snapshot()
+                view = manager._verified_ledger_view
+                future = pool.submit(acquire)
+                assert started.wait(timeout=5)
+>               assert not entered.wait(timeout=0.1)
+E               assert not True
+E                +  where True = wait(timeout=0.1)
+E                +    where wait = <threading.Event at 0x10b9bce10: set>.wait
+
+tests/services/test_verified_ledger_view.py:506: AssertionError
+=========================== short test summary info ============================
+FAILED tests/services/test_verified_ledger_view.py::test_another_thread_waits_for_same_manager_outer_hold
+1 failed in 0.78s

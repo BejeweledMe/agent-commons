@@ -1,0 +1,21 @@
+{
+  "utc": "2026-09-21T19:50:41.330676+00:00",
+  "installed_source_sha256": "786583b5c1c55dda154910926bd990a2a6bac3c358fbdc13ef6ca5c0302aadad",
+  "checkout_source_sha256": "ed233d7e8e28f2af035c711bff00215bf968e493b2f569e9bc70b997c4099841",
+  "profiles": {
+    "codex-builder": {
+      "receipt_qualified": true,
+      "checked_at": "2026-09-21T18:36:51.257820Z",
+      "receipt_fingerprint": "15ff0d84258460bca3fe525c8e66f77cf0b26fc7cf4f3dcb2a3c76039c3a8ed0",
+      "current_fingerprint": "e3044724dcdf1c3f2daabb9e1d03e30389c64198880886bbe6510fe971945332",
+      "matches": false
+    },
+    "codex-independent-reviewer": {
+      "receipt_qualified": true,
+      "checked_at": "2026-09-21T18:38:13.077040Z",
+      "receipt_fingerprint": "88d864687784bf7a400487a943563aa7f8c972ad35b50b43e67898cdcb51e40e",
+      "current_fingerprint": "b2bc8882b6f0d8f6f1cb30b640cf81875d37331ea9cd20750d0a3631ffe07be5",
+      "matches": false
+    }
+  }
+}

@@ -290,6 +290,36 @@
     "caption": "BASE → разговор после Claude: первое сообщение получено и чтение подтверждено; EN read-ack и RU reply-blocker также показывают ответ с блокером. Второе сообщение в поле — неотправленный черновик; вложения нет."
   },
   {
+    "file": "V11-base-review-launch-EN.jpg",
+    "sha256": "430d42ef04c62939458d1627eb865bcc1cac5cccf163ad936a1179bdb6182f99",
+    "width": 947,
+    "height": 4612,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:52:03.276747+00:00",
+    "caption": "BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет."
+  },
+  {
+    "file": "V11-base-review-launch-RU.jpg",
+    "sha256": "03c8a61e859969db189ae601697d32d4b4fe08192dcb43fdab6170004729d5ec",
+    "width": 947,
+    "height": 4700,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:52:04.055839+00:00",
+    "caption": "BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет."
+  },
+  {
+    "file": "V11-base-review-requested-EN.jpg",
+    "sha256": "cf69184fb20d7cf3320defe90829d8446439d92e476cd61fafbef645d78bb9b2",
+    "width": 947,
+    "height": 3943,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:51:41.930414+00:00",
+    "caption": "BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет."
+  },
+  {
     "file": "V12-reasons-saving-RU.jpg",
     "sha256": "bcb548afdd2cf12ddf75503391d43abfacce545b0d3d87576ebb40761272b0f2",
     "width": 1042,
@@ -478,5 +508,125 @@
     "asset": "work-BBA7jVsK.js",
     "saved_at_utc": "2026-09-21T18:41:54.096684+00:00",
     "caption": "BASE#4 → карта/инспектор/сведения прогона. UI показывает running и одновременно ready; stale warning ограничивает вывод о свежести."
+  },
+  {
+    "file": "V23-base-changes-requested-EN.jpg",
+    "sha256": "bffd47b51b9b056fc768553c526cd72e4b619e95287bd15734876e0141febf17",
+    "width": 947,
+    "height": 425,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:56:37.026819+00:00",
+    "caption": "Settings → legacy Runs → QA Show record → result_ref → Search review ID → Show review. Вердикт changes_requested, independent:true, stale:false; Work его не показывает."
+  },
+  {
+    "file": "V23-base-changes-requested-RU.jpg",
+    "sha256": "4208b1ada33426f70ac59f6cfaf75136f3f0cc1427624bb907b69971d37454e1",
+    "width": 947,
+    "height": 425,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:56:37.275638+00:00",
+    "caption": "Settings → legacy Runs → QA Show record → result_ref → Search review ID → Show review. Вердикт changes_requested, independent:true, stale:false; Work его не показывает."
+  },
+  {
+    "file": "V24-base-reopened-RU.jpg",
+    "sha256": "da65b949be96890a5ac584847bce3a9e674ad738c6f7528248cf172b8537de17",
+    "width": 947,
+    "height": 5075,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:01:16.312248+00:00",
+    "caption": "BASE после changes_requested: EN — записанный комментарий возврата; RU — новая ревизия после CLI task reopen. Нового прогона и приёмки нет."
+  },
+  {
+    "file": "V24-base-return-comment-EN.jpg",
+    "sha256": "77730bf07319040b43cf904c86b36a3d8858f66a23a341d1969d0168af1496ab",
+    "width": 947,
+    "height": 4059,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:58:50.371670+00:00",
+    "caption": "BASE после changes_requested: EN — записанный комментарий возврата; RU — новая ревизия после CLI task reopen. Нового прогона и приёмки нет."
+  },
+  {
+    "file": "V25-work-missing-verdict-EN.jpg",
+    "sha256": "a78ac241d17136fb272e77a57f01b284085fd63e7c9de9f16b16f70443b484a3",
+    "width": 947,
+    "height": 4059,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:59:26.543499+00:00",
+    "caption": "После QA и reload: новый Work показывает In review/succeeded, снова Request review, без отрицательного вердикта и Reopen. Точная ревизия совпала с review."
+  },
+  {
+    "file": "V25-work-missing-verdict-RU.jpg",
+    "sha256": "85cafb35818416436d11ffd7914f83f884cafc1cc40f3ac0d821c67b3a2bbb30",
+    "width": 947,
+    "height": 4109,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T18:59:26.985298+00:00",
+    "caption": "После QA и reload: новый Work показывает In review/succeeded, снова Request review, без отрицательного вердикта и Reopen. Точная ревизия совпала с review."
+  },
+  {
+    "file": "V26-attachment-sent-EN.jpg",
+    "sha256": "e46706aa94bcd5ba72710b8e1df9d7623d03184b7d80ab0ca957cfe9dff83fcb",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:20:15.824008+00:00",
+    "caption": "Исправление BASE → разговор → native picker → BASE-owner-constraints.txt → Send. EN: файл и стадия Fetched; RU: явный ответ о прочтении файла19:20:19UTC. Содержимое файла — только несекретные ограничения текущей работы."
+  },
+  {
+    "file": "V26-attachment-sent-RU.jpg",
+    "sha256": "f30508d2e57adf6c21502ff2558eee04f7081448a67c74b199734a0dc22bb4a2",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:21:51.645728+00:00",
+    "caption": "Исправление BASE → разговор → native picker → BASE-owner-constraints.txt → Send. EN: файл и стадия Fetched; RU: явный ответ о прочтении файла19:20:19UTC. Содержимое файла — только несекретные ограничения текущей работы."
+  },
+  {
+    "file": "V27-base-handoff-blocked-EN.jpg",
+    "sha256": "ec4fcffdabc100c738a8c9f54aeba8c16911df24f073da0afff7179a4b98da5d",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:29:48.321094+00:00",
+    "caption": "После исправляющего BASE: Work → Tasks → BASE → EN/RU. Карта показывает needs_operator; результата/приёмки нет. Точная причина доступна только в legacy записи и разговоре."
+  },
+  {
+    "file": "V27-base-handoff-blocked-RU.jpg",
+    "sha256": "f6aae85fa01473a70cf9e4d1f3d0ac2a196c4e15975ce4b96a2b4950b993ce07",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:30:13.921909+00:00",
+    "caption": "После исправляющего BASE: Work → Tasks → BASE → EN/RU. Карта показывает needs_operator; результата/приёмки нет. Точная причина доступна только в legacy записи и разговоре."
+  },
+  {
+    "file": "V28-qualification-invalid-EN.jpg",
+    "sha256": "9e456ef61eab20164b8031a2294d03f8eff20646d9dad2898a8abbd5307de869",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:53:03.898824+00:00",
+    "caption": "После регистрации BASE: Board → QA → Give task заблокирован → Settings → codex-builder → Technical details → EN/RU. UI Check run failed/failed-invalid; read-only диагностика установила mismatch ранее успешного receipt."
+  },
+  {
+    "file": "V28-qualification-invalid-RU.jpg",
+    "sha256": "c6503f36c34316b773735e7dc075816e2f9b41f78c61bd777b413000cdd09b98",
+    "width": 1042,
+    "height": 467,
+    "commit": "5153a56fd524709c608bc867d788c5f0fe0801da",
+    "asset": "work-BBA7jVsK.js",
+    "saved_at_utc": "2026-09-21T19:52:41.247846+00:00",
+    "caption": "После регистрации BASE: Board → QA → Give task заблокирован → Settings → codex-builder → Technical details → EN/RU. UI Check run failed/failed-invalid; read-only диагностика установила mismatch ранее успешного receipt."
   }
 ]

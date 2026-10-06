@@ -1,6 +1,17 @@
 import { translate, type Locale, type MessageKey } from "./i18n.js";
 
 const KEYS = [
+  "search",
+  "focusLabel",
+  "upstream",
+  "downstream",
+  "zoom",
+  "zoomOut",
+  "zoomIn",
+  "fit",
+  "edgeMeaning",
+  "hiddenPrerequisites",
+  "noMatches",
   "suggested",
   "graph",
   "list",

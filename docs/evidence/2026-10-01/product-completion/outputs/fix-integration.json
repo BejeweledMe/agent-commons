@@ -1,0 +1,38 @@
+[
+  {
+    "path": "src/agent_commons/security/policy.py",
+    "main_before_sha256": "7899e7b90ef8b3cfebd6d54f2164e09368d7257a438e77de042df51c41f66cc9",
+    "exact_worker_base": true,
+    "main_after_sha256": "38d28367490fd162495fe177bf7f63b8e74ad64485d901a0a2ce90379f8a3f4c"
+  },
+  {
+    "path": "src/agent_commons/mcp/server.py",
+    "main_before_sha256": "6226b0beb4500cc433d6290c3703f63e99d2518e04c523348b19e8011c26f3ce",
+    "exact_worker_base": false,
+    "main_after_sha256": "064633ba080cb2e3e1d62aef51160e7a53723c697b2cb4d787b500768bbaa611"
+  },
+  {
+    "path": "src/agent_commons/mcp/design_output_tools.py",
+    "main_before_sha256": "a446df1ebfc925afd1ef749b52ba58af9794dbb96df1fb4b0d3e9861d9bfab04",
+    "exact_worker_base": true,
+    "main_after_sha256": "9ad2d9e94e7095c54ab07bbdc11bf1585bd647d46599bdb9034e6883c1d69623"
+  },
+  {
+    "path": "tests/security/test_policy.py",
+    "main_before_sha256": "da5f2ac5771aab6f1410022b8217f5b4e430f7953a198e1a9947bb2e93a2869c",
+    "exact_worker_base": true,
+    "main_after_sha256": "51c47910261994c896d6d7523ee0620d32272cb1a27696031244530ed4d5610a"
+  },
+  {
+    "path": "tests/mcp/test_design_output_tools.py",
+    "main_before_sha256": "a62d96b4908b0c5d3c30be7bb912dac77a31138cecf4cc58b1a92be59c70f8b3",
+    "exact_worker_base": true,
+    "main_after_sha256": "fd363a9453479aeaca69b93c6b0c04dc9450e8b61e649652001b5e44a256c566"
+  },
+  {
+    "path": "docs/PROTOCOL.md",
+    "main_before_sha256": "9584f4cb528ce07a523740e090404f54e3b0b9b70beeaef13ffc72932452fa31",
+    "exact_worker_base": true,
+    "main_after_sha256": "fce76b56fa2e92fd95a2430a02e171f0bea60d340646fdfd3660be8acd363ec2"
+  }
+]

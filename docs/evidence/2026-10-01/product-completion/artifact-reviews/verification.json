@@ -1,0 +1,26 @@
+{
+  "source_deleted": true,
+  "retained_hashes_verified": true,
+  "containment_distinct_from_dependencies": true,
+  "outputs": {
+    "artifact.0KN7CWA64CB305GW4RV08J9ZRP": {
+      "state": "stale",
+      "historical_verified": true,
+      "task_review": "awaiting",
+      "artifact_review": "approved"
+    },
+    "artifact.4B2CXW8DSA2RMYAQ78WYXNSZT5": {
+      "state": "stale",
+      "historical_verified": true,
+      "task_review": "awaiting",
+      "artifact_review": null
+    },
+    "artifact.6DZNY3RA52CSWSWDGJVV4A2B4X": {
+      "state": "ready",
+      "historical_verified": false,
+      "task_review": null,
+      "artifact_review": "approved"
+    }
+  },
+  "task_review_still_requested": true
+}

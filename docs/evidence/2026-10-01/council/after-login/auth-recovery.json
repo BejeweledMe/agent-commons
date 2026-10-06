@@ -1,0 +1,24 @@
+{
+  "schema": "agent_commons.council_auth_recovery.v1",
+  "date": "2026-10-01",
+  "authorization": "Owner explicitly approved displayed Claude Code and Grok Build OAuth scopes in this chat before the final consent actions.",
+  "claude": {
+    "login_process_exit_code": 0,
+    "logged_in": true,
+    "auth_method": "claude.ai",
+    "subscription_type": "max",
+    "browser_confirmation": "You are all set up for Claude Code."
+  },
+  "grok": {
+    "login_process_exit_code": 0,
+    "browser_confirmation": "Device Authorised",
+    "models_command_exit_code": 0,
+    "requested_model": "grok-4.7",
+    "requested_model_present_in_catalog": true
+  },
+  "boundaries": [
+    "No credentials, account identifiers, OAuth codes or signed links are stored in this record.",
+    "Authentication is not a model answer, Commons broker qualification or release acceptance.",
+    "No billing credential switch, subscription purchase or model fallback was performed."
+  ]
+}

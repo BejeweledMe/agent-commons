@@ -1,0 +1,32 @@
+{
+  "transport": "CUA Chrome extension",
+  "url": "http://127.0.0.1:8873/",
+  "desktop": {
+    "height": 1100,
+    "scrollWidth": 1440,
+    "width": 1440
+  },
+  "mobile": {
+    "width": 390,
+    "height": 843,
+    "scrollWidth": 390
+  },
+  "narrow": {
+    "height": 740,
+    "scrollWidth": 320,
+    "width": 320
+  },
+  "checks": [
+    "initial6tasks4results",
+    "Mira2tasks1result",
+    "Mira+Planned+keyboard empty0tasks0results",
+    "reset6tasks4results",
+    "dialog producer/task/type provenance visible",
+    "Escape returns focus to opener",
+    "Tab search to status select",
+    "Enter opens result dialog",
+    "no horizontal overflow1440/390/320"
+  ],
+  "consoleWarningsAndErrors": [],
+  "scope": "bounded manual verification; not exhaustive accessibility audit; screenshots from actual browser, distinct from worker AppKit previews"
+}

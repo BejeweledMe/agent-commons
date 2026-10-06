@@ -1,0 +1,45 @@
+{
+  "handoff": {
+    "created": true,
+    "entity_ref": {
+      "id": "handoff.5XRBQEZ5A142R5C6AC13W66WKQ",
+      "kind": "handoff"
+    },
+    "event_id": "evt.01M3VYPJV8RYS5NP7N9DNMCBER",
+    "event_type": "handoff.created",
+    "idempotency_key": "product-final-20261001-targeted-handoff",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M3VYPJV8RYS5NP7N9DNMCBER"
+  },
+  "thread_reply": {
+    "created": true,
+    "entity_ref": {
+      "id": "thread.3Y4JX67VM1BY7AHHBGHJ9RMMWG",
+      "kind": "thread"
+    },
+    "event_id": "evt.01M3VYNR3SMGF91JKNVRXSK8KT",
+    "event_type": "thread.replied",
+    "idempotency_key": "product-final-20261001-state-root-thread",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M3VYNR3SMGF91JKNVRXSK8KT"
+  },
+  "doctor": {
+    "ok": true,
+    "issues": [],
+    "event_count": 4272,
+    "manifest_count": 434,
+    "schema_count": 28
+  },
+  "historical_warning_count": 173,
+  "handoff_visible_in_final_orientation": true
+}

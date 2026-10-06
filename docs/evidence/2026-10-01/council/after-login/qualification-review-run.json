@@ -1,0 +1,34 @@
+{
+  "schema": "agent_commons.qualification_review_run.v1",
+  "review_id": "review.0RB0BM15Z1175KR168M8D8PFKP",
+  "review_revision": "evt.01M3VNVWGFKB5YHH5X63210MBM",
+  "target_ref": {
+    "id": "task.5KX5GZJSWZY9N6GBND09FX1223",
+    "kind": "task"
+  },
+  "target_revision": "evt.01M3VNFEN170HSHTPNM33EQPYM",
+  "verdict": "approved",
+  "model": "gpt-6-astra",
+  "profile_id": "codex-independent-reviewer",
+  "provider_version": "codex-cli 0.159.3",
+  "canonical_state": "succeeded",
+  "process_canonical_mismatch": false,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "process": {
+    "diagnostic_code": "none",
+    "diagnostic_hint": "No provider failure was classified.",
+    "duration_seconds": 326.35032879101345,
+    "exit_code": 0,
+    "outcome": "succeeded",
+    "output_truncated": false,
+    "reason": "completed",
+    "stderr_bytes_seen": 0,
+    "stdout_bytes_seen": 791882,
+    "workflow_diagnostic_code": "none"
+  },
+  "delegation_id": "delegation.148DF8C93PKTGPQVE470VRC23B",
+  "delegation_revision": "evt.01M3VNWW53SYEATSNV15W88WX8",
+  "scope": "Frozen G1/G2 evidence only. No task acceptance or full release is inferred from this review."
+}

@@ -1,0 +1,25 @@
+{
+  "transport": "CUA Chrome extension",
+  "app": "shipped Commons /work",
+  "mode": "read-only single-project",
+  "entry": "agent name/avatar button Open design gallery for Astra Frontend Pilot",
+  "imageCount": 2,
+  "images": [
+    {
+      "alt": "Engineering Desk mobile — AppKit design preview, not browser validation",
+      "complete": true,
+      "naturalHeight": 2450,
+      "naturalWidth": 390
+    },
+    {
+      "alt": "Engineering Desk desktop — AppKit design preview, not browser validation",
+      "complete": true,
+      "naturalHeight": 1620,
+      "naturalWidth": 1440
+    }
+  ],
+  "taskTitle": "Build Engineering Desk static task and agent gallery",
+  "agentName": "Astra Frontend Pilot",
+  "labels": "Both explicitly AppKit design preview, not browser validation",
+  "canonicalUiWrites": false
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "agent_commons.synthetic-output-cap-check.v1",
+  "retained_stdout_bytes": 1048576,
+  "stdout_bytes_seen": 1398244,
+  "output_truncated": true,
+  "terminal_stdout_marker_retained": false,
+  "actual_pixels_read": true,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "canonical_terminal_event": "delegation.succeeded",
+  "exact_result_review_state": "approved",
+  "real_provider_run": false,
+  "max_output_bytes_changed": false
+}

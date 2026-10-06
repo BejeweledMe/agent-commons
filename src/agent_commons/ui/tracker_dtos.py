@@ -16,6 +16,8 @@ _SOURCE_REVISION = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 class TrackerTaskPayload(TypedDict):
+    task_kind: str
+    parent_task_id: str | None
     task_id: str
     title: str
     task_state: str
@@ -135,6 +137,8 @@ class TrackerTaskDTO:
     gaps: tuple[str, ...]
     objective_id: str | None = None
     application_id: str | None = None
+    task_kind: str = "task"
+    parent_task_id: str | None = None
     suggested_agent_id: str | None = None
     suggested_role_name: str | None = None
     suggested_provider: str | None = None
@@ -144,6 +148,8 @@ class TrackerTaskDTO:
             "task_id": self.task_id,
             "title": self.title,
             "task_state": self.task_state,
+            "task_kind": self.task_kind,
+            "parent_task_id": self.parent_task_id,
             "readiness": self.readiness,
             "dependency_task_ids": list(self.dependency_task_ids),
             "blocking_dependency_ids": list(self.blocking_dependency_ids),

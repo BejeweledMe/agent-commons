@@ -384,6 +384,8 @@ export type TrackerSurfaceState =
   | "error";
 
 export type TrackerTask = {
+  taskKind: "task" | "component";
+  parentTaskId: string | null;
   taskId: string;
   title: string;
   taskState: string;

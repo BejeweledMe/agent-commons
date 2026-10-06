@@ -1,0 +1,10 @@
+{
+  "schema": "agent_commons.operator_profile_rollback.v1",
+  "date": "2026-10-01",
+  "operator_profile_sha256": "6c8d83407babc7b7fb9135856933dbd16deb6f128b1cdda1fa03f5ffbacc258d",
+  "backup_sha256": "6c8d83407babc7b7fb9135856933dbd16deb6f128b1cdda1fa03f5ffbacc258d",
+  "backup_location": "operator-owned ~/.config/agent-commons/backups/runtime-before-gpt6-20261001.yaml",
+  "operator_profile_changed": false,
+  "credentials_or_billing_changed": false,
+  "scope": "Profile backup only. Existing CLI0.145.0 remains installed; no permanent GPT6 rollout performed."
+}

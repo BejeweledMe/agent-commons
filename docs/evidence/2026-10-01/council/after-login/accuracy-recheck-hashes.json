@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "path": "docs/evidence/2026-10-01/council/after-login/README.md",
+      "sha256": "444ebb39846c2531cea6801b07fffffe4a6a83007265fba5f89f50c7b821f738"
+    },
+    {
+      "path": "docs/plans/2026-10-01-gpt6-and-product-completion.md",
+      "sha256": "2b26964070cac1cb59c7b0585b5fb6b47f4945268ee03191fc61934fd8275356"
+    },
+    {
+      "path": "docs/evidence/2026-10-01/council/README.md",
+      "sha256": "04a2b95b9892ddef28bf6d75e08b8577022aa6504221ba85fac712aeed411ffa"
+    },
+    {
+      "path": "docs/evidence/2026-10-01/council/after-login/critique-C-all5-input-manifest.json",
+      "sha256": "0362a898db5667b2d1a7247a6173b4dacf055b274ceefc61490aa2bba6319c6f"
+    },
+    {
+      "path": "src/agent_commons/ui/reads.py",
+      "sha256": "766b865b6b1645b64dcd56bf99f4dd0209cffba450f849df07ea5822ccc0b3cc"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "sha256": "4d37264a4604b29dfede887d00ed4e4da9eba32827f83d54a3618cb3e694c5bc"
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "d806f8529a9551f5dd1fb7cf03d14cc7f88722b8cdb42f46287b796427186c7e"
+    },
+    {
+      "path": "frontend/work/src/components/DecisionCard.tsx",
+      "sha256": "9965a966826ad2d537a1954076bbdca8c42efcf945f44f107cdc3a31939368cb"
+    }
+  ],
+  "python_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e"
+}

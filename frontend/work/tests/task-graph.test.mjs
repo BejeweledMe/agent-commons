@@ -18,7 +18,7 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), [
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (file) => import(pathToFileURL(resolve(compiled, file + ".js")).href);
-const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, MAX_GRAPH_TASKS, NODE_HEIGHT } = await load("taskGraph");
+const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, MAX_GRAPH_TASKS, NODE_HEIGHT, NODE_WIDTH, selectGraphTasks, focusedTaskIds, graphViewport, fitGraphZoom } = await load("taskGraph");
 const { TaskGraphApi, parseTaskEditDetail } = await load("taskGraphApi");
 const { taskEditorDraft, observeTaskEditorDraft, editorInput } = await load("taskEditorState");
 const { bucketTasksForNow, filterTrackerTasks, NOW_COLUMNS } = await load("taskPresentation");
@@ -89,7 +89,7 @@ test("accepted, completed and running are separate facts with status text and ic
   assert.equal(graphTaskState(task(taskId, [otherId], { blockingDependencyIds: [otherId] })), "queued");
   assert.notEqual(GRAPH_ICONS.accepted, GRAPH_ICONS.completed);
   const css = readFileSync(resolve(root, "src/taskGraph.css"), "utf8");
-  // Accepted and completed nodes wear the status-accepted tokens, never a raw green.
+  // Only accepted nodes use acceptance tokens; completed work has neutral colours.
   assert.match(css, /\[data-graph-state="accepted"\][^{]*\{ background:var\(--status-accepted-surface\); color:var\(--status-accepted-text\); border-color:var\(--status-accepted\);/);
   assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b/, "no raw colour in the graph stylesheet"); assert.match(css, /double/);
   for (const locale of ["en", "ru"]) {
@@ -129,14 +129,24 @@ test("tracker suggestion parser requires a complete bounded metadata triple", ()
   ]) assert.throws(() => parseTrackerSnapshot(withHint(invalid)));
 });
 
-test("completed node text has at least 4.5 to 1 contrast on its status surface", () => {
+test("completed uses actual neutral colours and readable text; acceptance alone is green", () => {
   // The node reads its colours from the :root tokens; resolve them and measure the pair.
   const rootCss = readFileSync(resolve(root, "src/styles.css"), "utf8");
   const token = (name) => rootCss.match(new RegExp(`--${name}:\\s*#([0-9a-fA-F]{6})`))[1];
   const luminance = (hex) => [0, 2, 4].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255)
     .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
     .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-  const text = luminance(token("status-accepted-text")), surface = luminance(token("status-accepted-surface"));
+  const css = readFileSync(resolve(root, "src/taskGraph.css"), "utf8");
+  const completed = css.match(/\.task-graph-node\[data-graph-state="completed"\]\s*\{([^}]+)\}/)[1];
+  const accepted = css.match(/\.task-graph-node\[data-graph-state="accepted"\]\s*\{([^}]+)\}/)[1];
+  const property = (rule, name) => rule.match(new RegExp(`${name}:\\s*var\\(--([a-z0-9-]+)\\)`))[1];
+  assert.equal(property(completed, "background"), "surface-2");
+  assert.equal(property(completed, "color"), "text-1");
+  assert.equal(property(completed, "border-color"), "border-2");
+  assert.doesNotMatch(completed, /status-accepted/);
+  assert.notEqual(token(property(completed, "background")), token(property(accepted, "background")));
+  assert.notEqual(token(property(completed, "border-color")), token(property(accepted, "border-color")));
+  const text = luminance(token(property(completed, "color"))), surface = luminance(token(property(completed, "background")));
   assert.ok((Math.max(text, surface) + 0.05) / (Math.min(text, surface) + 0.05) >= 4.5);
 });
 
@@ -278,7 +288,7 @@ test("the role filter narrows the Now columns exactly as it narrows the full lis
   assert.equal(groupOf(snapshot, thirdId, agentId), null, "another role's task is outside every column");
 });
 
-test("each Tasks view has one render path and the graph capacity is decided before mount", () => {
+test("each Tasks view has one render path and Map scopes capacity after mounting", () => {
   // Every column is populated, so an empty column can never hide a missing list.
   // Ids must be ULID-shaped: the task list renders an OutputsButton per row and its scope parser rejects anything else.
   const many = Array.from({ length: 300 }, (_, index) => task(`task.${String(index).padStart(26, "0")}`, [], { taskState: ["ready", "active", "review"][index % 3] }));
@@ -289,8 +299,10 @@ test("each Tasks view has one render path and the graph capacity is decided befo
   assert.equal(occurrences(now, /class="task-graph"/g), 0);
   assert.equal(occurrences(now, /class="now-column-list"/g), 3, "three columns, one list each");
   const map = renderToStaticMarkup(createElement(TaskViews, viewProps("map", large)));
-  assert.equal(occurrences(map, /class="task-graph"/g), 0, "over capacity the graph is never mounted");
-  assert.equal(occurrences(map, /class="task-list"/g), 1, "and the list replaces it instead of joining it");
+  assert.equal(occurrences(map, /class="task-graph"/g), 1, "Map owns selection and capacity");
+  assert.equal(occurrences(map, /class="task-graph-fallback"/g), 1, "one fallback represents the visible selection");
+  assert.equal(occurrences(map, /class="task-list"/g), 0, "the outer list does not duplicate Map");
+  assert.doesNotMatch(map, /<svg/, "the oversized full selection stays a list");
   assert.ok(map.includes(messages.en["task_graph.graphLimit"]));
   const graph = renderToStaticMarkup(createElement(TaskViews, viewProps("map", snapshotOf(many.slice(0, 4)))));
   assert.equal(occurrences(graph, /class="task-graph"/g), 1);
@@ -327,4 +339,155 @@ test("the three views are one accessible tab strip with EN and RU copy for every
     assert.ok(settled.includes(messages[locale].task_view_now_settled), `${locale} names where finished work stays`);
     assert.doesNotMatch(settled, /class="now-column-list"/, "an accepted task is in no column");
   }
+});
+
+
+test("a selected small component remains a graph in a 304-task Map", () => {
+  const many = Array.from({ length: 304 }, (_, index) => task(`task.${String(index).padStart(26, "0")}`));
+  many[1] = { ...many[1], dependencyTaskIds: [many[0].taskId] };
+  const edges = [edge(many[0].taskId, many[1].taskId)];
+  const focused = buildTaskGraph(many, edges, many[1].taskId);
+  assert.equal(focused.tooLarge, false);
+  assert.equal(focused.total, 304);
+  assert.deepEqual(focused.nodes.map((node) => node.task.taskId), [many[0].taskId, many[1].taskId]);
+  const snapshot = snapshotOf(many, { edges });
+  const html = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("map", snapshot), selectedTaskId: many[1].taskId }));
+  assert.match(html, /<svg/);
+  assert.equal(occurrences(html, /class="task-graph-node"/g), 2);
+  assert.ok(!html.includes(messages.en["task_graph.graphLimit"]));
+  const chain = many.slice(0, 129).map((item, index, all) => ({ ...item, dependencyTaskIds: index ? [all[index - 1].taskId] : [] }));
+  const chainEdges = chain.slice(1).map((item, index) => edge(chain[index].taskId, item.taskId));
+  const oversized = buildTaskGraph(chain, chainEdges, chain[0].taskId);
+  assert.equal(oversized.tooLarge, true);
+  assert.equal(oversized.selectedTasks.length, 129);
+  assert.equal(buildTaskGraph(chain, chainEdges, chain[0].taskId, "upstream").nodes.length, 1);
+});
+
+test("focus and search follow server edges, preserve direction and expose hidden prerequisites", () => {
+  const fourthId = `task.${"3".repeat(26)}`;
+  const tasks = [task(taskId, [], { title: "Foundation" }), task(otherId, [], { title: "API service" }), task(thirdId, [], { title: "Frontend", roleName: "Designer" }), task(fourthId, [], { title: "Release" })];
+  const edges = [edge(taskId, otherId), edge(taskId, thirdId), edge(otherId, fourthId), edge(thirdId, fourthId)];
+  assert.deepEqual([...focusedTaskIds(tasks, edges, otherId, "upstream")].sort(), [taskId, otherId]);
+  assert.deepEqual([...focusedTaskIds(tasks, edges, otherId, "downstream")].sort(), [otherId, fourthId]);
+  assert.equal(selectGraphTasks(tasks, edges, otherId, "connected").length, 4);
+  assert.deepEqual(selectGraphTasks(tasks, edges, otherId, "connected", "DESIGNER").map((item) => item.taskId), [thirdId]);
+  assert.deepEqual(selectGraphTasks(tasks, edges, null, "all", " API ").map((item) => item.taskId), [otherId]);
+  assert.equal(selectGraphTasks(tasks, edges, null, "all", "not found").length, 0);
+  const filtered = buildTaskGraph(tasks, edges, null, "all", "Release");
+  assert.equal(filtered.invalid, false);
+  assert.equal(filtered.hiddenPrerequisites, 2);
+  assert.equal(filtered.nodes[0].hiddenPrerequisites, 2);
+  assert.equal(filtered.edges.length, 0, "hidden prerequisites are counted, not drawn as imaginary nodes");
+  const upstream = buildTaskGraph(tasks, edges, otherId, "upstream");
+  assert.equal(upstream.hiddenPrerequisites, 0);
+  const downstream = buildTaskGraph(tasks, edges, otherId, "downstream");
+  assert.equal(downstream.hiddenPrerequisites, 2);
+  assert.equal(buildTaskGraph(tasks, [], otherId).nodes.length, 1, "task metadata cannot fabricate server edges");
+  const missing = buildTaskGraph([tasks[1]], [edge(taskId, otherId, true)], null);
+  assert.equal(missing.invalid, true);
+  assert.equal(missing.hiddenPrerequisites, 0, "missing is a fault, not merely filtered");
+});
+
+test("diamond and wide layers have no overlap or backwards wrapping and stable routed edges", () => {
+  const ids = Array.from({ length: 8 }, (_, index) => `task.${String(index).padStart(26, "0")}`);
+  const tasks = ids.map((id) => task(id));
+  const edges = [...ids.slice(1, 7).map((id) => edge(ids[0], id)), ...ids.slice(1, 7).map((id) => edge(id, ids[7]))];
+  const layout = buildTaskGraph(tasks, edges, null);
+  assert.deepEqual(buildTaskGraph([...tasks].reverse(), [...edges].reverse(), null), layout);
+  assert.equal(layout.edges.length, edges.length);
+  const byId = new Map(layout.nodes.map((node) => [node.task.taskId, node]));
+  for (const connection of edges) assert.ok(byId.get(connection.prerequisiteTaskId).y + NODE_HEIGHT < byId.get(connection.dependentTaskId).y);
+  assert.equal(new Set(layout.nodes.filter((node) => node.rank === 1).map((node) => node.y)).size, 1, "six peers stay on one dependency layer");
+  for (let i = 0; i < layout.nodes.length; i++) for (let j = i + 1; j < layout.nodes.length; j++) {
+    const a = layout.nodes[i], b = layout.nodes[j];
+    assert.ok(a.x + NODE_WIDTH <= b.x || b.x + NODE_WIDTH <= a.x || a.y + NODE_HEIGHT <= b.y || b.y + NODE_HEIGHT <= a.y, "node rectangles never overlap");
+  }
+  assert.ok(layout.edges.every((connection) => /^M [0-9.]+ [0-9.]+ L /.test(connection.path)), "use layout routing points");
+});
+
+test("zoom is bounded SVG sizing, and search/focus/fit/list controls render in both locales without inline styles", () => {
+  assert.deepEqual(graphViewport(400, 600, 1.5), { width: 600, height: 900, zoom: 1.5 });
+  assert.equal(graphViewport(400, 600, 5).zoom, 2);
+  assert.equal(graphViewport(400, 600, 0).zoom, 0.25);
+  assert.equal(graphViewport(400, 600, NaN).zoom, 1);
+  assert.equal(fitGraphZoom(1200, 600), 0.5);
+  assert.equal(fitGraphZoom(1200, 100), 0.25);
+  assert.equal(fitGraphZoom(400, 0), 1);
+  for (const locale of ["en", "ru"]) {
+    const html = renderToStaticMarkup(createElement(TaskGraph, { tasks: [task(otherId)], edges: [edge(taskId, otherId)], selectedTaskId: otherId, onSelectTask() {}, locale }));
+    for (const key of ["search", "focusLabel", "upstream", "downstream", "zoomIn", "zoomOut", "fit", "edgeMeaning", "hiddenPrerequisites", "list"]) assert.ok(html.includes(messages[locale][`task_graph.${key}`]), `${locale}.${key}`);
+    assert.match(html, /type="search"/);
+    assert.match(html, /<select/);
+    assert.match(html, /<details/);
+    assert.match(html, /viewBox="0 0 /);
+    assert.doesNotMatch(html, /style=|<script/);
+  }
+});
+
+const { hierarchyRows, hierarchyWouldCycle } = await load("taskHierarchy");
+const { TaskHierarchy } = await load("components/TaskHierarchy");
+test("structure is explicit, dependency-independent, cycle-safe, and survives filtered parents", () => {
+  const nodes = [task(taskId, [otherId], { taskKind: "component", parentTaskId: null }), task(otherId, [], { taskKind: "task", parentTaskId: taskId }), task(thirdId, [], { parentTaskId: otherId })];
+  assert.deepEqual(hierarchyRows(nodes).rows.map((row) => row.depth), [0, 1, 2]);
+  assert.equal(hierarchyWouldCycle(nodes, taskId, thirdId), true);
+  assert.equal(hierarchyWouldCycle(nodes, thirdId, taskId), false);
+  assert.equal(hierarchyRows(nodes.slice(1)).rows[0].parentOutside, true);
+  const cycle = hierarchyRows([nodes[0], { ...nodes[1], parentTaskId: otherId }]);
+  assert.equal(cycle.invalid, true);
+  assert.equal(cycle.rows.length, 2);
+  for (const locale of ["en", "ru"]) {
+    const html = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: nodes, selectedTaskId: otherId, onSelectTask() {}, text: (key) => messages[locale][key] }));
+    assert.match(html, /<svg/);
+    assert.match(html, /task-hierarchy-edges/);
+    assert.match(html, /task-hierarchy-root/);
+    assert.doesNotMatch(html, /style=/);
+    assert.match(html, /aria-pressed="true"/);
+    assert.ok(html.includes(messages[locale].hierarchy_component));
+    assert.ok(html.includes(messages[locale].hierarchy_help));
+  }
+});
+
+test("parent DTO validates typed IDs and draft/retry preserves explicit detach", async () => {
+  assert.throws(() => parseTaskEditDetail({ ...detail(), parent_task_id: "not-a-task" }, taskId));
+  assert.throws(() => parseTaskEditDetail({ ...detail(), task_kind: "directory" }, taskId));
+  const draft = taskEditorDraft(parseTaskEditDetail({ ...detail(), parent_task_id: otherId, task_kind: "component" }, taskId));
+  assert.equal(editorInput(draft).parentTaskId, otherId);
+  const requests = [];
+  const api = new TaskGraphApi({ async requestData(path, options) { requests.push(options.body); return success(); } });
+  await api.save(taskId, revision, editorInput({ ...draft, parentTaskId: null }), "detach", signal());
+  assert.equal(requests[0].changes.parent_task_id, null);
+  assert.equal("task_kind" in requests[0].changes, false);
+});
+
+const { buildHierarchyGraph } = await load("taskHierarchy");
+test("containment diagram uses explicit parents and a presentation-only project root", () => {
+  const parent = task(taskId, [thirdId], { parentTaskId: null, taskKind: "component" });
+  const child = task(otherId, [thirdId], { parentTaskId: taskId });
+  const unrelated = task(thirdId, [], { parentTaskId: null });
+  const graph = buildHierarchyGraph([parent, child, unrelated], taskId);
+  assert.deepEqual(graph.edges.map(({from, to}) => [from, to]), [["project-root", taskId], [taskId, otherId]]);
+  assert.equal(graph.nodes.filter(({task}) => task === null).length, 1);
+  assert.equal(graph.nodes.some(({id}) => id === thirdId), false, "dependencies never select containment nodes");
+  const p = graph.nodes.find(({id}) => id === taskId), c = graph.nodes.find(({id}) => id === otherId);
+  assert.ok(p.y + NODE_HEIGHT < c.y);
+  const boundary = buildHierarchyGraph([child], otherId);
+  assert.equal(boundary.hiddenParents, 1);
+  assert.deepEqual(boundary.edges, [], "hidden parents never turn into project-root edges");
+  assert.equal(buildHierarchyGraph([{...parent, parentTaskId: otherId}, child], null).invalid, true);
+});
+
+test("containment diagram applies branch/search before cap and remains bounded at 1/20/128/304", () => {
+  const nodes = Array.from({length: 304}, (_, index) => task(`task.${String(index).padStart(26, "0")}`, [], { parentTaskId: null }));
+  for (const count of [1, 20, 128]) {
+    const layout = buildHierarchyGraph(nodes.slice(0, count), null);
+    assert.equal(layout.tooLarge, false);
+    assert.equal(layout.nodes.length, count + 1);
+  }
+  assert.equal(buildHierarchyGraph(nodes, null).tooLarge, true);
+  assert.equal(buildHierarchyGraph(nodes, nodes[200].taskId).nodes.length, 2);
+  const search = buildHierarchyGraph(nodes, null, false, nodes[200].taskId);
+  assert.equal(search.nodes.length, 2);
+  const largeHtml = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: nodes, selectedTaskId: null, onSelectTask() {}, text: (key) => messages.en[key] }));
+  assert.doesNotMatch(largeHtml, /<svg/);
+  assert.match(largeHtml, /task-hierarchy-list/);
 });

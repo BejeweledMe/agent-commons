@@ -1,0 +1,73 @@
+{
+  "verdict": "approved",
+  "task_id": "task.01V3HM0QMDRQGQXG4NW914W1BV",
+  "target_revision": "evt.01M3VX4TRQ9Q77EZVGNCPTPTJE",
+  "review_id": "review.19A15NWKZF3WMY7M2YSVEEVCPP",
+  "review_request_revision": "evt.01M3VX5NSSQ2WYPJZVTZ4D0KSW",
+  "reviewer_session_id": "session.64b87c0e18064018b58a428c2376d8bb",
+  "completion_receipt": {
+    "created": true,
+    "entity_ref": {
+      "id": "review.19A15NWKZF3WMY7M2YSVEEVCPP",
+      "kind": "review"
+    },
+    "event_id": "evt.01M3VYACS45XX0496B5RCTBS5E",
+    "event_type": "review.completed",
+    "idempotency_key": "independent-g5-g7-final-review-20261001-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M3VYACS45XX0496B5RCTBS5E"
+  },
+  "task_accepted": false,
+  "release_approved": false,
+  "before_manifests": {
+    "final-source-manifest.json": {
+      "sha256": "3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+      "manifest_hash_matches": true,
+      "files": 1067,
+      "mismatches": []
+    },
+    "final-evidence-manifest.json": {
+      "sha256": "72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+      "manifest_hash_matches": true,
+      "files": 126,
+      "mismatches": []
+    }
+  },
+  "after_manifests": {
+    "final-source-manifest.json": {
+      "sha256": "3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+      "files": 1067,
+      "mismatches": []
+    },
+    "final-evidence-manifest.json": {
+      "sha256": "72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+      "files": 126,
+      "mismatches": []
+    }
+  },
+  "session_closure": {
+    "capabilities": [],
+    "client": "codex",
+    "closed_at": "2026-10-01T14:37:13.003967Z",
+    "effective_status": "closed",
+    "expires_at": "2026-10-01T15:33:10.736118Z",
+    "last_seen_at": "2026-10-01T14:37:13.003967Z",
+    "model": null,
+    "model_family": "gpt-6",
+    "opened_at": "2026-10-01T14:33:10.736118Z",
+    "principal": "codex",
+    "role": "independent-g5-g7-reviewer",
+    "schema": "agent_commons.session.v1",
+    "session_id": "session.64b87c0e18064018b58a428c2376d8bb",
+    "software": "codex-desktop",
+    "source_producer": null,
+    "stable_instance_id": "codex-independent-g5-g7-final-20261001",
+    "status": "closed"
+  },
+  "prose_sha256": "fca4107f82b065f72d966360010a6484a84d286162498a76fc146ead8da2a990"
+}

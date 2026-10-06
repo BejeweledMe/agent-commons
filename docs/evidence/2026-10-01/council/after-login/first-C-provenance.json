@@ -1,0 +1,31 @@
+{
+  "stage": "independent_first_answer",
+  "perspective": "engineering delivery, task graph/data integrity, blockers, practical strong-developer workflows",
+  "requested_model": "grok-4.7",
+  "actual_model": "grok-4.7-build",
+  "actual_model_basis": "provider final JSON modelUsage model key",
+  "requested_session_id": "f4b07eac-41b5-488e-a468-3eab253fc353",
+  "provider_session_id": "f4b07eac-41b5-488e-a468-3eab253fc353",
+  "provider_request_id": "1d940b62-4232-4522-bdc2-30ea4c6914e0",
+  "provider_version": "grok 1.0.13 (5e9a58528b76) [stable]",
+  "provider_stop_reason": "end_turn",
+  "provider_num_turns": 23,
+  "status": "completed",
+  "exit_code": 0,
+  "start_time_utc": "2026-10-01T10:58:54.826313+00:00",
+  "end_time_utc": "2026-10-01T11:04:25.910866+00:00",
+  "elapsed_seconds": 331.083,
+  "timeout_seconds": 1200,
+  "sandbox_enforced": true,
+  "isolation_limit": "Native read-only profile grants standard private runtime temp writes; entire isolated workspace is explicitly read_only and original peer/main directories are denied. Model tools are restricted to native reads; no web/MCP/subagents.",
+  "visible_final_bytes": 26326,
+  "visible_final_sha256": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0",
+  "visible_final_extraction": "complete provider JSON text only; thought and usage/cost fields stay private",
+  "postrun_source_mismatches": {
+    "original": [],
+    "isolated": []
+  },
+  "original_source_head": "aa9d3733decb9bff2f1b24892167842334bcf6a5",
+  "original_source_manifest_sha256": "86481622e733a85b87a9e0f514eadf6497583dd6b6231a9f45fd9952a396eaa8",
+  "visible_answer_file": "lane-C.md"
+}

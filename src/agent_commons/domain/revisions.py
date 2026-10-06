@@ -27,6 +27,7 @@ CORRECTION_IMMUTABLE_FIELDS = frozenset(
         "manifest_ref",
         "limits",
         "parent_delegation_id",
+        "parent_task_id",
         "parent_session_id",
         "purpose",
         "related_refs",
@@ -73,13 +74,27 @@ def structural_correction_changes(
 ) -> tuple[str, ...]:
     """Return causal/reference fields that immutable-envelope correction cannot change."""
 
-    return tuple(
-        sorted(
-            field
-            for field in CORRECTION_IMMUTABLE_FIELDS
-            if original.get(field) != replacement.get(field)
-        )
-    )
+    changed = {
+        field
+        for field in CORRECTION_IMMUTABLE_FIELDS
+        if original.get(field) != replacement.get(field)
+    }
+    # Legacy creation omits these defaults. Equivalent explicit defaults do
+    # not change containment, but kind conversion is never a typo correction.
+    if original.get("task_kind", "task") != replacement.get("task_kind", "task"):
+        changed.add("task_kind")
+    if "task_id" in original:
+        before = original.get("changes")
+        after = replacement.get("changes")
+        before = before if isinstance(before, Mapping) else {}
+        after = after if isinstance(after, Mapping) else {}
+        # Unlike creation's null default, revision null is an explicit detach.
+        # Preserve both presence and value without freezing wording changes.
+        if ("parent_task_id" in before) != ("parent_task_id" in after) or before.get(
+            "parent_task_id"
+        ) != after.get("parent_task_id"):
+            changed.add("changes.parent_task_id")
+    return tuple(sorted(changed))
 
 
 @dataclass(frozen=True)

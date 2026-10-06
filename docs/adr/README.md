@@ -41,6 +41,10 @@ contract test. The status written in each ADR remains the detailed record.
 | [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
 | [0023](0023-incremental-ledger-validation.md) | Draft proposal | Incremental ledger validation on the canonical write path: byte-identity re-verification and bulk receipt loading replace repeated full revalidation; `doctor` unchanged. |
 
+| [0024](0024-explicit-task-hierarchy.md) | Implemented proposal; acceptance separate | Explicit task/component containment, independent dependencies, CAS editing and no inherited acceptance. |
+
+| [0025](0025-retained-worker-results.md) | Implemented; acceptance separate | Bounded retained image/static-build bytes and exact artifact review; download-only frontend bundles. |
+
 ## How the two records fit together
 
 - ADRs explain stable architecture, migration and rollback consequences.

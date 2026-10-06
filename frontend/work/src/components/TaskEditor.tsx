@@ -1,13 +1,15 @@
 import { type Dispatch, type ReactElement, type SetStateAction, useEffect, useMemo, useRef } from "react";
 import { ApiProblem, type WorkApi } from "../api.js";
 import type { TrackerTask } from "../contracts";
+import { translate } from "../i18n.js";
+import { hierarchyWouldCycle } from "../taskHierarchy.js";
 import type { Locale } from "../i18n";
 import { TaskGraphApi, type TaskEditDetail, type TaskEditInput } from "../taskGraphApi.js";
 import { wouldCreateTaskCycle } from "../taskGraph.js";
 import { taskGraphText, type TaskGraphMessage } from "../taskGraphStrings.js";
 import { editorInput, observeTaskEditorDraft, taskEditorDraft, taskEditorInputError, type TaskEditorDraft } from "../taskEditorState.js";
 
-type Mode = "closed" | "edit" | "dependent" | "cancel";
+type Mode = "closed" | "edit" | "dependent" | "subtask" | "cancel";
 type Intent = { kind: "edit"; taskId: string; revision: string; input: TaskEditInput; key: string }
   | { kind: "dependent"; taskId: string; revision: string; input: TaskEditInput; key: string }
   | { kind: "cancel"; taskId: string; revision: string; reason: string; key: string };
@@ -23,7 +25,7 @@ function failure(error: unknown): { code: string; uncertain: boolean } {
 }
 function refusalMessage(code: string): TaskGraphMessage {
   return ({ task_live_work: "live", task_edit_stale: "stale", task_dependency_cycle: "cycle",
-    task_dependency_missing: "missing", task_edit_state: "unavailable" } as Record<string, TaskGraphMessage>)[code] ?? "failed";
+    task_dependency_missing: "missing", task_parent_missing: "missing", task_parent_cycle: "cycle", task_edit_state: "unavailable" } as Record<string, TaskGraphMessage>)[code] ?? "failed";
 }
 
 export function TaskEditor({ api, task, tasks, sourceRevision, locale, writesEnabled, actionsCurrent, onChanged, onSelectTask, entries, setEntries }: {
@@ -57,19 +59,19 @@ export function TaskEditor({ api, task, tasks, sourceRevision, locale, writesEna
   }, [client, task.taskId, sourceRevision, entry.mode]);
   const pending = entry.action.kind === "pending";
   const uncertain = entry.action.kind === "failure" && entry.action.uncertain;
-  const dependent = entry.mode === "dependent";
+  const dependent = entry.mode === "dependent" || entry.mode === "subtask";
   const draft = dependent ? entry.dependent : entry.draft;
   const input = draft === null ? null : editorInput(draft);
   const inputError = input === null ? null : taskEditorInputError(input);
-  const cycle = !dependent && input !== null && wouldCreateTaskCycle(tasks, task.taskId, input.dependencyIds);
+  const cycle = !dependent && input !== null && (wouldCreateTaskCycle(tasks, task.taskId, input.dependencyIds) || hierarchyWouldCycle(tasks, task.taskId, input.parentTaskId ?? null));
   const missing = input !== null && input.dependencyIds.some((id) => !tasks.some((candidate) => candidate.taskId === id));
   const permitted = actionsCurrent && (dependent || (entry.mode === "cancel" ? entry.detail?.cancellable : entry.detail?.editable));
   const stale = !dependent && entry.draft?.stale === true;
   const disabled = pending || uncertain || !permitted || entry.loading || entry.loadFailed || stale;
 
   function mode(next: Mode): void {
-    const additions = next === "dependent" && entry.dependent === null ? {
-      dependent: { taskId: task.taskId, revision: "", title: "", description: "", criteria: "", dependencyIds: [task.taskId], stale: false }
+    const additions = (next === "dependent" || next === "subtask") && (entry.dependent === null || (entry.mode !== next && !uncertain && !pending)) ? {
+      dependent: { taskId: task.taskId, revision: "", title: "", description: "", criteria: "", dependencyIds: next === "dependent" ? [task.taskId] : [], parentTaskId: next === "subtask" ? task.taskId : null, stale: false }
     } : {};
     update(task.taskId, { mode: next, ...additions });
   }
@@ -107,11 +109,12 @@ export function TaskEditor({ api, task, tasks, sourceRevision, locale, writesEna
   }}>
     <div className="task-editor-toolbar">
       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={entry.mode === "edit"} onClick={() => mode("edit")}>{t("edit")}</button>
+      <button type="button" className="button button-secondary" disabled={pending || uncertain || !writesEnabled} aria-expanded={entry.mode === "subtask"} onClick={() => mode("subtask")}>{translate(locale, "hierarchy_add_subtask")}</button>
       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={dependent} onClick={() => mode("dependent")}>{t("addDependent")}</button>
       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={entry.mode === "cancel"} onClick={() => mode("cancel")}>{t("cancel")}</button>
     </div>
     {entry.mode === "closed" ? null : <div>
-      <div className="task-editor-buttons"><strong>{t(dependent ? "addDependent" : entry.mode === "cancel" ? "cancel" : "edit")}</strong>
+      <div className="task-editor-buttons"><strong>{entry.mode === "subtask" ? translate(locale, "hierarchy_add_subtask") : t(dependent ? "addDependent" : entry.mode === "cancel" ? "cancel" : "edit")}</strong>
         <button type="button" className="button button-secondary button-inline" onClick={() => mode("closed")}>{t("close")}</button></div>
       <p className="small-copy">{t("draftKept")}</p>
       {entry.loading && entry.detail === null ? <p role="status">{t("loading")}</p> : null}
@@ -126,6 +129,13 @@ export function TaskEditor({ api, task, tasks, sourceRevision, locale, writesEna
         <label htmlFor="task-editor-title">{t("title")}</label><input id="task-editor-title" value={draft.title} maxLength={512} disabled={controlsLocked} onChange={(event) => changeDraft({ title: event.target.value })} />
         <label htmlFor="task-editor-description">{t("description")}</label><textarea id="task-editor-description" rows={5} value={draft.description} maxLength={16000} disabled={controlsLocked} onChange={(event) => changeDraft({ description: event.target.value })} />
         <label htmlFor="task-editor-criteria">{t("criteria")}</label><textarea id="task-editor-criteria" rows={4} value={draft.criteria} disabled={controlsLocked} onChange={(event) => changeDraft({ criteria: event.target.value })} />
+        <label htmlFor="task-editor-parent">{translate(locale, "hierarchy_parent")}</label>
+        <select id="task-editor-parent" value={draft.parentTaskId ?? ""} disabled={controlsLocked} onChange={(event) => changeDraft({ parentTaskId: event.target.value || null })}>
+          <option value="">{translate(locale, "hierarchy_project")}</option>
+          {tasks.filter((candidate) => dependent || !hierarchyWouldCycle(tasks, task.taskId, candidate.taskId)).map((candidate) => <option key={candidate.taskId} value={candidate.taskId}>{candidate.title}</option>)}
+          {draft.parentTaskId && !tasks.some((candidate) => candidate.taskId === draft.parentTaskId) ? <option value={draft.parentTaskId}>{draft.parentTaskId}</option> : null}
+        </select>
+        <p className="small-copy">{translate(locale, "hierarchy_help")}</p>
         <details><summary>{t("dependencies")} ({draft.dependencyIds.length})</summary>
           <div className="task-editor-dependencies">{tasks.filter((candidate) => dependent || candidate.taskId !== task.taskId).map((candidate) => <label className="task-editor-dependency" key={candidate.taskId}>
             <input type="checkbox" disabled={controlsLocked} checked={draft.dependencyIds.includes(candidate.taskId)} onChange={(event) => changeDraft({ dependencyIds: event.target.checked

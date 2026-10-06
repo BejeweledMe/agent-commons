@@ -14,11 +14,11 @@ execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--targe
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (path) => import(pathToFileURL(resolve(compiled, path)).href);
-const { OutputsApi, outputStatus, presentCurrent, reviewLabel } = await load("outputsApi.js");
-const { parseOutputList, parseOutputSummary, OutputsError, canViewImage } = await load("outputsTypes.js");
+const { OutputsApi, OutputPreviewQueue, outputStatus, presentCurrent, reviewLabel } = await load("outputsApi.js");
+const { parseOutputList, parseOutputSummary, OutputsError, canViewImage, filterOutputs } = await load("outputsTypes.js");
 const { outputText } = await load("outputsStrings.js");
 const { WorkApi } = await load("api.js");
-const { OutputsAction, ImagePreviewAction, ReviewStateLine } = await load("components/OutputsPanel.js");
+const { OutputsAction, ImagePreviewAction, ReviewStateLine, AgentGalleryAction, OutputAttribution, ImageThumbnail, OutputsPanel } = await load("components/OutputsPanel.js");
 const id = (kind, n = "0") => `${kind}.${n.repeat(26)}`;
 const scope = { kind: "task", id: id("task") };
 const agentScope = { kind: "agent", id: id("agent") };
@@ -258,10 +258,10 @@ test("every status and review label has distinct non-empty copy in both language
     assert.equal(new Set(seen).size, labels.length);
     assert.equal(seen.some((value) => /Out of date|Устарело/.test(value)), false);
   }
-  assert.equal(outputText("en", "reviewAwaiting"), "Awaiting check");
-  assert.equal(outputText("ru", "reviewAwaiting"), "Ждёт проверки");
-  assert.equal(outputText("en", "reviewApproved"), "Check approved");
-  assert.equal(outputText("ru", "reviewReturned"), "Возвращено с замечаниями");
+  assert.equal(outputText("en", "reviewAwaiting"), "Current task: awaiting check");
+  assert.equal(outputText("ru", "reviewAwaiting"), "Текущая задача: ждёт проверки");
+  assert.equal(outputText("en", "reviewApproved"), "Current task: check approved");
+  assert.equal(outputText("ru", "reviewReturned"), "Текущая задача: возвращена с замечаниями");
 });
 
 test("review state is read from the server field only; absent, null and unknown stay neutral", () => {
@@ -282,11 +282,11 @@ test("review state is read from the server field only; absent, null and unknown 
 test("a review label renders in both languages only when the server reported one", () => {
   assert.equal(renderToStaticMarkup(createElement(ReviewStateLine, { state: null, locale: "en" })), "");
   assert.equal(renderToStaticMarkup(createElement(ReviewStateLine, { state: null, locale: "ru" })), "");
-  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "en" })), /Awaiting check/);
-  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "ru" })), /Ждёт проверки/);
-  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "returned", locale: "en" })), /Returned with comments/);
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "en" })), /Current task: awaiting check/);
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "awaiting", locale: "ru" })), /Текущая задача: ждёт проверки/);
+  assert.match(renderToStaticMarkup(createElement(ReviewStateLine, { state: "returned", locale: "en" })), /Current task: returned with comments/);
   const approved = renderToStaticMarkup(createElement(ReviewStateLine, { state: "approved", locale: "ru" }));
-  assert.match(approved, /Проверка одобрена/);
+  assert.match(approved, /Текущая задача: проверка одобрена/);
   assert.match(approved, /class="outputs-review"/);
   assert.doesNotMatch(approved, /style=/);
 });
@@ -296,4 +296,165 @@ test("output styles stay class-based and reserve green for acceptance elsewhere"
   assert.match(css, /\.outputs-review/);
   assert.doesNotMatch(css, /green|#0f0|#00ff00/i);
   assert.doesNotMatch(readFileSync(resolve(root, "src/components/OutputsPanel.tsx"), "utf8"), /style=\{/);
+});
+
+
+test("agent gallery name and avatar are one accessible entry independent of result counts", () => {
+  for (const locale of ["en", "ru"]) {
+    const markup = renderToStaticMarkup(createElement(AgentGalleryAction, { title: "Designer", locale, onOpen() {} }));
+    assert.match(markup, /<button type="button"/);
+    assert.match(markup, /aria-haspopup="dialog"/);
+    assert.match(markup, /aria-label="[^"]*Designer"/);
+    assert.match(markup, /class="board-role-avatar" aria-hidden="true">D/);
+    assert.match(markup, /nodrag nowheel/);
+    assert.doesNotMatch(markup, /disabled|\(0\)/);
+  }
+  const board = readFileSync(resolve(root, "src/components/ProjectBoard.tsx"), "utf8");
+  assert.match(board, /<AgentGalleryButton scope=\{\{ kind: "agent", id: role.id \}\} title=\{role.name\}/);
+  assert.match(board, /<OutputsButton scope=\{\{ kind: "agent", id: role.id \}\}/, "existing counted Results action remains independent");
+});
+
+test("parser retains validated task and producer attribution across image and live results", () => {
+  for (const raw of [row(), generatedRow(), liveRow()]) {
+    const item = first([raw]);
+    assert.equal(item.taskId, raw.task_id);
+    assert.equal(item.taskRevision, raw.task_revision);
+    assert.equal(item.producerAgentId, raw.producer_agent_id);
+    assert.equal(item.producerSessionId, raw.producer_session_id);
+    assert.equal(item.producerDelegationId, raw.producer_delegation_id);
+    assert.equal(item.delegationRevision, raw.delegation_revision ?? null);
+    if (item.kind !== "live_preview") {
+      assert.equal(item.artifactRevision, raw.artifact_revision);
+      assert.equal(item.recordedAt, raw.recorded_at);
+      assert.equal(item.packageId, raw.package_id ?? null);
+      assert.equal(item.packageRevision, raw.package_revision ?? null);
+      assert.equal(item.screenId, raw.screen_id ?? null);
+    }
+  }
+});
+
+test("gallery filters retain history and unavailable records without promoting them", () => {
+  const rows = parseOutputList(list([row({ latest: false }), liveRow({ state: "stale", url: null, latest: false })], scope, "all"), scope, "all").items;
+  assert.equal(filterOutputs(rows, "all"), rows);
+  assert.deepEqual(filterOutputs(rows, "images").map((item) => item.kind), ["design_image"]);
+  assert.deepEqual(filterOutputs(rows, "live").map((item) => item.kind), ["live_preview"]);
+  assert.equal(filterOutputs(rows, "live")[0].state, "stale");
+  assert.equal(filterOutputs(rows, "images")[0].latest, false);
+  assert.deepEqual(filterOutputs([], "images"), []);
+});
+
+test("task and agent names are readable while exact provenance stays in a disclosure", () => {
+  const item = first([row()]);
+  for (const locale of ["en", "ru"]) {
+    const markup = renderToStaticMarkup(createElement(OutputAttribution, { item, locale, onOpenTask() {}, taskTitles: new Map([[scope.id, "Design checkout"]]), agentNames: new Map([[agentScope.id, "Designer"]]) }));
+    assert.match(markup, /<button type="button" class="notice-link">Design checkout<\/button>/);
+    assert.match(markup, /Designer/);
+    assert.match(markup, /<details><summary>/);
+    assert.match(markup, /task_revision/);
+    assert.match(markup, /producer_agent_id/);
+    assert.match(markup, new RegExp(item.taskId.replace(".", "\\.")));
+    assert.doesNotMatch(markup, /style=/);
+  }
+  const unknown = first([row({ producer_agent_id: null, producer_session_id: null, producer_delegation_id: null })]);
+  const fallback = renderToStaticMarkup(createElement(OutputAttribution, { item: unknown, locale: "en" }));
+  assert.match(fallback, /Producer not provided/);
+  assert.doesNotMatch(fallback, /<button|producer_agent_id/);
+});
+
+test("preview queue runs at most two checks and cancelled queued cards never request bytes", async () => {
+  const queue = new OutputPreviewQueue(), work = [deferred(), deferred(), deferred()], controllers = [new AbortController(), new AbortController(), new AbortController()], started = [];
+  let active = 0, maximum = 0;
+  const jobs = work.map((job, i) => queue.run(async () => { started.push(i); active++; maximum = Math.max(maximum, active); try { return await job.promise; } finally { active--; } }, controllers[i].signal));
+  await Promise.resolve();
+  assert.deepEqual(started, [0, 1]);
+  controllers[2].abort();
+  await assert.rejects(jobs[2], OutputsError);
+  work[0].resolve("first"); work[1].resolve("second");
+  assert.deepEqual(await Promise.all(jobs.slice(0, 2)), ["first", "second"]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(maximum, 2); assert.deepEqual(started, [0, 1]);
+  assert.equal(await queue.run(async () => "after cancellation", signal()), "after cancellation");
+});
+
+test("preview queue waits for an active aborted transport to settle before starting more bytes", async () => {
+  const queue = new OutputPreviewQueue(1), pending = deferred(), controller = new AbortController(), started = [];
+  const first = queue.run(async () => { started.push("old"); return pending.promise; }, controller.signal);
+  await Promise.resolve(); controller.abort(); await assert.rejects(first, OutputsError);
+  const next = queue.run(async () => { started.push("next"); return "new"; }, signal());
+  await Promise.resolve(); assert.deepEqual(started, ["old"]);
+  pending.resolve("ignored"); assert.equal(await next, "new"); assert.deepEqual(started, ["old", "next"]);
+});
+
+test("gallery opens with labelled version and kind filters and an honest loading state", () => {
+  const api = new OutputsApi({});
+  for (const locale of ["en", "ru"]) {
+    const markup = renderToStaticMarkup(createElement(OutputsPanel, { api, scope: agentScope, title: "Designer", locale, revision: "", onClose() {} }));
+    assert.match(markup, /<dialog/);
+    assert.match(markup, /aria-labelledby=/);
+    assert.match(markup, /role="status"/);
+    assert.equal((markup.match(/role="group"/g) ?? []).length, 2);
+    assert.equal((markup.match(/aria-pressed="true"/g) ?? []).length, 2);
+    for (const key of ["history", "allKinds", "images", "liveKinds"]) assert.ok(markup.includes(outputText(locale, key)));
+  }
+});
+
+test("unverified historical designs never render thumbnail image bytes", () => {
+  const item = first([row({ state: "stale", reason: "package_revision_superseded", latest: false, width: null, height: null })], scope, "all");
+  const markup = renderToStaticMarkup(createElement(ImageThumbnail, { api: new OutputsApi({}), queue: new OutputPreviewQueue(), scope, versions: "all", item, locale: "en", root: null }));
+  assert.match(markup, /Verified image unavailable/);
+  assert.doesNotMatch(markup, /<img|src=/);
+});
+
+const buildRow = (overrides = {}) => generatedRow({ kind: "static_build", media_type: "application/zip", retained: true, width: null, height: null, result_review_state: null, ...overrides });
+test("static build parser keeps retained result identity and never creates an image preview", async () => {
+  const { canDownloadBuild } = await load("outputsTypes.js");
+  const { BuildDownloadAction } = await load("components/OutputsPanel.js");
+  const item = parseOutputList(list([buildRow({ review_state: "approved" })]), scope, "latest").items[0];
+  assert.equal(item.reviewState, "approved"); assert.equal(item.resultReviewState, null);
+  assert.equal(canViewImage(item), false); assert.equal(canDownloadBuild(item), true);
+  assert.equal(filterOutputs([item], "images").length, 0); assert.equal(filterOutputs([item], "builds").length, 1);
+  for (const locale of ["en", "ru"]) {
+    const html = renderToStaticMarkup(createElement(BuildDownloadAction, { api: {}, scope, item, locale }));
+    assert.ok(html.includes(outputText(locale, "downloadBuild")));
+    assert.ok(html.includes(outputText(locale, "openLocally")));
+    assert.doesNotMatch(html, /<iframe|<img|href=/);
+    const unavailable = renderToStaticMarkup(createElement(BuildDownloadAction, { api: {}, scope, item: { ...item, state: "unavailable" }, locale }));
+    assert.match(unavailable, /disabled=""/);
+  }
+  for (const changed of [{ retained: false }, { media_type: "text/html" }, { width: 1 }, { task_id: id("task", "1") }]) assert.throws(() => parseOutputList(list([buildRow(changed)]), scope, "latest"), OutputsError);
+});
+test("build download verifies hash and scoped freshness, and propagates an honest retryable error", async () => {
+  const bytes = new TextEncoder().encode("synthetic zip content"), digest = `sha256:${Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex")}`;
+  const wire = buildRow({ content_revision: digest });
+  let response = list([wire]);
+  const transport = { readOutputs: async (_kind, _id, versions) => ({ ...response, versions }), readOutputImage: async () => { throw Error("must not request image bytes"); }, readOutputBuild: async () => new Blob([bytes], { type: "application/zip" }) };
+  const api = new OutputsApi(transport), item = parseOutputList(response, scope, "latest").items[0];
+  assert.equal((await api.build(scope, item, signal())).size, bytes.length);
+  response = list([buildRow({ ...wire, state: "unavailable", reason: "output_preview_unavailable" })], scope, "all");
+  await assert.rejects(api.build(scope, item, signal()), OutputsError);
+  response = list([wire], scope, "all");
+  assert.equal((await api.build(scope, item, signal())).size, bytes.length);
+  transport.readOutputBuild = async () => new Blob(["wrong version"], { type: "application/zip" });
+  await assert.rejects(api.build(scope, item, signal()), OutputsError);
+});
+
+test("build transport retains immutable project scope and rejects HTML, oversize and unsafe identities", async () => {
+  const previous = globalThis.fetch, calls = [];
+  const host = Object.assign(new WorkApi(), { apiBase: "/api/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+  const first = host.forProject("project.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), second = host.forProject("project.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  globalThis.fetch = async (url, init) => { calls.push({ url, init }); return new Response(new Uint8Array([1]), { headers: { "Content-Type": "application/zip" } }); };
+  try {
+    await first.readOutputBuild(id("artifact"), id("evt"), "task", scope.id, signal());
+    await second.readOutputBuild(id("artifact"), id("evt"), "agent", agentScope.id, signal());
+    assert.match(calls[0].url, /\/projects\/project.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\/outputs\/builds\/artifact\..*\/evt\..*scope_kind=task/);
+    assert.ok(calls[1].url.includes(`/projects/project.${"b".repeat(32)}/outputs/builds/`));
+    assert.equal(calls[0].init.redirect, "error"); assert.equal(calls[0].init.credentials, "same-origin");
+    for (const response of [new Response("<script/>", { headers: { "Content-Type": "text/html" } }), new Response(new Uint8Array(), { headers: { "Content-Type": "application/zip" } }), new Response(new Uint8Array([1]), { headers: { "Content-Type": "application/zip", "Content-Length": "20971521" } }), new Response(new Uint8Array(20971521), { headers: { "Content-Type": "application/zip" } })]) {
+      globalThis.fetch = async () => response;
+      await assert.rejects(first.readOutputBuild(id("artifact"), id("evt"), "task", scope.id, signal()));
+    }
+    await assert.rejects(first.readOutputBuild("../config", id("evt"), "task", scope.id, signal()));
+    await assert.rejects(first.readOutputBuild(id("artifact"), "evt.invalid", "task", scope.id, signal()));
+    await assert.rejects(first.readOutputBuild(id("artifact"), id("evt"), "task", "task.injected?scope=all", signal()));
+  } finally { globalThis.fetch = previous; }
 });

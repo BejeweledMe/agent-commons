@@ -57,3 +57,8 @@
   .board-section { height: auto; }
   .board-canvas { min-height: 420px; }
 }
+
+.board-role-gallery { display: flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); text-align: start; font: inherit; cursor: pointer; }
+.board-role-gallery:hover .board-role-name { text-decoration: underline; }
+.board-role-gallery:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.board-role-avatar { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); font-weight: 650; }

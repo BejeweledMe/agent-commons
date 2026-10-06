@@ -170,7 +170,6 @@ def test_work_source_keeps_fragment_exchange_and_cookie_session_rules() -> None:
     assert "exchangeCodeFromFragment" in source
     assert "restoreStoredSession" in source
     assert 'await this.hostGet("/projects", signal)' in source
-    assert "A project host has no unscoped /setup" in source
     assert "error instanceof ApiProblem && error.status === 404" in source
     assert 'this.get("/setup", signal)' in source
     assert 'fetch("/api/auth/exchange"' in source
@@ -388,7 +387,8 @@ def test_work_guidance_reconciles_uninitialized_and_409_without_rendering_raw_va
             return { ok: false, status: 404, json: async () => ({ error: { code: "not_found" } }) };
           }
           if (url === `${apiBase}/setup`) {
-            return { ok: true, status: 200, json: async () => ({ state: setupState }) };
+            return { ok: true, status: 200,
+              json: async () => ({ state: setupState, launch_enabled: false }) };
           }
           if (url === `${apiBase}/meta`) {
             return { ok: true, status: 200, json: async () => ({ repo: "/work/project" }) };

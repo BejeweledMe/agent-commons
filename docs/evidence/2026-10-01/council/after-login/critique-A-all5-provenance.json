@@ -1,0 +1,14 @@
+{
+  "label": "A",
+  "stage": "full-five peer critique",
+  "requested_model": "gpt-6-astra",
+  "reasoning_effort": "high",
+  "execution": "native Codex subagent, fresh context, fork_turns=none",
+  "provider_reported_actual_model": null,
+  "identity_limit": "Orchestration requested the exact model; no independent provider attestation returned.",
+  "terminal_status": "completed with visible final answer",
+  "source_scope": "immutable initial source plus all five first answers and frozen common-facts.json",
+  "parent_synthesis_or_peer_critiques_provided": false,
+  "visible_output_sha256": "e5ace186840c34e176cca41888f1cfd35fb27443e5df4ddac759b3c5a69a2cc2",
+  "native_agent": "/root/fiveway_critique_a"
+}

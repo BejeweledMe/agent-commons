@@ -1,0 +1,22 @@
+diff --git a/src/agent_commons/services/manager.py b/src/agent_commons/services/manager.py
+--- a/src/agent_commons/services/manager.py
++++ b/src/agent_commons/services/manager.py
+@@ -1268,6 +1268,18 @@
+                     and "dependencies" in payload_value["changes"]
+                 ):
+                     self._require_ledger_semantics("task.dependencies_revised")
++                if (
++                    event_type == "task.created"
++                    and (
++                        payload_value.get("task_kind", "task") != "task"
++                        or payload_value.get("parent_task_id") is not None
++                    )
++                ) or (
++                    event_type == "task.revised"
++                    and isinstance(payload_value.get("changes"), Mapping)
++                    and "parent_task_id" in payload_value["changes"]
++                ):
++                    self._require_ledger_semantics("task.hierarchy_changed")
+             semantic_candidate = {
+                 "schema": "commons.event.v1",
+                 "payload_schema": payload_schema,

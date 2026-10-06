@@ -727,6 +727,8 @@ def task_group() -> None:
 @click.option("--acceptance-criterion", multiple=True, required=True)
 @click.option("--priority", default="normal", show_default=True)
 @click.option("--dependency", multiple=True)
+@click.option("--task-kind", type=click.Choice(["task", "component"]), default="task")
+@click.option("--parent-task-id")
 @_idem
 @click.pass_obj
 def task_create(
@@ -736,6 +738,8 @@ def task_create(
     acceptance_criterion: tuple[str, ...],
     priority: str,
     dependency: tuple[str, ...],
+    task_kind: str,
+    parent_task_id: str | None,
     idempotency_key: str | None,
 ) -> None:
     """Create a task."""
@@ -747,6 +751,8 @@ def task_create(
             acceptance_criteria=acceptance_criterion,
             priority=priority,
             dependencies=dependency,
+            task_kind=task_kind,
+            parent_task_id=parent_task_id,
             idempotency_key=idempotency_key,
         )
     )
@@ -784,6 +790,25 @@ def task_join_application(
             application_id,
             expected_revision,
             reason=reason,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+@task_group.command("edit")
+@_expected
+@click.option("--changes-json", required=True)
+@click.option("--idempotency-key", required=True)
+@click.pass_obj
+def task_edit(
+    state: CLIState, entity_id: str, expected_revision: str, changes_json: str, idempotency_key: str
+) -> None:
+    """Edit idle task wording, dependencies or parent with exact revision CAS."""
+    state.emit(
+        state.manager().edit_task(
+            entity_id,
+            expected_revision,
+            changes=_json_object(changes_json, "changes_json"),
             idempotency_key=idempotency_key,
         )
     )

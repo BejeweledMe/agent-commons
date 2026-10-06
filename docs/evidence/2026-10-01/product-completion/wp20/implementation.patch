@@ -1,0 +1,480 @@
+--- a/src/agent_commons/services/manager.py
++++ b/src/agent_commons/services/manager.py
+@@ -4,6 +4,7 @@
+ 
+ import os
+ import stat
++import threading
+ import uuid
+ from collections.abc import Callable, Iterable, Mapping, Sequence
+ from contextlib import contextmanager
+@@ -207,6 +208,32 @@
+             ],
+         )
+ 
++    def accept_own_append(self, record: EventRecord) -> None:
++        """Verify one new append before the ordinary full freshness refresh.
++
++        This only accounts for our own known addition to the path set. The
++        following refresh still hashes every file, and any other added or
++        removed path still forces a complete validation of the collection.
++        Retries, repairs and maintenance writes retain the conservative path.
++        """
++        if (
++            not record.created
++            or record.repaired
++            or record.path in self.events
++            or str(record.event["event_type"]).startswith("event.")
++            or any(entry.record.event_id == record.event_id for entry in self.events.values())
++        ):
++            return
++        verified = self._verify(record.path, self.manager.events.read_path)
++        if (
++            isinstance(verified.record, EventRecord)
++            and verified.record.path == record.path
++            and verified.record.event_id == record.event_id
++            and verified.record.sha256 == record.sha256
++            and verified.record.event == record.event
++        ):
++            self.events[record.path] = verified
++
+     def event_identity_index(self) -> dict[tuple[str, str], EventRecord]:
+         return {
+             (
+@@ -330,6 +357,7 @@
+         # the outer hold instead of releasing and reacquiring between events,
+         # which is where a concurrent writer used to slip in.
+         self._write_lock_depth = 0
++        self._write_thread_lock = threading.RLock()
+ 
+     def _require_writable(self) -> None:
+         if self.read_only:
+@@ -485,11 +513,12 @@
+         return _public_session(renewed, include_nonce=True)
+ 
+     def _records_and_snapshot(self) -> tuple[list[EventRecord], ProjectSnapshot]:
+-        if self._verified_ledger_view is None:
+-            records = list(self.events.iter_events())
+-            manifests = list(self.manifests.iter_manifests())
+-        else:
+-            records, manifests = self._verified_ledger_view.refresh()
++        with self._write_thread_lock:
++            if self._verified_ledger_view is None:
++                records = list(self.events.iter_events())
++                manifests = list(self.manifests.iter_manifests())
++            else:
++                records, manifests = self._verified_ledger_view.refresh()
+         for record in records:
+             if record.event.get("workspace_id") != self.workspace_id:
+                 raise IntegrityError("canonical event belongs to a different workspace")
+@@ -605,11 +634,12 @@
+         records: Sequence[EventRecord],
+         snapshot: ProjectSnapshot,
+     ) -> tuple[list[str], list[str]]:
+-        if self._verified_ledger_view is None:
+-            manifest_records = self.manifests.iter_manifests()
+-        else:
+-            _, manifest_records = self._verified_ledger_view.refresh()
+-        manifests = {record.manifest_id: record for record in manifest_records}
++        with self._write_thread_lock:
++            if self._verified_ledger_view is None:
++                manifest_records = self.manifests.iter_manifests()
++            else:
++                _, manifest_records = self._verified_ledger_view.refresh()
++            manifests = {record.manifest_id: record for record in manifest_records}
+         issues: list[str] = []
+         referenced: set[str] = set()
+         for record in records:
+@@ -801,37 +831,39 @@
+     def _canonical_write_lock(self) -> Iterable[None]:
+         """Serialize lifecycle CAS and append across processes and worktrees.
+ 
+-        Reentrant within one manager: a nested acquisition reuses the outer
++        Reentrant within one manager on the owning thread: a nested acquisition reuses the outer
+         hold rather than blocking on the same file lock (flock does not detect
+         same-process nesting) or releasing it between writes.  An outer caller
+         can therefore make several record_event calls atomic against other
+-        processes -- the whole cascade lands or none of it does.
++        processes. The thread lock prevents another caller sharing this manager
++        from mistaking an active hold for its own nested acquisition.
+         """
+ 
+-        self._require_writable()
+-        if self._write_lock_depth > 0:
+-            self._write_lock_depth += 1
+-            try:
+-                yield
+-            finally:
+-                self._write_lock_depth -= 1
+-            return
+-        self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+-        lock_path = self.paths.state_root / "canonical-write.lock"
+-        with lock_path.open("a+b") as handle:
+-            try:
+-                os.fchmod(handle.fileno(), 0o600)
+-            except OSError:
+-                pass
+-            lock_exclusive(handle.fileno())
+-            self._write_lock_depth = 1
+-            self._verified_ledger_view = _VerifiedLedgerView(self)
+-            try:
+-                yield
+-            finally:
+-                self._verified_ledger_view = None
+-                self._write_lock_depth = 0
+-                unlock(handle.fileno())
++        with self._write_thread_lock:
++            self._require_writable()
++            if self._write_lock_depth > 0:
++                self._write_lock_depth += 1
++                try:
++                    yield
++                finally:
++                    self._write_lock_depth -= 1
++                return
++            self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
++            lock_path = self.paths.state_root / "canonical-write.lock"
++            with lock_path.open("a+b") as handle:
++                try:
++                    os.fchmod(handle.fileno(), 0o600)
++                except OSError:
++                    pass
++                lock_exclusive(handle.fileno())
++                self._write_lock_depth = 1
++                self._verified_ledger_view = _VerifiedLedgerView(self)
++                try:
++                    yield
++                finally:
++                    self._verified_ledger_view = None
++                    self._write_lock_depth = 0
++                    unlock(handle.fileno())
+ 
+     def _idempotency_key(self, event_type: str, value: str | None) -> str:
+         self.events.idempotency.refresh_scope()
+@@ -845,17 +877,18 @@
+         return f"commons:{self.workspace_id}:{session.session_id}"
+ 
+     def _event_for_idempotency_identity(self, namespace: str, key: str) -> EventRecord | None:
+-        if self._verified_ledger_view is None:
+-            matches = [
+-                record
+-                for record in self.events.iter_events()
+-                if record.event.get("idempotency_namespace") == namespace
+-                and record.event.get("idempotency_key") == key
+-            ]
+-        else:
+-            self._verified_ledger_view.refresh()
+-            record = self._verified_ledger_view.event_identity_index().get((namespace, key))
+-            matches = [] if record is None else [record]
++        with self._write_thread_lock:
++            if self._verified_ledger_view is None:
++                matches = [
++                    record
++                    for record in self.events.iter_events()
++                    if record.event.get("idempotency_namespace") == namespace
++                    and record.event.get("idempotency_key") == key
++                ]
++            else:
++                self._verified_ledger_view.refresh()
++                record = self._verified_ledger_view.event_identity_index().get((namespace, key))
++                matches = [] if record is None else [record]
+         if len(matches) > 1:
+             raise IntegrityError("multiple canonical events share an idempotency identity")
+         return matches[0] if matches else None
+@@ -1306,6 +1339,7 @@
+                 ),
+             )
+             if self._verified_ledger_view is not None:
++                self._verified_ledger_view.accept_own_append(record)
+                 records, _ = self._verified_ledger_view.refresh()
+                 file_digests = self._verified_ledger_view.event_file_digests()
+             else:
+--- a/tests/services/test_verified_ledger_view.py
++++ b/tests/services/test_verified_ledger_view.py
+@@ -1,12 +1,14 @@
+ from __future__ import annotations
+ 
+ import json
++import os
++from dataclasses import replace
+ from pathlib import Path
+ 
+ import pytest
+ 
+ from agent_commons.core.canonical import canonical_json_file_bytes
+-from agent_commons.errors import IntegrityError
++from agent_commons.errors import IntegrityError, ValidationError
+ from agent_commons.services import CommonsManager
+ 
+ 
+@@ -108,7 +110,7 @@
+     assert calls == 2
+ 
+ 
+-def test_verified_view_fully_revalidates_on_new_file_within_one_hold(
++def test_verified_view_validates_only_own_new_file_within_one_hold(
+     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+ ) -> None:
+     manager = _manager(tmp_path)
+@@ -123,11 +125,9 @@
+     with manager._canonical_write_lock():
+         manager._records_and_snapshot()
+         monkeypatch.setattr(manager.events, "read_path", counted)
+-        # A nested canonical write inside the same reentrant hold: a new event
+-        # path lands beside the seed. record_event re-establishes the view by
+-        # byte identity right after its own append (manager.py ~1302-1303),
+-        # and a new path is a structural change, so that refresh must
+-        # revalidate the complete collection, not merely the newcomer.
++        # Our own append is fully validated before being accepted into the
++        # current view. The freshness refresh still hashes the seed but does
++        # not repeat its schema and policy validation.
+         manager.create_task(
+             title="second",
+             description="a second canonical event created inside the same hold",
+@@ -136,7 +136,7 @@
+         )
+         event_paths = list(manager.paths.events.glob("*/*/*/evt.*.json"))
+         assert len(event_paths) == 2
+-        assert calls == len(event_paths)
++        assert calls == 1
+ 
+         # The view now covers both files by identity: a later snapshot in the
+         # same hold reuses them without going back through read_path.
+@@ -309,3 +309,237 @@
+         # must still enforce the resolved canonical storage boundary.
+         with pytest.raises(IntegrityError, match="outside canonical storage"):
+             manager._records_and_snapshot()
++
++
++def test_own_append_still_revalidates_an_unexpected_extra_path(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    manager = _manager(tmp_path)
++    original_append = manager.events.append_event
++    original_read = manager.events.read_path
++    reads: list[Path] = []
++
++    def counted(path: Path):
++        reads.append(path)
++        return original_read(path)
++
++    def extra_append(**kwargs):
++        record = original_append(**kwargs)
++        extra = dict(kwargs)
++        extra["idempotency_key"] = "unexpected-extra"
++        extra["payload"] = {**kwargs["payload"], "title": "unexpected"}
++        original_append(**extra)
++        return record
++
++    monkeypatch.setattr(manager.events, "read_path", counted)
++    monkeypatch.setattr(manager.events, "append_event", extra_append)
++    manager.create_task(
++        title="second",
++        description="second",
++        acceptance_criteria=["second"],
++        idempotency_key="second",
++    )
++    seed = next(
++        record.path
++        for record in manager.events.iter_events()
++        if record.event["payload"].get("title") == "seed"
++    )
++    # Initial read, structural rebuild, and our explicit iter_events read.
++    assert reads.count(seed) == 3
++
++
++@pytest.mark.parametrize("change", ["same-size-corruption", "delete", "symlink"])
++def test_own_append_does_not_hide_a_changed_prior_file(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
++) -> None:
++    manager = _manager(tmp_path)
++    seed = next(manager.paths.events.glob("*/*/*/evt.*.json"))
++    original_append = manager.events.append_event
++
++    def mutate_prior(**kwargs):
++        record = original_append(**kwargs)
++        if change == "same-size-corruption":
++            before = seed.stat()
++            raw = seed.read_bytes()
++            seed.write_bytes(
++                raw.replace(b'"schema":"commons.event.v1"', b'"schema":"commons.event.v0"')
++            )
++            assert seed.stat().st_size == before.st_size
++            os.utime(seed, ns=(before.st_atime_ns, before.st_mtime_ns))
++        elif change == "delete":
++            seed.unlink()
++        else:
++            outside = tmp_path / "seed-copy.json"
++            outside.write_bytes(seed.read_bytes())
++            seed.unlink()
++            seed.symlink_to(outside)
++        return record
++
++    monkeypatch.setattr(manager.events, "append_event", mutate_prior)
++    expected_error = ValidationError if change == "same-size-corruption" else IntegrityError
++    with pytest.raises(expected_error):
++        manager.create_task(
++            title="second",
++            description="second",
++            acceptance_criteria=["second"],
++            idempotency_key="second",
++        )
++    assert manager._verified_ledger_view is None
++
++
++@pytest.mark.parametrize("condition", ["retry", "repair", "maintenance", "different-content"])
++def test_own_append_falls_back_for_ambiguous_or_recovery_records(
++    tmp_path: Path, condition: str
++) -> None:
++    manager = _manager(tmp_path)
++    with manager._canonical_write_lock():
++        manager._records_and_snapshot()
++        view = manager._verified_ledger_view
++        assert view is not None
++        original = next(manager.events.iter_events())
++        view.events.clear()
++        record = replace(original, created=True)
++        if condition == "retry":
++            record = replace(record, created=False)
++        elif condition == "repair":
++            record = replace(record, repaired=True)
++        elif condition == "maintenance":
++            record = replace(record, event={**record.event, "event_type": "event.corrected"})
++        else:
++            record = replace(record, sha256="0" * 64)
++        view.accept_own_append(record)
++        assert view.events == {}
++        records, _ = view.refresh()
++        assert records == [original]
++
++
++def test_crash_while_accepting_own_append_is_recovered_by_identical_retry(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    from agent_commons.services.manager import _VerifiedLedgerView
++
++    manager = _manager(tmp_path)
++    kwargs = dict(
++        title="second",
++        description="second",
++        acceptance_criteria=["second"],
++        idempotency_key="second",
++    )
++
++    def crash(self, record):
++        assert record.created
++        raise RuntimeError("crash after append")
++
++    with monkeypatch.context() as patch:
++        patch.setattr(_VerifiedLedgerView, "accept_own_append", crash)
++        with pytest.raises(RuntimeError, match="crash after append"):
++            manager.create_task(**kwargs)
++    assert manager._verified_ledger_view is None
++    after_crash = list(manager.events.iter_events())
++    assert len(after_crash) == 2
++    result = manager.create_task(**kwargs)
++    assert result["created"] is False
++    assert len(list(manager.events.iter_events())) == 2
++    assert manager.doctor()["ok"]
++
++
++def test_same_manager_threads_cannot_bypass_lifecycle_lock(tmp_path: Path) -> None:
++    from concurrent.futures import ThreadPoolExecutor
++    from threading import Barrier
++
++    from agent_commons.domain.task_edits import TaskEditRefusal
++
++    manager = _manager(tmp_path)
++    first = next(iter(manager.snapshot().tasks.values()))
++    second = manager.create_task(
++        title="second",
++        description="second",
++        acceptance_criteria=["second"],
++        idempotency_key="second",
++    )
++    barrier = Barrier(2)
++
++    def depend(source_id: str, revision: str, dependency: str) -> str:
++        barrier.wait(timeout=5)
++        try:
++            manager.edit_task(
++                source_id,
++                revision,
++                changes={"dependencies": [dependency]},
++                idempotency_key="depend-" + source_id,
++            )
++            return "saved"
++        except TaskEditRefusal as exc:
++            return exc.code
++
++    with ThreadPoolExecutor(max_workers=2) as pool:
++        futures = [
++            pool.submit(depend, first["task_id"], first["revision"], second["entity_ref"]["id"]),
++            pool.submit(depend, second["entity_ref"]["id"], second["revision"], first["task_id"]),
++        ]
++        assert sorted(f.result(timeout=10) for f in futures) == ["saved", "task_dependency_cycle"]
++    assert manager._write_lock_depth == 0
++    assert manager._verified_ledger_view is None
++    assert manager.doctor()["ok"]
++
++
++def test_another_thread_waits_for_same_manager_outer_hold(tmp_path: Path) -> None:
++    from concurrent.futures import ThreadPoolExecutor
++    from threading import Event
++
++    manager = _manager(tmp_path)
++    started = Event()
++    entered = Event()
++
++    def acquire():
++        started.set()
++        with manager._canonical_write_lock():
++            entered.set()
++            assert manager._write_lock_depth == 1
++
++    with ThreadPoolExecutor(max_workers=1) as pool:
++        with manager._canonical_write_lock():
++            manager._records_and_snapshot()
++            view = manager._verified_ledger_view
++            future = pool.submit(acquire)
++            assert started.wait(timeout=5)
++            assert not entered.wait(timeout=0.1)
++            assert manager._verified_ledger_view is view
++            assert manager._write_lock_depth == 1
++        future.result(timeout=5)
++    assert entered.is_set()
++    assert manager._verified_ledger_view is None
++
++
++@pytest.mark.parametrize("read", ["snapshot", "identity", "manifests"])
++def test_other_thread_read_does_not_refresh_a_writers_view(tmp_path: Path, read: str) -> None:
++    from concurrent.futures import ThreadPoolExecutor
++    from threading import Event
++
++    manager = _manager(tmp_path)
++    started = Event()
++    completed = Event()
++    records = list(manager.events.iter_events())
++    snapshot = manager.snapshot()
++
++    def observe():
++        started.set()
++        if read == "snapshot":
++            manager.snapshot()
++        elif read == "identity":
++            seed = records[0].event
++            manager._event_for_idempotency_identity(
++                seed["idempotency_namespace"], seed["idempotency_key"]
++            )
++        else:
++            manager._manifest_reference_issues(records, snapshot)
++        completed.set()
++
++    with ThreadPoolExecutor(max_workers=1) as pool:
++        with manager._canonical_write_lock():
++            manager._records_and_snapshot()
++            future = pool.submit(observe)
++            assert started.wait(timeout=5)
++            assert not completed.wait(timeout=0.1)
++        future.result(timeout=5)
++    assert completed.is_set()

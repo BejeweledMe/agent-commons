@@ -1,0 +1,105 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "agent_commons_version": "0.1.0",
+  "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "provider": "codex",
+  "profile_id": "codex-builder",
+  "purpose": "implementation",
+  "model": "gpt-6.1-sol",
+  "provider_version": "codex-cli 0.159.3",
+  "requester_client": "agent-commons",
+  "skill_refs": [
+    "commons-start"
+  ],
+  "preflight": {
+    "profile_id": "codex-builder",
+    "provider": "codex",
+    "ok": true,
+    "checks": {
+      "workspace_snapshot": {
+        "ok": true,
+        "snapshot_diagnostic_count": 0
+      },
+      "provider_help": {
+        "ok": true,
+        "required_flags": "present"
+      },
+      "mcp_contract": {
+        "ok": true,
+        "catalog": "available",
+        "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+        "tool_catalog_sha256": "9a3b16de8e71ba7636d425f6c4ada77f8df928310b2ef6321f6b61b4c0cd4ea4",
+        "tool_count": 32
+      },
+      "mcp_handshake": {
+        "ok": true,
+        "protocol": "initialized",
+        "required_tools": "available",
+        "tool_count": 32
+      }
+    },
+    "consumed_delegation_attempt": false,
+    "provider_help_process_started": true,
+    "provider_work_process_started": false
+  },
+  "initialization": {
+    "state": "ready",
+    "supported": true,
+    "blocks_launch": false
+  },
+  "ok": true,
+  "provider_work_process_started": true,
+  "process": {
+    "outcome": "succeeded",
+    "exit_code": 0,
+    "duration_seconds": 54.728694542020094,
+    "stdout_bytes_seen": 35526,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false
+  },
+  "canonical_state": "succeeded",
+  "workflow_diagnostic_code": "none",
+  "process_canonical_mismatch": false,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "terminal_tool_rejection_details": [],
+  "terminal_tool_rejection_details_truncated": false,
+  "child_session_closed": true,
+  "sanitized_provider_errors": [],
+  "synthetic_terminal_diagnostic": [
+    {
+      "tool": "commons_succeed_delegation",
+      "status": "completed",
+      "arguments": {
+        "text": "{\"delegation_id\": \"[entity-id]\", \"expected_revision\": \"[entity-id]\", \"summary\": \"Inspected complete scoped [path] at SHA-256 7ca5abf65adee67782e5c831d9ee108b323c5a9d9fda11f97a9910b18f6b1bdc. It defines answer() returning integer 42, satisfying the unchanged exact target acceptance criterion. No changes required; no addressed threads. CLI startup commands were unavailable; session and target were confirmed through injected Commons tools.\", \"result_refs\": [\"task:[entity-id]\"], \"idempotency_key\": \"[entity-id]:canary-result:v1\"}",
+        "truncated": false,
+        "redacted": false
+      },
+      "result": {
+        "text": "{\"content\": [{\"type\": \"text\", \"text\": \"{\\n  \\\"event_id\\\": \\\"[entity-id]\\\",\\n  \\\"event_type\\\": \\\"[entity-id]\\\",\\n  \\\"entity_ref\\\": {\\n    \\\"kind\\\": \\\"delegation\\\",\\n    \\\"id\\\": \\\"[entity-id]\\\"\\n  },\\n  \\\"revision\\\": \\\"[entity-id]\\\",\\n  \\\"idempotency_key\\\": \\\"[entity-id]:canary-result:v1\\\",\\n  \\\"created\\\": true,\\n  \\\"repaired\\\": false,\\n  \\\"index\\\": {\\n    \\\"mode\\\": \\\"deferred\\\",\\n    \\\"synchronized\\\": false,\\n    \\\"next_action\\\": \\\"agent-commons index rebuild\\\"\\n  }\\n}\"}], \"structured_content\": {\"event_id\": \"[entity-id]\", \"event_type\": \"[entity-id]\", \"entity_ref\": {\"kind\": \"delegation\", \"id\": \"[entity-id]\"}, \"revision\": \"[entity-id]\", \"idempotency_key\": \"[entity-id]:canary-result:v1\", \"created\": true, \"repaired\": false, \"index\": {\"mode\": \"deferred\", \"synchronized\": false, \"next_action\": \"agent-commons index rebuild\"}}}",
+        "truncated": false,
+        "redacted": false
+      },
+      "error": {
+        "text": "null",
+        "truncated": false,
+        "redacted": false
+      }
+    }
+  ],
+  "synthetic_final_user_summary": {
+    "text": "Delegation success recorded. Scoped inspection confirmed `[path]` defines `answer()` returning integer `42`. No changes were needed.",
+    "truncated": false,
+    "redacted": false
+  },
+  "child_environment_proof": {
+    "ambient_state_root_unset": true,
+    "ambient_state_base_unset": true,
+    "ambient_session_id_unset": true,
+    "child_state_root_equals_broker_synthetic_root": true,
+    "child_state_root_is_temporary_synthetic": true,
+    "child_session_equals_broker_identity": true,
+    "child_delegation_equals_broker_identity": true
+  }
+}

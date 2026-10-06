@@ -1,0 +1,28 @@
+{
+  "legacy_exact": {
+    "conflicting_legacy_tombstone": false,
+    "reconcile_ok": true,
+    "returned_tombstone_matches": 0,
+    "returned_conflicting_receipts": 0,
+    "reconciled_count": 0,
+    "fresh_ok": false,
+    "fresh_tombstone_matches": 1,
+    "fresh_conflicting_receipts": 0,
+    "reconciliation_exists": false
+  },
+  "legacy_conflicting": {
+    "conflicting_legacy_tombstone": true,
+    "reconcile_ok": true,
+    "returned_tombstone_matches": 0,
+    "returned_conflicting_receipts": 0,
+    "reconciled_count": 0,
+    "fresh_ok": false,
+    "fresh_tombstone_matches": 0,
+    "fresh_conflicting_receipts": 1,
+    "reconciliation_exists": false
+  },
+  "parent_symlink": {
+    "cached_read": "accepted 1 records",
+    "full_read_path": "IntegrityError"
+  }
+}

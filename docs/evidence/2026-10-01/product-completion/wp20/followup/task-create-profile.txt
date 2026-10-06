@@ -1,0 +1,96 @@
+         43942624 function calls (42184048 primitive calls) in 22.617 seconds
+
+   Ordered by: cumulative time
+   List reduced from 660 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000   22.675   22.675 benchmark_work_mutation.py:934(<lambda>)
+        1    0.008    0.008   22.675   22.675 tasks.py:26(create_task)
+        1    0.002    0.002   22.621   22.621 manager.py:1125(record_event)
+        1    0.001    0.001   16.564   16.564 manager.py:603(_guard_integrity)
+        5    0.011    0.002   12.749    2.550 manager.py:196(refresh)
+        1    0.001    0.001   12.580   12.580 manager.py:520(_records_and_snapshot)
+       10    0.040    0.004   12.413    1.241 manager.py:150(_refresh)
+     3557    0.016    0.000   10.929    0.003 manager.py:179(_verify)
+     3207    0.048    0.000    9.689    0.003 events.py:236(read_path)
+     3209    0.004    0.000    8.275    0.003 events.py:279(_validate)
+    18670    0.048    0.000    6.537    0.000 schema_registry.py:98(validate)
+37870/30275    0.065    0.000    5.674    0.000 {built-in method builtins.sorted}
+     3209    0.009    0.000    5.451    0.002 manager.py:423(_validate_stored_event)
+    18670    0.046    0.000    5.169    0.000 validators.py:349(iter_errors)
+        2    0.004    0.002    5.046    2.523 idempotency.py:429(load_recovery_view)
+     6415    0.002    0.000    5.042    0.001 idempotency.py:326(iter_reservations)
+     6419    0.024    0.000    5.040    0.001 idempotency.py:332(_iter_receipts)
+     3569    0.003    0.000    4.924    0.001 policy.py:488(assert_safe)
+     3569    0.009    0.000    4.920    0.001 policy.py:416(scan)
+33753/18670    0.149    0.000    4.916    0.000 _keywords.py:290(properties)
+123748/3569    0.445    0.000    4.911    0.001 policy.py:425(walk)
+247908/125835    0.599    0.000    4.790    0.000 validators.py:396(descend)
+        1    0.001    0.001    4.680    4.680 receipt_recovery.py:371(reconcile)
+     6413    0.011    0.000    4.566    0.001 idempotency.py:302(get_by_digest)
+     6416    0.004    0.000    4.285    0.001 idempotency.py:623(_load)
+     6426    0.053    0.000    4.285    0.001 idempotency.py:630(_load_document)
+        1    0.001    0.001    3.538    3.538 receipt_recovery.py:466(prepare_for_write)
+     3209    0.052    0.000    2.819    0.001 schema_registry.py:113(validate_event)
+    47697    0.038    0.000    2.381    0.000 __init__.py:932(resolve)
+   523368    1.910    0.000    2.313    0.000 {built-in method posix.lstat}
+33937/31567    0.034    0.000    2.210    0.000 _keywords.py:274(ref)
+    47697    0.446    0.000    2.209    0.000 <frozen posixpath>:388(realpath)
+        3    0.014    0.005    2.206    0.735 receipt_recovery.py:63(_event_map)
+     9620    0.021    0.000    2.163    0.000 receipt_recovery.py:48(_event_info)
+    21339    0.044    0.000    2.066    0.000 manager.py:142(_identity)
+   195491    0.814    0.000    2.005    0.000 policy.py:324(_scan_text)
+        2    0.006    0.003    1.954    0.977 receipt_recovery.py:147(status)
+   347005    0.358    0.000    1.737    0.000 policy.py:167(_normalize_key)
+   112219    0.092    0.000    1.688    0.000 policy.py:312(classify_key)
+    26039    0.091    0.000    1.665    0.000 __init__.py:476(relative_to)
+     6446    0.056    0.000    1.640    0.000 idempotency.py:136(assert_operational_path)
+   266578    0.105    0.000    1.576    0.000 <attrs generated methods jsonschema.validators.create.<locals>.Validator>:26(__init__)
+        1    0.007    0.007    1.571    1.571 projection.py:1190(project_events)
+        1    0.045    0.045    1.555    1.555 projection.py:911(_project_events_once)
+     9620    0.025    0.000    1.543    0.000 config.py:543(canonical_relative)
+
+
+         43942624 function calls (42184048 primitive calls) in 22.617 seconds
+
+   Ordered by: internal time
+   List reduced from 660 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   523368    1.910    0.000    2.313    0.000 {built-in method posix.lstat}
+  3015581    0.908    0.000    0.908    0.000 {method 'search' of 're.Pattern' objects}
+   195491    0.814    0.000    2.005    0.000 policy.py:324(_scan_text)
+  6917887    0.811    0.000    0.914    0.000 {built-in method builtins.isinstance}
+    31335    0.796    0.000    0.809    0.000 {built-in method _io.open}
+821930/33156    0.642    0.000    0.869    0.000 canonical.py:14(_assert_json_value)
+247908/125835    0.599    0.000    4.790    0.000 validators.py:396(descend)
+    37340    0.449    0.000    0.515    0.000 {method 'update' of 'rpds.HashTrieMap' objects}
+    47697    0.446    0.000    2.209    0.000 <frozen posixpath>:388(realpath)
+123748/3569    0.445    0.000    4.911    0.001 policy.py:425(walk)
+   247908    0.417    0.000    0.894    0.000 validators.py:339(evolve)
+   347005    0.358    0.000    1.737    0.000 policy.py:167(_normalize_key)
+   122567    0.351    0.000    1.075    0.000 policy.py:172(_credential_key)
+    70754    0.344    0.000    0.374    0.000 {built-in method posix.stat}
+   769006    0.322    0.000    0.413    0.000 {method 'join' of 'str' objects}
+  1793218    0.284    0.000    0.320    0.000 {method 'get' of 'dict' objects}
+   777186    0.272    0.000    0.395    0.000 __init__.py:330(_compile)
+   298838    0.271    0.000    0.444    0.000 __init__.py:135(__init__)
+    18670    0.268    0.000    0.268    0.000 {method 'update' of 'rpds.HashTrieSet' objects}
+   537281    0.264    0.000    0.430    0.000 _types.py:94(is_type)
+   266578    0.264    0.000    1.471    0.000 validators.py:282(__attrs_post_init__)
+    94581    0.263    0.000    0.409    0.000 parse.py:501(_urlsplit)
+    23172    0.259    0.000    0.259    0.000 encoder.py:207(iterencode)
+   435753    0.246    0.000    0.606    0.000 __init__.py:198(_str_normcase)
+   206171    0.231    0.000    0.641    0.000 _keywords.py:282(type)
+   347005    0.224    0.000    0.224    0.000 {method 'sub' of 're.Pattern' objects}
+   285649    0.194    0.000    0.749    0.000 __init__.py:157(with_segments)
+   417900    0.191    0.000    0.854    0.000 __init__.py:251(__str__)
+   300515    0.163    0.000    0.301    0.000 _core.py:165(create_resource)
+   347005    0.157    0.000    0.552    0.000 __init__.py:183(sub)
+   347005    0.157    0.000    0.157    0.000 {method 'split' of 're.Pattern' objects}
+   537281    0.153    0.000    0.582    0.000 validators.py:452(is_type)
+970673/743895    0.152    0.000    0.202    0.000 {built-in method builtins.len}
+    33937    0.152    0.000    0.459    0.000 _core.py:254(pointer)
+   347005    0.152    0.000    0.473    0.000 __init__.py:241(split)
+
+

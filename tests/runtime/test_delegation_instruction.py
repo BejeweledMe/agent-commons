@@ -54,8 +54,12 @@ def test_independent_review_instruction_is_byte_stable() -> None:
     )
     assert "do not invent a synonym such as approve, accept, pass, or needs_changes" in instruction
     assert "If the call succeeds, stop immediately" in instruction
+    # ADR 0025 adds exact image/build reads; next profile requires a fresh canary.
+    assert "commons_read_output_image" in instruction
+    assert "manifest-only reads do not satisfy approval evidence" in instruction
+    assert "read every text entry fully" in instruction
     assert hashlib.sha256(instruction.encode()).hexdigest() == (
-        "b65147b589a3ea32bbbf739c4521c1300aaf61f408e7916eda5d0592ed11a497"
+        "f6e97fad21818e0a21e151a966070e10a471ce3d76f864d26729accf51d0937f"
     )
 
 
@@ -176,3 +180,138 @@ def test_grok_instructions_use_provider_native_terminal_tool_names() -> None:
         )
         assert "do not widen the worker tool catalog" in instruction
     assert "sole exception to the native-tool restriction" in review
+
+
+def test_implementation_startup_commands_override_login_environment_without_writes(tmp_path):
+    import json
+    import os
+    import subprocess
+    import sys
+
+    from agent_commons.services import CommonsManager
+    from agent_commons.services.delegation_instruction import DelegationStartupInput
+
+    repo = tmp_path / "repo space ' $(touch injected) `touch injected2`"
+    repo.mkdir()
+    CommonsManager.initialize(repo, integrations=())
+    state = tmp_path / "state space ' $(touch injected3)"
+    manager = CommonsManager(repo, state_root=state)
+    child = manager.start_session(
+        stable_instance_id="explicit-child",
+        principal="worker",
+        client="codex",
+        software="tests",
+        role="builder",
+    )
+    foreign_repo = tmp_path / "foreign-repo"
+    foreign_repo.mkdir()
+    CommonsManager.initialize(foreign_repo, integrations=())
+    foreign = CommonsManager(foreign_repo, state_root=tmp_path / "foreign-state")
+    foreign_session = foreign.start_session(
+        stable_instance_id="foreign-child",
+        principal="worker",
+        client="codex",
+        software="tests",
+        role="builder",
+    )
+    executable = tmp_path / "cli space ' $(touch injected4)"
+    executable.write_text(f"#!{sys.executable}\nfrom agent_commons.cli import cli\ncli()\n")
+    executable.chmod(0o700)
+    startup = DelegationStartupInput(repo, state, child["session_id"], str(executable))
+    text = compose_delegation_instruction(
+        DelegationInstructionInput(
+            "delegation.startup",
+            "task",
+            "task.startup",
+            "evt.startup",
+            "implementation",
+            "codex-builder",
+            0,
+            60,
+            1,
+            1,
+            1,
+            "provider_units",
+        ),
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+        startup=startup,
+    )
+    commands = text.split("```sh\n", 1)[1].split("\n```", 1)[0].splitlines()
+    env = os.environ.copy()
+    env.update(
+        {
+            "AGENT_COMMONS_STATE_ROOT": str(foreign.paths.state_root),
+            "AGENT_COMMONS_STATE_BASE": str(tmp_path / "foreign-base"),
+            "AGENT_COMMONS_SESSION_ID": foreign_session["session_id"],
+        }
+    )
+    before = {
+        str(path): path.read_bytes()
+        for root in (repo / ".agent-commons", state)
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+    # The old ambient startup command reproduces the refusal before the fix.
+    failed = subprocess.run(
+        [str(executable), "--repo", str(repo), "--read-only", "doctor"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert failed.returncode != 0 and "workspace" in (failed.stdout + failed.stderr).lower()
+    for command in commands:
+        result = subprocess.run(
+            ["/bin/sh", "-c", command],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+    assert "--read-only" in commands[0]
+    assert "All coordination writes and terminal outcomes must use the injected scoped MCP" in text
+    assert not any(
+        (tmp_path / name).exists() for name in ("injected", "injected2", "injected3", "injected4")
+    )
+    after = {
+        str(path): path.read_bytes()
+        for root in (repo / ".agent-commons", state)
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+    assert manager.sessions.require_active(child["session_id"]).session_id == child["session_id"]
+    assert "nonce" not in json.dumps({"commands": commands}).lower()
+
+
+def test_startup_missing_cli_is_honest_and_never_changes_reviewer_instructions(tmp_path):
+    from agent_commons.services.delegation_instruction import DelegationStartupInput
+
+    startup = DelegationStartupInput(tmp_path, tmp_path / "state", "session.bound", None)
+    inputs = DelegationInstructionInput(
+        "delegation.startup",
+        "task",
+        "task.startup",
+        "evt.startup",
+        "implementation",
+        "codex-builder",
+        0,
+        60,
+        1,
+        1,
+        1,
+        "provider_units",
+    )
+    text = compose_delegation_instruction(
+        inputs, profile_id=BuiltinProfileId.CODEX_BUILDER, startup=startup
+    )
+    assert "No trusted Agent Commons CLI was available" in text
+    assert "Do not guess a CLI from PATH, install one, or create a session" in text
+    assert "needs-operator outcome honestly" in text
+    assert "```sh" not in text
+    reviewer = BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER
+    assert compose_delegation_instruction(
+        inputs, profile_id=reviewer, startup=startup
+    ) == compose_delegation_instruction(inputs, profile_id=reviewer)

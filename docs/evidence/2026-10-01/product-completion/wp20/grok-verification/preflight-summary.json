@@ -1,0 +1,10 @@
+{
+  "source_sha256_verified": "194b08d49721b375aa7858a7db67b787134ff0cd7dfc26d377163dd7bf45b866",
+  "version": "grok 1.0.13 (5e9a58528b76) [stable]",
+  "active_mcp": [],
+  "hooks_count": 0,
+  "plugins_count": 0,
+  "lsp_count": 0,
+  "mcp_config_problems": null,
+  "state_env_unset": true
+}

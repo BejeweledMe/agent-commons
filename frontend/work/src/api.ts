@@ -1255,6 +1255,8 @@ function parseTrackerTask(value: unknown): TrackerTask {
     taskId: trackerIdentifierAt(value, "task_id"),
     title: trackerTextAt(value, "title", 300, true),
     taskState: trackerEnumAt(value, "task_state", TRACKER_TASK_STATES),
+    taskKind: value.task_kind === undefined ? "task" : trackerEnumAt(value, "task_kind", new Set(["task", "component"])) as "task" | "component",
+    parentTaskId: value.parent_task_id === undefined ? null : value.parent_task_id === null ? null : /^task\.[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value.parent_task_id)) ? trackerIdentifierAt(value, "parent_task_id") : (() => { throw new ApiProblem(502, null); })(),
     readiness: trackerEnumAt(value, "readiness", TRACKER_READINESS_STATES),
     dependencyTaskIds: trackerIdentifiersAt(value, "dependency_task_ids", TRACKER_MAX_TASKS),
     blockingDependencyIds: trackerIdentifiersAt(value, "blocking_dependency_ids", TRACKER_MAX_TASKS),
@@ -1851,20 +1853,32 @@ export class WorkApi {
     }
     this.apiBase = storedBase;
     try {
-      // A project host has no unscoped /setup. A legacy host deliberately
-      // answers 404 here and remains a valid authenticated fallback.
+      // A live project host proves this prefix through /projects. A 404 alone
+      // may also be a stale opaque prefix after a server restart.
       await this.hostGet("/projects", signal);
       return true;
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
         throw error;
       }
-      if (error instanceof ApiProblem && error.status === 401) {
+      if (error instanceof ApiProblem && error.status === 404) {
+        try {
+          // Legacy hosts have no /projects; their authenticated /setup must
+          // succeed on this same prefix before we ignore a one-use fragment.
+          const setup = await this.hostGet("/setup", signal);
+          if (!isObject(setup) || typeof setup.state !== "string" || typeof setup.launch_enabled !== "boolean") {
+            throw new ApiProblem(502, null);
+          }
+          return true;
+        } catch (legacyError: unknown) {
+          error = legacyError;
+        }
+      }
+      if (error instanceof ApiProblem && (error.status === 401 || error.status === 404)) {
         clearStoredApiBase();
         this.apiBase = "";
         return false;
       }
-      if (error instanceof ApiProblem && error.status === 404) return true;
       throw error;
     }
   }
@@ -2103,6 +2117,8 @@ export class WorkApi {
       description: string;
       criteria: readonly string[];
       dependencyIds: readonly string[];
+      taskKind?: "task" | "component";
+      parentTaskId?: string | null;
     },
     signal: AbortSignal,
     idempotencyKey: string
@@ -2113,7 +2129,9 @@ export class WorkApi {
         title: input.title,
         description: input.description,
         acceptance_criteria: [...input.criteria],
-        dependencies: [...input.dependencyIds]
+        dependencies: [...input.dependencyIds],
+        task_kind: input.taskKind ?? "task",
+        parent_task_id: input.parentTaskId ?? null
       },
       idempotencyKey,
       signal
@@ -2294,6 +2312,38 @@ export class WorkApi {
     const type = (response.headers.get("Content-Type") ?? "").split(";", 1)[0].trim();
     if (type !== "image/png" && type !== "image/jpeg") { await response.body?.cancel(); throw new ApiProblem(502, null); }
     const limit = 10 * 1024 * 1024;
+    const declared = response.headers.get("Content-Length");
+    if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) { await response.body?.cancel(); throw new ApiProblem(502, null); }
+    if (!response.body) throw new ApiProblem(502, null);
+    const reader = response.body.getReader(), chunks: BlobPart[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > limit || signal.aborted) { await reader.cancel(); throw new ApiProblem(502, null); }
+        chunks.push(Uint8Array.from(value));
+      }
+    } finally { reader.releaseLock(); }
+    if (total === 0 || signal.aborted) throw new ApiProblem(502, null);
+    return new Blob(chunks, { type });
+  }
+
+  async readOutputBuild(artifactId: string, artifactRevision: string, kind: "task" | "agent", scopeId: string, signal: AbortSignal): Promise<Blob> {
+    if (!/^artifact\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactId)) throw new ApiProblem(400, null);
+    if (!/^evt\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactRevision) || !new RegExp(`^${kind}\\.[0-7][0-9A-HJKMNP-TV-Z]{25}$`).test(scopeId) || (kind !== "task" && kind !== "agent")) throw new ApiProblem(400, null);
+    if (!this.apiBase) throw new ApiProblem(401, null);
+    const response = await fetch(`${this.apiBase}${this.scopedPath(`/outputs/builds/${encodeURIComponent(artifactId)}/${encodeURIComponent(artifactRevision)}?${new URLSearchParams({ scope_kind: kind, scope_id: scopeId })}`)}`, {
+      method: "GET", credentials: "same-origin", redirect: "error", signal,
+    });
+    if (!response.ok) {
+      if (response.status === 401) { clearStoredApiBase(); this.apiBase = ""; }
+      throw new ApiProblem(response.status, null);
+    }
+    const type = (response.headers.get("Content-Type") ?? "").split(";", 1)[0].trim();
+    if (type !== "application/zip") { await response.body?.cancel(); throw new ApiProblem(502, null); }
+    const limit = 20 * 1024 * 1024;
     const declared = response.headers.get("Content-Length");
     if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) { await response.body?.cancel(); throw new ApiProblem(502, null); }
     if (!response.body) throw new ApiProblem(502, null);

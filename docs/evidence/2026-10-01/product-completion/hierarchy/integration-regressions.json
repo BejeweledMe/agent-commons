@@ -1,0 +1,20 @@
+{
+  "source_files": {
+    "frontend/work/src/main.tsx": "ad06e369886627234badbf69386d5ff510a9559852f28d30211a1574ee28ceae",
+    "frontend/work/tests/task-create-draft.test.mjs": "9a93d5762d1fdba25a08e3b13f3914c2be2555170dc09b1c8a25b02be33c54d8",
+    "tests/ui/test_work_app_contract.py": "487d8e452830f7da657724df65259a7ce1202c823ffa5172df8eb08e16edbd0b"
+  },
+  "composer_regression": {
+    "baseline_failed": 3,
+    "fixed_passed": 8
+  },
+  "reconnect_contract_tests": "Removed brittle source-comment assertion; legacy setup response now includes actual launch_enabled boolean; focused2passed.",
+  "full_check_before_fix": {
+    "passed": 2843,
+    "failed": 2,
+    "skipped": 14,
+    "seconds": 1083.62
+  },
+  "format_only_note": "Final Ruff wrapping changed test_work_app_contract.py bytes after the focused test run; final make check covers the wrapped file.",
+  "final_full_check": "../make-check-summary.json"
+}

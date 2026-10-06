@@ -1,0 +1,82 @@
+{
+  "schema": "agent_commons.five_model_council_record.v1",
+  "date": "2026-10-01",
+  "stages": {
+    "independent_first_answers": 5,
+    "full_peer_critiques": 5,
+    "controller_synthesis": "README.md"
+  },
+  "label_mapping": [
+    {
+      "label": "A",
+      "requested_model": "gpt-6-astra",
+      "first_answer": {
+        "path": "docs/evidence/2026-10-01/council/lane-A.md",
+        "bytes": 28214,
+        "sha256": "d7146cb6d500d78949bae0817330cc7e87ac55ebf2324d127b4029289e858d95"
+      },
+      "full_five_critique": {
+        "path": "docs/evidence/2026-10-01/council/after-login/critique-A-all5.md",
+        "bytes": 16064,
+        "sha256": "e5ace186840c34e176cca41888f1cfd35fb27443e5df4ddac759b3c5a69a2cc2"
+      }
+    },
+    {
+      "label": "B",
+      "requested_model": "claude-fable-5-1",
+      "first_answer": {
+        "path": "docs/evidence/2026-10-01/council/after-login/lane-B.md",
+        "bytes": 27261,
+        "sha256": "0c828928c2ee9b864357f3a8a7e449a89b112fec72df78a5cda5c5936df39533"
+      },
+      "full_five_critique": {
+        "path": "docs/evidence/2026-10-01/council/after-login/critique-B-all5.md",
+        "bytes": 14193,
+        "sha256": "13c0b0a7f35ea0eb8ef723d9eff36db18f42950f5973ca49af058594ef85c707"
+      }
+    },
+    {
+      "label": "C",
+      "requested_model": "grok-4.7",
+      "first_answer": {
+        "path": "docs/evidence/2026-10-01/council/after-login/lane-C.md",
+        "bytes": 26326,
+        "sha256": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0"
+      },
+      "full_five_critique": {
+        "path": "docs/evidence/2026-10-01/council/after-login/critique-C-all5.md",
+        "bytes": 22041,
+        "sha256": "04f285929574cf527db14993a49923d3d8f29059979262cec0057b169a85f163"
+      }
+    },
+    {
+      "label": "D",
+      "requested_model": "claude-opus-4-6",
+      "first_answer": {
+        "path": "docs/evidence/2026-10-01/council/after-login/lane-D.md",
+        "bytes": 18213,
+        "sha256": "744c4340ee2ef34c0b8e112cd5f1762340e5784d8b672c4b6b0115a5a8d1f1ce"
+      },
+      "full_five_critique": {
+        "path": "docs/evidence/2026-10-01/council/after-login/critique-D-all5.md",
+        "bytes": 15910,
+        "sha256": "caaac457cb1b2ef2b36e28cf7a5e90f0683b8f6760c221e6c1c00782650313a4"
+      }
+    },
+    {
+      "label": "E",
+      "requested_model": "gpt-6.1-sol",
+      "first_answer": {
+        "path": "docs/evidence/2026-10-01/council/lane-E.md",
+        "bytes": 27960,
+        "sha256": "0a1ca910040abb4b9705dcbb59cbdf37095332a28215bc16d552603067b02e43"
+      },
+      "full_five_critique": {
+        "path": "docs/evidence/2026-10-01/council/after-login/critique-E-all5.md",
+        "bytes": 16845,
+        "sha256": "bf3b1243f08a0ff688b1a82691da0e798ae8759ae2971805248df621d1dd8dba"
+      }
+    }
+  ],
+  "provenance_limit": "Requested versus provider-reported model identity, auxiliary models, interrupted attempts, and native attestation limits are disclosed in README and per-stage provenance. No rankings or model agreement are project acceptance."
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "commons.incremental-fix-integration.v1",
+  "base": "current main 2026-10-01 after G5/G6 integration",
+  "files": [
+    {
+      "path": "frontend/work/src/api.ts",
+      "base_sha256": "ddf5e30a21ec882ce1ccca0f3e067d59c3c5fa3e7fe04c4300becb8b286809fd",
+      "final_sha256": "8212e987ab86222876dd782f89f67919f983eae24fd548b1fff159cf9ba82a66"
+    },
+    {
+      "path": "frontend/work/tests/task-inspector.test.mjs",
+      "base_sha256": "090a3071fa680f3f7a1a96000b3e4866fc4fe96befdb1a64d7a6fd92f244032f",
+      "final_sha256": "236ead91a5df53dd1af6d4fca0d00ae887d2b631d9146bacce8e20562a1d89f7"
+    }
+  ]
+}

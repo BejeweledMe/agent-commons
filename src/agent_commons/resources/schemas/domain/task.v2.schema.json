@@ -7,6 +7,8 @@
   "additionalProperties": false,
   "required": ["task_id", "title", "description", "acceptance_criteria", "priority", "objective_id"],
   "properties": {
+    "task_kind": {"enum": ["task", "component"]},
+    "parent_task_id": {"type": ["string", "null"], "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
     "task_id": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
     "title": {"type": "string", "minLength": 1, "maxLength": 512},
     "description": {"type": "string", "minLength": 1},

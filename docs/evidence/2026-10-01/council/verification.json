@@ -1,0 +1,133 @@
+{
+  "schema": "agent-commons.owner-request-verification.v1",
+  "date": "2026-10-01",
+  "git_head": "aa9d3733decb9bff2f1b24892167842334bcf6a5",
+  "source_boundary": "HEAD plus preserved pre-existing WP-20 and dogfooding changes plus this increment; no commit or release claimed",
+  "python_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "checks": {
+    "make_check": {
+      "exit_code": 0,
+      "python_passed": 2738,
+      "python_skipped": 14,
+      "work_passed": 401,
+      "gallery_passed": 27,
+      "duration_pytest_seconds": 746.94,
+      "log_sha256": "390969cbf7187541acae9265053dce4aab34c95230f0893191e265bd7832c050"
+    },
+    "typescript": {
+      "exit_code": 0,
+      "included_in": "npm run build"
+    },
+    "vite": {
+      "exit_code": 0,
+      "note": "Existing bundle-size warning, no build errors"
+    },
+    "git_diff_check": {
+      "exit_code": 0
+    },
+    "focused_wp20": {
+      "passed": 36
+    },
+    "independent_review": {
+      "reviewer": "native GPT-6 Astra, separate session from implementation",
+      "p1_p2_regressions": 0,
+      "exact_new_wp20_regressions_passed": 3,
+      "source": "final-review.md"
+    },
+    "browser": {
+      "synthetic_ui": "EN/RU, narrow/wide, gallery image/history/type/task/empty/error, graph 140->3->2->1 and hidden edges, zoom/fit, Escape focus; no console errors observed",
+      "production_readonly": "Rebuilt /work, actual agent gallery empty, tracker305tasks and WP-13 subset2tasks; no canonical UI writes"
+    }
+  },
+  "model_migration": {
+    "recommendation": "Initial Astra builder/reviewer on CLI0.159.3; Sol conditional on further protocol validation",
+    "operator_profiles_changed": false,
+    "global_codex_cli_changed": false,
+    "installed_agent_commons_mcp_rebuilt": true,
+    "dependencies": "uv.lock exported constraints, existing Python3.14 mcp/ui extras",
+    "council_completed": 2,
+    "council_requested": 5
+  },
+  "not_completed": [
+    "Claude and Grok account login and remaining3 council lanes",
+    "stable Sol builder qualification",
+    "real bounded product run through selected new permanent profile",
+    "WP-20 <=1s target",
+    "G5 durable result bytes/builds",
+    "G6 canonical component/subtask hierarchy",
+    "G7 exact output-review binding",
+    "authenticated Linux L1 and R2 release evidence"
+  ],
+  "files": {
+    "CHANGELOG.md": "334aab38777f152caa33a4ea1eb19cc5ce557c11b910a9b866feefb74e86e08a",
+    "docs/FRONTEND_CONTRACT.md": "034422c7f69ee923784b86d6fb431ad200fbfb071c18846c7a012e307ded9bd5",
+    "docs/PRODUCT.md": "17154d796581f48e62a569a0cc38390aca189c403518f9497b37a426d57d9744",
+    "docs/README.md": "0b272d1108aad2e15ac7e9a5205c30b1af07841bc1e4aec2115d51fa8b1d71c0",
+    "docs/THREAT_MODEL.md": "833430c259cb2caa2d52e0344799b440c9a25c7d4e3de2e3d4a6ac7019ba5064",
+    "docs/evidence/2026-09-21/blizhe-dogfooding/journal.md": "63064192a3d6f97191b58ab8ac68e0e790310465072119448ca510eff82d03ac",
+    "docs/evidence/2026-09-21/blizhe-dogfooding/manifest.json": "7eed6522f8a18e8433a638a4177fe4d2970854ec03b3cb2495613edb93599192",
+    "docs/evidence/2026-09-21/blizhe-dogfooding/manifest.md": "24336d2e16a65f68d00836fa6d31f2713e8b1e9b39a1fdfb4cc1cae5ef3f5049",
+    "docs/evidence/2026-09-21/blizhe-dogfooding/owner-check-final.json": "a9415dd3ffdc3e723ab8418f1fb2c5460f5dc9004b3e20c2ad1de1586945b8e7",
+    "docs/evidence/2026-10-01/council/README.md": "fde95544502b087d7c2b72845063ef183a0806235aca7f59255acf9e4a12d8b6",
+    "docs/evidence/2026-10-01/council/brief.md": "47b68bf5dec46118a326e2d3cdc0cdeaeb11f9f06f92ef14acf09d7eeb504a35",
+    "docs/evidence/2026-10-01/council/canary-astra-builder-cli01593.json": "04cc1762a34c4e9886a456b1b92544171277a773dbe1141c471c8bcfdaa272ba",
+    "docs/evidence/2026-10-01/council/canary-astra-cli01593.json": "0f5a349c805bf0b76aad725d4d7783fd3a5dd0bc1c8b1508411cedd36ba323ff",
+    "docs/evidence/2026-10-01/council/canary-astra-diagnostic.json": "ad5b6e1a684ea47b4541b99c5bf2d9b188605b374df79dd76fece71777370b64",
+    "docs/evidence/2026-10-01/council/canary-sol-cli01593-terminal-diagnostic.json": "6576fc89376201de5ba5b494f2853eda15ca9ff73ceaadae75a8c1e6f5a16d78",
+    "docs/evidence/2026-10-01/council/canary-sol-cli01593.json": "3a388ae1379dc8d41cd251ab5e65f48d0a4d80513ab4f0446a8abc510d31bc0a",
+    "docs/evidence/2026-10-01/council/canary-sol-diagnostic.json": "5b302ad3938d6060a5033102ec438306c2222b9994b4f9085711aba2ec68cef1",
+    "docs/evidence/2026-10-01/council/canary-sol.json": "b5adda5dceb2d9bbb82214b1d2cd43bd25185b893d7d997ce142de18218914d4",
+    "docs/evidence/2026-10-01/council/candidate-canary-diagnosis.md": "e09956450c6ebcd8dc4ab239caaebc74c42862498e4ef43556bbc4a125b65d46",
+    "docs/evidence/2026-10-01/council/critique-A.md": "05044121130c3717b667879223e59495700251106d5900a05920639964465734",
+    "docs/evidence/2026-10-01/council/critique-E.md": "4fe9c62b66143eeea5f4fb8874a38a31e52fbd6dc3bbb00e63965effd8285515",
+    "docs/evidence/2026-10-01/council/final-review.md": "1751b2795897dde88772e640ab7c3dae42674834e8d2d90d7acd555710a89596",
+    "docs/evidence/2026-10-01/council/first-B-failure.json": "1be3014a95f678dbc3df593a322ea47e8b1ae2f012d585a3b9de496e4e7cdb67",
+    "docs/evidence/2026-10-01/council/first-D-failure.json": "88f17e2b53b5e55e1bc95efaa32cc09e9a4e5267ba7fbfaa06efe271116ef5f7",
+    "docs/evidence/2026-10-01/council/gallery-ru.jpg": "5657935ac0acad075e49017e5ed3afc7c6670176b7a3cbf2c806cf476fd2adc5",
+    "docs/evidence/2026-10-01/council/graph-ru.jpg": "7fc26b2d13b4dc95ba77f875513e4a49302dd7ad5223f25a257f47bf92f8793e",
+    "docs/evidence/2026-10-01/council/inventory.md": "b5e7fc055aa92a240e772562caf2ed2bebfd3891dec82ac9574887ad6b42b1c0",
+    "docs/evidence/2026-10-01/council/lane-A.md": "d7146cb6d500d78949bae0817330cc7e87ac55ebf2324d127b4029289e858d95",
+    "docs/evidence/2026-10-01/council/lane-E.md": "0a1ca910040abb4b9705dcbb59cbdf37095332a28215bc16d552603067b02e43",
+    "docs/evidence/2026-10-01/council/preflight-astra-locked.json": "722dd1bab60048edb8a8e9215e27a3820aaf6d94e984aa41286af9af70e383ab",
+    "docs/evidence/2026-10-01/council/preflight-sol-locked.json": "2f7d672134cc8145a0536f081e5e7a8413a46b244d739f89f7c0b15d4713b744",
+    "docs/evidence/2026-10-01/council/project-inventory.json": "9e2882c95ef65c75c0656dffd10700e4c2dd5ef09ebf637cb6355a5e53f6352b",
+    "docs/evidence/2026-10-01/council/project-map-ru.jpg": "4dc170b7d8ea0ce20a73e152c75ce8e1b2e519ea3ec26a22eb6e34a0989865c0",
+    "docs/evidence/2026-10-01/council/sol-terminal-diagnosis.md": "4e9dfa531c924717a1f46cb64f2192f060c4d9c70493f5ce5ab04bf14d93757b",
+    "docs/evidence/2026-10-01/council/source-boundary.json": "29aa356ab1f518ea8316660647ec1caf068757ab0f2a95d30f010f332bfd844f",
+    "docs/evidence/2026-10-01/council/wp20-benchmark-summary.json": "cb29b6385dd9d6757b8bdeef9dfadbff0ecc1101e486ec5beb9baad124d2ef94",
+    "docs/evidence/2026-10-01/council/wp20-reproduction.json": "708636679f82643078508674ce7e7a6b79738390c83cad73ff1d8cc95818a43c",
+    "docs/evidence/2026-10-01/council/wp20-review.md": "a17b58d2d2bf1dc428a3eac20b553a7980d8234849735069b0de2d11e8629bd9",
+    "docs/handoffs/2026-09-21-blizhe-dogfooding-feedback.md": "054aa887ef09aec2a35874fc37687468d9e6adf45a3036f256c16afdde357fe1",
+    "docs/plans/2026-09-18-consolidation-and-wave-4-plan.md": "5291fa8fddf5f5eb70142eb162aa0e792758032f56f4db6c508efb04c13070f8",
+    "docs/plans/2026-10-01-gpt6-and-product-completion.md": "5584ebf22d09fd86092cff31a6552fb0d3d0bd0e745a714edb76d1f940ecabdb",
+    "docs/user/en/README.md": "0d7993f44e57fb9a0f29615eeecbed389bf65f0b87f77145b8e4982940189732",
+    "docs/user/ru/README.md": "393cf3c91986ac8adaf16d653d4f76088d51ac724995bafa7c9d6c2c6048157b",
+    "frontend/work/src/board.css": "5ae00d7e36bd1d9e8caa1f16add2d19250edc915de4d67e7dd2c7d51c7dcdbca",
+    "frontend/work/src/components/OutputsPanel.tsx": "4acb81570b03d5f8bc9b38351abc81b59e456b053e2801232d12b1f58670dc92",
+    "frontend/work/src/components/ProjectBoard.tsx": "9dd99ee55fcdc97ba414681fc84f816218e82bb4faf6ddccc109362fd684de41",
+    "frontend/work/src/components/TaskGraph.tsx": "adcb2c85f346121f36eaa38875f5ce3ed4a5274f89ea4efafdf320818b98fb12",
+    "frontend/work/src/components/TaskViews.tsx": "a7156f2a29d42718edfd6d5aca2a831baa175e0971d47cfd0e80309ae6dd9a8a",
+    "frontend/work/src/i18n.json": "279daee4fa8df57b6091386fbdf524761938bdb0f9cfd6fedc865f2aa5e86369",
+    "frontend/work/src/main.tsx": "7f03d24d20b8a30bd1a14d8b3419dad63c70f9e345c1497544587d01e6ecdcc5",
+    "frontend/work/src/outputs.css": "5359eca7b5cfda345ae49bdcfb1a86645276c6423b1457228341d129528ff385",
+    "frontend/work/src/outputsApi.ts": "5b03ca6a5ba9ef1501d722185cc95fe108b65a4290e53713fb7eef89759cbd22",
+    "frontend/work/src/outputsStrings.ts": "f33d879550f3ed3b99a5d8e5e7ddd3bbed0a015d16a0960f8009fbcc7b568165",
+    "frontend/work/src/outputsTypes.ts": "88f12851f37a0505c3d0d2addef3a0dd1f91746bc19530b9936b728360ac8c54",
+    "frontend/work/src/taskGraph.css": "606adff4afba15562c6131a09cd61a16c8d49a6c2a017c5f902b37a99883e70f",
+    "frontend/work/src/taskGraph.ts": "d5c51964c0c8fcd2c5475c26ca8efe2e7f74f133797430aa24f11d6bbea303e6",
+    "frontend/work/src/taskGraphStrings.ts": "805073923044690a97e5966a3ae3315e8eeac2584d2d912688f4ca8d5a60cac4",
+    "frontend/work/tests/outputs.test.mjs": "d382052364300cd9c4faa4c5eb4c4146fc004f543d324f81886446652daab910",
+    "frontend/work/tests/side-registry-snapshot.json": "cc7a5c3f1c27cf8c24d688c8b7777aec44edab889c06d1111ec1e0d4dfc0ce7f",
+    "frontend/work/tests/task-graph.test.mjs": "1b3a9a64831604b75b9fe062a7efc24b07c1e5e905f65b525b0ff771b62e5512",
+    "frontend/work/tests/tracker-contract.test.mjs": "4cb4c0d4ac1dc7165b630bef6d540cad7ea690a508b4ea92b1c1b12a08916507",
+    "src/agent_commons/services/manager.py": "207e1ae12ced53b8821ca0bcfdeff6adb69ca9a0f0a3d126817a2a9011ebbae0",
+    "src/agent_commons/storage/events.py": "8fa8b3d58a7d01dfbc5edb387ea89fc566241b10971238af8112577fc859ae7f",
+    "src/agent_commons/storage/idempotency.py": "5adb2eedc7efd855d84a50ce28fa346553c737e8f2ffea3b4118bf04af1dd326",
+    "src/agent_commons/storage/receipt_recovery.py": "7475dc7f1f8a4b4b450ebf36fa244f6bcb0d73b9bd9fd01003d0fd64ab9c1d51",
+    "src/agent_commons/ui/static/work/assets/work-3tzLSY6n.css": "05408e36af65b99464babaa16bafceb3b3f669f17e4fd1741008dc57ee69bed4",
+    "src/agent_commons/ui/static/work/assets/work-DnsM-t8c.js": "ecfa8d42bb57a20d32e5704747281fe8b439eae4f9f47d4db1036f0e2d0a72b7",
+    "src/agent_commons/ui/static/work/index.html": "6e05195a55c867f9c34576085aca023c31c0d816a1d280980cfb729fc4c21834",
+    "tests/services/test_verified_ledger_view.py": "551038df487e5eca2f9bb05e400445f17d0d7b31cc840474f03c24edcb9d8982",
+    "tests/storage/test_receipt_bulk_load.py": "69a01c413dcf7a3d30cbf6ca73c39f0ec136398bdf83c0fa5572b8cf4f60de9d"
+  }
+}

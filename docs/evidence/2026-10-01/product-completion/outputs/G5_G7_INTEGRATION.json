@@ -1,0 +1,140 @@
+{
+  "workspace": "/private/tmp/commons-product-outputs-20261001",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/output_routes.py",
+      "base_sha256": "dab2b8390dd428785f47d8d83fb5af3fbaa77b9f3c790b68658ddb7b869ccaf5",
+      "sha256": "b1c3306b0dc156b39edd1caa09126065ac0ac0f6f1ef96557f191f436155d963"
+    },
+    {
+      "path": "src/agent_commons/runtime/model.py",
+      "base_sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8",
+      "sha256": "994360dbc68368f2d73abcf4ac9e1a392433b56ca8f247684033b606841874e1"
+    },
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "base_sha256": "80e15ed6f0c5db18629736e1fd906af17849454231e27375cf7492bbdf5ccfb5",
+      "sha256": "d406df885f7ad158eacd972958d96c0c867a6bef4cb1024d1ad2b50a1ad5c57e"
+    },
+    {
+      "path": "src/agent_commons/mcp/design_output_tools.py",
+      "base_sha256": "bb19f3e990a8d6eb70dcd6a52fd6a01764e3baad78f1cd36e0984adee2b1911b",
+      "sha256": "a446df1ebfc925afd1ef749b52ba58af9794dbb96df1fb4b0d3e9861d9bfab04"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_instruction.py",
+      "base_sha256": "07e1a9df165a4fc04ae96c5eaf21730d9d388b4c1c1d126f46b036f9377b5483",
+      "sha256": "25117db5e183ff2c99a98a9230eee3811a6bb251859b1e75cd0c17cc6ed8390f"
+    },
+    {
+      "path": "src/agent_commons/services/output_content.py",
+      "base_sha256": null,
+      "sha256": "8c0a0b673c7d5166ffea4ab83abd745298a25ed16c4af55e6b377b7e21c2c8dd"
+    },
+    {
+      "path": "src/agent_commons/services/artifact_content.py",
+      "base_sha256": "d472f07086ae7c1cc690e24b56d24dc3f5b7723891db0aa8b1f2cb44f7f741c7",
+      "sha256": "7068eabe4b55f5e2fe33a717ccc52782af9ea9c4c82441421374b54aa137bd20"
+    },
+    {
+      "path": "src/agent_commons/services/generated_outputs.py",
+      "base_sha256": "9466dad95a9da737c60f6343cca8fdf09f9ffdc1e245bcbce9cbcc3902fb870e",
+      "sha256": "a23aec17289b93ec23b7c4d0b56bd18308c7e8029591abb8e41206adfd80d433"
+    },
+    {
+      "path": "src/agent_commons/services/outputs.py",
+      "base_sha256": "aa1f05c3014ab1329522b7dd38d610904bf32472e363025b997e6b9209a1dd54",
+      "sha256": "57e97276363c51b644382d2e882644bc5a1be86c6e41798107f4bedd62a2df0d"
+    },
+    {
+      "path": "frontend/work/tests/outputs.test.mjs",
+      "base_sha256": "d382052364300cd9c4faa4c5eb4c4146fc004f543d324f81886446652daab910",
+      "sha256": "08ff9c512b8b4ae05baf6fcd4afb79ed2cfe4aa4a29c58dc71673fbc61e34ce6"
+    },
+    {
+      "path": "frontend/work/src/outputsTypes.ts",
+      "base_sha256": "88f12851f37a0505c3d0d2addef3a0dd1f91746bc19530b9936b728360ac8c54",
+      "sha256": "5f160a17ec30dc2c33e3e3988fbe74c1c565061e01e6331d41e0f9a9cec71de3"
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "base_sha256": "279daee4fa8df57b6091386fbdf524761938bdb0f9cfd6fedc865f2aa5e86369",
+      "sha256": "ec065a1e2c692ff9429b7293453cb4c6879a681d4d0ede9253764c69b18e9be3"
+    },
+    {
+      "path": "frontend/work/src/api.ts",
+      "base_sha256": "4d37264a4604b29dfede887d00ed4e4da9eba32827f83d54a3618cb3e694c5bc",
+      "sha256": "66bc13f84a0e55f82399b7287e4b063bdb2fbbc232ba221e032aa779f334f014"
+    },
+    {
+      "path": "frontend/work/src/outputsStrings.ts",
+      "base_sha256": "f33d879550f3ed3b99a5d8e5e7ddd3bbed0a015d16a0960f8009fbcc7b568165",
+      "sha256": "2343a04c86819d75fc291ab38d009984cdc22a0290109f7ec32173965b32681d"
+    },
+    {
+      "path": "frontend/work/src/outputsApi.ts",
+      "base_sha256": "5b03ca6a5ba9ef1501d722185cc95fe108b65a4290e53713fb7eef89759cbd22",
+      "sha256": "3e32ce1a7ab54f719e1d0f0938e5ffcbd4d6a8d45c3754a91b86930e919911aa"
+    },
+    {
+      "path": "frontend/work/src/components/OutputsPanel.tsx",
+      "base_sha256": "4acb81570b03d5f8bc9b38351abc81b59e456b053e2801232d12b1f58670dc92",
+      "sha256": "219ead74830db36341c99ed2b682bb6a6ca866a92a02e1a6c4cd7438ac0c1582"
+    },
+    {
+      "path": "tests/ui/test_output_routes.py",
+      "base_sha256": "dacb455bab1ff1bb9eedae889ce5de514c33547bf420078e2e13f07ecbc112c2",
+      "sha256": "24221acbf6240b8b12b1a490e30585dd6b6790cc853163c9383a4d4a4678eafa"
+    },
+    {
+      "path": "tests/runtime/test_profiles_policy.py",
+      "base_sha256": "67d367eb8ff563565263b7507097d8829fc0c12d9b0a5f97bdb494cad74be0a9",
+      "sha256": "5e3173a714dd928e8b940518904732ff4bb2ed03e4e05dcdeafe1cc505c58a70"
+    },
+    {
+      "path": "tests/runtime/test_delegation_instruction.py",
+      "base_sha256": "e6062f872a0e3adade5806b38deb421f2e76c8aa77e54e4c59a9331f18b42773",
+      "sha256": "cf21e1bcc6403124c72cdedad24b23da35cb981c4ad5005032cd844cd5c01276"
+    },
+    {
+      "path": "tests/mcp/test_design_output_tools.py",
+      "base_sha256": "13a54a069f5f17d46eb940af4fdfae881980ee0f21b7f996cd507316b315eb5d",
+      "sha256": "a62d96b4908b0c5d3c30be7bb912dac77a31138cecf4cc58b1a92be59c70f8b3"
+    },
+    {
+      "path": "tests/mcp/test_worker_scope.py",
+      "base_sha256": "7e44015abd9f3fb736781c63f9933abd6c8ff867ffe705052dd91774d29aaae8",
+      "sha256": "f5c98c4a45113e5b2c95c4afd1a19c8cc233a669df4b68580639e7e29aeee5f2"
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "base_sha256": "034422c7f69ee923784b86d6fb431ad200fbfb071c18846c7a012e307ded9bd5",
+      "sha256": "32c0b6a002e9cd567c39039989c541cdd27b21a01e68d3067ab4d8699529ea7d"
+    },
+    {
+      "path": "docs/PROTOCOL.md",
+      "base_sha256": "54bd9f69ae7b0cea527947fce1bb365d912dac69bf892f78761bd053c655cfcd",
+      "sha256": "9584f4cb528ce07a523740e090404f54e3b0b9b70beeaef13ffc72932452fa31"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "base_sha256": "c5d03f76b4a8aaac6a1caa59a622509d6a9fcf6a17cc6ea0a4f8ae984fc8e24d",
+      "sha256": "3a9e84293ddf25095eef3e3bd9874aebcf2c638c8306dc59723055184b3386bc"
+    },
+    {
+      "path": "docs/adr/0025-retained-worker-results.md",
+      "base_sha256": null,
+      "sha256": "811acf7bf5b90cadb1ac285f18c0516b89d8385e97a1273571f38db981a0e7f0"
+    },
+    {
+      "path": "docs/user/ru/README.md",
+      "base_sha256": "393cf3c91986ac8adaf16d653d4f76088d51ac724995bafa7c9d6c2c6048157b",
+      "sha256": "eb2b8cbed901d8a5d54a99cce7a2c0f747bb59f0aa588bf0f14cd111f5880e33"
+    },
+    {
+      "path": "docs/user/en/README.md",
+      "base_sha256": "0d7993f44e57fb9a0f29615eeecbed389bf65f0b87f77145b8e4982940189732",
+      "sha256": "cda06217951130ed379322a35ec3c9c9f3caea6179c5b41494694a010194b9d7"
+    }
+  ]
+}

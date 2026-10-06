@@ -166,6 +166,23 @@ Open **Agents** and its hire form, or hire from the Board's side panel:
 The profile controls how that agent can run. If the form says **No runtime
 profiles are available yet**, finish runtime setup before hiring.
 
+### Organize components and subtasks
+
+Choose **Component** in the new task form to describe a planned part of your
+product. Select a **Parent component or task** to place a record underneath it,
+or leave **Project — no parent** for top-level work. Components have their own
+criteria and state.
+
+In the task inspector, **Add subtask** creates a child without adding a prerequisite.
+**Edit task** lets you move a task to another parent or back to the project root.
+Save uses the displayed task revision; a stale edit requires refreshing before a
+new attempt. Unknown outcomes retain the original request for retry.
+
+In **Map**, switch between **Structure** (components and children) and
+**Prerequisite tasks** (execution dependencies). Both show explicit recorded
+relationships. Cancelling a component retains its children; move or cancel each
+child explicitly as needed. Completing a child does not accept its parent.
+
 ### Create a task
 
 Open **Tasks** and choose **New task**:
@@ -249,7 +266,12 @@ eligible metadata, not source bodies. Refreshing it never upgrades an already
 selected revision. An unavailable or outdated reference must be resolved before
 publication. The advanced editor preserves structured JSON when needed.
 
-Open **Results** on a task or hired agent when accessible outputs exist.
+Click an agent’s name or avatar on the board to open its gallery, including
+when it has no results yet. **Results** buttons on tasks and agents also open
+available outputs. Filter images and live previews, switch latest/history,
+and follow the task link on a result. Technical details show recorded producer
+and version identifiers. “Current task” review labels describe the task, not
+independent approval of an earlier image.
 Results show that producer's images and separate live previews, labelled as the
 latest version, an earlier version, an expired preview, an unavailable address
 or a result awaiting a check; generated designs are not a Library tab. A Design
@@ -320,3 +342,28 @@ profiles, download external skills, or start a run.
 The product records coordination and decisions. It does not itself grant
 permission to commit, push, deploy, publish, contact people, or perform other
 external actions.
+
+### Explore dependencies
+
+In the task tracker’s map, search by title, task identifier or agent. Select a
+task to focus its connected work, prerequisites or dependents. Zoom and Fit
+help inspect the diagram; the task list is always available. Arrows mean that
+the target depends on the source. They do not describe component membership
+or parent/subtask hierarchy. The map reports prerequisites outside the current
+filter. A focused selection can be drawn even when the project exceeds 128 tasks.
+
+## Saved versions and builds
+
+Open an agent's gallery, choose History, and inspect the exact version. Retained
+images survive source overwrite and server restart when workspace state is kept.
+Builds offers **Download build**: extract the ZIP and explicitly serve it locally
+on a separate origin to inspect it. Commons does not start a server from a gallery
+view. Keep the content store with backups; missing bytes stay unavailable.
+
+**Current task** review and **Exact result** review are separate. A new image/build
+never inherits an older result's approval. Technical details contain the exact CLI
+review request. Run it from this project's directory, first verifying `session show`
+and `orient` against the same workspace/state as the panel. A reviewer can inspect
+exact pixels or all text build entries through scoped tools, then finalize the bound
+review. A code/hash check does not claim runtime or visual testing. Human acceptance
+remains separate. See the [result contract](../../PROTOCOL.md#retained-worker-results).

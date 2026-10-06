@@ -226,6 +226,8 @@ def test_bounded_tools_delegate_to_the_manager() -> None:
         "commons_orient",
         "commons_inbox",
         "commons_list_tasks",
+        "commons_create_task",
+        "commons_edit_task",
         "commons_list_delegations",
         "commons_show_delegation",
         "commons_list_reviews",
@@ -367,6 +369,8 @@ def test_stable_fastmcp_sdk_exposes_the_bounded_contract() -> None:
         "commons_orient",
         "commons_inbox",
         "commons_list_tasks",
+        "commons_create_task",
+        "commons_edit_task",
         "commons_list_delegations",
         "commons_show_delegation",
         "commons_list_reviews",
@@ -460,3 +464,29 @@ def test_runtime_tools_are_explicitly_feature_gated_and_bounded() -> None:
         context_pack_id="context_pack.01K00000000000000000000000",
         context_pack_revision="evt.01K00000000000000000000001",
     )
+
+
+def test_root_hierarchy_tools_forward_exact_parent_and_edit_identity(tmp_path: Path) -> None:
+    class HierarchyManager(FakeManager):
+        def create_task(self, **fields: Any) -> dict[str, Any]:
+            return fields
+
+        def edit_task(self, task_id: str, expected_revision: str, **fields: Any) -> dict[str, Any]:
+            return {"task_id": task_id, "expected_revision": expected_revision, **fields}
+
+    server = build_server(tmp_path, manager=HierarchyManager(), server_factory=FakeServer)  # type: ignore[arg-type]
+    created = server.tools["commons_create_task"](
+        "Component", "Plan", ["Done"], "create-key", "component", "task.parent", []
+    )
+    assert created["task_kind"] == "component"
+    assert created["parent_task_id"] == "task.parent"
+    assert created["dependencies"] == []
+    edited = server.tools["commons_edit_task"](
+        "task.child", "evt.exact", {"parent_task_id": None}, "edit-key"
+    )
+    assert edited == {
+        "task_id": "task.child",
+        "expected_revision": "evt.exact",
+        "changes": {"parent_task_id": None},
+        "idempotency_key": "edit-key",
+    }

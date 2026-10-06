@@ -1241,3 +1241,81 @@ def test_context_sources_changed_during_launch_hooks_never_reach_runner(
         assert len(children) == 1
         assert children[0].status == "closed"
     assert len(builds) == (1 if probe == "build" else 0)
+
+
+def test_implementation_invocation_contains_actual_broker_child_startup(tmp_path, monkeypatch):
+    import shlex
+    import sys
+
+    from agent_commons.runtime.model import invocation_instruction_bytes
+
+    manager, delegation = _workspace(tmp_path)
+    tools = tmp_path / "trusted-tools"
+    tools.mkdir()
+    for name in ("agent-commons-mcp", "agent-commons"):
+        executable = tools / name
+        executable.write_text(f"#!{sys.executable}\n# synthetic paired entrypoint\n")
+        executable.chmod(0o700)
+    runner = _SuccessWithoutTerminalMcp()
+    service = _service(
+        manager, runner=runner, initialization=_Initialization(ProviderInitializationState.READY)
+    )
+    service.profiles = default_profile_registry(
+        codex_executable="/bin/echo",
+        claude_executable="/bin/echo",
+        mcp_executable=str(tools / "agent-commons-mcp"),
+        git_executable="/usr/bin/true",
+        trusted_workspace=True,
+    )
+    result = service.run(
+        delegation["entity_ref"]["id"], delegation["revision"], idempotency_key="bound-startup"
+    )
+    assert len(runner.invocations) == 1
+    text = invocation_instruction_bytes(runner.invocations[0]).decode()
+    command = text.split("```sh\n", 1)[1].splitlines()[0]
+    argv = shlex.split(command)
+    current = manager.get_delegation(delegation["entity_ref"]["id"])
+    assert argv[argv.index("--repo") + 1] == str(manager.repo_root.resolve())
+    assert argv[argv.index("--state-root") + 1] == str(manager.paths.state_root.resolve())
+    assert argv[argv.index("--session-id") + 1] == current["child_session_id"]
+    assert argv[0] == str(tools / "agent-commons")
+    assert "session." + "0" * 32 not in text
+    assert result is not None
+
+
+@pytest.mark.parametrize("problem", ["missing", "unsafe", "other_interpreter", "other_install"])
+def test_startup_cli_requires_trusted_same_install_sibling(tmp_path, monkeypatch, problem):
+    import sys
+
+    from agent_commons.services.delegation_runtime import _startup_cli
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    mcp = tools / "agent-commons-mcp"
+    mcp.write_text(f"#!{sys.executable}\n# paired MCP\n")
+    mcp.chmod(0o700)
+    cli = tools / "agent-commons"
+    if problem != "missing":
+        cli.write_text(
+            f"#!{sys.executable if problem != 'other_interpreter' else '/other/python'}\n# CLI\n"
+        )
+        cli.chmod(0o777 if problem == "unsafe" else 0o700)
+    if problem == "other_install":
+        unrelated = tmp_path / "other-installed-cli"
+        unrelated.write_text(cli.read_text())
+        unrelated.chmod(0o700)
+        cli.unlink()
+        cli.symlink_to(unrelated)
+    # An earlier unrelated PATH CLI must never be substituted for the sibling.
+    earlier = tmp_path / "earlier-path"
+    earlier.mkdir()
+    candidate = earlier / "agent-commons"
+    candidate.write_text(f"#!{sys.executable}\n# unrelated PATH entrypoint\n")
+    candidate.chmod(0o700)
+    monkeypatch.setenv("PATH", str(earlier))
+    profile = default_profile_registry(mcp_executable=str(mcp), trusted_workspace=True).get(
+        "claude-builder"
+    )
+    assert _startup_cli(profile, repo) is None

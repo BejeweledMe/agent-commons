@@ -1,0 +1,16 @@
+{
+  "browser_download_click": true,
+  "browser_event_wait_timed_out": true,
+  "downloaded_file_observed": true,
+  "size": 1896,
+  "sha256": "6e661b42bc1edd1c2563edeee14e0d57c6580e51f212970a4629ddcab05c2b78",
+  "fixture_match": true,
+  "zip_entries": [
+    "commons-build-manifest.json",
+    "app.js",
+    "assets/mark.png",
+    "index.html",
+    "style.css"
+  ],
+  "http_headers": "not captured by browser tooling; route tests verify"
+}

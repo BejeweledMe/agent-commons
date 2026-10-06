@@ -1,0 +1,28 @@
+[
+  {
+    "artifact_id": "artifact.371604EAKB48D88Q437GSVH1R5",
+    "artifact_revision": "evt.01M3VM0MA2HGGCJCGS0DEA4SR3",
+    "source_path": "outputs/engineering-desk-desktop-v2.png",
+    "sha256": "3deaed840d19d68f19326ba5aee9806b1853abf3ab56628cf0183e7080503e55",
+    "manifest_match": true,
+    "size_bytes": 224810,
+    "dimensions": [
+      1440,
+      1620
+    ],
+    "validated_reader_passed": true
+  },
+  {
+    "artifact_id": "artifact.31GVB7CHNC5YF2W1746SFHPEPC",
+    "artifact_revision": "evt.01M3VM0MF76D3HE2M3MN6VGR17",
+    "source_path": "outputs/engineering-desk-mobile-v2.png",
+    "sha256": "586f60f0c19f47b123489d2ec3e04199941062ec9c978a20d42be4a1c68d98c3",
+    "manifest_match": true,
+    "size_bytes": 169728,
+    "dimensions": [
+      390,
+      2450
+    ],
+    "validated_reader_passed": true
+  }
+]

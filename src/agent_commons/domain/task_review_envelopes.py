@@ -29,6 +29,7 @@ class TaskChangesPayload(TypedDict):
     description: NotRequired[str]
     acceptance_criteria: NotRequired[list[str]]
     dependencies: NotRequired[list[str]]
+    parent_task_id: NotRequired[str | None]
 
 
 class TaskPayload(TypedDict):
@@ -39,6 +40,8 @@ class TaskPayload(TypedDict):
     changes: NotRequired[TaskChangesPayload]
     priority: NotRequired[str]
     dependencies: NotRequired[list[str]]
+    parent_task_id: NotRequired[str | None]
+    task_kind: NotRequired[str]
     objective_id: NotRequired[str | None]
     expected_revision: NotRequired[str]
     owner_session_id: NotRequired[str]
@@ -119,6 +122,8 @@ class TaskChanges:
     description: str | None
     acceptance_criteria: tuple[str, ...] | None
     dependencies: tuple[str, ...] | None = None
+    parent_task_id: str | None = None
+    has_parent_task_id: bool = False
 
     @classmethod
     def from_payload(cls, value: Mapping[str, object]) -> TaskChanges:
@@ -127,6 +132,8 @@ class TaskChanges:
             description=_optional_string(value, "description"),
             acceptance_criteria=_optional_string_tuple(value, "acceptance_criteria"),
             dependencies=_optional_string_tuple(value, "dependencies"),
+            parent_task_id=_optional_string(value, "parent_task_id"),
+            has_parent_task_id="parent_task_id" in value,
         )
 
     def to_payload(self) -> TaskChangesPayload:
@@ -139,6 +146,8 @@ class TaskChanges:
             payload["acceptance_criteria"] = list(self.acceptance_criteria)
         if self.dependencies is not None:
             payload["dependencies"] = list(self.dependencies)
+        if self.has_parent_task_id:
+            payload["parent_task_id"] = self.parent_task_id
         return payload
 
 
@@ -152,6 +161,9 @@ class TaskEnvelope(EventEnvelope):
     changes: TaskChanges | None
     priority: str | None
     dependencies: tuple[str, ...] | None
+    task_kind: str | None
+    parent_task_id: str | None
+    has_parent_task_id: bool
     objective_id: str | None
     has_objective_id: bool
     expected_revision: str | None
@@ -180,6 +192,10 @@ class TaskEnvelope(EventEnvelope):
             payload["priority"] = self.priority
         if self.dependencies is not None:
             payload["dependencies"] = list(self.dependencies)
+        if self.has_parent_task_id:
+            payload["parent_task_id"] = self.parent_task_id
+        if self.task_kind is not None:
+            payload["task_kind"] = self.task_kind
         if self.has_objective_id:
             payload["objective_id"] = self.objective_id
         if self.expected_revision is not None:
@@ -271,6 +287,9 @@ def parse_task_review_envelope(
             changes=_optional_task_changes(payload),
             priority=_optional_string(payload, "priority"),
             dependencies=_optional_string_tuple(payload, "dependencies"),
+            task_kind=_optional_string(payload, "task_kind"),
+            parent_task_id=_optional_string(payload, "parent_task_id"),
+            has_parent_task_id="parent_task_id" in payload,
             objective_id=_optional_string(payload, "objective_id"),
             has_objective_id="objective_id" in payload,
             expected_revision=_optional_string(payload, "expected_revision"),

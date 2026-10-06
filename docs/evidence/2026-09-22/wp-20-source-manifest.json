@@ -1,0 +1,68 @@
+{
+  "work_package": "WP-20",
+  "task": "task.3PA74TA6FF1WWPRYNRXHD8G68N",
+  "delegation": "delegation.0R71P4E05T25A14X7WST8VG268",
+  "base_commit": "aa9d3733decb9bff2f1b24892167842334bcf6a5",
+  "recorded_at": "2026-09-23",
+  "files": [
+    {
+      "path": "src/agent_commons/services/manager.py",
+      "sha256": "7134a28878eb42d30aa8884ae8ac39a914d3be226a4f3fcd8ee7665d98a24cc2"
+    },
+    {
+      "path": "src/agent_commons/storage/events.py",
+      "sha256": "8fa8b3d58a7d01dfbc5edb387ea89fc566241b10971238af8112577fc859ae7f"
+    },
+    {
+      "path": "src/agent_commons/storage/receipt_recovery.py",
+      "sha256": "87ad4ceeb09961ef1010ffcade19d5b04224d259e5d9cea1d1c160829da2d21a"
+    },
+    {
+      "path": "tests/services/test_verified_ledger_view.py",
+      "sha256": "464aabe026ce1111b8823b6d66fab8c20ccb1c8003ae952f095f36def4cc6be3"
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "31ed5a35fb22db85a37b5913122cc015389ad54ed23f532da96046deb27a7302"
+    },
+    {
+      "path": "docs/adr/0023-incremental-ledger-validation.md",
+      "sha256": "8e0d1b870b10444013ba5e0fa2a123ce9d5f236b70b1ed296eb04648a72dea5b"
+    }
+  ],
+  "verification": {
+    "tests_services_storage": "447 passed",
+    "ruff_check": "All checks passed",
+    "ruff_format": "749 files already formatted",
+    "doctor": "ok: true, no warnings (run 2 tree)",
+    "benchmark_small_task_create": {
+      "before": {
+        "warm_median_seconds": 3.282,
+        "median_read_calls": 1705
+      },
+      "after_run2_option_A": {
+        "cold_median_seconds": 2.242,
+        "warm_median_seconds": 2.26,
+        "median_read_calls": 853,
+        "warm_phase_exclusive_seconds": {
+          "canonical_reads_validation": 0.99,
+          "receipt_preparation": 0.382,
+          "reconcile": 0.675,
+          "lock_hold": 0.095,
+          "projection_replay": 0.051,
+          "append": 0.005
+        }
+      },
+      "command": "uv run --locked python benchmarks/benchmark_work_mutation.py --profile small --repeats 2 --json"
+    }
+  },
+  "notes": {
+    "run": "WP-20 run 2 (option A of ADR 0023) by Terra (codex-builder), delegation.0R71P4E05T25A14X7WST8VG268 succeeded; round 2 after review.3HD68W5A43QWXFT0QX5KYH0AVT",
+    "round2_changes": [
+      "manager.py _VerifiedLedgerView._verify: identity taken before and after the validating read must agree, three attempts, otherwise IntegrityError (canonical file changed while being verified) \u2014 closes the digest/record binding gap",
+      "tests/services/test_verified_ledger_view.py: five tests added by the qa-engineer preset (new file \u2192 full rebuild, deleted file \u2192 full rebuild of the remaining set with the same silent-drop behaviour as iter_events; the anchor check in prepare_for_write is what refuses the next write, nested write inside the trusted _before_append hook via reply_thread, doctor parity and view never set outside the lock, race binding raises after three changing reads)"
+    ],
+    "gates_run_by": "coordinator (worker sandboxes refuse uv/node)",
+    "remaining": "option B (bulk receipt load) is run 3; the D-16 1 s target on the large fixture is gated by a Grok re-run after run 3; the first refresh of a lock hold still fully validates every file once per write (canonical_reads_validation ~0.99 s on the small profile) because the view is per lock hold by design (option C deferred); a rebuild pass reads each file three times (before-identity, read_path, after-identity)"
+  }
+}

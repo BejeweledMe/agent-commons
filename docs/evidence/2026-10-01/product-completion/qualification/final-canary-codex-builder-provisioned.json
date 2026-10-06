@@ -1,0 +1,137 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "agent_commons_version": "0.1.0",
+  "agent_commons_source_sha256": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+  "provider": "codex",
+  "profile_id": "codex-builder",
+  "purpose": "implementation",
+  "model": "gpt-6-astra",
+  "provider_version": "codex-cli 0.159.3",
+  "requester_client": "agent-commons",
+  "skill_refs": [
+    "commons-start"
+  ],
+  "preflight": {
+    "profile_id": "codex-builder",
+    "provider": "codex",
+    "ok": true,
+    "checks": {
+      "workspace_snapshot": {
+        "ok": true,
+        "snapshot_diagnostic_count": 0
+      },
+      "provider_help": {
+        "ok": true,
+        "required_flags": "present"
+      },
+      "mcp_contract": {
+        "ok": true,
+        "catalog": "available",
+        "agent_commons_source_sha256": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+        "tool_catalog_sha256": "ca072f94ba5155e3f70938c2c8e3372401465b13d0a272a1fca7ca9ceaa6d5df",
+        "tool_count": 33
+      },
+      "mcp_handshake": {
+        "ok": true,
+        "protocol": "initialized",
+        "required_tools": "available",
+        "tool_count": 33
+      }
+    },
+    "consumed_delegation_attempt": false,
+    "provider_help_process_started": true,
+    "provider_work_process_started": false
+  },
+  "initialization": {
+    "state": "ready",
+    "supported": true,
+    "blocks_launch": false
+  },
+  "ok": false,
+  "provider_work_process_started": true,
+  "process": {
+    "outcome": "succeeded",
+    "exit_code": 0,
+    "duration_seconds": 56.09358041599626,
+    "stdout_bytes_seen": 37505,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false
+  },
+  "canonical_state": "needs_operator",
+  "workflow_diagnostic_code": "process_canonical_mismatch",
+  "process_canonical_mismatch": true,
+  "terminal_tool_calls": 2,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 1,
+  "terminal_tool_rejection_details": [
+    {
+      "ordinal": 1,
+      "tool": "commons_delegation_needs_operator",
+      "error_type": "ValidationError",
+      "message": "details withheld: the refusal text may quote tool arguments",
+      "recorded_at": "2026-10-01T13:36:09.190491Z"
+    }
+  ],
+  "terminal_tool_rejection_details_truncated": false,
+  "child_session_closed": true,
+  "sanitized_provider_errors": [],
+  "synthetic_terminal_diagnostic": [
+    {
+      "tool": "commons_delegation_needs_operator",
+      "status": "failed",
+      "arguments": {
+        "text": "{\"delegation_id\": \"[entity-id]\", \"expected_revision\": \"[entity-id]\", \"idempotency_key\": \"canary-1PYPEC1QNT1ZTS8TKPCX25WVGS-workspace-mismatch\", \"reason_code\": \"workspace_state_mismatch\", \"summary\": \"Scoped source inspection confirms [path] defines answer() returning integer 42; target revision matches. Required agent-commons doctor, session show, and claim list fail because operational state belongs to a different workspace. No files changed; no addressed threads. Operator must reconcile CLI [path] binding before normal workflow can be safely completed.\"}",
+        "truncated": false,
+        "redacted": false
+      },
+      "result": {
+        "text": "{\"content\": [{\"type\": \"text\", \"text\": \"Error executing tool commons_delegation_needs_operator: invalid delegation reason_code\"}], \"structured_content\": null}",
+        "truncated": false,
+        "redacted": false
+      },
+      "error": {
+        "text": "null",
+        "truncated": false,
+        "redacted": false
+      },
+      "reason_code_in_schema_enum": false,
+      "argument_issue_category": "invalid_reason_code_enum"
+    },
+    {
+      "tool": "commons_delegation_needs_operator",
+      "status": "completed",
+      "arguments": {
+        "text": "{\"delegation_id\": \"[entity-id]\", \"expected_revision\": \"[entity-id]\", \"idempotency_key\": \"canary-1PYPEC1QNT1ZTS8TKPCX25WVGS-integrity-error\", \"reason_code\": \"integrity_error\", \"summary\": \"Scoped source inspection confirms [path] defines answer() returning integer 42; target revision matches. Required CLI doctor, session show, and claim list fail because operational state belongs to a different workspace. No files changed and no addressed threads. Operator must reconcile CLI [path] binding before normal workflow can safely complete.\"}",
+        "truncated": false,
+        "redacted": false
+      },
+      "result": {
+        "text": "{\"content\": [{\"type\": \"text\", \"text\": \"{\\n  \\\"event_id\\\": \\\"[entity-id]\\\",\\n  \\\"event_type\\\": \\\"[entity-id]\\\",\\n  \\\"entity_ref\\\": {\\n    \\\"kind\\\": \\\"delegation\\\",\\n    \\\"id\\\": \\\"[entity-id]\\\"\\n  },\\n  \\\"revision\\\": \\\"[entity-id]\\\",\\n  \\\"idempotency_key\\\": \\\"canary-1PYPEC1QNT1ZTS8TKPCX25WVGS-integrity-error\\\",\\n  \\\"created\\\": true,\\n  \\\"repaired\\\": false,\\n  \\\"index\\\": {\\n    \\\"mode\\\": \\\"deferred\\\",\\n    \\\"synchronized\\\": false,\\n    \\\"next_action\\\": \\\"agent-commons index rebuild\\\"\\n  }\\n}\"}], \"structured_content\": {\"event_id\": \"[entity-id]\", \"event_type\": \"[entity-id]\", \"entity_ref\": {\"kind\": \"delegation\", \"id\": \"[entity-id]\"}, \"revision\": \"[entity-id]\", \"idempotency_key\": \"canary-1PYPEC1QNT1ZTS8TKPCX25WVGS-integrity-error\", \"created\": true, \"repaired\": false, \"index\": {\"mode\": \"deferred\", \"synchronized\": false, \"next_action\": \"agent-commons index rebuild\"}}}",
+        "truncated": false,
+        "redacted": false
+      },
+      "error": {
+        "text": "null",
+        "truncated": false,
+        "redacted": false
+      },
+      "reason_code_in_schema_enum": true,
+      "argument_issue_category": null
+    }
+  ],
+  "synthetic_final_user_summary": {
+    "text": "Recorded `needs_operator`: required CLI checks failed due to a [path] mismatch.\n\nSource inspection confirmed `answer()` returns integer `42`. No files changed; success was not claimed.",
+    "truncated": false,
+    "redacted": false
+  },
+  "child_environment_proof": {
+    "commons_cli_discoverable_in_child_path": true,
+    "ambient_state_root_unset": true,
+    "ambient_state_base_unset": true,
+    "ambient_session_id_unset": true,
+    "child_state_root_equals_broker_synthetic_root": true,
+    "child_state_root_is_temporary_synthetic": true,
+    "child_session_equals_broker_identity": true,
+    "child_delegation_equals_broker_identity": true
+  }
+}

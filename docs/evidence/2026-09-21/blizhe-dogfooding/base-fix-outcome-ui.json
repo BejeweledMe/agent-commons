@@ -1,0 +1,49 @@
+{
+  "delegation_id": "delegation.7PYQYHAZRAAR30RKJDJ80Q2AT7",
+  "target_ref": {
+    "kind": "task",
+    "id": "task.4D6NW589CTR6XVST3EG1R82CMF"
+  },
+  "target_revision": "evt.01M32P3C3CW9JXTCJ81S8KYY0H",
+  "target_profile": "codex-builder",
+  "purpose": "implementation",
+  "parent_session_id": "session.713c840823f54ba49089eb4bc5d21ae5",
+  "root_delegation_id": "delegation.7PYQYHAZRAAR30RKJDJ80Q2AT7",
+  "depth": 0,
+  "limits": {
+    "max_depth": 0,
+    "wall_time_seconds": 1500,
+    "max_attempts": 1,
+    "max_concurrency": 1,
+    "budget": {
+      "unit": "provider_units",
+      "limit": 1
+    }
+  },
+  "agent_id": "agent.5H2P2FVXE819AVHDBXJKBH3E8Q",
+  "id": "delegation.7PYQYHAZRAAR30RKJDJ80Q2AT7",
+  "state": "needs_operator",
+  "revision": "evt.01M32PPDSJ61C56X6EH53K978P",
+  "effective_revision": "evt.01M32PPDSJ61C56X6EH53K978P",
+  "recorded_at": "2026-09-21T19:22:13.170666Z",
+  "actor": {
+    "capabilities": [
+      "task:join_application"
+    ],
+    "client": "agent-commons",
+    "principal_id": "local-operator",
+    "role_id": "operator",
+    "session_id": "session.713c840823f54ba49089eb4bc5d21ae5",
+    "software": "agent-commons-ui",
+    "stable_instance_id": "agent-commons-ui-workspace.01M32JTG5N6BKFTMZFRARXXWWF"
+  },
+  "author_session_ids": [
+    "session.713c840823f54ba49089eb4bc5d21ae5",
+    "session.f5d8c88ef2a84448ba667c15491a6655"
+  ],
+  "expected_revision": "evt.01M32PNY54CKKXTJ4326Y5QTC0",
+  "child_session_id": "session.f5d8c88ef2a84448ba667c15491a6655",
+  "attempt": 1,
+  "summary": "The provider exited after requesting input; this runtime has no resumable interactive channel. Inspect the request before creating new work.",
+  "reason_code": "invalid_result"
+}

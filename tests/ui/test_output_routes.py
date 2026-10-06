@@ -88,6 +88,8 @@ def test_review_state_is_additive_nullable_and_leaves_the_rest_of_the_shape_inta
         "state",
         "reason",
         "review_state",
+        "result_review_state",
+        "retained",
         "latest",
         "version_count",
         "width",

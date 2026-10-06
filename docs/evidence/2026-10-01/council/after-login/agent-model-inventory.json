@@ -1,0 +1,52 @@
+{
+  "observed_at": "2026-10-01T11:20:01Z",
+  "source": "in-repo CLI agent list + explicit operator runtime.yaml; RoleCommands._agent_view preserves entire canonical role record",
+  "active_agents": [
+    {
+      "agent_id": "agent.25GGJJS24HRZD6KX2QNTPYRA8D",
+      "name": "Self-improvement · Frontend",
+      "revision": "evt.01M20GHHTQ08PN0CX49RFBQ1N4",
+      "profile_id": "codex-builder",
+      "agent_model_override": null,
+      "current_operator_profile_model": null,
+      "model_selection": "profile default; CLI decides when profile model is null"
+    },
+    {
+      "agent_id": "agent.2B5KDPJ5WYA3NMX107R63QG9FE",
+      "name": "Self-improvement · Independent review",
+      "revision": "evt.01M20H1X9XC0J5FBKTYXH7DSM8",
+      "profile_id": "claude-independent-reviewer",
+      "agent_model_override": null,
+      "current_operator_profile_model": null,
+      "model_selection": "profile default; CLI decides when profile model is null"
+    },
+    {
+      "agent_id": "agent.4QXCJ563C9C1RBFP9WTBHGMSBS",
+      "name": "Self-improvement · Grok performance engineer",
+      "revision": "evt.01M20XPY2F1148WNVZDATKFCYB",
+      "profile_id": "grok-builder",
+      "agent_model_override": null,
+      "current_operator_profile_model": null,
+      "model_selection": "profile default; CLI decides when profile model is null"
+    },
+    {
+      "agent_id": "agent.4R1RQYNMZVG326E4D1K3DAYXHE",
+      "name": "Self-improvement · Codex product interface",
+      "revision": "evt.01M20XXMX41S6MNWM7ST3YMESQ",
+      "profile_id": "codex-builder",
+      "agent_model_override": null,
+      "current_operator_profile_model": null,
+      "model_selection": "profile default; CLI decides when profile model is null"
+    },
+    {
+      "agent_id": "agent.4V8ZFF45TH3DQT6EAZ6KH50WW6",
+      "name": "Self-improvement · Claude project backend",
+      "revision": "evt.01M20Y4CCZZAXJTY152XGXJAD9",
+      "profile_id": "claude-builder",
+      "agent_model_override": null,
+      "current_operator_profile_model": null,
+      "model_selection": "profile default; CLI decides when profile model is null"
+    }
+  ],
+  "limitation": "Read-only inventory; no role or profile changes. This observation was after frozen critique inputs and was not given to critics."
+}

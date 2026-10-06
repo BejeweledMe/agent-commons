@@ -1,0 +1,76 @@
+{
+  "actor": {
+    "capabilities": [],
+    "client": "codex",
+    "model_family": "codex",
+    "principal_id": "codex",
+    "role_id": "independent-reviewer",
+    "session_id": "session.57dd3748a7e74fccb36761a97c6d3b5a",
+    "software": "codex-cli",
+    "stable_instance_id": "agent-commons-codex-2fa29c14b73128412b1c1ae1"
+  },
+  "author_session_ids": [
+    "session.57dd3748a7e74fccb36761a97c6d3b5a",
+    "session.635f19bdf3ed4605aae6c8ebf60364e8"
+  ],
+  "criteria": [
+    "Read every bound artifact and check the ten-answer council record, actual model identities and preserved unsuccessful attempts.",
+    "Check exact Astra canary and real product pilot evidence, rollback backup, and honest separation from permanent rollout and full release. Validate bounded evidence hashes; current overall plan remains outside this frozen review."
+  ],
+  "effective_revision": "evt.01M3VNVWGFKB5YHH5X63210MBM",
+  "evidence_refs": [
+    {
+      "ref": {
+        "id": "mft.artifact.sha256.10b6b4f7d965d17a2c42848eed506e789acf94f1fc42b112b060167038567db7",
+        "kind": "manifest"
+      },
+      "revision": "mft.artifact.sha256.10b6b4f7d965d17a2c42848eed506e789acf94f1fc42b112b060167038567db7"
+    },
+    {
+      "ref": {
+        "id": "mft.artifact.sha256.2ce901340bd166c5725663305bd492de59ae11d2544f36021b51b4fa8fe66846",
+        "kind": "manifest"
+      },
+      "revision": "mft.artifact.sha256.2ce901340bd166c5725663305bd492de59ae11d2544f36021b51b4fa8fe66846"
+    },
+    {
+      "ref": {
+        "id": "mft.artifact.sha256.9c00d2a2815099de220db5cda4f73007a2f9f80a1a5c4f34dc0477fe1324f9e6",
+        "kind": "manifest"
+      },
+      "revision": "mft.artifact.sha256.9c00d2a2815099de220db5cda4f73007a2f9f80a1a5c4f34dc0477fe1324f9e6"
+    },
+    {
+      "ref": {
+        "id": "mft.artifact.sha256.195268f1f5a5577b5a9aa0e1080436d4640f22b7fdde294436065ca6d0b11ff7",
+        "kind": "manifest"
+      },
+      "revision": "mft.artifact.sha256.195268f1f5a5577b5a9aa0e1080436d4640f22b7fdde294436065ca6d0b11ff7"
+    },
+    {
+      "ref": {
+        "id": "mft.artifact.sha256.7306455b5b77d799c7e0626f99effc2424b7e3ca69bcc2527f4620cd836502ea",
+        "kind": "manifest"
+      },
+      "revision": "mft.artifact.sha256.7306455b5b77d799c7e0626f99effc2424b7e3ca69bcc2527f4620cd836502ea"
+    }
+  ],
+  "expected_revision": "evt.01M3VNGD5J9Q84NMFBGY70S99Y",
+  "id": "review.0RB0BM15Z1175KR168M8D8PFKP",
+  "independent": true,
+  "producer_agent_ids": [],
+  "producer_context_mode": null,
+  "producer_prior_verdict_count": 0,
+  "recorded_at": "2026-10-01T12:08:44.303709Z",
+  "review_id": "review.0RB0BM15Z1175KR168M8D8PFKP",
+  "revision": "evt.01M3VNVWGFKB5YHH5X63210MBM",
+  "stale": false,
+  "state": "approved",
+  "summary": "Approved the frozen G1/G2 evidence boundary only. Inspected the existing exact-target review, found no canonical verifications, located the unchanged task once, and read all five bound artifacts exactly once. Their claims are supported by 29 specifically cited UTF-8 evidence files read through SHA-256-constrained snapshot readers; all returned complete, unredacted content with matching hashes. The four bound documents listed in verification.json also match its hashes. The council record retains five first answers and five full critiques; provider provenance supports Fable/Opus identities and Grok's requested grok-4.7 versus reported grok-4.7-build distinction. Native Astra/Sol identity remains requested orchestration identity, explicitly without independent provider attestation. Interrupted B/D attempts, Sol's failed canary and successful diagnostic repeat, and the failed first product attempt remain preserved. Exact Astra CLI 0.159.3 builder/reviewer canaries show 1/1/0 terminal success. The product retry records canonical success, no mismatch and 1/1/0; static/browser/gallery evidence supports the bounded real frontend pilot and distinguishes AppKit previews from browser captures. Rollback evidence records equal original/backup YAML hashes and no permanent profile change. This is an evidence review, not a rerun of providers, browser checks or external backup verification, nor validation of every binary in the broader manifest. Permanent rollout, durable builds, exact-output acceptance, later integration, the mutable overall plan and full release remain outside approval. No blocking inconsistency found within this bounded claim.",
+  "target_ref": {
+    "id": "task.5KX5GZJSWZY9N6GBND09FX1223",
+    "kind": "task"
+  },
+  "target_revision": "evt.01M3VNFEN170HSHTPNM33EQPYM",
+  "verdict": "approved"
+}

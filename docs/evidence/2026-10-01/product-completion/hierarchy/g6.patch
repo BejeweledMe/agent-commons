@@ -1,0 +1,1916 @@
+diff --git a/src/agent_commons/cli/__init__.py b/src/agent_commons/cli/__init__.py
+--- a/src/agent_commons/cli/__init__.py
++++ b/src/agent_commons/cli/__init__.py
+@@ -727,6 +727,8 @@
+ @click.option("--acceptance-criterion", multiple=True, required=True)
+ @click.option("--priority", default="normal", show_default=True)
+ @click.option("--dependency", multiple=True)
++@click.option("--task-kind", type=click.Choice(["task", "component"]), default="task")
++@click.option("--parent-task-id")
+ @_idem
+ @click.pass_obj
+ def task_create(
+@@ -736,6 +738,8 @@
+     acceptance_criterion: tuple[str, ...],
+     priority: str,
+     dependency: tuple[str, ...],
++    task_kind: str,
++    parent_task_id: str | None,
+     idempotency_key: str | None,
+ ) -> None:
+     """Create a task."""
+@@ -747,6 +751,8 @@
+             acceptance_criteria=acceptance_criterion,
+             priority=priority,
+             dependencies=dependency,
++            task_kind=task_kind,
++            parent_task_id=parent_task_id,
+             idempotency_key=idempotency_key,
+         )
+     )
+@@ -784,6 +790,25 @@
+             application_id,
+             expected_revision,
+             reason=reason,
++            idempotency_key=idempotency_key,
++        )
++    )
++
++
++@task_group.command("edit")
++@_expected
++@click.option("--changes-json", required=True)
++@click.option("--idempotency-key", required=True)
++@click.pass_obj
++def task_edit(
++    state: CLIState, entity_id: str, expected_revision: str, changes_json: str, idempotency_key: str
++) -> None:
++    """Edit idle task wording, dependencies or parent with exact revision CAS."""
++    state.emit(
++        state.manager().edit_task(
++            entity_id,
++            expected_revision,
++            changes=_json_object(changes_json, "changes_json"),
+             idempotency_key=idempotency_key,
+         )
+     )
+diff --git a/src/agent_commons/domain/lifecycle.py b/src/agent_commons/domain/lifecycle.py
+--- a/src/agent_commons/domain/lifecycle.py
++++ b/src/agent_commons/domain/lifecycle.py
+@@ -17,6 +17,7 @@
+ )
+ from agent_commons.domain.task_edits import (
+     validate_task_dependency_change,
++    validate_task_parent,
+     validate_task_suggestion,
+ )
+ from agent_commons.domain.transitions import transition_spec
+@@ -131,6 +132,8 @@
+         if isinstance(changes, Mapping) and "objective_id" in changes:
+             raise LifecycleConflictError("task.revised cannot change objective_id")
+         validate_task_dependency_change(snapshot, payload)
++        if isinstance(changes, Mapping) and "parent_task_id" in changes:
++            validate_task_parent(snapshot, identifier, changes["parent_task_id"])
+     if event_type == "context_pack.revised":
+         _validate_context_pack_bindings(snapshot, payload)
+     if event_type == "design_package.revised":
+@@ -474,6 +477,7 @@
+         _validate_target_binding(snapshot, payload)
+     if event_type == "task.created":
+         validate_task_suggestion(snapshot, payload)
++        validate_task_parent(snapshot, str(payload["task_id"]), payload.get("parent_task_id"))
+         for dependency in payload.get("dependencies") or []:
+             require_entity(snapshot, "task", str(dependency))
+     if event_type == "delegation.requested":
+diff --git a/src/agent_commons/domain/projection.py b/src/agent_commons/domain/projection.py
+--- a/src/agent_commons/domain/projection.py
++++ b/src/agent_commons/domain/projection.py
+@@ -112,8 +112,10 @@
+ #: exact artifact/task provenance.  An older reader does not know those event
+ #: families.  A ledger
+ #: stamped above the reader makes projection say "update agent-commons"
+-#: instead of reporting integrity findings it cannot judge.
+-LEDGER_SEMANTICS_VERSION = 6
++#: instead of reporting integrity findings it cannot judge. Version 7 adds
++#: explicit task hierarchy and freezes its semantics under correction. Strict
++#: old storage schemas can reject new fields before reaching this diagnostic.
++LEDGER_SEMANTICS_VERSION = 7
+ 
+ #: Event types whose replay depends on newer-than-v1 semantics, and the
+ #: version each one requires.  Writers consult this to stamp the ledger
+@@ -130,6 +132,7 @@
+     "agent.specialization_bound": 5,
+     "task.dependencies_revised": 5,
+     "thread.conversation_bound": 6,
++    "task.hierarchy_changed": 7,
+ }
+ 
+ 
+diff --git a/src/agent_commons/domain/revisions.py b/src/agent_commons/domain/revisions.py
+--- a/src/agent_commons/domain/revisions.py
++++ b/src/agent_commons/domain/revisions.py
+@@ -27,6 +27,7 @@
+         "manifest_ref",
+         "limits",
+         "parent_delegation_id",
++        "parent_task_id",
+         "parent_session_id",
+         "purpose",
+         "related_refs",
+@@ -73,13 +74,27 @@
+ ) -> tuple[str, ...]:
+     """Return causal/reference fields that immutable-envelope correction cannot change."""
+ 
+-    return tuple(
+-        sorted(
+-            field
+-            for field in CORRECTION_IMMUTABLE_FIELDS
+-            if original.get(field) != replacement.get(field)
+-        )
+-    )
++    changed = {
++        field
++        for field in CORRECTION_IMMUTABLE_FIELDS
++        if original.get(field) != replacement.get(field)
++    }
++    # Legacy creation omits these defaults. Equivalent explicit defaults do
++    # not change containment, but kind conversion is never a typo correction.
++    if original.get("task_kind", "task") != replacement.get("task_kind", "task"):
++        changed.add("task_kind")
++    if "task_id" in original:
++        before = original.get("changes")
++        after = replacement.get("changes")
++        before = before if isinstance(before, Mapping) else {}
++        after = after if isinstance(after, Mapping) else {}
++        # Unlike creation's null default, revision null is an explicit detach.
++        # Preserve both presence and value without freezing wording changes.
++        if ("parent_task_id" in before) != ("parent_task_id" in after) or before.get(
++            "parent_task_id"
++        ) != after.get("parent_task_id"):
++            changed.add("changes.parent_task_id")
++    return tuple(sorted(changed))
+ 
+ 
+ @dataclass(frozen=True)
+diff --git a/src/agent_commons/domain/task_edits.py b/src/agent_commons/domain/task_edits.py
+--- a/src/agent_commons/domain/task_edits.py
++++ b/src/agent_commons/domain/task_edits.py
+@@ -128,3 +128,25 @@
+             "task_live_work",
+             "Resolve the task's requested or running work before editing or cancelling it.",
+         )
++
++
++def validate_task_parent(snapshot: ProjectSnapshot, task_id: str, parent_id: object) -> None:
++    """Validate containment independently of dependency readiness, iteratively."""
++    if parent_id is None:
++        return
++    if type(parent_id) is not str or not is_typed_id(parent_id, "task"):
++        raise ValidationError("parent_task_id must be a task ID or null")
++    seen = {task_id}
++    current = parent_id
++    while current is not None:
++        if current in seen:
++            raise TaskEditRefusal(
++                "task_parent_cycle", "This parent would create a hierarchy cycle."
++            )
++        seen.add(current)
++        if len(seen) > MAX_EDIT_GRAPH_NODES:
++            raise TaskEditRefusal("task_parent_limit", "The hierarchy exceeds its traversal limit.")
++        parent = snapshot.tasks.get(current)
++        if parent is None:
++            raise TaskEditRefusal("task_parent_missing", "The selected parent does not exist.")
++        current = parent.get("parent_task_id")
+diff --git a/src/agent_commons/domain/task_projection.py b/src/agent_commons/domain/task_projection.py
+--- a/src/agent_commons/domain/task_projection.py
++++ b/src/agent_commons/domain/task_projection.py
+@@ -1,8 +1,8 @@
+ """Frozen task projection records and their task-only reducer.
+ 
+ Canonical task events remain JSON mappings.  This module sits after their
+-validation and freezes the projected task read model without changing its
+-legacy mapping-shaped wire contract.
++validation and freezes the projected task read model. Additive hierarchy
++defaults do not rewrite legacy canonical event payloads.
+ """
+ 
+ from __future__ import annotations
+@@ -98,6 +98,8 @@
+         authors.add(actor_session_id)
+     collection[identifier] = TaskRecord.from_projected_data(
+         {
++            "task_kind": "task",
++            "parent_task_id": None,
+             **current_data,
+             **payload,
+             "id": identifier,
+diff --git a/src/agent_commons/domain/task_review_envelopes.py b/src/agent_commons/domain/task_review_envelopes.py
+--- a/src/agent_commons/domain/task_review_envelopes.py
++++ b/src/agent_commons/domain/task_review_envelopes.py
+@@ -29,6 +29,7 @@
+     description: NotRequired[str]
+     acceptance_criteria: NotRequired[list[str]]
+     dependencies: NotRequired[list[str]]
++    parent_task_id: NotRequired[str | None]
+ 
+ 
+ class TaskPayload(TypedDict):
+@@ -39,6 +40,8 @@
+     changes: NotRequired[TaskChangesPayload]
+     priority: NotRequired[str]
+     dependencies: NotRequired[list[str]]
++    parent_task_id: NotRequired[str | None]
++    task_kind: NotRequired[str]
+     objective_id: NotRequired[str | None]
+     expected_revision: NotRequired[str]
+     owner_session_id: NotRequired[str]
+@@ -119,6 +122,8 @@
+     description: str | None
+     acceptance_criteria: tuple[str, ...] | None
+     dependencies: tuple[str, ...] | None = None
++    parent_task_id: str | None = None
++    has_parent_task_id: bool = False
+ 
+     @classmethod
+     def from_payload(cls, value: Mapping[str, object]) -> TaskChanges:
+@@ -127,6 +132,8 @@
+             description=_optional_string(value, "description"),
+             acceptance_criteria=_optional_string_tuple(value, "acceptance_criteria"),
+             dependencies=_optional_string_tuple(value, "dependencies"),
++            parent_task_id=_optional_string(value, "parent_task_id"),
++            has_parent_task_id="parent_task_id" in value,
+         )
+ 
+     def to_payload(self) -> TaskChangesPayload:
+@@ -139,6 +146,8 @@
+             payload["acceptance_criteria"] = list(self.acceptance_criteria)
+         if self.dependencies is not None:
+             payload["dependencies"] = list(self.dependencies)
++        if self.has_parent_task_id:
++            payload["parent_task_id"] = self.parent_task_id
+         return payload
+ 
+ 
+@@ -152,6 +161,9 @@
+     changes: TaskChanges | None
+     priority: str | None
+     dependencies: tuple[str, ...] | None
++    task_kind: str | None
++    parent_task_id: str | None
++    has_parent_task_id: bool
+     objective_id: str | None
+     has_objective_id: bool
+     expected_revision: str | None
+@@ -180,6 +192,10 @@
+             payload["priority"] = self.priority
+         if self.dependencies is not None:
+             payload["dependencies"] = list(self.dependencies)
++        if self.has_parent_task_id:
++            payload["parent_task_id"] = self.parent_task_id
++        if self.task_kind is not None:
++            payload["task_kind"] = self.task_kind
+         if self.has_objective_id:
+             payload["objective_id"] = self.objective_id
+         if self.expected_revision is not None:
+@@ -271,6 +287,9 @@
+             changes=_optional_task_changes(payload),
+             priority=_optional_string(payload, "priority"),
+             dependencies=_optional_string_tuple(payload, "dependencies"),
++            task_kind=_optional_string(payload, "task_kind"),
++            parent_task_id=_optional_string(payload, "parent_task_id"),
++            has_parent_task_id="parent_task_id" in payload,
+             objective_id=_optional_string(payload, "objective_id"),
+             has_objective_id="objective_id" in payload,
+             expected_revision=_optional_string(payload, "expected_revision"),
+diff --git a/src/agent_commons/domain/validation.py b/src/agent_commons/domain/validation.py
+--- a/src/agent_commons/domain/validation.py
++++ b/src/agent_commons/domain/validation.py
+@@ -384,7 +384,13 @@
+ _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
+ 
+ _OBJECTIVE_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "extensions"}
+-_TASK_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "dependencies"}
++_TASK_CHANGE_FIELDS = {
++    "title",
++    "description",
++    "acceptance_criteria",
++    "dependencies",
++    "parent_task_id",
++}
+ 
+ _DELEGATION_TARGET_PROFILES = {
+     "codex-builder",
+@@ -583,6 +589,9 @@
+         raise ValidationError("extensions must be an object")
+     if event_type == "objective.revised":
+         _validate_objective_changes(payload["changes"])
++    if event_type.startswith("task.") and event_type != "task.created":
++        if {"task_kind", "parent_task_id"}.intersection(payload):
++            raise ValidationError("Hierarchy fields may only be created or revised through changes")
+     if event_type == "task.revised":
+         _validate_task_changes(payload["changes"])
+     if event_type == "event.corrected":
+diff --git a/src/agent_commons/mcp/server.py b/src/agent_commons/mcp/server.py
+--- a/src/agent_commons/mcp/server.py
++++ b/src/agent_commons/mcp/server.py
+@@ -848,6 +848,36 @@
+         return require_communication().acknowledge_control(
+             operation_id,
+             idempotency_key=idempotency_key,
++        )
++
++    @register(_IDEMPOTENT_WRITE, root_only=True)
++    def commons_create_task(
++        title: str,
++        description: str,
++        acceptance_criteria: list[str],
++        idempotency_key: str,
++        task_kind: str = "task",
++        parent_task_id: str | None = None,
++        dependencies: list[str] | None = None,
++    ) -> dict[str, Any]:
++        """Create a task/component with containment separate from dependencies."""
++        return commons.create_task(
++            title=title,
++            description=description,
++            acceptance_criteria=acceptance_criteria,
++            task_kind=task_kind,
++            parent_task_id=parent_task_id,
++            dependencies=dependencies or [],
++            idempotency_key=idempotency_key,
++        )
++
++    @register(_IDEMPOTENT_WRITE, root_only=True)
++    def commons_edit_task(
++        task_id: str, expected_revision: str, changes: dict[str, Any], idempotency_key: str
++    ) -> dict[str, Any]:
++        """Edit idle work with CAS. parent_task_id=null detaches; dependencies stay independent."""
++        return commons.edit_task(
++            task_id, expected_revision, changes=changes, idempotency_key=idempotency_key
+         )
+ 
+     @register(_READ_ONLY)
+diff --git a/src/agent_commons/resources/schemas/domain/task.v1.schema.json b/src/agent_commons/resources/schemas/domain/task.v1.schema.json
+--- a/src/agent_commons/resources/schemas/domain/task.v1.schema.json
++++ b/src/agent_commons/resources/schemas/domain/task.v1.schema.json
+@@ -6,6 +6,8 @@
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
++    "task_kind": {"enum": ["task", "component"]},
++    "parent_task_id": {"type": ["string", "null"], "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+     "task_id": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+     "title": {"type": "string", "minLength": 1, "maxLength": 512},
+     "description": {"type": "string", "minLength": 1},
+@@ -15,6 +17,7 @@
+       "additionalProperties": false,
+       "minProperties": 1,
+       "properties": {
++        "parent_task_id": {"type": ["string", "null"], "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+         "title": {"type": "string", "minLength": 1, "maxLength": 512},
+         "description": {"type": "string", "minLength": 1},
+         "acceptance_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+diff --git a/src/agent_commons/resources/schemas/domain/task.v2.schema.json b/src/agent_commons/resources/schemas/domain/task.v2.schema.json
+--- a/src/agent_commons/resources/schemas/domain/task.v2.schema.json
++++ b/src/agent_commons/resources/schemas/domain/task.v2.schema.json
+@@ -7,6 +7,8 @@
+   "additionalProperties": false,
+   "required": ["task_id", "title", "description", "acceptance_criteria", "priority", "objective_id"],
+   "properties": {
++    "task_kind": {"enum": ["task", "component"]},
++    "parent_task_id": {"type": ["string", "null"], "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+     "task_id": {"type": "string", "pattern": "^task\\.[0-9A-HJKMNP-TV-Z]{26}$"},
+     "title": {"type": "string", "minLength": 1, "maxLength": 512},
+     "description": {"type": "string", "minLength": 1},
+diff --git a/src/agent_commons/services/tasks.py b/src/agent_commons/services/tasks.py
+--- a/src/agent_commons/services/tasks.py
++++ b/src/agent_commons/services/tasks.py
+@@ -33,6 +33,8 @@
+         dependencies: Sequence[str] = (),
+         suggested_agent_id: str | None = None,
+         objective_id: str | None = None,
++        task_kind: str = "task",
++        parent_task_id: str | None = None,
+         idempotency_key: str | None = None,
+     ) -> dict[str, Any]:
+         key = self._idempotency_key("task.created", idempotency_key)
+@@ -62,6 +64,8 @@
+                 "priority": priority,
+                 "dependencies": dependency_ids,
+                 "objective_id": objective_id,
++                **({"task_kind": task_kind} if task_kind != "task" else {}),
++                **({"parent_task_id": parent_task_id} if parent_task_id is not None else {}),
+                 **suggestion,
+             },
+             idempotency_key=key,
+diff --git a/src/agent_commons/ui/server.py b/src/agent_commons/ui/server.py
+--- a/src/agent_commons/ui/server.py
++++ b/src/agent_commons/ui/server.py
+@@ -1186,6 +1186,8 @@
+                 str(item) for item in (body.get("acceptance_criteria") or ())
+             ),
+             dependencies=tuple(str(item) for item in (body.get("dependencies") or ())),
++            task_kind=body.get("task_kind", "task"),
++            parent_task_id=body.get("parent_task_id"),
+             idempotency_key=body.get("idempotency_key"),
+         )
+ 
+diff --git a/src/agent_commons/ui/task_edit_routes.py b/src/agent_commons/ui/task_edit_routes.py
+--- a/src/agent_commons/ui/task_edit_routes.py
++++ b/src/agent_commons/ui/task_edit_routes.py
+@@ -26,7 +26,9 @@
+ TASK_EDIT_RESULT_SCHEMA = "agent-commons.ui.task-edit-result.v1"
+ MAX_TASK_EDIT_BYTES = 64 * 1024
+ _STATES = EDITABLE_TASK_STATES | {"accepted", "cancelled"}
+-_CHANGE_FIELDS = frozenset({"title", "description", "acceptance_criteria", "dependencies"})
++_CHANGE_FIELDS = frozenset(
++    {"title", "description", "acceptance_criteria", "dependencies", "parent_task_id"}
++)
+ 
+ 
+ def _text(value: object, maximum: int) -> str:
+@@ -50,6 +52,11 @@
+     if "dependencies" in value:
+         validate_task_dependencies(value["dependencies"])
+         result["dependencies"] = list(value["dependencies"])
++    if "parent_task_id" in value:
++        parent = value["parent_task_id"]
++        if parent is not None and (type(parent) is not str or not is_typed_id(parent, "task")):
++            raise ValidationError("parent_task_id must be a task ID or null")
++        result["parent_task_id"] = parent
+     if len(json.dumps(result, ensure_ascii=False).encode()) > MAX_TASK_EDIT_BYTES:
+         raise ValidationError("The task edit exceeds the 64 KiB limit.")
+     return result
+@@ -83,6 +90,7 @@
+         "task_id": task_id,
+         "revision": revision,
+         **content,
++        "task_kind": task.get("task_kind", "task"),
+         "state": state,
+         "editable": state in EDITABLE_TASK_STATES and not live,
+         "cancellable": state in CANCELLABLE_TASK_STATES and not live,
+diff --git a/src/agent_commons/ui/tracker_dtos.py b/src/agent_commons/ui/tracker_dtos.py
+--- a/src/agent_commons/ui/tracker_dtos.py
++++ b/src/agent_commons/ui/tracker_dtos.py
+@@ -16,6 +16,8 @@
+ 
+ 
+ class TrackerTaskPayload(TypedDict):
++    task_kind: str
++    parent_task_id: str | None
+     task_id: str
+     title: str
+     task_state: str
+@@ -135,6 +137,8 @@
+     gaps: tuple[str, ...]
+     objective_id: str | None = None
+     application_id: str | None = None
++    task_kind: str = "task"
++    parent_task_id: str | None = None
+     suggested_agent_id: str | None = None
+     suggested_role_name: str | None = None
+     suggested_provider: str | None = None
+@@ -144,6 +148,8 @@
+             "task_id": self.task_id,
+             "title": self.title,
+             "task_state": self.task_state,
++            "task_kind": self.task_kind,
++            "parent_task_id": self.parent_task_id,
+             "readiness": self.readiness,
+             "dependency_task_ids": list(self.dependency_task_ids),
+             "blocking_dependency_ids": list(self.blocking_dependency_ids),
+diff --git a/src/agent_commons/ui/tracker_reads.py b/src/agent_commons/ui/tracker_reads.py
+--- a/src/agent_commons/ui/tracker_reads.py
++++ b/src/agent_commons/ui/tracker_reads.py
+@@ -185,6 +185,8 @@
+             task_id=node.task_id,
+             title=_task_title(snapshot.tasks.get(node.task_id)),
+             task_state=node.task_state,
++            task_kind=str((snapshot.tasks.get(node.task_id) or {}).get("task_kind", "task")),
++            parent_task_id=(snapshot.tasks.get(node.task_id) or {}).get("parent_task_id"),
+             readiness=node.readiness.value,
+             dependency_task_ids=node.dependency_task_ids,
+             blocking_dependency_ids=node.blocking_dependency_ids,
+diff --git a/frontend/work/src/api.ts b/frontend/work/src/api.ts
+--- a/frontend/work/src/api.ts
++++ b/frontend/work/src/api.ts
+@@ -1255,6 +1255,8 @@
+     taskId: trackerIdentifierAt(value, "task_id"),
+     title: trackerTextAt(value, "title", 300, true),
+     taskState: trackerEnumAt(value, "task_state", TRACKER_TASK_STATES),
++    taskKind: value.task_kind === undefined ? "task" : trackerEnumAt(value, "task_kind", new Set(["task", "component"])) as "task" | "component",
++    parentTaskId: value.parent_task_id === undefined ? null : value.parent_task_id === null ? null : /^task\.[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value.parent_task_id)) ? trackerIdentifierAt(value, "parent_task_id") : (() => { throw new ApiProblem(502, null); })(),
+     readiness: trackerEnumAt(value, "readiness", TRACKER_READINESS_STATES),
+     dependencyTaskIds: trackerIdentifiersAt(value, "dependency_task_ids", TRACKER_MAX_TASKS),
+     blockingDependencyIds: trackerIdentifiersAt(value, "blocking_dependency_ids", TRACKER_MAX_TASKS),
+@@ -2103,6 +2105,8 @@
+       description: string;
+       criteria: readonly string[];
+       dependencyIds: readonly string[];
++      taskKind?: "task" | "component";
++      parentTaskId?: string | null;
+     },
+     signal: AbortSignal,
+     idempotencyKey: string
+@@ -2113,7 +2117,9 @@
+         title: input.title,
+         description: input.description,
+         acceptance_criteria: [...input.criteria],
+-        dependencies: [...input.dependencyIds]
++        dependencies: [...input.dependencyIds],
++        task_kind: input.taskKind ?? "task",
++        parent_task_id: input.parentTaskId ?? null
+       },
+       idempotencyKey,
+       signal
+diff --git a/frontend/work/src/components/TaskComposer.tsx b/frontend/work/src/components/TaskComposer.tsx
+--- a/frontend/work/src/components/TaskComposer.tsx
++++ b/frontend/work/src/components/TaskComposer.tsx
+@@ -3,7 +3,7 @@
+ import type { MessageKey } from "../i18n";
+ import { stateLabel } from "../taskPresentation.js";
+ 
+-export type TaskDraft = { title: string; description: string; criteria: string; dependencyIds: readonly string[] };
++export type TaskDraft = { title: string; description: string; criteria: string; dependencyIds: readonly string[]; taskKind?: "task" | "component"; parentTaskId?: string | null };
+ 
+ export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = false, writesEnabled, tasks, dependencyStatus = "current", onSubmit, onClose, onDependency, text }: {
+   draft: TaskDraft;
+@@ -26,6 +26,15 @@
+     <p className="small-copy">{text("shell_composer_intro")}</p>
+     <form noValidate onSubmit={onSubmit}>
+       <fieldset disabled={!writesEnabled || busy}>
++        <label htmlFor="task-kind">{text("hierarchy_kind")}</label>
++        <select id="task-kind" value={draft.taskKind ?? "task"} onChange={(event) => onChange({ ...draft, taskKind: event.target.value as "task" | "component" })}>
++          <option value="task">{text("hierarchy_task")}</option><option value="component">{text("hierarchy_component")}</option>
++        </select>
++        <label htmlFor="task-parent">{text("hierarchy_parent")}</label>
++        <select id="task-parent" value={draft.parentTaskId ?? ""} onChange={(event) => onChange({ ...draft, parentTaskId: event.target.value || null })}>
++          <option value="">{text("hierarchy_project")}</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
++        </select>
++        <p className="small-copy">{text("hierarchy_help")}</p>
+         <label htmlFor="task-title">{text("task_title")}</label>
+         <input id="task-title" value={draft.title} aria-invalid={errors.has("title")} onChange={(event) => onChange({ ...draft, title: event.target.value })} placeholder={text("task_title_placeholder")} />
+         {errors.has("title") ? <p className="field-error">{text("form_error_task_title")}</p> : null}
+diff --git a/frontend/work/src/components/TaskEditor.tsx b/frontend/work/src/components/TaskEditor.tsx
+--- a/frontend/work/src/components/TaskEditor.tsx
++++ b/frontend/work/src/components/TaskEditor.tsx
+@@ -1,13 +1,15 @@
+ import { type Dispatch, type ReactElement, type SetStateAction, useEffect, useMemo, useRef } from "react";
+ import { ApiProblem, type WorkApi } from "../api.js";
+ import type { TrackerTask } from "../contracts";
++import { translate } from "../i18n.js";
++import { hierarchyWouldCycle } from "../taskHierarchy.js";
+ import type { Locale } from "../i18n";
+ import { TaskGraphApi, type TaskEditDetail, type TaskEditInput } from "../taskGraphApi.js";
+ import { wouldCreateTaskCycle } from "../taskGraph.js";
+ import { taskGraphText, type TaskGraphMessage } from "../taskGraphStrings.js";
+ import { editorInput, observeTaskEditorDraft, taskEditorDraft, taskEditorInputError, type TaskEditorDraft } from "../taskEditorState.js";
+ 
+-type Mode = "closed" | "edit" | "dependent" | "cancel";
++type Mode = "closed" | "edit" | "dependent" | "subtask" | "cancel";
+ type Intent = { kind: "edit"; taskId: string; revision: string; input: TaskEditInput; key: string }
+   | { kind: "dependent"; taskId: string; revision: string; input: TaskEditInput; key: string }
+   | { kind: "cancel"; taskId: string; revision: string; reason: string; key: string };
+@@ -23,7 +25,7 @@
+ }
+ function refusalMessage(code: string): TaskGraphMessage {
+   return ({ task_live_work: "live", task_edit_stale: "stale", task_dependency_cycle: "cycle",
+-    task_dependency_missing: "missing", task_edit_state: "unavailable" } as Record<string, TaskGraphMessage>)[code] ?? "failed";
++    task_dependency_missing: "missing", task_parent_missing: "missing", task_parent_cycle: "cycle", task_edit_state: "unavailable" } as Record<string, TaskGraphMessage>)[code] ?? "failed";
+ }
+ 
+ export function TaskEditor({ api, task, tasks, sourceRevision, locale, writesEnabled, actionsCurrent, onChanged, onSelectTask, entries, setEntries }: {
+@@ -57,19 +59,19 @@
+   }, [client, task.taskId, sourceRevision, entry.mode]);
+   const pending = entry.action.kind === "pending";
+   const uncertain = entry.action.kind === "failure" && entry.action.uncertain;
+-  const dependent = entry.mode === "dependent";
++  const dependent = entry.mode === "dependent" || entry.mode === "subtask";
+   const draft = dependent ? entry.dependent : entry.draft;
+   const input = draft === null ? null : editorInput(draft);
+   const inputError = input === null ? null : taskEditorInputError(input);
+-  const cycle = !dependent && input !== null && wouldCreateTaskCycle(tasks, task.taskId, input.dependencyIds);
++  const cycle = !dependent && input !== null && (wouldCreateTaskCycle(tasks, task.taskId, input.dependencyIds) || hierarchyWouldCycle(tasks, task.taskId, input.parentTaskId ?? null));
+   const missing = input !== null && input.dependencyIds.some((id) => !tasks.some((candidate) => candidate.taskId === id));
+   const permitted = actionsCurrent && (dependent || (entry.mode === "cancel" ? entry.detail?.cancellable : entry.detail?.editable));
+   const stale = !dependent && entry.draft?.stale === true;
+   const disabled = pending || uncertain || !permitted || entry.loading || entry.loadFailed || stale;
+ 
+   function mode(next: Mode): void {
+-    const additions = next === "dependent" && entry.dependent === null ? {
+-      dependent: { taskId: task.taskId, revision: "", title: "", description: "", criteria: "", dependencyIds: [task.taskId], stale: false }
++    const additions = (next === "dependent" || next === "subtask") && (entry.dependent === null || (entry.mode !== next && !uncertain && !pending)) ? {
++      dependent: { taskId: task.taskId, revision: "", title: "", description: "", criteria: "", dependencyIds: next === "dependent" ? [task.taskId] : [], parentTaskId: next === "subtask" ? task.taskId : null, stale: false }
+     } : {};
+     update(task.taskId, { mode: next, ...additions });
+   }
+@@ -107,11 +109,12 @@
+   }}>
+     <div className="task-editor-toolbar">
+       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={entry.mode === "edit"} onClick={() => mode("edit")}>{t("edit")}</button>
++      <button type="button" className="button button-secondary" disabled={pending || uncertain || !writesEnabled} aria-expanded={entry.mode === "subtask"} onClick={() => mode("subtask")}>{translate(locale, "hierarchy_add_subtask")}</button>
+       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={dependent} onClick={() => mode("dependent")}>{t("addDependent")}</button>
+       <button type="button" className="button button-secondary" disabled={pending || !writesEnabled} aria-expanded={entry.mode === "cancel"} onClick={() => mode("cancel")}>{t("cancel")}</button>
+     </div>
+     {entry.mode === "closed" ? null : <div>
+-      <div className="task-editor-buttons"><strong>{t(dependent ? "addDependent" : entry.mode === "cancel" ? "cancel" : "edit")}</strong>
++      <div className="task-editor-buttons"><strong>{entry.mode === "subtask" ? translate(locale, "hierarchy_add_subtask") : t(dependent ? "addDependent" : entry.mode === "cancel" ? "cancel" : "edit")}</strong>
+         <button type="button" className="button button-secondary button-inline" onClick={() => mode("closed")}>{t("close")}</button></div>
+       <p className="small-copy">{t("draftKept")}</p>
+       {entry.loading && entry.detail === null ? <p role="status">{t("loading")}</p> : null}
+@@ -126,6 +129,13 @@
+         <label htmlFor="task-editor-title">{t("title")}</label><input id="task-editor-title" value={draft.title} maxLength={512} disabled={controlsLocked} onChange={(event) => changeDraft({ title: event.target.value })} />
+         <label htmlFor="task-editor-description">{t("description")}</label><textarea id="task-editor-description" rows={5} value={draft.description} maxLength={16000} disabled={controlsLocked} onChange={(event) => changeDraft({ description: event.target.value })} />
+         <label htmlFor="task-editor-criteria">{t("criteria")}</label><textarea id="task-editor-criteria" rows={4} value={draft.criteria} disabled={controlsLocked} onChange={(event) => changeDraft({ criteria: event.target.value })} />
++        <label htmlFor="task-editor-parent">{translate(locale, "hierarchy_parent")}</label>
++        <select id="task-editor-parent" value={draft.parentTaskId ?? ""} disabled={controlsLocked} onChange={(event) => changeDraft({ parentTaskId: event.target.value || null })}>
++          <option value="">{translate(locale, "hierarchy_project")}</option>
++          {tasks.filter((candidate) => dependent || !hierarchyWouldCycle(tasks, task.taskId, candidate.taskId)).map((candidate) => <option key={candidate.taskId} value={candidate.taskId}>{candidate.title}</option>)}
++          {draft.parentTaskId && !tasks.some((candidate) => candidate.taskId === draft.parentTaskId) ? <option value={draft.parentTaskId}>{draft.parentTaskId}</option> : null}
++        </select>
++        <p className="small-copy">{translate(locale, "hierarchy_help")}</p>
+         <details><summary>{t("dependencies")} ({draft.dependencyIds.length})</summary>
+           <div className="task-editor-dependencies">{tasks.filter((candidate) => dependent || candidate.taskId !== task.taskId).map((candidate) => <label className="task-editor-dependency" key={candidate.taskId}>
+             <input type="checkbox" disabled={controlsLocked} checked={draft.dependencyIds.includes(candidate.taskId)} onChange={(event) => changeDraft({ dependencyIds: event.target.checked
+diff --git a/frontend/work/src/components/TaskHierarchy.tsx b/frontend/work/src/components/TaskHierarchy.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/work/src/components/TaskHierarchy.tsx
+@@ -0,0 +1,67 @@
++import { type ReactElement, useId, useMemo, useRef, useState } from "react";
++import type { TrackerTask } from "../contracts.js";
++import type { MessageKey } from "../i18n.js";
++import { buildHierarchyGraph, hierarchyRows } from "../taskHierarchy.js";
++import { fitGraphZoom, graphViewport, NODE_HEIGHT, NODE_WIDTH } from "../taskGraph.js";
++import { TaskState } from "./TaskInspector.js";
++
++export function TaskHierarchy({ tasks, selectedTaskId, onSelectTask, text }: {
++  tasks: readonly TrackerTask[]; selectedTaskId: string | null;
++  onSelectTask: (id: string) => void; text: (key: MessageKey) => string;
++}): ReactElement {
++  const [focus, setFocus] = useState(true), [search, setSearch] = useState(""), [zoom, setZoom] = useState(1);
++  const scroll = useRef<HTMLDivElement>(null), buttons = useRef(new Map<string, HTMLButtonElement>());
++  const searchId = useId(), marker = useId().replace(/:/g, "");
++  const layout = useMemo(() => buildHierarchyGraph(tasks, selectedTaskId, focus, search), [tasks, selectedTaskId, focus, search]);
++  const { rows } = hierarchyRows(layout.selectedTasks);
++  const viewport = graphViewport(layout.width, layout.height, zoom);
++  const unavailable = layout.tooLarge || layout.invalid || !layout.nodes.length;
++  function nodeText(task: TrackerTask): ReactElement {
++    return <><span className="small-copy">{text(task.taskKind === "component" ? "hierarchy_component" : "hierarchy_task")}</span>
++      <strong className="task-graph-node-title">{task.title}</strong><TaskState domain="task" value={task.taskState} text={text} /></>;
++  }
++  function list(): ReactElement {
++    return <ul className="task-hierarchy-list">{rows.map(({ task, depth, parentOutside }) => <li key={task.taskId} className={`hierarchy-depth-${Math.min(depth, 6)}`}>
++      <button type="button" className={`task-row-button${selectedTaskId === task.taskId ? " selected" : ""}`} aria-pressed={selectedTaskId === task.taskId} onClick={() => onSelectTask(task.taskId)}>
++        {nodeText(task)}
++        {task.parentTaskId ? <span className="small-copy">{parentOutside ? text("hierarchy_parent_missing") : text("hierarchy_parent")}: {tasks.find((item) => item.taskId === task.parentTaskId)?.title ?? task.parentTaskId}</span> : null}
++      </button>
++    </li>)}</ul>;
++  }
++  return <section className="task-graph task-hierarchy" aria-label={text("hierarchy_structure")}>
++    <p className="small-copy">{text("hierarchy_help")}</p>
++    <div className="task-graph-toolbar">
++      <label className="task-graph-field" htmlFor={searchId}>{text("task_graph.search")}<input id={searchId} type="search" maxLength={256} value={search} onChange={(event) => setSearch(event.currentTarget.value)} /></label>
++      <button type="button" className="button button-secondary" aria-pressed={focus} disabled={!selectedTaskId} onClick={() => setFocus(!focus)}>{text("hierarchy_focus")}</button>
++      <div className="task-graph-zoom" role="group" aria-label={text("task_graph.zoom")}>
++        <button type="button" className="button button-secondary" aria-label={text("task_graph.zoomOut")} disabled={unavailable || viewport.zoom <= .25} onClick={() => setZoom(viewport.zoom - .25)}>−</button>
++        <output aria-label={text("task_graph.zoom")}>{Math.round(viewport.zoom * 100)}%</output>
++        <button type="button" className="button button-secondary" aria-label={text("task_graph.zoomIn")} disabled={unavailable || viewport.zoom >= 2} onClick={() => setZoom(viewport.zoom + .25)}>+</button>
++        <button type="button" className="button button-secondary" disabled={unavailable} onClick={() => { setZoom(fitGraphZoom(layout.width, scroll.current?.clientWidth ?? 0)); scroll.current?.scrollTo({ top: 0, left: 0 }); }}>{text("task_graph.fit")}</button>
++      </div>
++    </div>
++    <p className="small-copy">{layout.selectedTasks.length}/{tasks.length} · {text("hierarchy_edge")}</p>
++    {layout.hiddenParents ? <p role="status">{text("hierarchy_parent_missing")}: {layout.hiddenParents}</p> : null}
++    {unavailable ? <><p role="status">{text(layout.tooLarge ? "task_graph.graphLimit" : layout.invalid ? "hierarchy_cycle" : "task_graph.noMatches")}</p>{list()}</> : <>
++      <div className="task-graph-scroll" tabIndex={0} role="region" aria-label={text("hierarchy_structure")} ref={scroll}>
++        <svg width={viewport.width} height={viewport.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label={text("hierarchy_structure")}>
++          <defs><marker id={marker} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 Z" /></marker></defs>
++          <g className="task-graph-edges task-hierarchy-edges" aria-hidden="true">{layout.edges.map((edge) => <path key={`${edge.from}:${edge.to}`} d={edge.path} markerEnd={`url(#${marker})`}><title>{text("hierarchy_edge")}</title></path>)}</g>
++          {layout.nodes.map(({ id, task, x, y }) => <foreignObject key={id} x={x} y={y} width={NODE_WIDTH} height={NODE_HEIGHT}>
++            {task === null ? <div className="task-graph-node task-hierarchy-root"><strong>{text("hierarchy_project_root")}</strong><span className="small-copy">{text("hierarchy_structure")}</span></div>
++              : <button type="button" className="task-graph-node" data-task-kind={task.taskKind} data-graph-state={task.taskState} title={task.title} aria-pressed={task.taskId === selectedTaskId} onClick={() => onSelectTask(task.taskId)}
++                ref={(button) => { if (button) buttons.current.set(id, button); else buttons.current.delete(id); }}
++                onKeyDown={(event) => {
++                  if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
++                  event.preventDefault();
++                  const nodes = layout.nodes.filter((node) => node.task !== null), index = nodes.findIndex((node) => node.id === id);
++                  const next = event.key === "Home" ? 0 : event.key === "End" ? nodes.length - 1 : (index + (["ArrowDown", "ArrowRight"].includes(event.key) ? 1 : -1) + nodes.length) % nodes.length;
++                  const button = buttons.current.get(nodes[next].id); button?.focus(); button?.scrollIntoView({ block: "nearest", inline: "nearest" });
++                }}>{nodeText(task)}</button>}
++          </foreignObject>)}
++        </svg>
++      </div>
++      <details className="task-graph-list"><summary>{text("task_graph.list")}</summary>{list()}</details>
++    </>}
++  </section>;
++}
+diff --git a/frontend/work/src/components/TaskViews.tsx b/frontend/work/src/components/TaskViews.tsx
+--- a/frontend/work/src/components/TaskViews.tsx
++++ b/frontend/work/src/components/TaskViews.tsx
+@@ -1,10 +1,11 @@
+-import { type KeyboardEvent, type ReactElement, useRef } from "react";
++import { type KeyboardEvent, type ReactElement, useRef, useState } from "react";
+ import { TASKS_VIEWS, type TasksView } from "../appRouteState.js";
+ import type { TrackerSnapshot, TrackerTask } from "../contracts";
+ import type { Locale, MessageKey } from "../i18n";
+ import { taskGraphText } from "../taskGraphStrings.js";
+ import { NOW_COLUMNS, nowColumnEmpty, nowColumnLabel, type NowBuckets } from "../taskPresentation.js";
+ import { OutputsButton } from "./OutputsPanel.js";
++import { TaskHierarchy } from "./TaskHierarchy.js";
+ import { TaskGraph } from "./TaskGraph.js";
+ import { TaskState } from "./TaskInspector.js";
+ 
+@@ -35,6 +36,7 @@
+  * so a small selected component remains navigable in a large project.
+  */
+ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets, selectedTaskId, locale, text, onSelectTask, onTaskKeyDown, registerTaskButton, onClearFilters }: Props): ReactElement {
++  const [mapKind, setMapKind] = useState<"structure" | "dependencies">("dependencies");
+   const tabs = useRef(new Map<TasksView, HTMLButtonElement>());
+   const t = (key: Parameters<typeof taskGraphText>[1]): string => taskGraphText(locale, key);
+ 
+@@ -95,7 +97,12 @@
+   function mapView(): ReactElement {
+     if (visibleTasks.length === 0 && snapshot.tasks.length > 0) return filteredToNothing();
+     return <>
+-      <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} locale={locale} />
++      <div className="button-row" role="group" aria-label={text("hierarchy_view")}>
++        <button type="button" className="button button-secondary" aria-pressed={mapKind === "structure"} onClick={() => setMapKind("structure")}>{text("hierarchy_structure")}</button>
++        <button type="button" className="button button-secondary" aria-pressed={mapKind === "dependencies"} onClick={() => setMapKind("dependencies")}>{text("task_dependencies")}</button>
++      </div>
++      {mapKind === "structure" ? <TaskHierarchy tasks={visibleTasks} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} text={text} />
++        : <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} locale={locale} />}
+       {visibleTasks.length !== snapshot.tasks.length ? <p className="small-copy">{t("filtered")}</p> : null}
+     </>;
+   }
+diff --git a/frontend/work/src/contracts.ts b/frontend/work/src/contracts.ts
+--- a/frontend/work/src/contracts.ts
++++ b/frontend/work/src/contracts.ts
+@@ -384,6 +384,8 @@
+   | "error";
+ 
+ export type TrackerTask = {
++  taskKind: "task" | "component";
++  parentTaskId: string | null;
+   taskId: string;
+   title: string;
+   taskState: string;
+diff --git a/frontend/work/src/i18n.json b/frontend/work/src/i18n.json
+--- a/frontend/work/src/i18n.json
++++ b/frontend/work/src/i18n.json
+@@ -1070,7 +1070,21 @@
+     "task_graph.fit": "Fit width",
+     "task_graph.edgeMeaning": "Arrow: prerequisite → dependent task",
+     "task_graph.hiddenPrerequisites": "Prerequisite links outside this view",
+-    "task_graph.noMatches": "No tasks match this map view. Clear the search or show all tasks."
++    "task_graph.noMatches": "No tasks match this map view. Clear the search or show all tasks.",
++    "hierarchy_kind": "Planning record",
++    "hierarchy_task": "Task",
++    "hierarchy_component": "Component",
++    "hierarchy_parent": "Parent component or task",
++    "hierarchy_project": "Project — no parent",
++    "hierarchy_structure": "Structure",
++    "hierarchy_view": "Map relationships",
++    "hierarchy_help": "Structure groups work. Dependencies control readiness. Child completion never accepts its parent.",
++    "hierarchy_add_subtask": "Add subtask",
++    "hierarchy_parent_missing": "Parent outside this view",
++    "hierarchy_cycle": "Invalid hierarchy — shown as a list",
++    "hierarchy_focus": "Selected branch and ancestors",
++    "hierarchy_edge": "Dashed arrows: parent → child; no execution order",
++    "hierarchy_project_root": "Project"
+   },
+   "ru": {
+     "app_title": "Начните сфокусированную работу",
+@@ -2143,6 +2157,20 @@
+     "task_graph.fit": "По ширине",
+     "task_graph.edgeMeaning": "Стрелка: предварительная → зависимая задача",
+     "task_graph.hiddenPrerequisites": "Связи с предварительными задачами вне вида",
+-    "task_graph.noMatches": "В этом виде нет подходящих задач. Очистите поиск или покажите все задачи."
++    "task_graph.noMatches": "В этом виде нет подходящих задач. Очистите поиск или покажите все задачи.",
++    "hierarchy_kind": "Запись плана",
++    "hierarchy_task": "Задача",
++    "hierarchy_component": "Компонент",
++    "hierarchy_parent": "Родительский компонент или задача",
++    "hierarchy_project": "Проект — без родителя",
++    "hierarchy_structure": "Структура",
++    "hierarchy_view": "Связи на карте",
++    "hierarchy_help": "Структура объединяет работу. Зависимости определяют готовность. Завершение подзадачи не принимает родителя.",
++    "hierarchy_add_subtask": "Добавить подзадачу",
++    "hierarchy_parent_missing": "Родитель вне этого представления",
++    "hierarchy_cycle": "Некорректная иерархия — показан список",
++    "hierarchy_focus": "Выбранная ветвь и родители",
++    "hierarchy_edge": "Пунктирные стрелки: родитель → потомок; без порядка выполнения",
++    "hierarchy_project_root": "Проект"
+   }
+ }
+diff --git a/frontend/work/src/main.tsx b/frontend/work/src/main.tsx
+--- a/frontend/work/src/main.tsx
++++ b/frontend/work/src/main.tsx
+@@ -85,6 +85,8 @@
+   description: string;
+   criteria: string;
+   dependencyIds: readonly string[];
++  taskKind?: "task" | "component";
++  parentTaskId?: string | null;
+ };
+ 
+ type FormErrors = ReadonlySet<string>;
+@@ -997,7 +999,7 @@
+     }
+     const input = {
+       title: task.title.trim(), description: task.description.trim(),
+-      criteria, dependencyIds: [...task.dependencyIds]
++      criteria, dependencyIds: [...task.dependencyIds], taskKind: task.taskKind ?? "task", parentTaskId: task.parentTaskId ?? null
+     };
+     const idempotencyKey = taskRetryIdentity.current.forOperation(JSON.stringify(input));
+     const operationNavigation = navigationRevision.current;
+diff --git a/frontend/work/src/taskEditorState.ts b/frontend/work/src/taskEditorState.ts
+--- a/frontend/work/src/taskEditorState.ts
++++ b/frontend/work/src/taskEditorState.ts
+@@ -4,17 +4,19 @@
+   taskId: string; revision: string; title: string; description: string; criteria: string;
+   dependencyIds: readonly string[]; stale: boolean;
+   originalCriteria?: readonly string[];
++  parentTaskId?: string | null;
+ };
+ export function taskEditorDraft(detail: TaskEditDetail): TaskEditorDraft {
+   return { taskId: detail.taskId, revision: detail.revision, title: detail.title,
+-    description: detail.description, criteria: detail.criteria.join("\n"), originalCriteria: [...detail.criteria], dependencyIds: [...detail.dependencyIds], stale: false };
++    parentTaskId: detail.parentTaskId, description: detail.description, criteria: detail.criteria.join("\n"), originalCriteria: [...detail.criteria], dependencyIds: [...detail.dependencyIds], stale: false };
+ }
+ export function observeTaskEditorDraft(current: TaskEditorDraft | null, detail: TaskEditDetail): TaskEditorDraft {
+   if (current === null || current.taskId !== detail.taskId) return taskEditorDraft(detail);
+   return current.revision === detail.revision || current.stale ? current : { ...current, stale: true };
+ }
+-export function editorInput(draft: Pick<TaskEditorDraft, "title" | "description" | "criteria" | "dependencyIds" | "originalCriteria">): TaskEditInput {
++export function editorInput(draft: Pick<TaskEditorDraft, "title" | "description" | "criteria" | "dependencyIds" | "originalCriteria" | "parentTaskId">): TaskEditInput {
+   return { title: draft.title, description: draft.description,
++    ...(draft.parentTaskId !== undefined ? { parentTaskId: draft.parentTaskId } : {}),
+     criteria: draft.originalCriteria?.join("\n") === draft.criteria ? [...draft.originalCriteria]
+       : draft.criteria.split("\n").map((line) => line.trim()).filter(Boolean), dependencyIds: [...draft.dependencyIds] };
+ }
+diff --git a/frontend/work/src/taskGraph.css b/frontend/work/src/taskGraph.css
+--- a/frontend/work/src/taskGraph.css
++++ b/frontend/work/src/taskGraph.css
+@@ -43,3 +43,17 @@
+ .task-graph-boundary,.task-graph-node-boundary { font-size:.72rem; color:var(--text-2); }
+ .task-graph-list { margin-top:.7rem; }
+ .task-graph-list summary { cursor:pointer; }
++
++.task-hierarchy-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
++.task-hierarchy-list > li { min-width: 0; }
++.task-hierarchy-list .task-row-button { width: 100%; text-align: start; overflow-wrap: anywhere; }
++.task-hierarchy-edges path { stroke-dasharray: 5 4; }
++.task-hierarchy-root { border-style: double; justify-content: center; cursor: default; }
++.task-hierarchy .task-graph-node[data-task-kind="component"] { border-width: 3px; }
++.task-hierarchy .task-state { font-size: .8rem; }
++.hierarchy-depth-1 { padding-inline-start: 1.25rem; }
++.hierarchy-depth-2 { padding-inline-start: 2.5rem; }
++.hierarchy-depth-3 { padding-inline-start: 3.75rem; }
++.hierarchy-depth-4 { padding-inline-start: 5rem; }
++.hierarchy-depth-5 { padding-inline-start: 6.25rem; }
++.hierarchy-depth-6 { padding-inline-start: 7.5rem; }
+diff --git a/frontend/work/src/taskGraphApi.ts b/frontend/work/src/taskGraphApi.ts
+--- a/frontend/work/src/taskGraphApi.ts
++++ b/frontend/work/src/taskGraphApi.ts
+@@ -5,8 +5,9 @@
+   criteria: readonly string[]; dependencyIds: readonly string[]; state: string;
+   editable: boolean; cancellable: boolean; refusalCode: string | null;
+   suggestedAgentId?: string;
++  taskKind: "task" | "component"; parentTaskId: string | null;
+ };
+-export type TaskEditInput = Pick<TaskEditDetail, "title" | "description" | "criteria" | "dependencyIds">;
++export type TaskEditInput = Pick<TaskEditDetail, "title" | "description" | "criteria" | "dependencyIds"> & { parentTaskId?: string | null; taskKind?: "task" | "component" };
+ export type TaskEditResult = { taskId: string; revision: string; action: "revised" | "cancelled" };
+ export type TaskGraphTransport = {
+   requestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown>;
+@@ -40,6 +41,8 @@
+   if ((value.state === "accepted" || value.state === "cancelled" || value.refusal_code !== null) && (value.editable || value.cancellable)) return malformed();
+   if ((value.state === "completed" || value.state === "review") && value.cancellable) return malformed();
+   const result: TaskEditDetail = {
++    taskKind: value.task_kind === undefined ? "task" : value.task_kind === "task" || value.task_kind === "component" ? value.task_kind : malformed(),
++    parentTaskId: value.parent_task_id === undefined || value.parent_task_id === null ? null : taskId(value.parent_task_id),
+     taskId: taskId(value.task_id), revision: revision(value.revision), title: boundedText(value.title, 512),
+     description: boundedText(value.description, 16000), criteria, dependencyIds, state: value.state,
+     editable: value.editable, cancellable: value.cancellable, refusalCode: value.refusal_code as string | null
+@@ -80,7 +83,8 @@
+   save(id: string, expectedRevision: string, input: TaskEditInput, key: string, signal: AbortSignal): Promise<TaskEditResult> {
+     revision(expectedRevision);
+     return this.write(id, "edit", { expected_revision: expectedRevision, changes: {
+-      title: input.title, description: input.description, acceptance_criteria: [...input.criteria], dependencies: [...input.dependencyIds]
++      title: input.title, description: input.description, acceptance_criteria: [...input.criteria], dependencies: [...input.dependencyIds],
++      ...(input.parentTaskId !== undefined ? { parent_task_id: input.parentTaskId } : {})
+     } }, key, signal);
+   }
+   cancel(id: string, expectedRevision: string, reason: string, key: string, signal: AbortSignal): Promise<TaskEditResult> {
+diff --git a/frontend/work/src/taskHierarchy.ts b/frontend/work/src/taskHierarchy.ts
+new file mode 100644
+--- /dev/null
++++ b/frontend/work/src/taskHierarchy.ts
+@@ -0,0 +1,97 @@
++import dagre from "@dagrejs/dagre";
++import { MAX_GRAPH_TASKS, NODE_HEIGHT, NODE_WIDTH } from "./taskGraph.js";
++import type { TrackerTask } from "./contracts.js";
++
++type Node = Pick<TrackerTask, "taskId" | "parentTaskId">;
++export function hierarchyWouldCycle(tasks: readonly Node[], taskId: string, parentId: string | null): boolean {
++  const parents = new Map(tasks.map((task) => [task.taskId, task.parentTaskId]));
++  const seen = new Set([taskId]);
++  let current = parentId;
++  while (current) {
++    if (seen.has(current)) return true;
++    seen.add(current);
++    current = parents.get(current) ?? null;
++  }
++  return false;
++}
++
++/** Iterative traversal keeps deeply nested data bounded by the supplied view. */
++export function hierarchyRows<T extends Node>(tasks: readonly T[]): { rows: { task: T; depth: number; parentOutside: boolean }[]; invalid: boolean } {
++  const ids = new Set(tasks.map((task) => task.taskId));
++  const children = new Map<string | null, T[]>();
++  for (const task of tasks) {
++    const parent = task.parentTaskId && ids.has(task.parentTaskId) ? task.parentTaskId : null;
++    children.set(parent, [...(children.get(parent) ?? []), task]);
++  }
++  const pending = [...(children.get(null) ?? [])].reverse().map((task) => ({ task, depth: 0 }));
++  const seen = new Set<string>();
++  const rows: { task: T; depth: number; parentOutside: boolean }[] = [];
++  while (pending.length) {
++    const row = pending.pop()!;
++    if (seen.has(row.task.taskId)) continue;
++    seen.add(row.task.taskId);
++    rows.push({ ...row, parentOutside: Boolean(row.task.parentTaskId && !ids.has(row.task.parentTaskId)) });
++    for (const task of [...(children.get(row.task.taskId) ?? [])].reverse()) pending.push({ task, depth: row.depth + 1 });
++  }
++  const invalid = rows.length !== tasks.length;
++  for (const task of tasks) if (!seen.has(task.taskId)) rows.push({ task, depth: 0, parentOutside: false });
++  return { rows, invalid };
++}
++
++export type HierarchyLayout = {
++  nodes: { id: string; task: TrackerTask | null; x: number; y: number }[];
++  edges: { from: string; to: string; path: string }[];
++  selectedTasks: readonly TrackerTask[]; width: number; height: number;
++  tooLarge: boolean; invalid: boolean; hiddenParents: number;
++};
++
++/** Containment only: never reads dependencyTaskIds or server readiness edges. */
++export function buildHierarchyGraph(tasks: readonly TrackerTask[], selectedId: string | null, focus = true, search = ""): HierarchyLayout {
++  const byId = new Map(tasks.map((task) => [task.taskId, task]));
++  const children = new Map<string, string[]>();
++  for (const task of tasks) if (task.parentTaskId) children.set(task.parentTaskId, [...(children.get(task.parentTaskId) ?? []), task.taskId]);
++  let scope = new Set(byId.keys());
++  if (focus && selectedId && byId.has(selectedId)) {
++    scope = new Set<string>();
++    const pending = [selectedId];
++    while (pending.length) {
++      const current = pending.pop()!;
++      if (scope.has(current)) continue;
++      scope.add(current); pending.push(...(children.get(current) ?? []));
++    }
++    let current: string | null = byId.get(selectedId)?.parentTaskId ?? null;
++    while (current && byId.has(current) && !scope.has(current)) { scope.add(current); current = byId.get(current)?.parentTaskId ?? null; }
++  }
++  const query = search.trim().toLowerCase();
++  if (query) {
++    const matches = new Set(tasks.filter((task) => scope.has(task.taskId) && [task.title, task.taskId].some((text) => text.toLowerCase().includes(query))).map((task) => task.taskId));
++    for (const id of [...matches]) {
++      let parent = byId.get(id)?.parentTaskId;
++      while (parent && scope.has(parent) && !matches.has(parent)) { matches.add(parent); parent = byId.get(parent)?.parentTaskId; }
++    }
++    scope = matches;
++  }
++  const selected = tasks.filter((task) => scope.has(task.taskId)).slice().sort((a, b) => a.taskId.localeCompare(b.taskId));
++  const hiddenParents = selected.filter((task) => task.parentTaskId && !scope.has(task.parentTaskId)).length;
++  const base: HierarchyLayout = { nodes: [], edges: [], selectedTasks: selected, width: NODE_WIDTH + 48, height: NODE_HEIGHT + 48,
++    tooLarge: selected.length > MAX_GRAPH_TASKS, invalid: hierarchyRows(selected).invalid, hiddenParents };
++  if (base.tooLarge || base.invalid || !selected.length) return base;
++  const root = "project-root"; // Presentation only; never passed to canonical task actions.
++  const graph = new dagre.graphlib.Graph();
++  graph.setGraph({ rankdir: "TB", nodesep: 32, ranksep: 62, marginx: 24, marginy: 24 });
++  graph.setDefaultEdgeLabel(() => ({}));
++  graph.setNode(root, { width: NODE_WIDTH, height: NODE_HEIGHT });
++  for (const task of selected) graph.setNode(task.taskId, { width: NODE_WIDTH, height: NODE_HEIGHT });
++  const edges: { from: string; to: string }[] = [];
++  for (const task of selected) {
++    const parent = task.parentTaskId ?? root;
++    // A filtered-out parent is a boundary, never an invented project-root edge.
++    if (parent === root || scope.has(parent)) { graph.setEdge(parent, task.taskId); edges.push({ from: parent, to: task.taskId }); }
++  }
++  dagre.layout(graph);
++  return { ...base, width: graph.graph().width ?? base.width, height: graph.graph().height ?? base.height,
++    nodes: [{ id: root, task: null }, ...selected.map((task) => ({ id: task.taskId, task }))].map((node) => {
++      const position = graph.node(node.id); return { ...node, x: position.x - NODE_WIDTH / 2, y: position.y - NODE_HEIGHT / 2 };
++    }).sort((a, b) => a.y - b.y || a.x - b.x),
++    edges: edges.map((edge) => ({ ...edge, path: (graph.edge(edge.from, edge.to).points as { x: number; y: number }[]).map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ") })) };
++}
+diff --git a/frontend/work/tests/task-graph.test.mjs b/frontend/work/tests/task-graph.test.mjs
+--- a/frontend/work/tests/task-graph.test.mjs
++++ b/frontend/work/tests/task-graph.test.mjs
+@@ -423,3 +423,71 @@
+     assert.doesNotMatch(html, /style=|<script/);
+   }
+ });
++
++const { hierarchyRows, hierarchyWouldCycle } = await load("taskHierarchy");
++const { TaskHierarchy } = await load("components/TaskHierarchy");
++test("structure is explicit, dependency-independent, cycle-safe, and survives filtered parents", () => {
++  const nodes = [task(taskId, [otherId], { taskKind: "component", parentTaskId: null }), task(otherId, [], { taskKind: "task", parentTaskId: taskId }), task(thirdId, [], { parentTaskId: otherId })];
++  assert.deepEqual(hierarchyRows(nodes).rows.map((row) => row.depth), [0, 1, 2]);
++  assert.equal(hierarchyWouldCycle(nodes, taskId, thirdId), true);
++  assert.equal(hierarchyWouldCycle(nodes, thirdId, taskId), false);
++  assert.equal(hierarchyRows(nodes.slice(1)).rows[0].parentOutside, true);
++  const cycle = hierarchyRows([nodes[0], { ...nodes[1], parentTaskId: otherId }]);
++  assert.equal(cycle.invalid, true);
++  assert.equal(cycle.rows.length, 2);
++  for (const locale of ["en", "ru"]) {
++    const html = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: nodes, selectedTaskId: otherId, onSelectTask() {}, text: (key) => messages[locale][key] }));
++    assert.match(html, /<svg/);
++    assert.match(html, /task-hierarchy-edges/);
++    assert.match(html, /task-hierarchy-root/);
++    assert.doesNotMatch(html, /style=/);
++    assert.match(html, /aria-pressed="true"/);
++    assert.ok(html.includes(messages[locale].hierarchy_component));
++    assert.ok(html.includes(messages[locale].hierarchy_help));
++  }
++});
++
++test("parent DTO validates typed IDs and draft/retry preserves explicit detach", async () => {
++  assert.throws(() => parseTaskEditDetail({ ...detail(), parent_task_id: "not-a-task" }, taskId));
++  assert.throws(() => parseTaskEditDetail({ ...detail(), task_kind: "directory" }, taskId));
++  const draft = taskEditorDraft(parseTaskEditDetail({ ...detail(), parent_task_id: otherId, task_kind: "component" }, taskId));
++  assert.equal(editorInput(draft).parentTaskId, otherId);
++  const requests = [];
++  const api = new TaskGraphApi({ async requestData(path, options) { requests.push(options.body); return success(); } });
++  await api.save(taskId, revision, editorInput({ ...draft, parentTaskId: null }), "detach", signal());
++  assert.equal(requests[0].changes.parent_task_id, null);
++  assert.equal("task_kind" in requests[0].changes, false);
++});
++
++const { buildHierarchyGraph } = await load("taskHierarchy");
++test("containment diagram uses explicit parents and a presentation-only project root", () => {
++  const parent = task(taskId, [thirdId], { parentTaskId: null, taskKind: "component" });
++  const child = task(otherId, [thirdId], { parentTaskId: taskId });
++  const unrelated = task(thirdId, [], { parentTaskId: null });
++  const graph = buildHierarchyGraph([parent, child, unrelated], taskId);
++  assert.deepEqual(graph.edges.map(({from, to}) => [from, to]), [["project-root", taskId], [taskId, otherId]]);
++  assert.equal(graph.nodes.filter(({task}) => task === null).length, 1);
++  assert.equal(graph.nodes.some(({id}) => id === thirdId), false, "dependencies never select containment nodes");
++  const p = graph.nodes.find(({id}) => id === taskId), c = graph.nodes.find(({id}) => id === otherId);
++  assert.ok(p.y + NODE_HEIGHT < c.y);
++  const boundary = buildHierarchyGraph([child], otherId);
++  assert.equal(boundary.hiddenParents, 1);
++  assert.deepEqual(boundary.edges, [], "hidden parents never turn into project-root edges");
++  assert.equal(buildHierarchyGraph([{...parent, parentTaskId: otherId}, child], null).invalid, true);
++});
++
++test("containment diagram applies branch/search before cap and remains bounded at 1/20/128/304", () => {
++  const nodes = Array.from({length: 304}, (_, index) => task(`task.${String(index).padStart(26, "0")}`, [], { parentTaskId: null }));
++  for (const count of [1, 20, 128]) {
++    const layout = buildHierarchyGraph(nodes.slice(0, count), null);
++    assert.equal(layout.tooLarge, false);
++    assert.equal(layout.nodes.length, count + 1);
++  }
++  assert.equal(buildHierarchyGraph(nodes, null).tooLarge, true);
++  assert.equal(buildHierarchyGraph(nodes, nodes[200].taskId).nodes.length, 2);
++  const search = buildHierarchyGraph(nodes, null, false, nodes[200].taskId);
++  assert.equal(search.nodes.length, 2);
++  const largeHtml = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: nodes, selectedTaskId: null, onSelectTask() {}, text: (key) => messages.en[key] }));
++  assert.doesNotMatch(largeHtml, /<svg/);
++  assert.match(largeHtml, /task-hierarchy-list/);
++});
+diff --git a/frontend/work/tests/work-task-create.test.mjs b/frontend/work/tests/work-task-create.test.mjs
+--- a/frontend/work/tests/work-task-create.test.mjs
++++ b/frontend/work/tests/work-task-create.test.mjs
+@@ -63,6 +63,8 @@
+     "dependencies",
+     "description",
+     "idempotency_key",
++    "parent_task_id",
++    "task_kind",
+     "title"
+   ]);
+   assert.deepEqual(body.dependencies, ["task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ"]);
+diff --git a/tests/cli/test_cli.py b/tests/cli/test_cli.py
+--- a/tests/cli/test_cli.py
++++ b/tests/cli/test_cli.py
+@@ -615,3 +615,16 @@
+     assert error["ok"] is False
+     assert error["error"]["type"] == "ConfigurationError"
+     assert "security configuration must be a mapping" in error["error"]["message"]
++
++
++def test_task_hierarchy_cli_has_explicit_creation_and_cas_edit_contract() -> None:
++    runner = CliRunner()
++    created = runner.invoke(cli, ["task", "create", "--help"])
++    assert created.exit_code == 0
++    assert "--task-kind [task|component]" in created.output
++    assert "--parent-task-id" in created.output
++    edit = runner.invoke(cli, ["task", "edit", "--help"])
++    assert edit.exit_code == 0
++    assert "ENTITY_ID EXPECTED_REVISION" in edit.output
++    assert "--changes-json" in edit.output
++    assert "--idempotency-key" in edit.output
+diff --git a/tests/domain/test_task_projection.py b/tests/domain/test_task_projection.py
+--- a/tests/domain/test_task_projection.py
++++ b/tests/domain/test_task_projection.py
+@@ -151,6 +151,8 @@
+     assert record["artifact_bindings"] == [binding]
+ 
+     expected = {
++        "task_kind": "task",
++        "parent_task_id": None,
+         "task_id": task_id,
+         "title": "Corrected task",
+         "description": "Keep the existing task wire shape.",
+@@ -178,3 +180,22 @@
+         [expected], separators=(",", ":")
+     )
+     assert snapshot.issues == []
++
++
++def test_legacy_task_events_default_to_unparented_task_without_rewriting_payload() -> None:
++    from agent_commons.domain.task_review_envelopes import parse_task_review_envelope
++
++    identifier = "task." + "1" * 26
++    payload = {
++        "task_id": identifier,
++        "title": "Legacy",
++        "description": "Legacy task",
++        "priority": "normal",
++        "acceptance_criteria": ["Done"],
++        "dependencies": [],
++    }
++    envelope = parse_task_review_envelope("task.created", payload)
++    assert envelope.to_payload() == payload
++    snapshot = project_events([_event(1, "task.created", payload, "task", identifier)])
++    assert snapshot.tasks[identifier]["task_kind"] == "task"
++    assert snapshot.tasks[identifier]["parent_task_id"] is None
+diff --git a/tests/domain/test_task_review_envelopes.py b/tests/domain/test_task_review_envelopes.py
+--- a/tests/domain/test_task_review_envelopes.py
++++ b/tests/domain/test_task_review_envelopes.py
+@@ -170,3 +170,11 @@
+ 
+ def test_direct_parser_keeps_unknown_event_families_at_the_existing_boundary() -> None:
+     assert parse_task_review_envelope("not.a.known.event", {}) is None
++
++
++@pytest.mark.parametrize("parent", [None, f"task.{ULID_1}"])
++def test_hierarchy_fields_preserve_explicit_null_and_absence(parent: str | None) -> None:
++    created = {**PAYLOADS["task.created"], "task_kind": "component", "parent_task_id": parent}
++    assert parse_task_review_envelope("task.created", created).to_payload() == created
++    revised = {**PAYLOADS["task.revised"], "changes": {"parent_task_id": parent}}
++    assert parse_task_review_envelope("task.revised", revised).to_payload() == revised
+diff --git a/tests/mcp/test_server.py b/tests/mcp/test_server.py
+--- a/tests/mcp/test_server.py
++++ b/tests/mcp/test_server.py
+@@ -226,6 +226,8 @@
+         "commons_orient",
+         "commons_inbox",
+         "commons_list_tasks",
++        "commons_create_task",
++        "commons_edit_task",
+         "commons_list_delegations",
+         "commons_show_delegation",
+         "commons_list_reviews",
+@@ -367,6 +369,8 @@
+         "commons_orient",
+         "commons_inbox",
+         "commons_list_tasks",
++        "commons_create_task",
++        "commons_edit_task",
+         "commons_list_delegations",
+         "commons_show_delegation",
+         "commons_list_reviews",
+@@ -460,3 +464,29 @@
+         context_pack_id="context_pack.01K00000000000000000000000",
+         context_pack_revision="evt.01K00000000000000000000001",
+     )
++
++
++def test_root_hierarchy_tools_forward_exact_parent_and_edit_identity(tmp_path: Path) -> None:
++    class HierarchyManager(FakeManager):
++        def create_task(self, **fields: Any) -> dict[str, Any]:
++            return fields
++
++        def edit_task(self, task_id: str, expected_revision: str, **fields: Any) -> dict[str, Any]:
++            return {"task_id": task_id, "expected_revision": expected_revision, **fields}
++
++    server = build_server(tmp_path, manager=HierarchyManager(), server_factory=FakeServer)  # type: ignore[arg-type]
++    created = server.tools["commons_create_task"](
++        "Component", "Plan", ["Done"], "create-key", "component", "task.parent", []
++    )
++    assert created["task_kind"] == "component"
++    assert created["parent_task_id"] == "task.parent"
++    assert created["dependencies"] == []
++    edited = server.tools["commons_edit_task"](
++        "task.child", "evt.exact", {"parent_task_id": None}, "edit-key"
++    )
++    assert edited == {
++        "task_id": "task.child",
++        "expected_revision": "evt.exact",
++        "changes": {"parent_task_id": None},
++        "idempotency_key": "edit-key",
++    }
+diff --git a/tests/mcp/test_worker_scope.py b/tests/mcp/test_worker_scope.py
+--- a/tests/mcp/test_worker_scope.py
++++ b/tests/mcp/test_worker_scope.py
+@@ -501,6 +501,8 @@
+     assert {
+         name.removeprefix("mcp__agent-commons__") for name in allowed.split(",")
+     } == expected_tools
++    assert "commons_create_task" not in server.tools
++    assert "commons_edit_task" not in server.tools
+     assert "commons_request_delegation" not in server.tools
+     assert "commons_cancel_delegation" not in server.tools
+     assert "commons_recover_delegation" not in server.tools
+diff --git a/tests/services/test_manager.py b/tests/services/test_manager.py
+--- a/tests/services/test_manager.py
++++ b/tests/services/test_manager.py
+@@ -2168,3 +2168,54 @@
+     after = [record.event_id for record in builder.events.iter_events()]
+     assert after == before
+     assert builder.list_engagements() == []
++
++
++def test_reparenting_invalidates_exact_review_without_changing_parent(workspace) -> None:  # type: ignore[no-untyped-def]
++    _, _, builder, reviewer = workspace
++    parent = builder.create_task(
++        title="Component",
++        description="Plan",
++        acceptance_criteria=["Done"],
++        task_kind="component",
++        idempotency_key="hierarchy-parent",
++    )
++    child = builder.create_task(
++        title="Task",
++        description="Work",
++        acceptance_criteria=["Done"],
++        idempotency_key="hierarchy-child",
++    )
++    cid = child["entity_ref"]["id"]
++    taken = builder.take_task(cid, child["revision"], idempotency_key="hierarchy-take")
++    started = builder.start_task(cid, taken["revision"], idempotency_key="hierarchy-start")
++    completed = builder.complete_task(
++        cid, started["revision"], summary="Complete", idempotency_key="hierarchy-complete"
++    )
++    submitted = builder.submit_task(
++        cid, completed["revision"], summary="Ready", idempotency_key="hierarchy-submit"
++    )
++    requested = builder.request_review(
++        target_ref={"kind": "task", "id": cid},
++        target_revision=submitted["revision"],
++        criteria=["Done"],
++        idempotency_key="hierarchy-review",
++    )
++    reviewer.complete_review(
++        requested["entity_ref"]["id"],
++        requested["revision"],
++        target_revision=submitted["revision"],
++        verdict="approved",
++        summary="Reviewed",
++        idempotency_key="hierarchy-approved",
++    )
++    edited = builder.edit_task(
++        cid,
++        submitted["revision"],
++        changes={"parent_task_id": parent["entity_ref"]["id"]},
++        idempotency_key="hierarchy-move",
++    )
++    with pytest.raises(LifecycleConflictError, match="current approved independent review"):
++        reviewer.accept_task(
++            cid, edited["revision"], summary="Stale approval", idempotency_key="hierarchy-accept"
++        )
++    assert builder.snapshot().tasks[parent["entity_ref"]["id"]]["revision"] == parent["revision"]
+diff --git a/tests/services/test_task_edits.py b/tests/services/test_task_edits.py
+--- a/tests/services/test_task_edits.py
++++ b/tests/services/test_task_edits.py
+@@ -268,3 +268,167 @@
+             idempotency_key="edit-during-review",
+         )
+     assert refused.value.code == "task_live_work"
++
++
++def test_explicit_hierarchy_is_independent_and_survives_cancellation(
++    manager: CommonsManager,
++) -> None:
++    parent = manager.create_task(
++        title="Component",
++        description="Planning component",
++        acceptance_criteria=["Reviewed component"],
++        task_kind="component",
++        idempotency_key="component",
++    )
++    pid = parent["entity_ref"]["id"]
++    child = manager.create_task(
++        title="Subtask",
++        description="Work",
++        acceptance_criteria=["Done"],
++        parent_task_id=pid,
++        idempotency_key="child",
++    )
++    cid = child["entity_ref"]["id"]
++    snapshot = manager.snapshot()
++    assert snapshot.tasks[pid]["task_kind"] == "component"
++    assert snapshot.tasks[cid]["parent_task_id"] == pid
++    assert snapshot.tasks[cid]["dependencies"] == []
++    manager.cancel_idle_task(
++        pid, parent["revision"], reason="No longer scheduled", idempotency_key="cancel-component"
++    )
++    assert manager.snapshot().tasks[cid]["parent_task_id"] == pid
++    assert manager.snapshot().tasks[cid]["state"] == "ready"
++    changed = manager.edit_task(
++        cid, child["revision"], changes={"parent_task_id": None}, idempotency_key="detach"
++    )
++    assert manager.snapshot().tasks[cid]["parent_task_id"] is None
++    retry = manager.edit_task(
++        cid, child["revision"], changes={"parent_task_id": None}, idempotency_key="detach"
++    )
++    assert retry["event_id"] == changed["event_id"]
++    with pytest.raises(TaskEditRefusal, match="changed"):
++        manager.edit_task(
++            cid, child["revision"], changes={"parent_task_id": pid}, idempotency_key="stale-parent"
++        )
++
++
++def test_parent_cycles_orphans_and_kind_mutation_fail_at_canonical_boundary(
++    manager: CommonsManager,
++) -> None:
++    first = task(manager, "parent")
++    pid = first["entity_ref"]["id"]
++    child = manager.create_task(
++        title="Child",
++        description="Child",
++        acceptance_criteria=["Done"],
++        parent_task_id=pid,
++        idempotency_key="child",
++    )
++    cid = child["entity_ref"]["id"]
++    for parent, code in [
++        (pid, "task_parent_cycle"),
++        (cid, "task_parent_cycle"),
++        ("task." + "0" * 26, "task_parent_missing"),
++    ]:
++        with pytest.raises(TaskEditRefusal) as refused:
++            manager.revise_task(
++                pid, first["revision"], changes={"parent_task_id": parent}, idempotency_key=parent
++            )
++        assert refused.value.code == code
++    with pytest.raises(TaskEditRefusal):
++        manager.create_task(
++            title="Orphan",
++            description="No parent",
++            acceptance_criteria=["Done"],
++            parent_task_id="task." + "0" * 26,
++            idempotency_key="orphan",
++        )
++    for changes in [{"task_kind": "component"}, {"parent_task_id": 42}]:
++        with pytest.raises(ValidationError):
++            manager.revise_task(
++                pid, first["revision"], changes=changes, idempotency_key=str(changes)
++            )
++    assert manager.snapshot().tasks[pid]["revision"] == first["revision"]
++
++
++def test_hierarchy_completion_and_dependencies_remain_independent(manager: CommonsManager) -> None:
++    parent = task(manager, "parent")
++    pid = parent["entity_ref"]["id"]
++    child = manager.create_task(
++        title="Child",
++        description="Child",
++        acceptance_criteria=["Done"],
++        parent_task_id=pid,
++        dependencies=[pid],
++        idempotency_key="child",
++    )
++    cid = child["entity_ref"]["id"]
++    # Reverse containment is forbidden, but reverse dependency is a different relation.
++    manager.edit_task(
++        cid, child["revision"], changes={"dependencies": []}, idempotency_key="clear-wait"
++    )
++    current = manager.snapshot().tasks[cid]
++    taken = manager.take_task(cid, current["revision"], idempotency_key="take-child")
++    started = manager.start_task(cid, taken["revision"], idempotency_key="start-child")
++    manager.complete_task(
++        cid, started["revision"], summary="Child complete", idempotency_key="done-child"
++    )
++    assert manager.snapshot().tasks[pid]["state"] == "ready"
++    assert manager.snapshot().tasks[pid]["revision"] == parent["revision"]
++    assert manager.snapshot().tasks[cid]["parent_task_id"] == pid
++
++
++def test_hierarchy_cannot_be_smuggled_through_lifecycle_event(manager: CommonsManager) -> None:
++    created = task(manager, "immutable-kind")
++    with pytest.raises(ValidationError, match="Hierarchy fields"):
++        manager.record_event(
++            "task.taken",
++            {
++                "task_id": created["entity_ref"]["id"],
++                "expected_revision": created["revision"],
++                "owner_session_id": manager.session_id,
++                "task_kind": "component",
++            },
++            idempotency_key="smuggle-kind",
++        )
++
++
++@pytest.mark.parametrize("shared_manager", [True, False])
++def test_concurrent_reparenting_cannot_commit_a_cycle(
++    manager: CommonsManager, shared_manager: bool
++) -> None:
++    from concurrent.futures import ThreadPoolExecutor
++    from threading import Barrier
++
++    first, second = task(manager, "first"), task(manager, "second")
++    barrier = Barrier(2)
++
++    def move(source: dict, parent: dict) -> str:
++        writer = (
++            manager
++            if shared_manager
++            else CommonsManager(
++                manager.repo_root,
++                state_root=manager.paths.state_root,
++                session_id=manager.session_id,
++            )
++        )
++        barrier.wait(timeout=5)
++        try:
++            writer.edit_task(
++                source["entity_ref"]["id"],
++                source["revision"],
++                changes={"parent_task_id": parent["entity_ref"]["id"]},
++                idempotency_key="move-" + source["entity_ref"]["id"],
++            )
++            return "saved"
++        except TaskEditRefusal as exc:
++            return exc.code
++
++    with ThreadPoolExecutor(max_workers=2) as pool:
++        futures = [pool.submit(move, first, second), pool.submit(move, second, first)]
++        assert sorted(future.result(timeout=10) for future in futures) == [
++            "saved",
++            "task_parent_cycle",
++        ]
++    assert not [issue for issue in manager.snapshot().issues if issue.severity == "error"]
+diff --git a/tests/services/test_task_hierarchy_corrections.py b/tests/services/test_task_hierarchy_corrections.py
+new file mode 100644
+--- /dev/null
++++ b/tests/services/test_task_hierarchy_corrections.py
+@@ -0,0 +1,238 @@
++"""Hierarchy remains structural under correction and declares its replay floor."""
++
++from copy import deepcopy
++from pathlib import Path
++
++import pytest
++
++from agent_commons.domain.projection import project_events
++from agent_commons.domain.task_edits import TaskEditRefusal
++from agent_commons.errors import LifecycleConflictError, ValidationError
++from agent_commons.services import CommonsManager
++
++
++@pytest.fixture
++def manager(tmp_path: Path) -> CommonsManager:
++    repo = tmp_path / "repo"
++    repo.mkdir()
++    CommonsManager.initialize(repo, integrations=(), workspace_name="hierarchy-corrections")
++    manager = CommonsManager(repo, state_root=tmp_path / "state")
++    session = manager.start_session(
++        stable_instance_id="hierarchy-tests-12345678",
++        principal="operator",
++        client="codex",
++        software="tests",
++        role="builder",
++    )
++    manager.session_id = session["session_id"]
++    return manager
++
++
++def create(manager: CommonsManager, key: str, **fields: object) -> dict:
++    return manager.create_task(
++        title=key,
++        description="Planning work",
++        acceptance_criteria=["Done"],
++        idempotency_key=key,
++        **fields,
++    )
++
++
++def correct(manager: CommonsManager, event: dict, replacement: dict, key: str) -> dict:
++    shown = manager.show_event(event["event_id"])
++    return manager.correct_event(
++        event["event_id"],
++        expected_target_sha256=shown["canonical_sha256"],
++        replacement_payload=replacement,
++        idempotency_key=key,
++    )
++
++
++def payload(manager: CommonsManager, event: dict) -> dict:
++    return dict(manager.show_event(event["event_id"])["event"]["payload"])
++
++
++@pytest.mark.parametrize("field", ["task_kind", "parent_task_id"])
++def test_correction_cannot_change_hierarchy_after_lifecycle_progression(
++    manager: CommonsManager, field: str
++) -> None:
++    parent = create(manager, "parent")
++    child = create(manager, "child")
++    cid = child["entity_ref"]["id"]
++    manager.cancel_idle_task(cid, child["revision"], reason="Cancelled", idempotency_key="cancel")
++    original = payload(manager, child)
++    replacement = {
++        **original,
++        field: "component" if field == "task_kind" else parent["entity_ref"]["id"],
++    }
++    with pytest.raises(LifecycleConflictError, match=field):
++        correct(manager, child, replacement, "structural-correction")
++    assert manager.snapshot().tasks[cid]["state"] == "cancelled"
++    assert manager.snapshot().tasks[cid]["task_kind"] == "task"
++    assert manager.snapshot().tasks[cid]["parent_task_id"] is None
++    # Replay an imported version of a legitimate wording correction with the
++    # same target/digest but unauthorized structure: write and replay agree.
++    allowed = correct(manager, child, {**original, "title": "Correct spelling"}, "text-correction")
++    events = [deepcopy(record.event) for record in manager.events.iter_events()]
++    next(event for event in events if event["event_id"] == allowed["event_id"])["payload"][
++        "replacement_payload"
++    ] = replacement
++    replayed = project_events(events)
++    assert any(issue.code == "correction_structural_change" for issue in replayed.issues)
++
++
++@pytest.mark.parametrize(
++    "before,after", [("absent", None), (None, "absent"), (None, "parent"), ("parent", None)]
++)
++def test_nested_parent_revision_correction_preserves_presence_and_value(
++    manager: CommonsManager, before: str | None, after: str | None
++) -> None:
++    parent = create(manager, "parent")["entity_ref"]["id"]
++    child = create(manager, "child")
++    changes = {"title": "Wording"}
++    if before != "absent":
++        changes["parent_task_id"] = parent if before == "parent" else None
++    revised = manager.edit_task(
++        child["entity_ref"]["id"], child["revision"], changes=changes, idempotency_key="revise"
++    )
++    original = payload(manager, revised)
++    replacement = deepcopy(original)
++    replacement["changes"].pop("parent_task_id", None)
++    if after != "absent":
++        replacement["changes"]["parent_task_id"] = parent if after == "parent" else None
++    with pytest.raises(LifecycleConflictError, match="changes.parent_task_id"):
++        correct(manager, revised, replacement, "bad-nested")
++    safe = deepcopy(original)
++    safe["changes"]["title"] = "Correct wording"
++    corrected = correct(manager, revised, safe, "safe-nested")
++    assert manager.snapshot().tasks[child["entity_ref"]["id"]]["title"] == "Correct wording"
++    events = [deepcopy(record.event) for record in manager.events.iter_events()]
++    next(event for event in events if event["event_id"] == corrected["event_id"])["payload"][
++        "replacement_payload"
++    ] = replacement
++    assert any(
++        issue.code == "correction_structural_change" for issue in project_events(events).issues
++    )
++
++
++@pytest.mark.parametrize("explicit", [False, True])
++def test_creation_correction_accepts_equivalent_defaults_and_wording(
++    manager: CommonsManager, explicit: bool
++) -> None:
++    created = create(manager, "defaults")
++    if explicit:
++        created = manager.record_event(
++            "task.created",
++            {
++                **payload(manager, created),
++                "task_id": "task." + "2" * 26,
++                "task_kind": "task",
++                "parent_task_id": None,
++            },
++            idempotency_key="explicit-defaults",
++        )
++    replacement = payload(manager, created)
++    if explicit:
++        replacement.pop("task_kind")
++        replacement.pop("parent_task_id")
++    else:
++        replacement.update(task_kind="task", parent_task_id=None)
++    replacement["title"] = "Corrected title"
++    correct(manager, created, replacement, "default-correction")
++    snapshot = manager.snapshot()
++    assert snapshot.tasks[created["entity_ref"]["id"]]["title"] == "Corrected title"
++    assert snapshot.semantics_required == 1
++    assert not [issue for issue in snapshot.issues if issue.severity == "error"]
++
++
++@pytest.mark.parametrize("kind", ["component", "parented", "reparent", "detach"])
++def test_universal_writer_stamps_hierarchy_after_validation_once(
++    manager: CommonsManager, kind: str
++) -> None:
++    parent = create(manager, "parent")
++    child = create(manager, "child")
++    pid, cid = parent["entity_ref"]["id"], child["entity_ref"]["id"]
++    assert manager.snapshot().semantics_required == 1
++    if kind in {"component", "parented"}:
++        body = {**payload(manager, child), "task_id": "task." + "1" * 26}
++        body.update({"task_kind": "component"} if kind == "component" else {"parent_task_id": pid})
++        event_type = "task.created"
++    else:
++        body = {
++            "task_id": cid,
++            "expected_revision": child["revision"],
++            "changes": {"parent_task_id": pid if kind == "reparent" else None},
++        }
++        event_type = "task.revised"
++    written = manager.record_event(event_type, body, idempotency_key="direct-hierarchy")
++    assert manager.snapshot().semantics_required == 7
++    assert (
++        manager.record_event(event_type, body, idempotency_key="direct-hierarchy")["event_id"]
++        == written["event_id"]
++    )
++    events = list(manager.events.iter_events())
++    stamps = [
++        record for record in events if record.event["event_type"] == "workspace.semantics_required"
++    ]
++    assert len(stamps) == 1
++    assert stamps[0].event["payload"]["semantics_version"] == 7
++    assert events.index(stamps[0]) < next(
++        i for i, record in enumerate(events) if record.event_id == written["event_id"]
++    )
++
++
++def test_failed_hierarchy_default_writes_and_old_retry_do_not_raise_floor(
++    manager: CommonsManager,
++) -> None:
++    created = create(manager, "legacy")
++    assert (
++        create(manager, "legacy", task_kind="task", parent_task_id=None)["event_id"]
++        == created["event_id"]
++    )
++    assert "task_kind" not in payload(manager, created)
++    assert "parent_task_id" not in payload(manager, created)
++    with pytest.raises(TaskEditRefusal):
++        create(manager, "orphan", parent_task_id="task." + "0" * 26)
++    with pytest.raises(ValidationError):
++        create(manager, "bad-kind", task_kind="folder")
++    with pytest.raises(TaskEditRefusal):
++        manager.record_event(
++            "task.revised",
++            {
++                "task_id": created["entity_ref"]["id"],
++                "expected_revision": created["revision"],
++                "changes": {"parent_task_id": created["entity_ref"]["id"]},
++            },
++            idempotency_key="invalid-parent-revision",
++        )
++    manager.record_event(
++        "task.revised",
++        {
++            "task_id": created["entity_ref"]["id"],
++            "expected_revision": created["revision"],
++            "changes": {"title": "Wording only"},
++        },
++        idempotency_key="wording",
++    )
++    assert manager.snapshot().semantics_required == 1
++    assert not [
++        record
++        for record in manager.events.iter_events()
++        if record.event["event_type"] == "workspace.semantics_required"
++    ]
++
++
++def test_v7_stamp_uses_existing_projection_upgrade_guard(
++    manager: CommonsManager, monkeypatch
++) -> None:  # type: ignore[no-untyped-def]
++    from agent_commons.domain import projection
++
++    create(manager, "component", task_kind="component")
++    events = [record.event for record in manager.events.iter_events()]
++    assert projection.LEDGER_SEMANTICS_VERSION == 7
++    monkeypatch.setattr(projection, "LEDGER_SEMANTICS_VERSION", 6)
++    old_projection = projection.project_events(events)
++    assert old_projection.semantics_required == 7
++    assert [issue.code for issue in old_projection.issues] == ["ledger_ahead_of_code"]
++    # This exercises projection only. A strict old storage schema can reject
++    # task_kind before projection is reached; no doctor-message promise follows.
+diff --git a/tests/ui/test_task_edit_routes.py b/tests/ui/test_task_edit_routes.py
+--- a/tests/ui/test_task_edit_routes.py
++++ b/tests/ui/test_task_edit_routes.py
+@@ -34,6 +34,8 @@
+     assert body["editable"] is True and body["cancellable"] is True
+     assert set(body) == {
+         "schema",
++        "task_kind",
++        "parent_task_id",
+         "task_id",
+         "revision",
+         "title",
+@@ -129,3 +131,35 @@
+     result = asyncio.run(_bounded_body(request))
+     assert result.status_code == 413
+     assert consumed == 2
++
++
++def test_component_create_and_parent_edit_use_supported_routes(writable, writable_client):  # type: ignore[no-untyped-def]
++    parent = writable_client.post(
++        "/api/tasks",
++        headers=HEADERS,
++        json={
++            "title": "Component",
++            "description": "Explicit planning component",
++            "acceptance_criteria": ["Reviewed"],
++            "task_kind": "component",
++            "idempotency_key": "parent-component",
++        },
++    )
++    assert parent.status_code == 200, parent.text
++    pid = parent.json()["entity_ref"]["id"]
++    child = _task(writable)
++    cid = child["entity_ref"]["id"]
++    response = writable_client.post(
++        f"/api/work/tasks/{cid}/edit",
++        headers=HEADERS,
++        json={
++            "expected_revision": child["revision"],
++            "changes": {"parent_task_id": pid},
++            "idempotency_key": "parent-edit",
++        },
++    )
++    assert response.status_code == 200, response.text
++    detail = writable_client.get(f"/api/work/tasks/{cid}/edit-detail", headers=HEADERS).json()
++    assert detail["parent_task_id"] == pid
++    assert detail["task_kind"] == "task"
++    assert detail["dependencies"] == []
+diff --git a/docs/FRONTEND_CONTRACT.md b/docs/FRONTEND_CONTRACT.md
+--- a/docs/FRONTEND_CONTRACT.md
++++ b/docs/FRONTEND_CONTRACT.md
+@@ -323,3 +323,14 @@
+ workspace claim `path:src/agent_commons/ui/static/index.html` before any edit,
+ and edit it only to keep it serving or to remove it. New behaviour belongs in
+ Work.
++
++## Explicit task structure
++
++[ADR 0024](adr/0024-explicit-task-hierarchy.md) defines canonical components and
++parent/subtask containment. Work creation exposes kind and parent; the inspector
++adds subtasks and edits parents using the existing CAS/retry editor. Map offers
++Structure and Dependencies separately. Structure uses a bounded containment diagram with project root, dashed parent
++edges, search, branch focus, fit/zoom and native list fallback. It shows kind and
++state, and labels parents outside the filtered view. It does not imply
++readiness or accepted rollups. `frontend/work/tests/task-graph.test.mjs` and
++`tests/services/test_task_edits.py` exercise independence and invalid parent edges.
+diff --git a/docs/PRODUCT.md b/docs/PRODUCT.md
+--- a/docs/PRODUCT.md
++++ b/docs/PRODUCT.md
+@@ -117,7 +117,8 @@
+ | Profile / Профиль | The operator-owned provider launch configuration (CLI, model, permissions) defined outside the project | `profile` in `runtime.yaml` / `profiles.yaml` |
+ | Blueprint / Шаблон проекта | A versioned definition of a team, its tasks and dependencies; applying it creates agents and tasks and starts nothing | `blueprint`, `blueprint_application` ([ADR 0021](adr/0021-objective-blueprint-application-provenance.md)) |
+ | Objective / Цель | The canonical record of what a set of tasks is for; a task inherits the objective of its blueprint application when it has none | `objective`, `objective_id` |
+-| Task / Задача | The expected result, its result criteria and its dependencies | `task`; "acceptance criteria" is the stored field name |
++| Component / Компонент | An explicit planning task that groups a part of the product; its own criteria, lifecycle and acceptance remain independent of its children | `task_kind=component` ([ADR 0024](adr/0024-explicit-task-hierarchy.md)) |
++| Task / Задача | The expected result, its result criteria, optional parent and independent prerequisites | `task`; "acceptance criteria" is the stored field name |
+ | Run / Прогон | One bounded attempt by an agent at a task, with a time limit shown before launch | `delegation` + `attempt` (broker mechanism, [ADR 0004](adr/0004-optional-local-delegation-runtime.md)) |
+ | Result / Результат | A file, image or live preview bound to the exact task and producing agent | `output`; `artifact`/`revision` are ledger-level records |
+ | Review / Проверка | An independent judgment of one exact revision; never acceptance | `review` (`approved`, `changes_requested`) |
+diff --git a/docs/adr/0024-explicit-task-hierarchy.md b/docs/adr/0024-explicit-task-hierarchy.md
+new file mode 100644
+--- /dev/null
++++ b/docs/adr/0024-explicit-task-hierarchy.md
+@@ -0,0 +1,72 @@
++# ADR 0024: Explicit planning components and subtasks
++
++Status: Implemented proposal; product acceptance remains separate.
++
++## Decision
++
++Reuse canonical task records for planning components. `task_kind` is `task`
++(default) or `component`, chosen at creation and immutable. A component describes
++a planned part of the product, with its own criteria and lifecycle; it is not a
++source directory, board department, executable resource, or automatic rollup.
++Tasks and components can have one nullable `parent_task_id`. An absent parent
++means the project root. Nested components and task subtasks use the same edge.
++Titles, folders and dependency edges never infer containment.
++
++Dependencies remain the sole task-to-task readiness relation. Containment does
++not block execution, complete a parent, inherit an objective, or confer acceptance.
++Components retain the normal task lifecycle and can carry their own implementation
++work. A parent's acceptance covers its own exact revision and evidence, not a
++mutable aggregate of its descendants.
++
++## Mutation and replay
++
++Creation validates kind and parent. Parent edits use `task.revised.changes` with
++exact revision CAS; the operator editor, CLI `task edit`, and root MCP
++`commons_edit_task` use the existing idle-work guard and identical retry contract.
++Explicit null detaches. Parent existence and cycles are checked under canonical
++validation, including direct revisions and replay; traversal is iterative and
++bounded to 4096 visited records. A lifecycle event cannot smuggle hierarchy fields
++outside creation or revision changes. Corrections preserve kind and parent,
++including presence/value of `changes.parent_task_id`; they still permit wording
++repairs and absent/default equivalence on creation. Kind conversion is
++deliberately unsupported.
++
++A parent edit changes the child's revision and therefore invalidates reviews of
++its old revision through the existing review contract. It does not change the
++parent revision. Hierarchy is organizational metadata, not evidence aggregation.
++Accepted or cancelled tasks must use the normal reopen lifecycle before editing.
++Existing operational live-work restrictions remain in the supported editor.
++
++There is no task deletion/archive command. Cancellation retains the record and
++its containment edges, does not cascade to children, and remains visible with its
++state. Children can be moved away explicitly. Invalidating parent creation through
++the correction workflow cannot silently manufacture valid orphans: normal replay
++integrity checks report the missing parent. Project archival retains the ledger.
++
++Old events omit both fields and replay as unparented tasks. Typed envelope
++serialization preserves the original payload; new default task creation also
++omits these fields so old identical create retries keep their request identity.
++Schemas and browser DTO parsers accept the additive fields and reject malformed
++kind/parent values. The universal writer raises the semantics floor to v7 for
++component/parented creation and parent revisions, after validation and before append. Default task
++creation, wording-only revisions and identical retries keep their previous floor.
++Older readers require upgrading before reading hierarchy events. The projection
++version guard reports `ledger_ahead_of_code`, but old strict storage schemas can
++reject hierarchy fields before projection sees the stamp; the stamp alone does
++not guarantee a friendly upgrade diagnostic from `doctor`.
++
++## Surfaces and alternatives
++
++CLI creation exposes `--task-kind` and `--parent-task-id`; root MCP exposes
++`commons_create_task` and `commons_edit_task`. Worker MCP authority is unchanged.
++Work creation supports components and explicit parents; the inspector supports
++Add subtask and parent editing. Map offers Structure and Dependencies. Structure
++shows a bounded containment diagram with a project root, component/task kinds,
++canonical state, dashed parent-to-child edges, search, branch/ancestor focus,
++fit and zoom. A native button list retains indentation and parent labels;
++filtered/missing parents are labeled, never silently treated as canonical roots.
++The existing dependency graph, capacity handling and list fallback remain intact.
++
++A separate generic component entity would duplicate task lifecycle and review
++semantics without a current need. Inferring components from directories or graph
++clusters would give presentation heuristics canonical authority. Neither is used.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -41,6 +41,8 @@
+ | [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
+ | [0023](0023-incremental-ledger-validation.md) | Draft proposal | Incremental ledger validation on the canonical write path: byte-identity re-verification and bulk receipt loading replace repeated full revalidation; `doctor` unchanged. |
+ 
++| [0024](0024-explicit-task-hierarchy.md) | Implemented proposal; acceptance separate | Explicit task/component containment, independent dependencies, CAS editing and no inherited acceptance. |
++
+ ## How the two records fit together
+ 
+ - ADRs explain stable architecture, migration and rollback consequences.
+diff --git a/docs/user/en/README.md b/docs/user/en/README.md
+--- a/docs/user/en/README.md
++++ b/docs/user/en/README.md
+@@ -165,6 +165,23 @@
+ 
+ The profile controls how that agent can run. If the form says **No runtime
+ profiles are available yet**, finish runtime setup before hiring.
++
++### Organize components and subtasks
++
++Choose **Component** in the new task form to describe a planned part of your
++product. Select a **Parent component or task** to place a record underneath it,
++or leave **Project — no parent** for top-level work. Components have their own
++criteria and state.
++
++In the task inspector, **Add subtask** creates a child without adding a prerequisite.
++**Edit task** lets you move a task to another parent or back to the project root.
++Save uses the displayed task revision; a stale edit requires refreshing before a
++new attempt. Unknown outcomes retain the original request for retry.
++
++In **Map**, switch between **Structure** (components and children) and
++**Prerequisite tasks** (execution dependencies). Both show explicit recorded
++relationships. Cancelling a component retains its children; move or cancel each
++child explicitly as needed. Completing a child does not accept its parent.
+ 
+ ### Create a task
+ 
+diff --git a/docs/user/ru/README.md b/docs/user/ru/README.md
+--- a/docs/user/ru/README.md
++++ b/docs/user/ru/README.md
+@@ -349,3 +349,19 @@
+ что целевая задача зависит от исходной; это не связь компонента с подзадачей.
+ Скрытые фильтром предпосылки подсчитываются. Небольшой выбранный подграф
+ открывается и в проекте, где больше 128 задач.
++
++
++## Компоненты и подзадачи
++
++В форме новой задачи выберите «Компонент», чтобы описать запланированную часть
++продукта. Укажите «Родительский компонент или задача» или оставьте «Проект — без
++родителя». У компонента свои критерии и состояние.
++
++В инспекторе «Добавить подзадачу» создаёт дочернюю задачу без зависимости.
++Редактирование позволяет сменить родителя или вернуть задачу в корень проекта.
++Сохранение использует показанную ревизию: устаревшие данные нужно перечитать перед
++новой попыткой, а при неизвестном результате повторяется исходный запрос.
++
++На карте переключайтесь между «Структура» и зависимостями. Отмена компонента
++сохраняет его дочерние задачи; при необходимости перенесите или отмените каждую
++явно. Завершение подзадачи не принимает родительский компонент.

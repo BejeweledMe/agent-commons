@@ -1,0 +1,136 @@
+{
+  "id": "task.4D6NW589CTR6XVST3EG1R82CMF",
+  "state": "review",
+  "revision": "evt.01M32R2RYYA4E5ZRW1K89B571G",
+  "artifact_refs": [
+    {
+      "id": "artifact.5MD3FJN1Z9EZ26J6FRS0W3JDWK",
+      "kind": "artifact"
+    },
+    {
+      "id": "artifact.69RKABZPK4Z0DEW5TV56HMZDQQ",
+      "kind": "artifact"
+    },
+    {
+      "id": "artifact.1VRBV005R0BFB2J63M8AXS30SW",
+      "kind": "artifact"
+    }
+  ],
+  "artifact_bindings": [
+    {
+      "ref": {
+        "id": "artifact.5MD3FJN1Z9EZ26J6FRS0W3JDWK",
+        "kind": "artifact"
+      },
+      "revision": "evt.01M32QX4DTX8N8Z9M1B3YZH8ND"
+    },
+    {
+      "ref": {
+        "id": "artifact.69RKABZPK4Z0DEW5TV56HMZDQQ",
+        "kind": "artifact"
+      },
+      "revision": "evt.01M32QX580P0M4DBC935X1YDCE"
+    },
+    {
+      "ref": {
+        "id": "artifact.1VRBV005R0BFB2J63M8AXS30SW",
+        "kind": "artifact"
+      },
+      "revision": "evt.01M32QX61XM7A5CFES58PHY7NK"
+    }
+  ],
+  "artifact_stale": false,
+  "summary": "Owner submits recovered exact BASE artifacts for independent QA. Baseline preservation is supported by registered report/procedure and operator verification. No application code changed; external owner-checkout access is outside snapshot-only QA. Not accepted.",
+  "review_request": {
+    "created": true,
+    "entity_ref": {
+      "id": "review.0QCM21YZ9S80681HJGMJY0M53V",
+      "kind": "review"
+    },
+    "event_id": "evt.01M32R3H63VG61JT7PFYKG4NKF",
+    "event_type": "review.requested",
+    "idempotency_key": "blizhe-base-recovered-review-20260921",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M32R3H63VG61JT7PFYKG4NKF"
+  },
+  "registered_artifacts": [
+    {
+      "file": "BASE.md",
+      "seconds": 0.8063866669981508,
+      "exit_code": 0,
+      "result": {
+        "content_copied": false,
+        "created": true,
+        "entity_ref": {
+          "id": "artifact.5MD3FJN1Z9EZ26J6FRS0W3JDWK",
+          "kind": "artifact"
+        },
+        "event_id": "evt.01M32QX4DTX8N8Z9M1B3YZH8ND",
+        "event_type": "artifact.registered",
+        "idempotency_key": "blizhe-base-owner-register-20260921-BASE.md",
+        "index": {
+          "mode": "deferred",
+          "next_action": "agent-commons index rebuild",
+          "synchronized": false
+        },
+        "manifest_id": "mft.artifact.sha256.d20da4f37226ca89c278e56a0f686d291dc0fc1f1a40953ffd42c3b3cbe79bd8",
+        "repaired": false,
+        "revision": "evt.01M32QX4DTX8N8Z9M1B3YZH8ND"
+      }
+    },
+    {
+      "file": "BASE-owner-baseline-verification.json",
+      "seconds": 0.8484389999939594,
+      "exit_code": 0,
+      "result": {
+        "content_copied": false,
+        "created": true,
+        "entity_ref": {
+          "id": "artifact.69RKABZPK4Z0DEW5TV56HMZDQQ",
+          "kind": "artifact"
+        },
+        "event_id": "evt.01M32QX580P0M4DBC935X1YDCE",
+        "event_type": "artifact.registered",
+        "idempotency_key": "blizhe-base-owner-register-20260921-BASE-owner-baseline-verification.json",
+        "index": {
+          "mode": "deferred",
+          "next_action": "agent-commons index rebuild",
+          "synchronized": false
+        },
+        "manifest_id": "mft.artifact.sha256.b8b520b339c389bb88d19b181032566a7a8b6df7552a5b8163835dbe19642d74",
+        "repaired": false,
+        "revision": "evt.01M32QX580P0M4DBC935X1YDCE"
+      }
+    },
+    {
+      "file": "BASE-owner-baseline-verification.md",
+      "seconds": 0.8201359999948181,
+      "exit_code": 0,
+      "result": {
+        "content_copied": false,
+        "created": true,
+        "entity_ref": {
+          "id": "artifact.1VRBV005R0BFB2J63M8AXS30SW",
+          "kind": "artifact"
+        },
+        "event_id": "evt.01M32QX61XM7A5CFES58PHY7NK",
+        "event_type": "artifact.registered",
+        "idempotency_key": "blizhe-base-owner-register-20260921-BASE-owner-baseline-verification.md",
+        "index": {
+          "mode": "deferred",
+          "next_action": "agent-commons index rebuild",
+          "synchronized": false
+        },
+        "manifest_id": "mft.artifact.sha256.18acfb4b12787699fb38372518d71da84c268bd25f59bdca9b2fcfc3ef49e137",
+        "repaired": false,
+        "revision": "evt.01M32QX61XM7A5CFES58PHY7NK"
+      }
+    }
+  ],
+  "operator_verification": "verification.2FEBW2GQENAMC8FVAP51NY3GDE"
+}

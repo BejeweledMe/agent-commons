@@ -1,0 +1,23 @@
+from pathlib import Path
+import sys, os, signal, hashlib, json, cProfile, pstats, io, time
+signal.alarm(300)
+snapshot=Path('/private/tmp/commons-council-20261001/review-final')
+out=Path('/private/tmp/commons-council-20261001/resumed-council')
+for k in ['AGENT_COMMONS_STATE_ROOT','AGENT_COMMONS_STATE_BASE','AGENT_COMMONS_SESSION_ID']:os.environ.pop(k,None)
+sys.path[:0]=[str(snapshot/'src'),str(snapshot/'benchmarks')]
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
+import benchmark_work_mutation as b
+sha=agent_commons_source_sha256(); assert sha=='fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e',sha
+fixture_root=out/'wp20-profile-fixture'; fixture_root.mkdir()
+f=b.build_mutation_fixture(fixture_root,profile='large'); assert f.event_count==3206,f.event_count
+print('fixture ready',f.event_count,'source',sha,flush=True)
+m=b._bind_manager(f); operation=b._mutation_operation(f,m,'task_create',key='wp20-profile-one-task-create',client=None)
+p=cProfile.Profile(); start=time.perf_counter(); p.enable(); result=operation(); p.disable(); elapsed=time.perf_counter()-start
+stats=pstats.Stats(p); rows=[]
+for (file,line,name),(cc,nc,tt,ct,callers) in stats.stats.items():
+ rows.append(dict(file=file,line=line,function=name,primitive_calls=cc,total_calls=nc,self_seconds=tt,cumulative_seconds=ct,callers=[dict(file=k[0],line=k[1],function=k[2],stats=list(v) if isinstance(v,tuple) else v) for k,v in callers.items()]))
+rows.sort(key=lambda x:x['cumulative_seconds'],reverse=True)
+report=dict(source_sha256=sha,benchmark_path=str(Path(b.__file__)),benchmark_sha256=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest(),operation='task_create',fixture_event_count=f.event_count,fixture_manifest_count=f.manifest_count,fixture_build_seconds=f.build_seconds,elapsed_profiled_seconds=elapsed,total_calls=stats.total_calls,primitive_calls=stats.prim_calls,result_type=type(result).__name__,functions=rows)
+(out/'wp20-profile-aggregate.json').write_text(json.dumps(report,indent=2))
+s=io.StringIO(); pstats.Stats(p,stream=s).strip_dirs().sort_stats('cumulative').print_stats(55); pstats.Stats(p,stream=s).strip_dirs().sort_stats('tottime').print_stats(35); (out/'wp20-profile-aggregate.txt').write_text(s.getvalue())
+print(json.dumps({k:v for k,v in report.items() if k!='functions'})); print(s.getvalue())

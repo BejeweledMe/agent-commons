@@ -63,6 +63,8 @@ test("task creation sends canonical dependencies without private launch data", a
     "dependencies",
     "description",
     "idempotency_key",
+    "parent_task_id",
+    "task_kind",
     "title"
   ]);
   assert.deepEqual(body.dependencies, ["task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ"]);

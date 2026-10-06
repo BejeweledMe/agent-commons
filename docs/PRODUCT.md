@@ -27,10 +27,12 @@ read and write the same ledger through the same contract.
 
 ## Who it is for
 
-The primary user is a person who understands what an AI agent is and wants to
-build or improve a product with several of them, without learning an
-orchestration protocol. They own product decisions, provider accounts and the
-acceptance of finished work.
+The primary user is a technically capable developer building with AI agents:
+a programmer, engineer or technical product owner who understands code, tests,
+dependencies and delivery tradeoffs. They need readable plans and results, plus
+inspectable versions, blockers and execution details. The first level stays
+clear; technical depth is available where it supports a decision. They own
+product decisions, provider accounts and the acceptance of finished work.
 
 Agents are the second audience: a fresh Codex or Claude window entering a project
 must be able to orient in minutes from the ledger alone, coordinate with other
@@ -63,7 +65,7 @@ sessions, and leave a handoff the next one can act on.
 | Agents | `/work?view=…` | Hiring an agent from a specialization; the same action is available from the board |
 | Library | `/work?view=library` | Skills in groups, specializations, blueprints; service-wide, shared by all projects ([ADR 0016](adr/0016-service-library-and-live-workspace.md)) |
 | Settings | `/work?view=settings` | Workspace initialization, provider runtime, project settings |
-| Results | button on a task or agent | That producer's images and live previews, latest first, history kept ([ADR 0019](adr/0019-project-native-collaboration-and-outputs.md)) |
+| Results | agent name/avatar or a Results button | That producer's images and live previews, latest first, history kept ([ADR 0019](adr/0019-project-native-collaboration-and-outputs.md)) |
 | Gallery | `/gallery` | Design packages and their screens |
 
 The legacy single-file panel at `/` is being retired (decision scope
@@ -115,7 +117,8 @@ the ledger or code term where it differs. One thing, one word, per language.
 | Profile / Профиль | The operator-owned provider launch configuration (CLI, model, permissions) defined outside the project | `profile` in `runtime.yaml` / `profiles.yaml` |
 | Blueprint / Шаблон проекта | A versioned definition of a team, its tasks and dependencies; applying it creates agents and tasks and starts nothing | `blueprint`, `blueprint_application` ([ADR 0021](adr/0021-objective-blueprint-application-provenance.md)) |
 | Objective / Цель | The canonical record of what a set of tasks is for; a task inherits the objective of its blueprint application when it has none | `objective`, `objective_id` |
-| Task / Задача | The expected result, its result criteria and its dependencies | `task`; "acceptance criteria" is the stored field name |
+| Component / Компонент | An explicit planning task that groups a part of the product; its own criteria, lifecycle and acceptance remain independent of its children | `task_kind=component` ([ADR 0024](adr/0024-explicit-task-hierarchy.md)) |
+| Task / Задача | The expected result, its result criteria, optional parent and independent prerequisites | `task`; "acceptance criteria" is the stored field name |
 | Run / Прогон | One bounded attempt by an agent at a task, with a time limit shown before launch | `delegation` + `attempt` (broker mechanism, [ADR 0004](adr/0004-optional-local-delegation-runtime.md)) |
 | Result / Результат | A file, image or live preview bound to the exact task and producing agent | `output`; `artifact`/`revision` are ledger-level records |
 | Review / Проверка | An independent judgment of one exact revision; never acceptance | `review` (`approved`, `changes_requested`) |

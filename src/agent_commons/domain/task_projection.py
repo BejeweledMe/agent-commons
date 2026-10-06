@@ -1,8 +1,8 @@
 """Frozen task projection records and their task-only reducer.
 
 Canonical task events remain JSON mappings.  This module sits after their
-validation and freezes the projected task read model without changing its
-legacy mapping-shaped wire contract.
+validation and freezes the projected task read model. Hierarchy defaults are
+applied by consumers, preserving absent legacy fields in snapshot serialization.
 """
 
 from __future__ import annotations

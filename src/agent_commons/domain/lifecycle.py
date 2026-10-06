@@ -17,6 +17,7 @@ from agent_commons.domain.states import (
 )
 from agent_commons.domain.task_edits import (
     validate_task_dependency_change,
+    validate_task_parent,
     validate_task_suggestion,
 )
 from agent_commons.domain.transitions import transition_spec
@@ -131,6 +132,8 @@ def validate_transition(
         if isinstance(changes, Mapping) and "objective_id" in changes:
             raise LifecycleConflictError("task.revised cannot change objective_id")
         validate_task_dependency_change(snapshot, payload)
+        if isinstance(changes, Mapping) and "parent_task_id" in changes:
+            validate_task_parent(snapshot, identifier, changes["parent_task_id"])
     if event_type == "context_pack.revised":
         _validate_context_pack_bindings(snapshot, payload)
     if event_type == "design_package.revised":
@@ -474,6 +477,7 @@ def _validate_creation(
         _validate_target_binding(snapshot, payload)
     if event_type == "task.created":
         validate_task_suggestion(snapshot, payload)
+        validate_task_parent(snapshot, str(payload["task_id"]), payload.get("parent_task_id"))
         for dependency in payload.get("dependencies") or []:
             require_entity(snapshot, "task", str(dependency))
     if event_type == "delegation.requested":

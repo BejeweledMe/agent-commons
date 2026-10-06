@@ -1,0 +1,37 @@
+{
+  "source_before": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "source_after": "194b08d49721b375aa7858a7db67b787134ff0cd7dfc26d377163dd7bf45b866",
+  "files": {
+    "src/agent_commons/services/manager.py": {
+      "baseline_sha256": "207e1ae12ced53b8821ca0bcfdeff6adb69ca9a0f0a3d126817a2a9011ebbae0",
+      "result_sha256": "36cb00f5742828885e5b297a45125f8a094bd3e830e1e1b418858a801dc62b2a"
+    },
+    "tests/services/test_verified_ledger_view.py": {
+      "baseline_sha256": "551038df487e5eca2f9bb05e400445f17d0d7b31cc840474f03c24edcb9d8982",
+      "result_sha256": "41a0a077b02609ec798ce1441f8a2f1c888a0607f76e4738e3a581e35bad0773"
+    }
+  },
+  "benchmark_sha256": "2fb9eddb8e779abf1d9cf554a414e012522d48e4d3cd1002db218a4068253917",
+  "patch_sha256": "83d88aa93c559127dd7762153c9039ff81b260c5ef791547b9ddba95f30a3611",
+  "isolated_workspace": "/private/tmp/commons-product-wp20-20261001",
+  "main_checkout_written": false,
+  "scope": "Own-append verified-view performance and same-manager thread ownership of canonical lock/view",
+  "checks": {
+    "expanded_pytest": {
+      "passed": 384,
+      "seconds": 44.67,
+      "log": "final-focused-tests.txt"
+    },
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "full_make_check": "integration gate, not run in this worker"
+  },
+  "evidence_sha256": {
+    "benchmark-before.json": "14a760670e86536c1f65b9233de103fe6bf1fce7d218be1e5780e23871c5796b",
+    "benchmark-after.json": "7af405ae0125f78c139492a1899b6a583333bf98f31908a5cf685e7e3416dead",
+    "benchmark-comparison.py": "5048d9514b8916e35eedf0596396b2472f4f5374df2e37bf9f74a93b5abca42c",
+    "wp20-report.md": "8d8ea842c1493cb0937f676a4131029dbad6149be3ca5bd45c3d0640c33e1320",
+    "final-focused-tests.txt": "c5bd5c1588132bcd0c64ae448ca52ad4de3f1caa69e7ac4175cef95c90111ba9",
+    "thread-baseline-reproduction.txt": "82ae986ea40f7bb7257b7fed2dcddb3a9e63daf7200e065bc9ccbeaa133f870b"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schema": "astra-product-pilot-provenance.v1",
+  "model_pin": "gpt-6-astra",
+  "model_pin_source": "isolated operator YAML inherited by role",
+  "provider_version": "codex-cli 0.159.3",
+  "python_mcp_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "profile_config_sha256": "3ffb808f0149f3cf8842245853241f404995f9243d6bd9c106a56c281792cb30",
+  "task_id": "task.37536WFDJPKD7YA5X3433WEXTP",
+  "target_revision": "evt.01M3VKFBHMQ3HFECZ1JV3F0PW6",
+  "agent_id": "agent.4GE36C66DJRQ7V9DMWJECXH49P",
+  "delegation_id": "delegation.6F04S76ZY67CWR8PWT03AJZD1P",
+  "delegation_revision": "evt.01M3VM26TZ63VRMT14E7MRGMKH",
+  "attempt_id": "attempt.7QPK1X4G1K5FBM155W3VB92ND4",
+  "canonical_state": "succeeded",
+  "provider_exit_code": 0,
+  "duration_seconds": 623.0795300829923,
+  "process_canonical_mismatch": false,
+  "terminal_calls": 1,
+  "terminal_completions": 1,
+  "terminal_rejections": 0,
+  "limits": {
+    "budget": {
+      "limit": 1,
+      "unit": "provider_units"
+    },
+    "max_attempts": 1,
+    "max_concurrency": 1,
+    "max_depth": 0,
+    "wall_time_seconds": 1200
+  },
+  "worker_images": [
+    {
+      "artifact_id": "artifact.371604EAKB48D88Q437GSVH1R5",
+      "artifact_revision": "evt.01M3VM0MA2HGGCJCGS0DEA4SR3",
+      "source_path": "outputs/engineering-desk-desktop-v2.png",
+      "sha256": "3deaed840d19d68f19326ba5aee9806b1853abf3ab56628cf0183e7080503e55",
+      "manifest_match": true,
+      "size_bytes": 224810,
+      "dimensions": [
+        1440,
+        1620
+      ],
+      "validated_reader_passed": true
+    },
+    {
+      "artifact_id": "artifact.31GVB7CHNC5YF2W1746SFHPEPC",
+      "artifact_revision": "evt.01M3VM0MF76D3HE2M3MN6VGR17",
+      "source_path": "outputs/engineering-desk-mobile-v2.png",
+      "sha256": "586f60f0c19f47b123489d2ec3e04199941062ec9c978a20d42be4a1c68d98c3",
+      "manifest_match": true,
+      "size_bytes": 169728,
+      "dimensions": [
+        390,
+        2450
+      ],
+      "validated_reader_passed": true
+    }
+  ],
+  "independent_browser_evidence": "independent-browser-checks.json",
+  "shipped_commons_gallery_evidence": "commons-gallery-checks.json",
+  "first_failure_preserved": "attempt-1/broker-result.json",
+  "child_status": "closed",
+  "parent_status": "closed",
+  "servers_stopped": true,
+  "task_accepted": false,
+  "permanent_profile_changed": false,
+  "main_checkout_or_ledger_written": false
+}

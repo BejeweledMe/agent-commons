@@ -14,7 +14,7 @@ import {
   removeFrame, renameFrame, resetPositions, type BoardFrame, type BoardGraph, type BoardLayout, type BoardRoleNode
 } from "../boardState.js";
 import { ConversationButton } from "./ConversationPanel.js";
-import { OutputsButton } from "./OutputsPanel.js";
+import { AgentGalleryButton, OutputsButton } from "./OutputsPanel.js";
 
 type Text = (key: MessageKey) => string;
 
@@ -33,7 +33,7 @@ function RoleNode({ data }: NodeProps<RoleFlowNode>): ReactElement {
   return <div className="board-role" data-activity={role.activity} data-agent-id={role.id}>
     <Handle type="target" position={Position.Top} isConnectable={data.writesEnabled} />
     <div className="board-role-head">
-      <span className="board-role-name">{role.name}</span>
+      <AgentGalleryButton scope={{ kind: "agent", id: role.id }} title={role.name} />
       <span className="board-role-activity">{text(`board_activity_${role.activity}` as MessageKey)}</span>
     </div>
     <p className="board-role-meta">{role.specialization ? <><code>{role.specialization}</code> · </> : null}<code>{role.profileId}</code>{role.model ? <> · <code>{role.model}</code></> : null}</p>

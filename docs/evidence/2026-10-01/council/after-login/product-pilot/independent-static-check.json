@@ -1,0 +1,12 @@
+{
+  "method": "Read build.py, check.py and scripts/check.js, then execute installed same-source Python check.py without --browser",
+  "exit_code": 0,
+  "assertions_passed": 14,
+  "verified": [
+    "reproducible build",
+    "local asset existence",
+    "JS syntax",
+    "actual app data and filter functions"
+  ],
+  "browser_validation_in_this_command": false
+}

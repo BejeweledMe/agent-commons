@@ -1,0 +1,181 @@
+{
+  "root": "promotable",
+  "files": {
+    "provisioning-diagnosis.md": {
+      "sha256": "b3c189a862413ec1b5ec88fd290a52de591c7feeb6a8acbd466db101e14d7ae4",
+      "size_bytes": 5082
+    },
+    "retry-parent-session-ended.json": {
+      "sha256": "04435c31553996c45040b62d69b25203649aaa7da7e2cae7016a47d3e4bab5c8",
+      "size_bytes": 564
+    },
+    "provenance.json": {
+      "sha256": "7691484fb1f00cafd45f0089fe7e3f1a382538169ab720a73b80a30c611e9f83",
+      "size_bytes": 2406
+    },
+    "retry-outputs-projection.json": {
+      "sha256": "d123bdedfcbb158626afc84f160de963e7bb734ea29d6774f70502c083babafc",
+      "size_bytes": 5677
+    },
+    "canary.json": {
+      "sha256": "0aaa1d89c7cc8a5f9b2daac736971e570f106cde3db0bc3806672585b052fb55",
+      "size_bytes": 1628
+    },
+    "REPORT.md": {
+      "sha256": "11a0d838c4ce795cf9b206afbad46c3a3ee30819d744ea7647ccca9103b36234",
+      "size_bytes": 8161
+    },
+    "commons-agent-gallery.jpg": {
+      "sha256": "5f70272be363f1bdb19da447803981e787845e17dc853f86f66f7f480e3db604",
+      "size_bytes": 41840
+    },
+    "independent-overview.jpg": {
+      "sha256": "9f695dfe743fdfa1c7108a24245d34c731f116f3190ee019ab0619d8c4440780",
+      "size_bytes": 86788
+    },
+    "product-files-manifest.json": {
+      "sha256": "a0ebbe0d230c04c2146fbecf2c6d9f83be0bf54126df59b7f1ffb8c31b4d4b8d",
+      "size_bytes": 2930
+    },
+    "retry-broker-result.json": {
+      "sha256": "bfb503961144ac48c2f49c6635cbc8c492c12f442e11ffbf9060db23d3bb0b29",
+      "size_bytes": 4325
+    },
+    "independent-mobile.jpg": {
+      "sha256": "d96a217208c3304ec27adb88d2c963db8488e7409e232935bcaa8094f69cde5d",
+      "size_bytes": 90573
+    },
+    "fixed-cli-doctor.json": {
+      "sha256": "e00fbbac4b8db6c6bbb083ae84ad1ef1fdcc7aa04444d4c491558d68d41e8aaa",
+      "size_bytes": 548
+    },
+    "commons-gallery-checks.json": {
+      "sha256": "e3ed4891f8041be36079bf826bada8ab402c559f5a4d50e4b1a43be40a981f48",
+      "size_bytes": 817
+    },
+    "retry-child-session-final.json": {
+      "sha256": "f36e31948087918a4c99defa3c5f4a0be64af5137f514a8473baadb600dd3503",
+      "size_bytes": 563
+    },
+    "independent-browser-checks.json": {
+      "sha256": "3ffb12628e05284803ba8a2ce4a8ae86471ad84a1927f116d0def6e326e80f13",
+      "size_bytes": 848
+    },
+    "server-cleanup.json": {
+      "sha256": "7ea7f1b6b1c699d8bffabb4a582af44a2e0abdd975e033550c59a7bc06b632a0",
+      "size_bytes": 94
+    },
+    "preflight.json": {
+      "sha256": "f4a163606d72bf5c513d9242ce50fb030bba03a79c6409e38e056458829abe13",
+      "size_bytes": 649
+    },
+    "independent-narrow.jpg": {
+      "sha256": "af978af15d6ecce5d32e4bd707e6f409ac35e84dc9d4243b806fcb6d36a8a881",
+      "size_bytes": 86612
+    },
+    "independent-static-check.json": {
+      "sha256": "7afbd9488ec771e252850988c9aa734daba4575dede31bb342651ff67115d722",
+      "size_bytes": 360
+    },
+    "commons-agent-gallery-provenance.jpg": {
+      "sha256": "2de1353cce6146a3b50040a688109df786b4d17c192251a43300fa1623a1a7a0",
+      "size_bytes": 45108
+    },
+    "retry-artifact-verification.json": {
+      "sha256": "289acadecc492417c6500a5e66163a3334c157bc6b6316d868ed06423f5117d6",
+      "size_bytes": 820
+    },
+    "attempt-1/broker-result.json": {
+      "sha256": "614d3797102977676e37a4c4a99080e7bb05bdffffdc2a7a489f663038413e4b",
+      "size_bytes": 4189
+    },
+    "attempt-1/child-session-final.json": {
+      "sha256": "29370a9f45dc51706139a50e1a7a5c1a45402bfa6b99b7799a2beaf7ed3498d1",
+      "size_bytes": 563
+    },
+    "product/build.py": {
+      "sha256": "0c5f3fa46667999b23d6385e7a58b8db5b1cf1bea287e77ffe6e10f0371c79c0",
+      "size_bytes": 827
+    },
+    "product/index.html": {
+      "sha256": "4184d3ab20d8c86151053e827dacda3ca882a560f801a656006068aa92a0107c",
+      "size_bytes": 4111
+    },
+    "product/check.py": {
+      "sha256": "4c4d5e7727e2eb0353c0633551862ce0e65884df2b681e5f9ace66cbc1ed32e3",
+      "size_bytes": 4652
+    },
+    "product/styles.css": {
+      "sha256": "a7e99d858d69f961feee72bdbd1cb4d6f17a9d543ddfbf11e4fa9ea1541da760",
+      "size_bytes": 11046
+    },
+    "product/README.md": {
+      "sha256": "40cef0a164302da5e63dfc35c5d2f237d4994e3170fcbe6143ace9a2365b882d",
+      "size_bytes": 4348
+    },
+    "product/app.js": {
+      "sha256": "82d5b55684ffb396ef563cdd9b2d984ffd85bc6a36a76222e4d6830ec411f2bb",
+      "size_bytes": 9292
+    },
+    "product/scripts/render-preview.swift": {
+      "sha256": "817e71a8b84fc10e03879bfb537bee93c7e93ad9e411b0f0645244bcc05b639c",
+      "size_bytes": 7534
+    },
+    "product/scripts/browser-checks.js": {
+      "sha256": "04d8135b57f0852bece3f3a8a149f02aa0c31f62ca807e8988032063468d61df",
+      "size_bytes": 2984
+    },
+    "product/scripts/check.js": {
+      "sha256": "01ce420852ddd0b6ebe6c290400b5e7b615d5c4a6a2f0622f166585ae8a2bceb",
+      "size_bytes": 2113
+    },
+    "product/site/index.html": {
+      "sha256": "4184d3ab20d8c86151053e827dacda3ca882a560f801a656006068aa92a0107c",
+      "size_bytes": 4111
+    },
+    "product/site/styles.css": {
+      "sha256": "a7e99d858d69f961feee72bdbd1cb4d6f17a9d543ddfbf11e4fa9ea1541da760",
+      "size_bytes": 11046
+    },
+    "product/site/browser-checks.js": {
+      "sha256": "04d8135b57f0852bece3f3a8a149f02aa0c31f62ca807e8988032063468d61df",
+      "size_bytes": 2984
+    },
+    "product/site/manifest.json": {
+      "sha256": "473c57a0d32e39eefa6d7d1ae0386d4efef9c5d1b0b9282ff95df40490305d92",
+      "size_bytes": 342
+    },
+    "product/site/app.js": {
+      "sha256": "82d5b55684ffb396ef563cdd9b2d984ffd85bc6a36a76222e4d6830ec411f2bb",
+      "size_bytes": 9292
+    },
+    "product/outputs/engineering-desk-desktop-v2.png": {
+      "sha256": "3deaed840d19d68f19326ba5aee9806b1853abf3ab56628cf0183e7080503e55",
+      "size_bytes": 224810
+    },
+    "product/outputs/EVIDENCE.md": {
+      "sha256": "a5be799e06d69126b6912add5ddc589c7172b61bc7141c262e04705ec0c78939",
+      "size_bytes": 2371
+    },
+    "product/outputs/demo-data.json": {
+      "sha256": "634de4310ffed0933f7d53a7c2f39cb064ac6eddfbd1432f50a71dca6ebf4781",
+      "size_bytes": 2894
+    },
+    "product/outputs/validation.json": {
+      "sha256": "6f24e0972d002019671493b0aa8bc56158c5cc289ccb931584150152c98ac945",
+      "size_bytes": 548
+    },
+    "product/outputs/engineering-desk-mobile-v2.png": {
+      "sha256": "586f60f0c19f47b123489d2ec3e04199941062ec9c978a20d42be4a1c68d98c3",
+      "size_bytes": 169728
+    }
+  },
+  "excluded": [
+    "state/",
+    "private session/claim nonces",
+    "commons-ui-private.log",
+    "provider raw output",
+    "browser profiles",
+    "Swift caches"
+  ]
+}

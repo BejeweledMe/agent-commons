@@ -73,6 +73,7 @@ class EventStore:
         event: Mapping[str, Any],
         *,
         producer_namespace: str | None = None,
+        verified_identity_index: Mapping[tuple[str, str], EventRecord] | None = None,
     ) -> EventRecord:
         candidate = dict(event)
         if "event_id" in candidate or "recorded_at" in candidate:
@@ -101,7 +102,11 @@ class EventStore:
         reservation = self.idempotency.lookup(namespace=namespace, key=idempotency_key)
         existing_record: EventRecord | None = None
         if reservation is None:
-            existing_record = self._find_existing(namespace, idempotency_key)
+            existing_record = (
+                verified_identity_index.get((namespace, idempotency_key))
+                if verified_identity_index is not None
+                else self._find_existing(namespace, idempotency_key)
+            )
             if existing_record is not None:
                 existing_semantic = canonical_sha256(semantic_event_body(existing_record.event))
                 if existing_semantic != semantic_sha256:
@@ -129,7 +134,11 @@ class EventStore:
             try:
                 existing_record = self.get(reservation.event_id)
             except FileNotFoundError:
-                existing_record = self._find_existing(namespace, idempotency_key)
+                existing_record = (
+                    verified_identity_index.get((namespace, idempotency_key))
+                    if verified_identity_index is not None
+                    else self._find_existing(namespace, idempotency_key)
+                )
                 if existing_record is not None and existing_record.event_id != reservation.event_id:
                     raise IntegrityError(
                         "idempotency receipt conflicts with an existing canonical event"
@@ -181,6 +190,7 @@ class EventStore:
         relations: Iterable[Mapping[str, Any]] = (),
         tags: Iterable[str] = (),
         extensions: Mapping[str, Any] | None = None,
+        verified_identity_index: Mapping[tuple[str, str], EventRecord] | None = None,
     ) -> EventRecord:
         body: dict[str, Any] = {
             "schema": "commons.event.v1",
@@ -205,7 +215,7 @@ class EventStore:
                 body[name] = value
         if extensions:
             body["extensions"] = dict(extensions)
-        return self.append(body)
+        return self.append(body, verified_identity_index=verified_identity_index)
 
     def get(self, event_id: str) -> EventRecord:
         if not is_typed_id(event_id, "evt"):

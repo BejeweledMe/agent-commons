@@ -1,5 +1,5 @@
 {
-  "utc": "2026-09-21T18:27:11.213865+00:00",
+  "utc": "2026-09-21T19:45:15.807246+00:00",
   "head": "cbdcad62052808343feca6a0a84a8b9b9e54976a",
   "branch": "main",
   "baseline_head_same": true,
@@ -7,10 +7,23 @@
   "current_status_records": 44,
   "baseline_files_checked": 4914,
   "baseline_file_changes": [],
-  "requested_worktree_exists": true,
-  "requested_branch_exists": true,
   "worktree_branch": "codex/blizhe-improvement-20260921",
   "worktree_head": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
-  "worktree_status": "?? .agent-commons/",
-  "exclude_original": true
+  "worktree_status": "?? .agent-commons/\n?? docs/audit/2026-09-21-dogfooding/",
+  "exclude_original": true,
+  "artifacts": {
+    "docs/audit/2026-09-21-dogfooding/BASE.md": "08554d346837cef29b6c3bc8e372967d155b2ad923f601e88652eb360980e331",
+    "docs/audit/2026-09-21-dogfooding/BASE-owner-baseline-verification.json": "9dab1be07e39fe7e58a9c0fda28d7ad3484e5abd1ae2d604bd68eaa85e3446e4",
+    "docs/audit/2026-09-21-dogfooding/BASE-owner-baseline-verification.md": "ccdb6066385e943d50946476b44d3e81223b0165f700f19475fcda40d0efeb93"
+  },
+  "doctor": {
+    "ok": true,
+    "event_count": 49,
+    "manifest_count": 3,
+    "issues": [],
+    "warnings": [
+      "review review.15CPSD4Q6EH78T4Z5EQ63V9HZY is stale for current target revision"
+    ]
+  },
+  "baseline_status_matches": true
 }

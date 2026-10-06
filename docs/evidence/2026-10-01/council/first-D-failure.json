@@ -1,0 +1,9 @@
+{
+  "requested_model": "claude-opus-4-6",
+  "provider_model_usage": {},
+  "session_id": "bbd14acf-2cec-49cd-b1bb-07f6cf7ae278",
+  "returncode": 1,
+  "is_error": true,
+  "seconds": 1,
+  "result_chars": 72
+}

@@ -1,0 +1,105 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_rebuild_uses_only_verifications_before_and_after_identity ________
+
+tmp_path = PosixPath('/private/var/folders/s2/41w_xwpx3ys5shf05f13psk40000gn/T/pytest-of-dmitrijersov/pytest-40/test_rebuild_uses_only_verific0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1088acfc0>
+
+    def test_rebuild_uses_only_verifications_before_and_after_identity(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from agent_commons.services.manager import _VerifiedLedgerView
+    
+        manager = _manager(tmp_path)
+        identities: list[Path] = []
+        original = _VerifiedLedgerView._identity
+    
+        def counted(path: Path):
+            identities.append(path)
+            return original(path)
+    
+        monkeypatch.setattr(_VerifiedLedgerView, "_identity", staticmethod(counted))
+        with manager._canonical_write_lock():
+            records, _ = manager._records_and_snapshot()
+>           assert identities == [records[0].path, records[0].path]
+E           AssertionError: assert [PosixPath('/...QTXXNX.json')] == [PosixPath('/...QTXXNX.json')]
+E             
+E             Left contains one more item: PosixPath('/private/var/folders/s2/41w_xwpx3ys5shf05f13psk40000gn/T/pytest-of-dmitrijersov/pytest-40/test_rebuild_uses_only_verific0/repo/.agent-commons/events/2026/10/01/evt.01M3VSYJQ74HMA9BTTHFQTXXNX.json')
+E             Use -v to get more diff
+
+tests/services/test_verified_ledger_view.py:564: AssertionError
+_ test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly[complete_task] _
+
+manager = <agent_commons.services.manager.CommonsManager object at 0x10886a350>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1088adcd0>
+action = 'complete_task'
+
+    @pytest.mark.parametrize("action", ["complete_task", "submit_task"])
+    def test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly(
+        manager: CommonsManager, monkeypatch: pytest.MonkeyPatch, action: str
+    ) -> None:
+        previous = active_task(manager)
+        if action == "submit_task":
+            previous = manager.complete_task(
+                previous["entity_ref"]["id"],
+                previous["revision"],
+                summary="done",
+                artifact_refs=(),
+                idempotency_key="complete",
+            )
+        before = list(manager.events.iter_events())
+        reads: list[Path] = []
+        original = manager.events.read_path
+    
+        def counted(path: Path):
+            reads.append(path)
+            return original(path)
+    
+        monkeypatch.setattr(manager.events, "read_path", counted)
+        kwargs = dict(summary="ready", artifact_refs=(), idempotency_key="measured-" + action)
+        result = getattr(manager, action)(previous["entity_ref"]["id"], previous["revision"], **kwargs)
+>       assert all(reads.count(record.path) == 1 for record in before)
+E       assert False
+E        +  where False = all(<generator object test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly.<locals>.<genexpr> at 0x1088dedc0>)
+
+tests/services/test_task_evidence_snapshot.py:66: AssertionError
+_ test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly[submit_task] _
+
+manager = <agent_commons.services.manager.CommonsManager object at 0x10886b390>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1088ba7b0>
+action = 'submit_task'
+
+    @pytest.mark.parametrize("action", ["complete_task", "submit_task"])
+    def test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly(
+        manager: CommonsManager, monkeypatch: pytest.MonkeyPatch, action: str
+    ) -> None:
+        previous = active_task(manager)
+        if action == "submit_task":
+            previous = manager.complete_task(
+                previous["entity_ref"]["id"],
+                previous["revision"],
+                summary="done",
+                artifact_refs=(),
+                idempotency_key="complete",
+            )
+        before = list(manager.events.iter_events())
+        reads: list[Path] = []
+        original = manager.events.read_path
+    
+        def counted(path: Path):
+            reads.append(path)
+            return original(path)
+    
+        monkeypatch.setattr(manager.events, "read_path", counted)
+        kwargs = dict(summary="ready", artifact_refs=(), idempotency_key="measured-" + action)
+        result = getattr(manager, action)(previous["entity_ref"]["id"], previous["revision"], **kwargs)
+>       assert all(reads.count(record.path) == 1 for record in before)
+E       assert False
+E        +  where False = all(<generator object test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly.<locals>.<genexpr> at 0x1088dfca0>)
+
+tests/services/test_task_evidence_snapshot.py:66: AssertionError
+=========================== short test summary info ============================
+FAILED tests/services/test_verified_ledger_view.py::test_rebuild_uses_only_verifications_before_and_after_identity
+FAILED tests/services/test_task_evidence_snapshot.py::test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly[complete_task]
+FAILED tests/services/test_task_evidence_snapshot.py::test_explicit_empty_evidence_has_one_full_ledger_read_and_retries_exactly[submit_task]
+3 failed in 2.12s

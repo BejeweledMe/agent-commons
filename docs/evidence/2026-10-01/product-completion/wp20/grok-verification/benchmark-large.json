@@ -1,0 +1,1361 @@
+{
+  "fixture": {
+    "artifact_count": 350,
+    "decision_count": 80,
+    "delegation_count": 40,
+    "event_count": 3206,
+    "manifest_count": 350,
+    "review_count": 318,
+    "task_count": 390
+  },
+  "fixture_build_seconds": 8.890937999996822,
+  "hardware": {
+    "cpu_brand": "Apple M2 Max",
+    "cpu_count": 12,
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "processor": "arm",
+    "python": "3.14.5",
+    "python_implementation": "CPython",
+    "system": "Darwin"
+  },
+  "mutations": {
+    "decision_propose": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6798.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.00440814599278383,
+          "canonical_reads_validation": 4.030766656913329,
+          "lock_hold": 1.651379901508335,
+          "lock_wait": 0.0002721874916460365,
+          "projection_replay": 0.3642511286016088,
+          "receipt_preparation": 1.1498064170009457,
+          "reconcile": 1.5504113539645914
+        },
+        "median_read_bytes": 3763012.0,
+        "median_read_calls": 3574.0,
+        "median_seconds": 8.822390729008475,
+        "min_seconds": 8.800494958006311,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.0045184148795669905,
+          "canonical_reads_validation": 4.05546118702041,
+          "lock_hold": 1.6576825642667246,
+          "lock_wait": 0.000373756539192982,
+          "projection_replay": 0.36668676541594325,
+          "receipt_preparation": 1.1665548167249653,
+          "reconcile": 1.569236147266929
+        },
+        "p95_seconds": 8.842096922910422,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 8.84428650001064,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004530666978098452
+              },
+              "canonical_reads_validation": {
+                "calls": 6796,
+                "exclusive_elapsed_seconds": 4.003328290127683
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6583828601287678
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001593329943716526
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36695739172864705
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1684157500276342
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5713277909671888
+              }
+            },
+            "read_bytes": 3761950,
+            "read_calls": 3573,
+            "residual_elapsed_seconds": 0.07118441705824807
+          },
+          {
+            "elapsed_seconds": 8.800494958006311,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004285625007469207
+              },
+              "canonical_reads_validation": {
+                "calls": 6800,
+                "exclusive_elapsed_seconds": 4.058205023698974
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6443769428879023
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0003850419889204204
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36154486547457054
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1311970839742571
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.529494916961994
+              }
+            },
+            "read_bytes": 3764074,
+            "read_calls": 3575,
+            "residual_elapsed_seconds": 0.07100545801222324
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 8.712382708035875,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004187083977740258
+              },
+              "canonical_reads_validation": {
+                "calls": 6798,
+                "exclusive_elapsed_seconds": 3.985025296686217
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6289730570861138
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.000172999978531152
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3643170202267356
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1347970420029014
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5270117089967243
+              }
+            },
+            "read_bytes": 3763012,
+            "read_calls": 3574,
+            "residual_elapsed_seconds": 0.06789849908091128
+          },
+          {
+            "elapsed_seconds": 8.71321616700152,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00447616697056219
+              },
+              "canonical_reads_validation": {
+                "calls": 6802,
+                "exclusive_elapsed_seconds": 4.007727237301879
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6295065665617585
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00014379102503880858
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36722444515908137
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1287614589673467
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5072899170336314
+              }
+            },
+            "read_bytes": 3765136,
+            "read_calls": 3576,
+            "residual_elapsed_seconds": 0.06808658398222178
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6800.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004331625474151224,
+          "canonical_reads_validation": 3.996376266994048,
+          "lock_hold": 1.6292398118239362,
+          "lock_wait": 0.0001583955017849803,
+          "projection_replay": 0.3657707326929085,
+          "receipt_preparation": 1.131779250485124,
+          "reconcile": 1.5171508130151778
+        },
+        "median_read_bytes": 3764074.0,
+        "median_read_calls": 3575.0,
+        "median_seconds": 8.712799437518697,
+        "min_seconds": 8.712382708035875,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004461712820921093,
+          "canonical_reads_validation": 4.006592140271096,
+          "lock_hold": 1.6294798910879762,
+          "lock_wait": 0.00017153953085653485,
+          "projection_replay": 0.3670790739124641,
+          "receipt_preparation": 1.1344952628511236,
+          "reconcile": 1.5260256193985697
+        },
+        "p95_seconds": 8.713174494053236,
+        "samples": 2
+      }
+    },
+    "panel_http_task_create": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6806.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004702604521298781,
+          "canonical_reads_validation": 4.048021439375589,
+          "lock_hold": 1.66283752839081,
+          "lock_wait": 0.00014539601397700608,
+          "projection_replay": 0.3757070947322063,
+          "receipt_preparation": 1.1652644790010527,
+          "reconcile": 1.5185181874840055
+        },
+        "median_read_bytes": 3767358.0,
+        "median_read_calls": 3578.0,
+        "median_seconds": 8.914463958499255,
+        "min_seconds": 8.83840887498809,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004721522974432446,
+          "canonical_reads_validation": 4.066430344854598,
+          "lock_hold": 1.6855206920648924,
+          "lock_wait": 0.00016615183267276734,
+          "projection_replay": 0.3866497067792807,
+          "receipt_preparation": 1.1685010851128026,
+          "reconcile": 1.527006969062495
+        },
+        "p95_seconds": 8.982913533659303,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 8.83840887498809,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004681584017816931
+              },
+              "canonical_reads_validation": {
+                "calls": 6804,
+                "exclusive_elapsed_seconds": 4.027567099954467
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6376340131973848
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.000122333993203938
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3635486369021237
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1616682499879971
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5090862079523504
+              }
+            },
+            "read_bytes": 3766247,
+            "read_calls": 3577,
+            "residual_elapsed_seconds": 0.13410074898274615
+          },
+          {
+            "elapsed_seconds": 8.990519042010419,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004723625024780631
+              },
+              "canonical_reads_validation": {
+                "calls": 6808,
+                "exclusive_elapsed_seconds": 4.06847577879671
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.688041043584235
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00016845803475007415
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.38786555256228894
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1688607080141082
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5279501670156606
+              }
+            },
+            "read_bytes": 3768469,
+            "read_calls": 3579,
+            "residual_elapsed_seconds": 0.14443370897788554
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 9.01065925002331,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0045529999770224094
+              },
+              "canonical_reads_validation": {
+                "calls": 6806,
+                "exclusive_elapsed_seconds": 4.050697857921477
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6912686244468205
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001420000335201621
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3930095176328905
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1991644999943674
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5345930000185035
+              }
+            },
+            "read_bytes": 3767358,
+            "read_calls": 3578,
+            "residual_elapsed_seconds": 0.13723074999870732
+          },
+          {
+            "elapsed_seconds": 8.943173124978784,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00458104198332876
+              },
+              "canonical_reads_validation": {
+                "calls": 6810,
+                "exclusive_elapsed_seconds": 4.014258953509852
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.64892636903096
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00016883399803191423
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.42286455346038565
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1472030410077423
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.563212790992111
+              }
+            },
+            "read_bytes": 3769580,
+            "read_calls": 3580,
+            "residual_elapsed_seconds": 0.1419575409963727
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6808.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.0045670209801755846,
+          "canonical_reads_validation": 4.032478405715665,
+          "lock_hold": 1.6700974967388902,
+          "lock_wait": 0.00015541701577603817,
+          "projection_replay": 0.40793703554663807,
+          "receipt_preparation": 1.1731837705010548,
+          "reconcile": 1.5489028955053072
+        },
+        "median_read_bytes": 3768469.0,
+        "median_read_calls": 3579.0,
+        "median_seconds": 8.976916187501047,
+        "min_seconds": 8.943173124978784,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004579639883013442,
+          "canonical_reads_validation": 4.048875912700896,
+          "lock_hold": 1.6891515116760274,
+          "lock_wait": 0.00016749229980632662,
+          "projection_replay": 0.4213718016690109,
+          "receipt_preparation": 1.1965664270450362,
+          "reconcile": 1.5617818014434306
+        },
+        "p95_seconds": 9.007284943771083,
+        "samples": 2
+      }
+    },
+    "task_complete": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 13562.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 2.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.00444129150127992,
+          "canonical_reads_validation": 8.099094034725567,
+          "lock_hold": 1.5863186422502622,
+          "lock_wait": 0.00016727097681723535,
+          "projection_replay": 0.7333816821046639,
+          "receipt_preparation": 1.1347814164764713,
+          "reconcile": 1.5466434375266545
+        },
+        "median_read_bytes": 7508405.0,
+        "median_read_calls": 7131.0,
+        "median_seconds": 13.23292089550523,
+        "min_seconds": 13.058284375001676,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004484454164048656,
+          "canonical_reads_validation": 8.228493849156076,
+          "lock_hold": 1.597231023653876,
+          "lock_wait": 0.0001814648654544726,
+          "projection_replay": 0.7411212427628925,
+          "receipt_preparation": 1.1486713787977352,
+          "reconcile": 1.5543975562672132
+        },
+        "p95_seconds": 13.39009376395843,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 13.058284375001676,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004393332987092435
+              },
+              "canonical_reads_validation": {
+                "calls": 13558,
+                "exclusive_elapsed_seconds": 7.955316463136114
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5741937740240246
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001514999894425273
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7247821702621877
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1193481250084005
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.555259125016164
+              }
+            },
+            "read_bytes": 7506343,
+            "read_calls": 7129,
+            "residual_elapsed_seconds": 0.12483988457825035
+          },
+          {
+            "elapsed_seconds": 13.407557416008785,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004489250015467405
+              },
+              "canonical_reads_validation": {
+                "calls": 13566,
+                "exclusive_elapsed_seconds": 8.24287160631502
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5984435104764998
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001830419641919434
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7419811939471401
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1502147079445422
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5380277500371449
+              }
+            },
+            "read_bytes": 7510467,
+            "read_calls": 7133,
+            "residual_elapsed_seconds": 0.13134635530877858
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 13.426727124955505,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004227875033393502
+              },
+              "canonical_reads_validation": {
+                "calls": 13562,
+                "exclusive_elapsed_seconds": 7.9669023410533555
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.7024004312697798
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001563330297358334
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7209892662940547
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1802381669986062
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.7291073329979554
+              }
+            },
+            "read_bytes": 7508405,
+            "read_calls": 7131,
+            "residual_elapsed_seconds": 0.12270537827862427
+          },
+          {
+            "elapsed_seconds": 13.15536345797591,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0044538750080391765
+              },
+              "canonical_reads_validation": {
+                "calls": 13570,
+                "exclusive_elapsed_seconds": 8.027416738215834
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.581870153429918
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00018312502652406693
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7282617363380268
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1338495829841122
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5521933329873718
+              }
+            },
+            "read_bytes": 7512529,
+            "read_calls": 7135,
+            "residual_elapsed_seconds": 0.12713491398608312
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 13566.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 2.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004340875020716339,
+          "canonical_reads_validation": 7.997159539634595,
+          "lock_hold": 1.642135292349849,
+          "lock_wait": 0.00016972902812995017,
+          "projection_replay": 0.7246255013160408,
+          "receipt_preparation": 1.1570438749913592,
+          "reconcile": 1.6406503329926636
+        },
+        "median_read_bytes": 7510467.0,
+        "median_read_calls": 7133.0,
+        "median_seconds": 13.291045291465707,
+        "min_seconds": 13.15536345797591,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004442575009306893,
+          "canonical_reads_validation": 8.02439101835771,
+          "lock_hold": 1.6963739173777868,
+          "lock_wait": 0.00018178542668465525,
+          "projection_replay": 0.7278981128358282,
+          "receipt_preparation": 1.1779187377978815,
+          "reconcile": 1.720261632997426
+        },
+        "p95_seconds": 13.413158941606525,
+        "samples": 2
+      }
+    },
+    "task_create": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6766.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004648916481528431,
+          "canonical_reads_validation": 3.8968041884945706,
+          "lock_hold": 1.5949868475727271,
+          "lock_wait": 0.00018324950360693038,
+          "projection_replay": 0.35822433992871083,
+          "receipt_preparation": 1.1325018120114692,
+          "reconcile": 1.500920083024539
+        },
+        "median_read_bytes": 3746410.0,
+        "median_read_calls": 3558.0,
+        "median_seconds": 8.557665770495078,
+        "min_seconds": 8.556166249967646,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004686716926516965,
+          "canonical_reads_validation": 3.9116925727110354,
+          "lock_hold": 1.5969347302831012,
+          "lock_wait": 0.00023098682577256112,
+          "projection_replay": 0.3611779943894362,
+          "receipt_preparation": 1.1332075056037867,
+          "reconcile": 1.5139238455041777
+        },
+        "p95_seconds": 8.559015338969767,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 8.55916529102251,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0046909169759601355
+              },
+              "canonical_reads_validation": {
+                "calls": 6764,
+                "exclusive_elapsed_seconds": 3.880261539365165
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5928225334500894
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00023629097267985344
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3615061782184057
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.133285916002933
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5153687080019154
+              }
+            },
+            "read_bytes": 3745313,
+            "read_calls": 3557,
+            "residual_elapsed_seconds": 0.07099320803536102
+          },
+          {
+            "elapsed_seconds": 8.556166249967646,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004606915987096727
+              },
+              "canonical_reads_validation": {
+                "calls": 6768,
+                "exclusive_elapsed_seconds": 3.913346837623976
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5971511616953649
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0001302080345340073
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.354942501639016
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1317177080200054
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.4864714580471627
+              }
+            },
+            "read_bytes": 3747507,
+            "read_calls": 3559,
+            "residual_elapsed_seconds": 0.06779945892049
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 8.638892250019126,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004804833035450429
+              },
+              "canonical_reads_validation": {
+                "calls": 6766,
+                "exclusive_elapsed_seconds": 3.9863704971503466
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.641959733213298
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00015791697660461068
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3521967275883071
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1076928330003284
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.475646292034071
+              }
+            },
+            "read_bytes": 3746410,
+            "read_calls": 3558,
+            "residual_elapsed_seconds": 0.0700634170207195
+          },
+          {
+            "elapsed_seconds": 8.753001999983098,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0044332920224405825
+              },
+              "canonical_reads_validation": {
+                "calls": 6770,
+                "exclusive_elapsed_seconds": 3.9916251180693507
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.638197411375586
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00017145799938589334
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36927572055719793
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.179401291999966
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5025139579665847
+              }
+            },
+            "read_bytes": 3748604,
+            "read_calls": 3560,
+            "residual_elapsed_seconds": 0.06738374999258667
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6768.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004619062528945506,
+          "canonical_reads_validation": 3.9889978076098487,
+          "lock_hold": 1.640078572294442,
+          "lock_wait": 0.000164687487995252,
+          "projection_replay": 0.3607362240727525,
+          "receipt_preparation": 1.1435470625001471,
+          "reconcile": 1.4890801250003278
+        },
+        "median_read_bytes": 3747507.0,
+        "median_read_calls": 3559.0,
+        "median_seconds": 8.695947125001112,
+        "min_seconds": 8.638892250019126,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004786255984799937,
+          "canonical_reads_validation": 3.9913623870234005,
+          "lock_hold": 1.6417716171214123,
+          "lock_wait": 0.0001707809482468292,
+          "projection_replay": 0.3684217709087534,
+          "receipt_preparation": 1.175815869049984,
+          "reconcile": 1.501170574669959
+        },
+        "p95_seconds": 8.7472965124849,
+        "samples": 2
+      }
+    },
+    "task_submit": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 13578.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 2.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.00445358402794227,
+          "canonical_reads_validation": 8.021507029247005,
+          "lock_hold": 1.6049116278009024,
+          "lock_wait": 0.00018606250523589551,
+          "projection_replay": 0.7223602597659919,
+          "receipt_preparation": 1.1314543960033916,
+          "reconcile": 1.559321083012037
+        },
+        "median_read_bytes": 7516641.0,
+        "median_read_calls": 7139.0,
+        "median_seconds": 13.16852787497919,
+        "min_seconds": 13.15814233297715,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004458421538583934,
+          "canonical_reads_validation": 8.028120366774965,
+          "lock_hold": 1.6069674117985413,
+          "lock_wait": 0.00019463098433334378,
+          "projection_replay": 0.7238480388565223,
+          "receipt_preparation": 1.1349820396048018,
+          "reconcile": 1.5687326080107595
+        },
+        "p95_seconds": 13.177874862781026,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 13.15814233297715,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0044589590397663414
+              },
+              "canonical_reads_validation": {
+                "calls": 13574,
+                "exclusive_elapsed_seconds": 8.01415887643816
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6071958322427236
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00019558303756639361
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7240133476443589
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1353740000049584
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5488638330134563
+              }
+            },
+            "read_bytes": 7514587,
+            "read_calls": 7137,
+            "residual_elapsed_seconds": 0.1238819015561603
+          },
+          {
+            "elapsed_seconds": 13.178913416981231,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004448209016118199
+              },
+              "canonical_reads_validation": {
+                "calls": 13582,
+                "exclusive_elapsed_seconds": 8.02885518205585
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6026274233590811
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00017654197290539742
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.720707171887625
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1275347920018248
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5697783330106176
+              }
+            },
+            "read_bytes": 7518695,
+            "read_calls": 7141,
+            "residual_elapsed_seconds": 0.12478576367720962
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 13.111804499989375,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.0045653749839402735
+              },
+              "canonical_reads_validation": {
+                "calls": 13578,
+                "exclusive_elapsed_seconds": 8.00066292588599
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.586841091280803
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00016679096734151244
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7208023333223537
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1519264170201495
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5240916250040755
+              }
+            },
+            "read_bytes": 7516641,
+            "read_calls": 7139,
+            "residual_elapsed_seconds": 0.12274794152472168
+          },
+          {
+            "elapsed_seconds": 13.320223291986622,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004480750008951873
+              },
+              "canonical_reads_validation": {
+                "calls": 13586,
+                "exclusive_elapsed_seconds": 8.170065799029544
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.586264059995301
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00015216699102893472
+              },
+              "projection_replay": {
+                "calls": 2,
+                "exclusive_elapsed_seconds": 0.7369879150064662
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.146652500028722
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.545324917009566
+              }
+            },
+            "read_bytes": 7520749,
+            "read_calls": 7143,
+            "residual_elapsed_seconds": 0.13029518391704187
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 13582.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 2.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004523062496446073,
+          "canonical_reads_validation": 8.085364362457767,
+          "lock_hold": 1.586552575638052,
+          "lock_wait": 0.00015947897918522358,
+          "projection_replay": 0.7288951241644099,
+          "receipt_preparation": 1.1492894585244358,
+          "reconcile": 1.5347082710068207
+        },
+        "median_read_bytes": 7518695.0,
+        "median_read_calls": 7141.0,
+        "median_seconds": 13.216013895987999,
+        "min_seconds": 13.111804499989375,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004561143735190854,
+          "canonical_reads_validation": 8.161595655372366,
+          "lock_hold": 1.586812239716528,
+          "lock_wait": 0.00016605976852588356,
+          "projection_replay": 0.7361786359222606,
+          "receipt_preparation": 1.151662721170578,
+          "reconcile": 1.5442632524092914
+        },
+        "p95_seconds": 13.30980235238676,
+        "samples": 2
+      }
+    },
+    "task_take": {
+      "cold": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6774.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004432479530805722,
+          "canonical_reads_validation": 3.969796722289175,
+          "lock_hold": 1.5938350557116792,
+          "lock_wait": 0.0001517085183877498,
+          "projection_replay": 0.3604738254798576,
+          "receipt_preparation": 1.1344321249925997,
+          "reconcile": 1.50361454198719
+        },
+        "median_read_bytes": 3750630.0,
+        "median_read_calls": 3562.0,
+        "median_seconds": 8.633554958505556,
+        "min_seconds": 8.60995220800396,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.004446148293209262,
+          "canonical_reads_validation": 3.988973836449441,
+          "lock_hold": 1.5967621933144982,
+          "lock_wait": 0.00015909619687590749,
+          "projection_replay": 0.3649767051916569,
+          "receipt_preparation": 1.1482471627910855,
+          "reconcile": 1.5118196548166452
+        },
+        "p95_seconds": 8.654797433956992,
+        "samples": 2
+      },
+      "samples": {
+        "cold": [
+          {
+            "elapsed_seconds": 8.657157709007151,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004447667044587433
+              },
+              "canonical_reads_validation": {
+                "calls": 6772,
+                "exclusive_elapsed_seconds": 3.9911046269116923
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5970874308259226
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00015991705004125834
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36547702515963465
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1190820829942822
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.512731334019918
+              }
+            },
+            "read_bytes": 3749617,
+            "read_calls": 3561,
+            "residual_elapsed_seconds": 0.06706762500107288
+          },
+          {
+            "elapsed_seconds": 8.60995220800396,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00441729201702401
+              },
+              "canonical_reads_validation": {
+                "calls": 6776,
+                "exclusive_elapsed_seconds": 3.9484888176666573
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5905826805974357
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00014349998673424125
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3554706258000806
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1497821669909172
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.494497749954462
+              }
+            },
+            "read_bytes": 3751643,
+            "read_calls": 3563,
+            "residual_elapsed_seconds": 0.06656937499064952
+          }
+        ],
+        "warm": [
+          {
+            "elapsed_seconds": 8.624840958043933,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004655166994780302
+              },
+              "canonical_reads_validation": {
+                "calls": 6774,
+                "exclusive_elapsed_seconds": 3.9490794428274967
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.6150911921286024
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00016554200556129217
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.3627284490503371
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1226544579840265
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.4960996250156313
+              }
+            },
+            "read_bytes": 3750630,
+            "read_calls": 3562,
+            "residual_elapsed_seconds": 0.07436708203749731
+          },
+          {
+            "elapsed_seconds": 8.641164041007869,
+            "phases": {
+              "append": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.004304832953494042
+              },
+              "canonical_reads_validation": {
+                "calls": 6778,
+                "exclusive_elapsed_seconds": 3.9545651600928977
+              },
+              "lock_hold": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5930504579446279
+              },
+              "lock_wait": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.00015462504234164953
+              },
+              "projection_replay": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 0.36934084008680657
+              },
+              "receipt_preparation": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.1479445839649998
+              },
+              "reconcile": {
+                "calls": 1,
+                "exclusive_elapsed_seconds": 1.5045701249619015
+              }
+            },
+            "read_bytes": 3752656,
+            "read_calls": 3564,
+            "residual_elapsed_seconds": 0.0672334159607999
+          }
+        ]
+      },
+      "warm": {
+        "median_phase_calls": {
+          "append": 1.0,
+          "canonical_reads_validation": 6776.0,
+          "lock_hold": 1.0,
+          "lock_wait": 1.0,
+          "projection_replay": 1.0,
+          "receipt_preparation": 1.0,
+          "reconcile": 1.0
+        },
+        "median_phase_exclusive_seconds": {
+          "append": 0.004479999974137172,
+          "canonical_reads_validation": 3.951822301460197,
+          "lock_hold": 1.6040708250366151,
+          "lock_wait": 0.00016008352395147085,
+          "projection_replay": 0.3660346445685718,
+          "receipt_preparation": 1.1352995209745131,
+          "reconcile": 1.5003348749887664
+        },
+        "median_read_bytes": 3751643.0,
+        "median_read_calls": 3563.0,
+        "median_seconds": 8.633002499525901,
+        "min_seconds": 8.624840958043933,
+        "p95_phase_exclusive_seconds": {
+          "append": 0.00463765029271599,
+          "canonical_reads_validation": 3.9542908742296277,
+          "lock_hold": 1.6139891554194037,
+          "lock_wait": 0.00016499615740031003,
+          "projection_replay": 0.3690102205349831,
+          "receipt_preparation": 1.1466800776659511,
+          "reconcile": 1.504146599964588
+        },
+        "p95_seconds": 8.640347886859672,
+        "samples": 2
+      }
+    }
+  },
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "profile": "large",
+  "python": "3.14.5",
+  "repeats": 2,
+  "schema": "agent_commons.work_mutation_profile.v1"
+}

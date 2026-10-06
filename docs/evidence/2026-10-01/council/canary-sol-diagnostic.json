@@ -1,0 +1,91 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "agent_commons_version": "0.1.0",
+  "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "provider": "codex",
+  "profile_id": "codex-builder",
+  "purpose": "implementation",
+  "model": "gpt-6.1-sol",
+  "provider_version": "codex-cli 0.145.0",
+  "requester_client": "agent-commons",
+  "skill_refs": [
+    "commons-start"
+  ],
+  "preflight": {
+    "profile_id": "codex-builder",
+    "provider": "codex",
+    "ok": true,
+    "checks": {
+      "workspace_snapshot": {
+        "ok": true,
+        "snapshot_diagnostic_count": 0
+      },
+      "provider_help": {
+        "ok": true,
+        "required_flags": "present"
+      },
+      "mcp_contract": {
+        "ok": true,
+        "catalog": "available",
+        "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+        "tool_catalog_sha256": "9a3b16de8e71ba7636d425f6c4ada77f8df928310b2ef6321f6b61b4c0cd4ea4",
+        "tool_count": 32
+      },
+      "mcp_handshake": {
+        "ok": true,
+        "protocol": "initialized",
+        "required_tools": "available",
+        "tool_count": 32
+      }
+    },
+    "consumed_delegation_attempt": false,
+    "provider_help_process_started": true,
+    "provider_work_process_started": false
+  },
+  "initialization": {
+    "state": "ready",
+    "supported": true,
+    "blocks_launch": false
+  },
+  "ok": false,
+  "provider_work_process_started": true,
+  "process": {
+    "outcome": "failed",
+    "exit_code": 1,
+    "duration_seconds": 5.316873583011329,
+    "stdout_bytes_seen": 1018,
+    "stderr_bytes_seen": 147,
+    "output_truncated": false
+  },
+  "canonical_state": "failed",
+  "workflow_diagnostic_code": "provider_reported_error",
+  "process_canonical_mismatch": false,
+  "terminal_tool_calls": 0,
+  "terminal_tool_completions": 0,
+  "terminal_tool_rejections": 0,
+  "terminal_tool_rejection_details": [],
+  "terminal_tool_rejection_details_truncated": false,
+  "child_session_closed": true,
+  "sanitized_provider_errors": [
+    {
+      "channel": "stderr",
+      "message": "2026-10-01T09:34:46.454975Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 140 column 5",
+      "truncated": false,
+      "redacted": false
+    },
+    {
+      "channel": "provider_error_event",
+      "event_type": "error",
+      "message": "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.\"}}",
+      "truncated": false,
+      "redacted": false
+    },
+    {
+      "channel": "provider_error_event",
+      "event_type": "turn.failed",
+      "message": "{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.\"}}",
+      "truncated": false,
+      "redacted": false
+    }
+  ]
+}

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import os
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
+from threading import RLock
 from typing import Any, Literal, Protocol, TypeVar
 
 from agent_commons.core.refs import parse_ref
@@ -181,6 +183,7 @@ IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
     "commons_succeed_delegation",
     "commons_publish_live_preview",
     "commons_publish_design_image",
+    "commons_publish_static_build",
     "commons_read_message",
     "commons_read_message_image",
     "commons_read_message_file",
@@ -188,6 +191,8 @@ IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
 }
 VERIFICATION_WORKER_TOOL_NAMES = IMPLEMENTATION_WORKER_TOOL_NAMES | {"commons_record_verification"}
 INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
+    "commons_read_output_image",
+    "commons_read_build_file",
     "commons_record_verification",
     "commons_finalize_review",
 }
@@ -850,6 +855,36 @@ def build_server(
             idempotency_key=idempotency_key,
         )
 
+    @register(_IDEMPOTENT_WRITE, root_only=True)
+    def commons_create_task(
+        title: str,
+        description: str,
+        acceptance_criteria: list[str],
+        idempotency_key: str,
+        task_kind: str = "task",
+        parent_task_id: str | None = None,
+        dependencies: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a task/component with containment separate from dependencies."""
+        return commons.create_task(
+            title=title,
+            description=description,
+            acceptance_criteria=acceptance_criteria,
+            task_kind=task_kind,
+            parent_task_id=parent_task_id,
+            dependencies=dependencies or [],
+            idempotency_key=idempotency_key,
+        )
+
+    @register(_IDEMPOTENT_WRITE, root_only=True)
+    def commons_edit_task(
+        task_id: str, expected_revision: str, changes: dict[str, Any], idempotency_key: str
+    ) -> dict[str, Any]:
+        """Edit idle work with CAS. parent_task_id=null detaches; dependencies stay independent."""
+        return commons.edit_task(
+            task_id, expected_revision, changes=changes, idempotency_key=idempotency_key
+        )
+
     @register(_READ_ONLY)
     def commons_list_tasks(state: str | None = None) -> list[dict[str, Any]]:
         """List projected tasks, optionally filtered by lifecycle state."""
@@ -956,6 +991,183 @@ def build_server(
         )
         worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
         return result
+
+    build_read_ranges: dict[tuple[str, str], list[tuple[int, int]]] = {}
+    completed_build_entries: set[tuple[str, str]] = set()
+    # Cache only policy-checked text from exact immutable entry identities. Every
+    # call still checks the frozen artifact binding and reads/verifies CAS bytes.
+    # Session-local limits bound retained decoded text; eviction never affects CAS.
+    checked_build_text: OrderedDict[tuple[str, str, str], tuple[str, Any, int]] = OrderedDict()
+    checked_build_text_bytes = 0
+    checked_build_text_lock = RLock()
+
+    def exact_output_bundle(artifact_id: str) -> dict[str, Any]:
+        if artifact_id not in relevant_artifact_ids() or worker_artifact_bundles is None:
+            raise LifecycleConflictError("reviewer may read only its exact bound output")
+        frozen = worker_artifact_bundles[artifact_id]
+        current = commons.get_artifact_bundle(artifact_id)
+        if (
+            current["artifact"]["manifest_ref"] != frozen["artifact"]["manifest_ref"]
+            or current["artifact"].get("effective_revision", current["artifact"].get("revision"))
+            != frozen["artifact"].get("effective_revision", frozen["artifact"].get("revision"))
+            or frozen["manifest"].get("classification") not in {"internal", "public"}
+        ):
+            raise LifecycleConflictError("reviewer output binding has changed")
+        return frozen
+
+    @register(_READ_ONLY, worker_only=True, worker_purposes=("independent_review",))
+    def commons_read_output_image(artifact_id: str) -> Any:
+        """Receive exact bound PNG/JPEG pixels as MCP image content for review."""
+        import base64
+
+        from mcp.types import CallToolResult, ImageContent
+
+        from agent_commons.services.artifact_content import ArtifactPreviewReader
+
+        bundle = exact_output_bundle(artifact_id)
+        image = ArtifactPreviewReader(commons).read(artifact_id)
+        if image.revision != bundle["manifest"]["revision"]:
+            raise LifecycleConflictError("reviewer output bytes have changed")
+        worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
+        return CallToolResult(
+            content=[
+                ImageContent(
+                    type="image",
+                    data=base64.b64encode(image.content).decode("ascii"),
+                    mimeType=image.media_type,
+                )
+            ]
+        )
+
+    @register(_READ_ONLY, worker_only=True, worker_purposes=("independent_review",))
+    def commons_read_build_file(
+        artifact_id: str, path: str = "", offset: int = 0, limit: int = 65536
+    ) -> dict[str, Any]:
+        """Inspect verified retained build manifest or bounded UTF-8 frontend content.
+
+        Empty path returns manifest only and never satisfies review evidence.
+        For approval, read every text entry completely (follow next_offset).
+        Asset hashes prove retained bytes, not visual appearance or execution.
+        """
+        nonlocal checked_build_text_bytes
+
+        import hashlib
+        import io
+        import zipfile
+
+        from agent_commons.services.output_content import BUILD_KIND, OutputContentStore
+
+        if (
+            type(offset) is not int
+            or offset < 0
+            or type(limit) is not int
+            or not 1 <= limit <= 65536
+        ):
+            raise ValidationError("Invalid build read bounds")
+        bundle = exact_output_bundle(artifact_id)
+        manifest = bundle["manifest"]
+        metadata = manifest.get("metadata") or {}
+        files = metadata.get("build_files")
+        if (
+            metadata.get("output_kind") != BUILD_KIND
+            or not isinstance(files, list)
+            or not 1 <= len(files) <= 128
+            or metadata.get("retained_content")
+            != {"revision": manifest.get("revision"), "size_bytes": manifest.get("size_bytes")}
+        ):
+            raise LifecycleConflictError("Bound output is not a retained static build")
+        content = OutputContentStore(commons).read(manifest["revision"], manifest["size_bytes"])
+        if not path:
+            return {
+                "schema": "agent_commons.build-read.v1",
+                "artifact_id": artifact_id,
+                "content_revision": manifest["revision"],
+                "files": files,
+                "content_verified": True,
+                "review_content_complete": False,
+            }
+        entry = next((entry for entry in files if entry.get("path") == path), None)
+        if entry is None or Path(path).suffix.lower() not in {
+            ".html",
+            ".css",
+            ".js",
+            ".mjs",
+            ".json",
+            ".txt",
+        }:
+            raise ValidationError("Build read requires a manifest-bound UTF-8 frontend entry")
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            info = archive.getinfo(path)
+            if info.file_size != entry["size_bytes"] or info.file_size > 10 * 1024 * 1024:
+                raise IntegrityError("Build entry bounds changed")
+            body = archive.read(path)
+        if "sha256:" + hashlib.sha256(body).hexdigest() != entry["revision"]:
+            raise IntegrityError("Build entry content changed")
+        cache_key = (artifact_id, str(bundle["artifact"]["manifest_ref"]), entry["revision"])
+        with checked_build_text_lock:
+            cached = checked_build_text.get(cache_key)
+            if cached is None:
+                try:
+                    text = body.decode("utf-8")
+                except UnicodeDecodeError:
+                    raise ValidationError("Build entry is not UTF-8") from None
+                # Scan the whole entry before slicing, including cross-chunk secrets.
+                text, redactions = workspace._review_content(
+                    text, context="scoped static build content"
+                )
+                # Account for redaction disclosures as well as decoded text.
+                weight = len(text.encode("utf-8")) + sum(
+                    256 + sum(len(str(value)) for value in item.values()) for item in redactions
+                )
+                if weight <= 20 * 1024 * 1024:
+                    while checked_build_text and (
+                        len(checked_build_text) >= 128
+                        or checked_build_text_bytes + weight > 20 * 1024 * 1024
+                    ):
+                        _, (_, _, removed) = checked_build_text.popitem(last=False)
+                        checked_build_text_bytes -= removed
+                    checked_build_text[cache_key] = (text, redactions, weight)
+                    checked_build_text_bytes += weight
+            else:
+                text, redactions, _ = cached
+                checked_build_text.move_to_end(cache_key)
+        if offset > len(text):
+            raise ValidationError("Build offset exceeds entry")
+        end = min(offset + limit, len(text))
+        ranges = build_read_ranges.setdefault((artifact_id, path), [])
+        ranges.append((offset, end))
+        cursor = 0
+        for start, stop in sorted(ranges):
+            if start > cursor:
+                break
+            cursor = max(cursor, stop)
+        if cursor == len(text):
+            build_read_ranges[(artifact_id, path)] = [(0, len(text))]
+        required = [
+            entry["path"]
+            for entry in files
+            if Path(entry["path"]).suffix.lower()
+            in {".html", ".css", ".js", ".mjs", ".json", ".txt"}
+        ]
+        # Completed entries have one consolidated range; do not infer completion
+        # from a manifest read or from a last chunk that skipped earlier bytes.
+        if cursor == len(text):
+            completed_build_entries.add((artifact_id, path))
+        complete = all((artifact_id, name) in completed_build_entries for name in required)
+        if complete:
+            worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
+        return {
+            "schema": "agent_commons.build-file-read.v1",
+            "artifact_id": artifact_id,
+            "content_revision": manifest["revision"],
+            "path": path,
+            "entry_revision": entry["revision"],
+            "content": text[offset:end],
+            "offset": offset,
+            "next_offset": end if end < len(text) else None,
+            "redactions": redactions,
+            "review_content_complete": complete,
+        }
 
     @register(_READ_ONLY, worker_only=True)
     def commons_read_skill(

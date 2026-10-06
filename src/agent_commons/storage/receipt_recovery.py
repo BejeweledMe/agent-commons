@@ -17,7 +17,11 @@ from agent_commons.core.schema_registry import SchemaRegistry
 from agent_commons.errors import IntegrityError, ValidationError
 from agent_commons.storage.atomic import atomic_write_replace
 from agent_commons.storage.events import EventRecord, semantic_event_body
-from agent_commons.storage.idempotency import IdempotencyReservation, IdempotencyStore
+from agent_commons.storage.idempotency import (
+    IdempotencyReservation,
+    IdempotencyStore,
+    ReceiptRecoveryView,
+)
 
 
 def _utc_now() -> str:
@@ -41,13 +45,13 @@ class ReceiptRecovery:
         self.workspace_id = workspace_id
         self.store.bind_workspace(workspace_id)
 
-    def _event_info(self, record: EventRecord) -> dict[str, str]:
+    def _event_info(self, record: EventRecord, *, file_sha256: str | None = None) -> dict[str, str]:
         event = record.event
         namespace = str(event["idempotency_namespace"])
         key = str(event["idempotency_key"])
         return {
             "path": self.paths.canonical_relative(record.path),
-            "event_sha256": sha256_bytes(record.path.read_bytes()),
+            "event_sha256": file_sha256 or sha256_bytes(record.path.read_bytes()),
             "key_digest": self.store.key_digest(namespace, key),
             "namespace": namespace,
             "key": key,
@@ -56,11 +60,19 @@ class ReceiptRecovery:
             "recorded_at": str(event["recorded_at"]),
         }
 
-    def _event_map(self, records: Sequence[EventRecord]) -> dict[str, dict[str, str]]:
+    def _event_map(
+        self,
+        records: Sequence[EventRecord],
+        *,
+        file_digests: Mapping[object, str] | None = None,
+    ) -> dict[str, dict[str, str]]:
         result: dict[str, dict[str, str]] = {}
         identities: set[tuple[str, str]] = set()
         for record in records:
-            info = self._event_info(record)
+            info = self._event_info(
+                record,
+                file_sha256=None if file_digests is None else file_digests.get(record.path),
+            )
             digest = info["key_digest"]
             identity = (info["namespace"], info["key"])
             if digest in result or identity in identities:
@@ -132,10 +144,17 @@ class ReceiptRecovery:
         additions = sorted(path for path in current if path not in anchored)
         return issues, additions
 
-    def status(self, records: Sequence[EventRecord]) -> dict[str, Any]:
+    def status(
+        self,
+        records: Sequence[EventRecord],
+        *,
+        file_digests: Mapping[object, str] | None = None,
+        receipt_view: ReceiptRecoveryView | None = None,
+    ) -> dict[str, Any]:
+        receipt_view = receipt_view or self.store.load_recovery_view()
         issues: list[str] = []
         warnings: list[str] = []
-        event_map = self._event_map(records)
+        event_map = self._event_map(records, file_digests=file_digests)
         current_anchor = self._current_anchor_entries(event_map)
         migration = self.store.get_migration()
         scope_document = self.store.get_scope_document()
@@ -153,13 +172,13 @@ class ReceiptRecovery:
         tombstone_matches: list[str] = []
         reconciled: list[str] = []
         for digest, info in event_map.items():
-            receipt = self.store.get_by_digest(digest)
+            receipt = receipt_view.reservations.get(digest)
             if receipt is None:
                 missing.append(digest)
             elif not self._receipt_matches(receipt, info):
                 conflicts.append(digest)
-            abandonment = self.store.get_abandonment(digest)
-            reconciliation = self.store.get_reconciliation(digest)
+            abandonment = receipt_view.abandonments.get(digest)
+            reconciliation = receipt_view.reconciliations.get(digest)
             if abandonment is not None:
                 if not self._abandonment_matches(abandonment, info):
                     conflicts.append(digest)
@@ -173,7 +192,7 @@ class ReceiptRecovery:
                     conflicts.append(digest)
                 else:
                     reconciled.append(digest)
-        for receipt in self.store.iter_reservations():
+        for receipt in receipt_view.reservations.values():
             info = event_map.get(receipt.key_digest)
             if info is None:
                 orphan.append(receipt.key_digest)
@@ -249,7 +268,7 @@ class ReceiptRecovery:
             ),
             "anchor_generation": None if anchor is None else anchor["generation"],
             "event_count": len(event_map),
-            "receipt_count": sum(1 for _ in self.store.iter_reservations()),
+            "receipt_count": len(receipt_view.reservations),
             "missing_receipts": sorted(set(missing)),
             "orphan_receipts": sorted(set(orphan)),
             "conflicting_receipts": sorted(set(conflicts)),
@@ -293,16 +312,17 @@ class ReceiptRecovery:
         event_map: Mapping[str, Mapping[str, str]],
         *,
         actor: Mapping[str, Any],
+        receipt_view: ReceiptRecoveryView,
     ) -> tuple[int, int]:
         derived = 0
         tombstones = 0
         for digest, info in event_map.items():
-            abandonment = self.store.get_abandonment(digest)
+            abandonment = receipt_view.abandonments.get(digest)
             if abandonment is not None:
                 if not self._abandonment_matches(abandonment, info):
                     raise IntegrityError("idempotency abandonment conflicts with a canonical event")
-                if self.store.get_reconciliation(digest) is None:
-                    self.store.reconcile_abandonment(
+                if receipt_view.reconciliations.get(digest) is None:
+                    reconciliation = self.store.reconcile_abandonment(
                         abandonment,
                         namespace=info["namespace"],
                         key=info["key"],
@@ -313,8 +333,9 @@ class ReceiptRecovery:
                         actor_principal_id=str(actor["principal_id"]),
                         reason="exact canonical event observed in current checkout",
                     )
+                    receipt_view.reconciliations[digest] = dict(reconciliation)
                     tombstones += 1
-            reservation = self.store.get_by_digest(digest)
+            reservation = receipt_view.reservations.get(digest)
             if reservation is None:
                 reservation = self.store.reserve(
                     namespace=info["namespace"],
@@ -323,20 +344,23 @@ class ReceiptRecovery:
                     event_id_factory=lambda event_id=info["event_id"]: event_id,
                     recorded_at=info["recorded_at"],
                 )
+                receipt_view.reservations[digest] = reservation
                 derived += int(reservation.created)
             if not self._receipt_matches(reservation, info):
                 raise IntegrityError("derived receipt conflicts with its canonical event")
         return derived, tombstones
 
-    def _preflight_event_identities(self, event_map: Mapping[str, Mapping[str, str]]) -> None:
+    def _preflight_event_identities(
+        self, event_map: Mapping[str, Mapping[str, str]], *, receipt_view: ReceiptRecoveryView
+    ) -> None:
         for digest, info in event_map.items():
-            receipt = self.store.get_by_digest(digest)
+            receipt = receipt_view.reservations.get(digest)
             if receipt is not None and not self._receipt_matches(receipt, info):
                 raise IntegrityError("idempotency receipt conflicts with a canonical event")
-            abandonment = self.store.get_abandonment(digest)
+            abandonment = receipt_view.abandonments.get(digest)
             if abandonment is not None and not self._abandonment_matches(abandonment, info):
                 raise IntegrityError("idempotency abandonment conflicts with a canonical event")
-            reconciliation = self.store.get_reconciliation(digest)
+            reconciliation = receipt_view.reconciliations.get(digest)
             if reconciliation is not None and (
                 reconciliation["event_id"] != info["event_id"]
                 or reconciliation["event_sha256"] != info["event_sha256"]
@@ -350,9 +374,12 @@ class ReceiptRecovery:
         *,
         actor: Mapping[str, Any],
         adopt_legacy_orphans: Sequence[str] = (),
+        file_digests: Mapping[object, str] | None = None,
+        receipt_view: ReceiptRecoveryView | None = None,
     ) -> dict[str, Any]:
-        event_map = self._event_map(records)
-        self._preflight_event_identities(event_map)
+        receipt_view = receipt_view or self.store.load_recovery_view()
+        event_map = self._event_map(records, file_digests=file_digests)
+        self._preflight_event_identities(event_map, receipt_view=receipt_view)
         current_anchor = self._current_anchor_entries(event_map)
         migration = self.store.get_migration()
         scope_document = self.store.get_scope_document()
@@ -391,8 +418,15 @@ class ReceiptRecovery:
                     f"legacy orphan idempotency receipt {digest} requires "
                     f"`receipt reconcile --adopt-legacy-orphan {digest}` or abandonment"
                 )
+            # Validate legacy identities before publishing recovery state. They
+            # were not present in the scoped view checked above.
+            for abandonment in legacy_abandonments:
+                info = event_map.get(str(abandonment["key_digest"]))
+                if info is not None and not self._abandonment_matches(abandonment, info):
+                    raise IntegrityError("idempotency abandonment conflicts with a canonical event")
             for abandonment in legacy_abandonments:
                 self.store.copy_legacy_abandonment(abandonment)
+                receipt_view.abandonments[str(abandonment["key_digest"])] = dict(abandonment)
 
             # The anchor is published before scoped recovery state. A crash can
             # therefore resume from the anchor without mistaking bootstrap for deletion.
@@ -400,6 +434,7 @@ class ReceiptRecovery:
             for receipt in legacy_receipts:
                 if receipt.key_digest in event_map or receipt.key_digest in adopted:
                     result = self.store.import_reservation(receipt)
+                    receipt_view.reservations[receipt.key_digest] = result
                     imported += int(result.created)
         else:
             anchor = self._write_anchor(current_anchor, anchor)
@@ -407,6 +442,7 @@ class ReceiptRecovery:
         derived, reconciled = self._derive_receipts_and_tombstones(
             event_map,
             actor=actor,
+            receipt_view=receipt_view,
         )
         self.store.ensure_scope()
         if migration is None:
@@ -415,7 +451,7 @@ class ReceiptRecovery:
                 legacy_receipt_count=len(legacy_receipts),
                 legacy_abandonment_count=len(legacy_abandonments),
             )
-        result = self.status(records)
+        result = self.status(records, file_digests=file_digests, receipt_view=receipt_view)
         result.update(
             {
                 "imported_receipts": imported,
@@ -433,7 +469,9 @@ class ReceiptRecovery:
         *,
         actor: Mapping[str, Any],
         requested_identity: tuple[str, str] | None,
+        file_digests: Mapping[object, str] | None = None,
     ) -> None:
+        receipt_view = self.store.load_recovery_view()
         migration = self.store.get_migration()
         legacy_state = any(self.store.iter_legacy_reservations()) or any(
             self.store.iter_legacy_abandonments()
@@ -443,9 +481,11 @@ class ReceiptRecovery:
                 raise IntegrityError(
                     "idempotency v2 migration is required; run `agent-commons receipt reconcile`"
                 )
-            self.reconcile(records, actor=actor)
+            self.reconcile(
+                records, actor=actor, file_digests=file_digests, receipt_view=receipt_view
+            )
 
-        status = self.status(records)
+        status = self.status(records, file_digests=file_digests, receipt_view=receipt_view)
         hard_prefixes = (
             "ledger anchor is missing",
             "ledger anchor conflicts",
@@ -464,8 +504,10 @@ class ReceiptRecovery:
             or status["anchor_state"] == "absent"
         )
         if recoverable:
-            self.reconcile(records, actor=actor)
-            status = self.status(records)
+            self.reconcile(
+                records, actor=actor, file_digests=file_digests, receipt_view=receipt_view
+            )
+            status = self.status(records, file_digests=file_digests, receipt_view=receipt_view)
 
         orphans = set(status["orphan_receipts"])
         requested_digest: str | None = None

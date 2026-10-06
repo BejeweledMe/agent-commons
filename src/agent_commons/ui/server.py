@@ -1186,6 +1186,8 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
                 str(item) for item in (body.get("acceptance_criteria") or ())
             ),
             dependencies=tuple(str(item) for item in (body.get("dependencies") or ())),
+            task_kind=body.get("task_kind", "task"),
+            parent_task_id=body.get("parent_task_id"),
             idempotency_key=body.get("idempotency_key"),
         )
 

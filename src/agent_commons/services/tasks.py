@@ -33,6 +33,8 @@ class TaskCommands:
         dependencies: Sequence[str] = (),
         suggested_agent_id: str | None = None,
         objective_id: str | None = None,
+        task_kind: str = "task",
+        parent_task_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("task.created", idempotency_key)
@@ -62,6 +64,8 @@ class TaskCommands:
                 "priority": priority,
                 "dependencies": dependency_ids,
                 "objective_id": objective_id,
+                **({"task_kind": task_kind} if task_kind != "task" else {}),
+                **({"parent_task_id": parent_task_id} if parent_task_id is not None else {}),
                 **suggestion,
             },
             idempotency_key=key,
@@ -240,6 +244,10 @@ class TaskCommands:
         """None retains exact task evidence; an explicit sequence replaces it."""
 
         if artifact_refs is not None:
+            if not artifact_refs:
+                # No evidence needs binding. record_event still validates the
+                # ledger and transition inside the canonical write lock.
+                return []
             return self._bind_evidence_refs(artifact_refs)
         task = entity(self.snapshot(), "task", task_id)
         if task is None:

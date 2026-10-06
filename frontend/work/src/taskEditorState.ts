@@ -4,17 +4,19 @@ export type TaskEditorDraft = {
   taskId: string; revision: string; title: string; description: string; criteria: string;
   dependencyIds: readonly string[]; stale: boolean;
   originalCriteria?: readonly string[];
+  parentTaskId?: string | null;
 };
 export function taskEditorDraft(detail: TaskEditDetail): TaskEditorDraft {
   return { taskId: detail.taskId, revision: detail.revision, title: detail.title,
-    description: detail.description, criteria: detail.criteria.join("\n"), originalCriteria: [...detail.criteria], dependencyIds: [...detail.dependencyIds], stale: false };
+    parentTaskId: detail.parentTaskId, description: detail.description, criteria: detail.criteria.join("\n"), originalCriteria: [...detail.criteria], dependencyIds: [...detail.dependencyIds], stale: false };
 }
 export function observeTaskEditorDraft(current: TaskEditorDraft | null, detail: TaskEditDetail): TaskEditorDraft {
   if (current === null || current.taskId !== detail.taskId) return taskEditorDraft(detail);
   return current.revision === detail.revision || current.stale ? current : { ...current, stale: true };
 }
-export function editorInput(draft: Pick<TaskEditorDraft, "title" | "description" | "criteria" | "dependencyIds" | "originalCriteria">): TaskEditInput {
+export function editorInput(draft: Pick<TaskEditorDraft, "title" | "description" | "criteria" | "dependencyIds" | "originalCriteria" | "parentTaskId">): TaskEditInput {
   return { title: draft.title, description: draft.description,
+    ...(draft.parentTaskId !== undefined ? { parentTaskId: draft.parentTaskId } : {}),
     criteria: draft.originalCriteria?.join("\n") === draft.criteria ? [...draft.originalCriteria]
       : draft.criteria.split("\n").map((line) => line.trim()).filter(Boolean), dependencyIds: [...draft.dependencyIds] };
 }

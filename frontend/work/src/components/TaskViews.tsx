@@ -1,11 +1,11 @@
-import { type KeyboardEvent, type ReactElement, useRef } from "react";
+import { type KeyboardEvent, type ReactElement, useRef, useState } from "react";
 import { TASKS_VIEWS, type TasksView } from "../appRouteState.js";
 import type { TrackerSnapshot, TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
-import { MAX_GRAPH_TASKS } from "../taskGraph.js";
 import { taskGraphText } from "../taskGraphStrings.js";
 import { NOW_COLUMNS, nowColumnEmpty, nowColumnLabel, type NowBuckets } from "../taskPresentation.js";
 import { OutputsButton } from "./OutputsPanel.js";
+import { TaskHierarchy } from "./TaskHierarchy.js";
 import { TaskGraph } from "./TaskGraph.js";
 import { TaskState } from "./TaskInspector.js";
 
@@ -32,14 +32,13 @@ type Props = {
 
 /**
  * The three presentations of the Tasks tab (ADR 0020, item 6): Now, Map and All
- * tasks. Exactly one of them is in the DOM at a time — the capacity fallback for
- * Map is decided here, before the graph would be mounted, so a large project can
- * never render both a graph and a task list (B-16).
+ * tasks. Exactly one is in the DOM at a time. Map owns its scoped capacity check
+ * so a small selected component remains navigable in a large project.
  */
 export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets, selectedTaskId, locale, text, onSelectTask, onTaskKeyDown, registerTaskButton, onClearFilters }: Props): ReactElement {
+  const [mapKind, setMapKind] = useState<"structure" | "dependencies">("dependencies");
   const tabs = useRef(new Map<TasksView, HTMLButtonElement>());
   const t = (key: Parameters<typeof taskGraphText>[1]): string => taskGraphText(locale, key);
-  const overGraphCapacity = visibleTasks.length > MAX_GRAPH_TASKS;
 
   function moveTabFocus(event: KeyboardEvent<HTMLButtonElement>): void {
     if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -66,7 +65,7 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
     </li>;
   }
 
-  /** The one task list in the application; Map borrows it above its capacity. */
+  /** The All tasks list; Map owns its bounded selection and list equivalent. */
   function taskList(): ReactElement {
     return <ul className="task-list" aria-describedby="tracker-keyboard-help">{visibleTasks.map(taskRow)}</ul>;
   }
@@ -97,12 +96,13 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
 
   function mapView(): ReactElement {
     if (visibleTasks.length === 0 && snapshot.tasks.length > 0) return filteredToNothing();
-    if (overGraphCapacity) return <>
-      <p className="inspector-notice" role="status">{t("graphLimit")}</p>
-      {taskList()}
-    </>;
     return <>
-      <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} locale={locale} />
+      <div className="button-row" role="group" aria-label={text("hierarchy_view")}>
+        <button type="button" className="button button-secondary" aria-pressed={mapKind === "structure"} onClick={() => setMapKind("structure")}>{text("hierarchy_structure")}</button>
+        <button type="button" className="button button-secondary" aria-pressed={mapKind === "dependencies"} onClick={() => setMapKind("dependencies")}>{text("task_dependencies")}</button>
+      </div>
+      {mapKind === "structure" ? <TaskHierarchy tasks={visibleTasks} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} text={text} />
+        : <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} locale={locale} />}
       {visibleTasks.length !== snapshot.tasks.length ? <p className="small-copy">{t("filtered")}</p> : null}
     </>;
   }

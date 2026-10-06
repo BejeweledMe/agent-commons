@@ -1,0 +1,41 @@
+{
+  "command": "PATH=/opt/homebrew/opt/node@24/bin:$PATH make check",
+  "exit_code": 0,
+  "source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+  "python": {
+    "passed": 2852,
+    "skipped": 14,
+    "warnings": 2,
+    "seconds": 1099.59
+  },
+  "frontend_work": {
+    "passed": 429,
+    "failed": 0
+  },
+  "frontend_gallery": {
+    "passed": 27,
+    "failed": 0
+  },
+  "ruff_check": "passed",
+  "ruff_format_check": "passed",
+  "full_log_sha256": "ae47715d45f3dc73bebc193058a9a956f0ed9769b90377ff2d0bbbf8d2cdf825",
+  "full_log_local_path": "/private/tmp/commons-product-integration-20261001/make-check-release.log",
+  "skip_reasons": {
+    "large_benchmark_opt_in": 1,
+    "automatic_grant_level_intentionally_withheld": 12,
+    "ci_only": 1
+  },
+  "separate_large_benchmark": "Actual Grok six-workload run is preserved in wp20/grok-verification; it is not inferred from the skipped default test.",
+  "prior_runs": [
+    {
+      "passed": 2821,
+      "failed": 4,
+      "issue": "Legacy history expectations migrated with true legacy coverage."
+    },
+    {
+      "passed": 2843,
+      "failed": 2,
+      "issue": "Stale comment assertion and legacy setup mock fixed; behavior separately tested."
+    }
+  ]
+}

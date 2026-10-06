@@ -197,6 +197,20 @@ delegation is one leaf worker, and worker profiles receive no delegation-create
 or broker-run tools. The ledger continues to replay older parent/child records,
 but new recursive Codex/Claude chains are rejected until parent-sliced budgets,
 fanout accounting, and worker authority are implemented together.
+Implementation startup also carries ephemeral broker-selected repository, resolved
+state root and existing child session facts. When the configured MCP's paired CLI
+is available, commons-start reads use its trusted absolute sibling entrypoint with
+explicit `--repo`, `--state-root`, `--session-id` and `--read-only` flags. Pairing
+requires the same resolved installation bin directory and Python shebang; another
+CLI earlier on PATH is never substituted. Login-shell exports cannot override the
+explicit arguments. Custom wrappers or missing/untrusted siblings have no proven
+CLI pairing: the instruction says so and requires an honest scoped needs-operator
+outcome when mandatory startup cannot be completed. No CLI installation, session
+creation, nonce disclosure or canonical CLI write is authorized. Canonical writes
+and outcomes remain worker-scoped MCP operations. Reviewer native-tool restrictions
+and instructions are unchanged. The final child-bound instruction is checked for
+size and included in the existing immutable launch/skill/context fingerprint.
+
 
 Those request limits never define their own global authority. Every broker using
 one state root shares operator-owned global, per-provider, per-profile,
@@ -365,3 +379,66 @@ security-sensitive, or externally visible decisions should not bypass governed
 promotion. These modes choose where the same lifecycle stops; they do not
 weaken integrity rules or create a hidden acceptance bypass. Local
 principal/model labels are not an authority mechanism.
+
+## Retained worker results
+
+[ADR 0025](adr/0025-retained-worker-results.md) defines the local durable-result
+boundary. `commons_publish_design_image` now retains validated PNG/JPEG bytes;
+`commons_publish_static_build` retains a deterministic ZIP of a repository-relative
+static dist directory. Both are implementation/verification worker tools and prove
+current worker/task/delegation bindings before canonical publication. Publication
+neither completes the task nor requests/approves review or accepts work.
+
+Existing artifact manifest metadata adds `retained_content: {revision, size_bytes}`
+matching the manifest digest and size. Generated output provenance remains a closed
+contract. Static build metadata uses `output_kind: task_static_build` and adds
+`build_files` (path, SHA256 revision, size); ZIP includes
+`commons-build-manifest.json`. Image bounds remain 10 MiB/16 million pixels. Build
+bounds are 128 files, 128 directories, depth 16, 10 MiB per file and 20 MiB for the
+whole ZIP. An `index.html` is required. Frontend extension allowlist, ordinary
+single-link files, descriptor traversal without symlinks, and exact byte verification
+exclude hidden/private entries, external paths, special files and link escapes.
+
+The local `output-content` directory below workspace state retains at most 512
+objects/256 MiB. Content addresses are SHA256 names. Publication takes the manager
+canonical lock, then the content-store process/thread lock; readers never acquire
+a canonical write lock while holding a store lock. Write, fsync and atomic link
+precede canonical append. An interrupted pre-append object remains quota charged;
+identical retries reuse it and repair an interrupted link to their own verified
+partial object. Partial files never become readable objects. Quota
+failure refuses publication and preserves earlier outputs; no automatic eviction
+exists. Backup/restore must include this store. Missing/corrupt bytes have an honest
+unavailable preview. Legacy metadata-only images continue checking original source
+bytes, and cannot be reconstructed from hashes. New versions need new operation
+keys; reuse conflicts if content or intent changed. An identical retry of the exact
+historical five-field image metadata returns its original artifact/event revision
+with `content_copied: false`; it neither copies bytes nor upgrades ledger history.
+Publishing retained bytes for that image requires a new operation key.
+
+`/api/outputs/builds/{artifact_id}/{artifact_revision}` is an authenticated,
+project/scoped, exact-version ZIP attachment with `nosniff` and `no-store`; it never
+serves build HTML. Browsing the gallery never downloads a build or launches a
+server. Live advertisements retain their separate TTL/reachability contract.
+
+Output DTOs add `retained` (old default false) and `result_review_state` (old default
+null). Existing `review_state` describes the current task review. Exact result
+standing comes only from an artifact-target review of the displayed artifact event
+revision. An approval requires independence and, for a delegated reviewer, a
+matching succeeded delegation. It does not propagate to another version and does
+not imply task acceptance or Design Package acceptance.
+
+Independent-review worker tools `commons_read_output_image` and
+`commons_read_build_file` inspect only frozen in-scope artifact revisions. The image
+tool returns actual verified MCP pixels. The build tool verifies the entire retained
+bundle and requested entry hashes, returns manifest or UTF-8 text chunks of at most
+65,536 characters, and rejects non-text/unknown entries. Whole-entry policy scanning
+precedes slicing, so secrets spanning chunk boundaries remain redacted. A session
+cache reuses checked text only for the frozen manifest/entry digest (at most 128
+entries/20 MiB of text and redaction accounting); each read still verifies the
+current frozen binding, CAS object and entry bytes. Cache eviction removes no
+retained content. All text entries must be
+read without gaps before artifact evidence satisfies `commons_finalize_review`;
+manifest-only reads do not. Binary assets have verified hashes but are not rendered
+by the build-file tool. Evidence coverage is separate from a substantive review:
+criteria/summary must state visual, execution and test limitations honestly. Changed
+artifact binding, missing bytes, failed verification and out-of-scope reads refuse.

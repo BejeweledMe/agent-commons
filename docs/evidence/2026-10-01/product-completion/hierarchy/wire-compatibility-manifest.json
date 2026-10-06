@@ -1,0 +1,25 @@
+{
+  "files": [
+    {
+      "path": "src/agent_commons/domain/task_projection.py",
+      "base_sha256": "e4d1d0292f2c57eb73bd04e7197a36e8e4a7227220a944e4c95105fb1dc50615",
+      "sha256": "f8b67ff0f0f99d50052a08adddaa2b1fd924870f974e2b5d15992162cd2bdcf8"
+    },
+    {
+      "path": "tests/domain/test_task_projection.py",
+      "base_sha256": "17fb61d32b34c19d960b688c124d4a4d72d2b17968ec26b448ed93502632d886",
+      "sha256": "15808f10ef5a199b6c4a9ac5726f18fd0977298df4dc42986834f636b01ba27f"
+    },
+    {
+      "path": "tests/services/test_task_hierarchy_corrections.py",
+      "base_sha256": "75c5e4cd1df8e6d8ca2ffc36acbd2cdf3d964d0981f1e3bc588d108ada7b2527",
+      "sha256": "26e106569cc455353a53904c394af8f614e17cd39a71a47b02474e5f2cee2bec"
+    },
+    {
+      "path": "docs/adr/0024-explicit-task-hierarchy.md",
+      "base_sha256": "1f3dec3542ecaadca365d05a0c8d33a8484b7f016a2e59d1a2f03b630cca61c3",
+      "sha256": "5beb5d821066b1d1c5e87d23a27a8541bdf41270a82019f32f54c7c74d795d88"
+    }
+  ],
+  "base": "last delivered final G6 manifest cabfad11aa330749267d43d3280985109f63a8595bb4b6058c8436392f0f11a8"
+}

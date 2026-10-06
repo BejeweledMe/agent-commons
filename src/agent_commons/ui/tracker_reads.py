@@ -185,6 +185,8 @@ def build_tracker_snapshot(
             task_id=node.task_id,
             title=_task_title(snapshot.tasks.get(node.task_id)),
             task_state=node.task_state,
+            task_kind=str((snapshot.tasks.get(node.task_id) or {}).get("task_kind", "task")),
+            parent_task_id=(snapshot.tasks.get(node.task_id) or {}).get("parent_task_id"),
             readiness=node.readiness.value,
             dependency_task_ids=node.dependency_task_ids,
             blocking_dependency_ids=node.blocking_dependency_ids,

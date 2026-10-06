@@ -3,7 +3,7 @@ import type { TaskOption } from "../contracts";
 import type { MessageKey } from "../i18n";
 import { stateLabel } from "../taskPresentation.js";
 
-export type TaskDraft = { title: string; description: string; criteria: string; dependencyIds: readonly string[] };
+export type TaskDraft = { title: string; description: string; criteria: string; dependencyIds: readonly string[]; taskKind?: "task" | "component"; parentTaskId?: string | null };
 
 export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = false, writesEnabled, tasks, dependencyStatus = "current", onSubmit, onClose, onDependency, text }: {
   draft: TaskDraft;
@@ -26,6 +26,15 @@ export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = fa
     <p className="small-copy">{text("shell_composer_intro")}</p>
     <form noValidate onSubmit={onSubmit}>
       <fieldset disabled={!writesEnabled || busy}>
+        <label htmlFor="task-kind">{text("hierarchy_kind")}</label>
+        <select id="task-kind" value={draft.taskKind ?? "task"} onChange={(event) => onChange({ ...draft, taskKind: event.target.value as "task" | "component" })}>
+          <option value="task">{text("hierarchy_task")}</option><option value="component">{text("hierarchy_component")}</option>
+        </select>
+        <label htmlFor="task-parent">{text("hierarchy_parent")}</label>
+        <select id="task-parent" value={draft.parentTaskId ?? ""} onChange={(event) => onChange({ ...draft, parentTaskId: event.target.value || null })}>
+          <option value="">{text("hierarchy_project")}</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+        </select>
+        <p className="small-copy">{text("hierarchy_help")}</p>
         <label htmlFor="task-title">{text("task_title")}</label>
         <input id="task-title" value={draft.title} aria-invalid={errors.has("title")} onChange={(event) => onChange({ ...draft, title: event.target.value })} placeholder={text("task_title_placeholder")} />
         {errors.has("title") ? <p className="field-error">{text("form_error_task_title")}</p> : null}

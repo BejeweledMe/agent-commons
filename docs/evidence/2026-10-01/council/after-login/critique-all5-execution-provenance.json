@@ -1,0 +1,125 @@
+{
+  "stage": "full_five_response_peer_critique",
+  "safe_mode": true,
+  "restricted": true,
+  "tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "mcp_servers": [],
+  "session_persistence": false,
+  "fresh_contexts": true,
+  "identical_rubric_and_inputs": true,
+  "role_specific_rubric": false,
+  "other_critiques_supplied": false,
+  "frozen_input_hashes_unchanged": true,
+  "source_manifest_hash_unchanged": true,
+  "original_attempt1": "interrupted, no visible final, partial usage unknown, actual runtime model identity unknown; preserved per-lane interruption provenance",
+  "records": [
+    {
+      "lane": "B",
+      "attempt": 2,
+      "status": "succeeded",
+      "requested_model": "claude-fable-5-1",
+      "provider_reported_primary_model": "claude-fable-5-1",
+      "provider_model_usage": {
+        "claude-haiku-4-5-20251001": {
+          "inputTokens": 1000,
+          "outputTokens": 15,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 0.001075,
+          "contextWindow": 200000,
+          "maxOutputTokens": 32000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-haiku-4-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        },
+        "claude-fable-5-1": {
+          "inputTokens": 368,
+          "outputTokens": 15608,
+          "cacheReadInputTokens": 324511,
+          "cacheCreationInputTokens": 86879,
+          "webSearchRequests": 0,
+          "costUSD": 2.60278775,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 5622,
+          "canonicalModel": "claude-fable-5-1",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "session_id": "a5a4b262-45d2-4358-b0c5-85d4c1ecf88d",
+      "seconds": 236.223,
+      "result_chars": 9212,
+      "result_words_whitespace": 1196,
+      "final_sha256": "13c0b0a7f35ea0eb8ef723d9eff36db18f42950f5973ca49af058594ef85c707",
+      "final_path": "/private/tmp/commons-council-20261001/resumed-council/critique-B-all5.md",
+      "private_raw_path": "/private/tmp/commons-council-20261001/resumed-council/critique-B-all5-attempt2-stdout.txt",
+      "raw_stdout_sha256": "d6303e1503e77f9ccfcefda956a21eef60b4d12e957d4edbc4c7f80a60bcaab3",
+      "permission_denials_count": 0,
+      "additional_runtime_models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "additional_runtime_model_purpose": "unknown; not a council opinion",
+      "retry_reason": "original exec session/processes disappeared before final output",
+      "fallback": null
+    },
+    {
+      "lane": "D",
+      "attempt": 2,
+      "status": "succeeded",
+      "requested_model": "claude-opus-4-6",
+      "provider_reported_primary_model": "claude-opus-4-6",
+      "provider_model_usage": {
+        "claude-haiku-4-5-20251001": {
+          "inputTokens": 1000,
+          "outputTokens": 12,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 0.00106,
+          "contextWindow": 200000,
+          "maxOutputTokens": 32000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-haiku-4-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        },
+        "claude-opus-4-6": {
+          "inputTokens": 7,
+          "outputTokens": 6680,
+          "cacheReadInputTokens": 112213,
+          "cacheCreationInputTokens": 51822,
+          "webSearchRequests": 0,
+          "costUSD": 0.7413615,
+          "contextWindow": 200000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 1395,
+          "canonicalModel": "claude-opus-4-6",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "session_id": "9f02f22b-2d05-4b52-a28f-a109a157ac00",
+      "seconds": 160.235,
+      "result_chars": 10078,
+      "result_words_whitespace": 1281,
+      "final_sha256": "caaac457cb1b2ef2b36e28cf7a5e90f0683b8f6760c221e6c1c00782650313a4",
+      "final_path": "/private/tmp/commons-council-20261001/resumed-council/critique-D-all5.md",
+      "private_raw_path": "/private/tmp/commons-council-20261001/resumed-council/critique-D-all5-attempt2-stdout.txt",
+      "raw_stdout_sha256": "a7dff0c11e6ee4cfe2ea54a725f15495699aadbd52641c56b7e0e50c536445be",
+      "permission_denials_count": 0,
+      "additional_runtime_models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "additional_runtime_model_purpose": "unknown; not a council opinion",
+      "retry_reason": "original exec session/processes disappeared before final output",
+      "fallback": null
+    }
+  ]
+}

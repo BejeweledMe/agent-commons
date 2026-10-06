@@ -208,3 +208,36 @@ def test_a_private_key_without_a_closing_marker_is_redacted_to_the_end() -> None
     start, end, finding = policy.scan_text_lines(key)[0]
     assert finding.category == "pem_private_key"
     assert (start, end) == (1, 3), "a block with no END must run to the end of the input"
+
+
+@pytest.mark.parametrize("size", [65_535, 1024 * 1024])
+def test_long_identifier_scanning_has_a_bounded_runtime(size) -> None:
+    # A subprocess deadline also stops a future quadratic regression rather
+    # than allowing the test runner itself to hang on attacker-controlled text.
+    import subprocess
+    import sys
+
+    program = """
+import sys
+from agent_commons.security import SecurityPolicy
+text = 'a' * int(sys.argv[1]) + '😀Жe\\u0301終' + 'b' * 10
+policy = SecurityPolicy()
+assert not policy.scan(text)
+assert not policy.scan_text_lines(text)
+policy.assert_safe(text)
+"""
+    subprocess.run([sys.executable, "-c", program, str(size)], check=True, timeout=5)
+
+
+@pytest.mark.parametrize("prefix", ["", "123", ".-123", "Ж", " "])
+@pytest.mark.parametrize("value", ['"short"', "'short'", "short"])
+def test_assignment_token_boundaries_preserve_credentials(prefix, value) -> None:
+    text = prefix + "password\n = \n" + value
+    assert SecurityPolicy().scan(text)
+    assert SecurityPolicy().scan_text_lines(text)
+
+
+def test_adjacent_identifier_suffix_does_not_create_a_credential() -> None:
+    # The original scanner's greedy key also treated this as one safe key.
+    assert not SecurityPolicy().scan('unrelatedpassword="value"')
+    assert not SecurityPolicy().scan_text_lines('unrelatedpassword="value"')

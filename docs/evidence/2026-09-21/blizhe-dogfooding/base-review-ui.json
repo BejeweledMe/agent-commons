@@ -1,0 +1,47 @@
+{
+  "review_id": "review.15CPSD4Q6EH78T4Z5EQ63V9HZY",
+  "target_ref": {
+    "kind": "task",
+    "id": "task.4D6NW589CTR6XVST3EG1R82CMF"
+  },
+  "target_revision": "evt.01M32MXE8KDCW267YE20DMC2G5",
+  "criteria": [
+    "Проверь независимо текущую ревизию задачи BASE и файл docs/audit/2026-09-21-dogfooding/BASE.md; ожидаемый SHA-256 08554d346837cef29b6c3bc8e372967d155b2ad923f601e88652eb360980e331. Только read-only проверка, без исправлений, commit/push/PR/Linear/deploy.",
+    "Учтены 44 незакоммиченные записи и 4914 исходных файлов; повторно сверь /tmp/blizhe-dogfooding-20260921/owner-baseline.json с исходным /Users/dmitrijersov/Desktop/blizhe-webapp, не меняя его.",
+    "Сравнены исходный HEAD, свежий main и цепочка PR30/31/32, точные SHA и отсутствующие локально коммиты; недоступное живое чтение GitHub явно отделено от fetched refs и не выдано за актуальную внешнюю проверку.",
+    "Проверена отдельная ветка codex/blizhe-improvement-20260921 от main ae2de22f81767c63c3b2806343f2ca0be196aa2a; оригинал остаётся main/cbdcad62052808343feca6a0a84a8b9b9e54976a.",
+    "Происхождение ключевых документов разделено на committed main, owner-WIP, исторические материалы; целевая модель не выдана за shipped behavior.",
+    "CHATRLS/PUBLIC/GRANTS и SQL-политики исключены; существующие security PR не дублировались.",
+    "Проверь точную регистрацию результата в Commons и соответствие файла; в Work Evidence не показала exact reference. Зафиксируй проверенный путь, хеш и ограничения в вердикте. Не принимай работу за владельца."
+  ],
+  "independent": true,
+  "id": "review.15CPSD4Q6EH78T4Z5EQ63V9HZY",
+  "state": "changes_requested",
+  "revision": "evt.01M32N2WEWQD4XENTZKD34XG2W",
+  "effective_revision": "evt.01M32N2WEWQD4XENTZKD34XG2W",
+  "recorded_at": "2026-09-21T18:54:04.252407Z",
+  "actor": {
+    "capabilities": [],
+    "client": "codex",
+    "model_family": "codex",
+    "principal_id": "local-operator",
+    "role_id": "independent-reviewer",
+    "session_id": "session.990ab3f68f7d43af933746a2984be3fd",
+    "software": "codex-cli",
+    "stable_instance_id": "agent-commons-codex-d01573a9f62ca7ef31ffc54e"
+  },
+  "author_session_ids": [
+    "session.713c840823f54ba49089eb4bc5d21ae5",
+    "session.990ab3f68f7d43af933746a2984be3fd"
+  ],
+  "expected_revision": "evt.01M32MXEP792444YV2GCTY31R6",
+  "verdict": "changes_requested",
+  "summary": "Проверен read-only snapshot: docs/audit/2026-09-21-dogfooding/BASE.md, SHA-256 08554d346837cef29b6c3bc8e372967d155b2ad923f601e88652eb360980e331 (точное совпадение). Текст фиксирует original main/cbdcad62052808343feca6a0a84a8b9b9e54976a, отдельную ветку codex/blizhe-improvement-20260921 на ae2de22f81767c63c3b2806343f2ca0be196aa2a, PR #30/#31/#32 и fetched-ref границы, provenance документов, исключение CHATRLS/PUBLIC/GRANTS/SQL и недоступность live GitHub. Но у точной ревизии задачи artifact_refs и artifact_bindings пусты, canonical verifications отсутствуют: требуемая точная регистрация BASE.md в Commons не выполнена, а независимая повторная сверка owner-baseline (44 записи/4914 файлов, missing=0, changed=0) не подкреплена доступным каноническим evidence и потому не воспроизведена. Требуется зарегистрировать точный BASE.md как task artifact и приложить/зарегистрировать воспроизводимое read-only evidence baseline; после этого повторить независимый review. Работа владельца этим вердиктом не принимается.",
+  "evidence_refs": [],
+  "producer_agent_ids": [
+    "agent.7JST1KCVR32KBBYPWA1Y9K54RV"
+  ],
+  "producer_context_mode": "fresh",
+  "producer_prior_verdict_count": 0,
+  "stale": false
+}

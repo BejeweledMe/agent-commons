@@ -1,0 +1,93 @@
+diff --git a/src/agent_commons/domain/task_projection.py b/src/agent_commons/domain/task_projection.py
+--- a/src/agent_commons/domain/task_projection.py
++++ b/src/agent_commons/domain/task_projection.py
+@@ -1,8 +1,8 @@
+ """Frozen task projection records and their task-only reducer.
+ 
+ Canonical task events remain JSON mappings.  This module sits after their
+-validation and freezes the projected task read model. Additive hierarchy
+-defaults do not rewrite legacy canonical event payloads.
++validation and freezes the projected task read model. Hierarchy defaults are
++applied by consumers, preserving absent legacy fields in snapshot serialization.
+ """
+ 
+ from __future__ import annotations
+@@ -98,8 +98,6 @@
+         authors.add(actor_session_id)
+     collection[identifier] = TaskRecord.from_projected_data(
+         {
+-            "task_kind": "task",
+-            "parent_task_id": None,
+             **current_data,
+             **payload,
+             "id": identifier,
+diff --git a/tests/domain/test_task_projection.py b/tests/domain/test_task_projection.py
+--- a/tests/domain/test_task_projection.py
++++ b/tests/domain/test_task_projection.py
+@@ -151,8 +151,6 @@
+     assert record["artifact_bindings"] == [binding]
+ 
+     expected = {
+-        "task_kind": "task",
+-        "parent_task_id": None,
+         "task_id": task_id,
+         "title": "Corrected task",
+         "description": "Keep the existing task wire shape.",
+@@ -197,5 +195,28 @@
+     envelope = parse_task_review_envelope("task.created", payload)
+     assert envelope.to_payload() == payload
+     snapshot = project_events([_event(1, "task.created", payload, "task", identifier)])
+-    assert snapshot.tasks[identifier]["task_kind"] == "task"
+-    assert snapshot.tasks[identifier]["parent_task_id"] is None
++    record = snapshot.tasks[identifier]
++    assert record.get("task_kind", "task") == "task"
++    assert record.get("parent_task_id") is None
++    assert "task_kind" not in record.to_dict()
++    assert "parent_task_id" not in record.to_dict()
++
++
++def test_explicit_hierarchy_fields_remain_in_snapshot_wire_mapping() -> None:
++    identifier = "task." + "1" * 26
++    payload = {
++        "task_id": identifier,
++        "title": "Component",
++        "description": "Explicit hierarchy",
++        "priority": "normal",
++        "acceptance_criteria": ["Done"],
++        "task_kind": "component",
++        "parent_task_id": None,
++    }
++    created = _event(1, "task.created", payload, "task", identifier)
++    snapshot = project_events([created])
++    record = snapshot.tasks[identifier]
++    assert record.to_dict()["task_kind"] == "component"
++    assert "parent_task_id" in record.to_dict()
++    assert record.to_dict()["parent_task_id"] is None
++    assert snapshot.to_dict()["tasks"][0]["task_kind"] == "component"
+diff --git a/tests/services/test_task_hierarchy_corrections.py b/tests/services/test_task_hierarchy_corrections.py
+--- a/tests/services/test_task_hierarchy_corrections.py
++++ b/tests/services/test_task_hierarchy_corrections.py
+@@ -68,8 +68,8 @@
+     with pytest.raises(LifecycleConflictError, match=field):
+         correct(manager, child, replacement, "structural-correction")
+     assert manager.snapshot().tasks[cid]["state"] == "cancelled"
+-    assert manager.snapshot().tasks[cid]["task_kind"] == "task"
+-    assert manager.snapshot().tasks[cid]["parent_task_id"] is None
++    assert manager.snapshot().tasks[cid].get("task_kind", "task") == "task"
++    assert manager.snapshot().tasks[cid].get("parent_task_id") is None
+     # Replay an imported version of a legitimate wording correction with the
+     # same target/digest but unauthorized structure: write and replay agree.
+     allowed = correct(manager, child, {**original, "title": "Correct spelling"}, "text-correction")
+diff --git a/docs/adr/0024-explicit-task-hierarchy.md b/docs/adr/0024-explicit-task-hierarchy.md
+--- a/docs/adr/0024-explicit-task-hierarchy.md
++++ b/docs/adr/0024-explicit-task-hierarchy.md
+@@ -43,7 +43,8 @@
+ the correction workflow cannot silently manufacture valid orphans: normal replay
+ integrity checks report the missing parent. Project archival retains the ledger.
+ 
+-Old events omit both fields and replay as unparented tasks. Typed envelope
++Old events omit both fields and retain absent keys in raw snapshot mappings;
++consumers and browser DTOs apply the unparented/task defaults. Typed envelope
+ serialization preserves the original payload; new default task creation also
+ omits these fields so old identical create retries keep their request identity.
+ Schemas and browser DTO parsers accept the additive fields and reject malformed

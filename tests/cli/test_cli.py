@@ -615,3 +615,16 @@ def test_cli_rejects_null_security_configuration_as_structured_error(
     assert error["ok"] is False
     assert error["error"]["type"] == "ConfigurationError"
     assert "security configuration must be a mapping" in error["error"]["message"]
+
+
+def test_task_hierarchy_cli_has_explicit_creation_and_cas_edit_contract() -> None:
+    runner = CliRunner()
+    created = runner.invoke(cli, ["task", "create", "--help"])
+    assert created.exit_code == 0
+    assert "--task-kind [task|component]" in created.output
+    assert "--parent-task-id" in created.output
+    edit = runner.invoke(cli, ["task", "edit", "--help"])
+    assert edit.exit_code == 0
+    assert "ENTITY_ID EXPECTED_REVISION" in edit.output
+    assert "--changes-json" in edit.output
+    assert "--idempotency-key" in edit.output

@@ -2168,3 +2168,54 @@ def test_a_rejected_engagement_leaves_no_empty_thread_in_the_ledger(
     after = [record.event_id for record in builder.events.iter_events()]
     assert after == before
     assert builder.list_engagements() == []
+
+
+def test_reparenting_invalidates_exact_review_without_changing_parent(workspace) -> None:  # type: ignore[no-untyped-def]
+    _, _, builder, reviewer = workspace
+    parent = builder.create_task(
+        title="Component",
+        description="Plan",
+        acceptance_criteria=["Done"],
+        task_kind="component",
+        idempotency_key="hierarchy-parent",
+    )
+    child = builder.create_task(
+        title="Task",
+        description="Work",
+        acceptance_criteria=["Done"],
+        idempotency_key="hierarchy-child",
+    )
+    cid = child["entity_ref"]["id"]
+    taken = builder.take_task(cid, child["revision"], idempotency_key="hierarchy-take")
+    started = builder.start_task(cid, taken["revision"], idempotency_key="hierarchy-start")
+    completed = builder.complete_task(
+        cid, started["revision"], summary="Complete", idempotency_key="hierarchy-complete"
+    )
+    submitted = builder.submit_task(
+        cid, completed["revision"], summary="Ready", idempotency_key="hierarchy-submit"
+    )
+    requested = builder.request_review(
+        target_ref={"kind": "task", "id": cid},
+        target_revision=submitted["revision"],
+        criteria=["Done"],
+        idempotency_key="hierarchy-review",
+    )
+    reviewer.complete_review(
+        requested["entity_ref"]["id"],
+        requested["revision"],
+        target_revision=submitted["revision"],
+        verdict="approved",
+        summary="Reviewed",
+        idempotency_key="hierarchy-approved",
+    )
+    edited = builder.edit_task(
+        cid,
+        submitted["revision"],
+        changes={"parent_task_id": parent["entity_ref"]["id"]},
+        idempotency_key="hierarchy-move",
+    )
+    with pytest.raises(LifecycleConflictError, match="current approved independent review"):
+        reviewer.accept_task(
+            cid, edited["revision"], summary="Stale approval", idempotency_key="hierarchy-accept"
+        )
+    assert builder.snapshot().tasks[parent["entity_ref"]["id"]]["revision"] == parent["revision"]

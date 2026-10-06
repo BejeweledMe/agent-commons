@@ -1,0 +1,106 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "agent_commons_version": "0.1.0",
+  "agent_commons_source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+  "provider": "codex",
+  "profile_id": "codex-builder",
+  "purpose": "implementation",
+  "model": "gpt-6-astra",
+  "provider_version": "codex-cli 0.159.3",
+  "requester_client": "agent-commons",
+  "skill_refs": [
+    "commons-start"
+  ],
+  "preflight": {
+    "profile_id": "codex-builder",
+    "provider": "codex",
+    "ok": true,
+    "checks": {
+      "workspace_snapshot": {
+        "ok": true,
+        "snapshot_diagnostic_count": 0
+      },
+      "provider_help": {
+        "ok": true,
+        "required_flags": "present"
+      },
+      "mcp_contract": {
+        "ok": true,
+        "catalog": "available",
+        "agent_commons_source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+        "tool_catalog_sha256": "ca072f94ba5155e3f70938c2c8e3372401465b13d0a272a1fca7ca9ceaa6d5df",
+        "tool_count": 33
+      },
+      "mcp_handshake": {
+        "ok": true,
+        "protocol": "initialized",
+        "required_tools": "available",
+        "tool_count": 33
+      }
+    },
+    "consumed_delegation_attempt": false,
+    "provider_help_process_started": true,
+    "provider_work_process_started": false
+  },
+  "initialization": {
+    "state": "ready",
+    "supported": true,
+    "blocks_launch": false
+  },
+  "ok": true,
+  "provider_work_process_started": true,
+  "process": {
+    "outcome": "succeeded",
+    "exit_code": 0,
+    "duration_seconds": 62.07406174996868,
+    "stdout_bytes_seen": 33427,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false
+  },
+  "canonical_state": "succeeded",
+  "workflow_diagnostic_code": "none",
+  "process_canonical_mismatch": false,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "terminal_tool_rejection_details": [],
+  "terminal_tool_rejection_details_truncated": false,
+  "child_session_closed": true,
+  "sanitized_provider_errors": [],
+  "synthetic_terminal_diagnostic": [
+    {
+      "tool": "commons_succeed_delegation",
+      "status": "completed",
+      "arguments": {
+        "text": "{\"delegation_id\": \"[entity-id]\", \"expected_revision\": \"[entity-id]\", \"summary\": \"Inspected complete [path] through scoped commons_repo_read: answer() is defined and returns integer 42. Acceptance criterion is satisfied without edits. Exact target revision is unchanged; no addressed threads or active claims were present.\", \"result_refs\": [\"task:[entity-id]\"], \"idempotency_key\": \"canary-5JH5MFYS4R4S6APH7WCCGXYWP1-success\"}",
+        "truncated": false,
+        "redacted": false
+      },
+      "result": {
+        "text": "{\"content\": [{\"type\": \"text\", \"text\": \"{\\n  \\\"event_id\\\": \\\"[entity-id]\\\",\\n  \\\"event_type\\\": \\\"[entity-id]\\\",\\n  \\\"entity_ref\\\": {\\n    \\\"kind\\\": \\\"delegation\\\",\\n    \\\"id\\\": \\\"[entity-id]\\\"\\n  },\\n  \\\"revision\\\": \\\"[entity-id]\\\",\\n  \\\"idempotency_key\\\": \\\"canary-5JH5MFYS4R4S6APH7WCCGXYWP1-success\\\",\\n  \\\"created\\\": true,\\n  \\\"repaired\\\": false,\\n  \\\"index\\\": {\\n    \\\"mode\\\": \\\"deferred\\\",\\n    \\\"synchronized\\\": false,\\n    \\\"next_action\\\": \\\"agent-commons index rebuild\\\"\\n  }\\n}\"}], \"structured_content\": {\"event_id\": \"[entity-id]\", \"event_type\": \"[entity-id]\", \"entity_ref\": {\"kind\": \"delegation\", \"id\": \"[entity-id]\"}, \"revision\": \"[entity-id]\", \"idempotency_key\": \"canary-5JH5MFYS4R4S6APH7WCCGXYWP1-success\", \"created\": true, \"repaired\": false, \"index\": {\"mode\": \"deferred\", \"synchronized\": false, \"next_action\": \"agent-commons index rebuild\"}}}",
+        "truncated": false,
+        "redacted": false
+      },
+      "error": {
+        "text": "null",
+        "truncated": false,
+        "redacted": false
+      }
+    }
+  ],
+  "synthetic_final_user_summary": {
+    "text": "Verified through scoped tools that `[path]` defines `answer()` returning integer `42`. No edits were needed. Canonical delegation success was recorded with the required task reference.",
+    "truncated": false,
+    "redacted": false
+  },
+  "child_environment_proof": {
+    "commons_cli_discoverable_in_child_path": true,
+    "ambient_state_root_unset": true,
+    "ambient_state_base_unset": true,
+    "ambient_session_id_unset": true,
+    "child_state_root_equals_broker_synthetic_root": true,
+    "child_state_root_is_temporary_synthetic": true,
+    "child_session_equals_broker_identity": true,
+    "child_delegation_equals_broker_identity": true
+  }
+}

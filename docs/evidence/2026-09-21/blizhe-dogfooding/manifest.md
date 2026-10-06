@@ -4,7 +4,7 @@ Commit Agent Commons: `5153a56fd524709c608bc867d788c5f0fe0801da`. Work asset: `w
 
 Источник: браузер Agent Commons: сначала 127.0.0.1:8793, с V18 — 127.0.0.1:8794, UI-действия текущего прохода. Начальный viewport 1042×518; размеры сохранённых файлов приведены отдельно. Full-page инструмент местами обрезает правый край длинного содержимого. Байты не редактировались, расширение исправлено на фактический JPEG. Время ниже — сохранение кадра, не измерение завершения серверной записи.
 
-Нумерация использует V01–V22 как семейства экранов, а не обещает полное покрытие эталона. V10/V11 отсутствуют: успешного результата/review/acceptance нет. Есть локальные пути и текст задания; auth-коды, секреты и nonce не включены.
+Нумерация использует V01–V28 как семейства экранов, а не обещает полное покрытие эталона. V10 отсутствует: Results не удалось открыть для непривязанного Markdown-файла. V11 — запрос/запуск review; V23 — changes_requested. Положительной приёмки нет. Есть локальные пути и текст задания; auth-коды, секреты и nonce не включены.
 
 ## V01-empty-EN.jpg
 
@@ -325,6 +325,39 @@ BASE → разговор после Claude: первое сообщение п�
 - Сохранён: 2026-09-21T17:46:43.605991+00:00.
 - SHA256: `23dfe8168d02d864d3d84d1d39fad5eb1ce717ead4aab8558db571ac44a196ea`.
 
+## V11-base-review-launch-EN.jpg
+
+[Открыть кадр](V11-base-review-launch-EN.jpg)
+
+BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×4612.
+- Сохранён: 2026-09-21T18:52:03.276747+00:00.
+- SHA256: `430d42ef04c62939458d1627eb865bcc1cac5cccf163ad936a1179bdb6182f99`.
+
+## V11-base-review-launch-RU.jpg
+
+[Открыть кадр](V11-base-review-launch-RU.jpg)
+
+BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×4700.
+- Сохранён: 2026-09-21T18:52:04.055839+00:00.
+- SHA256: `03c8a61e859969db189ae601697d32d4b4fe08192dcb43fdab6170004729d5ec`.
+
+## V11-base-review-requested-EN.jpg
+
+[Открыть кадр](V11-base-review-requested-EN.jpg)
+
+BASE → Request review → Board → QA → Give a task → форма независимого запуска20мин. Запрос и запуск отдельные действия; положительной приёмки нет.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×3943.
+- Сохранён: 2026-09-21T18:51:41.930414+00:00.
+- SHA256: `cf69184fb20d7cf3320defe90829d8446439d92e476cd61fafbef645d78bb9b2`.
+
 ## V12-reasons-saving-RU.jpg
 
 [Открыть кадр](V12-reasons-saving-RU.jpg)
@@ -533,3 +566,135 @@ BASE#4 → карта/инспектор/сведения прогона. UI п�
 - Размер: 947×3992.
 - Сохранён: 2026-09-21T18:41:54.096684+00:00.
 - SHA256: `4b135be02fc51ec909cd1a7aabc57ce334c0318d69dbff189192629a9b4bc5e7`.
+
+## V23-base-changes-requested-EN.jpg
+
+[Открыть кадр](V23-base-changes-requested-EN.jpg)
+
+Settings → legacy Runs → QA Show record → result_ref → Search review ID → Show review. Вердикт changes_requested, independent:true, stale:false; Work его не показывает.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×425.
+- Сохранён: 2026-09-21T18:56:37.026819+00:00.
+- SHA256: `bffd47b51b9b056fc768553c526cd72e4b619e95287bd15734876e0141febf17`.
+
+## V23-base-changes-requested-RU.jpg
+
+[Открыть кадр](V23-base-changes-requested-RU.jpg)
+
+Settings → legacy Runs → QA Show record → result_ref → Search review ID → Show review. Вердикт changes_requested, independent:true, stale:false; Work его не показывает.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×425.
+- Сохранён: 2026-09-21T18:56:37.275638+00:00.
+- SHA256: `4208b1ada33426f70ac59f6cfaf75136f3f0cc1427624bb907b69971d37454e1`.
+
+## V24-base-reopened-RU.jpg
+
+[Открыть кадр](V24-base-reopened-RU.jpg)
+
+BASE после changes_requested: EN — записанный комментарий возврата; RU — новая ревизия после CLI task reopen. Нового прогона и приёмки нет.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×5075.
+- Сохранён: 2026-09-21T19:01:16.312248+00:00.
+- SHA256: `da65b949be96890a5ac584847bce3a9e674ad738c6f7528248cf172b8537de17`.
+
+## V24-base-return-comment-EN.jpg
+
+[Открыть кадр](V24-base-return-comment-EN.jpg)
+
+BASE после changes_requested: EN — записанный комментарий возврата; RU — новая ревизия после CLI task reopen. Нового прогона и приёмки нет.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×4059.
+- Сохранён: 2026-09-21T18:58:50.371670+00:00.
+- SHA256: `77730bf07319040b43cf904c86b36a3d8858f66a23a341d1969d0168af1496ab`.
+
+## V25-work-missing-verdict-EN.jpg
+
+[Открыть кадр](V25-work-missing-verdict-EN.jpg)
+
+После QA и reload: новый Work показывает In review/succeeded, снова Request review, без отрицательного вердикта и Reopen. Точная ревизия совпала с review.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×4059.
+- Сохранён: 2026-09-21T18:59:26.543499+00:00.
+- SHA256: `a78ac241d17136fb272e77a57f01b284085fd63e7c9de9f16b16f70443b484a3`.
+
+## V25-work-missing-verdict-RU.jpg
+
+[Открыть кадр](V25-work-missing-verdict-RU.jpg)
+
+После QA и reload: новый Work показывает In review/succeeded, снова Request review, без отрицательного вердикта и Reopen. Точная ревизия совпала с review.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 947×4109.
+- Сохранён: 2026-09-21T18:59:26.985298+00:00.
+- SHA256: `85cafb35818416436d11ffd7914f83f884cafc1cc40f3ac0d821c67b3a2bbb30`.
+
+## V26-attachment-sent-EN.jpg
+
+[Открыть кадр](V26-attachment-sent-EN.jpg)
+
+Исправление BASE → разговор → native picker → BASE-owner-constraints.txt → Send. EN: файл и стадия Fetched; RU: явный ответ о прочтении файла19:20:19UTC. Содержимое файла — только несекретные ограничения текущей работы.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:20:15.824008+00:00.
+- SHA256: `e46706aa94bcd5ba72710b8e1df9d7623d03184b7d80ab0ca957cfe9dff83fcb`.
+
+## V26-attachment-sent-RU.jpg
+
+[Открыть кадр](V26-attachment-sent-RU.jpg)
+
+Исправление BASE → разговор → native picker → BASE-owner-constraints.txt → Send. EN: файл и стадия Fetched; RU: явный ответ о прочтении файла19:20:19UTC. Содержимое файла — только несекретные ограничения текущей работы.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:21:51.645728+00:00.
+- SHA256: `f30508d2e57adf6c21502ff2558eee04f7081448a67c74b199734a0dc22bb4a2`.
+
+## V27-base-handoff-blocked-EN.jpg
+
+[Открыть кадр](V27-base-handoff-blocked-EN.jpg)
+
+После исправляющего BASE: Work → Tasks → BASE → EN/RU. Карта показывает needs_operator; результата/приёмки нет. Точная причина доступна только в legacy записи и разговоре.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:29:48.321094+00:00.
+- SHA256: `ec4fcffdabc100c738a8c9f54aeba8c16911df24f073da0afff7179a4b98da5d`.
+
+## V27-base-handoff-blocked-RU.jpg
+
+[Открыть кадр](V27-base-handoff-blocked-RU.jpg)
+
+После исправляющего BASE: Work → Tasks → BASE → EN/RU. Карта показывает needs_operator; результата/приёмки нет. Точная причина доступна только в legacy записи и разговоре.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:30:13.921909+00:00.
+- SHA256: `f6aae85fa01473a70cf9e4d1f3d0ac2a196c4e15975ce4b96a2b4950b993ce07`.
+
+## V28-qualification-invalid-EN.jpg
+
+[Открыть кадр](V28-qualification-invalid-EN.jpg)
+
+После регистрации BASE: Board → QA → Give task заблокирован → Settings → codex-builder → Technical details → EN/RU. UI Check run failed/failed-invalid; read-only диагностика установила mismatch ранее успешного receipt.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:53:03.898824+00:00.
+- SHA256: `9e456ef61eab20164b8031a2294d03f8eff20646d9dad2898a8abbd5307de869`.
+
+## V28-qualification-invalid-RU.jpg
+
+[Открыть кадр](V28-qualification-invalid-RU.jpg)
+
+После регистрации BASE: Board → QA → Give task заблокирован → Settings → codex-builder → Technical details → EN/RU. UI Check run failed/failed-invalid; read-only диагностика установила mismatch ранее успешного receipt.
+
+- Commit: `5153a56fd524709c608bc867d788c5f0fe0801da`; asset: `work-BBA7jVsK.js`.
+- Размер: 1042×467.
+- Сохранён: 2026-09-21T19:52:41.247846+00:00.
+- SHA256: `c6503f36c34316b773735e7dc075816e2f9b41f78c61bd777b413000cdd09b98`.

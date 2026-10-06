@@ -1,0 +1,9 @@
+{
+  "requested_model": "claude-fable-5-1",
+  "provider_model_usage": {},
+  "session_id": "7b91ce27-5d17-4d05-8dff-842f43442a35",
+  "returncode": 1,
+  "is_error": true,
+  "seconds": 2,
+  "result_chars": 72
+}

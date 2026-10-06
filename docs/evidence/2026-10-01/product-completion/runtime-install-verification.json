@@ -1,0 +1,29 @@
+{
+  "checkout": {
+    "source_sha256": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+    "package_root": "/Users/dmitrijersov/Desktop/vibecoding/agent-commons/src/agent_commons",
+    "assets": {
+      "ui/static/work/assets/work-CUlkmsY2.css": "03ef0deb5c5c7b413b881623c15f8cd7c51da0d543b72b3687ad0c63bf9362ac",
+      "ui/static/work/assets/work-Cmt6jz6d.js": "02e2dc15800fe3b3df1aeec1b657bff23807f033514a2260623d6861702f4477",
+      "ui/static/work/index.html": "cf6e22914f93fa38412f36cf0fba188067c07227017396ddd8c3c4d0a36d7442",
+      "ui/static/gallery/assets/gallery-C4hvTKLN.css": "8a4c953d72cc1fc613ef1880dbaab89815c8ad811cdb7260bd0ef0013bd1f024",
+      "ui/static/gallery/assets/gallery-Djtn_TWU.js": "be93839fb862b98c93cff6f85c26944eeb9e2f5fa3d3180b3323817212620f48",
+      "ui/static/gallery/index.html": "e3fb4c87684e72f222ebcc811f70d68b9dc9a548d25b07d0fbc1d83a752b2dff"
+    }
+  },
+  "installed": {
+    "source_sha256": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+    "package_root": "/Users/dmitrijersov/.local/share/uv/tools/agent-commons/lib/python3.14/site-packages/agent_commons",
+    "assets": {
+      "ui/static/work/assets/work-CUlkmsY2.css": "03ef0deb5c5c7b413b881623c15f8cd7c51da0d543b72b3687ad0c63bf9362ac",
+      "ui/static/work/assets/work-Cmt6jz6d.js": "02e2dc15800fe3b3df1aeec1b657bff23807f033514a2260623d6861702f4477",
+      "ui/static/work/index.html": "cf6e22914f93fa38412f36cf0fba188067c07227017396ddd8c3c4d0a36d7442",
+      "ui/static/gallery/assets/gallery-C4hvTKLN.css": "8a4c953d72cc1fc613ef1880dbaab89815c8ad811cdb7260bd0ef0013bd1f024",
+      "ui/static/gallery/assets/gallery-Djtn_TWU.js": "be93839fb862b98c93cff6f85c26944eeb9e2f5fa3d3180b3323817212620f48",
+      "ui/static/gallery/index.html": "e3fb4c87684e72f222ebcc811f70d68b9dc9a548d25b07d0fbc1d83a752b2dff"
+    }
+  },
+  "source_and_assets_match": true,
+  "uv_lock_sha256": "c148e226c1cfd147fd39a5122de187de8ad6ada0404add466e7ce0b6e1e7477e",
+  "constraints_sha256": "a3e6f5f8aa46e7e2b5c27970c3194007ce62702a2a1a94297b039d0fe723f9b0"
+}

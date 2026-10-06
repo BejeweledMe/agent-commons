@@ -1,0 +1,71 @@
+{
+  "previous_sha256": "6c8d83407babc7b7fb9135856933dbd16deb6f128b1cdda1fa03f5ffbacc258d",
+  "current_sha256": "a850bbf97365ef51159f7f9738f4f0ee9cedfe935ce1c7347d69ce6dac1c9bb2",
+  "changed_fields": [
+    "profiles.codex-builder.executable",
+    "profiles.codex-builder.model",
+    "profiles.codex-independent-reviewer.executable",
+    "profiles.codex-independent-reviewer.model"
+  ],
+  "model": "gpt-6-astra",
+  "provider_version": "0.159.3",
+  "rollback_backup_matches_original": true,
+  "unrelated_settings_unchanged": true,
+  "credential_or_billing_changes": false,
+  "qualified_profiles": [
+    {
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": false,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:00:39.563220Z",
+        "fingerprint": "e376676d2b37fc23bb8f7379b5aae34320dd41b06d3a7805a35f0eb2cd9b536f"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "codex-independent-reviewer",
+      "provider": "codex",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": true,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:02:34.819511Z",
+        "fingerprint": "d5fbbdd2720c6e3773009b1ca61c7bbb114bb2f364e146d0def9ee5b62df95f7"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    }
+  ]
+}

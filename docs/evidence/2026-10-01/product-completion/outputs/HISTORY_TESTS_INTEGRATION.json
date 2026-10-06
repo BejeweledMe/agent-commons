@@ -1,0 +1,10 @@
+{
+  "schema": "commons.incremental-test-integration.v1",
+  "files": [
+    {
+      "path": "tests/mcp/test_generated_output_history.py",
+      "base_sha256": "fd68548fcbc8c4c887ea0a08d1a04b2387b2cf59f1e432cce4cf0e41dfa7f56a",
+      "final_sha256": "7acb557b18cf9beb69ef3b9d41d5c4cc4522fb6739ea89e08ffbcfefcf7a7051"
+    }
+  ]
+}

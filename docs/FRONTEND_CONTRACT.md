@@ -60,12 +60,17 @@ project shell, library, outputs and conversations.
   files.
 - Reusable skills/groups and versioned Blueprint definitions belong to Library.
   Producer outputs are task/agent scoped; legacy Design links redirect away
-  from the reusable catalog. Results buttons require scoped server counts.
+  from the reusable catalog. Counted Results buttons require scoped server counts.
+  An agent name/avatar is a permanent gallery entry, including an empty result
+  set or unavailable count; it never infers an output count.
 - Output labels distinguish latest, earlier version (viewable), preview expired,
   address unavailable, preview not verified and the additive nullable
   `review_state` (`awaiting` | `approved` | `returned` | null). Review state is
   never derived from output freshness; a missing field renders the neutral
-  label. Historical bytes are never presented as current.
+  label. Historical bytes are never presented as current. The current DTO joins
+  review state from the task: copy says "Current task" and must not imply that
+  an old output version received that review. Output-specific review binding
+  remains separate work.
 - Conversations retain local drafts by project and scope in memory only; one
   global `beforeunload` guard fires only with unsent text or attachments. The
   recipient's availability chip reads the server-joined nullable
@@ -274,6 +279,18 @@ receive Commons authentication or capabilities.
   styling is class-based. Agent activity is text plus a data attribute; green
   is still reserved for acceptance.
 
+## Task dependency map
+
+- Search and connected/upstream/downstream focus run before the 128-node render
+  limit. A large project can show a small selected subgraph. Larger selections
+  retain a searchable list instead of silently dropping tasks.
+- Edges come from the tracker DTO and mean prerequisite → dependent. Hidden
+  prerequisites are counted; these edges never mean parent/child or component
+  membership. The layout is derived and deterministic.
+- Zoom and fit use numeric SVG attributes under the existing CSP. Keyboard
+  navigation and a list remain available. Completed tasks are neutral; only
+  accepted tasks use the acceptance color. (`frontend/work/tests/task-graph.test.mjs`)
+
 ## Local instrumentation privacy
 
 UI instrumentation collection is off by default. Its schema rejects content,
@@ -306,3 +323,28 @@ untranslated; the suite reads it as text through `read_spa()`. Take the
 workspace claim `path:src/agent_commons/ui/static/index.html` before any edit,
 and edit it only to keep it serving or to remove it. New behaviour belongs in
 Work.
+
+## Explicit task structure
+
+[ADR 0024](adr/0024-explicit-task-hierarchy.md) defines canonical components and
+parent/subtask containment. Work creation exposes kind and parent; the inspector
+adds subtasks and edits parents using the existing CAS/retry editor. Map offers
+Structure and Dependencies separately. Structure uses a bounded containment diagram with project root, dashed parent
+edges, search, branch focus, fit/zoom and native list fallback. It shows kind and
+state, and labels parents outside the filtered view. It does not imply
+readiness or accepted rollups. `frontend/work/tests/task-graph.test.mjs` and
+`tests/services/test_task_edits.py` exercise independence and invalid parent edges.
+
+## Retained result cards
+
+The [retained-result protocol](PROTOCOL.md#retained-worker-results) supplies local
+retained-byte state and exact result review separately from current task review.
+Work accepts explicit old DTO defaults (`retained=false`, result review null); it
+never derives approval from task ID or image readiness. Static build cards use a
+separate Builds filter and an explicit Download build action. Verified ZIPs are
+downloaded as attachments only after digest and fresh scoped identity checks.
+They never create image thumbnails, iframes or HTML blob navigation. Failure stays
+on the card with a retryable action. EN/RU technical disclosure gives an exact
+artifact-review CLI command with a stable operation key and instructs the operator
+to verify this project's active session/workspace/state before running it. The
+current UI review action targets tasks; exact artifact review launch is separate.

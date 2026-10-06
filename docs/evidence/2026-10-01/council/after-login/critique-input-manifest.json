@@ -1,0 +1,37 @@
+[
+  {
+    "label": "A",
+    "original_sha256": "d7146cb6d500d78949bae0817330cc7e87ac55ebf2324d127b4029289e858d95",
+    "original_bytes": 28214,
+    "masked_header_count": 1
+  },
+  {
+    "label": "B",
+    "original_sha256": "0c828928c2ee9b864357f3a8a7e449a89b112fec72df78a5cda5c5936df39533",
+    "original_bytes": 27261,
+    "masked_header_count": 0
+  },
+  {
+    "label": "C",
+    "original_sha256": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0",
+    "original_bytes": 26326,
+    "masked_header_count": 0
+  },
+  {
+    "label": "D",
+    "original_sha256": "744c4340ee2ef34c0b8e112cd5f1762340e5784d8b672c4b6b0115a5a8d1f1ce",
+    "original_bytes": 18213,
+    "masked_header_count": 1
+  },
+  {
+    "label": "E",
+    "original_sha256": "0a1ca910040abb4b9705dcbb59cbdf37095332a28215bc16d552603067b02e43",
+    "original_bytes": 27960,
+    "masked_header_count": 1
+  },
+  {
+    "package_sha256": "1443de9751941043acf80aee7d88b4e4e821a7cb903e523f4b63e55a42249957",
+    "facts_sha256": "5a8f4feba7bed1144ea6a350b487d88eed1653b6fc29744238aec61dfb8a3768",
+    "rubric_sha256": "a23916679748c62817e8362d553ff904209faf3bdf5bf295f8f42fa265d57448"
+  }
+]

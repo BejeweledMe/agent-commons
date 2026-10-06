@@ -1,0 +1,221 @@
+{
+  "fixture": {
+    "artifact_count": 350,
+    "decision_count": 80,
+    "delegation_count": 40,
+    "event_count": 3206,
+    "manifest_count": 350,
+    "review_count": 318,
+    "task_count": 390
+  },
+  "fixture_build_seconds": 10.7230345410062,
+  "hardware": {
+    "cpu_count": 12,
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "processor": "arm",
+    "python": "3.14.5",
+    "python_implementation": "CPython",
+    "system": "Darwin"
+  },
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "profile": "large",
+  "python": "3.14.5",
+  "repeats": 2,
+  "schema": "agent_commons.work_mutation_profile.v1",
+  "mutations": {
+    "decision_propose": {
+      "cold": {
+        "median_seconds": 14.06519043748267,
+        "samples": 2,
+        "median_read_bytes": 7402462.0,
+        "median_read_calls": 6797.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004425750026712194,
+          "canonical_reads_validation": 8.61319652129896,
+          "lock_hold": 2.179866017686436,
+          "lock_wait": 0.00014685402857139707,
+          "projection_replay": 0.37621150197810493,
+          "receipt_preparation": 1.2152893750171643,
+          "reconcile": 1.6067447919922415
+        }
+      },
+      "warm": {
+        "median_seconds": 13.506543311988935,
+        "samples": 2,
+        "median_read_bytes": 7404586.0,
+        "median_read_calls": 6799.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004642604006221518,
+          "canonical_reads_validation": 7.974908201897051,
+          "lock_hold": 2.2172591305570677,
+          "lock_wait": 0.00017456201021559536,
+          "projection_replay": 0.37655804253881797,
+          "receipt_preparation": 1.2684645414992701,
+          "reconcile": 1.5959681874664966
+        }
+      }
+    },
+    "panel_http_task_create": {
+      "cold": {
+        "median_seconds": 13.759847958514001,
+        "samples": 2,
+        "median_read_bytes": 7411105.0,
+        "median_read_calls": 6805.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004657458513975143,
+          "canonical_reads_validation": 8.018692822224693,
+          "lock_hold": 2.1949055905279238,
+          "lock_wait": 0.00013975001638755202,
+          "projection_replay": 0.38521360827144235,
+          "receipt_preparation": 1.2690263125114143,
+          "reconcile": 1.7496649789973162
+        }
+      },
+      "warm": {
+        "median_seconds": 14.880991958489176,
+        "samples": 2,
+        "median_read_bytes": 7413327.0,
+        "median_read_calls": 6807.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.0047499795036856085,
+          "canonical_reads_validation": 8.622149965493008,
+          "lock_hold": 2.5858780407870654,
+          "lock_wait": 0.00021547949290834367,
+          "projection_replay": 0.39366330625489354,
+          "receipt_preparation": 1.35610131197609,
+          "reconcile": 1.6599403335130773
+        }
+      }
+    },
+    "task_complete": {
+      "cold": {
+        "median_seconds": 18.419119875499746,
+        "samples": 2,
+        "median_read_bytes": 11139592.0,
+        "median_read_calls": 10346.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004437312512891367,
+          "canonical_reads_validation": 12.517498178232927,
+          "lock_hold": 2.209134870150592,
+          "lock_wait": 0.0001530210138298571,
+          "projection_replay": 0.7487532135855872,
+          "receipt_preparation": 1.2087727295001969,
+          "reconcile": 1.6052812915295362
+        }
+      },
+      "warm": {
+        "median_seconds": 18.608484291966306,
+        "samples": 2,
+        "median_read_bytes": 11142685.0,
+        "median_read_calls": 10349.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004376832977868617,
+          "canonical_reads_validation": 12.700016083545052,
+          "lock_hold": 2.1754934746422805,
+          "lock_wait": 0.00015408353647217155,
+          "projection_replay": 0.7517345573578496,
+          "receipt_preparation": 1.221704833500553,
+          "reconcile": 1.632474062498659
+        }
+      }
+    },
+    "task_create": {
+      "cold": {
+        "median_seconds": 13.701239395479206,
+        "samples": 2,
+        "median_read_bytes": 7369223.0,
+        "median_read_calls": 6765.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004746541497297585,
+          "canonical_reads_validation": 8.277039456588682,
+          "lock_hold": 2.208241719927173,
+          "lock_wait": 0.00018591698608361185,
+          "projection_replay": 0.3630817814846523,
+          "receipt_preparation": 1.2046196880110074,
+          "reconcile": 1.5771620415034704
+        }
+      },
+      "warm": {
+        "median_seconds": 13.272343937511323,
+        "samples": 2,
+        "median_read_bytes": 7371417.0,
+        "median_read_calls": 6767.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004715811985079199,
+          "canonical_reads_validation": 7.900963813532144,
+          "lock_hold": 2.0967940480913967,
+          "lock_wait": 0.00016339548164978623,
+          "projection_replay": 0.37417009787168354,
+          "receipt_preparation": 1.2057095204945654,
+          "reconcile": 1.6209750830021221
+        }
+      }
+    },
+    "task_submit": {
+      "cold": {
+        "median_seconds": 18.103239146003034,
+        "samples": 2,
+        "median_read_bytes": 11151948.0,
+        "median_read_calls": 10358.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004695916490163654,
+          "canonical_reads_validation": 12.052372790931258,
+          "lock_hold": 2.250280087289866,
+          "lock_wait": 0.00017110453336499631,
+          "projection_replay": 0.7520852504239883,
+          "receipt_preparation": 1.2835161045077257,
+          "reconcile": 1.634643875004258
+        }
+      },
+      "warm": {
+        "median_seconds": 17.838364437018754,
+        "samples": 2,
+        "median_read_bytes": 11155029.0,
+        "median_read_calls": 10361.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004642208019504324,
+          "canonical_reads_validation": 12.00022036145674,
+          "lock_hold": 2.120788814558182,
+          "lock_wait": 0.0001520624791737646,
+          "projection_replay": 0.7423640424967743,
+          "receipt_preparation": 1.2478103545145132,
+          "reconcile": 1.5981987710110843
+        }
+      }
+    },
+    "task_take": {
+      "cold": {
+        "median_seconds": 13.207806207996327,
+        "samples": 2,
+        "median_read_bytes": 7377747.0,
+        "median_read_calls": 6773.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.005021917022531852,
+          "canonical_reads_validation": 7.867161379457684,
+          "lock_hold": 2.0848576817661524,
+          "lock_wait": 0.00015204149531200528,
+          "projection_replay": 0.3738678342779167,
+          "receipt_preparation": 1.2038542709778994,
+          "reconcile": 1.606927207991248
+        }
+      },
+      "warm": {
+        "median_seconds": 13.212120562500786,
+        "samples": 2,
+        "median_read_bytes": 7379773.0,
+        "median_read_calls": 6775.0,
+        "median_phase_exclusive_seconds": {
+          "append": 0.004487895464990288,
+          "canonical_reads_validation": 7.858272970566759,
+          "lock_hold": 2.0957197985844687,
+          "lock_wait": 0.00014304197975434363,
+          "projection_replay": 0.3780048148764763,
+          "receipt_preparation": 1.2124102500092704,
+          "reconcile": 1.5961074579972774
+        }
+      }
+    }
+  },
+  "note": "Two-repeat diagnostic run on the local host; other verification jobs overlapped part of execution. This is not a release performance certificate. All mutations exceed the <=1s target."
+}

@@ -1,3 +1,4 @@
+import dagre from "@dagrejs/dagre";
 import type { TrackerEdge, TrackerTask } from "./contracts";
 
 export type GraphState = "accepted" | "completed" | "review" | "active" | "ready" | "queued" | "blocked" | "cancelled" | "unknown";
@@ -7,15 +8,17 @@ export const GRAPH_ICONS: Readonly<Record<GraphState, string>> = {
 };
 export const MAX_GRAPH_TASKS = 128;
 export const NODE_WIDTH = 244;
-export const NODE_HEIGHT = 144;
+export const NODE_HEIGHT = 168;
 const GAP_X = 32;
 const GAP_Y = 62;
 const MARGIN = 24;
-export type TaskGraphNode = { task: TrackerTask; x: number; y: number; rank: number; state: GraphState };
+export type GraphFocus = "all" | "connected" | "upstream" | "downstream";
+export type TaskGraphNode = { task: TrackerTask; x: number; y: number; rank: number; state: GraphState; hiddenPrerequisites: number };
 export type TaskGraphLayout = {
   nodes: readonly TaskGraphNode[];
   edges: readonly { from: string; to: string; path: string }[];
   width: number; height: number; invalid: boolean; tooLarge: boolean; total: number; focused: boolean;
+  selectedTasks: readonly TrackerTask[]; hiddenPrerequisites: number;
 };
 
 export function graphTaskState(task: TrackerTask): GraphState {
@@ -46,22 +49,71 @@ export function connectedTaskIds(tasks: readonly TrackerTask[], id: string): Rea
   return found;
 }
 
-export function buildTaskGraph(tasks: readonly TrackerTask[], edges: readonly TrackerEdge[], selectedTaskId: string | null, focusSelected = true): TaskGraphLayout {
-  const connected = focusSelected && selectedTaskId !== null ? connectedTaskIds(tasks, selectedTaskId) : null;
-  const selected = (connected && connected.size > 0 ? tasks.filter((task) => connected.has(task.taskId)) : tasks).slice().sort((a, b) => a.taskId.localeCompare(b.taskId));
-  const base = { nodes: [], edges: [], width: NODE_WIDTH + MARGIN * 2, height: NODE_HEIGHT + MARGIN * 2, invalid: false, tooLarge: selected.length > MAX_GRAPH_TASKS, total: tasks.length, focused: connected !== null && connected.size > 0 };
-  if (base.tooLarge || selected.length === 0) return base;
+/** Focus follows only the server's edges; a dependency is never a parent/component relation. */
+export function focusedTaskIds(tasks: readonly TrackerTask[], edges: readonly TrackerEdge[], id: string, direction: Exclude<GraphFocus, "all">): ReadonlySet<string> {
+  const ids = new Set(tasks.map((task) => task.taskId));
+  if (!ids.has(id)) return new Set();
+  const links = new Map(tasks.map((task) => [task.taskId, new Set<string>()]));
+  for (const edge of edges) {
+    if (!ids.has(edge.prerequisiteTaskId) || !ids.has(edge.dependentTaskId) || edge.prerequisiteMissing) continue;
+    if (direction !== "downstream") links.get(edge.dependentTaskId)?.add(edge.prerequisiteTaskId);
+    if (direction !== "upstream") links.get(edge.prerequisiteTaskId)?.add(edge.dependentTaskId);
+  }
+  const found = new Set<string>(), pending = [id];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (found.has(current)) continue;
+    found.add(current); pending.push(...(links.get(current) ?? []));
+  }
+  return found;
+}
+
+export function selectGraphTasks(tasks: readonly TrackerTask[], edges: readonly TrackerEdge[], selectedTaskId: string | null, focus: GraphFocus, search = ""): readonly TrackerTask[] {
+  const focused = focus !== "all" && selectedTaskId !== null ? focusedTaskIds(tasks, edges, selectedTaskId, focus) : null;
+  const query = search.trim().toLowerCase();
+  return tasks.filter((task) => (!focused || focused.size === 0 || focused.has(task.taskId)) &&
+    (!query || [task.title, task.taskId, task.roleName ?? "", task.suggestedRoleName ?? ""].some((value) => value.toLowerCase().includes(query))))
+    .slice().sort((a, b) => a.taskId.localeCompare(b.taskId));
+}
+
+/** Numeric SVG sizing keeps zoom compatible with the no-inline-style CSP. */
+export function graphViewport(width: number, height: number, zoom: number): { width: number; height: number; zoom: number } {
+  const bounded = Number.isFinite(zoom) ? Math.min(2, Math.max(0.25, zoom)) : 1;
+  return { width: Math.round(width * bounded), height: Math.round(height * bounded), zoom: bounded };
+}
+
+export function fitGraphZoom(width: number, availableWidth: number): number {
+  return width > 0 && availableWidth > 0 ? Math.min(1, Math.max(0.25, availableWidth / width)) : 1;
+}
+
+export function buildTaskGraph(tasks: readonly TrackerTask[], edges: readonly TrackerEdge[], selectedTaskId: string | null, focusSelected: boolean | GraphFocus = true, search = ""): TaskGraphLayout {
+  const focus = typeof focusSelected === "boolean" ? (focusSelected ? "connected" : "all") : focusSelected;
+  const selected = selectGraphTasks(tasks, edges, selectedTaskId, focus, search);
   const ids = new Set(selected.map((task) => task.taskId));
+  // De-duplicate server pairs without synthesizing edges from titles or assignments.
+  const byPair = new Map<string, TrackerEdge>();
+  for (const edge of edges) {
+    const key = `${edge.prerequisiteTaskId}:${edge.dependentTaskId}`;
+    byPair.set(key, { ...edge, prerequisiteMissing: edge.prerequisiteMissing || (byPair.get(key)?.prerequisiteMissing ?? false) });
+  }
+  const uniqueEdges = [...byPair.values()]
+    .sort((a, b) => a.prerequisiteTaskId.localeCompare(b.prerequisiteTaskId) || a.dependentTaskId.localeCompare(b.dependentTaskId));
+  const hiddenByTask = new Map(selected.map((task) => [task.taskId, 0]));
+  for (const edge of uniqueEdges) if (ids.has(edge.dependentTaskId) && !ids.has(edge.prerequisiteTaskId) && !edge.prerequisiteMissing) {
+    hiddenByTask.set(edge.dependentTaskId, hiddenByTask.get(edge.dependentTaskId)! + 1);
+  }
+  const base: TaskGraphLayout = { nodes: [], edges: [], width: NODE_WIDTH + MARGIN * 2, height: NODE_HEIGHT + MARGIN * 2,
+    invalid: false, tooLarge: selected.length > MAX_GRAPH_TASKS, total: tasks.length,
+    focused: focus !== "all" && selectedTaskId !== null && tasks.some((task) => task.taskId === selectedTaskId),
+    selectedTasks: selected, hiddenPrerequisites: [...hiddenByTask.values()].reduce((sum, count) => sum + count, 0) };
+  if (base.tooLarge || selected.length === 0) return base;
   const children = new Map(selected.map((task) => [task.taskId, new Set<string>()]));
   const incoming = new Map(selected.map((task) => [task.taskId, 0]));
-  const selectedEdges = edges.filter((edge) => ids.has(edge.dependentTaskId) && ids.has(edge.prerequisiteTaskId));
-  let invalid = edges.some((edge) => ids.has(edge.dependentTaskId) && edge.prerequisiteMissing);
+  const selectedEdges = uniqueEdges.filter((edge) => ids.has(edge.dependentTaskId) && ids.has(edge.prerequisiteTaskId));
+  let invalid = uniqueEdges.some((edge) => ids.has(edge.dependentTaskId) && edge.prerequisiteMissing);
   for (const edge of selectedEdges) {
-    const destinations = children.get(edge.prerequisiteTaskId)!;
-    if (!destinations.has(edge.dependentTaskId)) {
-      destinations.add(edge.dependentTaskId);
-      incoming.set(edge.dependentTaskId, incoming.get(edge.dependentTaskId)! + 1);
-    }
+    children.get(edge.prerequisiteTaskId)!.add(edge.dependentTaskId);
+    incoming.set(edge.dependentTaskId, incoming.get(edge.dependentTaskId)! + 1);
   }
   const ranks = new Map(selected.map((task) => [task.taskId, 0]));
   const pending = selected.filter((task) => incoming.get(task.taskId) === 0).map((task) => task.taskId);
@@ -76,27 +128,23 @@ export function buildTaskGraph(tasks: readonly TrackerTask[], edges: readonly Tr
   }
   invalid ||= visited !== selected.length;
   if (invalid) return { ...base, invalid: true };
-  const nodes: TaskGraphNode[] = [];
-  let y = MARGIN; let columns = 1;
-  for (let rank = 0; rank <= Math.max(...ranks.values()); rank += 1) {
-    const row = selected.filter((task) => ranks.get(task.taskId) === rank);
-    const count = Math.min(4, row.length); columns = Math.max(columns, count);
-    row.forEach((task, index) => nodes.push({ task, rank, state: graphTaskState(task),
-      x: MARGIN + (index % 4) * (NODE_WIDTH + GAP_X), y: y + Math.floor(index / 4) * (NODE_HEIGHT + GAP_Y) }));
-    y += Math.ceil(row.length / 4) * (NODE_HEIGHT + GAP_Y);
-  }
-  const byId = new Map(nodes.map((node) => [node.task.taskId, node]));
-  return {
-    ...base, nodes, width: MARGIN * 2 + columns * NODE_WIDTH + (columns - 1) * GAP_X,
-    height: y - GAP_Y + MARGIN,
+  const graph = new dagre.graphlib.Graph();
+  graph.setGraph({ rankdir: "TB", nodesep: GAP_X, ranksep: GAP_Y, marginx: MARGIN, marginy: MARGIN });
+  graph.setDefaultEdgeLabel(() => ({}));
+  for (const task of selected) graph.setNode(task.taskId, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  for (const edge of selectedEdges) graph.setEdge(edge.prerequisiteTaskId, edge.dependentTaskId);
+  dagre.layout(graph);
+  const nodes = selected.map((task): TaskGraphNode => {
+    const position = graph.node(task.taskId);
+    return { task, x: position.x - NODE_WIDTH / 2, y: position.y - NODE_HEIGHT / 2, rank: ranks.get(task.taskId)!,
+      state: graphTaskState(task), hiddenPrerequisites: hiddenByTask.get(task.taskId)! };
+  }).sort((a, b) => a.y - b.y || a.x - b.x || a.task.taskId.localeCompare(b.task.taskId));
+  return { ...base, nodes, width: graph.graph().width ?? base.width, height: graph.graph().height ?? base.height,
     edges: selectedEdges.map((edge) => {
-      const from = byId.get(edge.prerequisiteTaskId)!; const to = byId.get(edge.dependentTaskId)!;
-      const x1 = from.x + NODE_WIDTH / 2; const y1 = from.y + NODE_HEIGHT;
-      const x2 = to.x + NODE_WIDTH / 2; const y2 = to.y;
+      const points: { x: number; y: number }[] = graph.edge(edge.prerequisiteTaskId, edge.dependentTaskId).points;
       return { from: edge.prerequisiteTaskId, to: edge.dependentTaskId,
-        path: `M ${x1} ${y1} C ${x1} ${y1 + GAP_Y / 2}, ${x2} ${y2 - GAP_Y / 2}, ${x2} ${y2}` };
-    })
-  };
+        path: points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ") };
+    }) };
 }
 
 export function wouldCreateTaskCycle(tasks: readonly TrackerTask[], id: string, dependencies: readonly string[]): boolean {

@@ -643,3 +643,125 @@ test("the card renders only from the snapshot the tracker reloaded, with no opti
   assert.match(tracker, /tracker_retry_previous_action/);
   assert.match(tracker, /inspector_new_attempt/);
 });
+
+async function withStoredConnection(fragment, respond, check) {
+  const storedWindow = globalThis.window;
+  const storedFetch = globalThis.fetch;
+  const key = "agent_commons.ui.api_base";
+  const oldBase = `/api/${"a".repeat(32)}`;
+  const newBase = `/api/${"b".repeat(32)}`;
+  const saved = new Map([[key, oldBase]]);
+  const locations = [];
+  const calls = [];
+  globalThis.window = {
+    location: { pathname: "/work", search: `?view=work&task=${taskId}&q=private`, hash: fragment },
+    history: { replaceState: (_state, _title, url) => locations.push(url) },
+    sessionStorage: { getItem: (name) => saved.get(name) ?? null, setItem: (name, value) => saved.set(name, value), removeItem: (name) => saved.delete(name) }
+  };
+  globalThis.fetch = async (url, init) => {
+    assert.equal(locations.length, 1, "scrub fragment before any restore or exchange request");
+    assert.equal(locations[0].includes("#"), false);
+    assert.equal(locations[0].includes("private"), false);
+    assert.equal(init.credentials, "same-origin");
+    calls.push(url);
+    return respond(url, init, { oldBase, newBase });
+  };
+  try {
+    await check({ api: new WorkApi(), saved, key, oldBase, newBase, calls, signal: new AbortController().signal });
+    assert.equal(JSON.stringify([...saved.values()]).includes("fresh-code"), false);
+  } finally {
+    globalThis.window = storedWindow;
+    globalThis.fetch = storedFetch;
+  }
+}
+
+const restoredSetup = { state: "setup_configured", launch_enabled: true };
+
+test("same-origin server restart exchanges fresh code after both old-prefix routes refuse", async () => {
+  await withStoredConnection("#c=fresh-code", (url, init, { oldBase, newBase }) => {
+    if (url.startsWith(oldBase)) return reply({ error: { code: "not_found" } }, 404);
+    if (url === "/api/auth/exchange") {
+      assert.deepEqual(JSON.parse(init.body), { code: "fresh-code" });
+      assert.equal(init.method, "POST");
+      return reply({ api_base: newBase });
+    }
+    assert.equal(url, `${newBase}/setup`);
+    return reply(restoredSetup);
+  }, async ({ api, saved, key, newBase, oldBase, calls, signal }) => {
+    await api.connect(signal);
+    assert.equal(saved.get(key), newBase);
+    assert.deepEqual(await api.hostRequestData("/setup", { signal }), restoredSetup);
+    assert.deepEqual(calls, [`${oldBase}/projects`, `${oldBase}/setup`, "/api/auth/exchange", `${newBase}/setup`]);
+  });
+});
+
+for (const fragment of ["", "#c=already-used-code"]) {
+  test(`valid project session reload avoids exchange (${fragment ? "used fragment" : "no fragment"})`, async () => {
+    await withStoredConnection(fragment, (url, _init, { oldBase }) => {
+      assert.equal(url, `${oldBase}/projects`);
+      return reply({ projects: [] });
+    }, async ({ api, saved, key, oldBase, calls, signal }) => {
+      await api.connect(signal);
+      assert.equal(saved.get(key), oldBase);
+      assert.deepEqual(calls, [`${oldBase}/projects`]);
+    });
+  });
+
+  test(`legacy session reload requires authenticated setup (${fragment ? "used fragment" : "no fragment"})`, async () => {
+    await withStoredConnection(fragment, (url, _init, { oldBase }) => {
+      if (url === `${oldBase}/projects`) return reply(null, 404);
+      assert.equal(url, `${oldBase}/setup`);
+      return reply(restoredSetup);
+    }, async ({ api, saved, key, oldBase, calls, signal }) => {
+      await api.connect(signal);
+      assert.equal(saved.get(key), oldBase);
+      assert.deepEqual(calls, [`${oldBase}/projects`, `${oldBase}/setup`]);
+    });
+  });
+}
+
+for (const status of [401, 404]) {
+  test(`invalid saved prefix without a fragment refuses and clears storage (${status})`, async () => {
+    await withStoredConnection("", () => reply(null, status), async ({ api, saved, key, oldBase, calls, signal }) => {
+      await assert.rejects(() => api.connect(signal), (error) => error instanceof ApiProblem && error.status === 401);
+      assert.equal(saved.has(key), false);
+      assert.deepEqual(calls, status === 401 ? [`${oldBase}/projects`] : [`${oldBase}/projects`, `${oldBase}/setup`]);
+    });
+  });
+}
+
+for (const failure of ["unauthorized", "abort", "offline", "server", "malformed"]) {
+  test(`legacy probe handles ${failure} without treating transient failure as expiry`, async () => {
+    await withStoredConnection("#c=fresh-code", (url, _init, { oldBase, newBase }) => {
+      if (url === `${oldBase}/projects`) return reply(null, 404);
+      if (url === "/api/auth/exchange") {
+        assert.equal(failure, "unauthorized");
+        return reply({ api_base: newBase });
+      }
+      assert.equal(url, `${oldBase}/setup`);
+      if (failure === "abort") throw new DOMException("aborted", "AbortError");
+      if (failure === "offline") throw new TypeError("offline");
+      return reply(failure === "malformed" ? {} : null, failure === "unauthorized" ? 401 : failure === "server" ? 503 : 200);
+    }, async ({ api, saved, key, oldBase, newBase, calls, signal }) => {
+      if (failure === "unauthorized") {
+        await api.connect(signal);
+        assert.equal(saved.get(key), newBase);
+        assert.equal(calls.at(-1), "/api/auth/exchange");
+      } else {
+        await assert.rejects(() => api.connect(signal), (error) => failure === "abort"
+          ? error.name === "AbortError" : failure === "offline" ? error instanceof TypeError
+          : error instanceof ApiProblem && error.status === (failure === "server" ? 503 : 502));
+        assert.equal(saved.get(key), oldBase);
+        assert.deepEqual(calls, [`${oldBase}/projects`, `${oldBase}/setup`]);
+      }
+    });
+  });
+}
+
+test("an entity 404 after successful restore does not invalidate the browser session", async () => {
+  await withStoredConnection("", (url, _init, { oldBase }) => url === `${oldBase}/projects` ? reply({ projects: [] }) : reply(null, 404), async ({ api, saved, key, oldBase, signal }) => {
+    await api.connect(signal);
+    await assert.rejects(() => api.hostRequestData("/projects/missing", { signal }), (error) => error.status === 404);
+    assert.equal(saved.get(key), oldBase);
+  });
+});

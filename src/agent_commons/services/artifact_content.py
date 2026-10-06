@@ -66,6 +66,7 @@ class ArtifactManifest(TypedDict):
     media_type: str
     size_bytes: int
     classification: str
+    retained_content: dict | None
 
 
 class ArtifactBundle(TypedDict):
@@ -226,7 +227,19 @@ class ArtifactPreviewReader:
                 "artifact preview exceeds the configured byte limit",
             )
         relative = _relative_source(manifest["source"]["path"])
-        content = self._read_verified_source(relative, expected_size, expected_digest)
+        if manifest.get("retained_content") is not None:
+            from agent_commons.services.output_content import OutputContentStore
+
+            try:
+                content = OutputContentStore(self._manager).read(
+                    manifest["revision"], expected_size
+                )
+            except (CommonsError, OSError, ValueError):
+                _refuse(
+                    "artifact_preview_missing_source", 409, "Retained output bytes are unavailable"
+                )
+        else:
+            content = self._read_verified_source(relative, expected_size, expected_digest)
         width, height = _image_dimensions(content, media_type)
         if width * height > self._max_pixels:
             _refuse(
@@ -298,11 +311,13 @@ class ArtifactPreviewReader:
         relative: Path,
         expected_size: int,
         expected_digest: str,
+        *,
+        single_link: bool = False,
     ) -> bytes:
         descriptor = self._open_regular(relative)
         try:
             before = os.fstat(descriptor)
-            if not stat.S_ISREG(before.st_mode):
+            if not stat.S_ISREG(before.st_mode) or (single_link and before.st_nlink != 1):
                 _refuse(
                     "artifact_preview_non_regular_source",
                     409,
@@ -330,7 +345,8 @@ class ArtifactPreviewReader:
                 chunks.append(chunk)
                 remaining -= len(chunk)
             content = b"".join(chunks)
-            if _FileIdentity.from_stat(os.fstat(descriptor)) != identity:
+            after = os.fstat(descriptor)
+            if _FileIdentity.from_stat(after) != identity or (single_link and after.st_nlink != 1):
                 _refuse(
                     "artifact_preview_stale_source",
                     409,
@@ -440,7 +456,21 @@ def _parse_manifest(value: object) -> ArtifactManifest:
         "media_type": _string(mapping, "media_type"),
         "size_bytes": size,
         "classification": _string(mapping, "classification"),
+        "retained_content": _retained_binding(mapping),
     }
+
+
+def _retained_binding(mapping):
+    metadata = mapping.get("metadata")
+    retained = metadata.get("retained_content") if isinstance(metadata, Mapping) else None
+    if retained is not None and (
+        not isinstance(retained, Mapping)
+        or set(retained) != {"revision", "size_bytes"}
+        or retained
+        != {"revision": mapping.get("revision"), "size_bytes": mapping.get("size_bytes")}
+    ):
+        _invalid_manifest()
+    return retained
 
 
 def _mapping(value: object) -> Mapping[str, object]:

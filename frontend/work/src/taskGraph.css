@@ -17,7 +17,7 @@
 .task-graph-node-title { font-size:.91rem; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .task-graph-node-role,.task-graph-node-run { font-size:.72rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .task-graph-node-role { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-.task-graph-node[data-graph-state="completed"],.task-graph-node[data-graph-state="accepted"] { background:var(--status-accepted-surface); color:var(--status-accepted-text); border-color:var(--status-accepted); }
+.task-graph-node[data-graph-state="accepted"] { background:var(--status-accepted-surface); color:var(--status-accepted-text); border-color:var(--status-accepted); }
 .task-graph-node[data-graph-state="accepted"] { border-width:4px; border-style:double; }
 .task-graph-node[data-graph-state="active"] { border-left:6px solid var(--accent); }
 .task-graph-node[data-graph-state="blocked"] { border-color:var(--status-attention); background:var(--status-attention-surface); }
@@ -34,3 +34,26 @@
 .task-editor-cancel { border-top:1px solid var(--border-1); margin-top:1rem; padding-top:.8rem; }
 .task-editor-error { overflow-wrap:anywhere; }
 @media (max-width:760px) { .task-graph-scroll { max-height:50vh; } .task-graph-node { touch-action:manipulation; } }
+
+.task-graph-node[data-graph-state="completed"] { background:var(--surface-2); color:var(--text-1); border-color:var(--border-2); }
+.task-graph-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; margin:.6rem 0; }
+.task-graph-field { display:grid; gap:.25rem; font-size:.84rem; }
+.task-graph-field input,.task-graph-field select { width:auto; max-width:100%; margin:0; }
+.task-graph-zoom { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; }
+.task-graph-boundary,.task-graph-node-boundary { font-size:.72rem; color:var(--text-2); }
+.task-graph-list { margin-top:.7rem; }
+.task-graph-list summary { cursor:pointer; }
+
+.task-hierarchy-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.task-hierarchy-list > li { min-width: 0; }
+.task-hierarchy-list .task-row-button { width: 100%; text-align: start; overflow-wrap: anywhere; }
+.task-hierarchy-edges path { stroke-dasharray: 5 4; }
+.task-hierarchy-root { border-style: double; justify-content: center; cursor: default; }
+.task-hierarchy .task-graph-node[data-task-kind="component"] { border-width: 3px; }
+.task-hierarchy .task-state { font-size: .8rem; }
+.hierarchy-depth-1 { padding-inline-start: 1.25rem; }
+.hierarchy-depth-2 { padding-inline-start: 2.5rem; }
+.hierarchy-depth-3 { padding-inline-start: 3.75rem; }
+.hierarchy-depth-4 { padding-inline-start: 5rem; }
+.hierarchy-depth-5 { padding-inline-start: 6.25rem; }
+.hierarchy-depth-6 { padding-inline-start: 7.5rem; }

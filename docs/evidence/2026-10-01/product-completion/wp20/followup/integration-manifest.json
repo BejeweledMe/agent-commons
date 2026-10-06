@@ -1,0 +1,60 @@
+{
+  "schema": "wp20-bounded-followup-integration.v1",
+  "source_before": "fe98a42e588e29d79198d109627814f22d496272d1447732605b5dba44169fe4",
+  "source_after": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+  "files": {
+    "src/agent_commons/services/manager.py": {
+      "baseline_sha256": "a950df257bfc88b6ae5adc150c0aa737a4d4a27ec8a999eb18b7e77701b55b89",
+      "result_sha256": "4ca10ba6e7f31c2b90d153ce21675eacc75c5e8758a6cbb524fb91d84c9a64bb"
+    },
+    "src/agent_commons/services/tasks.py": {
+      "baseline_sha256": "0e2e4446f8f09503572403a8ef8cf054f2d1fdfa91aaefa25a8878d9c3c49f0b",
+      "result_sha256": "7b044bef6bdc7fc154ff80d10e4236daf9de1e9ea236407bf94df37e6add1d75"
+    },
+    "tests/services/test_verified_ledger_view.py": {
+      "baseline_sha256": "41a0a077b02609ec798ce1441f8a2f1c888a0607f76e4738e3a581e35bad0773",
+      "result_sha256": "367fc2bdead16f74bd2239e07a62966a71a132a632f5c82d18e90d377999c756"
+    },
+    "tests/services/test_task_evidence_snapshot.py": {
+      "baseline_sha256": null,
+      "result_sha256": "782c328644b8fd19ef6ef954e2dae0351d6f1fe17bf1c2a2ba27eaac916b4e31"
+    }
+  },
+  "patch_sha256": "f54476b2fc96dfe71e5aca792ef7b6b74e3c737e598987f3fd0978174ad6b102",
+  "benchmark_sha256": "2fb9eddb8e779abf1d9cf554a414e012522d48e4d3cd1002db218a4068253917",
+  "tests": {
+    "passed": 422,
+    "seconds": 68.18,
+    "base_regressions_failed_as_expected": 3,
+    "log": "focused-tests.txt",
+    "baseline_log": "baseline-regressions.txt"
+  },
+  "main_checkout_written": false,
+  "full_make_check": "not run in isolated worker; root integration gate required",
+  "benchmark": {
+    "exit_code": 0,
+    "repeats": 2,
+    "profile": "large",
+    "mutations": 6,
+    "file": "benchmark-large.json",
+    "host_load": "concurrent; no matched fe98 baseline measurement",
+    "one_second_target_met": false
+  },
+  "granular_profile": {
+    "source_sha256": "9b3368df09bceb1a5196663937886fbc0c7705ee3b814562f771463763868196",
+    "fixture_event_count": 3206,
+    "fixture_manifest_count": 350,
+    "elapsed_profiled_seconds": 22.675151915987954,
+    "total_calls": 43942624
+  },
+  "evidence_sha256": {
+    "benchmark-large.json": "28140ec476af51e8f45bd477d74be02bb462c028718bebc95213c0f9bc5469ea",
+    "benchmark-large-stderr.txt": "bcbf4750ad8bb84b216c108971ef9edfb8e94a67916bc615adb17c35b23873ed",
+    "task-create-profile.json": "ec37b8a41641c25be0e43d5c1ae93f0b3f7d254217f975a8f09d284057ce597d",
+    "task-create-profile.txt": "0c3afd0e6649122a06b88b534891d3acad8e7a58e1f155aa5b87826de7ba7402",
+    "profile-task-create.py": "9ce89bad38a053ace42dfd86ba4ad0241c398888ebe48046d02803b480d1256b",
+    "followup-report.md": "af86b27456c19424620ec76c7dbe6b9724b7f2e6cf1402bb452bbe0093ff3a27",
+    "focused-tests.txt": "a61a7a3b5621e3efc0d3b22a92c1565bce494188b9912afa402688401092ce91",
+    "baseline-regressions.txt": "14f5bc8dd9498c7acb6ae9fa020964bacb29d691be958c7dd202d58dd8bb3970"
+  }
+}

@@ -85,6 +85,8 @@ type TaskDraft = {
   description: string;
   criteria: string;
   dependencyIds: readonly string[];
+  taskKind?: "task" | "component";
+  parentTaskId?: string | null;
 };
 
 type FormErrors = ReadonlySet<string>;
@@ -997,7 +999,7 @@ function WorkApp(): ReactElement {
     }
     const input = {
       title: task.title.trim(), description: task.description.trim(),
-      criteria, dependencyIds: [...task.dependencyIds]
+      criteria, dependencyIds: [...task.dependencyIds], taskKind: task.taskKind ?? "task", parentTaskId: task.parentTaskId ?? null
     };
     const idempotencyKey = taskRetryIdentity.current.forOperation(JSON.stringify(input));
     const operationNavigation = navigationRevision.current;
@@ -1019,7 +1021,12 @@ function WorkApp(): ReactElement {
         if (!stillCurrent()) return;
         api.forgetTaskWrite(idempotencyKey);
         taskRetryIdentity.current.reset();
-        setTask((current) => JSON.stringify({ title: current.title.trim(), description: current.description.trim(), criteria: current.criteria.split("\n").map((item) => item.trim()).filter(Boolean), dependencyIds: [...current.dependencyIds] }) === JSON.stringify(input) ? emptyTask : current);
+        setTask((current) => JSON.stringify({
+          title: current.title.trim(), description: current.description.trim(),
+          criteria: current.criteria.split("\n").map((item) => item.trim()).filter(Boolean),
+          dependencyIds: [...current.dependencyIds], taskKind: current.taskKind ?? "task",
+          parentTaskId: current.parentTaskId ?? null
+        }) === JSON.stringify(input) ? emptyTask : current);
         if (navigationRevision.current === operationNavigation) {
           navigate({ view: "work", taskId: result.taskId, composer: false });
           setRun((current) => ({ ...current, taskId: result.taskId }));
@@ -1403,7 +1410,10 @@ function WorkApp(): ReactElement {
   return (
     <ConversationWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId} locale={locale} writesEnabled={workspaceInitialized && data.meta.writesEnabled} sessions={conversationSessions.current} onPrepareRun={prepareRunForConversation}>
     <OutputsWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId}
-      revision={trackerObservation.kind === "ready" ? trackerObservation.snapshot.sourceRevision : null} locale={locale}>
+      revision={trackerObservation.kind === "ready" ? trackerObservation.snapshot.sourceRevision : null} locale={locale}
+      taskTitles={trackerObservation.kind === "ready" ? new Map(trackerObservation.snapshot.tasks.map((task) => [task.taskId, task.title])) : undefined}
+      agentNames={new Map(roleOptions.map((agent) => [agent.id, agent.name]))}
+      onOpenTask={(taskId) => { navigate({ view: "work", filter: "all", agentId: null, taskId, composer: false }); setLaunchOpen(false); }}>
     <main className="work-app">
       <aside className="app-rail" aria-label={text("shell_navigation")}>
         <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}

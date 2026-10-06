@@ -1,0 +1,13 @@
+{
+  "grok-visible-final.md": "cec89ef77131f4f3482ca80f567bac4f38be4ab10ecd6e422f0cb43bf33e2114",
+  "benchmark-large.json": "d33d8779a67e7bcbde698e32c186562b2ef0c8a57cc2346eaa1f0db26ecab415",
+  "benchmark-summary.json": "1945e86f0f4f3b7999cb45dc73595cd6a95ecfbf02b1789dfc28a18e9f7a27a3",
+  "provenance.json": "32632d3a330bbe6faec7fd663428e8d8d8744c6a3c2e8343d55173632c4dc734",
+  "handoff.md": "d725a9b05871192db8adaccff5b2334cb0ecfc0d43f85cd5c69615fafdd6432e",
+  "input-manifest.json": "791b2138632be2a05dbd409ea7ef5fa3fab94f93cffc67727ddf30d9123fc532",
+  "baseline-hashes.json": "866bbe7bc0ac9c670f4dd233f90d7a8e8b2e1d896f6577951a685d53cc19f4ad",
+  "prompt.txt": "f4fe1a7c28654a71cae446c2e8cf0e1277f66ae700502c6dfd8c8dbc28d916a4",
+  "environment-controls.json": "176d6341be2d6853d59d6bd20793463f116e9eb1b8dabe2f08afc96439d5ad5b",
+  "preflight-summary.json": "e0a0b4eb715a8cfd52cca1848ab150dcab03a7848468cfc0e082e9f734d001aa",
+  "benchmark-large-stderr.txt": "bcbf4750ad8bb84b216c108971ef9edfb8e94a67916bc615adb17c35b23873ed"
+}

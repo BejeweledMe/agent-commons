@@ -1,0 +1,58 @@
+[
+  {
+    "path": "/private/tmp/commons-council-20261001/source/SOURCE_MANIFEST.json",
+    "sha256": "86481622e733a85b87a9e0f514eadf6497583dd6b6231a9f45fd9952a396eaa8"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/candidate-package.md",
+    "sha256": "1443de9751941043acf80aee7d88b4e4e821a7cb903e523f4b63e55a42249957"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-C-all5-input-manifest.json",
+    "sha256": "0362a898db5667b2d1a7247a6173b4dacf055b274ceefc61490aa2bba6319c6f"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/response-A.md",
+    "sha256": "bbbd73d511789ccc2c356db933e0ca2aef1076a7dddb5f44b5531838131ba34c"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/response-B.md",
+    "sha256": "0c828928c2ee9b864357f3a8a7e449a89b112fec72df78a5cda5c5936df39533"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/response-C.md",
+    "sha256": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/response-D.md",
+    "sha256": "d00f2d6f92473705b4d73005fb6a89b859544e361c0fea874cab2b483af68d7d"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/resumed-council/critique-input/response-E.md",
+    "sha256": "ef1d296bddafa78e79be1f5f7abffa9adb628f201ac3b644678acc663bd3d6d5"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/services/roles.py",
+    "sha256": "5cf239c2e47b39b19fd324562669071086356e564ba4eb01013857866e0e373d"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/services/delegation_runtime.py",
+    "sha256": "e21c93763ef51520d3669fc22cbf70974364a100154d8c10735d5a32cfd52c01"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/runtime/provider_qualification.py",
+    "sha256": "1e0839dcfeeee445e873352623086939efd0417792172f783b416ac4483472de"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/runtime/model.py",
+    "sha256": "7461ad173787f463cfc398d11f74ff25e8c7acfde75f1efa61ef41725c6732e8"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/services/design_gallery.py",
+    "sha256": "a84ecdbe8e3043ee5c04c02b8b0f17b1323eeded45339977df4df4a212e62b3a"
+  },
+  {
+    "path": "/private/tmp/commons-council-20261001/review-final/src/agent_commons/services/manager.py",
+    "sha256": "207e1ae12ced53b8821ca0bcfdeff6adb69ca9a0f0a3d126817a2a9011ebbae0"
+  }
+]

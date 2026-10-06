@@ -384,7 +384,13 @@ _STRING_LIST_FIELDS = {
 _REF_LIST_FIELDS = {"artifact_refs", "related_refs", "result_refs"}
 
 _OBJECTIVE_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "extensions"}
-_TASK_CHANGE_FIELDS = {"title", "description", "acceptance_criteria", "dependencies"}
+_TASK_CHANGE_FIELDS = {
+    "title",
+    "description",
+    "acceptance_criteria",
+    "dependencies",
+    "parent_task_id",
+}
 
 _DELEGATION_TARGET_PROFILES = {
     "codex-builder",
@@ -583,6 +589,9 @@ def validate_payload(event_type: str, payload: Mapping[str, Any]) -> EventSpec:
         raise ValidationError("extensions must be an object")
     if event_type == "objective.revised":
         _validate_objective_changes(payload["changes"])
+    if event_type.startswith("task.") and event_type != "task.created":
+        if {"task_kind", "parent_task_id"}.intersection(payload):
+            raise ValidationError("Hierarchy fields may only be created or revised through changes")
     if event_type == "task.revised":
         _validate_task_changes(payload["changes"])
     if event_type == "event.corrected":

@@ -1,0 +1,30 @@
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import sys
+import tempfile
+
+signal.alarm(600)
+for key in ('AGENT_COMMONS_STATE_ROOT', 'AGENT_COMMONS_STATE_BASE', 'AGENT_COMMONS_SESSION_ID'):
+    os.environ.pop(key, None)
+root = Path('/private/tmp/commons-product-wp20-20261001')
+sys.path.insert(0, str(root / 'benchmarks'))
+import benchmark_work_mutation as b
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
+
+with tempfile.TemporaryDirectory(prefix='wp20-comparison-', dir=root) as temp:
+    fixture = b.build_mutation_fixture(Path(temp), profile='large')
+    assert fixture.event_count == 3206
+    assert fixture.manifest_count == 350
+    report = b.profile_work_mutations(fixture, repeats=3, mutations=('task_create',), profile='large')
+report['source_sha256'] = agent_commons_source_sha256()
+report['benchmark_sha256'] = hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
+report['protocol_note'] = ('Unchanged official task_create workload; fixture built once per variant, '
+                           '3206 events/350 manifests before first sample; fixture construction excluded. '
+                           'Cold=fresh manager in imported process; warm=second call on same manager. '
+                           'Each pair appends two events. Source variants run sequentially. '
+                           'Other product builders may be active; not an idle-host certification.')
+(root / sys.argv[1]).write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps({k: report[k] for k in ('source_sha256', 'benchmark_sha256', 'fixture', 'mutations')}, indent=2))

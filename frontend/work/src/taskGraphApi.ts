@@ -5,8 +5,9 @@ export type TaskEditDetail = {
   criteria: readonly string[]; dependencyIds: readonly string[]; state: string;
   editable: boolean; cancellable: boolean; refusalCode: string | null;
   suggestedAgentId?: string;
+  taskKind: "task" | "component"; parentTaskId: string | null;
 };
-export type TaskEditInput = Pick<TaskEditDetail, "title" | "description" | "criteria" | "dependencyIds">;
+export type TaskEditInput = Pick<TaskEditDetail, "title" | "description" | "criteria" | "dependencyIds"> & { parentTaskId?: string | null; taskKind?: "task" | "component" };
 export type TaskEditResult = { taskId: string; revision: string; action: "revised" | "cancelled" };
 export type TaskGraphTransport = {
   requestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown>;
@@ -40,6 +41,8 @@ export function parseTaskEditDetail(raw: unknown, expectedTaskId: string): TaskE
   if ((value.state === "accepted" || value.state === "cancelled" || value.refusal_code !== null) && (value.editable || value.cancellable)) return malformed();
   if ((value.state === "completed" || value.state === "review") && value.cancellable) return malformed();
   const result: TaskEditDetail = {
+    taskKind: value.task_kind === undefined ? "task" : value.task_kind === "task" || value.task_kind === "component" ? value.task_kind : malformed(),
+    parentTaskId: value.parent_task_id === undefined || value.parent_task_id === null ? null : taskId(value.parent_task_id),
     taskId: taskId(value.task_id), revision: revision(value.revision), title: boundedText(value.title, 512),
     description: boundedText(value.description, 16000), criteria, dependencyIds, state: value.state,
     editable: value.editable, cancellable: value.cancellable, refusalCode: value.refusal_code as string | null
@@ -80,7 +83,8 @@ export class TaskGraphApi {
   save(id: string, expectedRevision: string, input: TaskEditInput, key: string, signal: AbortSignal): Promise<TaskEditResult> {
     revision(expectedRevision);
     return this.write(id, "edit", { expected_revision: expectedRevision, changes: {
-      title: input.title, description: input.description, acceptance_criteria: [...input.criteria], dependencies: [...input.dependencyIds]
+      title: input.title, description: input.description, acceptance_criteria: [...input.criteria], dependencies: [...input.dependencyIds],
+      ...(input.parentTaskId !== undefined ? { parent_task_id: input.parentTaskId } : {})
     } }, key, signal);
   }
   cancel(id: string, expectedRevision: string, reason: string, key: string, signal: AbortSignal): Promise<TaskEditResult> {

@@ -1,0 +1,111 @@
+(node:41890) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ confirmed creation clears the saved {} draft (5.535459ms)
+✖ confirmed creation clears the saved {"taskKind":"component","parentTaskId":null} draft (1.109584ms)
+✖ confirmed creation clears the saved {"taskKind":"task","parentTaskId":"task.parent"} draft (0.970667ms)
+✔ a late confirmation preserves the newer {"title":"A newer draft"} draft (0.62625ms)
+✔ a late confirmation preserves the newer {"taskKind":"component"} draft (0.360541ms)
+✔ a late confirmation preserves the newer {"parentTaskId":"task.other-parent"} draft (0.310416ms)
+✔ an uncertain creation preserves the draft and does not navigate (0.383958ms)
+✔ confirmation from the previous project cannot clear the current project's draft (0.316667ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123.054167
+
+✖ failing tests:
+
+test at frontend/work/tests/task-create-draft.test.mjs:36:3
+✖ confirmed creation clears the saved {} draft (5.535459ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   criteria: ' First \n\n Second ',
+  +   dependencyIds: [
+  +     'task.prerequisite'
+  +   ],
+  +   description: '  Outcome  ',
+  +   title: '  New work  '
+  -   criteria: '',
+  -   dependencyIds: [],
+  -   description: '',
+  -   title: ''
+    }
+  
+      at TestContext.<anonymous> (file:///Users/dmitrijersov/Desktop/vibecoding/agent-commons/frontend/work/tests/task-create-draft.test.mjs:39:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { title: '  New work  ', description: '  Outcome  ', criteria: ' First \n\n Second ', dependencyIds: [ 'task.prerequisite' ] },
+    expected: { title: '', description: '', criteria: '', dependencyIds: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at frontend/work/tests/task-create-draft.test.mjs:36:3
+✖ confirmed creation clears the saved {"taskKind":"component","parentTaskId":null} draft (1.109584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   criteria: ' First \n\n Second ',
+  +   dependencyIds: [
+  +     'task.prerequisite'
+  +   ],
+  +   description: '  Outcome  ',
+  +   parentTaskId: null,
+  +   taskKind: 'component',
+  +   title: '  New work  '
+  -   criteria: '',
+  -   dependencyIds: [],
+  -   description: '',
+  -   title: ''
+    }
+  
+      at TestContext.<anonymous> (file:///Users/dmitrijersov/Desktop/vibecoding/agent-commons/frontend/work/tests/task-create-draft.test.mjs:39:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { title: '  New work  ', description: '  Outcome  ', criteria: ' First \n\n Second ', dependencyIds: [ 'task.prerequisite' ], taskKind: 'component', parentTaskId: null },
+    expected: { title: '', description: '', criteria: '', dependencyIds: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at frontend/work/tests/task-create-draft.test.mjs:36:3
+✖ confirmed creation clears the saved {"taskKind":"task","parentTaskId":"task.parent"} draft (0.970667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   criteria: ' First \n\n Second ',
+  +   dependencyIds: [
+  +     'task.prerequisite'
+  +   ],
+  +   description: '  Outcome  ',
+  +   parentTaskId: 'task.parent',
+  +   taskKind: 'task',
+  +   title: '  New work  '
+  -   criteria: '',
+  -   dependencyIds: [],
+  -   description: '',
+  -   title: ''
+    }
+  
+      at TestContext.<anonymous> (file:///Users/dmitrijersov/Desktop/vibecoding/agent-commons/frontend/work/tests/task-create-draft.test.mjs:39:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { title: '  New work  ', description: '  Outcome  ', criteria: ' First \n\n Second ', dependencyIds: [ 'task.prerequisite' ], taskKind: 'task', parentTaskId: 'task.parent' },
+    expected: { title: '', description: '', criteria: '', dependencyIds: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

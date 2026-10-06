@@ -1,0 +1,20 @@
+{
+  "head": "aa9d3733decb9bff2f1b24892167842334bcf6a5",
+  "manifest_sha256": "86481622e733a85b87a9e0f514eadf6497583dd6b6231a9f45fd9952a396eaa8",
+  "snapshot_files": 1324,
+  "preexisting_uncommitted_work": true,
+  "doctor": {
+    "ok": true,
+    "events": 4212,
+    "manifests": 418,
+    "warnings": 173
+  },
+  "tasks": {
+    "accepted": 173,
+    "completed": 52,
+    "cancelled": 69,
+    "ready": 9,
+    "review": 1
+  },
+  "temporary_source_manifest": "/private/tmp/commons-council-20261001/source/SOURCE_MANIFEST.json"
+}

@@ -1,0 +1,26 @@
+{
+  "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+  "agent_commons_version": "0.1.0",
+  "canonical_state": "succeeded",
+  "child_session_closed": true,
+  "model": null,
+  "ok": true,
+  "process_canonical_mismatch": false,
+  "profile_id": "codex-builder",
+  "provider": "codex",
+  "provider_version": "codex-cli 0.145.0",
+  "provider_work_process_started": true,
+  "purpose": "implementation",
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "workflow_diagnostic_code": "none",
+  "process": {
+    "duration_seconds": 54.35863941599382,
+    "exit_code": 0,
+    "outcome": "succeeded"
+  },
+  "configuration": "Explicit existing operator runtime.yaml; model/executable/trust unchanged. model=null means unpinned, not evidence of a particular model.",
+  "scope": "Installed MCP from final source; synthetic builder canary, not product frontend end-to-end."
+}

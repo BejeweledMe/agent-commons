@@ -144,8 +144,13 @@ _CLAUDE_COMMONS_COLLABORATION_TOOLS = (
     "mcp__agent-commons__commons_acknowledge_message",
     "mcp__agent-commons__commons_publish_live_preview",
     "mcp__agent-commons__commons_publish_design_image",
+    "mcp__agent-commons__commons_publish_static_build",
 )
-_CLAUDE_COMMONS_REVIEW_TOOLS = ("mcp__agent-commons__commons_record_verification",)
+_CLAUDE_COMMONS_REVIEW_TOOLS = (
+    "mcp__agent-commons__commons_record_verification",
+    "mcp__agent-commons__commons_read_output_image",
+    "mcp__agent-commons__commons_read_build_file",
+)
 _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
 #: Staff-changing tools, keyed by the standing grant *and its level*.  A run
 #: acting for no role, or for a role at `deny`, receives none of them: the grant

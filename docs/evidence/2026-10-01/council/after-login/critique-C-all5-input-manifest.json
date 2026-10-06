@@ -1,0 +1,20 @@
+{
+  "files": {
+    "candidate-package.md": "1443de9751941043acf80aee7d88b4e4e821a7cb903e523f4b63e55a42249957",
+    "common-facts.json": "5a8f4feba7bed1144ea6a350b487d88eed1653b6fc29744238aec61dfb8a3768",
+    "critique-task.md": "a23916679748c62817e8362d553ff904209faf3bdf5bf295f8f42fa265d57448",
+    "response-A.md": "bbbd73d511789ccc2c356db933e0ca2aef1076a7dddb5f44b5531838131ba34c",
+    "response-B.md": "0c828928c2ee9b864357f3a8a7e449a89b112fec72df78a5cda5c5936df39533",
+    "response-C.md": "2a46292cd0314cc56feb385d5b4ab4184fccb23438fb50d27b6098c761ddeed0",
+    "response-D.md": "d00f2d6f92473705b4d73005fb6a89b859544e361c0fea874cab2b483af68d7d",
+    "response-E.md": "ef1d296bddafa78e79be1f5f7abffa9adb628f201ac3b644678acc663bd3d6d5",
+    "wp20-performance-diagnosis.md": "2190a436f9f293c8e5002fcbe50eb8f1d6c1e7ba897e9a1e432d0028869b5d18",
+    "wp20-profile-aggregate.json": "b2df58b92a2ff640eeb10424a318ca72e25cd71dcdc6b5133af1145bc2a30d32"
+  },
+  "original_input_dir": "/private/tmp/commons-council-20261001/resumed-council/critique-input",
+  "isolated_input_dir": "/private/tmp/commons-council-grok-C-fresh-20261001/critique-input",
+  "prompt_sha256": "4b8cbf1654106b6e1fae62cb760f65d8983f8e89d889706e1c76a61cb5c4c2a7",
+  "task_changes": "source path replacement only; original task input file copied unchanged",
+  "requested_model": "grok-4.7",
+  "session_requested": "2b30d9ae-7fb7-40b7-86ed-1c6be0db9c98"
+}

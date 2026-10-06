@@ -1,0 +1,258 @@
+{
+  "verdict": "approved",
+  "scope": "G6 only; no task acceptance or overall release approval",
+  "task_id": "task.0HPFPQHVQ4VNTV08PR3Y6SBBVJ",
+  "target_revision": "evt.01M3VX7AKV5WEDFCS9CQHJ76KF",
+  "review_id": "review.6AECRGYFT7NWF33KFD1TK7ME0J",
+  "requested_review_revision": "evt.01M3VX85JZF9JBN0A44WCHSH16",
+  "completion": {
+    "created": true,
+    "entity_ref": {
+      "id": "review.6AECRGYFT7NWF33KFD1TK7ME0J",
+      "kind": "review"
+    },
+    "event_id": "evt.01M3VXT0FEFA9T1KRVJP8CK6EK",
+    "event_type": "review.completed",
+    "idempotency_key": "g6-independent-canonical-review-20261001-fb5668",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M3VXT0FEFA9T1KRVJP8CK6EK"
+  },
+  "reviewer_session": {
+    "capabilities": [],
+    "client": "codex",
+    "closed_at": "2026-10-01T14:28:44.759646Z",
+    "effective_status": "closed",
+    "expires_at": "2026-10-01T22:22:36.059023Z",
+    "last_seen_at": "2026-10-01T14:28:44.759646Z",
+    "model": null,
+    "model_family": "gpt-6",
+    "opened_at": "2026-10-01T14:22:36.059023Z",
+    "principal": "codex",
+    "role": "independent-g6-reviewer",
+    "schema": "agent_commons.session.v1",
+    "session_id": "session.fb5668f4da604822afa37f32d214e79f",
+    "software": "codex-desktop",
+    "source_producer": null,
+    "stable_instance_id": "codex-g6-independent-review-20261001",
+    "status": "closed"
+  },
+  "artifact_bindings": [
+    {
+      "artifact": {
+        "actor": {
+          "capabilities": [],
+          "client": "codex",
+          "model_family": "gpt-6",
+          "principal_id": "codex",
+          "role_id": "product-completion-lead",
+          "session_id": "session.635f19bdf3ed4605aae6c8ebf60364e8",
+          "software": "codex-desktop",
+          "stable_instance_id": "codex-council-auth-resume-20261001"
+        },
+        "artifact_id": "artifact.2X28CHET2EAM502YFWHAZQY629",
+        "author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "classification": "internal",
+        "content_revision": "sha256:d40b4407ea828e8b4ca1874d883d5b12c880e5fea25b53dce4fd0ef8a79203f4",
+        "effective_revision": "evt.01M3VX22XZXFSJ458WHDYFM8K6",
+        "evidence_author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "id": "artifact.2X28CHET2EAM502YFWHAZQY629",
+        "manifest_ref": "mft.artifact.sha256.749a7d7848055c73837b0c169090ca850e6c470ea37e3247868320d5899152a0",
+        "recorded_at": "2026-10-01T14:14:27.519062Z",
+        "revision": "evt.01M3VX22XZXFSJ458WHDYFM8K6",
+        "state": "registered"
+      },
+      "manifest": {
+        "artifact_id": "artifact.2X28CHET2EAM502YFWHAZQY629",
+        "captured": false,
+        "classification": "internal",
+        "kind": "artifact",
+        "media_type": "text/markdown",
+        "metadata": {},
+        "revision": "sha256:d40b4407ea828e8b4ca1874d883d5b12c880e5fea25b53dce4fd0ef8a79203f4",
+        "schema": "commons.manifest.artifact.v1",
+        "size_bytes": 8348,
+        "source": {
+          "path": "docs/evidence/2026-10-01/product-completion/REPORT.md"
+        }
+      }
+    },
+    {
+      "artifact": {
+        "actor": {
+          "capabilities": [],
+          "client": "codex",
+          "model_family": "gpt-6",
+          "principal_id": "codex",
+          "role_id": "product-completion-lead",
+          "session_id": "session.635f19bdf3ed4605aae6c8ebf60364e8",
+          "software": "codex-desktop",
+          "stable_instance_id": "codex-council-auth-resume-20261001"
+        },
+        "artifact_id": "artifact.4X7YVXTWGF4D2NYRYEXC17C61J",
+        "author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "classification": "internal",
+        "content_revision": "sha256:3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+        "effective_revision": "evt.01M3VX2MQNTNTR675EECVFHCPN",
+        "evidence_author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "id": "artifact.4X7YVXTWGF4D2NYRYEXC17C61J",
+        "manifest_ref": "mft.artifact.sha256.4342ce1803d1844439f499e410829c538b913b7bb2a9864cade2f9c06f405ca3",
+        "recorded_at": "2026-10-01T14:14:45.749511Z",
+        "revision": "evt.01M3VX2MQNTNTR675EECVFHCPN",
+        "state": "registered"
+      },
+      "manifest": {
+        "artifact_id": "artifact.4X7YVXTWGF4D2NYRYEXC17C61J",
+        "captured": false,
+        "classification": "internal",
+        "kind": "artifact",
+        "media_type": "application/json",
+        "metadata": {},
+        "revision": "sha256:3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+        "schema": "commons.manifest.artifact.v1",
+        "size_bytes": 147280,
+        "source": {
+          "path": "docs/evidence/2026-10-01/product-completion/final-source-manifest.json"
+        }
+      }
+    },
+    {
+      "artifact": {
+        "actor": {
+          "capabilities": [],
+          "client": "codex",
+          "model_family": "gpt-6",
+          "principal_id": "codex",
+          "role_id": "product-completion-lead",
+          "session_id": "session.635f19bdf3ed4605aae6c8ebf60364e8",
+          "software": "codex-desktop",
+          "stable_instance_id": "codex-council-auth-resume-20261001"
+        },
+        "artifact_id": "artifact.619TJ90TNCD0HAAZ0W6YQSGGMQ",
+        "author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "classification": "internal",
+        "content_revision": "sha256:72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+        "effective_revision": "evt.01M3VX367WJE4P6MNTV5DRVA50",
+        "evidence_author_session_ids": [
+          "session.635f19bdf3ed4605aae6c8ebf60364e8"
+        ],
+        "id": "artifact.619TJ90TNCD0HAAZ0W6YQSGGMQ",
+        "manifest_ref": "mft.artifact.sha256.09d78df88a112c68d735ebfdd8c0a6a9e062e380733ba3a0876bfbe544cfa3a9",
+        "recorded_at": "2026-10-01T14:15:03.676323Z",
+        "revision": "evt.01M3VX367WJE4P6MNTV5DRVA50",
+        "state": "registered"
+      },
+      "manifest": {
+        "artifact_id": "artifact.619TJ90TNCD0HAAZ0W6YQSGGMQ",
+        "captured": false,
+        "classification": "internal",
+        "kind": "artifact",
+        "media_type": "application/json",
+        "metadata": {},
+        "revision": "sha256:72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+        "schema": "commons.manifest.artifact.v1",
+        "size_bytes": 19741,
+        "source": {
+          "path": "docs/evidence/2026-10-01/product-completion/final-evidence-manifest.json"
+        }
+      }
+    }
+  ],
+  "hashes_before": {
+    "final-source-manifest.json": {
+      "sha256": "3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+      "checked_count": 1067,
+      "mismatches": []
+    },
+    "final-evidence-manifest.json": {
+      "sha256": "72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+      "checked_count": 126,
+      "mismatches": []
+    },
+    "prior_g6_integration": {
+      "checked_count": 47,
+      "mismatches": []
+    },
+    "make_check_log": {
+      "sha256": "ae47715d45f3dc73bebc193058a9a956f0ed9769b90377ff2d0bbbf8d2cdf825",
+      "expected_sha256": "ae47715d45f3dc73bebc193058a9a956f0ed9769b90377ff2d0bbbf8d2cdf825",
+      "hash_matches": true
+    }
+  },
+  "hashes_after": {
+    "final-source-manifest.json": {
+      "sha256": "3fc10207029df09ce1eef9bfab8d15ba935eca3584538926ee12eb2a8cea4b63",
+      "checked_count": 1067,
+      "mismatches": []
+    },
+    "final-evidence-manifest.json": {
+      "sha256": "72f6d206597f84460a1cae407c163735bf4f61c2aa2dbdc6fe8a2052930a3554",
+      "checked_count": 126,
+      "mismatches": []
+    }
+  },
+  "after_session_close_reverified": true,
+  "previous_g6_source_test_hashes": {
+    "src/agent_commons/cli/__init__.py": "881a35d430c1397fa6024b1652f11ea3262732817b1e2c7a656a78a743c97569",
+    "src/agent_commons/domain/lifecycle.py": "f883c3f4667bef6d7d5efbe4279cf376098defd2384903e29813f2159d3c96b2",
+    "src/agent_commons/domain/projection.py": "966731b45994ddcc34d325fb879d77e5c084ae285edb7e852248716f485e8d3c",
+    "src/agent_commons/domain/revisions.py": "c14b569fc9d51cdaeaac97f6d302da54f89fefd0f75898cf0a9e7058e9963392",
+    "src/agent_commons/domain/task_edits.py": "29fb1d3cd605ce134c6350f1cea9386078207d9e9cd8ba8d98315ce9f2a2c5c7",
+    "src/agent_commons/domain/task_projection.py": "f8b67ff0f0f99d50052a08adddaa2b1fd924870f974e2b5d15992162cd2bdcf8",
+    "src/agent_commons/domain/task_review_envelopes.py": "22c1c0a350bfbd98f1257b7774cf0aec42ad387f4ba78531163b18391551cbbe",
+    "src/agent_commons/domain/validation.py": "d506631f33585447bd176e599acc5bbc9c1fd5d44156efca4bee6e44b55254b0",
+    "src/agent_commons/mcp/server.py": "064633ba080cb2e3e1d62aef51160e7a53723c697b2cb4d787b500768bbaa611",
+    "src/agent_commons/resources/schemas/domain/task.v1.schema.json": "ea1f08d32d89bc1c2b734ccc68acc24070a37cddd9ae55293d518bcdcd1e0c6c",
+    "src/agent_commons/resources/schemas/domain/task.v2.schema.json": "c2dfbcaf7890eba36b47c0707a03ca7a9cb0605a99028910260fd7b5453edfdc",
+    "src/agent_commons/services/tasks.py": "7b044bef6bdc7fc154ff80d10e4236daf9de1e9ea236407bf94df37e6add1d75",
+    "src/agent_commons/ui/server.py": "72d522caae5425e71a7fa32f75611fe197c105538309245cb2dcaa0e5272560e",
+    "src/agent_commons/ui/task_edit_routes.py": "55a143ff3dfb3b35eb71eb3313f7d08b5fdaa86592fa951a58596d860097fd0c",
+    "src/agent_commons/ui/tracker_dtos.py": "f37dfb9a4684b0beae20e11504b435440ef8fc484e4b3fae3a3c7f794e334c45",
+    "src/agent_commons/ui/tracker_reads.py": "df127afd5ad3b2beb20cdfc1e2356a5063c83b898cfc27653e4433c6dcbf5667",
+    "frontend/work/src/api.ts": "8212e987ab86222876dd782f89f67919f983eae24fd548b1fff159cf9ba82a66",
+    "frontend/work/src/components/TaskComposer.tsx": "9e1432d899b8a45464d5ba374971baec57a52b8c828b05e69620ed32c7b4d6d5",
+    "frontend/work/src/components/TaskEditor.tsx": "dfec9cedb9a0cf078c0833ec345a4fdfcfbe6574a2307e2ce555fcd4124420fb",
+    "frontend/work/src/components/TaskHierarchy.tsx": "ccd199b55f075383282f4ed7c60951a4653738453320142bd14e58cd34a4d3c4",
+    "frontend/work/src/components/TaskViews.tsx": "9d66743287f8ecdbd5d941f6b81b3a215088086bee45539430dd148e18139ac4",
+    "frontend/work/src/contracts.ts": "564921a3c62567994d44b472edc4de62f85e74b5b6271cdabba7a9c390b1bb8b",
+    "frontend/work/src/i18n.json": "338b985f5022c8d3c3ca613395797f70557169675c227068978006fd8f4231ae",
+    "frontend/work/src/main.tsx": "ad06e369886627234badbf69386d5ff510a9559852f28d30211a1574ee28ceae",
+    "frontend/work/src/taskEditorState.ts": "1e9bffa3836f4d0e82123be1ead93b07d9cecfc52264386d9847b2a67ecb97ae",
+    "frontend/work/src/taskGraph.css": "437857d76ab98c281f0139d6945baafda872d029f0ac05afa50d3d03f921ea21",
+    "frontend/work/src/taskGraphApi.ts": "86ab42cd49d3c8441ff9d12268da147a7c35d71113a9c22429caf3229f81ccd4",
+    "frontend/work/src/taskHierarchy.ts": "51b04f75a4d000bf9b9ac32364d7861dcbff0045bb8e9d5082bea0f13e3aef43",
+    "frontend/work/tests/task-graph.test.mjs": "0a08903db16fdc3a1863f4b1c96a2469bb52676dc0f0afc32821cae6942c66f5",
+    "frontend/work/tests/work-task-create.test.mjs": "59605e6bc8a43bb9b2fdaeeb28628f46455b94f759316d802741342fed11f94a",
+    "tests/cli/test_cli.py": "8f45565d6209dcdc099faeca76f28edbac9992e7ae2135bb752c469bc9cf013a",
+    "tests/domain/test_task_projection.py": "15808f10ef5a199b6c4a9ac5726f18fd0977298df4dc42986834f636b01ba27f",
+    "tests/domain/test_task_review_envelopes.py": "a53ff15331d44764da59ba802cf86b1c65ba0da0835231d9d0b69e34b8b21960",
+    "tests/mcp/test_server.py": "47b54d12a3fb89dfa1a5ec725153671eda270c0add215c88aa69990c6c9dd39e",
+    "tests/mcp/test_worker_scope.py": "92aa3f637ef42eb49938ecdbfc246fc17c80960ead9b0afda98d0b2d365aa927",
+    "tests/services/test_manager.py": "0b54cba58ca7bf02ba8d0756d28cacb2b9a7d21242d2759f3ee6636bfe2c1f7f",
+    "tests/services/test_task_edits.py": "49c150868be7454ae32a1d78d32deec15e4c2ad1dd95283d07729e0382fbf2ba",
+    "tests/services/test_task_hierarchy_corrections.py": "26e106569cc455353a53904c394af8f614e17cd39a71a47b02474e5f2cee2bec",
+    "tests/ui/test_task_edit_routes.py": "09ae98f811bf6356bd460a8ccab5396280d10c6efe188b8105b55d8290f22aa5",
+    "src/agent_commons/services/manager.py": "4ca10ba6e7f31c2b90d153ce21675eacc75c5e8758a6cbb524fb91d84c9a64bb",
+    "frontend/work/src/taskGraph.ts": "d5c51964c0c8fcd2c5475c26ca8efe2e7f74f133797430aa24f11d6bbea303e6",
+    "frontend/work/src/components/TaskGraph.tsx": "adcb2c85f346121f36eaa38875f5ce3ed4a5274f89ea4efafdf320818b98fb12",
+    "frontend/work/src/components/TaskInspector.tsx": "d806f8529a9551f5dd1fb7cf03d14cc7f88722b8cdb42f46287b796427186c7e",
+    "frontend/work/src/trackerState.ts": "c1a02e5c2eb4a4f4a16c15bdce659cdf35fa870d568b4c1d84b816a4d4010284",
+    "frontend/work/src/i18n.ts": "824bebf3421b5480d04605048c6e9b709978cd966efd5127685da5fafb2aa009",
+    "frontend/work/src/taskGraphStrings.ts": "805073923044690a97e5966a3ae3315e8eeac2584d2d912688f4ca8d5a60cac4",
+    "frontend/work/tests/task-create-draft.test.mjs": "9a93d5762d1fdba25a08e3b13f3914c2be2555170dc09b1c8a25b02be33c54d8"
+  }
+}

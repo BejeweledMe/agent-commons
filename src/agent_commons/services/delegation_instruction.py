@@ -7,7 +7,9 @@ owner without changing that persistence boundary.
 
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
+from pathlib import Path
 
 from agent_commons.runtime import BuiltinProfileId, Provider
 
@@ -30,10 +32,67 @@ class DelegationInstructionInput:
     budget_unit: str
 
 
+@dataclass(frozen=True, slots=True)
+class DelegationStartupInput:
+    """Ephemeral broker-selected implementation startup, never a nonce or credential."""
+
+    repo_root: Path
+    state_root: Path
+    child_session_id: str
+    cli_executable: str | None
+
+
+def _implementation_startup(startup: DelegationStartupInput) -> str:
+    facts = (
+        "Broker-selected read-only startup (these explicit values override ambient "
+        "environment and login-shell exports):\n"
+        f"Repository: {shlex.quote(str(startup.repo_root))}\n"
+        f"Exact state root: {shlex.quote(str(startup.state_root))}\n"
+        f"Existing child session: {shlex.quote(startup.child_session_id)}\n"
+    )
+    if startup.cli_executable is None:
+        return facts + (
+            "No trusted Agent Commons CLI was available to the broker. Do not guess a "
+            "CLI from PATH, install one, or create a session. If required startup checks "
+            "cannot be completed, use the scoped MCP needs-operator outcome honestly."
+        )
+    prefix = [
+        startup.cli_executable,
+        "--repo",
+        str(startup.repo_root),
+        "--state-root",
+        str(startup.state_root),
+        "--session-id",
+        startup.child_session_id,
+        "--read-only",
+    ]
+    commands = "\n".join(
+        shlex.join([*prefix, *operation])
+        for operation in (
+            ("doctor",),
+            ("session", "show"),
+            ("orient",),
+            ("inbox",),
+            ("task", "list"),
+            ("claim", "list"),
+        )
+    )
+    return facts + (
+        "Use exactly this CLI and explicit prefix for commons-start read-only checks; "
+        "never substitute bare agent-commons or environment-selected paths.\n"
+        "```sh\n" + commands + "\n```\n"
+        "This is read-only inspection of your existing session, not permission to start, "
+        "renew or end sessions, acquire claims, or write canonical records via CLI. "
+        "All coordination writes and terminal outcomes must use the injected scoped MCP. "
+        "Never expose session nonces or credentials."
+    )
+
+
 def compose_delegation_instruction(
     instruction: DelegationInstructionInput,
     *,
     profile_id: BuiltinProfileId,
+    startup: DelegationStartupInput | None = None,
 ) -> str:
     """Compose the provider-only instruction for one already-validated delegation."""
 
@@ -107,6 +166,13 @@ transport and do not widen the worker tool catalog."""
             "tools for canonical coordination and outcomes."
         )
 
+    if (
+        startup is not None
+        and instruction.purpose == "implementation"
+        and not profile_id.independent_reviewer
+    ):
+        reviewer_entry += "\n" + _implementation_startup(startup)
+
     if instruction.purpose == "independent_review":
         result_protocol = (
             "For independent_review, do not edit source. Find the existing review "
@@ -114,8 +180,14 @@ transport and do not widen the worker tool catalog."""
             f"""the exact target. Before the terminal call, satisfy every evidence
 precondition: inspect the review, locate its exact task once, and call
 commons_read_artifact exactly once for every artifact required by that task. Do
-not attempt finalization first and repair a rejected call afterward. After
-analysis, call the injected
+not attempt finalization first and repair a rejected call afterward.
+For an exact image artifact target, use commons_read_output_image to inspect its
+verified pixels instead of the UTF-8 artifact reader. For a retained static build,
+use commons_read_build_file: manifest-only reads do not satisfy approval evidence;
+read every text entry fully, following next_offset without gaps. Binary asset
+hashes do not prove visual appearance. State any execution, visual or test limits
+honestly in the verdict summary. Artifact-target review need not locate a task.
+After analysis, call the injected
 {finalize_review_tool} tool exactly once with the bounded
 verdict. That retry-convergent terminal operation records review.completed and then
 delegation.succeeded with the bound review as its fixed result; do not call a

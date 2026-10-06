@@ -1,0 +1,475 @@
+--- a/src/agent_commons/services/delegation_instruction.py
++++ b/src/agent_commons/services/delegation_instruction.py
+@@ -7,7 +7,9 @@
+ 
+ from __future__ import annotations
+ 
++import shlex
+ from dataclasses import dataclass
++from pathlib import Path
+ 
+ from agent_commons.runtime import BuiltinProfileId, Provider
+ 
+@@ -30,10 +32,67 @@
+     budget_unit: str
+ 
+ 
++@dataclass(frozen=True, slots=True)
++class DelegationStartupInput:
++    """Ephemeral broker-selected implementation startup, never a nonce or credential."""
++
++    repo_root: Path
++    state_root: Path
++    child_session_id: str
++    cli_executable: str | None
++
++
++def _implementation_startup(startup: DelegationStartupInput) -> str:
++    facts = (
++        "Broker-selected read-only startup (these explicit values override ambient "
++        "environment and login-shell exports):\n"
++        f"Repository: {shlex.quote(str(startup.repo_root))}\n"
++        f"Exact state root: {shlex.quote(str(startup.state_root))}\n"
++        f"Existing child session: {shlex.quote(startup.child_session_id)}\n"
++    )
++    if startup.cli_executable is None:
++        return facts + (
++            "No trusted Agent Commons CLI was available to the broker. Do not guess a "
++            "CLI from PATH, install one, or create a session. If required startup checks "
++            "cannot be completed, use the scoped MCP needs-operator outcome honestly."
++        )
++    prefix = [
++        startup.cli_executable,
++        "--repo",
++        str(startup.repo_root),
++        "--state-root",
++        str(startup.state_root),
++        "--session-id",
++        startup.child_session_id,
++        "--read-only",
++    ]
++    commands = "\n".join(
++        shlex.join([*prefix, *operation])
++        for operation in (
++            ("doctor",),
++            ("session", "show"),
++            ("orient",),
++            ("inbox",),
++            ("task", "list"),
++            ("claim", "list"),
++        )
++    )
++    return facts + (
++        "Use exactly this CLI and explicit prefix for commons-start read-only checks; "
++        "never substitute bare agent-commons or environment-selected paths.\n"
++        "```sh\n" + commands + "\n```\n"
++        "This is read-only inspection of your existing session, not permission to start, "
++        "renew or end sessions, acquire claims, or write canonical records via CLI. "
++        "All coordination writes and terminal outcomes must use the injected scoped MCP. "
++        "Never expose session nonces or credentials."
++    )
++
++
+ def compose_delegation_instruction(
+     instruction: DelegationInstructionInput,
+     *,
+     profile_id: BuiltinProfileId,
++    startup: DelegationStartupInput | None = None,
+ ) -> str:
+     """Compose the provider-only instruction for one already-validated delegation."""
+ 
+@@ -106,6 +165,13 @@
+             "this delegation and exact target before acting. Use the injected Agent Commons "
+             "tools for canonical coordination and outcomes."
+         )
++
++    if (
++        startup is not None
++        and instruction.purpose == "implementation"
++        and not profile_id.independent_reviewer
++    ):
++        reviewer_entry += "\n" + _implementation_startup(startup)
+ 
+     if instruction.purpose == "independent_review":
+         result_protocol = (
+--- a/src/agent_commons/services/delegation_runtime.py
++++ b/src/agent_commons/services/delegation_runtime.py
+@@ -67,6 +67,7 @@
+     DesignPackageBindingResolver,
+     DesignPackageBindingStore,
+     DiagnosticCode,
++    ExecutableRole,
+     InitializationProbe,
+     JsonlTelemetrySink,
+     LaunchPlan,
+@@ -100,12 +101,14 @@
+     TelemetrySink,
+     TerminalToolAuditStore,
+     TypedRefusal,
++    compile_skill_bundle,
+     context_binding_refusal_error,
+     default_profile_registry,
+     design_package_binding_refusal_error,
+     diagnostic_hint,
+     diagnostic_safe_next_actions,
+     launch_refusal_error,
++    resolve_trusted_executable,
+     terminate_process_group,
+     validate_model_name,
+     verify_executor_access,
+@@ -121,10 +124,45 @@
+ from agent_commons.storage.opstate import DELEGATION_STORAGE, exclusive_lock
+ 
+ from ..domain.agents import effective_grants
+-from .delegation_instruction import DelegationInstructionInput, compose_delegation_instruction
++from .delegation_instruction import (
++    DelegationInstructionInput,
++    DelegationStartupInput,
++    compose_delegation_instruction,
++)
+ from .design_gallery import DesignGalleryReads
+ from .manager import CommonsManager
+ from .roles import role_model
++
++
++def _startup_cli(profile: RunnerProfile, workspace_root: Path) -> str | None:
++    """Use only the paired installed Python console entrypoint, never another PATH CLI."""
++    try:
++        mcp = Path(
++            resolve_trusted_executable(
++                profile.mcp_executable, workspace_root=workspace_root, role=ExecutableRole.MCP
++            )
++        )
++        cli = Path(
++            resolve_trusted_executable(
++                str(mcp.parent / "agent-commons"),
++                workspace_root=workspace_root,
++                role=ExecutableRole.MCP,
++            )
++        )
++        if cli.parent != mcp.parent:
++            return None
++        # The supported wheel installs both entrypoints in one interpreter's
++        # bin directory. Custom wrappers/binaries have no proven CLI pairing.
++        with mcp.open("rb") as stream:
++            mcp_header = stream.readline(4096)
++        with cli.open("rb") as stream:
++            cli_header = stream.readline(4096)
++        if not mcp_header.startswith(b"#!/") or b"python" not in mcp_header.lower():
++            return None
++        return str(cli) if cli_header == mcp_header else None
++    except (ConfigurationError, OSError):
++        return None
++
+ 
+ _TERMINAL_DELEGATION_STATES = {
+     "succeeded",
+@@ -1061,6 +1099,7 @@
+         delegation: Mapping[str, Any],
+         *,
+         profile_id: BuiltinProfileId,
++        startup: DelegationStartupInput | None = None,
+     ) -> str:
+         """Adapt a projected delegation to the typed instruction-composition seam."""
+ 
+@@ -1083,6 +1122,7 @@
+                 budget_unit=str(budget["unit"]),
+             ),
+             profile_id=profile_id,
++            startup=startup,
+         )
+ 
+     def _broker(
+@@ -1711,7 +1751,20 @@
+             budget_unit = str(delegation["limits"]["budget"]["unit"])
+             parent_policy, child_policy = self._policies(delegation)
+             role_tools, role_grants = scope.tools, scope.grants
+-            instruction = self._instruction(delegation, profile_id=profile_id)
++            startup = None
++            if (
++                str(delegation["purpose"]) == "implementation"
++                and not profile_id.independent_reviewer
++            ):
++                cli_executable = _startup_cli(profile, self.manager.repo_root)
++                startup = DelegationStartupInput(
++                    repo_root=self.manager.repo_root.resolve(),
++                    state_root=self.manager.paths.state_root.resolve(),
++                    # Reserve an equal-sized identity before creating the child.
++                    child_session_id="session." + "0" * 32,
++                    cli_executable=cli_executable,
++                )
++            instruction = self._instruction(delegation, profile_id=profile_id, startup=startup)
+             if scope.library_bundle is not None:
+                 instruction += scope.library_bundle.instruction
+             launch_plan = LaunchPlan(
+@@ -1839,6 +1892,22 @@
+             )
+             child_manager.sessions.require_active(child_session_id)
+             try:
++                if startup is not None:
++                    startup = replace(startup, child_session_id=child_session_id)
++                    instruction = self._instruction(
++                        delegation, profile_id=profile_id, startup=startup
++                    )
++                    if scope.library_bundle is not None:
++                        instruction += scope.library_bundle.instruction
++                    # Keep the existing validated skill projection and executable
++                    # facts; only the broker-owned child identity is now concrete.
++                    static_validation = replace(
++                        static_validation,
++                        plan=replace(static_validation.plan, instruction=instruction),
++                        instruction=compile_skill_bundle(
++                            instruction, static_validation.skill_bundle
++                        ),
++                    )
+                 context_binding = revalidate_bound_inputs()
+                 try:
+                     validated_launch_plan = self.launch_planner.build(
+--- a/tests/runtime/test_delegation_instruction.py
++++ b/tests/runtime/test_delegation_instruction.py
+@@ -180,3 +180,138 @@
+         )
+         assert "do not widen the worker tool catalog" in instruction
+     assert "sole exception to the native-tool restriction" in review
++
++
++def test_implementation_startup_commands_override_login_environment_without_writes(tmp_path):
++    import json
++    import os
++    import subprocess
++    import sys
++
++    from agent_commons.services import CommonsManager
++    from agent_commons.services.delegation_instruction import DelegationStartupInput
++
++    repo = tmp_path / "repo space ' $(touch injected) `touch injected2`"
++    repo.mkdir()
++    CommonsManager.initialize(repo, integrations=())
++    state = tmp_path / "state space ' $(touch injected3)"
++    manager = CommonsManager(repo, state_root=state)
++    child = manager.start_session(
++        stable_instance_id="explicit-child",
++        principal="worker",
++        client="codex",
++        software="tests",
++        role="builder",
++    )
++    foreign_repo = tmp_path / "foreign-repo"
++    foreign_repo.mkdir()
++    CommonsManager.initialize(foreign_repo, integrations=())
++    foreign = CommonsManager(foreign_repo, state_root=tmp_path / "foreign-state")
++    foreign_session = foreign.start_session(
++        stable_instance_id="foreign-child",
++        principal="worker",
++        client="codex",
++        software="tests",
++        role="builder",
++    )
++    executable = tmp_path / "cli space ' $(touch injected4)"
++    executable.write_text(f"#!{sys.executable}\nfrom agent_commons.cli import cli\ncli()\n")
++    executable.chmod(0o700)
++    startup = DelegationStartupInput(repo, state, child["session_id"], str(executable))
++    text = compose_delegation_instruction(
++        DelegationInstructionInput(
++            "delegation.startup",
++            "task",
++            "task.startup",
++            "evt.startup",
++            "implementation",
++            "codex-builder",
++            0,
++            60,
++            1,
++            1,
++            1,
++            "provider_units",
++        ),
++        profile_id=BuiltinProfileId.CODEX_BUILDER,
++        startup=startup,
++    )
++    commands = text.split("```sh\n", 1)[1].split("\n```", 1)[0].splitlines()
++    env = os.environ.copy()
++    env.update(
++        {
++            "AGENT_COMMONS_STATE_ROOT": str(foreign.paths.state_root),
++            "AGENT_COMMONS_STATE_BASE": str(tmp_path / "foreign-base"),
++            "AGENT_COMMONS_SESSION_ID": foreign_session["session_id"],
++        }
++    )
++    before = {
++        str(path): path.read_bytes()
++        for root in (repo / ".agent-commons", state)
++        for path in root.rglob("*")
++        if path.is_file()
++    }
++    # The old ambient startup command reproduces the refusal before the fix.
++    failed = subprocess.run(
++        [str(executable), "--repo", str(repo), "--read-only", "doctor"],
++        env=env,
++        capture_output=True,
++        text=True,
++        timeout=15,
++    )
++    assert failed.returncode != 0 and "workspace" in (failed.stdout + failed.stderr).lower()
++    for command in commands:
++        result = subprocess.run(
++            ["/bin/sh", "-c", command],
++            cwd=tmp_path,
++            env=env,
++            capture_output=True,
++            text=True,
++            timeout=15,
++        )
++        assert result.returncode == 0, result.stdout + result.stderr
++    assert "--read-only" in commands[0]
++    assert "All coordination writes and terminal outcomes must use the injected scoped MCP" in text
++    assert not any(
++        (tmp_path / name).exists() for name in ("injected", "injected2", "injected3", "injected4")
++    )
++    after = {
++        str(path): path.read_bytes()
++        for root in (repo / ".agent-commons", state)
++        for path in root.rglob("*")
++        if path.is_file()
++    }
++    assert after == before
++    assert manager.sessions.require_active(child["session_id"]).session_id == child["session_id"]
++    assert "nonce" not in json.dumps({"commands": commands}).lower()
++
++
++def test_startup_missing_cli_is_honest_and_never_changes_reviewer_instructions(tmp_path):
++    from agent_commons.services.delegation_instruction import DelegationStartupInput
++
++    startup = DelegationStartupInput(tmp_path, tmp_path / "state", "session.bound", None)
++    inputs = DelegationInstructionInput(
++        "delegation.startup",
++        "task",
++        "task.startup",
++        "evt.startup",
++        "implementation",
++        "codex-builder",
++        0,
++        60,
++        1,
++        1,
++        1,
++        "provider_units",
++    )
++    text = compose_delegation_instruction(
++        inputs, profile_id=BuiltinProfileId.CODEX_BUILDER, startup=startup
++    )
++    assert "No trusted Agent Commons CLI was available" in text
++    assert "Do not guess a CLI from PATH, install one, or create a session" in text
++    assert "needs-operator outcome honestly" in text
++    assert "```sh" not in text
++    reviewer = BuiltinProfileId.CODEX_INDEPENDENT_REVIEWER
++    assert compose_delegation_instruction(
++        inputs, profile_id=reviewer, startup=startup
++    ) == compose_delegation_instruction(inputs, profile_id=reviewer)
+--- a/tests/services/test_delegation_launch_plan.py
++++ b/tests/services/test_delegation_launch_plan.py
+@@ -1241,3 +1241,81 @@
+         assert len(children) == 1
+         assert children[0].status == "closed"
+     assert len(builds) == (1 if probe == "build" else 0)
++
++
++def test_implementation_invocation_contains_actual_broker_child_startup(tmp_path, monkeypatch):
++    import shlex
++    import sys
++
++    from agent_commons.runtime.model import invocation_instruction_bytes
++
++    manager, delegation = _workspace(tmp_path)
++    tools = tmp_path / "trusted-tools"
++    tools.mkdir()
++    for name in ("agent-commons-mcp", "agent-commons"):
++        executable = tools / name
++        executable.write_text(f"#!{sys.executable}\n# synthetic paired entrypoint\n")
++        executable.chmod(0o700)
++    runner = _SuccessWithoutTerminalMcp()
++    service = _service(
++        manager, runner=runner, initialization=_Initialization(ProviderInitializationState.READY)
++    )
++    service.profiles = default_profile_registry(
++        codex_executable="/bin/echo",
++        claude_executable="/bin/echo",
++        mcp_executable=str(tools / "agent-commons-mcp"),
++        git_executable="/usr/bin/true",
++        trusted_workspace=True,
++    )
++    result = service.run(
++        delegation["entity_ref"]["id"], delegation["revision"], idempotency_key="bound-startup"
++    )
++    assert len(runner.invocations) == 1
++    text = invocation_instruction_bytes(runner.invocations[0]).decode()
++    command = text.split("```sh\n", 1)[1].splitlines()[0]
++    argv = shlex.split(command)
++    current = manager.get_delegation(delegation["entity_ref"]["id"])
++    assert argv[argv.index("--repo") + 1] == str(manager.repo_root.resolve())
++    assert argv[argv.index("--state-root") + 1] == str(manager.paths.state_root.resolve())
++    assert argv[argv.index("--session-id") + 1] == current["child_session_id"]
++    assert argv[0] == str(tools / "agent-commons")
++    assert "session." + "0" * 32 not in text
++    assert result is not None
++
++
++@pytest.mark.parametrize("problem", ["missing", "unsafe", "other_interpreter", "other_install"])
++def test_startup_cli_requires_trusted_same_install_sibling(tmp_path, monkeypatch, problem):
++    import sys
++
++    from agent_commons.services.delegation_runtime import _startup_cli
++
++    repo = tmp_path / "repo"
++    repo.mkdir()
++    tools = tmp_path / "tools"
++    tools.mkdir()
++    mcp = tools / "agent-commons-mcp"
++    mcp.write_text(f"#!{sys.executable}\n# paired MCP\n")
++    mcp.chmod(0o700)
++    cli = tools / "agent-commons"
++    if problem != "missing":
++        cli.write_text(
++            f"#!{sys.executable if problem != 'other_interpreter' else '/other/python'}\n# CLI\n"
++        )
++        cli.chmod(0o777 if problem == "unsafe" else 0o700)
++    if problem == "other_install":
++        unrelated = tmp_path / "other-installed-cli"
++        unrelated.write_text(cli.read_text())
++        unrelated.chmod(0o700)
++        cli.unlink()
++        cli.symlink_to(unrelated)
++    # An earlier unrelated PATH CLI must never be substituted for the sibling.
++    earlier = tmp_path / "earlier-path"
++    earlier.mkdir()
++    candidate = earlier / "agent-commons"
++    candidate.write_text(f"#!{sys.executable}\n# unrelated PATH entrypoint\n")
++    candidate.chmod(0o700)
++    monkeypatch.setenv("PATH", str(earlier))
++    profile = default_profile_registry(mcp_executable=str(mcp), trusted_workspace=True).get(
++        "claude-builder"
++    )
++    assert _startup_cli(profile, repo) is None
+--- a/docs/PROTOCOL.md
++++ b/docs/PROTOCOL.md
+@@ -197,6 +197,20 @@
+ or broker-run tools. The ledger continues to replay older parent/child records,
+ but new recursive Codex/Claude chains are rejected until parent-sliced budgets,
+ fanout accounting, and worker authority are implemented together.
++Implementation startup also carries ephemeral broker-selected repository, resolved
++state root and existing child session facts. When the configured MCP's paired CLI
++is available, commons-start reads use its trusted absolute sibling entrypoint with
++explicit `--repo`, `--state-root`, `--session-id` and `--read-only` flags. Pairing
++requires the same resolved installation bin directory and Python shebang; another
++CLI earlier on PATH is never substituted. Login-shell exports cannot override the
++explicit arguments. Custom wrappers or missing/untrusted siblings have no proven
++CLI pairing: the instruction says so and requires an honest scoped needs-operator
++outcome when mandatory startup cannot be completed. No CLI installation, session
++creation, nonce disclosure or canonical CLI write is authorized. Canonical writes
++and outcomes remain worker-scoped MCP operations. Reviewer native-tool restrictions
++and instructions are unchanged. The final child-bound instruction is checked for
++size and included in the existing immutable launch/skill/context fingerprint.
++
+ 
+ Those request limits never define their own global authority. Every broker using
+ one state root shares operator-owned global, per-provider, per-profile,

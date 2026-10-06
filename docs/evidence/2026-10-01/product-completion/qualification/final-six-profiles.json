@@ -1,0 +1,169 @@
+{
+  "source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+  "profiles": [
+    {
+      "profile_id": "claude-builder",
+      "provider": "claude",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": false,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:12:32.804333Z",
+        "fingerprint": "7c3e6e54a712be2d8171d0d6ab12db56684641a39b1b42c509e8e5da93a52e0f"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": false,
+      "isolation_note": "no operating-system boundary; external isolation is the only one",
+      "supported_budget_units": [
+        "micro_usd",
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "claude-independent-reviewer",
+      "provider": "claude",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": true,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:10:39.586763Z",
+        "fingerprint": "091cbaf9148b0bfee4852b9ac0d6955fc32e735980737f9705d1326921ebc32e"
+      },
+      "launch_mode": "scoped-reviewer",
+      "os_enforced_sandbox": false,
+      "isolation_note": "no operating-system boundary; external isolation is the only one",
+      "supported_budget_units": [
+        "micro_usd",
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "codex-builder",
+      "provider": "codex",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": false,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:00:39.563220Z",
+        "fingerprint": "e376676d2b37fc23bb8f7379b5aae34320dd41b06d3a7805a35f0eb2cd9b536f"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "codex-independent-reviewer",
+      "provider": "codex",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": true,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:02:34.819511Z",
+        "fingerprint": "d5fbbdd2720c6e3773009b1ca61c7bbb114bb2f364e146d0def9ee5b62df95f7"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "grok-builder",
+      "provider": "grok",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": false,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:08:34.552007Z",
+        "fingerprint": "70584df0bb13111cee1cbcba80ba81ca8180a48074a9360918656130710fcc82"
+      },
+      "launch_mode": "trusted-workspace",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    },
+    {
+      "profile_id": "grok-independent-reviewer",
+      "provider": "grok",
+      "release_stage": "experimental_manual_opt_in",
+      "independent_reviewer": true,
+      "qualification": {
+        "state": "qualified",
+        "launchable": true,
+        "checked_at": "2026-10-01T14:09:53.301494Z",
+        "fingerprint": "700edf82caa3e9e828dd0176f9d0955a2deea7f0cadf4bbb118b8f4ee8f0ebd8"
+      },
+      "launch_mode": "scoped-reviewer",
+      "os_enforced_sandbox": true,
+      "isolation_note": "operating-system sandbox enforced by the provider",
+      "supported_budget_units": [
+        "provider_units"
+      ],
+      "operator_limits": {
+        "global_concurrency": 2,
+        "provider_concurrency": 2,
+        "profile_concurrency": 1,
+        "parent_provider_units": 24,
+        "parent_budget_microusd": 10000000,
+        "queue_capacity": 8,
+        "queue_wait_seconds": 30
+      }
+    }
+  ]
+}

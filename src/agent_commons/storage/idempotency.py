@@ -30,6 +30,15 @@ class IdempotencyReservation:
     created: bool
 
 
+@dataclass(frozen=True)
+class ReceiptRecoveryView:
+    """Validated scoped receipt documents for one recovery operation only."""
+
+    reservations: dict[str, IdempotencyReservation]
+    abandonments: dict[str, dict[str, object]]
+    reconciliations: dict[str, dict[str, object]]
+
+
 class IdempotencyStore:
     """Store in-flight receipts in the current worktree/ref recovery scope."""
 
@@ -416,6 +425,53 @@ class IdempotencyStore:
         if value["tombstone_sha256"] != tombstone_sha256:
             raise IdempotencyConflictError("idempotency reconciliation tombstone hash conflicts")
         return value
+
+    def load_recovery_view(self) -> ReceiptRecoveryView:
+        """Read each scoped recovery receipt once with normal accessor validation.
+
+        The caller owns this short-lived view.  It is deliberately not retained by
+        the store, so it cannot cross a canonical write-lock release.
+        """
+
+        reservations = {receipt.key_digest: receipt for receipt in self.iter_reservations()}
+        abandonments = {
+            str(abandonment["key_digest"]): dict(abandonment)
+            for abandonment in self.iter_abandonments()
+        }
+        reconciliations: dict[str, dict[str, object]] = {}
+        root = self.paths.idempotency_v2 / "reconciliations" / self.scope["scope_id"]
+        self.assert_operational_path(root)
+        if root.exists():
+            for path in sorted(root.glob("*.json")):
+                digest = self._validate_digest(path.stem)
+                value = self._load_document(
+                    path,
+                    schema="commons.idempotency_reconciliation.v1",
+                    label="idempotency reconciliation",
+                )
+                if value is None:  # pragma: no cover - path was just enumerated
+                    raise IdempotencyConflictError(
+                        "idempotency reconciliation disappeared during scan"
+                    )
+                if (
+                    value["key_digest"] != digest
+                    or value["workspace_id"] != self.workspace_id
+                    or value["scope_id"] != self.scope["scope_id"]
+                ):
+                    raise IdempotencyConflictError(
+                        "idempotency reconciliation conflicts with its recovery scope"
+                    )
+                abandonment = abandonments.get(digest)
+                if abandonment is None:
+                    raise IdempotencyConflictError("idempotency reconciliation has no tombstone")
+                if value["tombstone_sha256"] != sha256_bytes(
+                    canonical_json_file_bytes(dict(abandonment))
+                ):
+                    raise IdempotencyConflictError(
+                        "idempotency reconciliation tombstone hash conflicts"
+                    )
+                reconciliations[digest] = dict(value)
+        return ReceiptRecoveryView(reservations, abandonments, reconciliations)
 
     def reconcile_abandonment(
         self,

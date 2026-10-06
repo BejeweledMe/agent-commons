@@ -1,0 +1,4146 @@
+{
+  "source_boundary": "aa9d373 plus pre-existing working tree; initial ledger read 2026-10-01 before this task/session",
+  "note": "Recorded lifecycle is not a fresh code audit; completed is not accepted. Current work task is intentionally outside initial inventory.",
+  "tasks": [
+    {
+      "id": "task.003S27535KNR48TDD88VJE5E5H",
+      "state": "accepted",
+      "title": "WP-05: Honest output status labels and additive review_state",
+      "revision": "evt.01M233PXZPKZ425FEDN7DV5DZH",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.00PY1JAPA6JW1NAFT7GHCBGPVY",
+      "state": "accepted",
+      "title": "Pin the toolchain and write down the standards agents kept re-learning",
+      "revision": "evt.01M0A75JPC0W4K5AFCY7D9J2Y1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0246R0QDD8BSZAK2FT9V0GKT1F",
+      "state": "completed",
+      "title": "Synthesize Corrected Architecture Improvement Plan",
+      "revision": "evt.01M0W2B1VS5BS840R20KQJAYGH",
+      "priority": "normal",
+      "dependencies": [
+        "task.4WE4J3C25Z1QZ64FS8J1T5YAZ4",
+        "task.1GACGKQCD9EQ1XNZ5SW1FWRTQ5",
+        "task.6BJHYNRTH9S9A62VDR1CRQY3KC"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.02CXVGHPNXHVMT43RWFH2KW7EK",
+      "state": "accepted",
+      "title": "C0.2: Add hermetic CLI recovery-drill characterization",
+      "revision": "evt.01M0ZWJ19N81PYEKHNVHCQGKZC",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.03K47JY0J17WMN0RHAP67J6C63",
+      "state": "accepted",
+      "title": "Remediate repeated review closure and browser handoff blockers",
+      "revision": "evt.01M17KXD5E13Z7RE6F8DFW1GAZ",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.05AY2D704HB71Z842VMHCK1SJQ",
+      "state": "accepted",
+      "title": "Extract Session and Claim Public Views",
+      "revision": "evt.01M0XJEYN8WAG6GKN3FQXXBPWR",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.05Q8ZW3WB18HRG5NAK8DG3MG0H",
+      "state": "accepted",
+      "title": "A3: move role domain rules to domain/roles.py",
+      "revision": "evt.01M0XAS0TXQ0BEYPG7AV8FR4Y3",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.069WJSJXDE8CVJVGXN1FS7KJ6V",
+      "state": "completed",
+      "title": "Document audit rollout and compatibility",
+      "revision": "evt.01KZCEHNTRJ3B9ANR737Z6Q762",
+      "priority": "high",
+      "dependencies": [
+        "task.50QBQJS1BHM5XSY37287FR8X82"
+      ],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.07DZQY9AZYBK31F3T5ESSE6A9Z",
+      "state": "ready",
+      "title": "Build workflow evals, CI gates, docs, and independent release evidence",
+      "revision": "evt.01KZC6EPADE5ERDV4SK5QRP178",
+      "priority": "high",
+      "dependencies": [
+        "task.0AJXEBVMHP20HXA9AMBNW01EBV",
+        "task.7SP8T6FSCQXENRFTJ0T5CKC6RM",
+        "task.5XWPCS0RKZTM7EQ6322E82MTZ9",
+        "task.7HY1A5FB3C1WR2R49V2XC3AG3K"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.07QF30Z1VH5SPWHK8WVX604PJ7",
+      "state": "accepted",
+      "title": "Introduce frozen review projection record",
+      "revision": "evt.01M0XJ414DC1WQMQPD4C2YFXEH",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.08NM11PA5C990W8VZYVN1FANY2",
+      "state": "accepted",
+      "title": "A5.4: type truth and evidence envelopes",
+      "revision": "evt.01M0Z0T4EYR7E8R129AWDWR6FA",
+      "priority": "high",
+      "dependencies": [
+        "task.7Z39VCTRX25HGQ84SSMXQ5PJJC"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0A140A3DT0BC13QP8GFPNVQVN9",
+      "state": "cancelled",
+      "title": "Delta Review Architecture Plan P1 Remediation",
+      "revision": "evt.01M0W43PR949K93AFHAEMR0BW6",
+      "priority": "normal",
+      "dependencies": [
+        "task.6Y7GJ4Q4VNEG7RCSRA5YPKRTPX"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0AJXEBVMHP20HXA9AMBNW01EBV",
+      "state": "completed",
+      "title": "Implement P0 workspace state isolation and core CLI diagnostics",
+      "revision": "evt.01KZC853PGJM061M7V4DDYSRMP",
+      "priority": "high",
+      "dependencies": [
+        "task.2Z88GCBBAZG5M4TY505D4YJNA7"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0AZ82ARW6DVT6TYDB1A1NCD1FW",
+      "state": "accepted",
+      "title": "WP-41: The reason a run stopped, in the interface (UX-10)",
+      "revision": "evt.01M35RPBGDZ95JGGETY74K4272",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0C9KHDKR7EGMPS1XM5KSRDSVNN",
+      "state": "completed",
+      "title": "Show server-projected role model on board cards",
+      "revision": "evt.01M0JZD9HP8NAJXCB1GHE4MZZ5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0CCPR6KS0WRXZ9AF95ACRJX2FZ",
+      "state": "accepted",
+      "title": "Extract Objective Commands",
+      "revision": "evt.01M0XHEMCAQNMQX7EHMN2W3JHG",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0DAF8ZNJF8FN11GXC0ATJGTBV6",
+      "state": "accepted",
+      "title": "WP-09: Now / Map / All tasks views inside the Tasks tab",
+      "revision": "evt.01M2SZHQ6M7785XZ3PCHTV9ZV6",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0FXAKVHTJRMSHN6J8MMR4VGBB4",
+      "state": "accepted",
+      "title": "Extract Receipt Commands",
+      "revision": "evt.01M0XHFDQR942HNM7E2RF630TT",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0GFGGW8GRRJCMR93068Q27RBFC",
+      "state": "completed",
+      "title": "Close legacy acknowledgement bypass for control feature gate",
+      "revision": "evt.01KZDVZPYJ7Y2CCR8730PH1PZN",
+      "priority": "normal",
+      "dependencies": [
+        "task.26PV4WMK8E9VAXE8NKZNXG0D95"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0GJ4MYT6WJZ2DZX6G1MHSJ6JNQ",
+      "state": "accepted",
+      "title": "Document a two-level first-delegation quickstart",
+      "revision": "evt.01M0A72HFY2P2ABJ2HMH7JBNYY",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0GJARAV3C9ZTGCHAHRWKVZHECN",
+      "state": "cancelled",
+      "title": "J1: Verify the integrated Work operator journey",
+      "revision": "evt.01M1HB35MANGKMYQE4X3ZS8J9J",
+      "priority": "critical",
+      "dependencies": [
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ",
+        "task.7FE4KZ9RSHR0B9KX3Y7CTE7H8Z",
+        "task.4TCM30868X5ZEV7GGSA6HF51AE",
+        "task.1JE820T992D7YEZKW44ZBFPRMG",
+        "task.2DY7ATZMFXC2P3GRARY65YS1Z1"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0J1BKNDK3TP58RQA96G4CBRE0H",
+      "state": "accepted",
+      "title": "Project-native UX R1: safe folder connect and host picker",
+      "revision": "evt.01M2T1HVVKNQVCCPEEGPPN1Z8F",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0NE2MXJBHM1W1TYDN1E2BYJHP7",
+      "state": "accepted",
+      "title": "W3: Expose tracker backend DTO API and SSE contract",
+      "revision": "evt.01M1E7NHQRJHMGFCHSG91Y71A8",
+      "priority": "critical",
+      "dependencies": [
+        "task.4PNGRR0ATFEYTGNQ5CM15YWDHW"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0NGD87QY1W66QV9AGQQ6PR13RM",
+      "state": "cancelled",
+      "title": "Integrate provider-neutral default role specializations",
+      "revision": "evt.01M2V7XMBWY7F911DDASWJE6A5",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0PKXNSPAF025GX030A11YR17V4",
+      "state": "completed",
+      "title": "Write claude_architecture_improvement_review.md via expert council synthesis",
+      "revision": "evt.01M0TS9VW4BED1RVG2JQ56YMEK",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0Q6H8FJV6DQKGJ060KVQPVB9MF",
+      "state": "accepted",
+      "title": "G4: Author canonical Design Packages from Gallery",
+      "revision": "evt.01M1DWKF5Q3PAHFY3X74KSC0B6",
+      "priority": "critical",
+      "dependencies": [
+        "task.7AB20VK2RZD6B5EM7SRRJRR7W1"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0QNV9XXFA888E93257C67AZT7R",
+      "state": "accepted",
+      "title": "Round-3 usability fixes: accept flow, live run signs, profile config, human reference",
+      "revision": "evt.01M07FKKMVEDWVCDP7X8G7D8JY",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0QYK78FV33M2G7NX7VFGG8JDJ9",
+      "state": "accepted",
+      "title": "Release candidate review: 41e552b",
+      "revision": "evt.01M1BCXAR7J38Z2SPGX3K9N6B4",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0R25315J8H6VG2W5MM3FXPG2ND",
+      "state": "accepted",
+      "title": "Consolidation plan and wave-4 UX plan after repository/documentation audit",
+      "revision": "evt.01M309GZR6ATCD1GFXAVJASX58",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0RWZD18DF1VGQ8BNMWANCGXY1D",
+      "state": "completed",
+      "title": "Audit real-world Agent Commons orchestration and deliver P0/P1 batches",
+      "revision": "evt.01KZCFKH2W97PZ7MMK4QS6SWHZ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0RYHGFZJ4P0V4G3WBKEJPW3V4K",
+      "state": "accepted",
+      "title": "W1: Build provider-safe derived work views",
+      "revision": "evt.01M18XYEEQGAHCM4ARZ4V6N66H",
+      "priority": "high",
+      "dependencies": [
+        "task.5C2AYWBS8HECVZXDH6KGTM64RC"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0SJDFZGJSZCTESJ9TNWTFWWHBX",
+      "state": "accepted",
+      "title": "Fix codex preflight help-scope false negative",
+      "revision": "evt.01KY7QN60Z8D966WKG5ES5PBH4",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0V6MQPN7423640BYR4AVPY7MPD",
+      "state": "cancelled",
+      "title": "UX pivot: Readable task inspector and strict frontend API",
+      "revision": "evt.01M2V7ZX79V7JK5X3BZBZSKH02",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0WEFP8J3SNGXG3T65GT9RBEXDP",
+      "state": "cancelled",
+      "title": "Refine Work toolbar and shared browser visual hierarchy",
+      "revision": "evt.01M2V826A7KC6AQA9GCK0DY1VW",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0WHKPFJNYSQ9Y2YFFSCQEVWX98",
+      "state": "accepted",
+      "title": "A6.2: instrument and optimise verified projection reads",
+      "revision": "evt.01M0YMF0FTCF40BQ34MW698BZB",
+      "priority": "high",
+      "dependencies": [
+        "task.6JZP6J57782Y8ERHT2K140DJ13"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0X4S1F5FVG20CBQG89E6PB0SCV",
+      "state": "accepted",
+      "title": "Fix F01 exact task evidence and review retry",
+      "revision": "evt.01M2T1MJRNH0Y3XFHDF21KF9N4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0XRP47NK30X1DYM535K63582GV",
+      "state": "accepted",
+      "title": "Guard F08 oversized Grok prompt arguments before launch",
+      "revision": "evt.01M2T1QAXTAWJ34A6GJYFY0HMJ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.0Z7YVE12JXWZJ15J2DF2BRCBAC",
+      "state": "accepted",
+      "title": "WP-13.2: Dark semantic token system applied across Work",
+      "revision": "evt.01M2ZSVE71V50QS2HQKPZ239BS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.11Z0D8EAT78X6QM3Y152QV9E2X",
+      "state": "accepted",
+      "title": "G1: Implement canonical Design Package domain",
+      "revision": "evt.01M1ACE635830AMPZJD01VQ2M2",
+      "priority": "critical",
+      "dependencies": [
+        "task.5C2AYWBS8HECVZXDH6KGTM64RC"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.12CQ87V76K8G2KD95S55RH7958",
+      "state": "accepted",
+      "title": "Integrate Council Review Gates into Architecture Plan",
+      "revision": "evt.01M0WYQ26J0BYWFW0H5S8ZV5QS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.132BM9TEYE202XX5EWHQD3S8GB",
+      "state": "accepted",
+      "title": "Introduce Frozen Delegation Projection Record",
+      "revision": "evt.01M0Y6NWP43N8G7KACMRG928EC",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.13FF56884VF6NTGXJXWFDBXG1P",
+      "state": "cancelled",
+      "title": "P3-host: Add operator-owned local broker execution host",
+      "revision": "evt.01M1FC699X6D21KE7EQD081FQ8",
+      "priority": "critical",
+      "dependencies": [
+        "task.5P553Q5DKG4N3ZEA7FZ2T9CQAX"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.14Q6YWTZZPHD8GYS80HH8XRAYA",
+      "state": "cancelled",
+      "title": "PM cold-run round 2 fixes: board visibility, template hire, errors, result path",
+      "revision": "evt.01M0F9JHYA6WXTVBN74CHVG2MF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.14STWGQPYEDFJ2VR4XF01QMXXR",
+      "state": "cancelled",
+      "title": "Record future API and local-model role execution plan",
+      "revision": "evt.01M2V8H77PZR69XN0T84BBGS5C",
+      "priority": "low",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.16HAD00XW5CJMED2QQCF08C8DD",
+      "state": "accepted",
+      "title": "Preserve chronological mixed-precision replay ordering",
+      "revision": "evt.01M0YK4AY2C8B1YB8S3QRZ7H8V",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.181493Y54PJDCNV9QGP4XAF4F2",
+      "state": "accepted",
+      "title": "P4: Project provider-neutral skills with exact digests",
+      "revision": "evt.01M1ECXJVR5SQJRSB09H49WW9D",
+      "priority": "critical",
+      "dependencies": [
+        "task.5P553Q5DKG4N3ZEA7FZ2T9CQAX"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1BAADXYSVR5R39EAHX4RCAWXXR",
+      "state": "cancelled",
+      "title": "Plan project-scoped workspace navigation and creation",
+      "revision": "evt.01M2V8KG6RX1B8VPPMBSMGNWBD",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1GACGKQCD9EQ1XNZ5SW1FWRTQ5",
+      "state": "cancelled",
+      "title": "Assess Corrected Control Plane Proposals",
+      "revision": "evt.01M2V8NS67SWW6RRHC1VYDZ60R",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1GAMB7AK99YCBXJJ2EHVRHJZ07",
+      "state": "accepted",
+      "title": "Integrate accepted A6.5 envelope reuse characterization",
+      "revision": "evt.01M0Z8CK1BTAGKMEVHV0TYEKJN",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1J7JNCGPANFKTY7Z2TTQYM4X2Z",
+      "state": "cancelled",
+      "title": "Assess Product Evals And Roadmap Proposals",
+      "revision": "evt.01M1HBJH5M8B80233Q5GMBETPC",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1JE820T992D7YEZKW44ZBFPRMG",
+      "state": "accepted",
+      "title": "G5: Enforce Gallery green-contract parity",
+      "revision": "evt.01M1FPJPA741XK1TD1ZVP16DZV",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1JQYR06A2FMN1ZFGWSS6ZTBQXW",
+      "state": "accepted",
+      "title": "Reconcile Pending Structural Review Queue",
+      "revision": "evt.01M0YAVD7G3XT3WGFT4775Y8TN",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1KDSVG1EPXJMGGW5J7RERAQ1BA",
+      "state": "accepted",
+      "title": "WP-15.2: Editable run time limit in Prepare run and truthful limit copy",
+      "revision": "evt.01M23K2D7K8CBKMH5SFADVE22N",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1KKE992Z8ECPFFTFKTVEJS5CXH",
+      "state": "accepted",
+      "title": "A5.1: type delegation and maintenance envelopes",
+      "revision": "evt.01M0XC72HQ255KC0VZ1VC6RYFZ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1KNM08FM7R1H2F8S1EEABQK3FS",
+      "state": "accepted",
+      "title": "Extract thread commands from CommonsManager",
+      "revision": "evt.01M0XH770NDJ6N1YBS1YG6CQYC",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1MN2KRF4MR1ZHDSCH76VQ3H9NZ",
+      "state": "accepted",
+      "title": "Extract delegation commands from CommonsManager",
+      "revision": "evt.01M0XH5J4AETNEHB7Z1J4WQW2Z",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1MYRD23CGGJNR4A6YAE2JJQ69A",
+      "state": "accepted",
+      "title": "P0: Reproduce and design first-hour UI onboarding remediation",
+      "revision": "evt.01M11AZ1V0G6J2KXY0D36AS5PK",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1P2JWYZW80QQ37A12B02VV2CKY",
+      "state": "completed",
+      "title": "Wave 2: expose task-scoped communication MCP tools",
+      "revision": "evt.01KZCD47VX5TENDXB7D172C9K6",
+      "priority": "critical",
+      "dependencies": [
+        "task.6GJ1QH71VJ5CKYSTFHZY1B9G92"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1Q5SZ6GEM9YKJ00680WEJT66NB",
+      "state": "accepted",
+      "title": "A4 MCP: extract scoped repository reader seam",
+      "revision": "evt.01M0XBKKXCTYZ9FH4Z859CQVHN",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1QSF3JXKM5XBJ7BHMQF9SZ79E6",
+      "state": "accepted",
+      "title": "S2–S4: Make Work setup, project identity, and launch handoff actionable",
+      "revision": "evt.01M2T1TNS53N2R2K7P1J36YQD4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1R5GFXHCJQ785DKKBFWNHF1K8R",
+      "state": "completed",
+      "title": "Integrate Grok Build as a first-class local provider",
+      "revision": "evt.01M1E2QFK2KTS6A7XS4R7W5BT0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1WDSCZFNQ79QEGRCMH11NHT968",
+      "state": "cancelled",
+      "title": "Astra: detailed technical plan closing the UX dogfooding items",
+      "revision": "evt.01M2V5J0HEHHT48JAR34D7TPY4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1WYWAY4HEMQ06J8ZKA4M66FB1D",
+      "state": "accepted",
+      "title": "C2.0: Identify the first automation/recovery boundary candidate",
+      "revision": "evt.01M0ZXCB1TZG5V7WV8KM1366GF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.1YHDT583BDMA1AT1QFTTXXCN5Q",
+      "state": "accepted",
+      "title": "A6.3: profile verified replay on immutable workspace snapshot",
+      "revision": "evt.01M0YP6ZMD65N593W68F2D5X02",
+      "priority": "high",
+      "dependencies": [
+        "task.0WHKPFJNYSQ9Y2YFFSCQEVWX98"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.221406G3FT9Z9BX6NKK4MH3DNY",
+      "state": "accepted",
+      "title": "Introduce Frozen Objective Projection Record",
+      "revision": "evt.01M0XM8QKM214966V59AVY78D0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.223XJ3EGN9MN7G73WSVBGM78XF",
+      "state": "cancelled",
+      "title": "Document the current Agent Commons product and architecture",
+      "revision": "evt.01M2V5P7SCG392BZMXAFQJXM4R",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.22EKAZ5C8V4S6PMG1N8TQP3YEX",
+      "state": "cancelled",
+      "title": "Implement editable canonical task graph",
+      "revision": "evt.01M2V83BKE1JWBMJDMSBDG4RVQ",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.22YS8KGEVR62VNGNV9J85PMNVK",
+      "state": "accepted",
+      "title": "Add Russian/English language toggle to the browser UI panel",
+      "revision": "evt.01M07MENX3R41V7YTYNYXR7YRD",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.245K673HYR5JFHJQG1EDPRS1X1",
+      "state": "completed",
+      "title": "C1.1: add Work app build prerequisite to green contract",
+      "revision": "evt.01M0ZZK2T72GF92D89SH7ZPFVK",
+      "priority": "critical",
+      "dependencies": [
+        "task.4RWKTPN74XVVVWJZJ7RXWNBECH"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.24D8SEHAVQAZAKVBZMEF83PZ43",
+      "state": "accepted",
+      "title": "Normalize decision and ADR routing and retire stale product docs",
+      "revision": "evt.01M18XZVJX4XS2TY8R9VQXRGRZ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.24GYS8JEZ01A7S5N8AB8BX30RQ",
+      "state": "cancelled",
+      "title": "A7.1: introduce typed UI read DTOs",
+      "revision": "evt.01M2V5TEWTJ1G31K73E7G7NH0N",
+      "priority": "high",
+      "dependencies": [
+        "task.0WHKPFJNYSQ9Y2YFFSCQEVWX98"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2516VV5KCMP2SVPWS2T26CA0X2",
+      "state": "cancelled",
+      "title": "Visual refinement: Figma audit board and browser integration evidence",
+      "revision": "evt.01M2V84GFEFW885NFH6N256GJ6",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.26PV4WMK8E9VAXE8NKZNXG0D95",
+      "state": "completed",
+      "title": "Add parent guidance and checkpoint control slice",
+      "revision": "evt.01KZDVPEF3BXMGYZQ7YEKTX15P",
+      "priority": "high",
+      "dependencies": [
+        "task.1P2JWYZW80QQ37A12B02VV2CKY"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.26Q1AP651HW9VDPWCMVF9SH63M",
+      "state": "accepted",
+      "title": "Document Starter Packs integration and mock rollout",
+      "revision": "evt.01M12G0TSE2BTHH4SDT3B3T0M6",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.26T1R1QVHNZGTXCXMTDW4P8T3C",
+      "state": "accepted",
+      "title": "Close Snake retest install and Claude compatibility gaps",
+      "revision": "evt.01KY71TR6MZEZEQCDYG6HWDYB3",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2971V71ET4YY31REY8G3WPXYH3",
+      "state": "accepted",
+      "title": "Optimize staged test feedback without reducing coverage",
+      "revision": "evt.01M2T1Y896MQNVMDC3AK5RNE8F",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.29JJX4H1BR1HSQ2NP5W7YTR0FC",
+      "state": "accepted",
+      "title": "S1: Route local browser handoff directly to Work",
+      "revision": "evt.01M126JC0HCXVZP1CMM03RWHRK",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.29VZ36D5JAGTH1878GYA4GJZ57",
+      "state": "cancelled",
+      "title": "Fix broker child state resolution and exact-root authorization",
+      "revision": "evt.01M2V5YPCAJ5C1NAKV1Q9VXM3Y",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2AZN9N5TCHNA2X30N7A02JR3ZY",
+      "state": "cancelled",
+      "title": "Implement Work Library editors and specialization hire",
+      "revision": "evt.01M2V62XQ8CB7E2SV1YPQYKW9H",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2BM6RQY93G0E8Q6TKRD23VSAXY",
+      "state": "accepted",
+      "title": "Complete canonical Grok profile schemas",
+      "revision": "evt.01M1F5S073JMP97KZ49VKNHXB0",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2C85VT3EEZ752BNJK0S6SH9VRC",
+      "state": "accepted",
+      "title": "Extract Maintenance Commands",
+      "revision": "evt.01M0XHG6H83EZGSZCBJG0T0G3G",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2DY7ATZMFXC2P3GRARY65YS1Z1",
+      "state": "accepted",
+      "title": "G6: Link Design Packages into Work tasks and launches",
+      "revision": "evt.01M1NVAGXZZ1K9GGJYX3S7XP3M",
+      "priority": "high",
+      "dependencies": [
+        "task.0Q6H8FJV6DQKGJ060KVQPVB9MF",
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2FN5KSDDDQ7Y23CFJ47CFAJJR9",
+      "state": "cancelled",
+      "title": "UX pivot: ADR, task-first workspace integration and verification",
+      "revision": "evt.01M2V85N6R30X5B5KRJ1HDSMT1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2FQ0VW24V2J0866GM5G8WKT2VR",
+      "state": "cancelled",
+      "title": "Implement native project sidebar and scoped Work/Gallery state",
+      "revision": "evt.01M2V8R2FE3E5DWZ2A204DQFRV",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2H3V0XFNXKGHTPRFRDJ4Z9E2WW",
+      "state": "completed",
+      "title": "Independently Review Corrected Architecture Improvement Plan",
+      "revision": "evt.01M0W4YCXM42SHRQ8EB2DBQDBZ",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2K0AN2EZFXR51HS9CFTV2FQCR4",
+      "state": "cancelled",
+      "title": "Self-improvement: keep confirmed role creation successful during refresh",
+      "revision": "evt.01M2V675168S3M8T7XP5TF8QP8",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2K5X1TDQN1B83RHYXGA21T29TY",
+      "state": "accepted",
+      "title": "Implement receipt portability and recovery contract",
+      "revision": "evt.01KXZA9JHMVPFNXASQZY2H61J2",
+      "priority": "high",
+      "dependencies": [
+        "task.3PDJVBGKZG4N47DATA1BW12B9N"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2NS89BD76A24BV6XQRG5GSZ3ES",
+      "state": "accepted",
+      "title": "Extract presentation views behind compatibility facade",
+      "revision": "evt.01M0YH71HCYPKCZS4033EZVJQV",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2P2SF564PBP4Q6N91JSD7H42DD",
+      "state": "completed",
+      "title": "Record approved first-hour delivery decisions",
+      "revision": "evt.01M120EH7Q78HDPM53CR4ZNHEY",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2PJJ0D7TDMKV8A12W84R5YJPE8",
+      "state": "accepted",
+      "title": "Starter Packs core: validate and expose two bundled mock packs",
+      "revision": "evt.01M13F2Z2F4V9QF6JASMQFYWQB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2Q75QR8GJZHSGCEKSKEMWQH248",
+      "state": "accepted",
+      "title": "Extract review commands from CommonsManager",
+      "revision": "evt.01M0XH8148AS2PDX59M20EG6C5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2R2FJEWZPD57MHV6GB2ENAEDRP",
+      "state": "ready",
+      "title": "L1: Qualify skill-aware broker on authenticated Linux",
+      "revision": "evt.01M1FD8J0XMNXPFW94HGBTFDQ8",
+      "priority": "critical",
+      "dependencies": [
+        "task.4TCM30868X5ZEV7GGSA6HF51AE"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2SW6GF7XH16TK07HW5GA91KW3N",
+      "state": "ready",
+      "title": "Independently review Context Pack and Gallery programme implementation",
+      "revision": "evt.01M0R531DGJFA2RJKVWA3GSXRH",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2TWA24BSZ04K8QCQRSN3CZCKWX",
+      "state": "cancelled",
+      "title": "A7.2: type immutable launch read DTOs",
+      "revision": "evt.01M1FCAN8KDG5N6GGRP17KX4Q5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2V7NT6H48CE9X4BCMHFXW2SY3M",
+      "state": "completed",
+      "title": "Design provider-neutral adapters and skill projections",
+      "revision": "evt.01M16BFK4P6Y5DQX6VQN8ZJXC1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2W8XNHK7G48AV1P88X58FCYAWG",
+      "state": "accepted",
+      "title": "A6.5: characterize envelope reuse safety across fixed-point passes",
+      "revision": "evt.01M0Z0Z5R5BRBWECJ0S2WVAQV3",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2X5J7DSMR2SJ7999TPHH3S79K6",
+      "state": "cancelled",
+      "title": "P3b2-host: Bound capacity timeout and cancellation",
+      "revision": "evt.01M1HAWT0FRKB86ST09HTVK8TN",
+      "priority": "high",
+      "dependencies": [
+        "task.5EQG0HNWA6R0QMW4H1V5MNXVBN"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2X88DG3W91RVX5K2V3X6PCFY1X",
+      "state": "completed",
+      "title": "Silence expected Ctrl-C SSE cancellation traceback",
+      "revision": "evt.01M0JZC5Q8VS4H67M2NW3GYMYX",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.2Z88GCBBAZG5M4TY505D4YJNA7",
+      "state": "completed",
+      "title": "Capture real-world baseline and risk-ranked audit matrix",
+      "revision": "evt.01KZC7287G2FMG77DHC5038F9E",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.31ACFFPZ5J4H6HYQAVKSRJVT5T",
+      "state": "accepted",
+      "title": "Introduce frozen task projection record",
+      "revision": "evt.01M0XJ35ZAXMGN4HFYNYA42YD0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.32FJY7ERS66ZHNSXFZS73BZ2MA",
+      "state": "accepted",
+      "title": "WP-15.1: Server-enforced editable run time limit and factual wall_time_seconds in read DTOs",
+      "revision": "evt.01M23EMDHVPWTKEKZJ5QT1J4ZS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.32HVS2V47PSXHQP53Y6FHX6H6V",
+      "state": "completed",
+      "title": "Require strict legacy migration proof before state adoption",
+      "revision": "evt.01KZCFAQ1SMVYT9JN6Y5ENBV55",
+      "priority": "critical",
+      "dependencies": [
+        "task.0RWZD18DF1VGQ8BNMWANCGXY1D"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3363JTB7R1VP3YQ1VJSQCK1WKS",
+      "state": "cancelled",
+      "title": "Fact Check Council Architecture Claims",
+      "revision": "evt.01M1HBM648TP9QFWHZ9VDKC72R",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.33HF1BZ79CFWW3SWB9E16B8ZBG",
+      "state": "completed",
+      "title": "Harden operational communication after independent review",
+      "revision": "evt.01KZCBV1T7XZWFC6Y975AFASDR",
+      "priority": "critical",
+      "dependencies": [
+        "task.7TNJEGCDJPJF8P6C7Z3XDCKW33"
+      ],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.33TX998R0M729YRZJVZ2P8H9KW",
+      "state": "accepted",
+      "title": "Expose read-only Starter Pack catalog",
+      "revision": "evt.01M2T20YK5FFS6GX2R2G3X57AB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.35A1RZJPHAMB954YP2DPD6NAPD",
+      "state": "accepted",
+      "title": "WP-07: Scoped mutation feedback with 2 s / 8 s duration hints",
+      "revision": "evt.01M25XTJCND1WDZ3VA9MA8VC31",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.35SXKTWB4RCR8JWV8YGC0Q25B0",
+      "state": "accepted",
+      "title": "WP-02.2: Archive and restore skill groups in the library UI",
+      "revision": "evt.01M25T9DXVASXR25JZBZX3RCWE",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.39Y6GZ6JAJ7PY3NW5YGQ233RWS",
+      "state": "cancelled",
+      "title": "Implement task-first Work shell and composer",
+      "revision": "evt.01M2V86T1DX79KEY9QKH4J86BK",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3A6FPW5ZP6BMRP5AZ1P486M9K9",
+      "state": "accepted",
+      "title": "Fix independent task-review authorship invariant",
+      "revision": "evt.01KXJA4Y33KEWV97N99KV9Z6VA",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3AHJQ4CS705Z5H0F7C26GN0T2X",
+      "state": "accepted",
+      "title": "WP-03: Project archive confirmation, semantic rail state, readable provider readiness",
+      "revision": "evt.01M236E1ZMR3P849BBQ8VM1NZ6",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3C3QAYWSS0WY8F9BE6GJEYNKRA",
+      "state": "accepted",
+      "title": "P1: Introduce provider adapter contract and registry",
+      "revision": "evt.01M18XSZEW158HV2K52M9FV55F",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3C69KKYHXVDAH8CZBXMHM0MTVW",
+      "state": "cancelled",
+      "title": "Align project workspace UI contract tests",
+      "revision": "evt.01M2V6BCHQ1509Q64195WM6ZEJ",
+      "priority": "high",
+      "dependencies": [
+        "task.5K83Z3A8EC62Q04W69MXSXQ691"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3CAVCFZNV71MWZA9M8TKRZKMC2",
+      "state": "cancelled",
+      "title": "P3c-host: Qualify reciprocal external execution",
+      "revision": "evt.01M1HB08GYW3EQAKRYMGS32WMS",
+      "priority": "high",
+      "dependencies": [
+        "task.7WSHANPQRHKZC5KKNPJD0H53MM"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3CKP1QJA4S1Z8AMFZ3M8E9MF42",
+      "state": "completed",
+      "title": "LLM runtime architect assessment for provider adapters",
+      "revision": "evt.01M16HA1PXKADXXXN9Q0KNS1D3",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3CS1CADA9HX5C1X8AAHH7WMCDX",
+      "state": "accepted",
+      "title": "Add a concrete Codex plus Claude getting-started walkthrough",
+      "revision": "evt.01KXJFH347R2D1G1E9E01269N0",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3DX84XZHS5VSK4D7S98GPZT5NM",
+      "state": "accepted",
+      "title": "R6: Project, task and agent conversations with private attachments",
+      "revision": "evt.01M2T23K4ZFHA88TTSZ3XYKMEN",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3ES48JYNPFGMNJFM06M72PDYMM",
+      "state": "accepted",
+      "title": "WP-17.1: Local opt-in content-free instrumentation store",
+      "revision": "evt.01M2VK75CVKDNRY9VVW3S2W0NB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3FBSJJ2QS46QB0CS7Q60QQZ07G",
+      "state": "cancelled",
+      "title": "Audit code structure and module boundaries",
+      "revision": "evt.01M0G7HXG71AHHVD66PE59PHYB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3H9Y6QK9SKQBS0969YZBD2RZKS",
+      "state": "cancelled",
+      "title": "Amend Architecture Plan for Hierarchical Acceptance",
+      "revision": "evt.01M1FCCWT6GD8GHVQ0QKGTHKN7",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3KS7ZAB6SMKAWHMY88PXTMHYHH",
+      "state": "accepted",
+      "title": "Reconcile audit R-status before the next structural slice",
+      "revision": "evt.01M0X4DCXPQ2NZRFS4SMSHMHP6",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3MS4T9Y1520WT7ZVNS5FJ1AW13",
+      "state": "accepted",
+      "title": "Keep Terminal Provider Runs Terminal",
+      "revision": "evt.01M0XFY6A3B3GYWWGVYWMVFHPV",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3N13VJY72MY0A7DK4RXNKK6JNY",
+      "state": "accepted",
+      "title": "WP-17.2: Settings toggle and disclosure for local content-free instrumentation",
+      "revision": "evt.01M2VNTDMQYYHPXD4WK8D81CP2",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3N479FG3B0AHCCD75C66847W84",
+      "state": "completed",
+      "title": "React Flow: establish packaged Gallery screen foundation",
+      "revision": "evt.01M0NCHY8MAAB7N5ZD20VCH5XT",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3N7AZYCG4GTVMSE0F44XC7G8WQ",
+      "state": "cancelled",
+      "title": "Correct current-state document revision boundary",
+      "revision": "evt.01M2V6FKYEYKEAX81P1BGMC1T2",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3PA74TA6FF1WWPRYNRXHD8G68N",
+      "state": "ready",
+      "title": "WP-20: Write-path speed — incremental ledger validation and single receipt read per write",
+      "revision": "evt.01M366BQMCS4YAQ1QFNEXY216D",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3PDJVBGKZG4N47DATA1BW12B9N",
+      "state": "accepted",
+      "title": "Decide receipt portability and checkout recovery contract",
+      "revision": "evt.01KXJFGWEHY0C22CJ5YTDDM0J5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3Q8RP7D6SWY4QHATWX7B31PTEH",
+      "state": "accepted",
+      "title": "WP-11.1: ADR 0021 on canonical objective and blueprint application provenance",
+      "revision": "evt.01M266TY70EW5JFQHW4Z3EZMYW",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3R42RHKBP0HJ7M2GCYTBTMP8D2",
+      "state": "accepted",
+      "title": "R0: Unify provider availability across CLI API and Work",
+      "revision": "evt.01M1EP4YDQ3PX8QAPGM4N4GMVV",
+      "priority": "critical",
+      "dependencies": [
+        "task.181493Y54PJDCNV9QGP4XAF4F2"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3RTW2XSB6F610G73EXJV3H7F7P",
+      "state": "accepted",
+      "title": "WP-06: Blueprint apply leads to an explicit Prepare run, never a launch",
+      "revision": "evt.01M23145Q63WWA11S4N0GY9V9M",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3S5977Z8PZ3BM6C39B2A73RJWY",
+      "state": "accepted",
+      "title": "A6.4: characterize project-events replay phases",
+      "revision": "evt.01M0YSG2WH1HKZE5EF3T2AGZ9Z",
+      "priority": "high",
+      "dependencies": [
+        "task.1YHDT583BDMA1AT1QFTTXXCN5Q"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3S8G0WH7A1D7HM6075XA96E0SV",
+      "state": "completed",
+      "title": "Remove product demo surface and add honest no-provider setup",
+      "revision": "evt.01M0MH12RCQCFHRMKF8REH3K9M",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3SDZD4Z61PCKERKT09PFYE8MMY",
+      "state": "accepted",
+      "title": "Project-native UX R5: private conversation attachments and delivery",
+      "revision": "evt.01M2T266B5Z6AF7VMVCHNWVPY4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3TBPT5EDY1HSSYK5DT7S698K4X",
+      "state": "cancelled",
+      "title": "Remediate live-run P0 diagnostics, Codex startup, and first-delegation state path",
+      "revision": "evt.01M2V6KVG66T3814DMR68QZJ5S",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3TJ6T2DDKE4RVN6D087WPT436B",
+      "state": "accepted",
+      "title": "Introduce frozen artifact projection record",
+      "revision": "evt.01M0XJWY6XYXDPYWCBG02DE9R7",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3W6X2DYN7RVNMFRJZZZ67QF2YV",
+      "state": "cancelled",
+      "title": "Bind local UI session cookie to an unguessable API route",
+      "revision": "evt.01M2V6R2SYMNNXD6YN0CJ76PQY",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3WAEPZ6Q7F38CH8NMNYRJK0N6R",
+      "state": "completed",
+      "title": "Remediate Wave 1 independent-review blockers",
+      "revision": "evt.01KZC994RS32053QG62N76PHVC",
+      "priority": "critical",
+      "dependencies": [
+        "task.0AJXEBVMHP20HXA9AMBNW01EBV"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3WN8G6KAD0JVH2J8VV5HGZKVTG",
+      "state": "accepted",
+      "title": "F12: Enforce the repository Node major before frontend checks",
+      "revision": "evt.01M2T28RGN1QDVTT8612HA027P",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3WTBQDTJVC54NZGP6ZMR4MTT7X",
+      "state": "cancelled",
+      "title": "Close Batch 0 integrity and boundary gaps from Snake audit",
+      "revision": "evt.01M2V6WAS78Q3771C06DQ587E1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3XJNY0AR6Q3PMDM9AERRYWQQ4K",
+      "state": "accepted",
+      "title": "Wire agent-commons MCP into delegated codex children (reverse-direction slice)",
+      "revision": "evt.01M07PXR0YW31FVHT3RTDVKQXS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3XT1H637CYS9710HSC1JSWCZ4V",
+      "state": "completed",
+      "title": "Wave 4: deterministic agent workflow eval harness",
+      "revision": "evt.01KZCCQYY4D8YJE98NNB5NJ25T",
+      "priority": "high",
+      "dependencies": [
+        "task.50157DJEGTVSRD2RTVH2BGRPEA"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3XX3KW5FKWNHQMZHEWWTPBVMYR",
+      "state": "accepted",
+      "title": "Extract MCP CLI entrypoint from server facade",
+      "revision": "evt.01M0YCK8Z0W16HYSDZE7MRHA02",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.3ZYN221ADSRAQD413KKCVYHZ3R",
+      "state": "accepted",
+      "title": "Extract decision commands from CommonsManager",
+      "revision": "evt.01M0XHD04NDAXDE0Y7RECMWYPA",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.439A523AD0MWC8643JKBA6AGCZ",
+      "state": "cancelled",
+      "title": "Audit deadweight and missing explanations",
+      "revision": "evt.01M0G7JAD2T9BW7SJ36GDTNTH5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.43PGGBJECJH5WH26AZEQR6M4Q4",
+      "state": "cancelled",
+      "title": "Refine Library and Context browser presentation",
+      "revision": "evt.01M2V87ZASVX126K0QF1VZV0J3",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.446DEW2GZ62HC32VHQPD6Q6PYD",
+      "state": "cancelled",
+      "title": "Integrate the reviewed workspace and simplify repository maintenance",
+      "revision": "evt.01M2V895QKVS4QQ8AWHP51N77N",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.45PD34CX9NAZMDBHS724A5N46J",
+      "state": "accepted",
+      "title": "WP-02: Server-authoritative archive and restore of custom skill groups",
+      "revision": "evt.01M25QJD2J469ACNQYB13S9PED",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.49Z8QF3YQYF7734FB9K8YHDJT7",
+      "state": "accepted",
+      "title": "Extract finding commands from CommonsManager",
+      "revision": "evt.01M0XH963NDBXN9JJP87Z7RC14",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4A15VT58XX1W6XE7J6GG4DAG3N",
+      "state": "ready",
+      "title": "R2: Assemble exact Wave 1 release evidence",
+      "revision": "evt.01M1HB95PAC3CD9NEDAZTC3PC3",
+      "priority": "critical",
+      "dependencies": [
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ",
+        "task.4W7MQDXRHP5VMN75GH6VW2KK5J",
+        "task.7FE4KZ9RSHR0B9KX3Y7CTE7H8Z",
+        "task.4TCM30868X5ZEV7GGSA6HF51AE",
+        "task.1JE820T992D7YEZKW44ZBFPRMG",
+        "task.2R2FJEWZPD57MHV6GB2ENAEDRP",
+        "task.2DY7ATZMFXC2P3GRARY65YS1Z1",
+        "task.6GGRYSZFTXTG4GYZ1Q0EVQVXNR"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4AWK0F35FG8HXYS6AKPZ51V9D0",
+      "state": "completed",
+      "title": "Product and frontend assessment for Gallery tracker and context branching",
+      "revision": "evt.01M16HB268QZYCNMJWFY7NMKP5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4B59T4AVWG3ENC3QYKTTXYRFVM",
+      "state": "accepted",
+      "title": "WP-40: A real run reaches the agent (UX-19 nested worktrees, UX-21 executor access, typed stop reasons)",
+      "revision": "evt.01M35MTE8EN55JYQWGPY35Z57N",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4BSJKSTG4TBX53A5BJ0QKQZ3Y3",
+      "state": "accepted",
+      "title": "Make the stale-review acceptance guard causal in projection replay",
+      "revision": "evt.01M0A74W4JV8EJ0BF8SYP5V09X",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4CX3E9E8NK0GRVSXXMDQX78A5B",
+      "state": "accepted",
+      "title": "F02: Validate Context Pack sources before runtime binding and retry",
+      "revision": "evt.01M2T2BEEPDCF7ATWAZC9HBRHT",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4DDHCXZ3QVTHJV1VR50EFHC2G9",
+      "state": "completed",
+      "title": "C1.1: ignore generated Work app dependencies",
+      "revision": "evt.01M1007K2D4521FRVC4KQP5AGV",
+      "priority": "critical",
+      "dependencies": [
+        "task.4RWKTPN74XVVVWJZJ7RXWNBECH"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4E0XNEC38K3WSWNVDEWMZHJQ78",
+      "state": "accepted",
+      "title": "F04: Refuse stale Design Package provenance consistently",
+      "revision": "evt.01M2T2E2E4Q4XASKF2X2MBB028",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4EWPW51GF2CVJ267BAYGX37D8T",
+      "state": "completed",
+      "title": "Remediate live-run P1 review, task, role, and depth workflows",
+      "revision": "evt.01M0B6F4KQHRXS9CYDFY5T50RW",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4FYZ0KC7F5SFYKQAJ10JVWCJHE",
+      "state": "cancelled",
+      "title": "Preserve stale source labels and disclosure spacing",
+      "revision": "evt.01M2V8TBVY3E1QRHS2K3YMFY9D",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4G3EMSXYCBHBH5Q7QVCF1FDY5R",
+      "state": "accepted",
+      "title": "Rewrite bilingual user documentation around the product UI",
+      "revision": "evt.01M11FY9VPE1WJW3MKQYPS47Q6",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4G9KA8PHZ280A4N58GVZGKA8JP",
+      "state": "cancelled",
+      "title": "Consolidate current documentation after task-first merge",
+      "revision": "evt.01M2V8WNHPQV543K2DXT5JK3MW",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4J4RW685TP3M0NV57C0K7RQHXD",
+      "state": "accepted",
+      "title": "C2: Bind exact Context Pack to immutable launch plan",
+      "revision": "evt.01M1C0V22JJ7FWF0EHZFZ4HCGX",
+      "priority": "critical",
+      "dependencies": [
+        "task.6GT6W0EKQVTDD5XDB7Q6R3XJBF"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4JJXVXXQ7X6XC8S0W97TAJ53AP",
+      "state": "accepted",
+      "title": "Extract task commands from CommonsManager",
+      "revision": "evt.01M0XH6CXXHN34QT6JB3JMXKSP",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4KB6R9GK67FZB6Q2ZBHN9NWWCP",
+      "state": "accepted",
+      "title": "WP-16.1: Migrate Starter Pack content into built-in blueprints and remove the backend surface",
+      "revision": "evt.01M264YHAGNER417Y61K5SV42Z",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4MGXJMAFSV3D41H7TSKR63X2VH",
+      "state": "accepted",
+      "title": "WP-13.1: Mechanical i18n consolidation and colour/spacing token inventory",
+      "revision": "evt.01M2SWS1QB9C2SC7C4B75P3ZE9",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4PCV4E0SS79TWFQX01A0ZS6Z1N",
+      "state": "completed",
+      "title": "Produce code quality audit reports and synthesis",
+      "revision": "evt.01M0BGYYA1GQF1VWGPJP6GX9CK",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4PH2ZT7ECH94HE3H51H5R8EPQC",
+      "state": "cancelled",
+      "title": "Assess Derived Control Plane Architecture",
+      "revision": "evt.01M1HBNSSAZFJCV6AKVW66S56G",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4PNGRR0ATFEYTGNQ5CM15YWDHW",
+      "state": "accepted",
+      "title": "W2: Build ExecutionPlanView readiness and critical path",
+      "revision": "evt.01M1DZ0AERFP0X26A8FMMN4VBR",
+      "priority": "high",
+      "dependencies": [
+        "task.0RYHGFZJ4P0V4G3WBKEJPW3V4K"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4Q0FEZ0HKRW4MJ77AVA5ZGE5JF",
+      "state": "accepted",
+      "title": "Final post-remediation validation of Agent Commons",
+      "revision": "evt.01KXZD8RD9RN8PEGZ54EFZ8P1D",
+      "priority": "high",
+      "dependencies": [
+        "task.3A6FPW5ZP6BMRP5AZ1P486M9K9",
+        "task.2K5X1TDQN1B83RHYXGA21T29TY"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4Q1WTPAP884D1JAG5GX8Y1MWQB",
+      "state": "accepted",
+      "title": "Project-native UX R3A: compact accessible project shell",
+      "revision": "evt.01M2T2GQ21JPWP21R552GQ68GF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4QS4XJHGJGV488NTV4DAX6ASHR",
+      "state": "completed",
+      "title": "Wave 3: compact orient and fast SQLite read path",
+      "revision": "evt.01KZCCZSWRN98R75XN2R6YQW1N",
+      "priority": "high",
+      "dependencies": [
+        "task.33HF1BZ79CFWW3SWB9E16B8ZBG"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4R62ZGCJQRWJDS10NSFJWP6NM7",
+      "state": "accepted",
+      "title": "Introduce frozen handoff projection record",
+      "revision": "evt.01M0XJW399QRD1VCHBEY03YCFF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4RVRG5PJE6BZDS2TRHR07RDH8D",
+      "state": "cancelled",
+      "title": "Restore opaque API base after local UI refresh",
+      "revision": "evt.01M2V70JJPJK4JQ58BKPX58NFF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4RWKTPN74XVVVWJZJ7RXWNBECH",
+      "state": "accepted",
+      "title": "C1.1: Build isolated Work web-app foundation and Cold Start contract",
+      "revision": "evt.01M100QVWF11STXCZSRG3590DH",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4S8H8ZHDSKK5T3W99PKQDFWNHM",
+      "state": "accepted",
+      "title": "Stabilize Finished Run Liveness Fixture",
+      "revision": "evt.01M0XEWX4ADHSBDXB85T51PHW9",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4TCM30868X5ZEV7GGSA6HF51AE",
+      "state": "accepted",
+      "title": "K1: Prove behavioral skill delivery over real stdio",
+      "revision": "evt.01M1FN0PVGFT8EFNAWWSJ2YT71",
+      "priority": "critical",
+      "dependencies": [
+        "task.181493Y54PJDCNV9QGP4XAF4F2"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4TS1R73QXYXBEAM9W5MN9B4PCH",
+      "state": "accepted",
+      "title": "P0: Wire actionable provider authentication recovery into Work UI",
+      "revision": "evt.01M18XVF3Y47HZJ1KA5MWMJKKK",
+      "priority": "critical",
+      "dependencies": [
+        "task.6HM0K7C0G8WQD89X2JPWY10529"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4TSGFPE9GZ7JBXAE32Y933FXDM",
+      "state": "accepted",
+      "title": "Implement optional local delegation runtime foundation",
+      "revision": "evt.01KY0F67SSPXJF1Y9VZ3R23NQ8",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4TWRCYZ98FW5D7HJPT78BCNYZB",
+      "state": "accepted",
+      "title": "Record CLI retirement policy and align implementation plan",
+      "revision": "evt.01M0ZPR4HET72CV3XVHXK2JHF9",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4V87W14RHVYYX86591MAPN5CSN",
+      "state": "accepted",
+      "title": "R3B: Grouped service skills and editable blueprints",
+      "revision": "evt.01M2T2P8W2G2TRG4R1Z8BY7SCK",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4W7MQDXRHP5VMN75GH6VW2KK5J",
+      "state": "accepted",
+      "title": "RC1-backend: Build a usable starter roles catalog",
+      "revision": "evt.01M1FJE9P6E66QWX7V1583ZT0N",
+      "priority": "critical",
+      "dependencies": [
+        "task.2PJJ0D7TDMKV8A12W84R5YJPE8"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4WE4J3C25Z1QZ64FS8J1T5YAZ4",
+      "state": "completed",
+      "title": "Fact Check Corrected Architecture Reviews",
+      "revision": "evt.01M0W1CZ4BEB5S44D43XC2C45T",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4YSS2TG9BYN4ME34RMN5E6JYR9",
+      "state": "accepted",
+      "title": "Design optional local delegation runtime",
+      "revision": "evt.01KY042C98B7CSW7XB9QP4JDZ9",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.4ZRNSZ33ZMKYG6DTFCD10T7SEK",
+      "state": "accepted",
+      "title": "A5.2: type task and review envelopes",
+      "revision": "evt.01M0XDQE93F4G2W7NS3AEC9YRK",
+      "priority": "high",
+      "dependencies": [
+        "task.1KKE992Z8ECPFFTFKTVEJS5CXH"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.50157DJEGTVSRD2RTVH2BGRPEA",
+      "state": "completed",
+      "title": "Remediate authenticated communication integrity",
+      "revision": "evt.01KZCCBNA1P3ESFTDT8REENVX1",
+      "priority": "critical",
+      "dependencies": [
+        "task.33HF1BZ79CFWW3SWB9E16B8ZBG"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.50GNGDY63WB86K4J3HDS64WGP0",
+      "state": "accepted",
+      "title": "WP-16.2: Delete the Starter Packs surface from the Work app",
+      "revision": "evt.01M2694FS0PZAHNKECBH60J193",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.50Q7A0XV3CE1V25JZA23DMRKKY",
+      "state": "cancelled",
+      "title": "Add guarded disposable directory cleanup",
+      "revision": "evt.01M2V8YZT2N22WK6K9F2ZTFWMZ",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.50QBQJS1BHM5XSY37287FR8X82",
+      "state": "completed",
+      "title": "Prevent canonical reply content leakage",
+      "revision": "evt.01KZCE0W97BQPBMBZ67192XH6X",
+      "priority": "critical",
+      "dependencies": [
+        "task.6GJ1QH71VJ5CKYSTFHZY1B9G92"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.50VSMKR5XKDM8KWEXJSV83FVRF",
+      "state": "cancelled",
+      "title": "Audit efficiency and memory behavior",
+      "revision": "evt.01M0G7JQ9D2RHAJ53QW3AMSCNP",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.51Z5PF113AY0J8JMQFGB8HPSAG",
+      "state": "cancelled",
+      "title": "Record dd9edab L1 fail-closed and triage provider blockers",
+      "revision": "evt.01M2V74TN29YTGWXH3A25DNVD2",
+      "priority": "critical",
+      "dependencies": [
+        "task.2R2FJEWZPD57MHV6GB2ENAEDRP"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.526331J4425W93ZEQFFV4NMJPQ",
+      "state": "review",
+      "title": "Honor role:-prefixed recipients in handoff acknowledgement",
+      "revision": "evt.01M0A9MYY4Y68Z3DM8S4A13GYT",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.53Q243VDZCN0ZTR1AJE331CMDK",
+      "state": "accepted",
+      "title": "WP-10.1: Findings attached to the task entity record",
+      "revision": "evt.01M2VBXSJ5MCMSG9AF234N0PH4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.577TNYMC1YH674P54MTZVRVBAY",
+      "state": "accepted",
+      "title": "Recover orphaned requested delegations safely",
+      "revision": "evt.01KY5VPF6XG3WBHKBXP7WE82JY",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5834H1JYK7P8TZJSZKH5HJ7Z28",
+      "state": "cancelled",
+      "title": "Refine inspector visual hierarchy and browser disclosure behavior",
+      "revision": "evt.01M2V905VEQF5759TESWNRH0A6",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.591KMGYHCAEHMAJC2WZ2ET1V3H",
+      "state": "accepted",
+      "title": "Project-native UX R4: exact producer-scoped task and agent outputs",
+      "revision": "evt.01M2T2RZVV0VXER4RGSEM3F6QY",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5AGK7R40VNQBKT5J59GKYEZ2C7",
+      "state": "accepted",
+      "title": "Build provider-neutral local broker runtime foundation",
+      "revision": "evt.01M07MV61647NS5ZX9WAQ1Z3R4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5BHC8X35V3EQ9S8AM2GPT742PA",
+      "state": "accepted",
+      "title": "WP-04.1: Server-derived recipient availability on conversation reads",
+      "revision": "evt.01M239PG67P9EQ4B3V0GB3FK6M",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5C2AYWBS8HECVZXDH6KGTM64RC",
+      "state": "accepted",
+      "title": "S1: Consolidate broker delegation locking on shared operational primitive",
+      "revision": "evt.01M18QW7368HX2WBPH2T4VJCKQ",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5CD5DP604ZQSNCYNGQ43X7FCHV",
+      "state": "completed",
+      "title": "Produce council architecture improvement review",
+      "revision": "evt.01M0TSFG72NPZYDMN6V1RXTRA8",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5CH0NZWD4SV90TYA7YTCV51QPH",
+      "state": "completed",
+      "title": "Implement code-quality audit A0 through A2.2",
+      "revision": "evt.01M0CPDBBHQATHGQTCNV44VY3V",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5E6V1P1DTP7PA0E54G6EN6TV6S",
+      "state": "cancelled",
+      "title": "Validate the Agent Commons repository",
+      "revision": "evt.01KXZB0ANZZV401M64AQJ192T2",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5EQG0HNWA6R0QMW4H1V5MNXVBN",
+      "state": "cancelled",
+      "title": "P3b1-host: Launch one admitted immutable plan exactly once",
+      "revision": "evt.01M1FC932K8F57GJRN8GS90JTH",
+      "priority": "high",
+      "dependencies": [
+        "task.5FR2V9CWSC3AKX1F1Z6VDD0E4J"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5FR2V9CWSC3AKX1F1Z6VDD0E4J",
+      "state": "accepted",
+      "title": "P3a-host: Authenticate exact local broker IPC",
+      "revision": "evt.01M1EWQ4JAZJD4BHRD2NQ5ENGT",
+      "priority": "high",
+      "dependencies": [
+        "task.5P553Q5DKG4N3ZEA7FZ2T9CQAX"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5GMM9MKQS4PN32CNQ2DFF9JF0T",
+      "state": "accepted",
+      "title": "R1: Publish and revise Context Packs from Work",
+      "revision": "evt.01M1ENE2XVCWY72VPAH5JHM9XE",
+      "priority": "critical",
+      "dependencies": [
+        "task.4J4RW685TP3M0NV57C0K7RQHXD"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ",
+      "state": "accepted",
+      "title": "W4: Close canonical tracker frontend in Work",
+      "revision": "evt.01M1GH32NS3Q5XT5SR377R2A8H",
+      "priority": "critical",
+      "dependencies": [
+        "task.0NE2MXJBHM1W1TYDN1E2BYJHP7",
+        "task.1JE820T992D7YEZKW44ZBFPRMG"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5HN652186T9245DMFQESRF7TV1",
+      "state": "cancelled",
+      "title": "Implement service-managed specialization and skill library",
+      "revision": "evt.01M2V8BEXGDMFTJKZW13VFTG8X",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5JK8KHKWD5EZBW61AXQ0DXXPKM",
+      "state": "accepted",
+      "title": "Harden field readiness from Snake workflow feedback",
+      "revision": "evt.01KY34M7KM7Q1TK9TH9600XV27",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5JSNBFYD2SBY7593QDA5MSVK9E",
+      "state": "cancelled",
+      "title": "Implement private project registry and safe UI create/connect operations",
+      "revision": "evt.01M2V78ZC1906ZTQRMJX65XWBA",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5K83Z3A8EC62Q04W69MXSXQ691",
+      "state": "accepted",
+      "title": "Integrate and release project-scoped Agent Commons workspaces",
+      "revision": "evt.01M2T2VP85BJ6RNZQX9DH99WCX",
+      "priority": "normal",
+      "dependencies": [
+        "task.5JSNBFYD2SBY7593QDA5MSVK9E",
+        "task.7XDH8023BDMHWSFS51Z053N2MF",
+        "task.2FQ0VW24V2J0866GM5G8WKT2VR"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5NG0QCXKABA2NB3G6K1YFDMFHP",
+      "state": "accepted",
+      "title": "Fix F06 F07 Work retries and preset hire",
+      "revision": "evt.01M2T2Y9K2QNYR01WK7PHJA1DF",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5NNT30SDSNRB43N3HAG1RGQ3BG",
+      "state": "ready",
+      "title": "Audit test-suite breadth and CI cost",
+      "revision": "evt.01M16NJ797DNC29GY80H55Y2N5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5P553Q5DKG4N3ZEA7FZ2T9CQAX",
+      "state": "accepted",
+      "title": "P2: Build and launch one immutable ValidatedLaunchPlan",
+      "revision": "evt.01M1BZ08NY85SWG67YGSW5B3DE",
+      "priority": "critical",
+      "dependencies": [
+        "task.3C3QAYWSS0WY8F9BE6GJEYNKRA"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5PB4V1924M5923BK1E8FEAH8CQ",
+      "state": "cancelled",
+      "title": "Show Starter Pack examples in Work",
+      "revision": "evt.01M2V4EQENHPMS8N68APQJANZP",
+      "priority": "high",
+      "dependencies": [
+        "task.33TX998R0M729YRZJVZ2P8H9KW"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5QE4V19XV2TDHCRZRCYPB3MBSN",
+      "state": "accepted",
+      "title": "Add an engaging Agent Commons README hero",
+      "revision": "evt.01M07MVXWBD3MVXGWZB0VB2ATY",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5RAFTFAGK9Z5VV46B2BED7XTER",
+      "state": "cancelled",
+      "title": "S2 UI: show safe setup guidance and retry in Work",
+      "revision": "evt.01M126P7GGHWYPHXWAMDESCKQY",
+      "priority": "high",
+      "dependencies": [
+        "task.6HA4YD35ZRFNQGYXBKH6EW6194",
+        "task.1QSF3JXKM5XBJ7BHMQF9SZ79E6"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5SQYDA5DHVSD8VW73XHCRJ0R02",
+      "state": "cancelled",
+      "title": "Create executable implementation programme for provider adapters and agent workspaces",
+      "revision": "evt.01M2V7C0947VR7J90CEJ8XCSH5",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5T0ZQTJQC6539Y1QDXAHAVXDWX",
+      "state": "accepted",
+      "title": "Implement schema-validated delegation aggregate",
+      "revision": "evt.01KY02NR6N32D0KZDQZAG9BS82",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5VZH3KTJSA1Y3DPFXB6FVNDT99",
+      "state": "cancelled",
+      "title": "P3b3-host: Reconcile restart and orphan outcomes",
+      "revision": "evt.01M1HAYJ5WEBPMZW6H0RVK0BC4",
+      "priority": "high",
+      "dependencies": [
+        "task.2X5J7DSMR2SJ7999TPHH3S79K6"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5XK0NKTJNM6HR9N3JVQ43XV0RD",
+      "state": "accepted",
+      "title": "Make first delegation CLI guidance self-contained",
+      "revision": "evt.01M0A73A7YSKDEMB0472BGX217",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5XWPCS0RKZTM7EQ6322E82MTZ9",
+      "state": "ready",
+      "title": "Implement compact indexed orient, delta inbox, and maintenance UX",
+      "revision": "evt.01KZC6ECN0QZYS6ZAVD00BRG4P",
+      "priority": "high",
+      "dependencies": [
+        "task.2Z88GCBBAZG5M4TY505D4YJNA7",
+        "task.0AJXEBVMHP20HXA9AMBNW01EBV"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5Y22M96JPZHS8TM9J9XP9WF6TV",
+      "state": "cancelled",
+      "title": "Fail fast when independent_review delegation lacks an open review request",
+      "revision": "evt.01M2ZS0N47AEWX60YFCF3YRK4C",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.5ZR1CA1VPQENFH1MTA7R1QS4CB",
+      "state": "accepted",
+      "title": "Close residual session and broker lifecycle leaks",
+      "revision": "evt.01KY5VPPVC8GPYXEQHRMTAE1YB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.5ZWMC713R5MRCG3EMD4WQC4F3Z",
+      "state": "completed",
+      "title": "Remediate Grok MCP terminal-use failure",
+      "revision": "evt.01M1HY2JFKV9XYDTVTDB6ZS97E",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.60E8AFJB3YZF000M6PYF3K96PT",
+      "state": "accepted",
+      "title": "WP-04.2: Conversation draft guard, recipient availability chip, delivery Stepper",
+      "revision": "evt.01M23C6ZZ0XS2Z2F7CBCC8RVG0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.62M1D8R7GQ7X78Y3D309G031D4",
+      "state": "accepted",
+      "title": "A4.5: extract delegation instruction composition seam",
+      "revision": "evt.01M0XBNJDGQ0GA64T15Y8E7EAJ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.64Z9RGK58YFMR6GP9CBG3QPMFA",
+      "state": "cancelled",
+      "title": "Self-improvement: finalize task-target independent reviews with the bound review revision",
+      "revision": "evt.01M2V7FMKTZ73Z9YRWD90NYDR1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6526R472K8A5GDHPPSH7MYFSH6",
+      "state": "cancelled",
+      "title": "Remediate Gallery bearer-token handoff",
+      "revision": "evt.01M2V7KWBZ7WCMS0DF7TH0TMTR",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.66DBAD3V94M3481B9ETQADEG2X",
+      "state": "accepted",
+      "title": "Reconcile accepted audit slice statuses",
+      "revision": "evt.01M0YVQMA559Z9H1R92XW4YZVC",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.66GWDNJS400JSA6BMPJDS45HNG",
+      "state": "completed",
+      "title": "Promote current product branch to main",
+      "revision": "evt.01M14FTK29B3KAMRY7QMB1XWH0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.66RN2H02EEDX5JC4MZ01T0AK7M",
+      "state": "completed",
+      "title": "Qualify Claude-to-Codex reciprocal delegation",
+      "revision": "evt.01M17R58VNDB31P2ECZD908VF1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.67616SEZWXPKZR47FRVDSD96PC",
+      "state": "completed",
+      "title": "Repair CI demo executable path portability",
+      "revision": "evt.01M0W5RNJZASTS12BN4T0MW5XB",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.67TJBXTY7X3AT7ZFZAEA7K1F51",
+      "state": "completed",
+      "title": "Document approved Context Pack, Gallery, and A4.5 implementation programme",
+      "revision": "evt.01M0N6R0KZY0H6ZR6KS12WC9DR",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.68675SR8DNBJBBSWHM9PSBYAFY",
+      "state": "ready",
+      "title": "WP-29: Stale handoffs without a live recipient leave the inbox",
+      "revision": "evt.01M2ZYEFQBGT9JWR1PQ59BZPTJ",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6ATWKY0CJB6V00VR373Q46X8QZ",
+      "state": "cancelled",
+      "title": "Audit human readability across workflows",
+      "revision": "evt.01M0G7K4809DG7Z10Z3TJNZ1G7",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6BJHYNRTH9S9A62VDR1CRQY3KC",
+      "state": "completed",
+      "title": "Assess Corrected Product Evals Roadmap",
+      "revision": "evt.01M0W1C68XJ6A341EFR35F0EZ4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6D7950ZNP9JR1611T34GAS1X0D",
+      "state": "accepted",
+      "title": "S2 UI: show safe setup guidance and retry in Work",
+      "revision": "evt.01M12ER7PWQW8K56W9HDZXCDKA",
+      "priority": "high",
+      "dependencies": [
+        "task.6HA4YD35ZRFNQGYXBKH6EW6194"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6DGTPFF0ASEWBZBGP6TV5G6KPR",
+      "state": "accepted",
+      "title": "Draft H0 hierarchical acceptance semantic RFC",
+      "revision": "evt.01M0X4CS1VMG746KEWZ3RD7B9D",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6DVTP4864VPZ83RZY8HB4MEV25",
+      "state": "completed",
+      "title": "A4 CLI: introduce package facade and workspace command seam",
+      "revision": "evt.01M0NCW18KE5RH0A1GRTW5MWYR",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6EVFXS7WAR4A9S8RAYAT9KXVDN",
+      "state": "accepted",
+      "title": "Introduce frozen thread projection record",
+      "revision": "evt.01M0XJV8X5JXA3V4QDAYHKMQZS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6GGRYSZFTXTG4GYZ1Q0EVQVXNR",
+      "state": "accepted",
+      "title": "J1: Verify the integrated Work operator journey",
+      "revision": "evt.01M1KM60TP7VH1Z6013Q7S6NEM",
+      "priority": "critical",
+      "dependencies": [
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ",
+        "task.7FE4KZ9RSHR0B9KX3Y7CTE7H8Z",
+        "task.4TCM30868X5ZEV7GGSA6HF51AE",
+        "task.1JE820T992D7YEZKW44ZBFPRMG"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6GJ1QH71VJ5CKYSTFHZY1B9G92",
+      "state": "completed",
+      "title": "Wave 2: bind communication core to delegation runtime",
+      "revision": "evt.01KZCCVWMXA21561YACA2J6ZXE",
+      "priority": "critical",
+      "dependencies": [
+        "task.50157DJEGTVSRD2RTVH2BGRPEA"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6GNFK5BTJA3ZCRGTTD7GEAZ4EY",
+      "state": "accepted",
+      "title": "Replace noisy cold uv reinstall guidance",
+      "revision": "evt.01KY732Y1J0ZMHSVW74J04YEK6",
+      "priority": "normal",
+      "dependencies": [
+        "task.26T1R1QVHNZGTXCXMTDW4P8T3C"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6GQM73R57PZ4YTWTKVMCA8CZS6",
+      "state": "accepted",
+      "title": "Complete Snake P1/P2 product and reliability hardening",
+      "revision": "evt.01KY5MEAFDWRSXPV5Q9AX21X04",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6GT6W0EKQVTDD5XDB7Q6R3XJBF",
+      "state": "accepted",
+      "title": "C1: Implement canonical Context Pack entity and compiler",
+      "revision": "evt.01M18XWZ7C431KGZ2S1XNEWJG6",
+      "priority": "critical",
+      "dependencies": [
+        "task.5C2AYWBS8HECVZXDH6KGTM64RC"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6H5E800JWQC04ME117DHWJ2KW1",
+      "state": "cancelled",
+      "title": "Triage and sequence confirmed medium review findings",
+      "revision": "evt.01M0G7KH381VY5077F1DY216AG",
+      "priority": "normal",
+      "dependencies": [
+        "task.3A6FPW5ZP6BMRP5AZ1P486M9K9",
+        "task.2K5X1TDQN1B83RHYXGA21T29TY"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6HA4YD35ZRFNQGYXBKH6EW6194",
+      "state": "accepted",
+      "title": "S2 adapter: expose safe typed setup guidance to Work",
+      "revision": "evt.01M126K9TPGMH98GTF2AWXZ5X0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6HM0K7C0G8WQD89X2JPWY10529",
+      "state": "accepted",
+      "title": "Implement provider auth controller and pre-start runtime gate",
+      "revision": "evt.01M17WCCRWCF8B9156VVM3ZCW5",
+      "priority": "critical",
+      "dependencies": [
+        "task.03K47JY0J17WMN0RHAP67J6C63"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6HZHN07HE10SFYVJ90R4Y981XR",
+      "state": "completed",
+      "title": "Technical director assessment for control plane security and operations",
+      "revision": "evt.01M16HC2PZET7FFAAG2N0J18CA",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6J4R6XAAC6D0R6CJKBRR48NDXY",
+      "state": "accepted",
+      "title": "Project-native UX R0: remove Grok prompt argv exposure and qualify actual execution",
+      "revision": "evt.01M2T3448RG56KZFVGHXEX0498",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6JHVS94R922587RGQ6J87358GQ",
+      "state": "accepted",
+      "title": "Build W0 synthetic metric fixture harness",
+      "revision": "evt.01M0X98VE5KWQB9VJQR6N2KSM1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6JZP6J57782Y8ERHT2K140DJ13",
+      "state": "completed",
+      "title": "A6.1: profile replay and verified read cost",
+      "revision": "evt.01M0PX94X1HMFR6929ZJ6ECZ9T",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.6KPEARAYJAT7RF7N3562VECP81",
+      "state": "accepted",
+      "title": "Restore reliable Claude terminal MCP execution",
+      "revision": "evt.01M17EQZ5JV9ATVZ21T8E256WT",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6MJD4C6RDN7MZ7WFVWDA0BPNHS",
+      "state": "cancelled",
+      "title": "R2: Assemble exact Wave 1 release evidence",
+      "revision": "evt.01M1HB720RRDK868KM883EQJM1",
+      "priority": "critical",
+      "dependencies": [
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ",
+        "task.4W7MQDXRHP5VMN75GH6VW2KK5J",
+        "task.7FE4KZ9RSHR0B9KX3Y7CTE7H8Z",
+        "task.4TCM30868X5ZEV7GGSA6HF51AE",
+        "task.1JE820T992D7YEZKW44ZBFPRMG",
+        "task.2R2FJEWZPD57MHV6GB2ENAEDRP",
+        "task.2DY7ATZMFXC2P3GRARY65YS1Z1",
+        "task.0GJARAV3C9ZTGCHAHRWKVZHECN"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6MXSCFQ6KTM8WBHAD51QTVGM6A",
+      "state": "completed",
+      "title": "Repair provenance of Codex architecture review",
+      "revision": "evt.01M0VWB5BV9EZP6YWE2ZH0F8F9",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6N1KDQH6DFB16P3VX5811DNF05",
+      "state": "accepted",
+      "title": "Introduce frozen decision projection record",
+      "revision": "evt.01M0Y7F32HSCVQP8NNV03K8GMP",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6Q4A7HE1QVX4VQKBBSNS8CRZA4",
+      "state": "accepted",
+      "title": "WP-08: Baseline populated-ledger mutation latency (measurement only)",
+      "revision": "evt.01M25JXSQYB7E020XYW7ENEZ3B",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6R27CF985ZS6Q39T0XFRST5EMM",
+      "state": "accepted",
+      "title": "C1.0: Propose owner-ready UI-surface contract for normal workflows",
+      "revision": "evt.01M0ZWG6SKYHA3KHYJ8WGGF44J",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6SCKBZTSQCNWSDW92EDTH2KWYC",
+      "state": "completed",
+      "title": "Clean repository and establish documentation source of truth",
+      "revision": "evt.01M14866N6C1T29QG126B2ZVS0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6SVVZ4EA2SG9K6NTMTQK26BVZQ",
+      "state": "completed",
+      "title": "Authorize blocker replies across panel session lineage",
+      "revision": "evt.01M0JZCQDHANF47HXSG5TCKJXV",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6W62S6ZQ5NDRVTZEBJ94W4Z24S",
+      "state": "completed",
+      "title": "A2: extract artifact commands from CommonsManager",
+      "revision": "evt.01M0NE3KEV6FA7XA9WHK89FBHE",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6XC7JQJMS5CFMWD1M0V3885DXA",
+      "state": "cancelled",
+      "title": "Harden Grok terminal outcome path",
+      "revision": "evt.01M2V7RGJAV2P2BJ1EH5TTQS23",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6XMT2PEZS5SDWBE3ZB8ES1S95G",
+      "state": "accepted",
+      "title": "Project-native UX R2: grouped service catalog and custom Blueprint backend",
+      "revision": "evt.01M2T36XEFRENBFJ20QZ8KJATG",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6Y7GJ4Q4VNEG7RCSRA5YPKRTPX",
+      "state": "completed",
+      "title": "Remediate Architecture Plan Review Findings",
+      "revision": "evt.01M0W4X8NSC035RZ46BPYKKVY2",
+      "priority": "normal",
+      "dependencies": [
+        "task.2H3V0XFNXKGHTPRFRDJ4Z9E2WW"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.6ZA3PZ1TKBQ3ND78CZS1BRT1GK",
+      "state": "accepted",
+      "title": "A3.2: extract role validation and lifecycle seams",
+      "revision": "evt.01M0YZ8XVEBKPA9E2E0QE2V1J9",
+      "priority": "high",
+      "dependencies": [
+        "task.05Q8ZW3WB18HRG5NAK8DG3MG0H"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.706Y7NFG76R9BPXRZYVCANKGTC",
+      "state": "cancelled",
+      "title": "Visual orchestrator foundation: policy guards, run event store, local read-only UI",
+      "revision": "evt.01M0F9JYADEGVPKGSP0Z6Y1MW1",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.72CEA2EWRWWWTXW7MBAD4X3DJ6",
+      "state": "accepted",
+      "title": "Unify lifecycle transition specifications",
+      "revision": "evt.01M0XMA5K94Q683TAAWFA926Q2",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.72TSQB1V8YBMMH1543S7X8AGD0",
+      "state": "accepted",
+      "title": "A5.6: introduce frozen projected records by vertical family",
+      "revision": "evt.01M0XJSSV430W91AQV80P8NGYW",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.73D1MK404RC4KPTZGGSCY340QC",
+      "state": "completed",
+      "title": "Add verified image preview reader",
+      "revision": "evt.01M0NYQ8VM1QPR7QSY1QY2ZKKM",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.73NYGXH0NPR7DDQAXVEHNQXZZQ",
+      "state": "accepted",
+      "title": "WP-15.3: Check-run time limit in the qualification receipt and availability DTO",
+      "revision": "evt.01M2WD284K9ZARF5V3TTQGRGRW",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.73TM3XTRRTVDJA8TKX4V0BC8P7",
+      "state": "accepted",
+      "title": "WP-12.2: Role-first hiring: specialization first, then only server-eligible workers",
+      "revision": "evt.01M2VHP2JEEKMG5MR5GSNEMQ3A",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.740898SVJETNB160GSVC11FTTZ",
+      "state": "accepted",
+      "title": "Extract handoff commands from CommonsManager",
+      "revision": "evt.01M0XHDTNMP9E88Z8Y0NQPHRHR",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.742FKZQHAYG05FG6K897010BB2",
+      "state": "cancelled",
+      "title": "Audit data modeling and type safety",
+      "revision": "evt.01M0G7KY0RTYRWMW3D5G32X7KJ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.74HF1EYQ53M2JX9RMD6JVNZF1P",
+      "state": "accepted",
+      "title": "WP-12.1: Worker eligibility DTO and hire refusal contract",
+      "revision": "evt.01M2VEN44BX5QEEDG40EJ3H143",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.753NYMD571MN1FPBK41AAR2MDW",
+      "state": "cancelled",
+      "title": "Surface delegation launch blockers before attempts are consumed",
+      "revision": "evt.01M2ZS5FYNY6PBKSS0WA6FHDH7",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.76522VC33TS75C2XQGEBQ95EEX",
+      "state": "cancelled",
+      "title": "Implement actionable provider authentication recovery",
+      "revision": "evt.01M1FCDWTHG1QYB42NN3C8VK4P",
+      "priority": "critical",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.766M7E0KV69YJ8Q5ARA151KD4V",
+      "state": "cancelled",
+      "title": "Stamp the ledger with a minimum compatible code version",
+      "revision": "evt.01M2V7VN8N1KATTQMBRV5FACCD",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.78K5CB9FF8EZH5QSG9F6XY695K",
+      "state": "accepted",
+      "title": "Bound independent-review verdicts in MCP",
+      "revision": "evt.01M1EPJWY9WCC8CFKRT97ZBVB0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.79C36BJ9PCVJETJ7SR0HK2JQHB",
+      "state": "accepted",
+      "title": "Introduce Frozen Finding Projection Record",
+      "revision": "evt.01M0XKWEVQR7H6E2VW9G9HJG3X",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.79TWN3D9JPRDMJCFJBHH8GNQG4",
+      "state": "accepted",
+      "title": "Introduce frozen agent projection record",
+      "revision": "evt.01M0XJ2AP73PEC0DHB9S60KJ3T",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.79VTZMP8A03H48E03JK4A7JH4F",
+      "state": "accepted",
+      "title": "A4 UI: split UIContext into reads and actions seams",
+      "revision": "evt.01M0XBR309Z06D6T11J4R34WGE",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7AB20VK2RZD6B5EM7SRRJRR7W1",
+      "state": "accepted",
+      "title": "G2: Expose safe Gallery read API",
+      "revision": "evt.01M1CEW10AECB0GD5G0JDYHFRH",
+      "priority": "critical",
+      "dependencies": [
+        "task.11Z0D8EAT78X6QM3Y152QV9E2X"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7BW08D22PR9591MH985JVQTX93",
+      "state": "accepted",
+      "title": "A5.5: type role envelopes",
+      "revision": "evt.01M0Z6XHC0DSJKVW2N6Q1NZA90",
+      "priority": "high",
+      "dependencies": [
+        "task.08NM11PA5C990W8VZYVN1FANY2"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7CT1AESPCSDQQHKQQS4Z4M6JCS",
+      "state": "accepted",
+      "title": "C0: inventory CLI consumers and migration parity",
+      "revision": "evt.01M0ZR2X2RT886205VTPWSXN3W",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7D192PANMP2G8612EZ620Q0XPT",
+      "state": "accepted",
+      "title": "Define W0 metrics and deterministic eval harness",
+      "revision": "evt.01M0X5QQ0SGRN7A1T5ZEYG0PXM",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7D26JYPEFDHZ3T24CEWQMHRPJR",
+      "state": "accepted",
+      "title": "Verify and harden Gallery F1/F2 readiness",
+      "revision": "evt.01M0X560FDNJY5F372RBRCR1NT",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7D9HNAQ60G192XA1ECKRR64DGY",
+      "state": "cancelled",
+      "title": "Reject stale browser mutations across project switches",
+      "revision": "evt.01M2V8CM6140ANMAQ9C18D75X4",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7E2F6NNNKFHZK5HDXM7F1F112H",
+      "state": "accepted",
+      "title": "Deep-freeze A7 attention DTO payloads",
+      "revision": "evt.01M0Z2AX8JTGHXBRAYGJAE48NQ",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7E9C153146DZA2762JF865HVXW",
+      "state": "cancelled",
+      "title": "Implement task-first Library context and recipe UX",
+      "revision": "evt.01M2V8EX3D145FHV2KYY9FJY51",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7F8MZGZNSMPNBBBJ2FE05VEPNY",
+      "state": "accepted",
+      "title": "Remediate delegation docs and paired skill",
+      "revision": "evt.01KY0AYQZWXRT3CWKPPG5JFMRR",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7FE4KZ9RSHR0B9KX3Y7CTE7H8Z",
+      "state": "accepted",
+      "title": "RC1-ui: Apply starter roles from Work",
+      "revision": "evt.01M1GKB5FEKPKRFDX2179V96GW",
+      "priority": "critical",
+      "dependencies": [
+        "task.4W7MQDXRHP5VMN75GH6VW2KK5J",
+        "task.5HH3SWV3Q27WQNK0B3Z1YQAAXQ"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7FNE0994Z9R4BZ99CR0FRVDSPH",
+      "state": "accepted",
+      "title": "WP-11.2: Canonical objective on tasks and immutable blueprint-application provenance (ADR 0021)",
+      "revision": "evt.01M26V1BXT5Y1972F8F25FXK77",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7G91Z6ZDYP21EA00AEHM41VZYX",
+      "state": "accepted",
+      "title": "Extract UI launch coordinator from compatibility context",
+      "revision": "evt.01M0YET137ARPESWEHFCSZJK4Q",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7HY1A5FB3C1WR2R49V2XC3AG3K",
+      "state": "ready",
+      "title": "Implement DAG, routing, council, governance, and builder attestation primitives",
+      "revision": "evt.01KZC6EHEY9ZTYGHYNYHXAR0T6",
+      "priority": "high",
+      "dependencies": [
+        "task.2Z88GCBBAZG5M4TY505D4YJNA7",
+        "task.7SP8T6FSCQXENRFTJ0T5CKC6RM"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7MC6D9T1VW4T0RRM4MNDBF9YF7",
+      "state": "accepted",
+      "title": "WP-10: DecisionCard and inspector hierarchy",
+      "revision": "evt.01M2VA8HE5B0F1CV4CP2YF5Z01",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7MYYWQHS5Q11A6NRPJFJ271DJ4",
+      "state": "accepted",
+      "title": "C0.1: Characterize CLI command-tree and common transport contract",
+      "revision": "evt.01M0ZYC19C2VB84J6ESFKZ9C2A",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7PH8KE3S25P7B6NEZ52FC9YAXN",
+      "state": "accepted",
+      "title": "Preserve accepted task evidence across replay",
+      "revision": "evt.01M0Y9AZ0FDS12R11QGE1DNDBS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7Q3CJ1PCACEADQK18DH33YVA8G",
+      "state": "completed",
+      "title": "Delta Review Architecture Plan P1 Remediation",
+      "revision": "evt.01M0W4FKWPFX9CX71MFVN10EVC",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7Q4KQRX28T2ZDKSCDBQ5XY5CFB",
+      "state": "accepted",
+      "title": "Document Agent Commons product vision",
+      "revision": "evt.01KXGM2H5QPA6YHQ0R5AC7MXR8",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7SP8T6FSCQXENRFTJ0T5CKC6RM",
+      "state": "cancelled",
+      "title": "Implement bounded task input, resumability, and proven active cancellation",
+      "revision": "evt.01M0F9KANYWPVXFW15CWQMWZXF",
+      "priority": "high",
+      "dependencies": [
+        "task.2Z88GCBBAZG5M4TY505D4YJNA7"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7TNJEGCDJPJF8P6C7Z3XDCKW33",
+      "state": "completed",
+      "title": "Implement bounded operational task-input exchange core",
+      "revision": "evt.01KZCB19Y5HC358N9SEB7AQFQV",
+      "priority": "critical",
+      "dependencies": [
+        "task.0AJXEBVMHP20HXA9AMBNW01EBV"
+      ],
+      "artifact_stale": true
+    },
+    {
+      "id": "task.7V9NEEMZ8QPVZH4EYZDDTY722X",
+      "state": "accepted",
+      "title": "Project-native UX R7: eliminate whole-record thaw on field access",
+      "revision": "evt.01M2T3B9ZBWRHV9RRQ2XTFA3RM",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7VRYXYQPK9ABVPFCECA038XQW3",
+      "state": "accepted",
+      "title": "Fix F03 truncated stderr privacy boundary",
+      "revision": "evt.01M2T3EJS8TYA5XED1H0FFY52E",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7WPM9XJX56CZV6M0BB1B3MK07K",
+      "state": "completed",
+      "title": "Synchronize main and prune stale Git worktrees",
+      "revision": "evt.01M1E8Z6FQQT2MT9GXSW1NTFS0",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7WSHANPQRHKZC5KKNPJD0H53MM",
+      "state": "cancelled",
+      "title": "P3b-host: Own external provider process lifecycle",
+      "revision": "evt.01M1FC7986GJ06NF3H3DVGP13J",
+      "priority": "high",
+      "dependencies": [
+        "task.5FR2V9CWSC3AKX1F1Z6VDD0E4J"
+      ],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7XDH8023BDMHWSFS51Z053N2MF",
+      "state": "cancelled",
+      "title": "Implement immutable multi-project host routing and run lifecycle",
+      "revision": "evt.01M2V91BV7QMS05BH5HP2JJ6RX",
+      "priority": "normal",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7YK7EV8NJ8P8K3F7789PMDVVM5",
+      "state": "accepted",
+      "title": "WP-14: User-authored library text is entered once and shown as-is in both locales",
+      "revision": "evt.01M25NKP4Y5ED2J2JJFATC98TS",
+      "priority": "high",
+      "dependencies": [],
+      "artifact_stale": false
+    },
+    {
+      "id": "task.7Z39VCTRX25HGQ84SSMXQ5PJJC",
+      "state": "accepted",
+      "title": "A5.3: type thread and handoff envelopes",
+      "revision": "evt.01M0XE17KP5S3R1V3NAH7WT0GD",
+      "priority": "high",
+      "dependencies": [
+        "task.4ZRNSZ33ZMKYG6DTFCD10T7SEK"
+      ],
+      "artifact_stale": false
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding.017DAFGEF4NS1Z66Z5YE4N0NYV",
+      "state": "reported",
+      "summary": "Wave-3 integration defect found in the coordinator's browser pass: WP-15.3 (accepted) added qualification.wall_time_seconds to the provider-availability DTO, and the strict client parser (hasExactKeys on the qualification block in frontend/work/src/api.ts) rejected the additive key, so every provider-availability read failed: the Tasks view showed request_unavailable and Settings said availability could not be read. Fixed by the coordinator: the client accepts the optional key (integer 30..1800 or null; absent = not provided), exposes qualification.wallTimeSeconds, with a DTO-shape test. Lesson: an 'additive' server field is only additive once the client's exact-key parser admits it; backend packages that extend a DTO need the client half in the same wave.",
+      "revision": "evt.01M2WF6F8NNNHJB2KTBMP62EAN",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "task.73NYGXH0NPR7DDQAXVEHNQXZZQ",
+            "kind": "task"
+          },
+          "revision": "evt.01M2WD284K9ZARF5V3TTQGRGRW"
+        }
+      ]
+    },
+    {
+      "id": "finding.026GYJFW71EAK7QTWDA0E1T6PR",
+      "state": "reported",
+      "summary": "Projection fixed-point strips a superseded acceptance non-causally and collapses valid history. Reproduction: task.3XJNY0AR6Q3PMDM9AERRYWQQ4K held July chain submit(evt.01KY9S721J) -> accepted(evt.01KYA18SEF) -> reopened(evt.01KYA5Q3KX) -> submitted(evt.01KYA6HZ1R). Recording a new acceptance today (evt.01M07MF21T, since invalidated as the repair) made replay strip the July acceptance because its bound review is stale at end-of-history, reject the already-applied reopen as stale-expected, truncate the chain, drop the fresh review.58W4H4P31H4PYEQRQD6EF8T769, and turn doctor red blocking unrelated writes. The guard must evaluate causally: an acceptance superseded by a later reopen is history, not a live claim. Doctor green again after invalidating the trigger. Until fixed, accepting any task with an acceptance-then-reopen history re-triggers the collapse; task.3XJNY0AR6Q3PMDM9AERRYWQQ4K cannot be accepted safely.",
+      "revision": "evt.01M07MY1WCG3RQV7EXN4CRBJ16",
+      "severity": "high",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "task.3XJNY0AR6Q3PMDM9AERRYWQQ4K",
+            "kind": "task"
+          },
+          "revision": "evt.01KYA6HZ1R1E7G60G56T94NDR9"
+        }
+      ]
+    },
+    {
+      "id": "finding.09KR70BKW3NJHNNWKM7DREQ9HD",
+      "state": "reported",
+      "summary": "Heterogeneous provider launch has two independent availability failures that static preflight cannot represent: Claude can be signed out or unable to persist provider-owned credentials, while nested Codex initialization can be blocked by the outer execution-host sandbox. Product remediation requires separate typed auth/host/init/canary states, async provider-owned auth recovery, no child/attempt on pure pre-start refusal, and an operator-owned authenticated broker host for reciprocal nested launches. Retry, credential copying and silent fallback are unsafe.",
+      "revision": "evt.01M18MA43PZ3Z2M3TBSD2V8FTV",
+      "severity": "critical",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.30RA6C67P8BFV1ASGHHP0YNY6M",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M18JBYVQ13NJP9VXH4YFREDX"
+        },
+        {
+          "ref": {
+            "id": "delegation.6FGQF700HV3ZV0069ZXRQHMRDB",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M18JMF2QZ4K1Y8924SR34RP9"
+        }
+      ]
+    },
+    {
+      "id": "finding.0B214Y8B3739EC46SVDB6T5AEM",
+      "state": "reported",
+      "summary": "Repository documentation had conflicting current/withdrawn/shipped claims and no single routing page; cleanup added an explicit authority map, corrected stale operational and setup references, and aligned Starter Pack status with the current read-only implementation.",
+      "revision": "evt.01M1483NM2RX0H9P0DWYVFVPA1",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.0FMSVEMMRVZ1EEHWJMFBQKWWWJ",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M1482M6YPFBWHSJB3WCP7K9D"
+        }
+      ]
+    },
+    {
+      "id": "finding.0MAD58V699NP8WX4CM3QTTJEMC",
+      "state": "reported",
+      "summary": "CentOS 9 L1 live qualification exposed a Grok builder control-plane bypass: the real Grok builder process can finish canonical delegation state without an audited worker-MCP terminal outcome when native run_terminal_cmd can reach the Agent Commons CLI with broker child bindings. The observed signature was canonical_state=succeeded with terminal_tool_calls=0; reviewer, which lacked native shell, failed closed. Remediation task task.6XC7JQJMS5CFMWD1M0V3885DXA removes Grok builder native shell and strips Agent Commons control-plane env from Grok native shell policy; L1 still requires a fresh CentOS live rerun on the remediation commit.",
+      "revision": "evt.01M1HRESSDY643ZQ6VC2T559B8",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.5ZS2YMJ6SX1608SF8F83HHS3B8",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M1HRAVQCRZA15C8B8NXJW8HQ"
+        }
+      ]
+    },
+    {
+      "id": "finding.19V1E5CR2WZ5EBQ9E4GQVTFMMH",
+      "state": "reported",
+      "summary": "P2 unresolved first-open concurrency failure in immutable Git commit 405d8c690d3c7e33fedb63828db9d30e6a6185e9, src/agent_commons/runtime/message_delivery.py:103: os.open of receipts.lock with O_CREAT can raise ENOENT under four synchronized first-open workers. Lead-reported stronger evidence: full make check failed one test with 2585 passed and 13 skipped; independent outside-pytest reproduction failed at cycle 3 in 0.97 seconds with the existing linked root retaining the same device/inode and no root unlink. This establishes first attachment-delivery availability risk, not proven loss of confirmed updates. The earlier R5 approved review review.50FYAXT2W7MPAV7RF9V2FCD9B6 at evt.01M21GTYCEY6Q2E005HRZCH8PD is a historical judgment contradicted by this later reproduction and must not support acceptance. R6 review remains paused; R5 and R6 require corrected successor source, gates and independent review. Reporter independently reviewed original source/tests but did not execute this later reproduction; reproduction attribution remains explicit.",
+      "revision": "evt.01M21H6SE34TQNCHCZVNWM0ZTZ",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.1423MPJ8FDYQ8GXWSR52ES8AJX",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M21DR7HYJGT4XANAA9QK0HE4"
+        }
+      ]
+    },
+    {
+      "id": "finding.1B5F955SRTPXHHFEM7W9THJ8ZP",
+      "state": "resolved",
+      "summary": "Verified: independent review confirmed the handoff self-review defect and the accepted H1 remediation closes it with replay-derived work-author identities.",
+      "revision": "evt.01KXJA4ZE59M88QD109VEA7680",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "review.06QS35410CGFAX0JZ91HDTBXHN",
+            "kind": "review"
+          },
+          "revision": "evt.01KXJ8S0G1HJ9DCBXG843HEQMY"
+        },
+        {
+          "ref": {
+            "id": "verification.03NQ5ZTDZ41GSMP0AQD09R4JVS",
+            "kind": "verification"
+          },
+          "revision": "evt.01KXJ8R5RH8KBT9GMQ61AXBTHR"
+        }
+      ]
+    },
+    {
+      "id": "finding.1D8JXCV0VPE7HWE1Y6JJKPEQ1K",
+      "state": "resolved",
+      "summary": "Verified broker-boundary risk: a provider child can resolve a foreign ambient exact root after process start unless the launching workspace root is pinned explicitly. Commit 8195bdb pins it and exposes one deterministic resolution notice.",
+      "revision": "evt.01M0G0PP2C3KCVKMDPGZ2XWAW7",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.7SGQRGWHC4BKKEYDFN2M81WDCA",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M0G0JM2AVV6YW6DXT7FS969K"
+        }
+      ]
+    },
+    {
+      "id": "finding.1J0VT9597NVS6SKRMFQTSQSH3E",
+      "state": "reported",
+      "summary": "Task 1 pre-CAS stale-acceptance guard counts unapplied successors. Repro at main@0107fc8: after an approved review is non-structurally corrected, add two task.reopened events that both name the live task.accepted event as expected_revision. _cas_conflicts rejects both successors, yet _stale_task_acceptance_ids builds built_upon from all materialized events, so it does not strip the live acceptance; projection remains state=accepted, acceptance_stale=false, review effective revision moves, and fixed_point_passes=1. This violates the Batch 0 live-tail guarantee and the task's causal applied-event requirement. Compute the pre-CAS exemption from successors proven effective, or otherwise ensure rejected/conflicted successors cannot shield a live acceptance, and add this regression.",
+      "revision": "evt.01M0876P44XQ7RWSPE11Q41895",
+      "severity": "high",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "task.4BSJKSTG4TBX53A5BJ0QKQZ3Y3",
+            "kind": "task"
+          },
+          "revision": "evt.01M07Q0XBA3G6PXPF3FQPYDNF0"
+        }
+      ]
+    },
+    {
+      "id": "finding.1JSG1HQJZXP0EHGRH1NE6RJ82S",
+      "state": "reported",
+      "summary": "WP-08 Grok run (delegation.0D8JZM8GWHXJRV3C2QPYVR3WV8, attempt.7SJJJ5XFAPT2BX80CNG7WJTP3J): grok-builder exited 0 after 37 minutes having written benchmarks/benchmark_work_mutation.py and tests/benchmarks/test_work_mutation_latency.py, but made zero terminal-tool calls, so the delegation ended needs_operator (invalid_result) and the report docs/performance/2026-09-10-mutation-baseline.md was not written. Coordinator verified the files (2 tests pass, ruff clean) and generates the report with the delivered tool. Brief text for Grok runs should name commons_report_outcome as the mandatory last step.",
+      "revision": "evt.01M25G38DH5QSM6D516ER35PYP",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.0D8JZM8GWHXJRV3C2QPYVR3WV8",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M25FVE9WCJEHC9WNEQNHGBQM"
+        }
+      ]
+    },
+    {
+      "id": "finding.1K1HY86749G4D7VKD75QN2EV4C",
+      "state": "reported",
+      "summary": "Provenance collision in architecture review: the previous codex_architecture_improvement_review.md (preserved as codex_architecture_improvement_review.provenance-copy.md, SHA-256 558dc6fbdca6ed1a4a33bf7df29e75f8e49e088c32fa5e084c04d6210147be72) differed from claude_architecture_improvement_review.md (SHA-256 61e49c44b1b69b4294a93b72912030f050118067d3c12d3255d7ae3278c0c788) only by the Codex title line. This proves the previous Codex artifact was not an independent synthesis; local evidence alone does not prove which external session first authored the shared body. The previous artifact is withdrawn from architectural evidence. A fresh independent Codex synthesis is registered as artifact.6Y11FCK0EBK6AMFQ7230GG48HE, SHA-256 2d84d3cf10571dd082a18c38d2e90190695317bcb74d7c131ebf2054c9f46aa8.",
+      "revision": "evt.01M0VW9AN298741T6R0WS2XYAQ",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.6Y11FCK0EBK6AMFQ7230GG48HE",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M0VW6VWPVCC0T4PRPBSRK408"
+        }
+      ]
+    },
+    {
+      "id": "finding.1TTJK8411BP4BATZKVYB10Y2Q4",
+      "state": "reported",
+      "summary": "Task 2's Node-stdin law is false as written. AGENTS.md says scripts fed to node must travel over stdin, and docs/FRONTEND_CONTRACT.md says Node harness scripts travel over stdin. But tests/ui/test_board_order_and_units_guide.py:112-113 invokes subprocess.run([\"node\", \"-e\", harness, ...]), passing the JavaScript program as an argv element. The large STRINGS harness correctly uses node '-' plus input=, but the contract is universal. Either move the layout harness to stdin or narrow both documents to the size-sensitive STRINGS harness; add a check if the universal rule is intended.",
+      "revision": "evt.01M087FD7ZWM5G0Y62FZK2DWKR",
+      "severity": "medium",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "task.00PY1JAPA6JW1NAFT7GHCBGPVY",
+            "kind": "task"
+          },
+          "revision": "evt.01M085PZ6AK44QAJ6DWGHK4P40"
+        }
+      ]
+    },
+    {
+      "id": "finding.2AY4FGZWEME2KSCPRWS7TPAR49",
+      "state": "reported",
+      "summary": "Delegated codex children have no agent-commons MCP wiring: CodexRunnerProfile.build_invocation (runtime/model.py) passes no MCP config to the codex CLI, so a codex child can never call commons_succeed_delegation or any terminal tool. Every codex delegation therefore ends needs_operator (terminal_tool_not_called) even when the work fully succeeds. Evidence 2026-07-23, external pilot workspace pilot-site: delegation.7P7A7Z0T7KD2YA6TVQE5PY41ET (codex-builder, purpose implementation) produced a correct backend (4/4 tests parent-verified, later independently approved) yet finalized needs_operator/invalid_result with terminal_tool_calls:0. Codex CLI 0.144+ supports -c mcp_servers.* overrides in exec, so wiring the generated MCP contract analogous to the claude --mcp-config path is feasible. This is the ROADMAP reverse-direction slice.",
+      "revision": "evt.01KY7P1WC8XW9NGVF2JFB0E5NM",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.2H4S9YS1WX7VP6SN09EN6PA9M5",
+      "state": "resolved",
+      "summary": "An expired requester session permanently strands an unlaunched requested delegation: the expired session cannot heartbeat or be revived with the same session_id, while a fresh session is rejected from cancelled/needs_operator transitions as non-requester. Reproduced with zero attempts and no child sessions on the Fable and Opus review delegations.",
+      "revision": "evt.01KY5VA3WYVBVP32DGE4WBGCNT",
+      "severity": "medium",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.3WDMD09ZFK0QQYQYZBP45YNWXT",
+            "kind": "delegation"
+          },
+          "revision": "evt.01KY58DDDE4ENRZKRSWWGPNNNN"
+        },
+        {
+          "ref": {
+            "id": "delegation.2VTXV1GNZH079J040E6GZ2SXRM",
+            "kind": "delegation"
+          },
+          "revision": "evt.01KY58DMWWA0EAP9JF0E90EEMC"
+        }
+      ]
+    },
+    {
+      "id": "finding.2XH4K2XMPW2CBNX2JK52PT6B4Q",
+      "state": "resolved",
+      "summary": "Grok builder remains unqualified after successful fixed preflight and initialization. Direct authenticated catalog check succeeded, but two bounded behavioral canaries did not produce canonical terminal completion; no product delegation was launched. Investigate Grok terminal-tool interaction before another qualification attempt; process completion is not success.",
+      "revision": "evt.01M1FCNEG0GX9YW734PM9WGKYH",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.3CSE9Y5AEBQNG8W86MP0TCF1RP",
+      "state": "reported",
+      "summary": "Panel restart after the wave-3 merge was refused with project_state_binding_conflict ('Project state binding changed.'): the project registry (~/.config/agent-commons/projects/registry.json) pins the state root as device:inode 16777234:62607139, but after a reboot the same directory reports 16777230:62607139 (inode unchanged, device number changed). The check in ui/project_registry.py treats a device-number change as a binding conflict, so the multi-project panel cannot start until the registry is repaired; the coordinator started the 8787 panel with --single-project instead. Suggest a stable identity (inode plus a stored marker file/uuid, or re-binding when only the device number differs) and a documented repair command.",
+      "revision": "evt.01M30020DN4BC25Y3SJAHQKDZF",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "finding.017DAFGEF4NS1Z66Z5YE4N0NYV",
+            "kind": "finding"
+          },
+          "revision": "evt.01M2WF6F8NNNHJB2KTBMP62EAN"
+        }
+      ]
+    },
+    {
+      "id": "finding.3S86BPZQTJMYEXJFVY1YGPA73R",
+      "state": "reported",
+      "summary": "Operator-installed agent-commons CLI builds can lag lifecycle remediations that already validated newer canonical events: the pre-remediation uv-tool build replayed evt.01KY3202SBGJ9PCCHNWGRW5PNE under the old verification-authority rule, turning a valid reviewer verification into a doctor integrity failure and a falsely stale review.51GGP0F2TW6BR1EYP8HPBBBHBE, which blocked task acceptance. After any lifecycle-rule change is submitted, reinstall the operator CLI from the exact reviewed source (verify the registered manifest bytes first) before judging doctor failures or acting on projection staleness; the same stale-installed-build hazard was previously seen for the MCP runtime in review.1Z5YB8SH9XX3JRRW6AZXCHJX3K.",
+      "revision": "evt.01KY35AA01JK9RMV70PMC02RMK",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "review.51GGP0F2TW6BR1EYP8HPBBBHBE",
+            "kind": "review"
+          },
+          "revision": "evt.01KY3231YQDFQGG80BG40NCN7K"
+        },
+        {
+          "ref": {
+            "id": "delegation.2T3X462N6KX3THQNXKF7JDNCTX",
+            "kind": "delegation"
+          },
+          "revision": "evt.01KY325EMAXHV7WTR05BMDERP8"
+        }
+      ]
+    },
+    {
+      "id": "finding.3XK0XP1RGRJSNFQJKKRT4TX9FF",
+      "state": "reported",
+      "summary": "claude-independent-reviewer delegation requires a pre-existing open review request for the exact target, otherwise the child completes analysis but cannot record it and exits input_needed -> needs_operator, consuming the attempt and its provider budget. Evidence 2026-07-23, pilot-site workspace: delegation.6TR2GVQG4ZHM7HT30HDMSN1HMJ reported input_needed with sanitized verdict 'approved - all 4 acceptance criteria pass' because no review record existed for the target task; a rerun after review request creation (review.37AYGEABZ1W23B5635RP0VBC9E) recorded the review. delegation create should fail fast when purpose independent_review has no open review request matching the target ref and revision.",
+      "revision": "evt.01KY7P22WFTH2PXV25Q4GK1R9K",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.404886JS6ADSNPSZK9ETY68NTR",
+      "state": "reported",
+      "summary": "AGENTS.md's blanket PID rule does not match the test tree. It says tests must not hardcode pids, yet tests/runtime/test_attempts.py hardcodes pid=123 in ProcessResult/transition fixtures and tests/runtime/test_preflight.py does likewise. The real liveness-sensitive reconcile test correctly spawns and reaps a child via _dead_pid(), so the safe invariant appears narrower: never assume a hardcoded PID is dead/free. Rewrite the standard to that precise invariant or remove the literal PIDs so every stated rule matches repository reality.",
+      "revision": "evt.01M087FR7RKS99J1YF0EQ052C1",
+      "severity": "medium",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "task.00PY1JAPA6JW1NAFT7GHCBGPVY",
+            "kind": "task"
+          },
+          "revision": "evt.01M085PZ6AK44QAJ6DWGHK4P40"
+        }
+      ]
+    },
+    {
+      "id": "finding.46GEH6QMSFEARM2DDQ4ARCC15C",
+      "state": "reported",
+      "summary": "The green contract omits frontend/work and frontend/gallery Node behavior suites and Gallery bundle parity. Makefile and .github/workflows/ci.yml do not execute the Gallery frontend tests; Work has a checked-in bundle freshness test but Gallery has no equivalent. A green make check therefore does not prove both modular frontends are source-parity and behavior-tested.",
+      "revision": "evt.01M1FCR0B2BNFNNP7GFTBGXYV5",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.4EGV40Q20BHDSBP6V1ZG12CTNZ",
+      "state": "reported",
+      "summary": "The bounded output budget is shared between stdout and stderr, so a provider that floods stderr can exhaust it before the answer arrives on stdout, and the truncation path added in e3b8ab9 will then close a held stdin while the reply is still missing. _BoundedOutput keeps a single _remaining counter across both channels (src/agent_commons/runtime/subprocess_runner.py, consume() decrements the same _remaining for whichever channel wrote), and e3b8ab9 closes held stdin as soon as output.truncated is true. The reasoning behind that change is correct — once the budget is gone the retained stdout is frozen, so a predicate that has not fired never will — but it assumes stdout is what consumed the budget. If stderr consumed it instead, the handshake probe closes stdin with an incomplete stdout and reproduces the race that bf482fd fixed, from a different cause. The diagnostic is then actively misleading rather than merely opaque: preflight reports outcome succeeded and reason completed, which is true of the process and hides that we cut it off. Not reproduced: with --ignore-user-config the Codex child is quiet and the handshake budget is 256 KiB, so this is a latent edge rather than an observed failure, and it was deliberately not fixed without evidence. If a preflight diagnosis ever points at an exhausted budget, the first question is which channel consumed it; a per-channel counter, or naming the channel in the diagnostic, would answer it.",
+      "revision": "evt.01M0FX09P6T59M7ZB2BW51ZFMB",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.4ERR3PQ3XKGFRYZS9XZ3AQ8AM0",
+      "state": "reported",
+      "summary": "Codex workspace-write sandbox blocks all canonical CLI writes because every canonical write acquires locks under .git/agent-commons-state (canonical-write.lock, sessions/registry.lock, idempotency-v2), and codex sandbox denies .git writes. A manual headless codex reviewer therefore cannot even register a session; only an interactive trusted codex window (or a future MCP path per the codex-wiring finding, since MCP servers run outside the child sandbox) can write canonically. Evidence 2026-07-23 pilot-site: headless codex reviewer refused verdict with 'sandbox blocks writes to .git/agent-commons-state/sessions/registry.lock'. Longer-term question (ADR-worthy): whether checkout-scoped state belongs under .git at all.",
+      "revision": "evt.01KY7P2TA0XHKY6996C2WCA2NW",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.4FY20ZV3YQT8VCZGTRCJHXVS4T",
+      "state": "reported",
+      "summary": "Intermittent Claude reviewer noncompliance persists across model selections: one final Opus launch and one replacement Fable launch exited zero without any terminal-tool call despite the explicit two-call instruction. Terminal audit was available and Agent Commons correctly failed both closed to needs_operator; use the manual independent-session fallback when this occurs.",
+      "revision": "evt.01KY5VBA97PZYMYSZYMSR2ESQA",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.7GCFPX830B59WS3FQXH77MVT3C",
+            "kind": "delegation"
+          },
+          "revision": "evt.01KY5V4CFEMK9G6RXJZ23ERGGS"
+        },
+        {
+          "ref": {
+            "id": "delegation.0KYE6C2X9X8PA1046FKZ1D6C82",
+            "kind": "delegation"
+          },
+          "revision": "evt.01KY5V65DBE9B5MH2V8BGM585B"
+        }
+      ]
+    },
+    {
+      "id": "finding.4K5AHMS3VMAF86MD8TX0W9SED3",
+      "state": "reported",
+      "summary": "UX audit: a newly created ready task with no runs displays evidence complete as work is complete / работа завершена. TrackerSection.tsx lines 48-49 aliases complete/completed to one glossary; evidenceState uses it at line 574. i18n.json lines 302/653. Reproduced using isolated fake-provider fixture, no live provider. HEAD 329d2f3920753853ce265536d9d3ceb4e35f1f91 plus uncommitted changes; TrackerSection SHA256 842e86a1f3489f28033e2a1c8c51f354b79456b932102f3385bd9d021bed41ab. Separate evidence completeness from task completion in EN/RU and add regression for ready task with complete evidence and no runs. Proposed P1; no canonical task state corruption observed.",
+      "revision": "evt.01M1W3DYK54A3H9R877ZTYSM0R",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.4Y9BWC5ZHK1GHZFCEQ8VGZ8V7Q",
+      "state": "reported",
+      "summary": "WP-16.2 Grok run (delegation.41T1J95PRDY0KA69ZJVCPXVBXQ): grok-builder completed the deletion work and exited 0 with zero terminal-tool calls again, although the brief ended with an explicit mandatory last step naming commons_report_outcome (same failure as WP-08, finding.1JSG1HQJZXP0EHGRH1NE6RJ82S). The delegation ended needs_operator; the coordinator verified and completed the task. Grok runs currently require coordinator verification and a manual lifecycle; consider a Grok-specific brief header repeating the terminal-tool requirement at the top, or a broker-side hint.",
+      "revision": "evt.01M268GS06AMSAQ22BPBEXBXZ3",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.41T1J95PRDY0KA69ZJVCPXVBXQ",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M267ZZT7EW28CK4GESTV8TCB"
+        }
+      ]
+    },
+    {
+      "id": "finding.5BHS78WF6FGHE18RVXT5QQE933",
+      "state": "reported",
+      "summary": "Orphaned review delegation delegation.7JD5ZJVQAGNBV3XKX5E94Z25N7 (WP-13.1 review, codex-independent-reviewer): the reviewer process died when the host slept on 2026-09-11 (attempt failed, provider_reported_error), the requester session expired, and reconcile reports requester_unavailable while delegation fail requires the parent or child session. The delegation stays canonically active with no path to close it from an operator root session; a fresh delegation from a new requester is used instead. Suggested fix: allow an operator root session to classify an attempt whose process is provably terminated and whose requester is expired.",
+      "revision": "evt.01M2R02JC8332FRPDGHZN9MX58",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.7JD5ZJVQAGNBV3XKX5E94Z25N7",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M26XADZYS7N148HH0596842J"
+        }
+      ]
+    },
+    {
+      "id": "finding.5EX9CDCDHXJFBAENGE6ME066WN",
+      "state": "reported",
+      "summary": "Batch 0 criterion 'scoped workspace checks fail closed for final and nested-parent symlinks' is only half test-pinned: nested-parent has tests/mcp/test_worker_scope.py:325, but NO behavioral test covers a FINAL symlink (symlink as last path component) on the ScopedRepoReader surface (list/read/search/hash/registered-artifact read/assert_unchanged). Survey of every symlink_to in tests/ shows file-symlink coverage only for sessions, installer, views and config surfaces. Behavior itself is fail-closed — confirmed by an isolated probe (committed final symlink to an outside file: excluded from list_files, read denied 'workspace file is outside the delegated snapshot'; mechanism: _open_regular O_NOFOLLOW, src/agent_commons/mcp/server.py:263, and constructor exclusion at :221) — so the gap is test coverage, not behavior. Suggested fix: add a test beside test_worker_scope.py:325 committing a final symlink and asserting exclusion from listing plus denial of read/hash. Found reviewing task.3WTBQDTJVC54NZGP6ZMR4MTT7X at checkout eedb75c.",
+      "revision": "evt.01M07JKQYMHRH4P3VQHZV6YXBX",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.07KC86H2RN28JS5WGDYSRHPX7Z",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M07JFN83YFS4NJHVSRB6ZM2G"
+        }
+      ]
+    },
+    {
+      "id": "finding.5MER0TQVSQ1Q2A2627WB0B1X3F",
+      "state": "resolved",
+      "summary": "Verified historical cross-workspace authorization exploit: before 69262fb a foreign session in a shared exact root could create a canonical event in another workspace. Current ownership validation rejects before operational services; commit 51ad125 fixes the regression contract.",
+      "revision": "evt.01M0G0Q2GD8TZNRBEDEQ2ZPNY5",
+      "severity": "critical",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.7N7KY7364AAZPETD2BX2R7E8C5",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M0G0K0WW16MH1BM2W2Y1215K"
+        }
+      ]
+    },
+    {
+      "id": "finding.5YBDR8VWNA3J90JEZFB4M7EK23",
+      "state": "reported",
+      "summary": "Operational promotion prerequisite: source release 82d4d72 passed CI and all four authenticated macOS provider canaries, but BROKER_OPERATIONS requires a real authenticated Linux behavioral canary before the provider broker can leave experimental/manual. Hermetic Linux CI is not a substitute; do not fabricate this result or persist credentials. Run the existing canary on a separately authenticated Linux host, then attach the bounded evidence and promote this finding.",
+      "revision": "evt.01M1BEWP5DHKRRD7ED2FXSF723",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.55E1A8S3Q191YP2969CCTAQW3R",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M1BBM993MA2CDHVTJ462TX2D"
+        }
+      ]
+    },
+    {
+      "id": "finding.66CNKNHY4C9XZHVEWQBMK9HJ81",
+      "state": "reported",
+      "summary": "Architecture review provenance is now explicitly indexed: three root working inputs remain untracked and non-canonical, while the referenced provenance-copy is absent from checkout and represented only by its recorded external capture hash.",
+      "revision": "evt.01M14847N5862H18VXDV6ARECN",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.38MDGF2YXSND2QFTYXS5QPWXRW",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M1481W4NZGN6CRR8JQ1SFJFT"
+        }
+      ]
+    },
+    {
+      "id": "finding.6D4SW3BD147FJNZV5SZ2YSZAD5",
+      "state": "reported",
+      "summary": "Ephemeral workers cannot write the task lifecycle at all: the tools do not exist, so the registry is a read-only bulletin board for the actors who do the work, and every downstream symptom follows from that. Measured on this ledger: broker-launched child sessions have produced 35 events in the whole history, and every one is instantaneous and terminal — 15 delegation.succeeded, 10 review.completed, 5 thread.replied, 3 delegation.needs_operator, 2 verification.recorded. Not one task.taken, task.started, task.completed, claim acquisition or artifact registration. Human and coordinator sessions wrote the full lifecycle over the same period: 67 taken, 71 started, 70 completed, 50 submitted, 30 accepted, 111 artifacts registered. The cause is not behaviour: grep across src finds zero occurrences of commons_take_task, commons_start_task, commons_complete_task, commons_submit_task, commons_register_artifact and commons_acquire_claim. The worker MCP scope exposes commons_list_tasks read-only alongside the terminal commons_succeed_delegation and commons_delegation_needs_operator. The workers did not bypass the lifecycle; it was never built for them. This reframes the six audit task records that stood in ready while their deliverables were committed: they were untakeable by construction, and closing them as reconciliation treated a structural gap as bookkeeping. It also explains the stale critical finding differently than assumed: the work that invalidated it was never obliged to touch the record, because the record is not the source of work. Consequence to design against, not merely to fix: with the registry optional for the actors who change the world, an absent record is cheaper than a wrong one, and the system drifts toward an audit trail that is honest and empty. The correction is to make the registry issue work rather than mirror it — the broker already knows the target task, creates the child session and binds the delegation, so it can record the take itself at the moment the fact is true.",
+      "revision": "evt.01M0GCMM7J8Z5TWYXTF0K139A7",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.6K8VGMK210V6V84EG92CF9JM6E",
+      "state": "reported",
+      "summary": "Canonical records do not close themselves and nothing re-checks them, so the ledger drifts toward false alarm and false idleness, and the drift already changed planning. Two demonstrations from one day. First, finding.5MER0TQVSQ1Q2A2627WB0B1X3F sat critical and reported for about two weeks after the code that fixed it landed: commit 69262fb Add safe state ownership and task controls is dated 2026-08-07 and was in main long before, yet the finding was still treated as a live blocker and was written as a hard dependency into accepted decision.2VGMQ28H6NJ8FT779CE03RXVSV, which blocks the project sidebar. Work was planned around a defect that no longer existed; the eventual fix commit only added the regression test that proved it. Second, six audit task records stood in ready while their deliverables were committed under docs/audits/2026-08-18-code-quality/ in b2fe8d3 and 49c7b0d, and all six carried an empty work_author_session_ids, meaning no session ever took them and the lifecycle was bypassed entirely rather than left half-finished. Those six were closed as reconciliation rather than advanced through take and complete, because taking them now would bind them to a session that did not do the work and put a false author into append-only history. The cost is specific and asymmetric: a stale open critical finding stops work that could proceed, and a stale ready task hides work that is already done, so the record misleads in both directions at once. What is missing is not a state machine but a habit with a mechanism: nothing prompts a re-check of an open finding when related code lands, and nothing notices a task whose deliverable exists in the tree while its record never left ready. A product whose whole claim is who decided, who checked and who signed off cannot let its own record be the least current thing in the repository.",
+      "revision": "evt.01M0G7NC34HX78Q21KMBF3G663",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.6P1B8EGC4GWJM3EMQYDGCVB821",
+      "state": "resolved",
+      "summary": "HIGH H2: every canonical write requires event-receipt bijection while canonical events and operational receipts have incompatible Git, clone, branch, and linked-worktree lifecycles, causing unrecoverable false integrity locks.",
+      "revision": "evt.01KXZAB1WDMF207R5E3Y3PYEMJ",
+      "severity": "high",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "review.665T241J3M9ER6Z0VRGYRE7N80",
+            "kind": "review"
+          },
+          "revision": "evt.01KXJ3W9E7HA5KJZ1XA3ABZBAP"
+        },
+        {
+          "ref": {
+            "id": "thread.4QHNP7TG7JAN5N9BVAY2KE8CWJ",
+            "kind": "thread"
+          },
+          "revision": "evt.01KXJ3WQR1SDDMWJHSGJWE1E8P"
+        }
+      ]
+    },
+    {
+      "id": "finding.6VE6KG60D2MBGTJ4BN3AZCSZ72",
+      "state": "reported",
+      "summary": "Codex preflight checks the wrong help scope: preflight.py probes 'codex exec --help' for --ask-for-approval, but that flag exists only in root 'codex --help' on all current codex builds (0.27.0 homebrew, 0.144.2 ChatGPT.app bundle). Result: broker preflight reports unsupported_provider_flag (false negative) for codex-builder and codex-independent-reviewer while the actual launch argv parses fine. Reproduced 2026-07-23 against source commit 36fc3ea in external pilot workspace (pilot-site): preflight ok:false, subsequent real codex-builder launch started and ran 8 minutes.",
+      "revision": "evt.01KY7P172QJ8RVXT1WJ0Y4NXFP",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.6XGX8NMR6WJZMMHKBE08DA13J6",
+      "state": "reported",
+      "summary": "A6.1 20k two-pass profile isolates the warm verified SQLite read at 24.80 s versus 7.35 s for in-memory replay; preserve verification and profile read_projection before optimization.",
+      "revision": "evt.01M0PWYQ83BRNAC0MYFT3AF083",
+      "severity": "high",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.4H964F23VCFFHDMW5M6SCF8FSH",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M0PWWP5259FFPXPP10EZTGT4"
+        }
+      ]
+    },
+    {
+      "id": "finding.6YC5X2JY59KPW4E86R9MTFXNAF",
+      "state": "reported",
+      "summary": "Tracker Work frontend lacks canonical W4 closure: frontend/work/src/components/TrackerSection.tsx entered in commit f2a5074 without a task-bound artifact or exact independent review. The modular Work surface still lacks tracker accept, reopen, and review-request actions despite existing canonical MUTATING_ROUTES. Do not treat the checked-in component as accepted release evidence.",
+      "revision": "evt.01M1FCQ0P3DEYVF9CDJVVQ29Q6",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.6Z19HD1DQR31AXHH077PHJVKVG",
+      "state": "reported",
+      "summary": "Broker launch refused before any attempt (operator provider_units budget exhausted, attempts.py:769) still persists the runtime context binding for the delegation with the launch key (context_binding.py:399-411). Afterwards the same key with --retry fails (operational retry requires an earlier failed attempt) and a new launch key fails (binding belongs to a different runtime launch key), so a requested delegation can never be launched; the only recovery is delegation cancel plus a fresh delegation. Reproduced on delegation.45F6R13621KBXPSKY51NDBFYZW on 2026-09-09. Expected: a pre-attempt policy refusal should not write the binding, or --retry should accept a binding without attempts.",
+      "revision": "evt.01M235N12G4PE6MXAFY4DN1MKN",
+      "severity": "medium",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.76KS3GHQZBWAC1NEMPGYPARSN4",
+      "state": "reported",
+      "summary": "P1: a real Claude independent review of an exact task reached needs_operator because commons_finalize_review used the task target revision as the review CAS revision. Reproduced in three hermetic failures covering initial completion and partial convergence. The branch repair derives the immutable bound review precondition. Old live qualification does not cover the changed runtime; no approved review or acceptance is claimed.",
+      "revision": "evt.01M20QKGH89PDCD6M6GPQQH1BC",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.58BVQTHAWEG8KKS95VYW19XMKG",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M20PTN64EECKBEP83SWQDHJN"
+        },
+        {
+          "ref": {
+            "id": "artifact.7VZ1W9BBJESJDNPCHVW52AMBWW",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M20QG790W1DPV7TBW75ZBMB3"
+        },
+        {
+          "ref": {
+            "id": "artifact.6EMS28Q3S4848E53RT1D7RKPE0",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M20QHNPPNH5HSQ892J4XDYSC"
+        }
+      ]
+    },
+    {
+      "id": "finding.78KXGSER6200YS1K8D377T23WP",
+      "state": "resolved",
+      "summary": "MEDIUM: pre-start Git executable failures are not truthfully or safely classified. configuration_failure_diagnostic maps ExecutableRole.GIT to mcp_config_invalid, whose fixed hint says the provider rejected generated MCP configuration even though build_invocation refused before any provider process. An isolated CLI reproduction with a missing git_executable returned exit 1/code mcp_config_invalid, echoed the rejected operator-config value in error.message, left the delegation requested, and recorded zero attempts. Give Git resolution a truthful fixed diagnostic (or a semantically accurate existing one) and ensure the structured launch diagnostic does not return raw operator-config values; retain the current pre-reservation ordering.",
+      "revision": "evt.01M08R574Q9MBTW53TH2K4YFAB",
+      "severity": "medium",
+      "stale": true,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "artifact.4486R8ZVQ14TH6NBEJTTSX32K6",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M08NVCV3JPP65JKWARAAE1PD"
+        },
+        {
+          "ref": {
+            "id": "artifact.55XTEA92GNT7KG2F6TZTSES9E7",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M08NW2RY0947XBSA56SYD725"
+        },
+        {
+          "ref": {
+            "id": "artifact.0MAKEB0H9YH4VQQPTB3XV78RJ4",
+            "kind": "artifact"
+          },
+          "revision": "evt.01M08NWEZ8M4E4YMVJBTKJVK2K"
+        }
+      ]
+    },
+    {
+      "id": "finding.7B0CXG5QTQ5SCY2JMCTW7W2SVH",
+      "state": "reported",
+      "summary": "Handoffs addressed to 'role:<name>' are unacknowledgeable: handoff.acknowledged matches recipients against the literal session role (src/agent_commons/services/manager.py:811, recipients.intersection({'*', session_id, role})), and inbox addressing in views.py uses the same plain-name set, so the 'role:' prefix used by handoff.46B73RAVYDYS31BZS49ADQ1E9M (to: ['role:independent-reviewer']) can never match a session whose role is 'independent-reviewer'. Reproduction: open a session with --role independent-reviewer and run agent-commons handoff acknowledge handoff.46B73RAVYDYS31BZS49ADQ1E9M evt.01M0573W7EGAWVEEG27A5JSC06 --note ... -> 'handoff can only be acknowledged by its session or role recipient'. Either address handoffs by plain role name (convention used by earlier handoffs) or teach recipient matching the 'role:' prefix. Not a defect of the round-5 UI work; found while executing its review handoff.",
+      "revision": "evt.01M07CEFHZ5H8QQ15HKMNPEDXV",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.7BSHN3Z9YDSCJNCHJ4GFM0KM6F",
+      "state": "reported",
+      "summary": "Operator CLI staleness recurrence: homebrew codex 0.27.0 (brew stable as of 2026-07-23) rejects url-only mcp_servers entries entirely ('missing field command'), while the ChatGPT.app bundle ships 0.144.2 which parses them. A codex-builder profile pointing at the stale binary fails in 0.35s with provider_nonzero_unknown and content-free telemetry, which is hard to diagnose. Evidence: pilot-site delegation.1NRKGB9JXX1ZDH7W5Z5Q8750WX (failed) vs delegation.7P7A7Z0T7KD2YA6TVQE5PY41ET (ran) differing only in executable path. Suggest QUICKSTART/BROKER_OPERATIONS note: verify the profile executable is a current codex build (codex --version plus a config-load probe), not merely present.",
+      "revision": "evt.01KY7P30VNY0SXQJC0TRQ4TXRS",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.7FVJ0PBH59S4MRC3P5X4TEKFZW",
+      "state": "reported",
+      "summary": "Observed end-to-end UI run completed the role→task→run→independent review→human acceptance loop without terminal use after authentication, but first-use onboarding caused repeated terminal returns before first action: auto-open consumed a one-time auth URL, the refusal advised reopening an unusable URL, installation/workspace-selection guidance was not actionable, and the panel did not clearly identify its active project. Treat as P0 onboarding usability risk; reproduce and scope before promoting.",
+      "revision": "evt.01M114AABTDKSB7R033EFFZG4K",
+      "severity": "critical",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.7S4F59CDESH1DPPYP63TF8YTA2",
+      "state": "resolved",
+      "summary": "Demo-mode dead end confirmed live at 7c8939b: page-driven walkthrough on a bare repo — init, demo config, hire, task, implementation run all work in one process; the independent-review run ends needs_operator (DemoRunner records no review verdict) and Accept is refused with 'task acceptance requires a current approved independent review'. The panel's guidance loops the operator back to a reviewer run that cannot succeed in demo. Owner decision required: teach the panel to represent an independent reviewer, or narrow the demo promise to 'run without a subscription, without acceptance'.",
+      "revision": "evt.01M0MB89YZ0Z69GJVXDPZTT02G",
+      "severity": "high",
+      "stale": false,
+      "evidence_refs": []
+    },
+    {
+      "id": "finding.7WEDARP2X3JXJ2E57JSQ499BPC",
+      "state": "reported",
+      "summary": "grok-builder run delegation.1ZSHMVYVF64873X2CN0J39QV0B (WP-15.3) exited successfully without calling commons_report_outcome, so the delegation closed as needs_operator although the work was present in the checkout; the coordinator generated the report, fixed one syntax slip (a } closing a constructor call) and formatted two files. Third occurrence of this Grok pattern (WP-08, WP-16.2, WP-15.3).",
+      "revision": "evt.01M2WC7G2CAM491GXK9HXR0NA5",
+      "severity": "low",
+      "stale": false,
+      "evidence_refs": [
+        {
+          "ref": {
+            "id": "delegation.1ZSHMVYVF64873X2CN0J39QV0B",
+            "kind": "delegation"
+          },
+          "revision": "evt.01M2WBJV7AWF3NNCRF45BS81H8"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision.04MVV5WB1JG9S0KDH37AEHNJ2J",
+      "state": "accepted",
+      "scope": "ux/starter-packs",
+      "proposal": "Starter Packs are removed now with migration of their content into built-in blueprints/templates: backend routes and DTO deprecated, StarterPacksSection removed, tests and docs updated.",
+      "revision": "evt.01M22XK8NK9TENMTHN4P145R9G",
+      "stale": false
+    },
+    {
+      "id": "decision.04NE4TJR0WZ5D9E3EKH4YH1VGJ",
+      "state": "accepted",
+      "scope": "idempotency-receipt-portability-and-recovery",
+      "proposal": "Adopt ledger-derived, checkout-aware receipt recovery: canonical events remain authoritative for reconstructing matching receipts; orphan detection is scoped to the canonical checkout history; common sessions, claims, and locking remain operational; matching events can reconcile earlier tombstones without permanent identity lockout.",
+      "revision": "evt.01KXJA50635J730X6JE4AZZ2ED",
+      "stale": true
+    },
+    {
+      "id": "decision.05AECFGWYPFZ2X5PH2P375SSSM",
+      "state": "accepted",
+      "scope": "wave1.operator.parent-provider-units",
+      "proposal": "For the current Wave 1 operator qualification run, parent_provider_units is capped at 8 by explicit user authorization. This is an operator runtime launch cap for this run, not proof of account quota and not a repository default.",
+      "revision": "evt.01M1HAV1NM5Z9QSMCJ0TS61DJQ",
+      "stale": false
+    },
+    {
+      "id": "decision.05PXTD8FPK91QWG3A15ECMYNYB",
+      "state": "accepted",
+      "scope": "execution-plan-presentation",
+      "proposal": "Maintain the current Agent Commons execution plan as one status-aware Mermaid graph with an in-graph color legend. Every node must identify its status: completed and evidenced, active, ready/not started, blocked by an external prerequisite, or awaiting a product/human decision. Distinguish source implementation from canonical task acceptance and from operational promotion. Refresh the graph after material state changes and use it in user-facing progress updates.",
+      "revision": "evt.01M1BR8VCP18A686T85HFA1PB0",
+      "stale": false
+    },
+    {
+      "id": "decision.0A252PQN9QH7HZCBF4ZDF8BR8X",
+      "state": "accepted",
+      "scope": "product.design-gallery-surface",
+      "proposal": "Make Design Gallery the first product screen migrated to the accepted React Flow frontend stack. The screen is implemented incrementally alongside legacy UI, preserving common localisation and existing routes until its cutover.",
+      "revision": "evt.01M0N5SWTJW0S6GRYTFFY5XM05",
+      "stale": false
+    },
+    {
+      "id": "decision.0A7QB13FM66N1BCSB4STG4T0FY",
+      "state": "accepted",
+      "scope": "ux/wave-4-order-run-first",
+      "proposal": "D-23 (owner, 2026-09-21): the working run comes first (WP-40 UX-19/UX-21, WP-41 UX-10, WP-20), then the visual foundation WP-42; the ux-plan-lead session leads this step.",
+      "revision": "evt.01M32NKQJRW6HH20DY46CAR4PK",
+      "stale": false
+    },
+    {
+      "id": "decision.0AHZ3KYA8DPYM3PF1QJS4TP26K",
+      "state": "accepted",
+      "scope": "ux/local-instrumentation",
+      "proposal": "UX metrics use local opt-in counters without content (no text, paths or IDs), stored under the state root, toggled in Settings, never transmitted; a privacy section is added to the frontend contract.",
+      "revision": "evt.01M22XSJV5E84YTQ9JCBWRPJ72",
+      "stale": false
+    },
+    {
+      "id": "decision.0CG7V7V9DVM8K7CN2MJ1NTSQ4J",
+      "state": "proposed",
+      "scope": "product/record-currency-model",
+      "proposal": "Adopt one governing rule for how the record stays current, and four mechanisms that follow from it. The rule: an obligation performed by the system at the moment the fact is true cannot be faked, while an obligation performed by an agent after the fact always can. Issuing a task is the first kind; asking a worker to close a record at the end of its session is the second, and it is therefore not adopted. Silence stays free, assertion is paid, and the price equals how much of other peoples freedom the assertion takes: writing nothing costs nothing, writing an observation costs nothing because it takes nothing from anyone, and writing a record that stops other work must carry an executable way to refute itself. Refusing to pay is allowed — the record lives, is visible and is read, but does not block. Four mechanisms, in order. First, the registry issues work rather than mirroring it: the broker already resolves the target task, creates the child session and binds the delegation, so it records the take itself at the moment the fact is true, which removes the fabricated-authorship problem instead of policing it. Second, verification happens on read rather than on write: the tool that returns a record returns it with the fresh result of its predicate and the age of its last confirmation, so revision is a by-product of use, priced to whoever benefits and proportional to the harm the record causes; a read path must not return a live blocker while its predicate is green. Third, a predicate earns authority only by demonstrating discriminating power across two revisions, red before the fix and green after: a bad predicate can be written but a tautologically green check cannot be made to turn red on the old code, so cheap compliance is rejected arithmetically rather than by judgement, and the predicate lives as a repository artifact whose weakening is a diff with an author. Fourth, automation may refute but never confirm: a green reproduction retires the evidence for a defect and removes its right to block, it does not declare the defect fixed, and closure remains a human act; automation may demote a divergence but never erase it, because divergence is data about the process and hiding it is a new kind of blindness. Two supporting positions. A projection over the ledger is required alongside read-time checking rather than instead of it, because once observers write contesting claims some rule must resolve them deterministically and make automatic actions reversible; read-time checking supplies freshness, the projection supplies resolvability. And the state vocabulary must be able to express result present, originator not established, because a schema that cannot state that truth forces a choice between a lie and silence and always receives silence.",
+      "revision": "evt.01M0GCPAKBRG1Q0TX8FPS1PGED",
+      "stale": false
+    },
+    {
+      "id": "decision.0E25PERWJMD1PGRHS3K4B6QQZR",
+      "state": "accepted",
+      "scope": "architecture.delegation-instruction-composition",
+      "proposal": "Add audit step A4.5: mechanically extract existing delegation instruction composition into a focused service module, preserving inputs, output and behaviour. The extraction creates the seam for later Context Pack compilation and must land as a structural-only commit.",
+      "revision": "evt.01M0N5W99FAW09JZASKJZ6RDNK",
+      "stale": false
+    },
+    {
+      "id": "decision.0R0KX5QG0BYBSGHJXPYXH9GEQ2",
+      "state": "accepted",
+      "scope": "repo/evidence-retention",
+      "proposal": "docs/evidence keeps only the wave integration manifest and the latest version of each package manifest plus screenshots that prove distinct behaviour; superseded -vN versions live only in the git tag archive/2026-09-pre-consolidation; the policy is written in docs/evidence/README.md (D-13).",
+      "revision": "evt.01M2T0N8RW8TP2SWYR2371ZCYF",
+      "stale": true
+    },
+    {
+      "id": "decision.164ZP0QVSE544MWAXJ6SSBX1G3",
+      "state": "superseded",
+      "scope": "ux/wave-objective-provenance",
+      "proposal": "Task grouping into a wave/goal uses a new canonical objective: nullable objective_id on tasks plus an immutable blueprint-application record linking created tasks; manual tasks may join explicitly. An ADR precedes implementation; old tasks stay ungrouped.",
+      "revision": "evt.01M26J38GN1268TW6RKE8VRWCX",
+      "stale": false
+    },
+    {
+      "id": "decision.1A08MD6B8TXRWVNX00DJZD98DY",
+      "state": "accepted",
+      "scope": "product/operator-config-mutation",
+      "proposal": "Owner decision (2026-08-22, chat): runtime.yaml is written by the product once, at first-run setup, and by explicit operator hand-edits thereafter. POST /api/setup/runtime-config refuses with setup_configured when the environment already holds a working config, leaving the file untouched — mirroring the demo-route guard (5e0d3ce). The one sanctioned in-product mutation afterwards is an additive discovered-provider regeneration: a new parameterless setup route that first proves the current file is machine-generated (regenerates content for the providers the file names and compares bytes), and only then rewrites it with the superset of discovered providers — existing profile semantics preserved exactly, nothing removed or modified. A hand-edited config makes the operation refuse with a typed message pointing at hand-editing; it never merges over human changes. Rationale: the token authorizes panel actions, not redefinition of the trust anchor; role autonomy is edited in the ledger via role settings and is unaffected. The parameterless-setup-routes security property stays whole.",
+      "revision": "evt.01M0MCSFT6H6R025SEK0FSHP3K",
+      "stale": false
+    },
+    {
+      "id": "decision.1A7PJYNTX4Q3WB8BZBAG285Z1G",
+      "state": "accepted",
+      "scope": "ux/visual-foundation",
+      "proposal": "D-22 (owner, 2026-09-21): font Inter (OFL, self-hosted woff2, latin and cyrillic), icons Lucide as an SVG sprite, both in the bundle; the accepted reference mock is docs/evidence/2026-09-21/council/mockups/compare.png (scale 13/15/22 at 15px base, subtle inner borders, 56px task rows, badges, one primary control, technical values in a disclosure, empty states with an action).",
+      "revision": "evt.01M32NGQP8G95NQRPWWRA8046R",
+      "stale": false
+    },
+    {
+      "id": "decision.1EG4MZEE2B8HFB3GZR9R5F5D3S",
+      "state": "accepted",
+      "scope": "wave1.release.p3-reciprocal-external-host",
+      "proposal": "For the current Wave 1 release scope, reciprocal external-host execution is out of scope. P3b2-host, P3b3-host, and P3c-host remain valid future architecture topics but must not remain ready release work after their predecessor P3-host/P3b/P3b1 chain was cancelled without implementation.",
+      "revision": "evt.01M1HAQ8G5SC7PES3TN1BEYJHS",
+      "stale": false
+    },
+    {
+      "id": "decision.1H8KMRVD0A45BAXS1A1D9DYF6J",
+      "state": "accepted",
+      "scope": "ledger/hygiene-pass-2026-09",
+      "proposal": "Authorise the coordinator to run one hygiene pass under owner authority: accept review-state tasks that hold an approved independent review on their current revision, cancel pre-programme active/assigned tasks as superseded by the UX closure programme, close review-state tasks without any recorded approval administratively, and acknowledge open wildcard/operator handoffs (D-17).",
+      "revision": "evt.01M2T155Q0AEJCZCWSJCS7YZ8R",
+      "stale": true
+    },
+    {
+      "id": "decision.1HR6JZ0NG4NVG83JG7KEXMWV9T",
+      "state": "accepted",
+      "scope": "open-source-license",
+      "proposal": "License Agent Commons under Apache License 2.0 and include the license and required package metadata in release artifacts.",
+      "revision": "evt.01KY4TS7C2VAG877A357XB5JG3",
+      "stale": false
+    },
+    {
+      "id": "decision.1MWJ0V2QPQWXEARJQ4Y93WZX5A",
+      "state": "accepted",
+      "scope": "program.context-gallery.audit-a6-sequencing",
+      "proposal": "Ratify a narrow exception for A6 read-only projection profiling and allocation optimization commits 503d37f and 27b6eaa before the remaining A5 projected-record and TransitionSpec work. The exception changes no persisted event, ledger format, public wire shape, or business semantics. Complete remaining A5 before any further projection behavior or package functionality; rerun and record A6 profiles after A5.",
+      "revision": "evt.01M0SSYRFF6X25AQ3NXSHSWHQW",
+      "stale": false
+    },
+    {
+      "id": "decision.1VD06WKYZSS7R3J4FJWMPCQ2Z1",
+      "state": "accepted",
+      "scope": "docs/language-policy",
+      "proposal": "Contracts and ADRs are written in English (ADR 0020 and 0021 receive an English summary); plans, audits and handoffs in Russian; user guides in English and Russian (D-14).",
+      "revision": "evt.01M2T0RVH0QFBWY16QMXBHGFEX",
+      "stale": true
+    },
+    {
+      "id": "decision.29HVVKDWE6YEXTR2D80SE76YQT",
+      "state": "accepted",
+      "scope": "broker-operator-limits",
+      "proposal": "Ship conservative built-in broker limits with bounded queue/backpressure and shared state-root enforcement. Allow only operator-owned configuration to override global and per-provider/profile ceilings. Effective authority is the minimum of operator, provider/profile, inherited parent, and delegation limits.",
+      "revision": "evt.01KY4WCKSP1DZS2T6SER2PX0XT",
+      "stale": false
+    },
+    {
+      "id": "decision.2ASFCETB9SMAXTVQ5PXRFJYRXW",
+      "state": "accepted",
+      "scope": "product.context-and-design-packages",
+      "proposal": "Adopt Context Pack and Design Package as canonical revisioned product entities. Their persisted event/schema semantics, validation, projection, lifecycle and migration are a separately scoped behavioural project, not part of structural refactoring A3–A8.",
+      "revision": "evt.01M0N5RPTFC4XY3CHZM5WZQWTV",
+      "stale": false
+    },
+    {
+      "id": "decision.2C8F1CEMD4A8DF88NK3XF7FMJ4",
+      "state": "accepted",
+      "scope": "ux/latency-thresholds",
+      "proposal": "Owner decision 2026-09-10 after the WP-08 baseline (warm task_create median 4.4 s on 300 tasks / 420 events, 33 s on 3206 events, ~63% in canonical read validation): no product p50/p95 write-latency target is fixed yet. The Work app keeps the 2 s and 8 s duration hints as presentation only. Targets are revisited only after a write-path optimisation (the report's first proposal: remove the second full ledger scan in append) has been measured with the same benchmark.",
+      "revision": "evt.01M26HMX0QN9PSX7VJBQMBAWV0",
+      "stale": false
+    },
+    {
+      "id": "decision.2FFQCGQKQ21VS1MQHNFCQEZWKJ",
+      "state": "accepted",
+      "scope": "governance-policy-semantics",
+      "proposal": "Keep task.accepted as a strict project-truth boundary requiring a current approved independent review. In light mode, coordination may end honestly at task.completed without claiming accepted truth; standard and governed workflows use the acceptance gate, with governed adding stronger verification and operator-control expectations.",
+      "revision": "evt.01KY4VYW8ZDXBKHYZN2NDV4R12",
+      "stale": false
+    },
+    {
+      "id": "decision.2FSV7F0M7M1628BAB9GXNFVRXR",
+      "state": "accepted",
+      "scope": "ux/wave-order-instrumentation-first",
+      "proposal": "WP-17.1/17.2 (local opt-in counters) run before WP-24 (screen pack and first user sessions) so the section-9 metrics are measurable; WP-13.2 stays last in wave 3 (D-18).",
+      "revision": "evt.01M2T18VSDQ4T2E1V0MBDPB8VV",
+      "stale": true
+    },
+    {
+      "id": "decision.2HAH3A8XTG8839RNR11GGR4SY6",
+      "state": "accepted",
+      "scope": "ui/capability-gates",
+      "proposal": "The panel carries no capability gates: --enable-writes, --enable-catalog-editing and --enable-launch are all removed, and the fact that this software starts processes against the users paid provider subscription moves into the service description and the documentation instead of a flag typed at startup. The owners reasoning is that the flag was never evidence of anything: a person arriving at Codex is not asked to confirm that limits will be spent in each window, because that follows from what the service is, and a ceremony that everyone performs mechanically protects nobody. Read-only remains reachable and tested through agent-commons ui --read-only and through constructing UIContext without a session, so the structural invariant that a read-only panel registers no non-GET route is unchanged. Launch routes register on every writable panel and refuse with launch_not_configured until the runtime environment is configured, because the first-run screen now configures it inside an already running panel and the route table is not rebuilt after startup. This supersedes the narrower decision that kept the launch flag as a deliberate act of consent; it does not claim the broker is ready — see the same-day replacement in scope broker-release-readiness, which carries the evidence gate forward untouched.",
+      "revision": "evt.01M0HM1N6Z0GR1206N78K753F2",
+      "stale": false
+    },
+    {
+      "id": "decision.2MZM0KCW3TNCGKWQ58DZ7J3WSV",
+      "state": "accepted",
+      "scope": "delegation.recursion.current-support",
+      "proposal": "Require max_depth 0 for every newly created delegation until worker-safe child authority, parent-sliced budgets, and total fanout accounting ship together.",
+      "revision": "evt.01M0B6EFAW15C8DY35MKMT1HAF",
+      "stale": true
+    },
+    {
+      "id": "decision.2VGMQ28H6NJ8FT779CE03RXVSV",
+      "state": "accepted",
+      "scope": "ui/project-workspaces",
+      "proposal": "The panel gains a project list: create, open, close and reopen projects from the left sidebar, each project being one workspace with its own board. Two constraints are part of this decision. First, a project is not a session: sessions carry a TTL and an ownership nonce, so the panel holds and renews a session per open project rather than equating the two, otherwise a project left open past the TTL dies on its own and the audit trail suffers. Second, closing a project means closing its session and stopping the watch, never silently killing a live delegation — the runtime cannot reattach to an exited provider, so closing a project with a run in flight must be refused or explicitly confirmed. This makes one process serve N workspaces, which ADR 0005 currently governs and which finding.5MER0TQVSQ1Q2A2627WB0B1X3F reports as a critical open defect: the ambient exact operational state root is accepted across workspaces before ownership validation. That finding must be closed before the sidebar ships, because the sidebar turns the dangerous configuration into the normal operating mode.",
+      "revision": "evt.01M0F83MQX53KJBP245PZFJF89",
+      "stale": false
+    },
+    {
+      "id": "decision.2ZTHNGPQVMHZ5RF614HQPWCKYV",
+      "state": "accepted",
+      "scope": "product/no-provider-first-run",
+      "proposal": "Owner decision (2026-08-22, chat): when neither claude nor codex resolves, the panel states plainly that run functionality is unavailable and offers the documentation/guide — nothing else. The demo offer is removed from the product surface: no demo button on the first-run screen, no demo_available in GET /api/setup, and POST /api/setup/demo-config leaves SETUP_ROUTES. The product serves operators who hold subscriptions; machines with none get an honest refusal, not a simulated workaround. This supersedes, in part, the wave-contract L0 amendments that froze the demo route and required setup_no_provider_found to name demo as an exit (S0-contract file, sections 'L0 решение по F5' and the demo_available requirement). The DemoRunner and the loader's demo flag may remain as internal scaffolding until the planned local-provider fallback (vllm/ollama checkpoint prompt) replaces them; they are no longer a product promise. This also resolves finding.7S4F59CDESH1DPPYP63TF8YTA2 (demo cannot reach accepted work) by removing the promise rather than closing the loop.",
+      "revision": "evt.01M0MB77ZDD9BPJWF99D58ARQT",
+      "stale": false
+    },
+    {
+      "id": "decision.33ZP85QCM4G48YWT79VFQM9E62",
+      "state": "accepted",
+      "scope": "ui/frontend-stack",
+      "proposal": "The panel moves to React Flow with a build step, as the earlier visual orchestrator plan proposed, rather than staying on the single-file CSP-safe asset. This is the owner decision taken against the recommendation to stay single-file, and it carries obligations that must not be discovered later. docs/FRONTEND_CONTRACT.md must be rewritten rather than quietly broken: some of its laws survive the move untouched — the two-language string table, the vocabulary glossary, canonical values never translated — and the test suite enforces them today, so they need a new enforcement point in the new stack. Others do not survive and must be retired explicitly, in particular the single-file shape and the single-writer workspace claim on src/agent_commons/ui/static/index.html, which stops being meaningful once the asset is generated. Packaging changes too: read_spa() currently serves one file out of the wheel, so a build artifact has to be produced and shipped, and clone-and-run must keep working without a manual npm step or the product loses a real strength. Node is already a CI dependency through .node-version and the UI behaviour harnesses, which lowers the cost. Sequencing: per the pivot plan this gates the A7 DTO slice for the UI and packaging, but not the A4.2 UIContext split, because ui/graph.py emits a semantic graph with kinds, labels, states and ranks and no coordinates, leaving layout to the client.",
+      "revision": "evt.01M0F8438BA4F5WNTCJKYVGGM8",
+      "stale": false
+    },
+    {
+      "id": "decision.3EGE6PFFSMABQYB159NDTX52AD",
+      "state": "accepted",
+      "scope": "runtime/child-state-root-resolution",
+      "proposal": "When the inherited AGENT_COMMONS_STATE_BASE or ROOT does not resolve to the launching workspace, the broker resolves the child state root from the launching workspace itself and prints one line saying it did so and what it ignored; an explicit flag remains for the deliberate case, and an interactive terminal may offer a choice only on a real conflict, meaning the inherited value points at another workspace that actually owns state. Two things were explicitly rejected during design: an option labelled \"write into the wrong one\", because it has no legitimate use and a control marked not recommended is still clicked; and leaving the behaviour undefined for non-interactive callers, because the panel, scripts and schedules have no human to answer a dialog. Silent override alone was also rejected: the product does nothing silently, so the correcting line is mandatory. Evidence: finding.1D8JXCV0VPE7HWE1Y6JJKPEQ1K, delegation.56ZPSZ3BA226KF4TZYFQV4WK65 wrote its report but could register no artifact and closed neither task nor delegation.",
+      "revision": "evt.01M0F84HXJQ7PCNDBPZ9J68V0F",
+      "stale": false
+    },
+    {
+      "id": "decision.3F95WMKZD5P6026RB31XVHRKR1",
+      "state": "superseded",
+      "scope": "ui/capability-gates",
+      "proposal": "Drop --enable-writes and --enable-catalog-editing; keep --enable-launch. Recording and catalog editing are what the product is for on a local single-user machine, and gating them adds friction without protecting anything. Starting a paid provider process is different in kind, and accepted decision.7PAPYKR4QRC018E372AF952ZZ9 keeps the broker at experimental manual opt-in until its evidence gate is met; retaining the launch flag honours that decision rather than superseding it, so no supersede is required and the evidence gate remains the trigger for any further change. The acknowledgement that this software starts paid processes on the user subscription still moves into the service description and a first-run notice, because the launch flag will not carry it forever.",
+      "revision": "evt.01M0HM01CKZPM0ZAB6GKRT11WB",
+      "stale": false
+    },
+    {
+      "id": "decision.3JJTDQ7J5RN8846K8FGG9QKAM1",
+      "state": "accepted",
+      "scope": "product.hierarchical-acceptance-and-escalation",
+      "proposal": "Use hierarchical accountability: a parent role locally accepts most delegated technical results, while task.accepted remains the existing strict project-truth boundary requiring a current independent review. Require independent review only when the parent lacks authority or competence, or when the work materially changes product positioning, user experience, security, strategy, or requires an unresolved product decision. Escalate only these matters one level at a time; the human owner may inspect and directly intervene in any branch, but lower agents do not proactively bypass the chain.",
+      "revision": "evt.01M0WAA7Q1MD4M2HXX3134KBWS",
+      "stale": false
+    },
+    {
+      "id": "decision.3KDMC0SEV3K43SX01KKVZ4BF98",
+      "state": "accepted",
+      "scope": "platform-support-contract",
+      "proposal": "Officially support macOS and Linux. Retain POSIX fcntl locking semantics and fail early on Windows with an actionable unsupported-platform diagnostic.",
+      "revision": "evt.01KY4QTSXR1MZM4Q31XJFSHFM8",
+      "stale": false
+    },
+    {
+      "id": "decision.3XHCHGPYHR9P44T1DKEX35DZ7M",
+      "state": "deferred",
+      "scope": "ui/role-reasoning-effort",
+      "proposal": "Expose reasoning effort in the role UI only for the Codex family, and state the Claude limitation instead of hiding it. Codex accepts model_reasoning_effort as a config key, reachable through the -c override the broker already uses for the agent-commons MCP server, so this is plumbing an existing mechanism. The Claude CLI exposes no reasoning or effort flag at all (claude --help has none), so no equivalent control exists. The hire dialog therefore shows the control for Codex families and, for Claude families, a short line saying the provider offers no such setting — the same discipline already used for \"model: fixed in the profile\" rather than a control that silently does nothing for half the families. Note that model is different: the model field already exists in both runner profiles and is passed as --model, so surfacing model choice is exposure of an existing field, while reasoning effort for Codex needs a new profile field plumbed into argv.",
+      "revision": "evt.01M0CNNDG8Z20TMQXJE63V9QMQ",
+      "stale": false
+    },
+    {
+      "id": "decision.3ZHZ9B75A4T62D745J8HTS0JMY",
+      "state": "accepted",
+      "scope": "repo/skills-mirror",
+      "proposal": ".agents/skills and .claude/skills remain a byte-identical dual-client mirror guarded by a repository test (D-19).",
+      "revision": "evt.01M2T1CHVZ2S976EBW2F6JZS80",
+      "stale": true
+    },
+    {
+      "id": "decision.44DH8ZBAFX6VJ9EAM2GHD809FN",
+      "state": "accepted",
+      "scope": "product/public-name-migration-windows",
+      "proposal": "Migration windows are decided by whether a user could have copied the name. Names that appear in documentation and tutorials — CLI commands, MCP tool names, HTTP routes — get a one-cycle window: the old name keeps working and warns, the new one appears beside it, removal is a third step. The internal Python API — manager collaborators, DemoRunner, presentation helpers — is renamed immediately with no window, because nothing outside the codebase depends on it and a window there is ceremony that outlives its purpose. This is audit item V6, which was decided in discussion but never reached the ledger until now.",
+      "revision": "evt.01M0F9FY1Z39MDDX70NWHFHF2A",
+      "stale": false
+    },
+    {
+      "id": "decision.46WMB9XKCDJ87HD58PGQZHXWVG",
+      "state": "accepted",
+      "scope": "perf/write-path-target",
+      "proposal": "WP-20 engineering target: warm task_create <= 1 s on a 3206-event ledger via incremental canonical validation that never replaces the full check on mismatch; no product-facing p50/p95 SLO is fixed (D-16, consistent with ux/latency-thresholds).",
+      "revision": "evt.01M2T107C5YJD85BHBSH8DKZ3W",
+      "stale": true
+    },
+    {
+      "id": "decision.47ZN20DCVTVP6HR2JB1MCV1V7W",
+      "state": "accepted",
+      "scope": "ux/project-board-home",
+      "proposal": "A project opens on an infinite board (one project = one board): standing roles are nodes, agent links are edges, departments are board frames populated by blueprint applications (several departments may coexist and be launched in parallel within one project), roles can be hired and linked on the board, each role card opens its conversation, its outputs and its tasks. The task tracker is a separate tab. Board layout (positions, frames) is operational per-project state, never canonical truth. This supersedes the 2026-09-09 decision to open Work on a Now view; the Now/Map views remain inside the tracker tab. True simultaneous writable runs of several departments still need worktree-per-agent isolation (separate ADR); until then departments queue through the broker.",
+      "revision": "evt.01M23Y956H4F5A4Y0S569WTKVN",
+      "stale": false
+    },
+    {
+      "id": "decision.4H64HFK4K3S7FEZAPQK23NJ3MP",
+      "state": "accepted",
+      "scope": "product/active-run-cancellation",
+      "proposal": "Active cancellation of a live provider process stays out of the pivot. The panel keeps only canonical cancellation, which changes the record rather than stopping the process. Because the product does nothing silently, the affordance must say what it actually does: a stop control that leaves the process running has to be labelled as recording the cancellation, not as stopping the run, and an orphaned process needs its PID surfaced so the operator can end it. Recorded consequence: task.7SP8T6FSCQXENRFTJ0T5CKC6RM stays out of scope, and the honesty requirement above belongs to whichever pivot item builds the run controls.",
+      "revision": "evt.01M0F9GCGG8FHWE8ECDNRP1Y5Y",
+      "stale": false
+    },
+    {
+      "id": "decision.4Q24X67V7DD34SP4ZTPBBZV6SR",
+      "state": "proposed",
+      "scope": "product/record-health-metrics",
+      "proposal": "Measure record health by what the record is silent about, not by what it contains. Primary: the share of repository changes not linked to any record, split by the cost of the change, watching whether it rises faster on expensive work such as migrations, data and security. It measures the share of the world the journal says nothing about, it can only be improved by genuinely linking work to records, and it deviates before a parallel private list appears, because that list is already a consequence of the broken link rather than its beginning. Second: the gap between when the world changed and when the record about it was written, median and tail — a growing tail against a stable median reads as batch compliance writing. Third: the share of records that actually block someone and carry a predicate with a fresh result; the remainder are unfalsifiable blockers and are the risk surface. Fourth, as an alarm rather than a success measure: the share of records closed by observation rather than by an executor claim, whose growth means work is migrating away from the lifecycle. Explicitly retired: the share of records confirmed within N days and the share of closed records, both of which are improved by a mass closing session. Also retired before adoption: the share of reads followed by independent verification in the source — it is sound today but the read-time checking mechanism above destroys it by construction, since the tool verifies on the readers behalf and the metric stops distinguishing trust from delegation of the check; it must be dropped in the same change that introduces read-time verification, not left to report a false green.",
+      "revision": "evt.01M0GCPQP7R5M0T8Y46G79ZYCY",
+      "stale": false
+    },
+    {
+      "id": "decision.4Q4TY0A4WZ9YQHJ3N9M8V1AWND",
+      "state": "superseded",
+      "scope": "ux/latency-thresholds",
+      "proposal": "Performance baseline (300-task fixture, lock/read/replay/append split) is measured before fixing p50/p95 targets; 2 s and 8 s are temporary UI hint thresholds for \"large project\" and \"no need to click again\".",
+      "revision": "evt.01M26HK22Z8FWS69G19SWK835P",
+      "stale": false
+    },
+    {
+      "id": "decision.4TZDDRT5PF84KXV6RHQAPTG5BX",
+      "state": "superseded",
+      "scope": "product/cli-surface-status",
+      "proposal": "The CLI is frozen: security fixes only, no behaviour changes, no new features. MCP is untouched, because it is the brokers channel to worker processes rather than a user surface, and freezing it would stop delegation working at all. The freeze has a precondition that must not be skipped, because today the CLI is the only way to initialise a workspace and to open and carry a session: freezing it before the panel can do both would leave a new user unable to start the product at all. The freeze therefore takes effect per capability, not as a flag day — a CLI command may be frozen once the panel covers what it does, and the bootstrap commands stay live until the panel owns workspace initialisation and session lifecycle. Recorded consequence: the audit decision to skip decomposing cli.py stands and hardens, since polishing the structure of a surface under freeze is spent work.",
+      "revision": "evt.01M0ZN8TGPJH9XG473Z58T7MAT",
+      "stale": false
+    },
+    {
+      "id": "decision.504ACCEZRB2MRPFZ0W7DX7F0CR",
+      "state": "accepted",
+      "scope": "ux/closure-executor-logistics",
+      "proposal": "UX closure packages run sequentially in this checkout (one writable worker), 60 minutes per run, launched per wave without per-run confirmation; Terra = codex-builder with model gpt-5.6-terra (qualified 2026-09-09 via profiles-terra.yaml), Opus = claude-builder, Grok = grok-builder; Astra (default Codex) and the Claude Fable coordinator review; formal independent reviews run through the broker with cross-provider reviewers. Executor mapping follows strengths: Opus frontend/design, Grok volume/mechanical/perf, Terra backend/domain/integration.",
+      "revision": "evt.01M22XY3K10HKVQRHDAV9GJSA2",
+      "stale": false
+    },
+    {
+      "id": "decision.50RSN30Q2Q1QW7QYHXX4BZJDHQ",
+      "state": "accepted",
+      "scope": "product.artifact-preview-access",
+      "proposal": "For authenticated Design Gallery preview, allow only public and internal PNG/JPEG artifacts. Always refuse restricted, pii and secret classifications; preview remains current-revision-only and uses verified server-side reads.",
+      "revision": "evt.01M0N5V2VP40MCCVN7X8DDSEQX",
+      "stale": false
+    },
+    {
+      "id": "decision.53MWND3SQNX2S58N12YDKWJWY5",
+      "state": "accepted",
+      "scope": "docs/archive-location",
+      "proposal": "docs/archive/{plans,reviews} is the location of completed or superseded documents: moved byte-for-byte with a status stamp; historical is never only a label in prose (D-15).",
+      "revision": "evt.01M2T0WH6MBTGN1QQ64CX79KQB",
+      "stale": true
+    },
+    {
+      "id": "decision.558YVVEX7D1BTEBERNBPT14XY2",
+      "state": "accepted",
+      "scope": "broker-release-readiness",
+      "proposal": "The broker stays experimental and its evidence gate is unchanged: behavioral canaries green on macOS and Linux, 100 consecutive hermetic provider runs per supported provider without mismatch, and 20 real local launches with zero process_canonical_mismatch events. None of those conditions has been met and this decision does not claim otherwise. What changes is only how the experimental status is signalled to a person: it stops being a flag the operator types at startup and becomes a statement in the service description and the documentation, because the UI is now the primary surface and a startup flag is unreachable from it. The release stage label therefore reads experimental rather than experimental_manual_opt_in, which is a truthful narrowing — the software is no less experimental, the manual ceremony is simply gone. Recorded consequence: nothing here permits calling the broker ready, and the gate above remains the only thing that can.",
+      "revision": "evt.01M0HM1ZPDZF22X3B65YCB4HS5",
+      "stale": false
+    },
+    {
+      "id": "decision.55YN4B2W60Z8HD03WDD0T1V2A9",
+      "state": "accepted",
+      "scope": "docs/prior-pivot-documents",
+      "proposal": "docs/visual_multi_agent_orchestrator_prd.md and docs/visual_orchestrator_plan.md are rewritten in place to match the new course, rather than being left in force or merely marked historical. They currently carry eleven positions that contradict the pivot, including the visual layer as an optional overlay, profiles created outside the UI, and a mitigation against rewriting core for UI requirements. Leaving them would let a reader or an agent open them tomorrow and receive the opposite instructions. The rewrite is roughly two thousand lines of work and it does erase the trail of how the earlier positions were reached, which is acceptable only because that trail now lives in the ledger: each superseded position has a decision entry with its evidence and its rejected alternative. The rewrite must therefore cite those decision identifiers rather than restate conclusions, and anything not backed by a recorded decision must not silently change meaning during the rewrite.",
+      "revision": "evt.01M0F85FC9VX79ZW43QYTA5K9S",
+      "stale": false
+    },
+    {
+      "id": "decision.56W1SPK9EBWY2B3CP8ADRRE42V",
+      "state": "superseded",
+      "scope": "ux/work-home-screen",
+      "proposal": "Work opens on a \"Now\" view with three columns (Needs you / In progress / Up next) derived from existing attention/active/ready filters; the dependency graph moves to a \"Map\" tab and the full list to \"All tasks\". Navigation state stays allowlisted URL state, not canonical.",
+      "revision": "evt.01M23YHKH1AJV49M1BAZAQMFWD",
+      "stale": false
+    },
+    {
+      "id": "decision.5CG82CGGHD6FRNKDSJ3PSF85RF",
+      "state": "accepted",
+      "scope": "product/target-user-and-licence",
+      "proposal": "D-20 (owner, 2026-09-21): open source in about three months; a commercial licence for corporations or a sale may follow. Licence Apache-2.0 plus CLA/DCO from the first day so relicensing stays possible.",
+      "revision": "evt.01M32NB439Q4665TQ5Y95FWKG7",
+      "stale": false
+    },
+    {
+      "id": "decision.5EQJKBJG0RW1YYQ8CBE7F87V7G",
+      "state": "accepted",
+      "scope": "ux/visual-direction",
+      "proposal": "Phase 3 keeps the dark scheme (direction A): semantic CSS tokens replacing raw hex, 4n spacing and type scale, Card/StatusChip/Stepper/DecisionCard primitives. No light theme in scope.",
+      "revision": "evt.01M22X9QJFRVBBV71MZM4ZCHZG",
+      "stale": false
+    },
+    {
+      "id": "decision.5J44AM6ADGRR86G0PRN4GYA1DN",
+      "state": "accepted",
+      "scope": "ux/work-home-screen",
+      "proposal": "A project opens on its board (ADR 0020, decision.47ZN20DCVTVP6HR2JB1MCV1V7W): standing roles as nodes, agent links as edges, departments as board frames. The task tracker is the separate Tasks tab; the Now (Needs you / In progress / Up next), Map and All tasks views from the 2026-09-09 decision live inside that tab rather than on the project home.",
+      "revision": "evt.01M23YSWQWAX2AVYP1Z9YKJDA2",
+      "stale": false
+    },
+    {
+      "id": "decision.5NMN1QKBM8DS3CACDDD0F4CS1S",
+      "state": "accepted",
+      "scope": "task.3XJNY0AR6Q3PMDM9AERRYWQQ4K/codex-worker-mcp-contract",
+      "proposal": "Codex workers receive one required agent-commons stdio MCP server through repeated exec-scoped -c mcp_servers.agent-commons.* overrides; command, args, and enabled_tools use generated TOML-compatible literals; --ignore-user-config and --strict-config exclude ambient user MCP and reject drift. Codex enabled_tools derive from the same purpose-specific raw worker catalog as Claude allowed-tools, the MCP child inherits AGENT_COMMONS_SESSION_ID, and local stdio MCP is treated as host-launched outside the model command sandbox. The paid compatibility canary becomes provider-generic with an explicit codex-independent-reviewer entry point.",
+      "revision": "evt.01KY9QPKHETWJVGPQ6Y72WCHTP",
+      "stale": false
+    },
+    {
+      "id": "decision.5QPR0HQYNAG3XKBMMKBJCAG1RB",
+      "state": "accepted",
+      "scope": "runtime/provider-subscription-state",
+      "proposal": "Provider subscription state stays the user responsibility, documented as part of what the service is, and the product reports the provider failure honestly rather than pre-verifying it. Three states cannot be detected before a paid run: no subscription, model unavailable on the current plan, and exhausted limits. All three surface only when the provider talks to the model, which is after the process started and the attempt is committed; verifying them in advance would require a real billable call, so preflight cannot cover them by construction. Preflight stays credential-free and structural: missing executable, invalid config, MCP handshake. The runtime side is already largely satisfied by the bounded stderr tail added in P0-2, which puts the provider own error text in delegation show and in the panel. Remaining work is limited to documenting the boundary in the service description and confirming the stored stderr tail is visible at the moment a run fails in the panel, not only through delegation show.",
+      "revision": "evt.01M0F85Y3TEPHCXM30K3KKYKWR",
+      "stale": false
+    },
+    {
+      "id": "decision.5WCVD0E735E7K9HNEX1HTR0KF5",
+      "state": "accepted",
+      "scope": "product/evals-package-status",
+      "proposal": "agent_commons.evals stays a public surface. docs/evals/README.md documents it as a versioned catalogue carrying the version 2026-08-wave4-v1, and a documented versioned artifact behaves as public whether or not pyproject singles it out. Only the internal consumer moves into tests; the package is neither deleted nor hidden and needs no deprecation window. This is audit item V5, which the audit run already honoured in practice — the package was kept — but which never reached the ledger.",
+      "revision": "evt.01M0F9H9BSWVQB08SVWJEWNB4V",
+      "stale": false
+    },
+    {
+      "id": "decision.61BDS4NC4GVK9K50R09XK98A07",
+      "state": "accepted",
+      "scope": "product/primary-surface",
+      "proposal": "The UI becomes the primary surface of the product: a user installs from GitHub, runs it locally, and does the whole job in the panel rather than calling heterogeneous agents from a Codex window. This is a change of intent that must be reconciled with the existing visual orchestrator documents, which record the opposite premise: docs/visual_orchestrator_plan.md keeps the visual layer as an optional overlay and carries an explicit mitigation against rewriting core to satisfy UI requirements. Both positions cannot stand; this decision records the new intent and requires that the prior documents be superseded rather than silently contradicted. Scope note: the product stays local and single-user, so no accounts are implied — an earlier claim that UI-only requires user accounts was raised and withdrawn during the session.",
+      "revision": "evt.01M0F86D0TZPXYFH88B427M4J2",
+      "stale": false
+    },
+    {
+      "id": "decision.65J1MEQNYC1GNHJYK9KDBDK49S",
+      "state": "accepted",
+      "scope": "product/cli-surface-status",
+      "proposal": "CLI ceases to be the product centre and becomes a legacy compatibility, bootstrap and emergency/recovery adapter. Normal human product workflows migrate to the UI; MCP remains a purpose-scoped agent interface; unattended operator automation gains a typed service/Python boundary after the A8 thematic seams are complete. New product capabilities must land in thematic domain/service modules and be exposed through UI/MCP adapters, not new CLI command behaviour. The existing cli/_shared.py and cli/workspace.py split is grandfathered solely for still-live bootstrap support. No further CLI decomposition, new commands, behavioural changes, or removal occur without a separate owner-authorised bounded migration decision and explicit compatibility/recovery evidence.",
+      "revision": "evt.01M0ZN9NHWZM7XJ7SAF53ZTN88",
+      "stale": false
+    },
+    {
+      "id": "decision.66658SW7S23Z1ZN5RVDS5471XD",
+      "state": "accepted",
+      "scope": "ux/wave-objective-provenance",
+      "proposal": "Owner decision 2026-09-11: ADR 0021 (docs/adr/0021-objective-blueprint-application-provenance.md) is accepted as written after two independent reviews; WP-11.2 (canonical objective_id on tasks, immutable blueprint_application record, revision-bound manual join, additive tracker DTO fields) is implemented by Terra now, before wave 3.",
+      "revision": "evt.01M26J4KZ6YWVRZB52F0KCV06K",
+      "stale": false
+    },
+    {
+      "id": "decision.6A0F6EVKBGV9S74511BRBAZWBM",
+      "state": "accepted",
+      "scope": "ui/role-creation-flow",
+      "proposal": "Hiring a role happens entirely in the UI: the user picks provider family, concrete model, role name, then permissions, skills and system prompt. The product discovers provider executables itself on first run and generates the runtime configuration; the operator no longer hand-writes runtime.yaml to get a usable profile list. What stays outside the UI is the security-bearing part: which executable runs and under which sandbox mode. Evidence for the current break: with no runtime.yaml the profile select is empty and hiring cannot proceed, and the field format is undocumented — it was learned during the session by trial and error from ConfigurationError messages (\"codex-builder has unsupported fields: permission_mode\", \"independent Claude reviewer must use dontAsk with fixed allowed tools\"). This contradicts the recorded position that profiles are created outside the UI, which the panel also prints to the user; that position must be superseded, not quietly ignored.",
+      "revision": "evt.01M0F86VQXBSKJE8213R0G9K74",
+      "stale": false
+    },
+    {
+      "id": "decision.6AKNF46H0P9E6X19HNK38SHT4A",
+      "state": "rejected",
+      "scope": "ui/capability-gates",
+      "proposal": "For a local single-user product the three panel gates (--enable-writes, --enable-catalog-editing, --enable-launch) stop being process flags: the user who starts the product gets the whole product. The acknowledgement they used to carry — that this software starts paid processes on the user subscription — moves into the service description and a first-run notice. This decision conflicts with accepted decision.7PAPYKR4QRC018E372AF952ZZ9, which keeps the broker at experimental manual opt-in until an evidence gate is met, and it cannot simply override it: either the evidence gate is declared met and that decision is superseded, or the gates stay until it is. This entry records the intent and the conflict; it must not be implemented before that reconciliation.",
+      "revision": "evt.01M0CYJ8J9J8GGBTBDFTWVPKPS",
+      "stale": false
+    },
+    {
+      "id": "decision.6KH1WJ7G8CJA618C7TN7QP5G79",
+      "state": "accepted",
+      "scope": "ux/run-time-limit",
+      "proposal": "Run and check-run time limits come from an additive real wall_time_seconds in DTOs (\"limit not provided\" when absent), and the user can change the run time limit in the Prepare run form within server-enforced bounds; the client is never trusted for the limit.",
+      "revision": "evt.01M22XG34S2VP0NBMWERSF8A09",
+      "stale": false
+    },
+    {
+      "id": "decision.719S9ZV8HZ9G9YNR4WV02KGAQK",
+      "state": "accepted",
+      "scope": "repo/legacy-panel-retirement",
+      "proposal": "Retire the legacy single-file panel src/agent_commons/ui/static/index.html: ADR 0022 redirects / to /work, removes the asset, read_spa and its 16 tests, and retires the single-writer rule for that file from AGENTS.md and docs/FRONTEND_CONTRACT.md (D-12).",
+      "revision": "evt.01M2T0HNH6QF8N868WTFQFMZPD",
+      "stale": true
+    },
+    {
+      "id": "decision.726EPF5DF8QG2JN3N5NV707TSJ",
+      "state": "accepted",
+      "scope": "product/local-first-and-trackers",
+      "proposal": "D-21 (owner, 2026-09-21): local-first is absolute. The task tracker stays in the app; Linear/Jira integration and export are not built. Trigger to revisit: a second real user who lives in an external tracker.",
+      "revision": "evt.01M32NDVQQG5GP8A5QRR2V4AQK",
+      "stale": false
+    },
+    {
+      "id": "decision.79KBK9YYAESX5N17T6K45YV2CH",
+      "state": "accepted",
+      "scope": "ux/user-content-locale",
+      "proposal": "Built-in catalog content stays bilingual EN/RU. User-authored content (custom blueprints, skill groups, tasks) is entered once in the language the user typed and shown as-is under both UI locales; it is never translated and no second locale field is required.",
+      "revision": "evt.01M22XCX8BG34DHK8AXVRWJ2W0",
+      "stale": false
+    },
+    {
+      "id": "decision.7APTQCV222EETRE4HDY54CGFPS",
+      "state": "accepted",
+      "scope": "audit/replay-optimisation-target",
+      "proposal": "Re-scope A6 from reducing full passes over a large ledger to removing the fixed floor of a single replay, and demote pass reduction to secondary. Measured on the heaviest real ledger available, this repository own workspace: 892 events over five weeks (14 July to 19 August), 3.7 MB, growing at roughly 500 to 650 events per month under daily dogfooding; a one-day customer project produced 69. A snapshot replay of that ledger costs 2.281, 2.322 and 2.341 seconds on three consecutive in-process calls, against 0.113 for package import and 0.151 for the manager constructor, so start-up is not the cost and the result is not cached between calls. Compared with the A0 baseline of 5.236654 seconds median at 20 000 events, a 22-fold increase in volume yields a 2.3-fold increase in time, which places roughly two seconds of fixed cost inside replay itself, largely independent of ledger size. The 20 000-event benchmark therefore represents about three years of the heaviest observed usage, and pass reduction optimises a case no user reaches. The floor is also what multi-project multiplies: N open projects pay it per change wave, not the growth of any one ledger, so this re-scope is a prerequisite for the project sidebar rather than an unrelated performance task. Before changing code, profile to confirm where the floor sits; audit finding E2 reports that verified SQLite reads deserialize every indexed document before replay, which is the first candidate. Note the two measurements may exercise different paths, so the profile is a required step and not a formality.",
+      "revision": "evt.01M0F87ABT6DBJVSFS94SGVQS5",
+      "stale": false
+    },
+    {
+      "id": "decision.7PAPYKR4QRC018E372AF952ZZ9",
+      "state": "superseded",
+      "scope": "broker-release-readiness",
+      "proposal": "Keep the broker experimental and manual opt-in until an evidence gate passes: behavioral canaries are green on macOS and Linux, 100 consecutive hermetic provider runs per supported provider complete without mismatch, and 20 real local launches complete with zero process_canonical_mismatch events.",
+      "revision": "evt.01M0HM0BVMMNQ48A46B5R6X9KB",
+      "stale": false
+    },
+    {
+      "id": "decision.7RFMQ0JR2A8TSEAYJ3M079GDSD",
+      "state": "accepted",
+      "scope": "copyright-attribution",
+      "proposal": "Use Dmitrii Ershov as the copyright holder in Apache-2.0 project notices. Use BejeweledMe only as the GitHub identity and project URL owner.",
+      "revision": "evt.01KY4VFNWT7T3BR9HMSN6D366S",
+      "stale": false
+    },
+    {
+      "id": "decision.7ZTNWNZN480TKQFG2WNDNA5ZQF",
+      "state": "accepted",
+      "scope": "ui/frontend-migration-shape",
+      "proposal": "The move to React Flow is incremental, screen by screen, not a single rewrite. The new stack lives beside the existing asset and screens migrate one at a time, so the product keeps working throughout and there is never a window where it does not. This constrains the accepted frontend stack decision decision.33ZP85QCM4G48YWT79VFQM9E62 in three ways that must hold from the first migrated screen rather than being retrofitted. The two surfaces coexist, so the two-language string table and the vocabulary glossary need one shared source both consume, not a copy per stack, or they drift within a release. Packaging must serve both at once while the migration runs, and clone-and-run must keep working without a manual npm step throughout, not only at the end. The contract tests that enforce the frontend laws today have to keep passing for whatever has not moved yet, so docs/FRONTEND_CONTRACT.md is amended per screen rather than replaced in one go. The single-writer claim on the existing asset stays meaningful until the last screen leaves it.",
+      "revision": "evt.01M0F899A62TCQ34J3V520FER4",
+      "stale": false
+    }
+  ]
+}

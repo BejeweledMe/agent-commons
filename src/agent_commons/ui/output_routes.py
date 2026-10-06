@@ -98,13 +98,15 @@ def _image_wire(item: ImageOutput) -> dict[str, object]:
         # Additive nullable review standing of the producing task. Absent server
         # knowledge is null, never an implied "awaiting" or an implied approval.
         "review_state": item.review_state,
+        "result_review_state": item.result_review_state,
+        "retained": item.retained,
         "latest": item.latest,
         "version_count": item.version_count,
         "width": item.width,
         "height": item.height,
     }
 
-    if item.kind == "artifact_image":
+    if item.kind in {"artifact_image", "static_build"}:
         for field in ("package_id", "package_revision", "screen_id"):
             value.pop(field)
         value["delegation_revision"] = item.delegation_revision
@@ -172,6 +174,30 @@ def register_output_routes(
             manager_factory,
             live_registry_factory,
         )
+
+    @routes.get("/api/outputs/builds/{artifact_id}/{artifact_revision}", dependencies=dependencies)
+    async def download_build(
+        artifact_id: str, artifact_revision: str, scope_kind: str = "", scope_id: str = ""
+    ) -> Response:
+        try:
+            content = await asyncio.to_thread(
+                lambda: OutputReads(manager_factory()).read_build(
+                    scope_kind, scope_id, artifact_id, artifact_revision
+                )
+            )
+            return Response(
+                content=content,
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": 'attachment; filename="commons-static-build.zip"',
+                    "X-Content-Type-Options": "nosniff",
+                    "Cache-Control": "no-store",
+                },
+            )
+        except OutputReadRefusal as exc:
+            return JSONResponse({"error": exc.code}, status_code=exc.status_code)
+        except Exception:
+            return JSONResponse({"error": "outputs_unavailable"}, status_code=409)
 
     if not register_writes:
         return

@@ -170,3 +170,11 @@ def test_event_dispatcher_is_fail_closed_for_direct_invalid_task_input() -> None
 
 def test_direct_parser_keeps_unknown_event_families_at_the_existing_boundary() -> None:
     assert parse_task_review_envelope("not.a.known.event", {}) is None
+
+
+@pytest.mark.parametrize("parent", [None, f"task.{ULID_1}"])
+def test_hierarchy_fields_preserve_explicit_null_and_absence(parent: str | None) -> None:
+    created = {**PAYLOADS["task.created"], "task_kind": "component", "parent_task_id": parent}
+    assert parse_task_review_envelope("task.created", created).to_payload() == created
+    revised = {**PAYLOADS["task.revised"], "changes": {"parent_task_id": parent}}
+    assert parse_task_review_envelope("task.revised", revised).to_payload() == revised

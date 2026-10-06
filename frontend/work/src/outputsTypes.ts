@@ -3,12 +3,17 @@ export type OutputVersions = "latest" | "all";
 export type OutputState = "unchecked" | "ready" | "stale" | "unavailable";
 /** Server-derived review standing of the producing task; never inferred here. */
 export type ReviewState = "awaiting" | "approved" | "returned";
-export type ImageOutput = Readonly<{
-  kind: "design_image" | "artifact_image";
-  outputId: string; title: string; artifactId: string; contentRevision: string;
-  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg";
+export type OutputProvenance = Readonly<{
+  taskId: string; taskRevision: string; producerAgentId: string | null;
+  producerSessionId: string | null; producerDelegationId: string | null; delegationRevision: string | null;
+}>;
+export type ImageOutput = OutputProvenance & Readonly<{
+  kind: "design_image" | "artifact_image" | "static_build";
+  outputId: string; title: string; artifactId: string; artifactRevision: string; contentRevision: string;
+  recordedAt: string | null; packageId: string | null; packageRevision: string | null; screenId: string | null;
+  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg" | "application/zip";
   latest: boolean; versionCount: number; width: number | null; height: number | null;
-  historicalPreviewVerified?: boolean; reviewState: ReviewState | null;
+  historicalPreviewVerified?: boolean; retained?: boolean; resultReviewState?: ReviewState | null; reviewState: ReviewState | null;
 }>;
 export type OutputList = Readonly<{ scope: OutputScope; versions: OutputVersions; items: readonly (ImageOutput | LiveOutput)[] }>;
 export type OutputSummary = Readonly<{ scope: OutputScope; total: number; unchecked: number; stale: number; unavailable: number }>;
@@ -64,11 +69,11 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
       seen.add(live.outputId); return live;
     }
     if (item.kind === "design_image") {
-      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state");
+      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state result_review_state retained");
       const packageId = id(item.package_id, "design_package"), packageRevision = id(item.package_revision, "evt"), screenId = id(item.screen_id, "screen");
       if (item.output_id !== `${packageId}@${packageRevision}:${screenId}` || item.series_id !== `${packageId}:${screenId}`) fail();
-    } else if (item.kind === "artifact_image") {
-      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state");
+    } else if ((item.kind === "artifact_image" || item.kind === "static_build")) {
+      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state result_review_state retained");
       if (item.output_id !== `${id(item.artifact_id, "artifact")}@${id(item.artifact_revision, "evt")}` || typeof item.series_id !== "string" || !/^generated\.[a-f0-9]{64}$/.test(item.series_id)) fail();
       if (typeof item.historical_preview_verified !== "boolean" || (item.historical_preview_verified && (item.state !== "stale" || item.reason !== "producer_task_revision_changed"))) fail();
       id(item.delegation_revision, "evt"); id(item.producer_agent_id, "agent"); id(item.producer_delegation_id, "delegation");
@@ -82,25 +87,31 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
     }
     if ((scope.kind === "task" && item.task_id !== scope.id) || (scope.kind === "agent" && item.producer_agent_id !== scope.id)) fail();
     if (typeof item.content_revision !== "string" || !DIGEST.test(item.content_revision) || !["public", "internal"].includes(item.classification as string)) fail();
-    if (item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
+    if (item.kind === "static_build" ? item.media_type !== "application/zip" || item.retained !== true : item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
+    if (item.retained !== undefined && typeof item.retained !== "boolean") fail();
     if (!["unchecked", "ready", "stale", "unavailable"].includes(item.state as string) || typeof item.latest !== "boolean" || (versions === "latest" && !item.latest)) fail();
     if (item.reason !== null && (typeof item.reason !== "string" || !REASONS.has(item.reason))) fail();
     if (item.recorded_at !== null && (typeof item.recorded_at !== "string" || !Number.isFinite(Date.parse(item.recorded_at)) || item.recorded_at.length > 64)) fail();
     const width = item.width === null ? null : count(item.width), height = item.height === null ? null : count(item.height);
-    if (item.state === "ready" && (item.reason !== null || !width || !height || width * height > 16_000_000)) fail();
+    if (item.state === "ready" && (item.reason !== null || (item.kind === "static_build" ? width !== null || height !== null : !width || !height || width * height > 16_000_000))) fail();
     if (item.state !== "ready" && (width !== null || height !== null)) fail();
     const versionCount = count(item.version_count); if (!versionCount) fail();
     seen.add(item.output_id as string);
-    return { kind: item.kind, outputId: item.output_id as string, title: text(item.title), artifactId: id(item.artifact_id, "artifact"), contentRevision: item.content_revision,
-      state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type, latest: item.latest,
-      versionCount, width, height, historicalPreviewVerified: item.kind === "artifact_image" && item.historical_preview_verified === true,
-      reviewState: reviewState(item.review_state) };
+    return { taskId: item.task_id as string, taskRevision: item.task_revision as string, producerAgentId: item.producer_agent_id as string | null,
+      producerSessionId: item.producer_session_id as string | null, producerDelegationId: item.producer_delegation_id as string | null,
+      delegationRevision: item.kind !== "design_image" ? item.delegation_revision as string : null,
+      artifactRevision: item.artifact_revision as string, recordedAt: item.recorded_at as string | null,
+      packageId: item.kind === "design_image" ? item.package_id as string : null, packageRevision: item.kind === "design_image" ? item.package_revision as string : null, screenId: item.kind === "design_image" ? item.screen_id as string : null,
+      kind: item.kind, outputId: item.output_id as string, title: text(item.title), artifactId: id(item.artifact_id, "artifact"), contentRevision: item.content_revision,
+      state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type as ImageOutput["mediaType"], latest: item.latest,
+      versionCount, width, height, historicalPreviewVerified: item.kind !== "design_image" && item.historical_preview_verified === true,
+      retained: item.retained === true, resultReviewState: reviewState(item.result_review_state), reviewState: reviewState(item.review_state) };
   });
   return { scope, versions, items };
 }
 
 
-export type LiveOutput = Readonly<{
+export type LiveOutput = OutputProvenance & Readonly<{
   kind: "live_preview"; outputId: string; title: string; url: string | null; origin: string;
   publishedAt: number; expiresAt: number; reportedState: "starting" | "ready" | "unavailable";
   state: "starting" | "reported_ready" | "unavailable" | "expired" | "stale";
@@ -125,7 +136,9 @@ function parseLive(item: Record<string, unknown>, scope: OutputScope, versions: 
   if (typeof item.published_at !== "string" || typeof item.expires_at !== "string" || item.published_at.length > 40 || item.expires_at.length > 40) fail();
   const publishedAt = Date.parse(item.published_at), expiresAt = Date.parse(item.expires_at);
   if (!Number.isFinite(publishedAt) || !Number.isFinite(expiresAt) || expiresAt - publishedAt < 60_000 || expiresAt - publishedAt > 3_600_000) fail();
-  return { kind: "live_preview", outputId: item.output_id, title: text(item.title, 160), url: item.url as string | null, origin, publishedAt, expiresAt,
+  return { taskId: item.task_id as string, taskRevision: item.task_revision as string, producerAgentId: item.producer_agent_id as string,
+    producerSessionId: item.producer_session_id as string, producerDelegationId: item.producer_delegation_id as string, delegationRevision: item.delegation_revision as string,
+    kind: "live_preview", outputId: item.output_id, title: text(item.title, 160), url: item.url as string | null, origin, publishedAt, expiresAt,
     reportedState: item.reported_state as LiveOutput["reportedState"], state: item.state as LiveOutput["state"], latest: item.latest, versionCount: item.version_count as number };
 }
 /** New-tab navigation is rechecked at render and click, without a network probe. */
@@ -139,5 +152,11 @@ export function liveNavigation(item: LiveOutput, now: number, uiOrigin: string):
 
 /** Viewing exact verified pixels never promotes historical task output to current readiness. */
 export function canViewImage(item: ImageOutput): boolean {
-  return item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true);
+  return item.kind !== "static_build" && (item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true));
+}
+export function canDownloadBuild(item: ImageOutput): boolean { return item.kind === "static_build" && (item.state === "ready" || item.historicalPreviewVerified === true); }
+
+export type OutputKindFilter = "all" | "images" | "builds" | "live";
+export function filterOutputs(items: OutputList["items"], filter: OutputKindFilter): OutputList["items"] {
+  return filter === "all" ? items : items.filter((item) => filter === "live" ? item.kind === "live_preview" : filter === "builds" ? item.kind === "static_build" : item.kind === "design_image" || item.kind === "artifact_image");
 }

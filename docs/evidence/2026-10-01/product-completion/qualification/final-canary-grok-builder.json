@@ -1,0 +1,69 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "agent_commons_version": "0.1.0",
+  "agent_commons_source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+  "provider": "grok",
+  "profile_id": "grok-builder",
+  "purpose": "implementation",
+  "model": null,
+  "provider_version": "grok 1.0.13",
+  "requester_client": "agent-commons",
+  "skill_refs": [
+    "commons-start"
+  ],
+  "preflight": {
+    "profile_id": "grok-builder",
+    "provider": "grok",
+    "ok": true,
+    "checks": {
+      "workspace_snapshot": {
+        "ok": true,
+        "snapshot_diagnostic_count": 0
+      },
+      "provider_help": {
+        "ok": true,
+        "required_flags": "present"
+      },
+      "mcp_contract": {
+        "ok": true,
+        "catalog": "available",
+        "agent_commons_source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+        "tool_catalog_sha256": "ca072f94ba5155e3f70938c2c8e3372401465b13d0a272a1fca7ca9ceaa6d5df",
+        "tool_count": 33
+      },
+      "mcp_handshake": {
+        "ok": true,
+        "protocol": "initialized",
+        "required_tools": "available",
+        "tool_count": 33
+      }
+    },
+    "consumed_delegation_attempt": false,
+    "provider_help_process_started": true,
+    "provider_work_process_started": false
+  },
+  "initialization": {
+    "state": "ready",
+    "supported": true,
+    "blocks_launch": false
+  },
+  "ok": true,
+  "provider_work_process_started": true,
+  "process": {
+    "outcome": "succeeded",
+    "exit_code": 0,
+    "duration_seconds": 90.39361370797269,
+    "stdout_bytes_seen": 4227,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false
+  },
+  "canonical_state": "succeeded",
+  "workflow_diagnostic_code": "none",
+  "process_canonical_mismatch": false,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "terminal_tool_rejection_details": [],
+  "terminal_tool_rejection_details_truncated": false,
+  "child_session_closed": true
+}

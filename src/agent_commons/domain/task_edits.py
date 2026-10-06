@@ -128,3 +128,25 @@ def require_task_editable(snapshot: ProjectSnapshot, task_id: str, *, cancel: bo
             "task_live_work",
             "Resolve the task's requested or running work before editing or cancelling it.",
         )
+
+
+def validate_task_parent(snapshot: ProjectSnapshot, task_id: str, parent_id: object) -> None:
+    """Validate containment independently of dependency readiness, iteratively."""
+    if parent_id is None:
+        return
+    if type(parent_id) is not str or not is_typed_id(parent_id, "task"):
+        raise ValidationError("parent_task_id must be a task ID or null")
+    seen = {task_id}
+    current = parent_id
+    while current is not None:
+        if current in seen:
+            raise TaskEditRefusal(
+                "task_parent_cycle", "This parent would create a hierarchy cycle."
+            )
+        seen.add(current)
+        if len(seen) > MAX_EDIT_GRAPH_NODES:
+            raise TaskEditRefusal("task_parent_limit", "The hierarchy exceeds its traversal limit.")
+        parent = snapshot.tasks.get(current)
+        if parent is None:
+            raise TaskEditRefusal("task_parent_missing", "The selected parent does not exist.")
+        current = parent.get("parent_task_id")

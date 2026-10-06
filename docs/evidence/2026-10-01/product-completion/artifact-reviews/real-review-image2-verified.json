@@ -1,0 +1,66 @@
+{
+  "expected_model": "gpt-6-astra",
+  "model_identity_limit": "Expected immutable role/profile model; runtime config/fingerprint evidence must independently confirm the selected model. No inference about provider internals.",
+  "delegation_id": "delegation.2AJE23Q2K33QBMFY48E46ZNA1B",
+  "review_state": "approved",
+  "review_summary": "Inspected the exact retained PNG pixels through commons_read_output_image. The visible label is SYNTHETIC FIXTURE / VERSION 2. The page has a dark navy left sidebar labeled COMMONS with Work, Team, and Results; a pale main area headed Engineering desk; and three stacked white rounded cards labeled Design overview, Implement overview, and Review exact result. The accent is a solid blue square at the right of the bottom card. Approval is limited to this retained image and the requested visual inspection. No execution or tests were performed, no canonical verifications were available, and source deletion was not independently verified. This artifact verdict does not approve the producing task or establish runtime behavior.",
+  "exact_target": {
+    "kind": "artifact",
+    "id": "artifact.0KN7CWA64CB305GW4RV08J9ZRP"
+  },
+  "target_revision": "evt.01M3VQGSEXZC6EF8DYBDMNDMV3",
+  "attempt": {
+    "schema": "agent_commons.runtime_attempt.v5",
+    "attempt_id": "attempt.71KB93G6H93ZVT494K66XEPWFT",
+    "request_id": "request.12RDHHPH8PB0Q73CNWX4P4390B",
+    "number": 1,
+    "profile_id": "codex-independent-reviewer",
+    "provider": "codex",
+    "correlation": {
+      "delegation_id": "delegation.2AJE23Q2K33QBMFY48E46ZNA1B",
+      "target_kind": "review",
+      "target_id": "review.1QYYHES3F1GAB21TYAC0F4S5V2",
+      "target_revision": "evt.01M3VQGTZXWPHHTGP4WWTVPM8X",
+      "parent_session_id": "session.83f2d728d7024a3992e424ee320a4d27",
+      "child_session_id": "session.f894c84168b445588608744075d0c72a",
+      "trace_id": "2c6a61a98897d68c352f56a534686a55",
+      "root_delegation_id": "delegation.2AJE23Q2K33QBMFY48E46ZNA1B"
+    },
+    "child_policy": {
+      "remaining_depth": 0,
+      "max_fanout": 1,
+      "max_attempts": 1,
+      "max_concurrency": 1,
+      "timeout_seconds": 600,
+      "max_output_bytes": 1048576,
+      "max_budget_microusd": null
+    },
+    "checkout_fingerprint": "81afd38ce88e95274e203c9f9681b594bb1599f143803041eb2eab4f9b721c84",
+    "launch_plan_sha256": "3108d093131bd1dd2da855acfafaeb8209dc171fc0ee4278fdbacd993f355f99",
+    "launch_key_sha256": "c44e94c1ee1ee07bf7c1f8588525308dbab2b7678a9c79255c907dd37f2fdc99",
+    "state": "succeeded",
+    "reason": "completed",
+    "pid": 30789,
+    "exit_code": 0,
+    "stdout_bytes_seen": 55660,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false,
+    "diagnostic_code": "none",
+    "stderr_diagnostic_tail": null,
+    "stderr_diagnostic_tail_truncated": false,
+    "stderr_diagnostic_tail_redacted": false,
+    "created_at": "2026-10-01T13:36:02.746083Z",
+    "updated_at": "2026-10-01T13:36:52.959147Z"
+  },
+  "terminal_tool_audit": {
+    "schema": "agent_commons.terminal_tool_audit.v2",
+    "delegation_id": "delegation.2AJE23Q2K33QBMFY48E46ZNA1B",
+    "terminal_tool_calls": 1,
+    "terminal_tool_rejections": 0,
+    "terminal_tool_completions": 1,
+    "last_tool": "commons_finalize_review",
+    "updated_at": "2026-10-01T13:36:45.020287Z",
+    "rejection_details": []
+  },
+  "task_review_still_requested": true
+}

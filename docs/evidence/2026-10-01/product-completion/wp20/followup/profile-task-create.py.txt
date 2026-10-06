@@ -1,0 +1,60 @@
+"""One synthetic task_create profile; no production state or provider calls."""
+import cProfile
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import pstats
+import signal
+import sys
+import tempfile
+import time
+
+signal.alarm(300)
+for key in ('AGENT_COMMONS_STATE_ROOT', 'AGENT_COMMONS_STATE_BASE', 'AGENT_COMMONS_SESSION_ID'):
+    os.environ.pop(key, None)
+root = Path(__file__).resolve().parent
+sys.path.insert(0, str(root / 'benchmarks'))
+import benchmark_work_mutation as b
+from agent_commons.runtime.source_contract import agent_commons_source_sha256
+
+source_hash = agent_commons_source_sha256()
+with tempfile.TemporaryDirectory(prefix='wp20-profile-', dir=root) as temp:
+    fixture = b.build_mutation_fixture(Path(temp), profile='large')
+    assert (fixture.event_count, fixture.manifest_count) == (3206, 350)
+    manager = b._bind_manager(fixture)
+    operation = b._mutation_operation(fixture, manager, 'task_create', key='granular-task-create', client=None)
+    profiler = cProfile.Profile()
+    started = time.perf_counter()
+    profiler.enable()
+    result = operation()
+    profiler.disable()
+    elapsed = time.perf_counter() - started
+assert source_hash == agent_commons_source_sha256()
+stats = pstats.Stats(profiler)
+rows = []
+for (file, line, name), (primitive, calls, self_seconds, cumulative, callers) in stats.stats.items():
+    rows.append(dict(file=file, line=line, function=name, primitive_calls=primitive,
+                     total_calls=calls, self_seconds=self_seconds, cumulative_seconds=cumulative,
+                     callers=[dict(file=key[0], line=key[1], function=key[2], stats=list(value) if isinstance(value, tuple) else value)
+                              for key, value in callers.items()]))
+selected = {'_identity', '_verify', '_refresh', 'refresh', 'read_path', 'validate', 'validate_event',
+            'assert_safe', 'scan', '_scan_text', 'classify_key', 'load_recovery_view', '_load_document',
+            '_event_map', '_event_info', 'prepare_for_write', 'reconcile', 'status', 'project_events',
+            'canonical_relative', 'resolve', 'canonical_sha256', 'canonical_json_bytes', 'iter_errors'}
+report = dict(source_sha256=source_hash,
+              benchmark_sha256=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest(),
+              fixture_event_count=fixture.event_count, fixture_manifest_count=fixture.manifest_count,
+              fixture_build_seconds=fixture.build_seconds, elapsed_profiled_seconds=elapsed,
+              total_calls=stats.total_calls, primitive_calls=stats.prim_calls,
+              selected_functions=[row for row in rows if row['function'] in selected],
+              top_cumulative=sorted(rows, key=lambda row: row['cumulative_seconds'], reverse=True)[:50],
+              top_self=sorted(rows, key=lambda row: row['self_seconds'], reverse=True)[:50],
+              note='One profiled cold-manager task_create, build excluded; profiler overhead and concurrent host jobs prohibit comparing wall time directly with unprofiled benchmark.')
+(root / 'task-create-profile.json').write_text(json.dumps(report, indent=2) + '\n')
+stream = io.StringIO()
+pstats.Stats(profiler, stream=stream).strip_dirs().sort_stats('cumulative').print_stats(45)
+pstats.Stats(profiler, stream=stream).strip_dirs().sort_stats('tottime').print_stats(35)
+(root / 'task-create-profile.txt').write_text(stream.getvalue())
+print(json.dumps({key: value for key, value in report.items() if key not in ('selected_functions', 'top_cumulative', 'top_self')}, indent=2))

@@ -1,0 +1,2233 @@
+diff --git a/src/agent_commons/ui/output_routes.py b/src/agent_commons/ui/output_routes.py
+--- a/src/agent_commons/ui/output_routes.py
++++ b/src/agent_commons/ui/output_routes.py
+@@ -98,13 +98,15 @@
+         # Additive nullable review standing of the producing task. Absent server
+         # knowledge is null, never an implied "awaiting" or an implied approval.
+         "review_state": item.review_state,
++        "result_review_state": item.result_review_state,
++        "retained": item.retained,
+         "latest": item.latest,
+         "version_count": item.version_count,
+         "width": item.width,
+         "height": item.height,
+     }
+ 
+-    if item.kind == "artifact_image":
++    if item.kind in {"artifact_image", "static_build"}:
+         for field in ("package_id", "package_revision", "screen_id"):
+             value.pop(field)
+         value["delegation_revision"] = item.delegation_revision
+@@ -172,6 +174,30 @@
+             manager_factory,
+             live_registry_factory,
+         )
++
++    @routes.get("/api/outputs/builds/{artifact_id}/{artifact_revision}", dependencies=dependencies)
++    async def download_build(
++        artifact_id: str, artifact_revision: str, scope_kind: str = "", scope_id: str = ""
++    ) -> Response:
++        try:
++            content = await asyncio.to_thread(
++                lambda: OutputReads(manager_factory()).read_build(
++                    scope_kind, scope_id, artifact_id, artifact_revision
++                )
++            )
++            return Response(
++                content=content,
++                media_type="application/zip",
++                headers={
++                    "Content-Disposition": 'attachment; filename="commons-static-build.zip"',
++                    "X-Content-Type-Options": "nosniff",
++                    "Cache-Control": "no-store",
++                },
++            )
++        except OutputReadRefusal as exc:
++            return JSONResponse({"error": exc.code}, status_code=exc.status_code)
++        except Exception:
++            return JSONResponse({"error": "outputs_unavailable"}, status_code=409)
+ 
+     if not register_writes:
+         return
+diff --git a/src/agent_commons/runtime/model.py b/src/agent_commons/runtime/model.py
+--- a/src/agent_commons/runtime/model.py
++++ b/src/agent_commons/runtime/model.py
+@@ -144,8 +144,13 @@
+     "mcp__agent-commons__commons_acknowledge_message",
+     "mcp__agent-commons__commons_publish_live_preview",
+     "mcp__agent-commons__commons_publish_design_image",
++    "mcp__agent-commons__commons_publish_static_build",
+ )
+-_CLAUDE_COMMONS_REVIEW_TOOLS = ("mcp__agent-commons__commons_record_verification",)
++_CLAUDE_COMMONS_REVIEW_TOOLS = (
++    "mcp__agent-commons__commons_record_verification",
++    "mcp__agent-commons__commons_read_output_image",
++    "mcp__agent-commons__commons_read_build_file",
++)
+ _CLAUDE_COMMONS_VERIFICATION_TOOLS = ("mcp__agent-commons__commons_record_verification",)
+ #: Staff-changing tools, keyed by the standing grant *and its level*.  A run
+ #: acting for no role, or for a role at `deny`, receives none of them: the grant
+diff --git a/src/agent_commons/mcp/server.py b/src/agent_commons/mcp/server.py
+--- a/src/agent_commons/mcp/server.py
++++ b/src/agent_commons/mcp/server.py
+@@ -181,6 +181,7 @@
+     "commons_succeed_delegation",
+     "commons_publish_live_preview",
+     "commons_publish_design_image",
++    "commons_publish_static_build",
+     "commons_read_message",
+     "commons_read_message_image",
+     "commons_read_message_file",
+@@ -188,6 +189,8 @@
+ }
+ VERIFICATION_WORKER_TOOL_NAMES = IMPLEMENTATION_WORKER_TOOL_NAMES | {"commons_record_verification"}
+ INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
++    "commons_read_output_image",
++    "commons_read_build_file",
+     "commons_record_verification",
+     "commons_finalize_review",
+ }
+@@ -956,6 +959,152 @@
+         )
+         worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
+         return result
++
++    build_read_ranges: dict[tuple[str, str], list[tuple[int, int]]] = {}
++    completed_build_entries: set[tuple[str, str]] = set()
++
++    def exact_output_bundle(artifact_id: str) -> dict[str, Any]:
++        if artifact_id not in relevant_artifact_ids() or worker_artifact_bundles is None:
++            raise LifecycleConflictError("reviewer may read only its exact bound output")
++        frozen = worker_artifact_bundles[artifact_id]
++        current = commons.get_artifact_bundle(artifact_id)
++        if (
++            current["artifact"]["manifest_ref"] != frozen["artifact"]["manifest_ref"]
++            or current["artifact"].get("effective_revision", current["artifact"].get("revision"))
++            != frozen["artifact"].get("effective_revision", frozen["artifact"].get("revision"))
++            or frozen["manifest"].get("classification") not in {"internal", "public"}
++        ):
++            raise LifecycleConflictError("reviewer output binding has changed")
++        return frozen
++
++    @register(_READ_ONLY, worker_only=True, worker_purposes=("independent_review",))
++    def commons_read_output_image(artifact_id: str) -> Any:
++        """Receive exact bound PNG/JPEG pixels as MCP image content for review."""
++        import base64
++
++        from mcp.types import CallToolResult, ImageContent
++
++        from agent_commons.services.artifact_content import ArtifactPreviewReader
++
++        bundle = exact_output_bundle(artifact_id)
++        image = ArtifactPreviewReader(commons).read(artifact_id)
++        if image.revision != bundle["manifest"]["revision"]:
++            raise LifecycleConflictError("reviewer output bytes have changed")
++        worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
++        return CallToolResult(
++            content=[
++                ImageContent(
++                    type="image",
++                    data=base64.b64encode(image.content).decode("ascii"),
++                    mimeType=image.media_type,
++                )
++            ]
++        )
++
++    @register(_READ_ONLY, worker_only=True, worker_purposes=("independent_review",))
++    def commons_read_build_file(
++        artifact_id: str, path: str = "", offset: int = 0, limit: int = 65536
++    ) -> dict[str, Any]:
++        """Inspect verified retained build manifest or bounded UTF-8 frontend content.
++
++        Empty path returns manifest only and never satisfies review evidence.
++        For approval, read every text entry completely (follow next_offset).
++        Asset hashes prove retained bytes, not visual appearance or execution.
++        """
++        import hashlib
++        import io
++        import zipfile
++
++        from agent_commons.services.output_content import BUILD_KIND, OutputContentStore
++
++        if (
++            type(offset) is not int
++            or offset < 0
++            or type(limit) is not int
++            or not 1 <= limit <= 65536
++        ):
++            raise ValidationError("Invalid build read bounds")
++        bundle = exact_output_bundle(artifact_id)
++        manifest = bundle["manifest"]
++        metadata = manifest.get("metadata") or {}
++        files = metadata.get("build_files")
++        if (
++            metadata.get("output_kind") != BUILD_KIND
++            or not isinstance(files, list)
++            or not 1 <= len(files) <= 128
++            or metadata.get("retained_content")
++            != {"revision": manifest.get("revision"), "size_bytes": manifest.get("size_bytes")}
++        ):
++            raise LifecycleConflictError("Bound output is not a retained static build")
++        content = OutputContentStore(commons).read(manifest["revision"], manifest["size_bytes"])
++        if not path:
++            return {
++                "schema": "agent_commons.build-read.v1",
++                "artifact_id": artifact_id,
++                "content_revision": manifest["revision"],
++                "files": files,
++                "content_verified": True,
++                "review_content_complete": False,
++            }
++        entry = next((entry for entry in files if entry.get("path") == path), None)
++        if entry is None or Path(path).suffix.lower() not in {
++            ".html",
++            ".css",
++            ".js",
++            ".mjs",
++            ".json",
++            ".txt",
++        }:
++            raise ValidationError("Build read requires a manifest-bound UTF-8 frontend entry")
++        with zipfile.ZipFile(io.BytesIO(content)) as archive:
++            info = archive.getinfo(path)
++            if info.file_size != entry["size_bytes"] or info.file_size > 10 * 1024 * 1024:
++                raise IntegrityError("Build entry bounds changed")
++            body = archive.read(path)
++        if "sha256:" + hashlib.sha256(body).hexdigest() != entry["revision"]:
++            raise IntegrityError("Build entry content changed")
++        try:
++            text = body.decode("utf-8")
++        except UnicodeDecodeError:
++            raise ValidationError("Build entry is not UTF-8") from None
++        text, redactions = workspace._review_content(text, context="scoped static build content")
++        if offset > len(text):
++            raise ValidationError("Build offset exceeds entry")
++        end = min(offset + limit, len(text))
++        ranges = build_read_ranges.setdefault((artifact_id, path), [])
++        ranges.append((offset, end))
++        cursor = 0
++        for start, stop in sorted(ranges):
++            if start > cursor:
++                break
++            cursor = max(cursor, stop)
++        if cursor == len(text):
++            build_read_ranges[(artifact_id, path)] = [(0, len(text))]
++        required = [
++            entry["path"]
++            for entry in files
++            if Path(entry["path"]).suffix.lower()
++            in {".html", ".css", ".js", ".mjs", ".json", ".txt"}
++        ]
++        # Completed entries have one consolidated range; do not infer completion
++        # from a manifest read or from a last chunk that skipped earlier bytes.
++        if cursor == len(text):
++            completed_build_entries.add((artifact_id, path))
++        complete = all((artifact_id, name) in completed_build_entries for name in required)
++        if complete:
++            worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
++        return {
++            "schema": "agent_commons.build-file-read.v1",
++            "artifact_id": artifact_id,
++            "content_revision": manifest["revision"],
++            "path": path,
++            "entry_revision": entry["revision"],
++            "content": text[offset:end],
++            "offset": offset,
++            "next_offset": end if end < len(text) else None,
++            "redactions": redactions,
++            "review_content_complete": complete,
++        }
+ 
+     @register(_READ_ONLY, worker_only=True)
+     def commons_read_skill(
+diff --git a/src/agent_commons/mcp/design_output_tools.py b/src/agent_commons/mcp/design_output_tools.py
+--- a/src/agent_commons/mcp/design_output_tools.py
++++ b/src/agent_commons/mcp/design_output_tools.py
+@@ -7,6 +7,7 @@
+ from collections.abc import Callable, Mapping
+ from typing import Any
+ 
++from agent_commons.core.canonical import canonical_sha256
+ from agent_commons.domain.snapshot import ProjectSnapshot
+ from agent_commons.domain.states import LIVE_WORKER_DELEGATION_STATES
+ from agent_commons.errors import (
+@@ -17,6 +18,12 @@
+ )
+ from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
+ from agent_commons.services.generated_outputs import OUTPUT_KIND, generated_series
++from agent_commons.services.output_content import (
++    BUILD_KIND,
++    BUILD_MEDIA,
++    OutputContentStore,
++    inspect_static_build,
++)
+ 
+ _REFUSAL = "Generated image publication is unavailable for this worker and task."
+ 
+@@ -30,6 +37,31 @@
+ ) -> None:
+     bound = dict(worker_binding or {})
+     bound["target_ref"] = dict(bound.get("target_ref") or {})
++
++    def decorate(fn):
++        return register(
++            {
++                "readOnlyHint": False,
++                "idempotentHint": True,
++                "destructiveHint": False,
++                "openWorldHint": False,
++            },
++            worker_only=True,
++            worker_purposes=("implementation", "verification"),
++        )(fn)
++
++    @decorate
++    def commons_publish_static_build(
++        source_path: str, title: str, idempotency_key: str
++    ) -> dict[str, Any]:
++        """Retain a bounded static dist build as a verified ZIP download.
++
++        Repository-relative directory; index.html required. At most 128 files,
++        20 MiB total, allowlisted frontend extensions, no links/hidden files.
++        Results offer Download build / Open locally, not a hosted preview.
++        An unchanged retry uses the same key; changed bytes require a new key.
++        """
++        return publish(source_path, title, idempotency_key, build=True)
+ 
+     @register(
+         {
+@@ -46,15 +78,18 @@
+         title: str,
+         idempotency_key: str,
+     ) -> dict[str, Any]:
+-        """Publish your generated PNG/JPEG into this task's and agent's Results.
+-
+-        source_path is a repository-relative generated image (no hidden folders,
+-        symlinks or external paths), at most 10 MiB and 16 million pixels. Write
+-        the image first, then call this tool. Only metadata enters the ledger.
+-        This neither completes the task nor creates an accepted Design Package.
+-        Reuse the key for an unchanged retry; use a new key for a new version of
+-        the same path. Source changes make earlier exact previews stale.
++        """Retain your generated PNG/JPEG in this task's and agent's Results.
++
++        Repository-relative image, no hidden folders or links, max 10 MiB and
++        16 million pixels. Bytes survive source overwrite and server restart.
++        An unchanged retry uses the same key; new versions use a new key.
++        Publication does not complete, review or accept the task.
+         """
++        return publish(source_path, title, idempotency_key, build=False)
++
++    def publish(
++        source_path: str, title: str, idempotency_key: str, *, build: bool
++    ) -> dict[str, Any]:
+         if (
+             not isinstance(idempotency_key, str)
+             or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{7,79}", idempotency_key)
+@@ -99,14 +134,25 @@
+                 )
+                 if task is None or current.get("agent_id") not in snapshot.agents:
+                     raise LifecycleConflictError(_REFUSAL)
+-                image = ArtifactPreviewReader(commons).inspect_generated_source(source_path)
+-                key = (
+-                    "generated-image-"
+-                    + hashlib.sha256(f"{current['id']}:{idempotency_key}".encode()).hexdigest()
+-                )
++                build_files = None
++                if build:
++                    content, build_files = inspect_static_build(commons, source_path)
++                    content_revision = "sha256:" + hashlib.sha256(content).hexdigest()
++                    media_type = BUILD_MEDIA
++                else:
++                    image = ArtifactPreviewReader(commons).inspect_generated_source(source_path)
++                    content, content_revision, media_type = (
++                        image.content,
++                        image.revision,
++                        image.media_type,
++                    )
++                output_kind = BUILD_KIND if build else OUTPUT_KIND
++                key = ("generated-build-" if build else "generated-image-") + hashlib.sha256(
++                    f"{current['id']}:{idempotency_key}".encode()
++                ).hexdigest()
+                 artifact_id = commons._new_entity_id("artifact", "artifact.registered", key)
+                 metadata = {
+-                    "output_kind": OUTPUT_KIND,
++                    "output_kind": output_kind,
+                     "output_task": {
+                         "id": target["id"],
+                         "revision": snapshot.entity_revision("task", target["id"]),
+@@ -118,19 +164,25 @@
+                     "series_id": generated_series(current["id"], source_path),
+                     "title": title,
+                 }
++                retained = {"revision": content_revision, "size_bytes": len(content)}
++                metadata["retained_content"] = retained
++                if build:
++                    metadata["build_files"] = build_files
+                 existing = snapshot.artifacts.get(artifact_id)
+                 if existing is not None:
+                     bundle = commons.get_artifact_bundle(artifact_id)
+                     manifest = bundle["manifest"]
+                     old = manifest.get("metadata", {})
+                     if (
+-                        manifest.get("revision") != image.revision
++                        manifest.get("revision") != content_revision
+                         or manifest.get("source") != {"path": source_path}
+-                        or manifest.get("media_type") != image.media_type
++                        or manifest.get("media_type") != media_type
+                         or manifest.get("classification") != "internal"
+                         or old.get("title") != title
+                         or old.get("series_id") != metadata["series_id"]
+-                        or old.get("output_kind") != OUTPUT_KIND
++                        or old.get("output_kind") != output_kind
++                        or old.get("retained_content") != retained
++                        or (build and old.get("build_files") != build_files)
+                         or old.get("output_task", {}).get("id") != target["id"]
+                         or old.get("output_delegation", {}).get("id") != current["id"]
+                         or snapshot.entity_revision_actor(
+@@ -143,33 +195,73 @@
+                         raise IdempotencyConflictError(
+                             "Generated image retry differs from its publication."
+                         )
++                    OutputContentStore(commons).put(content)
+                     metadata = old
+                     revision = snapshot.entity_revision("artifact", artifact_id)
+                 else:
+-                    result = commons.register_artifact(
+-                        source_path,
+-                        media_type=image.media_type,
+-                        classification="internal",
+-                        metadata=metadata,
+-                        expected_revision=image.revision,
+-                        expected_size=len(image.content),
+-                        expected_source_path=source_path,
+-                        idempotency_key=key,
+-                    )
++                    OutputContentStore(commons).put(content)
++                    if build:
++                        manifest = {
++                            "schema": "commons.manifest.artifact.v1",
++                            "kind": "artifact",
++                            "artifact_id": artifact_id,
++                            "revision": content_revision,
++                            "source": {"path": source_path},
++                            "media_type": media_type,
++                            "size_bytes": len(content),
++                            "classification": "internal",
++                            "captured": False,
++                            "metadata": metadata,
++                        }
++                        commons.policy.assert_safe(manifest, context="artifact metadata")
++                        commons.schemas.validate_manifest(manifest)
++                        manifest_id = "mft.artifact.sha256." + canonical_sha256(manifest)
++                        result = commons.record_event(
++                            "artifact.registered",
++                            {
++                                "artifact_id": artifact_id,
++                                "manifest_ref": manifest_id,
++                                "revision": content_revision,
++                                "classification": "internal",
++                            },
++                            idempotency_key=key,
++                            relations=(
++                                commons._relation(
++                                    {"kind": "artifact", "id": artifact_id},
++                                    "uses",
++                                    {"kind": "manifest", "id": manifest_id},
++                                ),
++                            ),
++                            tags=("artifact",),
++                            _manifest=manifest,
++                        )
++                    else:
++                        result = commons.register_artifact(
++                            source_path,
++                            media_type=media_type,
++                            classification="internal",
++                            metadata=metadata,
++                            expected_revision=content_revision,
++                            expected_size=len(content),
++                            expected_source_path=source_path,
++                            idempotency_key=key,
++                        )
+                     revision = result["revision"]
+                 return {
+-                    "schema": "agent_commons.generated-image-result.v1",
+-                    "kind": "artifact_image",
++                    "schema": "agent_commons.generated-build-result.v1"
++                    if build
++                    else "agent_commons.generated-image-result.v1",
++                    "kind": "static_build" if build else "artifact_image",
+                     "artifact_id": artifact_id,
+                     "artifact_revision": revision,
+-                    "content_revision": image.revision,
++                    "content_revision": content_revision,
+                     "task_id": target["id"],
+                     "task_revision": metadata["output_task"]["revision"],
+                     "producer_agent_id": current["agent_id"],
+                     "producer_delegation_id": current["id"],
+                     "delegation_revision": metadata["output_delegation"]["revision"],
+                     "series_id": metadata["series_id"],
+-                    "content_copied": False,
++                    "content_copied": True,
+                 }
+         except IdempotencyConflictError:
+             raise IdempotencyConflictError(
+diff --git a/src/agent_commons/services/delegation_instruction.py b/src/agent_commons/services/delegation_instruction.py
+--- a/src/agent_commons/services/delegation_instruction.py
++++ b/src/agent_commons/services/delegation_instruction.py
+@@ -114,8 +114,14 @@
+             f"""the exact target. Before the terminal call, satisfy every evidence
+ precondition: inspect the review, locate its exact task once, and call
+ commons_read_artifact exactly once for every artifact required by that task. Do
+-not attempt finalization first and repair a rejected call afterward. After
+-analysis, call the injected
++not attempt finalization first and repair a rejected call afterward.
++For an exact image artifact target, use commons_read_output_image to inspect its
++verified pixels instead of the UTF-8 artifact reader. For a retained static build,
++use commons_read_build_file: manifest-only reads do not satisfy approval evidence;
++read every text entry fully, following next_offset without gaps. Binary asset
++hashes do not prove visual appearance. State any execution, visual or test limits
++honestly in the verdict summary. Artifact-target review need not locate a task.
++After analysis, call the injected
+ {finalize_review_tool} tool exactly once with the bounded
+ verdict. That retry-convergent terminal operation records review.completed and then
+ delegation.succeeded with the bound review as its fixed result; do not call a
+diff --git a/src/agent_commons/services/output_content.py b/src/agent_commons/services/output_content.py
+--- /dev/null
++++ b/src/agent_commons/services/output_content.py
+@@ -0,0 +1,323 @@
++"""Bounded local, immutable output bytes; canonical manifests remain metadata.
++
++No automatic eviction: quota refusal preserves every previously published version.
++Unreferenced content from an interrupted publication remains charged to the quota
++and an identical retry reuses it. Back up this directory with the workspace state.
++"""
++
++from __future__ import annotations
++
++import fcntl
++import hashlib
++import io
++import json
++import os
++import re
++import stat
++import threading
++import uuid
++import zipfile
++from contextlib import contextmanager
++from pathlib import Path
++
++from agent_commons.errors import IntegrityError, ValidationError
++
++MAX_STORE_BYTES = 256 * 1024 * 1024
++MAX_STORE_OBJECTS = 512
++MAX_BUILD_BYTES = 20 * 1024 * 1024
++MAX_BUILD_FILES = 128
++BUILD_KIND = "task_static_build"
++BUILD_MEDIA = "application/zip"
++_SUFFIXES = {
++    ".html",
++    ".css",
++    ".js",
++    ".mjs",
++    ".json",
++    ".png",
++    ".jpg",
++    ".jpeg",
++    ".svg",
++    ".ico",
++    ".woff",
++    ".woff2",
++    ".ttf",
++    ".txt",
++    ".webp",
++}
++
++
++_STORE_LOCKS: dict[str, threading.RLock] = {}
++_STORE_LOCKS_GUARD = threading.Lock()
++
++
++class OutputContentStore:
++    def __init__(self, manager):
++        self.root = manager.paths.state_root / "output-content"
++
++    def _directory(self, *, create: bool = False) -> int:
++        if create:
++            self.root.mkdir(mode=0o700, exist_ok=True)
++        return os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
++
++    @contextmanager
++    def _write_lock(self):
++        with _STORE_LOCKS_GUARD:
++            lock = _STORE_LOCKS.setdefault(str(self.root), threading.RLock())
++        with lock:
++            directory = self._directory(create=True)
++            descriptor = None
++            try:
++                descriptor = os.open(
++                    "store.lock",
++                    os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
++                    0o600,
++                    dir_fd=directory,
++                )
++                info = os.fstat(descriptor)
++                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
++                    raise IntegrityError("Unsafe retained content lock")
++                fcntl.flock(descriptor, fcntl.LOCK_EX)
++                yield
++            finally:
++                if descriptor is not None:
++                    os.close(descriptor)
++                os.close(directory)
++
++    def put(self, content: bytes) -> dict[str, object]:
++        with self._write_lock():
++            return self._put_locked(content)
++
++    def _put_locked(self, content: bytes) -> dict[str, object]:
++        if not 1 <= len(content) <= MAX_BUILD_BYTES:
++            raise ValidationError("Output exceeds retained content bounds")
++        digest = hashlib.sha256(content).hexdigest()
++        directory = self._directory(create=True)
++        temporary = "partial-" + digest + "-" + uuid.uuid4().hex
++        try:
++            try:
++                self._recover_linked_partial(directory, digest, len(content))
++                if self._read(directory, digest, len(content)) == content:
++                    return {"revision": "sha256:" + digest, "size_bytes": len(content)}
++            except FileNotFoundError:
++                pass
++            names = [name for name in os.listdir(directory) if name != "store.lock"]
++            size = 0
++            for name in names:
++                info = os.stat(name, dir_fd=directory, follow_symlinks=False)
++                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
++                    raise IntegrityError("Unsafe retained content store")
++                size += info.st_size
++            if len(names) >= MAX_STORE_OBJECTS or size + len(content) > MAX_STORE_BYTES:
++                raise ValidationError("Retained output storage quota exceeded")
++            fd = os.open(
++                temporary,
++                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
++                0o600,
++                dir_fd=directory,
++            )
++            try:
++                with os.fdopen(fd, "wb") as stream:
++                    stream.write(content)
++                    stream.flush()
++                    os.fsync(stream.fileno())
++                os.link(
++                    temporary,
++                    digest,
++                    src_dir_fd=directory,
++                    dst_dir_fd=directory,
++                    follow_symlinks=False,
++                )
++                os.unlink(temporary, dir_fd=directory)
++                os.fsync(directory)
++            finally:
++                try:
++                    os.unlink(temporary, dir_fd=directory)
++                except FileNotFoundError:
++                    pass
++            return {"revision": "sha256:" + digest, "size_bytes": len(content)}
++        finally:
++            os.close(directory)
++
++    def _recover_linked_partial(self, directory: int, digest: str, size: int) -> None:
++        """Identical retry repairs only its interrupted atomic-link publication."""
++        current = os.stat(digest, dir_fd=directory, follow_symlinks=False)
++        if current.st_nlink == 1:
++            return
++        # Verify first; never delete another content identity to make a retry pass.
++        self._read(directory, digest, size, allow_links=True)
++        for name in os.listdir(directory):
++            if re.fullmatch(r"partial-" + digest + r"-[0-9a-f]{32}", name) is None:
++                continue
++            partial = os.stat(name, dir_fd=directory, follow_symlinks=False)
++            if (partial.st_dev, partial.st_ino) == (current.st_dev, current.st_ino):
++                os.unlink(name, dir_fd=directory)
++        os.fsync(directory)
++
++    def read(self, revision: str, size: int) -> bytes:
++        if (
++            not isinstance(revision, str)
++            or not re.fullmatch(r"sha256:[0-9a-f]{64}", revision)
++            or type(size) is not int
++            or not 1 <= size <= MAX_BUILD_BYTES
++        ):
++            raise IntegrityError("Invalid retained content binding")
++        directory = self._directory()
++        try:
++            return self._read(directory, revision[7:], size)
++        finally:
++            os.close(directory)
++
++    @staticmethod
++    def _read(directory: int, digest: str, size: int, *, allow_links: bool = False) -> bytes:
++        fd = os.open(digest, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
++        try:
++            before = os.fstat(fd)
++            if (
++                not stat.S_ISREG(before.st_mode)
++                or (before.st_nlink != 1 and not allow_links)
++                or before.st_size != size
++            ):
++                raise IntegrityError("Retained content is unavailable")
++            with os.fdopen(fd, "rb", closefd=False) as stream:
++                content = stream.read(size + 1)
++            after = os.fstat(fd)
++            if (
++                (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
++                != (after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
++                or len(content) != size
++                or hashlib.sha256(content).hexdigest() != digest
++            ):
++                raise IntegrityError("Retained content failed verification")
++            return content
++        finally:
++            os.close(fd)
++
++
++def inspect_static_build(manager, source_path: str) -> tuple[bytes, list[dict[str, object]]]:
++    """Capture an allowlisted dist directory into a deterministic download-only ZIP.
++
++    Directory and file descriptors never follow symlinks. HTML is never served on
++    the Commons origin. Hidden files, special files, hardlinks and escapes fail.
++    """
++    from agent_commons.services.artifact_content import ArtifactPreviewReader
++
++    relative = Path(source_path)
++    if (
++        not isinstance(source_path, str)
++        or not relative.parts
++        or relative.is_absolute()
++        or relative.as_posix() != source_path
++        or any(ord(c) < 32 or ord(c) == 127 for c in source_path)
++        or "\\" in source_path
++        or len(source_path) > 1024
++        or any(part.startswith(".") or part == "node_modules" for part in relative.parts)
++    ):
++        raise ValidationError("Invalid static build source")
++    reader = ArtifactPreviewReader(manager, max_bytes=MAX_BUILD_BYTES)
++    files: list[tuple[str, bytes]] = []
++    total = 0
++    directories = 0
++
++    def walk(directory: int, path: Path):
++        nonlocal total, directories
++        directories += 1
++        before = os.fstat(directory)
++        if directories > 128 or len(path.parts) > 16:
++            raise ValidationError("Static build directory bounds exceeded")
++        for name in sorted(os.listdir(directory)):
++            if (
++                name == "commons-build-manifest.json"
++                or name.startswith(".")
++                or name == "node_modules"
++                or "\\" in name
++                or any(ord(c) < 32 or ord(c) == 127 for c in name)
++            ):
++                raise ValidationError("Unsafe static build entry")
++            info = os.stat(name, dir_fd=directory, follow_symlinks=False)
++            child = path / name
++            if len(child.as_posix()) > 1024:
++                raise ValidationError("Static build path exceeds bounds")
++            if stat.S_ISDIR(info.st_mode):
++                fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
++                try:
++                    walk(fd, child)
++                finally:
++                    os.close(fd)
++            elif (
++                stat.S_ISREG(info.st_mode)
++                and info.st_nlink == 1
++                and child.suffix.lower() in _SUFFIXES
++            ):
++                total += info.st_size
++                if (
++                    len(files) >= MAX_BUILD_FILES
++                    or total > MAX_BUILD_BYTES
++                    or info.st_size > 10 * 1024 * 1024
++                ):
++                    raise ValidationError("Static build exceeds bounds")
++                content = reader._read_verified_source(
++                    relative / child, info.st_size, _file_digest(directory, name), single_link=True
++                )
++                files.append((child.as_posix(), content))
++            else:
++                raise ValidationError("Unsafe static build entry")
++        after = os.fstat(directory)
++        if (before.st_ino, before.st_mtime_ns, before.st_ctime_ns) != (
++            after.st_ino,
++            after.st_mtime_ns,
++            after.st_ctime_ns,
++        ):
++            raise IntegrityError("Static build directory changed while capturing")
++
++    root_fd = reader._open_regular(relative)
++    try:
++        if not stat.S_ISDIR(os.fstat(root_fd).st_mode):
++            raise ValidationError("Static build source is not a directory")
++        walk(root_fd, Path())
++    finally:
++        os.close(root_fd)
++    for name, captured in files:
++        reader._read_verified_source(
++            relative / name, len(captured), hashlib.sha256(captured).hexdigest(), single_link=True
++        )
++    if not any(name == "index.html" for name, _ in files):
++        raise ValidationError("Static build requires index.html")
++    manifest = [
++        {
++            "path": name,
++            "revision": "sha256:" + hashlib.sha256(content).hexdigest(),
++            "size_bytes": len(content),
++        }
++        for name, content in files
++    ]
++    buffer = io.BytesIO()
++    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_STORED) as archive:
++        archive.writestr(
++            zipfile.ZipInfo("commons-build-manifest.json"),
++            json.dumps(
++                {"schema": "agent_commons.static-build.v1", "files": manifest}, sort_keys=True
++            ),
++        )
++        for name, content in files:
++            archive.writestr(zipfile.ZipInfo(name), content)
++    content = buffer.getvalue()
++    if len(content) > MAX_BUILD_BYTES:
++        raise ValidationError("Static build bundle exceeds bounds")
++    return content, manifest
++
++
++def _file_digest(directory: int, name: str) -> str:
++    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
++    try:
++        digest = hashlib.sha256()
++        remaining = 10 * 1024 * 1024 + 1
++        while remaining:
++            chunk = os.read(fd, min(remaining, 65536))
++            if not chunk:
++                return digest.hexdigest()
++            remaining -= len(chunk)
++            digest.update(chunk)
++        raise ValidationError("Static build entry exceeds bounds")
++    finally:
++        os.close(fd)
+diff --git a/src/agent_commons/services/artifact_content.py b/src/agent_commons/services/artifact_content.py
+--- a/src/agent_commons/services/artifact_content.py
++++ b/src/agent_commons/services/artifact_content.py
+@@ -66,6 +66,7 @@
+     media_type: str
+     size_bytes: int
+     classification: str
++    retained_content: dict | None
+ 
+ 
+ class ArtifactBundle(TypedDict):
+@@ -226,7 +227,19 @@
+                 "artifact preview exceeds the configured byte limit",
+             )
+         relative = _relative_source(manifest["source"]["path"])
+-        content = self._read_verified_source(relative, expected_size, expected_digest)
++        if manifest.get("retained_content") is not None:
++            from agent_commons.services.output_content import OutputContentStore
++
++            try:
++                content = OutputContentStore(self._manager).read(
++                    manifest["revision"], expected_size
++                )
++            except (CommonsError, OSError, ValueError):
++                _refuse(
++                    "artifact_preview_missing_source", 409, "Retained output bytes are unavailable"
++                )
++        else:
++            content = self._read_verified_source(relative, expected_size, expected_digest)
+         width, height = _image_dimensions(content, media_type)
+         if width * height > self._max_pixels:
+             _refuse(
+@@ -298,11 +311,13 @@
+         relative: Path,
+         expected_size: int,
+         expected_digest: str,
++        *,
++        single_link: bool = False,
+     ) -> bytes:
+         descriptor = self._open_regular(relative)
+         try:
+             before = os.fstat(descriptor)
+-            if not stat.S_ISREG(before.st_mode):
++            if not stat.S_ISREG(before.st_mode) or (single_link and before.st_nlink != 1):
+                 _refuse(
+                     "artifact_preview_non_regular_source",
+                     409,
+@@ -330,7 +345,8 @@
+                 chunks.append(chunk)
+                 remaining -= len(chunk)
+             content = b"".join(chunks)
+-            if _FileIdentity.from_stat(os.fstat(descriptor)) != identity:
++            after = os.fstat(descriptor)
++            if _FileIdentity.from_stat(after) != identity or (single_link and after.st_nlink != 1):
+                 _refuse(
+                     "artifact_preview_stale_source",
+                     409,
+@@ -440,7 +456,21 @@
+         "media_type": _string(mapping, "media_type"),
+         "size_bytes": size,
+         "classification": _string(mapping, "classification"),
++        "retained_content": _retained_binding(mapping),
+     }
++
++
++def _retained_binding(mapping):
++    metadata = mapping.get("metadata")
++    retained = metadata.get("retained_content") if isinstance(metadata, Mapping) else None
++    if retained is not None and (
++        not isinstance(retained, Mapping)
++        or set(retained) != {"revision", "size_bytes"}
++        or retained
++        != {"revision": mapping.get("revision"), "size_bytes": mapping.get("size_bytes")}
++    ):
++        _invalid_manifest()
++    return retained
+ 
+ 
+ def _mapping(value: object) -> Mapping[str, object]:
+diff --git a/src/agent_commons/services/generated_outputs.py b/src/agent_commons/services/generated_outputs.py
+--- a/src/agent_commons/services/generated_outputs.py
++++ b/src/agent_commons/services/generated_outputs.py
+@@ -10,6 +10,7 @@
+ 
+ from agent_commons.core.ids import is_typed_id
+ from agent_commons.domain.snapshot import ProjectSnapshot
++from agent_commons.services.output_content import BUILD_KIND
+ 
+ OUTPUT_KIND = "task_design_image"
+ 
+@@ -49,8 +50,28 @@
+     value = manifest.get("metadata")
+     if (
+         not isinstance(value, dict)
+-        or set(value) != {"output_kind", "output_task", "output_delegation", "series_id", "title"}
+-        or value["output_kind"] != OUTPUT_KIND
++        or set(value)
++        not in (
++            {"output_kind", "output_task", "output_delegation", "series_id", "title"},
++            {
++                "output_kind",
++                "output_task",
++                "output_delegation",
++                "series_id",
++                "title",
++                "retained_content",
++            },
++            {
++                "output_kind",
++                "output_task",
++                "output_delegation",
++                "series_id",
++                "title",
++                "retained_content",
++                "build_files",
++            },
++        )
++        or value["output_kind"] not in {OUTPUT_KIND, BUILD_KIND}
+     ):
+         return None
+     task = value["output_task"]
+@@ -85,11 +106,54 @@
+         or not relative.parts
+         or relative.as_posix() != source["path"]
+         or any(part.startswith(".") for part in relative.parts)
+-        or relative.suffix.lower() not in {".png", ".jpg", ".jpeg"}
++        or (
++            value["output_kind"] == OUTPUT_KIND
++            and relative.suffix.lower() not in {".png", ".jpg", ".jpeg"}
++        )
+         or "\\" in source["path"]
+         or any(ord(char) < 32 or ord(char) == 127 for char in source["path"])
+     ):
+         return None
++    retained = value.get("retained_content")
++    if retained is not None and retained != {
++        "revision": manifest.get("revision"),
++        "size_bytes": manifest.get("size_bytes"),
++    }:
++        return None
++    if value["output_kind"] == BUILD_KIND:
++        files = value.get("build_files")
++        if (
++            retained is None
++            or manifest.get("media_type") != "application/zip"
++            or not isinstance(files, list)
++            or not 1 <= len(files) <= 128
++        ):
++            return None
++        paths = set()
++        total = 0
++        for entry in files:
++            if not isinstance(entry, dict) or set(entry) != {"path", "revision", "size_bytes"}:
++                return None
++            name, digest, size = entry["path"], entry["revision"], entry["size_bytes"]
++            if (
++                not isinstance(name, str)
++                or not name
++                or len(name) > 1024
++                or Path(name).is_absolute()
++                or Path(name).as_posix() != name
++                or any(part.startswith(".") for part in Path(name).parts)
++                or "\\" in name
++                or name in paths
++                or not isinstance(digest, str)
++                or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
++                or type(size) is not int
++                or not 0 <= size <= 10 * 1024 * 1024
++            ):
++                return None
++            paths.add(name)
++            total += size
++        if "index.html" not in paths or total > 20 * 1024 * 1024:
++            return None
+     revision = artifact.get("effective_revision") or artifact.get("revision")
+     session = snapshot.entity_revision_actor("artifact", artifact["id"], revision)
+     producer = producer_for_task(snapshot, session, task["id"], delegations)
+diff --git a/src/agent_commons/services/outputs.py b/src/agent_commons/services/outputs.py
+--- a/src/agent_commons/services/outputs.py
++++ b/src/agent_commons/services/outputs.py
+@@ -15,6 +15,7 @@
+ from agent_commons.core.ids import is_typed_id
+ from agent_commons.domain.chronology import chronological_key
+ from agent_commons.domain.design_packages import DesignPackageRecord, ScreenBinding
++from agent_commons.domain.lifecycle import _delegation_matches_review
+ from agent_commons.domain.snapshot import ProjectSnapshot
+ from agent_commons.runtime.live_previews import LivePreview, LivePreviewRegistry
+ from agent_commons.services.artifact_content import (
+@@ -24,6 +25,7 @@
+     PreviewRefusalCode,
+ )
+ from agent_commons.services.generated_outputs import producer_for_task, validated_generated_metadata
++from agent_commons.services.output_content import BUILD_KIND, OutputContentStore
+ 
+ ScopeKind = Literal["task", "agent"]
+ OutputState = Literal["unchecked", "ready", "stale", "unavailable"]
+@@ -104,10 +106,12 @@
+     version_count: int
+     width: int | None = None
+     height: int | None = None
+-    kind: Literal["design_image", "artifact_image"] = "design_image"
++    kind: Literal["design_image", "artifact_image", "static_build"] = "design_image"
+     delegation_revision: str | None = None
+     historical_preview_verified: bool = False
+     review_state: ReviewState | None = None
++    result_review_state: ReviewState | None = None
++    retained: bool = False
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+@@ -157,7 +161,7 @@
+         for item in items:
+             historical = (
+                 isinstance(item, ImageOutput)
+-                and item.kind == "artifact_image"
++                and item.kind in {"artifact_image", "static_build"}
+                 and item.state == "stale"
+                 and item.reason == "producer_task_revision_changed"
+             )
+@@ -165,7 +169,11 @@
+                 try:
+                     if reader is None:
+                         reader = self._reader_factory(self._manager)
+-                    checked = self._verify(item, reader)
++                    checked = (
++                        self._verify_build(item)
++                        if item.kind == "static_build"
++                        else self._verify(item, reader)
++                    )
+                     item = (
+                         replace(item, historical_preview_verified=True)
+                         if historical and checked.state == "ready"
+@@ -268,6 +276,7 @@
+                     version_count=versions_by_series[item.series_id],
+                     latest=item.output_id == latest_by_series[item.series_id],
+                     review_state=reviews.get(item.task_id),
++                    result_review_state=_result_review(snapshot, item),
+                 )
+                 for item in items
+                 if selected == "all" or item.output_id == latest_by_series[item.series_id]
+@@ -316,7 +325,10 @@
+             reason = None
+             if not _exact(snapshot.tasks.get(task["id"]), task["revision"]):
+                 state, reason = "stale", "producer_task_revision_changed"
+-            elif manifest.get("media_type") not in _SAFE_MEDIA:
++            elif (
++                manifest.get("media_type") not in _SAFE_MEDIA
++                and metadata["output_kind"] != BUILD_KIND
++            ):
+                 state, reason = "unavailable", "output_preview_unsupported"
+             items.append(
+                 ImageOutput(
+@@ -341,14 +353,17 @@
+                     reason=reason,
+                     latest=True,
+                     version_count=1,
+-                    kind="artifact_image",
++                    kind="static_build"
++                    if metadata["output_kind"] == BUILD_KIND
++                    else "artifact_image",
++                    retained=metadata.get("retained_content") is not None,
+                     delegation_revision=producer["revision"],
+                 )
+             )
+         return items
+ 
+-    @staticmethod
+     def _item(
++        self,
+         snapshot: ProjectSnapshot,
+         package: DesignPackageRecord,
+         screen: ScreenBinding,
+@@ -390,6 +405,17 @@
+             state, reason = "stale", "producer_provenance_missing"
+         elif not screen.safe_preview_eligible or screen.media_type not in _SAFE_MEDIA:
+             state, reason = "unavailable", "output_preview_unsupported"
++        retained = False
++        if artifact is not None and artifact.get("manifest_ref") in snapshot.known_manifest_ids:
++            try:
++                retained = (
++                    self._manager.manifests.get(artifact["manifest_ref"])
++                    .manifest.get("metadata", {})
++                    .get("retained_content")
++                    is not None
++                )
++            except Exception:
++                pass
+         series = f"{package.design_package_id}:{screen.screen_id}"
+         return ImageOutput(
+             output_id=f"{package.design_package_id}@{package.revision}:{screen.screen_id}",
+@@ -412,8 +438,40 @@
+             state=state,
+             reason=reason,
+             latest=latest,
++            retained=retained,
+             version_count=1,
+         )
++
++    def read_build(
++        self, scope_kind: str, scope_id: str, artifact_id: str, artifact_revision: str
++    ) -> bytes:
++        listing = self.list(scope_kind, scope_id, versions="all")
++        item = next(
++            (
++                item
++                for item in listing.items
++                if isinstance(item, ImageOutput)
++                and item.kind == "static_build"
++                and item.artifact_id == artifact_id
++                and item.artifact_revision == artifact_revision
++                and (item.state == "ready" or item.historical_preview_verified)
++            ),
++            None,
++        )
++        if item is None:
++            raise OutputReadRefusal(
++                "outputs_unavailable", 409, "Exact build bytes are unavailable."
++            )
++        manifest = self._manager.get_artifact_bundle(artifact_id)["manifest"]
++        return OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
++
++    def _verify_build(self, item: ImageOutput) -> ImageOutput:
++        try:
++            manifest = self._manager.get_artifact_bundle(item.artifact_id)["manifest"]
++            OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
++        except Exception:
++            return replace(item, state="unavailable", reason="output_preview_unavailable")
++        return replace(item, state="ready")
+ 
+     @staticmethod
+     def _verify(item: ImageOutput, reader: PreviewReader) -> ImageOutput:
+@@ -473,3 +531,39 @@
+     return record is not None and (record.get("effective_revision") or record.get("revision")) == (
+         revision
+     )
++
++
++def _result_review(snapshot: ProjectSnapshot, item: ImageOutput) -> ReviewState | None:
++    """An artifact-target review is exact; a task review never approves an output."""
++    candidates = []
++    for identifier, review in snapshot.reviews.items():
++        if (
++            review.get("target_ref") != {"kind": "artifact", "id": item.artifact_id}
++            or review.get("target_revision") != item.artifact_revision
++            or review.get("stale") is True
++        ):
++            continue
++        state = _REVIEW_STATES.get(str(review.get("state")))
++        if state == "approved":
++            if review.get("independent") is not True:
++                continue
++            actor = (review.get("actor") or {}).get("session_id")
++            delegated = [
++                delegation
++                for delegation in snapshot.delegations.values()
++                if delegation.get("child_session_id") == actor
++                and delegation.get("purpose") == "independent_review"
++                and _delegation_matches_review(delegation, review)
++            ]
++            if delegated and not any(
++                delegation.get("state") == "succeeded" for delegation in delegated
++            ):
++                continue
++        if state is not None:
++            candidates.append(
++                (
++                    chronological_key(review.get("recorded_at"), review.get("id") or identifier),
++                    state,
++                )
++            )
++    return max(candidates)[1] if candidates else None
+diff --git a/frontend/work/tests/outputs.test.mjs b/frontend/work/tests/outputs.test.mjs
+--- a/frontend/work/tests/outputs.test.mjs
++++ b/frontend/work/tests/outputs.test.mjs
+@@ -404,3 +404,57 @@
+   assert.match(markup, /Verified image unavailable/);
+   assert.doesNotMatch(markup, /<img|src=/);
+ });
++
++const buildRow = (overrides = {}) => generatedRow({ kind: "static_build", media_type: "application/zip", retained: true, width: null, height: null, result_review_state: null, ...overrides });
++test("static build parser keeps retained result identity and never creates an image preview", async () => {
++  const { canDownloadBuild } = await load("outputsTypes.js");
++  const { BuildDownloadAction } = await load("components/OutputsPanel.js");
++  const item = parseOutputList(list([buildRow({ review_state: "approved" })]), scope, "latest").items[0];
++  assert.equal(item.reviewState, "approved"); assert.equal(item.resultReviewState, null);
++  assert.equal(canViewImage(item), false); assert.equal(canDownloadBuild(item), true);
++  assert.equal(filterOutputs([item], "images").length, 0); assert.equal(filterOutputs([item], "builds").length, 1);
++  for (const locale of ["en", "ru"]) {
++    const html = renderToStaticMarkup(createElement(BuildDownloadAction, { api: {}, scope, item, locale }));
++    assert.ok(html.includes(outputText(locale, "downloadBuild")));
++    assert.ok(html.includes(outputText(locale, "openLocally")));
++    assert.doesNotMatch(html, /<iframe|<img|href=/);
++    const unavailable = renderToStaticMarkup(createElement(BuildDownloadAction, { api: {}, scope, item: { ...item, state: "unavailable" }, locale }));
++    assert.match(unavailable, /disabled=""/);
++  }
++  for (const changed of [{ retained: false }, { media_type: "text/html" }, { width: 1 }, { task_id: id("task", "1") }]) assert.throws(() => parseOutputList(list([buildRow(changed)]), scope, "latest"), OutputsError);
++});
++test("build download verifies hash and scoped freshness, and propagates an honest retryable error", async () => {
++  const bytes = new TextEncoder().encode("synthetic zip content"), digest = `sha256:${Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex")}`;
++  const wire = buildRow({ content_revision: digest });
++  let response = list([wire]);
++  const transport = { readOutputs: async (_kind, _id, versions) => ({ ...response, versions }), readOutputImage: async () => { throw Error("must not request image bytes"); }, readOutputBuild: async () => new Blob([bytes], { type: "application/zip" }) };
++  const api = new OutputsApi(transport), item = parseOutputList(response, scope, "latest").items[0];
++  assert.equal((await api.build(scope, item, signal())).size, bytes.length);
++  response = list([buildRow({ ...wire, state: "unavailable", reason: "output_preview_unavailable" })], scope, "all");
++  await assert.rejects(api.build(scope, item, signal()), OutputsError);
++  response = list([wire], scope, "all");
++  assert.equal((await api.build(scope, item, signal())).size, bytes.length);
++  transport.readOutputBuild = async () => new Blob(["wrong version"], { type: "application/zip" });
++  await assert.rejects(api.build(scope, item, signal()), OutputsError);
++});
++
++test("build transport retains immutable project scope and rejects HTML, oversize and unsafe identities", async () => {
++  const previous = globalThis.fetch, calls = [];
++  const host = Object.assign(new WorkApi(), { apiBase: "/api/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
++  const first = host.forProject("project.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), second = host.forProject("project.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
++  globalThis.fetch = async (url, init) => { calls.push({ url, init }); return new Response(new Uint8Array([1]), { headers: { "Content-Type": "application/zip" } }); };
++  try {
++    await first.readOutputBuild(id("artifact"), id("evt"), "task", scope.id, signal());
++    await second.readOutputBuild(id("artifact"), id("evt"), "agent", agentScope.id, signal());
++    assert.match(calls[0].url, /\/projects\/project.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\/outputs\/builds\/artifact\..*\/evt\..*scope_kind=task/);
++    assert.ok(calls[1].url.includes(`/projects/project.${"b".repeat(32)}/outputs/builds/`));
++    assert.equal(calls[0].init.redirect, "error"); assert.equal(calls[0].init.credentials, "same-origin");
++    for (const response of [new Response("<script/>", { headers: { "Content-Type": "text/html" } }), new Response(new Uint8Array(), { headers: { "Content-Type": "application/zip" } }), new Response(new Uint8Array([1]), { headers: { "Content-Type": "application/zip", "Content-Length": "20971521" } }), new Response(new Uint8Array(20971521), { headers: { "Content-Type": "application/zip" } })]) {
++      globalThis.fetch = async () => response;
++      await assert.rejects(first.readOutputBuild(id("artifact"), id("evt"), "task", scope.id, signal()));
++    }
++    await assert.rejects(first.readOutputBuild("../config", id("evt"), "task", scope.id, signal()));
++    await assert.rejects(first.readOutputBuild(id("artifact"), "evt.invalid", "task", scope.id, signal()));
++    await assert.rejects(first.readOutputBuild(id("artifact"), id("evt"), "task", "task.injected?scope=all", signal()));
++  } finally { globalThis.fetch = previous; }
++});
+diff --git a/frontend/work/src/outputsTypes.ts b/frontend/work/src/outputsTypes.ts
+--- a/frontend/work/src/outputsTypes.ts
++++ b/frontend/work/src/outputsTypes.ts
+@@ -8,12 +8,12 @@
+   producerSessionId: string | null; producerDelegationId: string | null; delegationRevision: string | null;
+ }>;
+ export type ImageOutput = OutputProvenance & Readonly<{
+-  kind: "design_image" | "artifact_image";
++  kind: "design_image" | "artifact_image" | "static_build";
+   outputId: string; title: string; artifactId: string; artifactRevision: string; contentRevision: string;
+   recordedAt: string | null; packageId: string | null; packageRevision: string | null; screenId: string | null;
+-  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg";
++  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg" | "application/zip";
+   latest: boolean; versionCount: number; width: number | null; height: number | null;
+-  historicalPreviewVerified?: boolean; reviewState: ReviewState | null;
++  historicalPreviewVerified?: boolean; retained?: boolean; resultReviewState?: ReviewState | null; reviewState: ReviewState | null;
+ }>;
+ export type OutputList = Readonly<{ scope: OutputScope; versions: OutputVersions; items: readonly (ImageOutput | LiveOutput)[] }>;
+ export type OutputSummary = Readonly<{ scope: OutputScope; total: number; unchecked: number; stale: number; unavailable: number }>;
+@@ -69,11 +69,11 @@
+       seen.add(live.outputId); return live;
+     }
+     if (item.kind === "design_image") {
+-      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state");
++      keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state result_review_state retained");
+       const packageId = id(item.package_id, "design_package"), packageRevision = id(item.package_revision, "evt"), screenId = id(item.screen_id, "screen");
+       if (item.output_id !== `${packageId}@${packageRevision}:${screenId}` || item.series_id !== `${packageId}:${screenId}`) fail();
+-    } else if (item.kind === "artifact_image") {
+-      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state");
++    } else if ((item.kind === "artifact_image" || item.kind === "static_build")) {
++      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state result_review_state retained");
+       if (item.output_id !== `${id(item.artifact_id, "artifact")}@${id(item.artifact_revision, "evt")}` || typeof item.series_id !== "string" || !/^generated\.[a-f0-9]{64}$/.test(item.series_id)) fail();
+       if (typeof item.historical_preview_verified !== "boolean" || (item.historical_preview_verified && (item.state !== "stale" || item.reason !== "producer_task_revision_changed"))) fail();
+       id(item.delegation_revision, "evt"); id(item.producer_agent_id, "agent"); id(item.producer_delegation_id, "delegation");
+@@ -87,24 +87,25 @@
+     }
+     if ((scope.kind === "task" && item.task_id !== scope.id) || (scope.kind === "agent" && item.producer_agent_id !== scope.id)) fail();
+     if (typeof item.content_revision !== "string" || !DIGEST.test(item.content_revision) || !["public", "internal"].includes(item.classification as string)) fail();
+-    if (item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
++    if (item.kind === "static_build" ? item.media_type !== "application/zip" || item.retained !== true : item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
++    if (item.retained !== undefined && typeof item.retained !== "boolean") fail();
+     if (!["unchecked", "ready", "stale", "unavailable"].includes(item.state as string) || typeof item.latest !== "boolean" || (versions === "latest" && !item.latest)) fail();
+     if (item.reason !== null && (typeof item.reason !== "string" || !REASONS.has(item.reason))) fail();
+     if (item.recorded_at !== null && (typeof item.recorded_at !== "string" || !Number.isFinite(Date.parse(item.recorded_at)) || item.recorded_at.length > 64)) fail();
+     const width = item.width === null ? null : count(item.width), height = item.height === null ? null : count(item.height);
+-    if (item.state === "ready" && (item.reason !== null || !width || !height || width * height > 16_000_000)) fail();
++    if (item.state === "ready" && (item.reason !== null || (item.kind === "static_build" ? width !== null || height !== null : !width || !height || width * height > 16_000_000))) fail();
+     if (item.state !== "ready" && (width !== null || height !== null)) fail();
+     const versionCount = count(item.version_count); if (!versionCount) fail();
+     seen.add(item.output_id as string);
+     return { taskId: item.task_id as string, taskRevision: item.task_revision as string, producerAgentId: item.producer_agent_id as string | null,
+       producerSessionId: item.producer_session_id as string | null, producerDelegationId: item.producer_delegation_id as string | null,
+-      delegationRevision: item.kind === "artifact_image" ? item.delegation_revision as string : null,
++      delegationRevision: item.kind !== "design_image" ? item.delegation_revision as string : null,
+       artifactRevision: item.artifact_revision as string, recordedAt: item.recorded_at as string | null,
+       packageId: item.kind === "design_image" ? item.package_id as string : null, packageRevision: item.kind === "design_image" ? item.package_revision as string : null, screenId: item.kind === "design_image" ? item.screen_id as string : null,
+       kind: item.kind, outputId: item.output_id as string, title: text(item.title), artifactId: id(item.artifact_id, "artifact"), contentRevision: item.content_revision,
+-      state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type, latest: item.latest,
+-      versionCount, width, height, historicalPreviewVerified: item.kind === "artifact_image" && item.historical_preview_verified === true,
+-      reviewState: reviewState(item.review_state) };
++      state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type as ImageOutput["mediaType"], latest: item.latest,
++      versionCount, width, height, historicalPreviewVerified: item.kind !== "design_image" && item.historical_preview_verified === true,
++      retained: item.retained === true, resultReviewState: reviewState(item.result_review_state), reviewState: reviewState(item.review_state) };
+   });
+   return { scope, versions, items };
+ }
+@@ -151,10 +152,11 @@
+ 
+ /** Viewing exact verified pixels never promotes historical task output to current readiness. */
+ export function canViewImage(item: ImageOutput): boolean {
+-  return item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true);
++  return item.kind !== "static_build" && (item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true));
+ }
++export function canDownloadBuild(item: ImageOutput): boolean { return item.kind === "static_build" && (item.state === "ready" || item.historicalPreviewVerified === true); }
+ 
+-export type OutputKindFilter = "all" | "images" | "live";
++export type OutputKindFilter = "all" | "images" | "builds" | "live";
+ export function filterOutputs(items: OutputList["items"], filter: OutputKindFilter): OutputList["items"] {
+-  return filter === "all" ? items : items.filter((item) => filter === "live" ? item.kind === "live_preview" : item.kind !== "live_preview");
++  return filter === "all" ? items : items.filter((item) => filter === "live" ? item.kind === "live_preview" : filter === "builds" ? item.kind === "static_build" : item.kind === "design_image" || item.kind === "artifact_image");
+ }
+diff --git a/frontend/work/src/i18n.json b/frontend/work/src/i18n.json
+--- a/frontend/work/src/i18n.json
++++ b/frontend/work/src/i18n.json
+@@ -1070,7 +1070,18 @@
+     "task_graph.fit": "Fit width",
+     "task_graph.edgeMeaning": "Arrow: prerequisite → dependent task",
+     "task_graph.hiddenPrerequisites": "Prerequisite links outside this view",
+-    "task_graph.noMatches": "No tasks match this map view. Clear the search or show all tasks."
++    "task_graph.noMatches": "No tasks match this map view. Clear the search or show all tasks.",
++    "outputs.staticBuild": "Static frontend build",
++    "outputs.builds": "Builds",
++    "outputs.downloadBuild": "Download build",
++    "outputs.openLocally": "Extract the ZIP and open locally. Hosted preview is separate.",
++    "outputs.retainedBytes": "Bytes retained locally",
++    "outputs.sourceBytes": "Uses current source bytes",
++    "outputs.resultAwaiting": "Exact result: awaiting check",
++    "outputs.resultApproved": "Exact result: check approved",
++    "outputs.resultReturned": "Exact result: returned with comments",
++    "outputs.resultUnreviewed": "Exact result: no recorded check",
++    "outputs.reviewCommandContext": "Run from this project directory with its active Commons session and matching state. Verify session and workspace first."
+   },
+   "ru": {
+     "app_title": "Начните сфокусированную работу",
+@@ -2143,6 +2154,17 @@
+     "task_graph.fit": "По ширине",
+     "task_graph.edgeMeaning": "Стрелка: предварительная → зависимая задача",
+     "task_graph.hiddenPrerequisites": "Связи с предварительными задачами вне вида",
+-    "task_graph.noMatches": "В этом виде нет подходящих задач. Очистите поиск или покажите все задачи."
++    "task_graph.noMatches": "В этом виде нет подходящих задач. Очистите поиск или покажите все задачи.",
++    "outputs.staticBuild": "Статическая сборка frontend",
++    "outputs.builds": "Сборки",
++    "outputs.downloadBuild": "Скачать сборку",
++    "outputs.openLocally": "Распакуйте ZIP и откройте локально. Размещённое превью — отдельный шаг.",
++    "outputs.retainedBytes": "Байты сохранены локально",
++    "outputs.sourceBytes": "Использует текущие исходные байты",
++    "outputs.resultAwaiting": "Точный результат: ждёт проверки",
++    "outputs.resultApproved": "Точный результат: проверка одобрена",
++    "outputs.resultReturned": "Точный результат: возвращён с замечаниями",
++    "outputs.resultUnreviewed": "Точный результат: проверка не записана",
++    "outputs.reviewCommandContext": "Запускайте из каталога этого проекта с его активной сессией Commons и соответствующим state. Сначала проверьте сессию и workspace."
+   }
+ }
+diff --git a/frontend/work/src/api.ts b/frontend/work/src/api.ts
+--- a/frontend/work/src/api.ts
++++ b/frontend/work/src/api.ts
+@@ -2312,6 +2312,38 @@
+     return new Blob(chunks, { type });
+   }
+ 
++  async readOutputBuild(artifactId: string, artifactRevision: string, kind: "task" | "agent", scopeId: string, signal: AbortSignal): Promise<Blob> {
++    if (!/^artifact\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactId)) throw new ApiProblem(400, null);
++    if (!/^evt\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactRevision) || !new RegExp(`^${kind}\\.[0-7][0-9A-HJKMNP-TV-Z]{25}$`).test(scopeId) || (kind !== "task" && kind !== "agent")) throw new ApiProblem(400, null);
++    if (!this.apiBase) throw new ApiProblem(401, null);
++    const response = await fetch(`${this.apiBase}${this.scopedPath(`/outputs/builds/${encodeURIComponent(artifactId)}/${encodeURIComponent(artifactRevision)}?${new URLSearchParams({ scope_kind: kind, scope_id: scopeId })}`)}`, {
++      method: "GET", credentials: "same-origin", redirect: "error", signal,
++    });
++    if (!response.ok) {
++      if (response.status === 401) { clearStoredApiBase(); this.apiBase = ""; }
++      throw new ApiProblem(response.status, null);
++    }
++    const type = (response.headers.get("Content-Type") ?? "").split(";", 1)[0].trim();
++    if (type !== "application/zip") { await response.body?.cancel(); throw new ApiProblem(502, null); }
++    const limit = 20 * 1024 * 1024;
++    const declared = response.headers.get("Content-Length");
++    if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) { await response.body?.cancel(); throw new ApiProblem(502, null); }
++    if (!response.body) throw new ApiProblem(502, null);
++    const reader = response.body.getReader(), chunks: BlobPart[] = [];
++    let total = 0;
++    try {
++      while (true) {
++        const { done, value } = await reader.read();
++        if (done) break;
++        total += value.byteLength;
++        if (total > limit || signal.aborted) { await reader.cancel(); throw new ApiProblem(502, null); }
++        chunks.push(Uint8Array.from(value));
++      }
++    } finally { reader.releaseLock(); }
++    if (total === 0 || signal.aborted) throw new ApiProblem(502, null);
++    return new Blob(chunks, { type });
++  }
++
+   async requestConversation(path: string, options: { method: "GET" | "POST"; body?: unknown; operationId?: string; signal: AbortSignal }): Promise<unknown> {
+     const file = typeof File !== "undefined" && options.body instanceof File ? options.body : null;
+     try { conversationPath(path, options.method, file); } catch { throw new ApiProblem(400, null); }
+diff --git a/frontend/work/src/outputsStrings.ts b/frontend/work/src/outputsStrings.ts
+--- a/frontend/work/src/outputsStrings.ts
++++ b/frontend/work/src/outputsStrings.ts
+@@ -1,6 +1,6 @@
+ import { translate, type Locale, type MessageKey } from "./i18n.js";
+ 
+-const KEYS = [
++const KEYS = ["reviewCommandContext","staticBuild", "builds", "downloadBuild", "openLocally", "retainedBytes", "sourceBytes", "resultAwaiting", "resultApproved", "resultReturned", "resultUnreviewed",
+   "galleryEmpty", "gallery", "openGallery", "versionFilter", "kindFilter", "allKinds", "images", "liveKinds", "retry", "filterEmpty", "designImage", "generatedImage", "noThumbnail", "task", "agent", "producerUnknown", "technicalDetails", "address",
+   "live",
+   "starting",
+diff --git a/frontend/work/src/outputsApi.ts b/frontend/work/src/outputsApi.ts
+--- a/frontend/work/src/outputsApi.ts
++++ b/frontend/work/src/outputsApi.ts
+@@ -1,5 +1,5 @@
+ import type { WorkApi } from "./api.js";
+-import { OutputsError, canViewImage, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type LiveOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions, type ReviewState } from "./outputsTypes.js";
++import { OutputsError, canViewImage, canDownloadBuild, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type LiveOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions, type ReviewState } from "./outputsTypes.js";
+ import type { OutputMessage } from "./outputsStrings.js";
+ 
+ export type OutputStatus = Extract<OutputMessage, "latestResult" | "earlierViewable" | "earlierVersion" | "previewExpired" | "addressUnavailable" | "previewNotVerified" | "previewUnavailable" | "starting" | "reported_ready">;
+@@ -13,7 +13,7 @@
+     if (item.state === "unavailable") return "addressUnavailable";
+     return item.state;
+   }
+-  if (canViewImage(item)) return item.state === "ready" && item.latest ? "latestResult" : "earlierViewable";
++  if (canViewImage(item) || canDownloadBuild(item)) return item.state === "ready" && item.latest ? "latestResult" : "earlierViewable";
+   if (item.state === "unchecked") return "previewNotVerified";
+   if (item.state === "unavailable") return "previewUnavailable";
+   return "earlierVersion";
+@@ -22,7 +22,7 @@
+ /** Only a server-supplied review state produces a review label; freshness never does. */
+ export function reviewLabel(state: ReviewState | null): OutputMessage | null { return state === null ? null : REVIEW_LABELS[state]; }
+ 
+-type Transport = Pick<WorkApi, "readOutputs" | "readOutputImage">;
++type Transport = Pick<WorkApi, "readOutputs" | "readOutputImage"> & Partial<Pick<WorkApi, "readOutputBuild">>;
+ export class OutputsApi {
+   private requests = new Set<AbortController>();
+   private summaries = new Map<string, Promise<OutputSummary>>();
+@@ -43,6 +43,16 @@
+   }
+   async list(scope: OutputScope, versions: OutputVersions, signal: AbortSignal): Promise<OutputList> {
+     scopeKey(scope); return parseOutputList(await this.transport.readOutputs(scope.kind, scope.id, versions, false, signal), scope, versions);
++  }
++  async build(scope: OutputScope, item: ImageOutput, signal: AbortSignal): Promise<Blob> {
++    if (!canDownloadBuild(item) || !this.transport.readOutputBuild) throw new OutputsError();
++    const blob = await this.transport.readOutputBuild(item.artifactId, item.artifactRevision, scope.kind, scope.id, signal);
++    if (blob.type !== "application/zip" || blob.size < 1 || blob.size > 20 * 1024 * 1024 || signal.aborted) throw new OutputsError();
++    const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
++    if (`sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}` !== item.contentRevision || signal.aborted) throw new OutputsError();
++    const fresh = await this.list(scope, "all", signal);
++    if (!fresh.items.some((current) => current.kind === "static_build" && current.outputId === item.outputId && canDownloadBuild(current) && current.contentRevision === item.contentRevision) || signal.aborted) throw new OutputsError();
++    return blob;
+   }
+   async preview(scope: OutputScope, item: ImageOutput, versions: OutputVersions, signal: AbortSignal): Promise<Blob> {
+     if (!canViewImage(item)) throw new OutputsError();
+diff --git a/frontend/work/src/components/OutputsPanel.tsx b/frontend/work/src/components/OutputsPanel.tsx
+--- a/frontend/work/src/components/OutputsPanel.tsx
++++ b/frontend/work/src/components/OutputsPanel.tsx
+@@ -3,7 +3,7 @@
+ import type { Locale } from "../i18n.js";
+ import { OutputsApi, OutputPreviewQueue, outputStatus, presentCurrent, reviewLabel } from "../outputsApi.js";
+ import { outputText } from "../outputsStrings.js";
+-import { canViewImage, filterOutputs, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions, type OutputKindFilter, type ReviewState } from "../outputsTypes.js";
++import { canViewImage, canDownloadBuild, filterOutputs, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions, type OutputKindFilter, type ReviewState } from "../outputsTypes.js";
+ 
+ type Selection = { owner: OutputsApi; projectId: string | null; scope: OutputScope; title: string; opener: HTMLButtonElement };
+ type OutputContext = { api: OutputsApi; locale: Locale; revision: string; open: (scope: OutputScope, title: string, opener: HTMLButtonElement) => void };
+@@ -114,15 +114,17 @@
+       <button type="button" className="button button-secondary button-inline" aria-pressed={versions === "latest"} onClick={() => setVersions("latest")}>{text("latest")}</button>
+       <button type="button" className="button button-secondary button-inline" aria-pressed={versions === "all"} onClick={() => setVersions("all")}>{text("history")}</button>
+     </div><div role="group" aria-label={text("kindFilter")}>
+-      {(["all", "images", "live"] as const).map((kind) => <button key={kind} type="button" className="button button-secondary button-inline" aria-pressed={filter === kind} onClick={() => setFilter(kind)}>{text(kind === "all" ? "allKinds" : kind === "images" ? "images" : "liveKinds")}</button>)}
++      {(["all", "images", "builds", "live"] as const).map((kind) => <button key={kind} type="button" className="button button-secondary button-inline" aria-pressed={filter === kind} onClick={() => setFilter(kind)}>{text(kind === "all" ? "allKinds" : kind === "images" ? "images" : kind === "builds" ? "builds" : "liveKinds")}</button>)}
+     </div><button type="button" className="button button-secondary button-inline" onClick={() => setAttempt((value) => value + 1)}>{text(current?.kind === "error" ? "retry" : "refresh")}</button></div>
+     {current === null ? <p role="status">{text("loading")}</p> : current.kind === "error" ? <p role="alert">{text("failed")}</p> : items.length === 0 ? <p role="status">{text(current.value.items.length === 0 ? "galleryEmpty" : "filterEmpty")}</p> : <ul className="outputs-list">{items.map((item) => item.kind === "live_preview" ? <LivePreviewCard key={item.outputId} item={item} locale={locale} now={now} uiOrigin={window.location.origin} {...attribution} /> : <li key={item.outputId} data-expanded={currentPreview?.outputId === item.outputId && currentPreview.kind === "ready"}>
+-      <ImageThumbnail key={`${item.outputId}:${item.contentRevision}:${item.state}:${item.historicalPreviewVerified}:${revision}:${attempt}`} api={api} queue={queue} scope={scope} versions={versions} item={item} locale={locale} root={dialog.current} />
+-      <p className="small-copy">{text(item.kind === "design_image" ? "designImage" : "generatedImage")}</p><h3>{item.title}</h3><p className="outputs-status" data-status={outputStatus(item, now)}>{text(outputStatus(item, now))}</p>
++      {item.kind !== "static_build" && <ImageThumbnail key={`${item.outputId}:${item.contentRevision}:${item.state}:${item.historicalPreviewVerified}:${revision}:${attempt}`} api={api} queue={queue} scope={scope} versions={versions} item={item} locale={locale} root={dialog.current} />}
++      <p className="small-copy">{text(item.kind === "design_image" ? "designImage" : item.kind === "static_build" ? "staticBuild" : "generatedImage")}</p><h3>{item.title}</h3><p className="outputs-status" data-status={outputStatus(item, now)}>{text(outputStatus(item, now))}</p>
++      <p className="small-copy">{text(item.retained ? "retainedBytes" : "sourceBytes")}</p>
++      <p className="outputs-review" data-result-review={item.resultReviewState ?? "none"}>{text(item.resultReviewState === "approved" ? "resultApproved" : item.resultReviewState === "returned" ? "resultReturned" : item.resultReviewState === "awaiting" ? "resultAwaiting" : "resultUnreviewed")}</p>
+       <ReviewStateLine state={item.reviewState} locale={locale} />
+       <p className="small-copy">{text(item.latest ? "current" : "previous")} · {item.versionCount} {text("versions")}</p>
+       <OutputAttribution item={item} locale={locale} {...attribution} />
+-      <ImagePreviewAction item={item} locale={locale} onOpen={() => void openImage(item)} />
++      {item.kind === "static_build" ? <BuildDownloadAction api={api} scope={scope} item={item} locale={locale} /> : <ImagePreviewAction item={item} locale={locale} onOpen={() => void openImage(item)} />}
+       {currentPreview?.outputId !== item.outputId ? null : currentPreview.kind === "loading" ? <p role="status">{text("imageLoading")}</p> : currentPreview.kind === "error" ? <p role="alert">{text("imageFailed")}</p> : currentPreview.kind === "ready" ? <img className="outputs-image" src={currentPreview.url} alt={item.title} width={item.width ?? undefined} height={item.height ?? undefined} /> : null}
+     </li>)}</ul>}
+   </dialog>;
+@@ -161,7 +163,7 @@
+   const fields: [string, string | null][] = [["task_id", item.taskId], ["task_revision", item.taskRevision], ["producer_agent_id", item.producerAgentId], ["producer_session_id", item.producerSessionId], ["producer_delegation_id", item.producerDelegationId], ["delegation_revision", item.delegationRevision]];
+   if (item.kind !== "live_preview") fields.push(["artifact_id", item.artifactId], ["artifact_revision", item.artifactRevision], ["content_revision", item.contentRevision], ["package_id", item.packageId], ["package_revision", item.packageRevision], ["screen_id", item.screenId], ["recorded_at", item.recordedAt]);
+   return <div className="outputs-attribution"><p className="small-copy">{text("task")}: {onOpenTask ? <button type="button" className="notice-link" onClick={() => onOpenTask(item.taskId)}>{taskTitle}</button> : taskTitle}<br />{text("agent")}: {agentName}</p>
+-    <details><summary>{text("technicalDetails")}</summary><dl>{fields.filter(([, value]) => value !== null).map(([field, value]) => <div key={field}><dt><code>{field}</code></dt><dd><code>{value}</code></dd></div>)}</dl></details>
++    <details><summary>{text("technicalDetails")}</summary>{item.kind !== "live_preview" ? <div><p className="small-copy">{text("reviewCommandContext")}</p><p><code>{`uv run agent-commons review request --target-ref artifact:${item.artifactId} --target-revision ${item.artifactRevision} --criterion "Check this exact result" --independent --idempotency-key result-review-${item.artifactId}-${item.artifactRevision}`}</code></p></div> : null}<dl>{fields.filter(([, value]) => value !== null).map(([field, value]) => <div key={field}><dt><code>{field}</code></dt><dd><code>{value}</code></dd></div>)}</dl></details>
+   </div>;
+ }
+ 
+@@ -188,3 +190,21 @@
+   return <>{item.historicalPreviewVerified ? <p>{text("historicalHelp")}</p> : item.state !== "ready" ? <p>{text(item.state === "unavailable" ? "unavailableHelp" : item.state === "stale" ? "earlierHelp" : "uncheckedHelp")}</p> : null}
+     {canViewImage(item) ? <button type="button" className="button button-secondary button-inline" onClick={onOpen}>{text(item.historicalPreviewVerified ? "viewHistorical" : "view")}</button> : null}</>;
+ }
++
++export function BuildDownloadAction({ api, scope, item, locale }: { api: OutputsApi; scope: OutputScope; item: ImageOutput; locale: Locale }): ReactElement {
++  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
++  const controller = useRef<AbortController | null>(null);
++  useEffect(() => () => controller.current?.abort(), [api, item.outputId]);
++  async function download(): Promise<void> {
++    controller.current?.abort(); const active = new AbortController(); controller.current = active;
++    setState("loading");
++    try {
++      const blob = await api.build(scope, item, active.signal);
++      if (active.signal.aborted) return;
++      const url = URL.createObjectURL(blob), link = document.createElement("a");
++      link.href = url; link.download = "commons-static-build.zip"; link.rel = "noopener"; link.click();
++      setTimeout(() => URL.revokeObjectURL(url), 1000); setState("idle");
++    } catch { if (!active.signal.aborted) setState("error"); }
++  }
++  return <div><button type="button" className="button button-secondary button-inline" disabled={!canDownloadBuild(item) || state === "loading"} onClick={() => void download()}>{outputText(locale, "downloadBuild")}</button><p className="small-copy">{outputText(locale, "openLocally")}</p>{state === "error" ? <p role="alert">{outputText(locale, "imageFailed")}</p> : null}</div>;
++}
+diff --git a/tests/ui/test_output_routes.py b/tests/ui/test_output_routes.py
+--- a/tests/ui/test_output_routes.py
++++ b/tests/ui/test_output_routes.py
+@@ -88,6 +88,8 @@
+         "state",
+         "reason",
+         "review_state",
++        "result_review_state",
++        "retained",
+         "latest",
+         "version_count",
+         "width",
+diff --git a/tests/runtime/test_profiles_policy.py b/tests/runtime/test_profiles_policy.py
+--- a/tests/runtime/test_profiles_policy.py
++++ b/tests/runtime/test_profiles_policy.py
+@@ -590,6 +590,8 @@
+         "mcp__agent-commons__commons_show_verification",
+         "mcp__agent-commons__commons_show_artifact",
+         "mcp__agent-commons__commons_read_artifact",
++        "mcp__agent-commons__commons_read_output_image",
++        "mcp__agent-commons__commons_read_build_file",
+         "mcp__agent-commons__commons_read_skill",
+         "mcp__agent-commons__commons_repo_files",
+         "mcp__agent-commons__commons_repo_read",
+diff --git a/tests/runtime/test_delegation_instruction.py b/tests/runtime/test_delegation_instruction.py
+--- a/tests/runtime/test_delegation_instruction.py
++++ b/tests/runtime/test_delegation_instruction.py
+@@ -54,8 +54,12 @@
+     )
+     assert "do not invent a synonym such as approve, accept, pass, or needs_changes" in instruction
+     assert "If the call succeeds, stop immediately" in instruction
++    # ADR 0025 adds exact image/build reads; next profile requires a fresh canary.
++    assert "commons_read_output_image" in instruction
++    assert "manifest-only reads do not satisfy approval evidence" in instruction
++    assert "read every text entry fully" in instruction
+     assert hashlib.sha256(instruction.encode()).hexdigest() == (
+-        "b65147b589a3ea32bbbf739c4521c1300aaf61f408e7916eda5d0592ed11a497"
++        "f6e97fad21818e0a21e151a966070e10a471ce3d76f864d26729accf51d0937f"
+     )
+ 
+ 
+diff --git a/tests/mcp/test_design_output_tools.py b/tests/mcp/test_design_output_tools.py
+--- a/tests/mcp/test_design_output_tools.py
++++ b/tests/mcp/test_design_output_tools.py
+@@ -91,6 +91,7 @@
+         agent=agent["entity_ref"]["id"],
+         run=run["entity_ref"]["id"],
+         tool=functions["commons_publish_design_image"],
++        build_tool=functions["commons_publish_static_build"],
+     )
+ 
+ 
+@@ -141,6 +142,8 @@
+             "delegation_revision",
+             "historical_preview_verified",
+             "review_state",
++            "result_review_state",
++            "retained",
+             "recorded_at",
+             "media_type",
+             "classification",
+@@ -184,7 +187,7 @@
+     latest = OutputReads(ctx.worker).list("task", ctx.task).items
+     assert len(latest) == 1 and latest[0].artifact_id == newest["artifact_id"]
+     history = OutputReads(ctx.worker).list("task", ctx.task, versions="all").items
+-    assert len(history) == 2 and sum(row.state == "ready" for row in history) == 1
++    assert len(history) == 2 and sum(row.state == "ready" for row in history) == 2
+     assert all(row.version_count == 2 for row in history)
+ 
+ 
+@@ -228,7 +231,11 @@
+     summary = OutputReads(ctx.worker, preview_reader_factory=no_reader).summary("task", ctx.task)
+     assert summary.total == summary.unchecked == 1
+     detail = OutputReads(ctx.worker).list("task", ctx.task).items[0]
+-    assert detail.state == "stale" and detail.reason == "artifact_preview_missing_source"
++    assert detail.state == "ready" and detail.retained
++    digest = ctx.worker.get_artifact_bundle(detail.artifact_id)["manifest"]["revision"][7:]
++    (ctx.worker.paths.state_root / "output-content" / digest).unlink()
++    missing = OutputReads(ctx.worker).list("task", ctx.task).items[0]
++    assert missing.state == "stale" and missing.reason == "artifact_preview_missing_source"
+ 
+ 
+ @pytest.mark.parametrize("change", ["task", "agent", "child", "ambiguous", "revision"])
+@@ -352,3 +359,416 @@
+     result = tool(source_path="outputs/screen.png", title="Homepage", idempotency_key="mounted-001")
+     assert result["producer_agent_id"] == ctx.agent
+     assert OutputReads(ctx.worker).summary("agent", ctx.agent).total == 1
++
++
++def test_versions_survive_source_overwrite_and_manager_restart(published_context):
++    from agent_commons.services.artifact_content import ArtifactPreviewReader
++
++    ctx = published_context
++    first_bytes = ctx.source.read_bytes()
++    first = publish(ctx)
++    Image.new("RGB", (5, 6), (70, 80, 90)).save(ctx.source)
++    second_bytes = ctx.source.read_bytes()
++    second = publish(ctx, idempotency_key="homepage-002")
++    ctx.source.unlink()
++    restarted = CommonsManager(ctx.worker.repo_root, state_root=ctx.worker.paths.state_root)
++    reader = ArtifactPreviewReader(restarted)
++    assert reader.read(first["artifact_id"]).content == first_bytes
++    assert reader.read(second["artifact_id"]).content == second_bytes
++    rows = OutputReads(restarted).list("agent", ctx.agent, versions="all").items
++    assert len(rows) == 2 and all(item.retained and item.state == "ready" for item in rows)
++    assert len({item.content_revision for item in rows}) == 2
++    assert restarted.doctor()["ok"]
++
++
++def test_static_build_download_is_exact_durable_attachment_and_never_html(published_context):
++    import io
++    import zipfile
++
++    from tests.ui.test_output_routes import _client
++
++    ctx = published_context
++    dist = ctx.worker.repo_root / "dist"
++    dist.mkdir()
++    (dist / "index.html").write_text('<script src="app.js"></script>')
++    (dist / "app.js").write_text('document.body.textContent = "v1";')
++    first = ctx.build_tool("dist", "Frontend", "frontend-001")
++    assert ctx.build_tool("dist", "Frontend", "frontend-001") == first
++    (dist / "app.js").write_text('document.body.textContent = "v2";')
++    second = ctx.build_tool("dist", "Frontend", "frontend-002")
++    (dist / "index.html").unlink()
++    (dist / "app.js").unlink()
++    restarted = CommonsManager(ctx.worker.repo_root, state_root=ctx.worker.paths.state_root)
++    reads = OutputReads(restarted)
++    for output, text in ((first, b'"v1"'), (second, b'"v2"')):
++        content = reads.read_build(
++            "task", ctx.task, output["artifact_id"], output["artifact_revision"]
++        )
++        with zipfile.ZipFile(io.BytesIO(content)) as archive:
++            assert text in archive.read("app.js")
++            manifest = json.loads(archive.read("commons-build-manifest.json"))
++            assert manifest["schema"] == "agent_commons.static-build.v1"
++            assert len(manifest["files"]) == 2
++    client = _client(lambda: restarted)
++    url = f"/api/outputs/builds/{first['artifact_id']}/{first['artifact_revision']}"
++    query = {"scope_kind": "task", "scope_id": ctx.task}
++    assert client.get(url, params=query).status_code == 401
++    response = client.get(url, params=query, headers={"X-Session": "allowed"})
++    assert response.status_code == 200
++    assert response.headers["content-type"] == "application/zip"
++    assert response.headers["content-disposition"].startswith("attachment;")
++    assert response.headers["x-content-type-options"] == "nosniff"
++    assert response.headers["cache-control"] == "no-store"
++    assert (
++        client.get(
++            url, params={**query, "scope_id": ctx.agent}, headers={"X-Session": "allowed"}
++        ).status_code
++        == 400
++    )
++    assert (
++        client.get(
++            url.replace(first["artifact_revision"], second["artifact_revision"]),
++            params=query,
++            headers={"X-Session": "allowed"},
++        ).status_code
++        == 409
++    )
++
++
++@pytest.mark.parametrize(
++    "unsafe",
++    ["symlink", "ancestor", "hardlink", "hidden", "special", "oversize", "directory-bounds"],
++)
++def test_static_build_refuses_unsafe_content_before_publication(published_context, unsafe):
++    ctx = published_context
++    dist = ctx.worker.repo_root / "dist"
++    dist.mkdir()
++    (dist / "index.html").write_text("safe")
++    if unsafe == "symlink":
++        (dist / "escape.js").symlink_to(ctx.source)
++    elif unsafe == "ancestor":
++        alias = ctx.worker.repo_root / "alias"
++        alias.symlink_to(dist, target_is_directory=True)
++        with pytest.raises(LifecycleConflictError):
++            ctx.build_tool("alias", "Frontend", "frontend-001")
++        assert not ctx.worker.snapshot().artifacts
++        return
++    elif unsafe == "hardlink":
++        os.link(dist / "index.html", dist / "copy.html")
++    elif unsafe == "hidden":
++        (dist / ".env").write_text("synthetic")
++    elif unsafe == "special":
++        os.mkfifo(dist / "pipe.js")
++    elif unsafe == "oversize":
++        (dist / "big.js").write_bytes(b"x" * (10 * 1024 * 1024 + 1))
++    else:
++        for number in range(130):
++            (dist / f"dir-{number}").mkdir()
++    with pytest.raises(LifecycleConflictError):
++        ctx.build_tool("dist", "Frontend", "frontend-001")
++    assert not ctx.worker.snapshot().artifacts
++
++
++def test_partial_store_failure_and_quota_do_not_claim_durable_publication(
++    published_context, monkeypatch
++):
++    import agent_commons.services.output_content as storage
++
++    ctx = published_context
++    original = storage.os.link
++
++    def interrupt(*args, **kwargs):
++        raise OSError("synthetic interruption")
++
++    monkeypatch.setattr(storage.os, "link", interrupt)
++    with pytest.raises(LifecycleConflictError):
++        publish(ctx)
++    assert not ctx.worker.snapshot().artifacts
++    assert [p.name for p in (ctx.worker.paths.state_root / "output-content").iterdir()] == [
++        "store.lock"
++    ]
++    monkeypatch.setattr(storage.os, "link", original)
++    first = publish(ctx)
++    monkeypatch.setattr(storage, "MAX_STORE_OBJECTS", 1)
++    Image.new("RGB", (4, 3), (99, 88, 77)).save(ctx.source)
++    with pytest.raises(LifecycleConflictError):
++        publish(ctx, idempotency_key="homepage-002")
++    assert len(ctx.worker.snapshot().artifacts) == 1
++    assert (
++        OutputReads(ctx.worker).list("task", ctx.task).items[0].artifact_id == first["artifact_id"]
++    )
++
++
++def test_retained_store_symlink_is_refused_without_source_fallback(published_context, tmp_path):
++    ctx = published_context
++    receipt = publish(ctx)
++    retained = ctx.worker.paths.state_root / "output-content" / receipt["content_revision"][7:]
++    external = tmp_path / "external"
++    external.write_bytes(ctx.source.read_bytes())
++    retained.unlink()
++    retained.symlink_to(external)
++    row = OutputReads(ctx.worker).list("task", ctx.task).items[0]
++    assert row.state == "stale" and row.reason == "artifact_preview_missing_source"
++    with pytest.raises(LifecycleConflictError):
++        publish(ctx)
++
++
++def test_exact_result_review_does_not_transfer_to_new_output(published_context):
++    ctx = published_context
++    first = publish(ctx)
++    review = ctx.parent.request_review(
++        target_ref={"kind": "artifact", "id": first["artifact_id"]},
++        target_revision=first["artifact_revision"],
++        criteria=("Check exact pixels",),
++    )
++    with pytest.raises(LifecycleConflictError):
++        ctx.worker.complete_review(
++            review["entity_ref"]["id"],
++            review["revision"],
++            target_revision=first["artifact_revision"],
++            verdict="approved",
++            summary="Self check",
++        )
++    session = ctx.parent.start_session(
++        stable_instance_id="output-reviewer",
++        principal="independent-reviewer",
++        client="claude",
++        software="tests",
++        role="reviewer",
++    )
++    reviewer = CommonsManager(
++        ctx.worker.repo_root,
++        state_root=ctx.worker.paths.state_root,
++        session_id=session["session_id"],
++    )
++    reviewer.complete_review(
++        review["entity_ref"]["id"],
++        review["revision"],
++        target_revision=first["artifact_revision"],
++        verdict="approved",
++        summary="Exact pixels checked",
++    )
++    Image.new("RGB", (4, 3), (99, 88, 77)).save(ctx.source)
++    second = publish(ctx, idempotency_key="homepage-002")
++    rows = {
++        item.artifact_id: item
++        for item in OutputReads(ctx.worker).list("task", ctx.task, versions="all").items
++    }
++    assert rows[first["artifact_id"]].result_review_state == "approved"
++    assert rows[second["artifact_id"]].result_review_state is None
++    assert all(item.review_state is None for item in rows.values())
++
++
++def _output_reviewer(ctx, output):
++    import subprocess
++
++    subprocess.run(
++        ["/usr/bin/git", "init", "-q", str(ctx.worker.repo_root)], check=True, capture_output=True
++    )
++    from agent_commons.mcp.server import build_server
++    from tests.mcp.test_worker_scope import FakeServer
++
++    review = ctx.parent.request_review(
++        target_ref={"kind": "artifact", "id": output["artifact_id"]},
++        target_revision=output["artifact_revision"],
++        criteria=("Inspect exact retained content",),
++    )
++    delegation = ctx.parent.create_delegation(
++        target_ref=review["entity_ref"],
++        target_revision=review["revision"],
++        target_profile="claude-independent-reviewer",
++        purpose="independent_review",
++        limits={
++            "max_depth": 0,
++            "wall_time_seconds": 300,
++            "max_attempts": 1,
++            "max_concurrency": 1,
++            "budget": {"unit": "provider_units", "limit": 1},
++        },
++    )
++    session = ctx.parent.start_session(
++        stable_instance_id="scoped-output-reviewer",
++        principal="reviewer-independent",
++        client="claude",
++        software="tests",
++        role="reviewer",
++    )
++    ctx.parent.start_delegation(
++        delegation["entity_ref"]["id"],
++        delegation["revision"],
++        child_session_id=session["session_id"],
++        attempt=1,
++    )
++    reviewer = CommonsManager(
++        ctx.worker.repo_root,
++        state_root=ctx.worker.paths.state_root,
++        session_id=session["session_id"],
++    )
++    server = build_server(
++        reviewer.repo_root,
++        manager=reviewer,
++        delegation_id=delegation["entity_ref"]["id"],
++        server_factory=FakeServer,
++    )
++    return reviewer, server, review
++
++
++@pytest.mark.parametrize("build", [False, True])
++def test_exact_output_review_reads_real_content_before_terminal_finalization(
++    published_context, build
++):
++    import base64
++
++    ctx = published_context
++    pixels_before = ctx.source.read_bytes()
++    if build:
++        dist = ctx.worker.repo_root / "dist"
++        dist.mkdir()
++        (dist / "index.html").write_text('<script src="app.js"></script>')
++        (dist / "app.js").write_text('document.body.textContent="demo"')
++        output = ctx.build_tool("dist", "Frontend", "frontend-001")
++        (dist / "index.html").unlink()
++        (dist / "app.js").unlink()
++    else:
++        output = publish(ctx)
++        ctx.source.unlink()
++    reviewer, server, review = _output_reviewer(ctx, output)
++    with pytest.raises(LifecycleConflictError, match="evidence is incomplete"):
++        server.tools["commons_finalize_review"]("approved", "Inspected result")
++    if build:
++        manifest = server.tools["commons_read_build_file"](output["artifact_id"])
++        assert manifest["content_verified"] and not manifest["review_content_complete"]
++        with pytest.raises(LifecycleConflictError, match="evidence is incomplete"):
++            server.tools["commons_finalize_review"]("approved", "Manifest alone")
++        first = server.tools["commons_read_build_file"](output["artifact_id"], "index.html")
++        assert not first["review_content_complete"]
++        skipped = server.tools["commons_read_build_file"](output["artifact_id"], "app.js", offset=4)
++        assert not skipped["review_content_complete"]
++        last = server.tools["commons_read_build_file"](output["artifact_id"], "app.js", limit=4)
++        assert last["review_content_complete"]
++        assert "document" in skipped["content"] or last["content"] == "docu"
++    else:
++        pixels = server.tools["commons_read_output_image"](output["artifact_id"])
++        assert base64.b64decode(pixels.content[0].data) == pixels_before
++        with pytest.raises(LifecycleConflictError):
++            server.tools["commons_read_output_image"]("artifact.00000000000000000000000000")
++    completed = server.tools["commons_finalize_review"](
++        "approved", "Exact retained content inspected; execution not tested"
++    )
++    assert completed["delegation_outcome"]["event_type"] == "delegation.succeeded"
++    row = OutputReads(reviewer).list("task", ctx.task).items[0]
++    assert row.result_review_state == "approved" and row.review_state is None
++    assert (
++        reviewer.snapshot().reviews[review["entity_ref"]["id"]]["target_revision"]
++        == output["artifact_revision"]
++    )
++
++
++def test_orphan_delegated_output_verdict_has_no_approval_and_changed_binding_refuses_read(
++    published_context,
++):
++    ctx = published_context
++    output = publish(ctx)
++    reviewer, server, review = _output_reviewer(ctx, output)
++    server.tools["commons_read_output_image"](output["artifact_id"])
++    reviewer.complete_review(
++        review["entity_ref"]["id"],
++        review["revision"],
++        target_revision=output["artifact_revision"],
++        verdict="approved",
++        summary="Before terminal outcome",
++    )
++    assert OutputReads(ctx.parent).list("task", ctx.task).items[0].result_review_state is None
++    ctx.worker.revise_artifact(
++        output["artifact_id"],
++        output["artifact_revision"],
++        "outputs/screen.png",
++        media_type="image/png",
++    )
++    with pytest.raises(LifecycleConflictError, match="binding has changed"):
++        server.tools["commons_read_output_image"](output["artifact_id"])
++
++
++def test_same_content_retention_serializes_threads_and_subprocesses(published_context):
++    import subprocess
++    import sys
++    from concurrent.futures import ThreadPoolExecutor
++
++    from agent_commons.services.output_content import OutputContentStore
++
++    ctx = published_context
++    content = b"synthetic retained bytes"
++    with ThreadPoolExecutor(max_workers=4) as executor:
++        values = list(executor.map(lambda _: OutputContentStore(ctx.worker).put(content), range(8)))
++    assert all(value == values[0] for value in values)
++    script = (
++        "from pathlib import Path; from types import SimpleNamespace; "
++        "from agent_commons.services.output_content import OutputContentStore; import sys; "
++        "OutputContentStore(SimpleNamespace(paths=SimpleNamespace(state_root=Path(sys.argv[1]))))"
++        ".put(b'synthetic retained bytes')"
++    )
++    children = [
++        subprocess.Popen(
++            [sys.executable, "-c", script, str(ctx.worker.paths.state_root)],
++            env=os.environ.copy(),
++            stdout=subprocess.PIPE,
++            stderr=subprocess.PIPE,
++        )
++        for _ in range(3)
++    ]
++    for child in children:
++        _, diagnostic = child.communicate(timeout=30)
++        assert child.returncode == 0, diagnostic
++    names = [
++        entry.name
++        for entry in (ctx.worker.paths.state_root / "output-content").iterdir()
++        if entry.name != "store.lock"
++    ]
++    assert len(names) == 1
++    assert OutputContentStore(ctx.worker).read(values[0]["revision"], len(content)) == content
++
++
++def test_identical_retry_recovers_kill_after_link_without_overwriting_content(published_context):
++    import hashlib
++
++    from agent_commons.services.output_content import OutputContentStore
++
++    ctx = published_context
++    content = b"synthetic interrupted retained result"
++    digest = hashlib.sha256(content).hexdigest()
++    store = OutputContentStore(ctx.worker)
++    store.root.mkdir()
++    partial = store.root / ("partial-" + digest + "-" + "a" * 32)
++    partial.write_bytes(content)
++    os.link(partial, store.root / digest)
++    assert (store.root / digest).stat().st_nlink == 2
++    retained = store.put(content)
++    assert not partial.exists()
++    assert store.read(retained["revision"], len(content)) == content
++    assert (store.root / digest).stat().st_nlink == 1
++
++
++def test_static_capture_refuses_mixed_versions_before_retention(published_context, monkeypatch):
++    from agent_commons.services.artifact_content import ArtifactPreviewReader
++
++    ctx = published_context
++    dist = ctx.worker.repo_root / "dist"
++    dist.mkdir()
++    (dist / "index.html").write_text('<script src="app.js"></script>')
++    (dist / "app.js").write_text("old")
++    original = ArtifactPreviewReader._read_verified_source
++    changed = False
++
++    def swap(reader, relative, *args, **kwargs):
++        nonlocal changed
++        content = original(reader, relative, *args, **kwargs)
++        if relative.name == "index.html" and not changed:
++            changed = True
++            (dist / "app.js").write_text("new")
++        return content
++
++    monkeypatch.setattr(ArtifactPreviewReader, "_read_verified_source", swap)
++    with pytest.raises(LifecycleConflictError):
++        ctx.build_tool("dist", "Frontend", "frontend-001")
++    assert not ctx.worker.snapshot().artifacts
++    assert not (ctx.worker.paths.state_root / "output-content").exists()
+diff --git a/tests/mcp/test_worker_scope.py b/tests/mcp/test_worker_scope.py
+--- a/tests/mcp/test_worker_scope.py
++++ b/tests/mcp/test_worker_scope.py
+@@ -462,6 +462,8 @@
+         "commons_show_verification",
+         "commons_show_artifact",
+         "commons_read_artifact",
++        "commons_read_output_image",
++        "commons_read_build_file",
+         "commons_read_skill",
+         "commons_finalize_review",
+         "commons_record_verification",
+diff --git a/docs/FRONTEND_CONTRACT.md b/docs/FRONTEND_CONTRACT.md
+--- a/docs/FRONTEND_CONTRACT.md
++++ b/docs/FRONTEND_CONTRACT.md
+@@ -323,3 +323,17 @@
+ workspace claim `path:src/agent_commons/ui/static/index.html` before any edit,
+ and edit it only to keep it serving or to remove it. New behaviour belongs in
+ Work.
++
++## Retained result cards
++
++The [retained-result protocol](PROTOCOL.md#retained-worker-results) supplies local
++retained-byte state and exact result review separately from current task review.
++Work accepts explicit old DTO defaults (`retained=false`, result review null); it
++never derives approval from task ID or image readiness. Static build cards use a
++separate Builds filter and an explicit Download build action. Verified ZIPs are
++downloaded as attachments only after digest and fresh scoped identity checks.
++They never create image thumbnails, iframes or HTML blob navigation. Failure stays
++on the card with a retryable action. EN/RU technical disclosure gives an exact
++artifact-review CLI command with a stable operation key and instructs the operator
++to verify this project's active session/workspace/state before running it. The
++current UI review action targets tasks; exact artifact review launch is separate.
+diff --git a/docs/PROTOCOL.md b/docs/PROTOCOL.md
+--- a/docs/PROTOCOL.md
++++ b/docs/PROTOCOL.md
+@@ -365,3 +365,58 @@
+ promotion. These modes choose where the same lifecycle stops; they do not
+ weaken integrity rules or create a hidden acceptance bypass. Local
+ principal/model labels are not an authority mechanism.
++
++## Retained worker results
++
++[ADR 0025](adr/0025-retained-worker-results.md) defines the local durable-result
++boundary. `commons_publish_design_image` now retains validated PNG/JPEG bytes;
++`commons_publish_static_build` retains a deterministic ZIP of a repository-relative
++static dist directory. Both are implementation/verification worker tools and prove
++current worker/task/delegation bindings before canonical publication. Publication
++neither completes the task nor requests/approves review or accepts work.
++
++Existing artifact manifest metadata adds `retained_content: {revision, size_bytes}`
++matching the manifest digest and size. Generated output provenance remains a closed
++contract. Static build metadata uses `output_kind: task_static_build` and adds
++`build_files` (path, SHA256 revision, size); ZIP includes
++`commons-build-manifest.json`. Image bounds remain 10 MiB/16 million pixels. Build
++bounds are 128 files, 128 directories, depth 16, 10 MiB per file and 20 MiB for the
++whole ZIP. An `index.html` is required. Frontend extension allowlist, ordinary
++single-link files, descriptor traversal without symlinks, and exact byte verification
++exclude hidden/private entries, external paths, special files and link escapes.
++
++The local `output-content` directory below workspace state retains at most 512
++objects/256 MiB. Content addresses are SHA256 names. Publication takes the manager
++canonical lock, then the content-store process/thread lock; readers never acquire
++a canonical write lock while holding a store lock. Write, fsync and atomic link
++precede canonical append. An interrupted pre-append object remains quota charged;
++identical retries reuse it and repair an interrupted link to their own verified
++partial object. Partial files never become readable objects. Quota
++failure refuses publication and preserves earlier outputs; no automatic eviction
++exists. Backup/restore must include this store. Missing/corrupt bytes have an honest
++unavailable preview. Legacy metadata-only images continue checking original source
++bytes, and cannot be reconstructed from hashes. New versions need new operation
++keys; reuse conflicts if content or intent changed.
++
++`/api/outputs/builds/{artifact_id}/{artifact_revision}` is an authenticated,
++project/scoped, exact-version ZIP attachment with `nosniff` and `no-store`; it never
++serves build HTML. Browsing the gallery never downloads a build or launches a
++server. Live advertisements retain their separate TTL/reachability contract.
++
++Output DTOs add `retained` (old default false) and `result_review_state` (old default
++null). Existing `review_state` describes the current task review. Exact result
++standing comes only from an artifact-target review of the displayed artifact event
++revision. An approval requires independence and, for a delegated reviewer, a
++matching succeeded delegation. It does not propagate to another version and does
++not imply task acceptance or Design Package acceptance.
++
++Independent-review worker tools `commons_read_output_image` and
++`commons_read_build_file` inspect only frozen in-scope artifact revisions. The image
++tool returns actual verified MCP pixels. The build tool verifies the entire retained
++bundle and requested entry hashes, returns manifest or UTF-8 text chunks of at most
++65,536 characters, and rejects non-text/unknown entries. All text entries must be
++read without gaps before artifact evidence satisfies `commons_finalize_review`;
++manifest-only reads do not. Binary assets have verified hashes but are not rendered
++by the build-file tool. Evidence coverage is separate from a substantive review:
++criteria/summary must state visual, execution and test limitations honestly. Changed
++artifact binding, missing bytes, failed verification and out-of-scope reads refuse.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -41,6 +41,8 @@
+ | [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
+ | [0023](0023-incremental-ledger-validation.md) | Draft proposal | Incremental ledger validation on the canonical write path: byte-identity re-verification and bulk receipt loading replace repeated full revalidation; `doctor` unchanged. |
+ 
++| [0025](0025-retained-worker-results.md) | Implemented; acceptance separate | Bounded retained image/static-build bytes and exact artifact review; download-only frontend bundles. |
++
+ ## How the two records fit together
+ 
+ - ADRs explain stable architecture, migration and rollback consequences.
+diff --git a/docs/adr/0025-retained-worker-results.md b/docs/adr/0025-retained-worker-results.md
+--- /dev/null
++++ b/docs/adr/0025-retained-worker-results.md
+@@ -0,0 +1,37 @@
++# ADR 0025: Retained worker results and exact artifact review
++
++Date: 2026-10-01.
++Status: Implemented for the authorized G5/G7 increment; product acceptance is separate.
++
++Worker image metadata alone cannot preserve earlier pixels when a source path is
++overwritten. A reported development URL also cannot establish durable build bytes,
++server ownership or reachability. The implementation retains image and bounded
++static build content in a local content-addressed store, referenced by an existing
++artifact manifest. The ledger still contains metadata only. Each worker publication
++creates a separate artifact version; task, delegation, producer, content digest and
++artifact event revision remain exact canonical bindings.
++
++The detailed storage, bounds, retry and reviewer read contract belongs to
++[Protocol](../PROTOCOL.md#retained-worker-results). This is deliberately a local
++storage boundary: backup/restore must preserve content with workspace operational
++state. Missing bytes remain unavailable. Earlier metadata-only publications remain
++readable through their original source contract and are not retroactively copied.
++
++Static builds are deterministic ZIP downloads with file hashes. They are never
++served as executable HTML on the Commons authenticated origin. Opening a local
++server is an explicit operator action on a separate origin. An owned, hosted static
++preview service, sandbox or arbitrary application process manager is a separate
++feature; this increment does not claim it exists.
++
++Existing artifact-target reviews already bind an exact event revision. Reusing
++that contract avoids a second approval lifecycle. Independent reviewers receive
++scope-frozen image pixels or bounded text entries from the retained build. A
++manifest-only build read cannot satisfy review finalization. Verification of
++hashes/read coverage proves evidence inspection, not runtime behavior, visual
++quality or human acceptance. Current task review and exact result review have
++separate DTO fields and labels. A delegated approval remains undisplayed until its
++matching delegation succeeds.
++
++Rollback preserves legacy manifest reads; retained metadata requires retained bytes
++and cannot silently fall back to the overwritten source. No automatic quota eviction
++or canonical history rewrite is permitted.
+diff --git a/docs/user/ru/README.md b/docs/user/ru/README.md
+--- a/docs/user/ru/README.md
++++ b/docs/user/ru/README.md
+@@ -349,3 +349,19 @@
+ что целевая задача зависит от исходной; это не связь компонента с подзадачей.
+ Скрытые фильтром предпосылки подсчитываются. Небольшой выбранный подграф
+ открывается и в проекте, где больше 128 задач.
++
++## Сохранённые версии и сборки
++
++Откройте галерею агента и выберите историю. Сохранённые изображения доступны
++после перезаписи исходника и перезапуска сервера, если сохранён state проекта.
++Фильтр «Сборки» предлагает **Скачать сборку**: распакуйте ZIP и явно запустите
++локальный сервер на отдельном origin. Просмотр галереи не запускает сервер.
++Добавьте content store в резервную копию; утраченные байты остаются недоступными.
++
++Проверки **Текущей задачи** и **Точного результата** показаны отдельно. Новая
++версия не наследует одобрение прежней. В технических деталях есть точная CLI-команда
++запроса review. Запускайте её из каталога этого проекта, сначала сверив `session show`
++и `orient` с workspace/state панели. Reviewer получает точные пиксели или все
++текстовые файлы сборки через scoped tools и завершает привязанный review. Проверка
++кода/хешей не означает визуального тестирования или запуска приложения. Человеческая
++приёмка остаётся отдельной. Подробнее: [контракт](../../PROTOCOL.md#retained-worker-results).
+diff --git a/docs/user/en/README.md b/docs/user/en/README.md
+--- a/docs/user/en/README.md
++++ b/docs/user/en/README.md
+@@ -334,3 +334,19 @@
+ the target depends on the source. They do not describe component membership
+ or parent/subtask hierarchy. The map reports prerequisites outside the current
+ filter. A focused selection can be drawn even when the project exceeds 128 tasks.
++
++## Saved versions and builds
++
++Open an agent's gallery, choose History, and inspect the exact version. Retained
++images survive source overwrite and server restart when workspace state is kept.
++Builds offers **Download build**: extract the ZIP and explicitly serve it locally
++on a separate origin to inspect it. Commons does not start a server from a gallery
++view. Keep the content store with backups; missing bytes stay unavailable.
++
++**Current task** review and **Exact result** review are separate. A new image/build
++never inherits an older result's approval. Technical details contain the exact CLI
++review request. Run it from this project's directory, first verifying `session show`
++and `orient` against the same workspace/state as the panel. A reviewer can inspect
++exact pixels or all text build entries through scoped tools, then finalize the bound
++review. A code/hash check does not claim runtime or visual testing. Human acceptance
++remains separate. See the [result contract](../../PROTOCOL.md#retained-worker-results).

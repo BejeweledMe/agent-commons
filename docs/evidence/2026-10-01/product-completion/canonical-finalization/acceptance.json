@@ -1,0 +1,77 @@
+{
+  "accepted_tasks": {
+    "g1": {
+      "created": true,
+      "entity_ref": {
+        "id": "task.5KX5GZJSWZY9N6GBND09FX1223",
+        "kind": "task"
+      },
+      "event_id": "evt.01M3VYEH40S09J8WH7Y1WAVPX5",
+      "event_type": "task.accepted",
+      "idempotency_key": "product-final-20261001-accept-g1",
+      "index": {
+        "mode": "deferred",
+        "next_action": "agent-commons index rebuild",
+        "synchronized": false
+      },
+      "repaired": false,
+      "revision": "evt.01M3VYEH40S09J8WH7Y1WAVPX5"
+    },
+    "g5": {
+      "created": true,
+      "entity_ref": {
+        "id": "task.01V3HM0QMDRQGQXG4NW914W1BV",
+        "kind": "task"
+      },
+      "event_id": "evt.01M3VYFWWWAM8FS26K5A04NFDG",
+      "event_type": "task.accepted",
+      "idempotency_key": "product-final-20261001-accept-g5",
+      "index": {
+        "mode": "deferred",
+        "next_action": "agent-commons index rebuild",
+        "synchronized": false
+      },
+      "repaired": false,
+      "revision": "evt.01M3VYFWWWAM8FS26K5A04NFDG"
+    },
+    "g6": {
+      "created": true,
+      "entity_ref": {
+        "id": "task.0HPFPQHVQ4VNTV08PR3Y6SBBVJ",
+        "kind": "task"
+      },
+      "event_id": "evt.01M3VYH8V9D2RJXTG1Z1QSHMKZ",
+      "event_type": "task.accepted",
+      "idempotency_key": "product-final-20261001-accept-g6",
+      "index": {
+        "mode": "deferred",
+        "next_action": "agent-commons index rebuild",
+        "synchronized": false
+      },
+      "repaired": false,
+      "revision": "evt.01M3VYH8V9D2RJXTG1Z1QSHMKZ"
+    }
+  },
+  "artifacts": [
+    "artifact:artifact.2X28CHET2EAM502YFWHAZQY629",
+    "artifact:artifact.4X7YVXTWGF4D2NYRYEXC17C61J",
+    "artifact:artifact.619TJ90TNCD0HAAZ0W6YQSGGMQ"
+  ],
+  "decision": {
+    "created": true,
+    "entity_ref": {
+      "id": "decision.7RF4BM25M5MATB12Q530WHK8BR",
+      "kind": "decision"
+    },
+    "event_id": "evt.01M3VYJMRGKCP4YDEVWR2ZZ4VW",
+    "event_type": "decision.accepted",
+    "idempotency_key": "product-final-20261001-migration-accept",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M3VYJMRGKCP4YDEVWR2ZZ4VW"
+  }
+}

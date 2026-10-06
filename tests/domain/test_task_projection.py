@@ -178,3 +178,45 @@ def test_task_record_is_frozen_and_preserves_replay_and_wire_shape() -> None:
         [expected], separators=(",", ":")
     )
     assert snapshot.issues == []
+
+
+def test_legacy_task_events_default_to_unparented_task_without_rewriting_payload() -> None:
+    from agent_commons.domain.task_review_envelopes import parse_task_review_envelope
+
+    identifier = "task." + "1" * 26
+    payload = {
+        "task_id": identifier,
+        "title": "Legacy",
+        "description": "Legacy task",
+        "priority": "normal",
+        "acceptance_criteria": ["Done"],
+        "dependencies": [],
+    }
+    envelope = parse_task_review_envelope("task.created", payload)
+    assert envelope.to_payload() == payload
+    snapshot = project_events([_event(1, "task.created", payload, "task", identifier)])
+    record = snapshot.tasks[identifier]
+    assert record.get("task_kind", "task") == "task"
+    assert record.get("parent_task_id") is None
+    assert "task_kind" not in record.to_dict()
+    assert "parent_task_id" not in record.to_dict()
+
+
+def test_explicit_hierarchy_fields_remain_in_snapshot_wire_mapping() -> None:
+    identifier = "task." + "1" * 26
+    payload = {
+        "task_id": identifier,
+        "title": "Component",
+        "description": "Explicit hierarchy",
+        "priority": "normal",
+        "acceptance_criteria": ["Done"],
+        "task_kind": "component",
+        "parent_task_id": None,
+    }
+    created = _event(1, "task.created", payload, "task", identifier)
+    snapshot = project_events([created])
+    record = snapshot.tasks[identifier]
+    assert record.to_dict()["task_kind"] == "component"
+    assert "parent_task_id" in record.to_dict()
+    assert record.to_dict()["parent_task_id"] is None
+    assert snapshot.to_dict()["tasks"][0]["task_kind"] == "component"

@@ -13,13 +13,18 @@ proposals and reviews do not establish delivery or acceptance.
 | Architecture and invariants | [Architecture](ARCHITECTURE.md) · [Protocol](PROTOCOL.md) · [Threat model](THREAT_MODEL.md) · [Frontend contract](FRONTEND_CONTRACT.md) |
 | Install, operate, troubleshoot | [Quickstart](QUICKSTART.md) · [Technical workflows](USER_WORKFLOWS.md) · [Troubleshooting](TROUBLESHOOTING.md) · [Broker operations](BROKER_OPERATIONS.md) |
 | Decisions | [ADR index](adr/README.md) plus the live registry: `uv run agent-commons decision list` |
-| Active plan | [Consolidation and wave 4](plans/2026-09-18-consolidation-and-wave-4-plan.md) · [UX closure technical plan](plans/2026-09-09-ux-closure-tech-plan.md) |
+| Active plan | [Consolidation and wave 4](plans/2026-09-18-consolidation-and-wave-4-plan.md) · [UX closure technical plan](plans/2026-09-09-ux-closure-tech-plan.md) · [GPT-6 and product completion](plans/2026-10-01-gpt6-and-product-completion.md) |
 | Evidence and verification | [Evidence](evidence/) · [Audits](audits/) · [Review provenance](reviews/README.md) |
 | Superseded and completed material | [Archive](archive/) |
 
-Both entries under "Active plan" are active: the consolidation plan owns
-repository and documentation work plus wave 4, the UX closure technical plan
-owns the remaining UX work packages. Nothing else in this tree is a backlog.
+The consolidation plan owns repository and documentation work plus wave 4;
+the UX closure technical plan owns the remaining UX work packages. The
+GPT-6 and product completion plan coordinates the 2026-10-01 owner request:
+model migration, agent galleries, task maps and the technical developer audience.
+It links existing work packages instead of superseding their delivery history.
+Its [frozen implementation evidence](evidence/2026-10-01/product-completion/REPORT.md)
+records source boundaries, product journeys, provider qualification and remaining gates.
+Nothing else in this tree is a backlog.
 
 Read the current decision registry through the command above. An ADR, proposal,
 review or completed task alone does not promote anything to project truth.

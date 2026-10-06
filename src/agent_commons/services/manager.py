@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import stat
+import threading
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +17,7 @@ import yaml
 from agent_commons import __version__
 from agent_commons.config import CommonsPaths
 from agent_commons.coordination import ClaimService, Session, SessionRegistry, SourceProducer
-from agent_commons.core.canonical import canonical_sha256
+from agent_commons.core.canonical import canonical_sha256, sha256_bytes
 from agent_commons.core.ids import is_typed_id, stable_id
 from agent_commons.core.refs import normalize_ref
 from agent_commons.core.schema_registry import SchemaRegistry
@@ -61,7 +63,13 @@ from agent_commons.presentation.views import (
     render_views,
 )
 from agent_commons.security import SecurityPolicy
-from agent_commons.storage import EventRecord, EventStore, ManifestStore, ReceiptRecovery
+from agent_commons.storage import (
+    EventRecord,
+    EventStore,
+    ManifestRecord,
+    ManifestStore,
+    ReceiptRecovery,
+)
 from agent_commons.storage.events import semantic_event_body
 
 from .artifacts import ArtifactCommands
@@ -99,6 +107,154 @@ PAYLOAD_SCHEMAS = {
     "context_pack": "commons.payload.context_pack.v1",
     "design_package": "commons.payload.design_package.v1",
 }
+
+
+@dataclass
+class _VerifiedFile:
+    """A document fully validated during this one canonical-lock hold.
+
+    The digest is over file bytes (including the canonical trailing newline),
+    rather than ``EventRecord.sha256`` which intentionally hashes the JSON
+    value.  Re-reading and hashing every path before reuse is therefore a
+    sound, cheap freshness check; a mismatch goes back through ``read_path``.
+    """
+
+    size: int
+    file_sha256: str
+    record: EventRecord | ManifestRecord
+    resolved_path: Path
+
+
+class _VerifiedLedgerView:
+    """In-memory verified canonical documents, scoped to one write-lock hold."""
+
+    def __init__(self, manager: CommonsManager) -> None:
+        self.manager = manager
+        self.events: dict[Path, _VerifiedFile] = {}
+        self.manifests: dict[Path, _VerifiedFile] = {}
+
+    @staticmethod
+    def _paths(root: Path, pattern: str) -> list[Path]:
+        if not root.exists():
+            return []
+        return sorted(root.glob(pattern))
+
+    @staticmethod
+    def _identity(path: Path) -> tuple[int, str, Path]:
+        mode = path.lstat().st_mode
+        if not stat.S_ISREG(mode):
+            raise IntegrityError(f"canonical path must be a regular file: {path}")
+        raw = path.read_bytes()
+        return len(raw), sha256_bytes(raw), path.resolve()
+
+    def _refresh(
+        self,
+        previous: dict[Path, _VerifiedFile],
+        paths: list[Path],
+        reader: Callable[[Path], EventRecord | ManifestRecord],
+    ) -> dict[Path, _VerifiedFile]:
+        # A structural change is deliberately conservative: validate the
+        # complete collection, not merely the path that changed.
+        rebuild = set(previous) != set(paths)
+        refreshed: dict[Path, _VerifiedFile] = {}
+        for path in paths:
+            cached = previous.get(path)
+            if rebuild or cached is None:
+                # Full verification already binds the validating read to its
+                # before/after byte identity. A preliminary identity here
+                # cannot enable reuse and would only repeat the raw read.
+                refreshed[path] = self._verify(path, reader)
+                continue
+            size, digest, resolved_path = self._identity(path)
+            if (cached.size, cached.file_sha256, cached.resolved_path) != (
+                size,
+                digest,
+                resolved_path,
+            ):
+                refreshed[path] = self._verify(path, reader)
+            else:
+                refreshed[path] = cached
+        return refreshed
+
+    def _verify(
+        self,
+        path: Path,
+        reader: Callable[[Path], EventRecord | ManifestRecord],
+    ) -> _VerifiedFile:
+        # ``reader`` reads the file itself, so the cached digest must be bound
+        # to the very bytes it validated: the identity taken before and after
+        # the validating read has to agree, otherwise the record may describe
+        # bytes that no longer exist and the digest would vouch for a stranger.
+        for _attempt in range(3):
+            before = self._identity(path)
+            record = reader(path)
+            after = self._identity(path)
+            if before == after:
+                return _VerifiedFile(after[0], after[1], record, after[2])
+        raise IntegrityError(f"canonical file changed while being verified: {path}")
+
+    def refresh(self) -> tuple[list[EventRecord], list[ManifestRecord]]:
+        event_paths = self._paths(self.manager.paths.events, "*/*/*/evt.*.json")
+        manifest_paths = self._paths(self.manager.paths.manifests, "*/*/*.json")
+        self.events = self._refresh(self.events, event_paths, self.manager.events.read_path)
+        self.manifests = self._refresh(
+            self.manifests, manifest_paths, self.manager.manifests.read_path
+        )
+        return (
+            [
+                entry.record
+                for entry in self.events.values()
+                if isinstance(entry.record, EventRecord)
+            ],
+            [
+                entry.record
+                for entry in self.manifests.values()
+                if isinstance(entry.record, ManifestRecord)
+            ],
+        )
+
+    def accept_own_append(self, record: EventRecord) -> None:
+        """Verify one new append before the ordinary full freshness refresh.
+
+        This only accounts for our own known addition to the path set. The
+        following refresh still hashes every file, and any other added or
+        removed path still forces a complete validation of the collection.
+        Retries, repairs and maintenance writes retain the conservative path.
+        """
+        if (
+            not record.created
+            or record.repaired
+            or record.path in self.events
+            or str(record.event["event_type"]).startswith("event.")
+            or any(entry.record.event_id == record.event_id for entry in self.events.values())
+        ):
+            return
+        verified = self._verify(record.path, self.manager.events.read_path)
+        if (
+            isinstance(verified.record, EventRecord)
+            and verified.record.path == record.path
+            and verified.record.event_id == record.event_id
+            and verified.record.sha256 == record.sha256
+            and verified.record.event == record.event
+        ):
+            self.events[record.path] = verified
+
+    def event_identity_index(self) -> dict[tuple[str, str], EventRecord]:
+        return {
+            (
+                str(record.event["idempotency_namespace"]),
+                str(record.event["idempotency_key"]),
+            ): record
+            for entry in self.events.values()
+            if isinstance((record := entry.record), EventRecord)
+        }
+
+    def event_file_digests(self) -> dict[Path, str]:
+        return {
+            path: entry.file_sha256
+            for path, entry in self.events.items()
+            if isinstance(entry.record, EventRecord)
+        }
 
 
 def _require_mapping(value: Any, label: str) -> dict[str, Any]:
@@ -146,6 +302,7 @@ class CommonsManager(
         )
         self.workspace_config = self._load_workspace_config()
         self.workspace_id = str(self.workspace_config["workspace_id"])
+        self._verified_ledger_view: _VerifiedLedgerView | None = None
         self.paths = self.paths.for_workspace_id(self.workspace_id)
         security_config = self.workspace_config.get("security", {})
         if not isinstance(security_config, Mapping):
@@ -205,6 +362,7 @@ class CommonsManager(
         # the outer hold instead of releasing and reacquiring between events,
         # which is where a concurrent writer used to slip in.
         self._write_lock_depth = 0
+        self._write_thread_lock = threading.RLock()
 
     def _require_writable(self) -> None:
         if self.read_only:
@@ -360,11 +518,15 @@ class CommonsManager(
         return _public_session(renewed, include_nonce=True)
 
     def _records_and_snapshot(self) -> tuple[list[EventRecord], ProjectSnapshot]:
-        records = list(self.events.iter_events())
+        with self._write_thread_lock:
+            if self._verified_ledger_view is None:
+                records = list(self.events.iter_events())
+                manifests = list(self.manifests.iter_manifests())
+            else:
+                records, manifests = self._verified_ledger_view.refresh()
         for record in records:
             if record.event.get("workspace_id") != self.workspace_id:
                 raise IntegrityError("canonical event belongs to a different workspace")
-        manifests = list(self.manifests.iter_manifests())
         return records, project_events(
             (record.event for record in records),
             known_manifest_ids=(record.manifest_id for record in manifests),
@@ -450,6 +612,11 @@ class CommonsManager(
             records,
             actor=actor or self._actor(),
             requested_identity=allow_missing_receipt,
+            file_digests=(
+                self._verified_ledger_view.event_file_digests()
+                if self._verified_ledger_view is not None
+                else None
+            ),
         )
         manifest_issues, _ = self._manifest_reference_issues(records, snapshot)
         if manifest_issues:
@@ -472,7 +639,12 @@ class CommonsManager(
         records: Sequence[EventRecord],
         snapshot: ProjectSnapshot,
     ) -> tuple[list[str], list[str]]:
-        manifests = {record.manifest_id: record for record in self.manifests.iter_manifests()}
+        with self._write_thread_lock:
+            if self._verified_ledger_view is None:
+                manifest_records = self.manifests.iter_manifests()
+            else:
+                _, manifest_records = self._verified_ledger_view.refresh()
+            manifests = {record.manifest_id: record for record in manifest_records}
         issues: list[str] = []
         referenced: set[str] = set()
         for record in records:
@@ -664,35 +836,39 @@ class CommonsManager(
     def _canonical_write_lock(self) -> Iterable[None]:
         """Serialize lifecycle CAS and append across processes and worktrees.
 
-        Reentrant within one manager: a nested acquisition reuses the outer
+        Reentrant within one manager on the owning thread: a nested acquisition reuses the outer
         hold rather than blocking on the same file lock (flock does not detect
         same-process nesting) or releasing it between writes.  An outer caller
         can therefore make several record_event calls atomic against other
-        processes -- the whole cascade lands or none of it does.
+        processes. The thread lock prevents another caller sharing this manager
+        from mistaking an active hold for its own nested acquisition.
         """
 
-        self._require_writable()
-        if self._write_lock_depth > 0:
-            self._write_lock_depth += 1
-            try:
-                yield
-            finally:
-                self._write_lock_depth -= 1
-            return
-        self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        lock_path = self.paths.state_root / "canonical-write.lock"
-        with lock_path.open("a+b") as handle:
-            try:
-                os.fchmod(handle.fileno(), 0o600)
-            except OSError:
-                pass
-            lock_exclusive(handle.fileno())
-            self._write_lock_depth = 1
-            try:
-                yield
-            finally:
-                self._write_lock_depth = 0
-                unlock(handle.fileno())
+        with self._write_thread_lock:
+            self._require_writable()
+            if self._write_lock_depth > 0:
+                self._write_lock_depth += 1
+                try:
+                    yield
+                finally:
+                    self._write_lock_depth -= 1
+                return
+            self.paths.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            lock_path = self.paths.state_root / "canonical-write.lock"
+            with lock_path.open("a+b") as handle:
+                try:
+                    os.fchmod(handle.fileno(), 0o600)
+                except OSError:
+                    pass
+                lock_exclusive(handle.fileno())
+                self._write_lock_depth = 1
+                self._verified_ledger_view = _VerifiedLedgerView(self)
+                try:
+                    yield
+                finally:
+                    self._verified_ledger_view = None
+                    self._write_lock_depth = 0
+                    unlock(handle.fileno())
 
     def _idempotency_key(self, event_type: str, value: str | None) -> str:
         self.events.idempotency.refresh_scope()
@@ -706,12 +882,18 @@ class CommonsManager(
         return f"commons:{self.workspace_id}:{session.session_id}"
 
     def _event_for_idempotency_identity(self, namespace: str, key: str) -> EventRecord | None:
-        matches = [
-            record
-            for record in self.events.iter_events()
-            if record.event.get("idempotency_namespace") == namespace
-            and record.event.get("idempotency_key") == key
-        ]
+        with self._write_thread_lock:
+            if self._verified_ledger_view is None:
+                matches = [
+                    record
+                    for record in self.events.iter_events()
+                    if record.event.get("idempotency_namespace") == namespace
+                    and record.event.get("idempotency_key") == key
+                ]
+            else:
+                self._verified_ledger_view.refresh()
+                record = self._verified_ledger_view.event_identity_index().get((namespace, key))
+                matches = [] if record is None else [record]
         if len(matches) > 1:
             raise IntegrityError("multiple canonical events share an idempotency identity")
         return matches[0] if matches else None
@@ -1091,6 +1273,18 @@ class CommonsManager(
                     and "dependencies" in payload_value["changes"]
                 ):
                     self._require_ledger_semantics("task.dependencies_revised")
+                if (
+                    event_type == "task.created"
+                    and (
+                        payload_value.get("task_kind", "task") != "task"
+                        or payload_value.get("parent_task_id") is not None
+                    )
+                ) or (
+                    event_type == "task.revised"
+                    and isinstance(payload_value.get("changes"), Mapping)
+                    and "parent_task_id" in payload_value["changes"]
+                ):
+                    self._require_ledger_semantics("task.hierarchy_changed")
             semantic_candidate = {
                 "schema": "commons.event.v1",
                 "payload_schema": payload_schema,
@@ -1133,6 +1327,11 @@ class CommonsManager(
                 # Trusted service hook, after complete validation and retry identity
                 # checks, while the canonical lock still protects this append.
                 _before_append()
+            if self._verified_ledger_view is not None:
+                # A trusted hook may have performed a nested canonical write.
+                # Re-establish byte identity immediately before handing the
+                # index to EventStore, not only at the start of the command.
+                self._verified_ledger_view.refresh()
             record = self.events.append_event(
                 workspace_id=self.workspace_id,
                 event_type=event_type,
@@ -1150,10 +1349,23 @@ class CommonsManager(
                 },
                 relations=normalized_relations,
                 tags=tags,
+                verified_identity_index=(
+                    self._verified_ledger_view.event_identity_index()
+                    if self._verified_ledger_view is not None
+                    else None
+                ),
             )
+            if self._verified_ledger_view is not None:
+                self._verified_ledger_view.accept_own_append(record)
+                records, _ = self._verified_ledger_view.refresh()
+                file_digests = self._verified_ledger_view.event_file_digests()
+            else:
+                records = list(self.events.iter_events())
+                file_digests = None
             self.receipt_recovery.reconcile(
-                list(self.events.iter_events()),
+                records,
                 actor=actor,
+                file_digests=file_digests,
             )
         return {
             "event_id": record.event_id,

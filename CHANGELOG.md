@@ -13,6 +13,27 @@ finished plans at the top level.
 
 ## Unreleased
 
+- **Saved results and an explicit project structure.** Published image versions
+  survive source-file changes and server restarts; bounded static builds can be
+  downloaded with their exact file manifest. Galleries distinguish review of
+  the result from review of the current task. Components and subtasks can be
+  created and moved explicitly, with a separate structure diagram, search,
+  branch focus and keyboard list. Concurrent edits now share the same lock,
+  and writes avoid a second full validation caused solely by their own append.
+  A fresh local sign-in link also works after a server restart when the browser
+  still remembers the previous server's API address.
+  Confirmed task creation clears the submitted draft without losing concurrent
+  edits. Workers start with explicit repository, state and child-session context
+  through the installed paired CLI, including under a customized login shell.
+
+- **Agent galleries and a navigable task map.** Click an agent’s name or avatar
+  to open its images and live previews, including an empty gallery. Filter
+  result types and versions, inspect authorship, and open the producing task.
+  Task maps now support search, dependency direction, zoom and fit, and can
+  show a small connected selection in a large project. Completed work stays
+  visually distinct from accepted work. Receipt recovery now reconciles copied
+  legacy tombstones immediately, and cached ledger reads recheck moved paths.
+
 - **The second dogfooding wave: measured write latency, one name field,
   archivable skill groups, and no more Starter Packs.** Before any latency
   target is declared, there is now a measurement: warm `task_create` has a

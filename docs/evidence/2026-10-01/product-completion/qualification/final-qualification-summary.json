@@ -1,0 +1,24 @@
+{
+  "source_sha256": "bcb3d97817cc67d38e07bb7324336ff1d4b2c202017c297cf3087b0afe1d66a3",
+  "codex_cli": "0.159.3",
+  "model": "gpt-6-astra",
+  "builder": {
+    "ok": true,
+    "seconds": 62.07406174996868,
+    "terminal": [
+      1,
+      1,
+      0
+    ]
+  },
+  "reviewer": {
+    "ok": true,
+    "seconds": 67.71630979201291,
+    "terminal": [
+      1,
+      1,
+      0
+    ]
+  },
+  "limits": "Compatibility canaries do not compare model quality; native implementation shell startup is covered by code and independent tests, while live terminal success is reported separately. Prior failed attempts are retained."
+}

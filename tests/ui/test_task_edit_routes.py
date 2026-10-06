@@ -34,6 +34,8 @@ def test_editor_routes_require_authentication_and_return_complete_owned_content(
     assert body["editable"] is True and body["cancellable"] is True
     assert set(body) == {
         "schema",
+        "task_kind",
+        "parent_task_id",
         "task_id",
         "revision",
         "title",
@@ -129,3 +131,35 @@ def test_stream_limit_stops_before_reading_remaining_chunks() -> None:
     result = asyncio.run(_bounded_body(request))
     assert result.status_code == 413
     assert consumed == 2
+
+
+def test_component_create_and_parent_edit_use_supported_routes(writable, writable_client):  # type: ignore[no-untyped-def]
+    parent = writable_client.post(
+        "/api/tasks",
+        headers=HEADERS,
+        json={
+            "title": "Component",
+            "description": "Explicit planning component",
+            "acceptance_criteria": ["Reviewed"],
+            "task_kind": "component",
+            "idempotency_key": "parent-component",
+        },
+    )
+    assert parent.status_code == 200, parent.text
+    pid = parent.json()["entity_ref"]["id"]
+    child = _task(writable)
+    cid = child["entity_ref"]["id"]
+    response = writable_client.post(
+        f"/api/work/tasks/{cid}/edit",
+        headers=HEADERS,
+        json={
+            "expected_revision": child["revision"],
+            "changes": {"parent_task_id": pid},
+            "idempotency_key": "parent-edit",
+        },
+    )
+    assert response.status_code == 200, response.text
+    detail = writable_client.get(f"/api/work/tasks/{cid}/edit-detail", headers=HEADERS).json()
+    assert detail["parent_task_id"] == pid
+    assert detail["task_kind"] == "task"
+    assert detail["dependencies"] == []

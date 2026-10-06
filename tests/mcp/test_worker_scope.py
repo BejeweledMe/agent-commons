@@ -462,6 +462,8 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
         "commons_show_verification",
         "commons_show_artifact",
         "commons_read_artifact",
+        "commons_read_output_image",
+        "commons_read_build_file",
         "commons_read_skill",
         "commons_finalize_review",
         "commons_record_verification",
@@ -501,6 +503,8 @@ def test_explicit_binding_never_falls_back_to_root_and_worker_catalog_is_scoped(
     assert {
         name.removeprefix("mcp__agent-commons__") for name in allowed.split(",")
     } == expected_tools
+    assert "commons_create_task" not in server.tools
+    assert "commons_edit_task" not in server.tools
     assert "commons_request_delegation" not in server.tools
     assert "commons_cancel_delegation" not in server.tools
     assert "commons_recover_delegation" not in server.tools

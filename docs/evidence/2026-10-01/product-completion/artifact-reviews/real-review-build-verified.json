@@ -1,0 +1,66 @@
+{
+  "expected_model": "gpt-6-astra",
+  "model_identity_limit": "Expected immutable role/profile model; runtime config/fingerprint evidence must independently confirm the selected model. No inference about provider internals.",
+  "delegation_id": "delegation.7Y72Q9YHMGKXKP3P37J7CFVMHJ",
+  "review_state": "approved",
+  "review_summary": "Approved only for the retained artifact inspection criteria. Read the integrity-verified retained manifest and every UTF-8 text entry (index.html, app.js, style.css) fully from offset 0 through next_offset=null, without redactions; the reader reported review_content_complete=true. HTML references match retained entries, and the counter handler targets the existing button after its markup. No blocking issue found by static inspection. No canonical verifications were available. Binary asset appearance and browser execution are untested; no runtime or automated tests were performed, and asset hashes do not establish visual appearance. This verdict does not approve the producing task or independently verify deletion of the original source. The bound review revision remained unchanged; no addressed threads were present.",
+  "exact_target": {
+    "kind": "artifact",
+    "id": "artifact.6DZNY3RA52CSWSWDGJVV4A2B4X"
+  },
+  "target_revision": "evt.01M3VQGT4VKZBPAR8TQ8TWDFRK",
+  "attempt": {
+    "schema": "agent_commons.runtime_attempt.v5",
+    "attempt_id": "attempt.3SVX1N58VRBHD2E8E0PWKB7K4T",
+    "request_id": "request.1B7CVYZME3P9NPA8V0NFKSFRQ1",
+    "number": 1,
+    "profile_id": "codex-independent-reviewer",
+    "provider": "codex",
+    "correlation": {
+      "delegation_id": "delegation.7Y72Q9YHMGKXKP3P37J7CFVMHJ",
+      "target_kind": "review",
+      "target_id": "review.7941ZRZDA0PADSYS535GYHHMDR",
+      "target_revision": "evt.01M3VQGV64AJF5GF6H1902K27Z",
+      "parent_session_id": "session.83f2d728d7024a3992e424ee320a4d27",
+      "child_session_id": "session.6150426c1f9546cda085ef10bd3d889d",
+      "trace_id": "4f2068f738fd6eef45313d796a9f3fd8",
+      "root_delegation_id": "delegation.7Y72Q9YHMGKXKP3P37J7CFVMHJ"
+    },
+    "child_policy": {
+      "remaining_depth": 0,
+      "max_fanout": 1,
+      "max_attempts": 1,
+      "max_concurrency": 1,
+      "timeout_seconds": 600,
+      "max_output_bytes": 1048576,
+      "max_budget_microusd": null
+    },
+    "checkout_fingerprint": "81afd38ce88e95274e203c9f9681b594bb1599f143803041eb2eab4f9b721c84",
+    "launch_plan_sha256": "8b7ae3ba26daa0cb512413607fa487c92ca119d13f0fc10af86d8487149faa4e",
+    "launch_key_sha256": "d6aee2bdec601fb1af12977ad3f9ff10e5636176da59fdf1b0ebfc3e7719421e",
+    "state": "succeeded",
+    "reason": "completed",
+    "pid": 33556,
+    "exit_code": 0,
+    "stdout_bytes_seen": 32564,
+    "stderr_bytes_seen": 0,
+    "output_truncated": false,
+    "diagnostic_code": "none",
+    "stderr_diagnostic_tail": null,
+    "stderr_diagnostic_tail_truncated": false,
+    "stderr_diagnostic_tail_redacted": false,
+    "created_at": "2026-10-01T13:38:32.708997Z",
+    "updated_at": "2026-10-01T13:39:37.345465Z"
+  },
+  "terminal_tool_audit": {
+    "schema": "agent_commons.terminal_tool_audit.v2",
+    "delegation_id": "delegation.7Y72Q9YHMGKXKP3P37J7CFVMHJ",
+    "terminal_tool_calls": 1,
+    "terminal_tool_rejections": 0,
+    "terminal_tool_completions": 1,
+    "last_tool": "commons_finalize_review",
+    "updated_at": "2026-10-01T13:39:27.262836Z",
+    "rejection_details": []
+  },
+  "task_review_still_requested": true
+}

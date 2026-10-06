@@ -1,0 +1,126 @@
+{
+  "scope": "Observed integration facts after the original independent first-answer snapshot; these do not rewrite that snapshot or prove model quality. Read as common factual addendum for peer critique only.",
+  "validated_increment": {
+    "gallery": "Agent name/avatar always opens scoped gallery, verified thumbnails, type/history filters, task navigation and producer/revision fields; current-task review label avoids output-version approval claim.",
+    "graph": "Search, fit/zoom, connected/upstream/downstream focus before128node cap; completed neutral and accepted green. No canonical parent/component relation added.",
+    "storage": "Legacy abandonment reconcile view/conflict checks and verified-file resolved-path cache identity fixed.",
+    "checks": {
+      "python_passed": 2738,
+      "python_skipped": 14,
+      "work_passed": 401,
+      "gallery_passed": 27,
+      "make_check_exit": 0,
+      "independent_review": "approved only bounded exact increment"
+    },
+    "browser": "Synthetic fixture plus readonly shipped application on real305task project. No real provider-generated frontend journey proven.",
+    "performance": "Diagnostic WP20 medians13.2-18.6s on3206events,2cold/warmrepeats; some concurrent checks. <=1s gate unproven."
+  },
+  "canaries": [
+    {
+      "file": "canary-astra-builder-cli01593.json",
+      "sha256": "04cc1762a34c4e9886a456b1b92544171277a773dbe1141c471c8bcfdaa272ba",
+      "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+      "model": "gpt-6-astra",
+      "canonical_state": "succeeded",
+      "ok": true,
+      "provider_version": "codex-cli 0.159.3",
+      "purpose": "implementation",
+      "profile_id": "codex-builder",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true
+    },
+    {
+      "file": "canary-astra-cli01593.json",
+      "sha256": "0f5a349c805bf0b76aad725d4d7783fd3a5dd0bc1c8b1508411cedd36ba323ff",
+      "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+      "model": "gpt-6-astra",
+      "canonical_state": "succeeded",
+      "ok": true,
+      "provider_version": "codex-cli 0.159.3",
+      "purpose": "independent_review",
+      "profile_id": "codex-independent-reviewer",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true
+    },
+    {
+      "file": "canary-sol-cli01593.json",
+      "sha256": "3a388ae1379dc8d41cd251ab5e65f48d0a4d80513ab4f0446a8abc510d31bc0a",
+      "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+      "model": "gpt-6.1-sol",
+      "canonical_state": "needs_operator",
+      "ok": false,
+      "provider_version": "codex-cli 0.159.3",
+      "purpose": "implementation",
+      "profile_id": "codex-builder",
+      "process_canonical_mismatch": true,
+      "terminal_tool_calls": 2,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 1,
+      "child_session_closed": true
+    },
+    {
+      "file": "canary-sol-cli01593-terminal-diagnostic.json",
+      "sha256": "6576fc89376201de5ba5b494f2853eda15ca9ff73ceaadae75a8c1e6f5a16d78",
+      "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+      "model": "gpt-6.1-sol",
+      "canonical_state": "succeeded",
+      "ok": true,
+      "provider_version": "codex-cli 0.159.3",
+      "purpose": "implementation",
+      "profile_id": "codex-builder",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true
+    },
+    {
+      "file": "canary-current-operator.json",
+      "sha256": "214087f738edf3bd079cc069ca79211971fc46baa25bb6c9e5a2e513d6bb7e19",
+      "agent_commons_source_sha256": "fab6f03a9ca61162e4495cc8758c662cf4720a7588d7cbee169b8e2c4dcc274e",
+      "model": null,
+      "canonical_state": "succeeded",
+      "ok": true,
+      "provider_version": "codex-cli 0.145.0",
+      "purpose": "implementation",
+      "profile_id": "codex-builder",
+      "process_canonical_mismatch": false,
+      "terminal_tool_calls": 1,
+      "terminal_tool_completions": 1,
+      "terminal_tool_rejections": 0,
+      "child_session_closed": true
+    }
+  ],
+  "auth": "Claude Code and Grok Build authorized1October via owner-confirmed browser login. Grok catalog includes exactgrok-4.7; Claude first replies still running. No billing credential change.",
+  "remaining": "Full five-model critique/synthesis; GPT6 real product run and rollout; durable image/build bytes; exact-output review; canonical parent/component decomposition; authenticated Linux/release evidence.",
+  "additional_code_checks": [
+    {
+      "fact": "A standing agent extensions.model overrides the operator profile model through dataclasses.replace; absent agent model uses profile default. A YAML pin alone does not update already-hired agent model selections.",
+      "evidence": [
+        "src/agent_commons/services/roles.py:28-43",
+        "src/agent_commons/services/delegation_runtime.py:1019-1043"
+      ]
+    },
+    {
+      "fact": "Qualification fingerprint includes profile ID and model along with runtime/source identities, while ProviderQualificationStore._path stores one JSON per profile ID. A later qualification of another model for that profile replaces the prior stored receipt. This is current storage behavior, not evidence that safety validation should be removed.",
+      "evidence": [
+        "src/agent_commons/runtime/provider_qualification.py:155-191",
+        "src/agent_commons/runtime/provider_qualification.py:263-264"
+      ]
+    }
+  ],
+  "performance_profile": {
+    "scope": "One original task_create workload under cProfile, synthetic3206events/350manifests; diagnostic only, not fresh benchmark or acceptance. No source change.",
+    "seconds_with_profiler": 24.14,
+    "event_read_path_calls": 6413,
+    "explanation": "Current lock-scoped view rebuilds all old events when path-set changes. Own append causes3206initial+3207post-append full event reads.",
+    "evidence": "wp20-performance-diagnosis.md and wp20-profile-aggregate.json",
+    "limitation": "A proposed narrow verified-own-append update is not implemented or tested and does not establish <=1s."
+  }
+}
