@@ -193,6 +193,37 @@ SQLite fast path without changing canonical history. Disabling the optional
 runtime removes communication tools; let in-flight operations finish or expire
 before removing any private operational communication directory.
 
+### Recover a panel project whose old state directory disappeared
+
+Stop panels using this project. Select an existing, owned **exact root** from
+the working installation's `support --show-paths` output, not its state base.
+List the panel projects, then explicitly recover the selected ID and revision:
+
+```bash
+uv run --locked agent-commons --json project list
+uv run --locked agent-commons --json project recover-state PROJECT_ID REVISION \
+  --state-root /absolute/existing/owned/exact-root \
+  --idempotency-key recover-project-state-1
+```
+
+The old state root must be missing. Recovery verifies the registered repository,
+workspace, replacement ownership and canonical data; it preserves the project
+ID, name, archive status and previous receipts. An identical retry uses the same
+key. Changed input needs a new key and the current revision. Restart the common
+panel and use its fresh sign-in link. An already-mounted old binding refuses
+requests until restart. Recovery does not restore missing runs or attachments.
+Never edit `registry.json` or remove receipts to bypass an identity conflict.
+
+**RU — восстановление привязки проекта.** Остановите панели этого проекта.
+В `support --show-paths` работающей установки найдите существующий точный каталог
+состояния, а не базовый каталог. Команда `project list` показывает ID и ревизию;
+`project recover-state` из примера выше явно привязывает проект к проверенному
+каталогу того же workspace. Старый каталог должен отсутствовать. ID, имя,
+архивный статус и предыдущие квитанции сохраняются. Повторяйте тот же запрос с
+тем же ключом; для новых параметров нужны новая ревизия и ключ. После этого
+перезапустите общую панель и откройте свежую ссылку входа. Потерянные запуски и
+вложения эта операция не восстанавливает. Не редактируйте реестр вручную.
+
 ## 3. Prototype a product design
 
 A designer session creates a task with measurable usability and accessibility

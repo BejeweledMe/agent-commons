@@ -360,3 +360,154 @@ def test_checkout_symlink_after_rename_does_not_brick_lexical_receipt_loading(
     listed = registry.list_projects()
     assert listed["projects"][0]["state"] == "missing"
     assert listed["projects"][0]["available"] is False
+
+
+def _recoverable(tmp_path: Path):  # type: ignore[no-untyped-def]
+    from agent_commons.services.manager import CommonsManager
+
+    repo = _repo(tmp_path / "repo")
+    CommonsManager.initialize(repo, integrations=())
+    old = CommonsManager(repo, state_root=tmp_path / "old-state")
+    replacement = CommonsManager(repo, state_root=tmp_path / "replacement")
+    registry = ProjectRegistry(tmp_path / "registry")
+    project = registry.register_existing(repo, old.paths.state_root)["project"]
+    return registry, project, old, replacement
+
+
+def test_recovery_preserves_identity_and_receipts_and_allows_startup(tmp_path: Path) -> None:
+    registry, project, old, replacement = _recoverable(tmp_path)
+    old.paths.state_root.rename(tmp_path / "retained-old-state")
+    before = registry._load()
+    arguments = dict(state_root=replacement.paths.state_root, idempotency_key="recover")
+    result = registry.recover_state(project["id"], project["revision"], **arguments)
+    assert result["project"]["id"] == project["id"]
+    assert result["project"]["workspace_id"] == project["workspace_id"]
+    assert result["project"]["state"] == "ready"
+    assert registry.recover_state(project["id"], project["revision"], **arguments) == result
+    assert (
+        registry.register_existing(old.repo_root, replacement.paths.state_root)["project"]
+        == result["project"]
+    )
+    assert all(
+        registry._load()["receipts"][key] == value for key, value in before["receipts"].items()
+    )
+    with pytest.raises(ProjectRegistryRefusal) as refused:
+        registry.recover_state(
+            project["id"],
+            project["revision"],
+            state_root=tmp_path / "other",
+            idempotency_key="recover",
+        )
+    assert refused.value.code == "project_idempotency_mismatch"
+
+
+@pytest.mark.parametrize(
+    "failure", ["old-present", "stale", "empty", "foreign", "symlink", "replaced-checkout"]
+)
+def test_recovery_refuses_unverified_changes_without_registry_writes(
+    tmp_path: Path, failure: str
+) -> None:
+    from agent_commons.services.manager import CommonsManager
+
+    registry, project, old, replacement = _recoverable(tmp_path)
+    revision = project["revision"]
+    state = replacement.paths.state_root
+    if failure != "old-present":
+        old.paths.state_root.rename(tmp_path / "retained-old-state")
+    if failure == "stale":
+        revision = "sha256:stale"
+    elif failure == "empty":
+        state = tmp_path / "empty"
+        state.mkdir()
+    elif failure == "foreign":
+        foreign = _repo(tmp_path / "foreign")
+        CommonsManager.initialize(foreign, integrations=())
+        state = CommonsManager(foreign, state_root=tmp_path / "foreign-state").paths.state_root
+    elif failure == "symlink":
+        link = tmp_path / "linked-state"
+        link.symlink_to(state, target_is_directory=True)
+        state = link
+    elif failure == "replaced-checkout":
+        old.repo_root.rename(tmp_path / "retained-repo")
+        _repo(old.repo_root)
+        CommonsManager.initialize(old.repo_root, integrations=())
+    before = registry.path.read_bytes()
+    with pytest.raises(ProjectRegistryRefusal):
+        registry.recover_state(project["id"], revision, state_root=state, idempotency_key="recover")
+    assert registry.path.read_bytes() == before
+
+
+def test_concurrent_recovery_has_one_winner(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from agent_commons.services.manager import CommonsManager
+
+    registry, project, old, replacement = _recoverable(tmp_path)
+    other = CommonsManager(old.repo_root, state_root=tmp_path / "other-state")
+    old.paths.state_root.rename(tmp_path / "retained-old-state")
+
+    def recover(state: Path) -> str:
+        try:
+            registry.recover_state(
+                project["id"], project["revision"], state_root=state, idempotency_key=state.name
+            )
+            return "recovered"
+        except ProjectRegistryRefusal as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(
+            executor.map(recover, [replacement.paths.state_root, other.paths.state_root])
+        )
+    assert sorted(outcomes) == ["project_stale", "recovered"]
+
+
+def test_restored_old_state_cannot_replay_its_startup_receipt(tmp_path: Path) -> None:
+    registry, project, old, replacement = _recoverable(tmp_path)
+    retained = tmp_path / "retained-old-state"
+    old.paths.state_root.rename(retained)
+    registry.recover_state(
+        project["id"],
+        project["revision"],
+        state_root=replacement.paths.state_root,
+        idempotency_key="recover",
+    )
+    retained.rename(old.paths.state_root)
+    with pytest.raises(ProjectRegistryRefusal) as refused:
+        registry.register_existing(old.repo_root, old.paths.state_root)
+    assert refused.value.code == "project_state_binding_conflict"
+    assert (
+        registry.register_existing(old.repo_root, replacement.paths.state_root)["project"]["id"]
+        == project["id"]
+    )
+
+
+@pytest.mark.parametrize("ancestor", [False, True])
+def test_recovery_receipt_stays_readable_after_state_symlink(
+    tmp_path: Path, ancestor: bool
+) -> None:
+    from agent_commons.services.manager import CommonsManager
+
+    registry, project, old, _ = _recoverable(tmp_path)
+    replacement = CommonsManager(old.repo_root, state_root=tmp_path / "parent" / "state")
+    other = registry.register(
+        checkout=_repo(tmp_path / "other"),
+        workspace_id="workspace.other",
+        state_binding=None,
+        name="Other",
+        idempotency_key="other",
+    )["project"]
+    old.paths.state_root.rename(tmp_path / "retained-old-state")
+    registry.recover_state(
+        project["id"],
+        project["revision"],
+        state_root=replacement.paths.state_root,
+        idempotency_key="recover",
+    )
+    path = replacement.paths.state_root.parent if ancestor else replacement.paths.state_root
+    moved = tmp_path / "moved-state"
+    path.rename(moved)
+    path.symlink_to(moved, target_is_directory=True)
+    projects = {p["id"]: p for p in registry.list_projects(read_only=True)["projects"]}
+    assert projects[other["id"]]["state"] == "ready"
+    assert projects[project["id"]]["available"] is False

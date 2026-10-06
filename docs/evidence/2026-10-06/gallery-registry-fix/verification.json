@@ -1,0 +1,54 @@
+{
+  "schema": "agent_commons.dogfooding_fix_verification.v1",
+  "source_sha256": "d2ca2730ca762c9c839740b3f4eccc0af6df6dc06f2be340f05a87230f2e98c4",
+  "source_bundle": "review-input-v2.json",
+  "source_bundle_sha256": "0186737a3149b2d4ce6b32daef5b91a1159b5c49703b471c491281410b99ac70",
+  "full_check": {
+    "command": "make check",
+    "exit_code": 0,
+    "python_passed": 2868,
+    "python_skipped": 14,
+    "python_warnings": 2,
+    "work_passed": 429,
+    "gallery_passed": 27,
+    "log_sha256": "5a1c0a4eb1da0b58dcff47a412819111434abb370f1d81b12bf132b38f9a158f"
+  },
+  "focused_tests": 42,
+  "independent_review": {
+    "id": "review.2TPNZ8Z1A6DDHMF2H56HQA27HY",
+    "revision": "evt.01M49G11DPV7J18D9GG1ZVNQAW",
+    "verdict": "approved",
+    "summary": "Approved as a bounded source review of the exact V2 artifact. Both prior findings are addressed: registration receipt replay now requires the current checkout, workspace, Git identity, state path and state inode; ProjectHost activation compares the supplied context's actual manager workspace and resolved state root against the registered manager before mounting. Thus restoring old root A after recovery to B cannot use the old startup receipt or mount an A context with B metadata. Persisted recovery receipts now validate paths lexically, independently of filesystem changes, while public availability retains canonical-path and directory-identity checks; a recovered root or ancestor becoming a symlink makes that binding unavailable without invalidating unrelated projects. Recovery retains locking, revision checks, existing-root ownership and snapshot validation, stable project identity and historical receipts. The CLI read-only guard and read-only listing are consistent, project is registered in the CLI and included in its command inventory, and hosted child applications receive the real host port. Inspected regression source covers restored old-root replay, mismatched supplied context, direct/ancestor symlink readability, unrelated-project availability, mounted-context refusal after recovery, recovery CAS/idempotency and CLI guards. No additional blocking defect found in inspected source. No canonical verifications were available; I did not execute tests, make check, visual checks or live Blizhe recovery, and this approval does not claim task completion. Artifact output was large and reader-redacted; bounded source reads supplemented it, with exact hash matches for the two regression test files. Authentication setup lines and a test email remained redacted; no absence claim depends on them."
+  },
+  "provider_canary": {
+    "profile_id": "codex-independent-reviewer",
+    "model": "gpt-6-astra",
+    "ok": true,
+    "canonical_state": "succeeded",
+    "terminal_tool_completions": 1,
+    "terminal_tool_rejections": 0
+  },
+  "browser_checks": {
+    "gallery": "Actual Self-improvement Frontend agent gallery loads its empty state on a separate read-only common panel at 8795. Latest and all versions checked; final V2 latest rechecked.",
+    "blizhe": "Supported recover-state succeeds on an isolated registry copy; read-only common panel 8796 opens the real Blizhe workspace with all seven roles. No real registry change and no stop of user panels. Isolated 8796 server stopped after verification."
+  },
+  "screenshots": [
+    {
+      "file": "blizhe-shadow-recovery-EN.jpg",
+      "sha256": "ef3971b72e7e5dbbf363d615921f3cb999c8fc25ab162f9f19394788f0ffd67f"
+    },
+    {
+      "file": "gallery-all-versions-EN.jpg",
+      "sha256": "f9098c551fc4f1a5ee2424a36e029ebb66e5f7895a956adbe13f9a710e4f95bb"
+    },
+    {
+      "file": "gallery-loaded-EN.jpg",
+      "sha256": "b900d0289b4f54bbe5cbf9c2cdcd2a60ed917a05cda7c960c24e8b25498d213c"
+    },
+    {
+      "file": "gallery-loaded-v2-EN.jpg",
+      "sha256": "b900d0289b4f54bbe5cbf9c2cdcd2a60ed917a05cda7c960c24e8b25498d213c"
+    }
+  ],
+  "deployment_boundary": "Real registry recovery and restart of user panels 8793/8794 await explicit consent after automatic approval review refused the stop. Git publication and CI are separate from these local application actions."
+}

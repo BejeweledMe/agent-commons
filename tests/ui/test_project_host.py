@@ -98,6 +98,41 @@ def test_host_keeps_non_repository_startup_in_first_run_state(tmp_path: Path) ->
     assert host.default_project_id is None
 
 
+def test_host_serves_scoped_outputs_and_excludes_its_real_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agent_commons.runtime.live_previews import LivePreviewRegistry
+
+    host, first, second = _host(tmp_path, monkeypatch)
+    app = host.create_app(token="test-token", port=PORT, api_base="/api")
+    observed_ports = []
+    original_list = LivePreviewRegistry.list
+
+    def list_previews(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        observed_ports.append(self.forbidden_ports)
+        return original_list(self, *args, **kwargs)
+
+    monkeypatch.setattr(LivePreviewRegistry, "list", list_previews)
+    with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
+        for project in (first, second):
+            handle = host._activate(str(project["id"]))
+            assert handle is not None
+            task = handle.context.writer().create_task(
+                title="Gallery scope",
+                description="An empty gallery is a successful read.",
+                acceptance_criteria=("List and summary both load.",),
+            )
+            query = {"scope_kind": "task", "scope_id": task["entity_ref"]["id"]}
+            for endpoint in ("outputs", "outputs/summary"):
+                response = client.get(
+                    f"/api/projects/{project['id']}/{endpoint}", params=query, headers=_COOKIE
+                )
+                assert response.status_code == 200, response.text
+                assert response.json()["scope"] == {"kind": "task", "id": query["scope_id"]}
+            assert response.json()["total"] == 0
+    assert observed_ports == [frozenset({PORT})] * 4
+
+
 def test_host_registry_writes_are_read_only_guarded_and_closed_to_known_fields(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -200,6 +235,29 @@ def test_host_child_route_inventory_has_no_second_auth_exchange_or_static_shell(
     assert "/api/auth/exchange" not in paths
     assert "/" not in paths
     assert len(host._children) == 1
+
+
+def test_mounted_context_refuses_a_recovered_state_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    host, _, second = _host(tmp_path, monkeypatch)
+    app = host.create_app(token="test-token", port=PORT, api_base="/api")
+    path = f"/api/projects/{second['id']}/meta"
+    with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
+        assert client.get(path, headers=_COOKIE).status_code == 200
+        entry = host.registry.get(str(second["id"]))
+        assert entry.state_binding is not None
+        replacement = CommonsManager(entry.checkout, state_root=tmp_path / "replacement")
+        Path(entry.state_binding).rename(tmp_path / "retained-old-state")
+        host.registry.recover_state(
+            entry.id,
+            entry.revision,
+            state_root=replacement.paths.state_root,
+            idempotency_key="recover-mounted-project",
+        )
+        refused = client.get(path, headers=_COOKIE)
+        assert refused.status_code == 409
+        assert refused.json()["error"]["code"] == "project_unavailable"
 
 
 def test_host_shutdown_waits_for_owned_bounded_thread_before_closing_owner(
@@ -388,3 +446,23 @@ def test_native_picker_readonly_refusal_precedes_host_dialog(
         )
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "read_only"
+
+
+def test_host_refuses_supplied_context_from_a_restored_old_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    host, _, second = _host(tmp_path, monkeypatch)
+    host.create_app(token="test-token", port=PORT, api_base="/api")
+    entry = host.registry.get(str(second["id"]))
+    assert entry.state_binding is not None
+    old = Path(entry.state_binding)
+    old_context = UIContext(entry.checkout, state_root=old)
+    replacement = CommonsManager(entry.checkout, state_root=tmp_path / "replacement")
+    retained = tmp_path / "retained-old-state"
+    old.rename(retained)
+    host.registry.recover_state(
+        entry.id, entry.revision, state_root=replacement.paths.state_root, idempotency_key="recover"
+    )
+    retained.rename(old)
+    assert host._activate(entry.id, context=old_context) is None
+    assert entry.id not in host._handles

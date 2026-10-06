@@ -118,6 +118,11 @@ def _normalized_absolute(value: object) -> bool:
         return False
 
 
+def _lexical_absolute(value: object) -> bool:
+    """Validate stored intent bytes independently of later filesystem changes."""
+    return isinstance(value, str) and Path(value).is_absolute() and os.path.normpath(value) == value
+
+
 def _create_intent(value: object) -> dict[str, Any] | None:
     if not isinstance(value, dict) or set(value) != {
         "inspection_id",
@@ -245,9 +250,9 @@ class RegisteredProject:
         elif _git_identity(self.checkout) != self.git_identity:
             state = "identity_conflict"
             available = False
-        elif (
-            self.state_binding is not None
-            and _directory_identity(Path(self.state_binding)) != self.state_identity
+        elif self.state_binding is not None and (
+            not _normalized_absolute(self.state_binding)
+            or _directory_identity(Path(self.state_binding)) != self.state_identity
         ):
             state = "identity_conflict"
             available = False
@@ -317,8 +322,13 @@ class ProjectRegistry:
         body["revision"] = _revision(body)
         return body
 
-    def _load(self) -> dict[str, Any]:
-        self._ensure_root()
+    def _load(self, *, read_only: bool = False) -> dict[str, Any]:
+        if not read_only:
+            self._ensure_root()
+        elif self.root.is_symlink():
+            raise ProjectRegistryRefusal(
+                "project_registry_unavailable", "Project registry is unavailable.", 409
+            )
         if not self.path.exists():
             return self._empty()
         if self.path.is_symlink():
@@ -423,7 +433,16 @@ class ProjectRegistry:
                 )
                 and (intent.get("archived") is None or type(intent.get("archived")) is bool)
             )
-            return (_normal_intent(intent) or update) and value["project_id"] in project_ids
+            recovery = (
+                isinstance(intent, dict)
+                and set(intent) == {"project_id", "expected_revision", "recover_state"}
+                and intent.get("project_id") in project_ids
+                and isinstance(intent.get("expected_revision"), str)
+                and _lexical_absolute(intent.get("recover_state"))
+            )
+            return (_normal_intent(intent) or update or recovery) and value[
+                "project_id"
+            ] in project_ids
         expected = {"create_intent", "project_id", "milestone", "target_identity"}
         if set(value) != expected or _create_intent(value["create_intent"]) is None:
             return False
@@ -545,7 +564,14 @@ class ProjectRegistry:
     def _entries(self, document: Mapping[str, Any]) -> list[RegisteredProject]:
         return [self._record(item) for item in document["projects"]]
 
-    def list_projects(self) -> dict[str, Any]:
+    def list_projects(self, *, read_only: bool = False) -> dict[str, Any]:
+        if read_only:
+            document = self._load(read_only=True)
+            return {
+                "schema": PROJECT_LIST_SCHEMA,
+                "revision": document["revision"],
+                "projects": [entry.public() for entry in self._entries(document)],
+            }
         self._ensure_root()
         with exclusive_lock(self.lock_path, policy=_REGISTRY_POLICY):
             document = self._load()
@@ -606,8 +632,130 @@ class ProjectRegistry:
             workspace_id=manager.workspace_id,
             state_binding=manager.paths.state_root,
             name=name or checkout.name,
-            idempotency_key="startup:" + str(checkout),
+            # Startup attachment is an assertion of this exact binding, not a
+            # permanent operation key for every state directory ever selected.
+            idempotency_key="startup:v2:"
+            + hashlib.sha256(
+                _canonical(
+                    {
+                        "checkout": str(checkout),
+                        "state_binding": str(manager.paths.state_root),
+                        "workspace_id": manager.workspace_id,
+                        "name": name or checkout.name,
+                    }
+                )
+            ).hexdigest(),
         )
+
+    def recover_state(
+        self,
+        project_id: str,
+        expected_revision: str,
+        *,
+        state_root: Path,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Explicitly replace a missing binding with an already-owned exact root.
+
+        This does not migrate or recreate operational data. The previous root
+        must be absent, and the replacement must already belong to the same
+        workspace and checkout. The old registration receipts remain intact.
+        """
+        state = str(state_root.expanduser().absolute())
+        if (
+            not _valid_key(idempotency_key)
+            or not isinstance(expected_revision, str)
+            or not _normalized_absolute(state)
+        ):
+            raise ProjectRegistryRefusal("project_invalid", "Project recovery is invalid.")
+        intent = {
+            "project_id": project_id,
+            "expected_revision": expected_revision,
+            "recover_state": state,
+        }
+        self._ensure_root()
+        with exclusive_lock(self.lock_path, policy=_REGISTRY_POLICY):
+            document = self._load()
+            receipt = document["receipts"].get(idempotency_key)
+            if receipt is not None and receipt != {"intent": intent, "project_id": project_id}:
+                raise ProjectRegistryRefusal(
+                    "project_idempotency_mismatch", "Project recovery input changed.", 409
+                )
+            for index, entry in enumerate(self._entries(document)):
+                if entry.id != project_id:
+                    continue
+                if receipt is None and entry.revision != expected_revision:
+                    raise ProjectRegistryRefusal(
+                        "project_stale", "Project changed; refresh and try again.", 409
+                    )
+                if (
+                    _git_identity(entry.checkout) != entry.git_identity
+                    or entry.checkout.is_symlink()
+                ):
+                    raise ProjectRegistryRefusal(
+                        "project_identity_conflict", "Project repository identity changed.", 409
+                    )
+                if receipt is None:
+                    if entry.state_binding is None:
+                        raise ProjectRegistryRefusal(
+                            "project_state_not_missing",
+                            "Only a missing state root can be recovered.",
+                            409,
+                        )
+                    try:
+                        Path(entry.state_binding).lstat()
+                    except FileNotFoundError:
+                        pass
+                    else:
+                        raise ProjectRegistryRefusal(
+                            "project_state_not_missing",
+                            "The previous state root still exists.",
+                            409,
+                        )
+                try:
+                    before_identity = _directory_identity(Path(state))
+                    manager = open_project_manager(entry.checkout, state, read_only=True)
+                    state_identity = _directory_identity(Path(state))
+                    ownership = manager.paths.ownership_report()
+                    if (
+                        state_identity is None
+                        or manager.paths.state_root != Path(state)
+                        or state_identity != before_identity
+                        or ownership["status"] not in {"owned", "legacy-owned"}
+                        or ownership["match"] is not True
+                        or manager.workspace_id != entry.workspace_id
+                        or any(issue.severity == "error" for issue in manager.snapshot().issues)
+                    ):
+                        raise ValueError("binding mismatch")
+                except (ConfigurationError, IntegrityError, OSError, ValueError) as exc:
+                    raise ProjectRegistryRefusal(
+                        "project_recovery_unverified",
+                        "The replacement must be an existing state root owned by this workspace.",
+                        409,
+                    ) from exc
+                if _directory_identity(Path(state)) != state_identity:
+                    raise ProjectRegistryRefusal(
+                        "project_state_binding_conflict",
+                        "Replacement state changed during recovery.",
+                        409,
+                    )
+                if receipt is not None:
+                    if entry.state_binding != state or entry.state_identity != state_identity:
+                        raise ProjectRegistryRefusal(
+                            "project_state_binding_conflict",
+                            "Recovered project binding changed.",
+                            409,
+                        )
+                    return {"project": entry.public(), "revision": document["revision"]}
+                body = dict(document["projects"][index])
+                body.pop("revision")
+                body.update(state_binding=state, state_identity=state_identity)
+                body["revision"] = _revision(body)
+                document["projects"][index] = body
+                document["receipts"][idempotency_key] = {"intent": intent, "project_id": project_id}
+                self._save(document)
+                return {"project": self._record(body).public(), "revision": document["revision"]}
+        raise ProjectRegistryRefusal("project_unknown", "Project was not found.", 404)
 
     def register(
         self,
@@ -665,8 +813,11 @@ class ProjectRegistry:
                     for entry in self._entries(document):
                         if entry.id == project_id:
                             if (
-                                entry.state_binding == state
-                                and entry.state_identity != state_identity
+                                entry.checkout != checkout
+                                or entry.workspace_id != workspace_id
+                                or entry.git_identity != identity
+                                or entry.state_binding != state
+                                or entry.state_identity != state_identity
                             ):
                                 raise ProjectRegistryRefusal(
                                     "project_state_binding_conflict",

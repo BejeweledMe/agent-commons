@@ -39,6 +39,7 @@ from agent_commons.services.provider_canary import (
 from agent_commons.ui import STARTED_SCHEMA
 
 from ._shared import CLIState, CommonsGroup, _expected, _idem, _json_object, _ref, _refs
+from .projects import project_group
 from .workspace import doctor_command, init_command, search_command, support_command
 
 
@@ -122,6 +123,7 @@ def cli(
 
 
 cli.add_command(init_command)
+cli.add_command(project_group)
 
 
 def _operator_runtime_config(

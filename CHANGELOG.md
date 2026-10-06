@@ -13,6 +13,11 @@ finished plans at the top level.
 
 ## Unreleased
 
+- **Results load in the common project panel.** Agent galleries and task results
+  use the actual panel port when checking live previews. Projects whose old
+  operational-state directory disappeared can be explicitly rebound to a
+  verified existing root with `project recover-state`, preserving their identity.
+
 - **Saved results and an explicit project structure.** Published image versions
   survive source-file changes and server restarts; bounded static builds can be
   downloaded with their exact file manifest. Galleries distinguish review of

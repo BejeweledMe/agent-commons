@@ -24,7 +24,11 @@ from agent_commons.errors import CommonsError
 from agent_commons.ui.context import UIContext
 from agent_commons.ui.project_folder_picker import ProjectFolderPicker
 from agent_commons.ui.project_operations import ProjectOperations
-from agent_commons.ui.project_registry import ProjectRegistry, ProjectRegistryRefusal
+from agent_commons.ui.project_registry import (
+    ProjectRegistry,
+    ProjectRegistryRefusal,
+    open_project_manager,
+)
 
 _PROJECT_ID = re.compile(r"project\.[0-9a-f]{32}\Z")
 
@@ -36,6 +40,8 @@ class ProjectHandle:
     project_id: str
     context: UIContext
     generation: int
+    state_binding: str | None
+    state_identity: str | None
 
 
 class ProjectHost:
@@ -343,6 +349,8 @@ class ProjectHost:
                 bound = (
                     context if context is not None else self._context_factory(entry.checkout, state)
                 )
+                actual_manager = bound.manager()
+                registered_manager = open_project_manager(entry.checkout, state, read_only=True)
             except CommonsError:
                 self._activation_refusals[project_id] = (
                     "project_unavailable",
@@ -350,7 +358,14 @@ class ProjectHost:
                     "This project is unavailable.",
                 )
                 return None
-            if not self._same_binding(bound.repo, entry.checkout):
+            if (
+                not self._same_binding(bound.repo, entry.checkout)
+                or actual_manager.workspace_id != entry.workspace_id
+                or registered_manager.workspace_id != entry.workspace_id
+                or not self._same_binding(
+                    actual_manager.paths.state_root, registered_manager.paths.state_root
+                )
+            ):
                 self._activation_refusals[project_id] = (
                     "project_identity_conflict",
                     409,
@@ -363,7 +378,9 @@ class ProjectHost:
                 bound._session_owner.acquire_panel_lock(self._port)
                 bound._session_owner.start()
             self._generation += 1
-            handle = ProjectHandle(project_id, bound, self._generation)
+            handle = ProjectHandle(
+                project_id, bound, self._generation, entry.state_binding, entry.state_identity
+            )
             self._handles[project_id] = handle
             self._activation_refusals.pop(project_id, None)
             # The admission token is shared by host-owned contexts only.  The
@@ -390,10 +407,11 @@ class ProjectHost:
     def _build_project_app(self, handle: ProjectHandle) -> FastAPI:
         from agent_commons.ui.server import _error, create_app
 
+        assert self._port is not None
         child = create_app(
             handle.context,
             token="",
-            port=0,
+            port=self._port,
             api_base="",
             hosted=True,
             read_only=self.read_only,
@@ -403,8 +421,11 @@ class ProjectHost:
         async def binding_guard(request: Request, call_next: Callable[[Request], Any]) -> Response:
             try:
                 entry = self.registry.project_binding(handle.project_id)
-                if not entry.public()["available"] or not self._same_binding(
-                    handle.context.repo, entry.checkout
+                if (
+                    not entry.public()["available"]
+                    or not self._same_binding(handle.context.repo, entry.checkout)
+                    or (entry.state_binding, entry.state_identity)
+                    != (handle.state_binding, handle.state_identity)
                 ):
                     return _error(409, "project_unavailable", "This project is unavailable.")
             except ProjectRegistryRefusal:

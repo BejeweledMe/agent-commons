@@ -18,6 +18,7 @@ from agent_commons.services import CommonsManager
 TOP_LEVEL_COMMANDS = (
     "init",
     "ui",
+    "project",
     "chat",
     "search",
     "support",
