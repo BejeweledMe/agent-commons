@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-07",
+  "source_sha": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "tool_version": "0.1.0",
+  "ui_asset": "work-C0nYR3qF.js",
+  "panel": "http://127.0.0.1:8794/work",
+  "blizhe_sha": "cbdcad62052808343feca6a0a84a8b9b9e54976a",
+  "blizhe_status_entries": 44,
+  "project_id": "project.8d0b5b1f055a792caebc2b5ba24c65f5",
+  "canaries": 0,
+  "model_runs": 0,
+  "new_tasks": 0
+}

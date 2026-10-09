@@ -29,6 +29,7 @@ from agent_commons.domain.work_state import (
     EvidenceState,
     FreshnessState,
     NextAction,
+    RunPhase,
     RunView,
     WorkSourceGap,
 )
@@ -47,6 +48,16 @@ _HUMAN_ACTIONS = frozenset(
         NextAction.REVISE_WORK,
         NextAction.ACCEPT_TASK,
         NextAction.INSPECT_MISSING_EVIDENCE,
+    }
+)
+_LIVE_RUN_PHASES = frozenset(
+    {
+        RunPhase.REQUESTED,
+        RunPhase.RESERVED,
+        RunPhase.LAUNCHING,
+        RunPhase.RUNNING,
+        RunPhase.CANCELLATION_REQUESTED,
+        RunPhase.INPUT_NEEDED,
     }
 )
 MAX_ATTEMPT_INPUTS = MAX_PLAN_TASKS * 4
@@ -411,15 +422,28 @@ def _focused_tasks(
     return selected, fatal
 
 
+def _run_blocks_review(run: RunView) -> bool:
+    return (
+        run.phase in _LIVE_RUN_PHASES
+        or run.phase is RunPhase.UNKNOWN
+        or "canonical_attempt_state_match" in run.missing_fields
+    )
+
+
 def _runs_by_task(runs: tuple[RunView, ...]) -> dict[str, RunView]:
     selected: dict[str, RunView] = {}
-    keys: dict[str, tuple[datetime, str]] = {}
+    keys: dict[str, tuple[bool, datetime, str]] = {}
     minimum = datetime.min.replace(tzinfo=UTC)
     for run in runs:
         if run.task_id is None:
             continue
-        key = (_timestamp(run.updated_at) or minimum, run.delegation_id)
-        if key > keys.get(run.task_id, (minimum, "")):
+        # A historical run must never hide live or unresolved execution.
+        key = (
+            _run_blocks_review(run),
+            _timestamp(run.updated_at) or minimum,
+            run.delegation_id,
+        )
+        if key > keys.get(run.task_id, (False, minimum, "")):
             selected[run.task_id] = run
             keys[run.task_id] = key
     return selected
@@ -461,10 +485,24 @@ def _task_readiness(
     action = (
         acceptance.next_action if acceptance is not None else NextAction.INSPECT_MISSING_EVIDENCE
     )
+    live_run = run is not None and run.phase in _LIVE_RUN_PHASES
+    # A completed task's exact review owns its next decision. Historical run
+    # success/failure has its own evidence completeness. Only live or unresolved
+    # execution, or an unobserved current task revision, blocks the review action.
+    review_owns_action = (
+        acceptance is not None
+        and state in {"completed", "review"}
+        and not live_run
+        and (observed_task_freshness or aggregate_freshness) is FreshnessState.FRESH
+        and (run is None or not _run_blocks_review(run))
+    )
     awaits_human = action in _HUMAN_ACTIONS
-    if run is not None:
+    if run is not None and not review_owns_action:
         action = run.next_action
         awaits_human = run.awaits_human or action in _HUMAN_ACTIONS
+    if state in {"completed", "review"} and not live_run and not review_owns_action:
+        action = NextAction.INSPECT_MISSING_EVIDENCE
+        awaits_human = True
     dependency_input_invalid = bool(gaps & {PlanGap.TASK_MALFORMED, PlanGap.DEPENDENCIES_TRUNCATED})
     if terminal_failures:
         readiness = ReadinessState.TERMINAL_DEPENDENCY_FAILURE
@@ -491,6 +529,8 @@ def _task_readiness(
     elif blockers:
         readiness = ReadinessState.BLOCKED
         action = NextAction.RESOLVE_DEPENDENCIES
+    elif live_run:
+        readiness = ReadinessState.IN_PROGRESS
     elif state == "ready":
         readiness = ReadinessState.READY
         action = NextAction.START_READY_WORK
@@ -510,9 +550,13 @@ def _task_readiness(
         else (run.freshness if run is not None else aggregate_freshness)
     )
     evidence = (
-        run.evidence_state
-        if run is not None
-        else (acceptance.evidence_state if acceptance is not None else EvidenceState.MISSING)
+        acceptance.evidence_state
+        if review_owns_action
+        else (
+            run.evidence_state
+            if run is not None
+            else (acceptance.evidence_state if acceptance is not None else EvidenceState.MISSING)
+        )
     )
     if gaps and evidence is EvidenceState.COMPLETE:
         evidence = EvidenceState.PARTIAL

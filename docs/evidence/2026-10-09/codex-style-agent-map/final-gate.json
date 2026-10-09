@@ -1,0 +1,38 @@
+{
+  "schema": "agent-commons.local-verification.v1",
+  "date": "2026-10-09",
+  "source_manifest": "source-review-manifest-v2.json",
+  "source_manifest_sha256": "84d9a588d1e42fe25477e896ed2be9d433b964ba982649efae4a86cba54559f5",
+  "make_check": {
+    "exit_code": 0,
+    "python_passed": 3034,
+    "python_skipped": 14,
+    "python_warnings": 2,
+    "python_seconds": 897.92,
+    "work_passed": 467,
+    "gallery_passed": 27,
+    "log_sha256": "60fcefe5fa0054790e889fa86f8a8ce7f79d65adcaf4526b826b6ed6c014ccd6"
+  },
+  "frontend_build": "TypeScript and Vite passed",
+  "installed_assets_match": true,
+  "provider_canary": "codex-canary.json",
+  "review_outcomes": {
+    "backend": "approved",
+    "frontend_after_fixes": "approved"
+  },
+  "post_review_changes": {
+    "code_changed": false,
+    "documentation_link_relocations": [
+      "docs/adr/0027-agent-organization-and-method-edits.md"
+    ],
+    "documentation_map_tests_passed": 5,
+    "completed_plans_archived": true
+  },
+  "limits": [
+    "Physical trackpad smoothness was not measured.",
+    "Large graph performance and light theme were not visually qualified.",
+    "Local macOS verification; Linux CI was not run.",
+    "Vite reports a JS chunk above 500 kB; around 300 kB gzip.",
+    "The Opus attempt was interrupted by provider 403; Codex completed its partial frontend work."
+  ]
+}

@@ -1,0 +1,3 @@
+Source: https://grok.com/release-notes/oct-03-2026
+Observed: 2026-10-09T12:21:46.113Z
+Grok 4.7, our most capable model for coding and knowledge work, now powers Expert mode on grok.com, and Fast mode for paid subscribers.

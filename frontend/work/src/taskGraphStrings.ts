@@ -2,6 +2,8 @@ import { translate, type Locale, type MessageKey } from "./i18n.js";
 
 const KEYS = [
   "search",
+  "options",
+  "help",
   "focusLabel",
   "upstream",
   "downstream",
@@ -71,6 +73,13 @@ const KEYS = [
   "sourceChanged",
   "cancelConfirm",
   "draftKept",
+  "reset",
+  "gestures",
+  "workingZoom",
+  "workingZoomHelp",
+  "selectNode",
+  "openSelected",
+  "fitHint",
 ] as const;
 
 export type TaskGraphMessage = (typeof KEYS)[number];

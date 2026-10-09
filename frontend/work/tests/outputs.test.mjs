@@ -309,9 +309,12 @@ test("agent gallery name and avatar are one accessible entry independent of resu
     assert.match(markup, /nodrag nowheel/);
     assert.doesNotMatch(markup, /disabled|\(0\)/);
   }
+  const profession = renderToStaticMarkup(createElement(AgentGalleryAction, { title: "Frontend · checkout", displayTitle: "Frontend engineer", locale: "en", onOpen() {} }));
+  assert.match(profession, /class="board-role-name">Frontend engineer/);
+  assert.match(profession, /aria-label="[^"]*Frontend · checkout"/, "the gallery retains the distinct agent identity");
   const board = readFileSync(resolve(root, "src/components/ProjectBoard.tsx"), "utf8");
   assert.match(board, /<AgentGalleryButton scope=\{\{ kind: "agent", id: role.id \}\} title=\{role.name\}/);
-  assert.match(board, /<OutputsButton scope=\{\{ kind: "agent", id: role.id \}\}/, "existing counted Results action remains independent");
+  assert.match(board, /<OutputsButton compact scope=\{\{ kind: "agent", id: role.id \}\}/, "compact Results action remains independently reachable without polling counts");
 });
 
 test("parser retains validated task and producer attribution across image and live results", () => {

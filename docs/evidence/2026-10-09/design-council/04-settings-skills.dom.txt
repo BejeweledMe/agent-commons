@@ -1,0 +1,596 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&filter=all&tab=context
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=skills
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=blueprints
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=context
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&filter=all&tab=context
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Агенты" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - navigation "Карты проекта":
+    - link "Задачи":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&filter=all&tab=context
+      - text: Задачи
+    - link "Агенты":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&filter=all&tab=context
+      - text: Агенты
+  - region "Агенты":
+    - button "Нанять роль"
+    - button "Добавить отдел"
+    - button "Показать всё"
+    - button "Расставить автоматически"
+    - generic "Список агентов"
+    - generic "Связи на карте"
+    - generic "Агенты":
+      - application:
+        - strong: Вы · владелец
+        - button "Главный чат":
+          - text: Главный чат
+        - button "Открыть галерею результатов агента Blizhe QA · BASE и TOOL":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · BASE и TOOL
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 2 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · BASE и TOOL"':
+        - button "Результаты Blizhe QA · BASE и TOOL":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · PHOTO":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · PHOTO
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · PHOTO"':
+        - button "Результаты Blizhe Backend · PHOTO":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Search · Codex":
+          - generic: И
+          - generic: Инженер RAG и retrieval
+        - generic: Нужны вы
+        - paragraph: Blizhe Search · Codex
+        - paragraph: Обеспечить проверяемый путь от разрешённых источников к релевантному evidence, grounded answer и корректному отказу при отсутствии оснований.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 2 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Search · Codex"':
+        - button "Результаты Blizhe Search · Codex":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Frontend · TOOL":
+          - generic: F
+          - generic: Frontend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Frontend · TOOL
+        - paragraph: JavaScript / TypeScript · Работающий браузерный сценарий с корректными состояниями и взаимодействием.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Frontend · TOOL"':
+        - button "Результаты Blizhe Frontend · TOOL":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Lead · BASE":
+          - generic: Т
+          - generic: Техлид реализации и интеграции
+        - generic: Свободна
+        - paragraph: Blizhe Lead · BASE
+        - paragraph: Довести сложную задачу разработки до целостного работающего результата, сохранив одного владельца реализации, интеграции и проверки.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Lead · BASE"':
+        - button "Результаты Blizhe Lead · BASE":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · CONFIG и REASONS":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · CONFIG и REASONS
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · CONFIG и REASONS"':
+        - button "Результаты Blizhe Backend · CONFIG и REASONS":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe QA · PHOTO и SEARCH":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · PHOTO и SEARCH
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · PHOTO и SEARCH"':
+        - button "Результаты Blizhe QA · PHOTO и SEARCH":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - generic "Масштаб карты":
+          - button "Увеличить масштаб":
+          - button "Уменьшить масштаб":
+          - button "Показать всё":
+    - dialog "Blizhe Frontend · TOOL":
+      - heading "Blizhe Frontend · TOOL" [level=2]
+      - tablist "Настройки агента":
+        - tab "Основное"
+        - tab "Навыки" [active] [selected]
+        - tab "Права"
+        - tab "Связи"
+      - button "Закрыть":
+      - status
+      - tabpanel "Навыки":
+        - paragraph: Работающий браузерный сценарий с корректными состояниями и взаимодействием.
+        - paragraph: Изменения сохраняются как отдельная версия специализации этого агента. У прежних запусков остаются прежние методы. Другие агенты не меняются.
+        - text: Основной навык
+        - combobox "Основной навык":
+          - option "agent-llm-evals"
+          - option "agent-workflows"
+          - option "ai-platform-llmops"
+          - option "api-contract-engineering"
+          - option "application-security-engineering"
+          - option "audience-adaptation"
+          - option "business-product-consulting"
+          - option "computer-vision-data-and-labeling"
+          - option "computer-vision-evaluation"
+          - option "computer-vision-inference-optimization"
+          - option "computer-vision-modeling-and-training"
+          - option "computer-vision-system-design"
+          - option "data-engineering"
+          - option "database-engineering"
+          - option "execution-writing"
+          - option "flutter-skill"
+          - option "genai-security-testing"
+          - option "information-decision-support"
+          - option "information-editing"
+          - option "information-explanation"
+          - option "information-presentation"
+          - option "information-research-synthesis"
+          - option "information-source-summary"
+          - option "information-writing"
+          - option "ios-app-development"
+          - option "llm-council"
+          - option "llm-inference-optimization"
+          - option "llm-system-design"
+          - option "ml-system-design"
+          - option "neural-training-systems"
+          - option "nlp-modeling-and-adaptation"
+          - option "node-typescript-backend-engineering"
+          - option "platform-devops-engineering"
+          - option "product-design"
+          - option "python-backend-engineering"
+          - option "qa-testing"
+          - option "rag-engineering"
+          - option "security-review"
+          - option "software-engineering"
+          - option "sre-reliability-engineering"
+          - option "swift-skill"
+          - option "system-design"
+          - option "technical-writing"
+          - option "telegram-mini-apps"
+          - option "web-frontend-engineering" [selected]
+        - heading "Основные навыки · до 8" [level=3]
+        - button "Изменить набор"
+        - list:
+          - checkbox "web-frontend-engineering" [checked]
+          - text: web-frontend-engineering
+        - heading "Навыки для отдельных ситуаций" [level=3]
+        - list:
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering"
+            - option "application-security-engineering"
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design" [selected]
+            - option "python-backend-engineering"
+            - option "qa-testing"
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering"
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps"
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Не определены приемлемое поведение, состояния или пользовательский сценарий
+          - button "Убрать этот навык":
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering" [selected]
+            - option "application-security-engineering"
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design"
+            - option "python-backend-engineering"
+            - option "qa-testing"
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering"
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps"
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Расходятся HTTP-обмен, схема и ожидания клиента
+          - button "Убрать этот навык":
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering"
+            - option "application-security-engineering"
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design"
+            - option "python-backend-engineering"
+            - option "qa-testing" [selected]
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering"
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps"
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Нужна стратегия UI-проверок или диагностика flaky suite
+          - button "Убрать этот навык":
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering"
+            - option "application-security-engineering" [selected]
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design"
+            - option "python-backend-engineering"
+            - option "qa-testing"
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering"
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps"
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Нужно реализовать защиту на браузерной границе
+          - button "Убрать этот навык":
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering"
+            - option "application-security-engineering"
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design"
+            - option "python-backend-engineering"
+            - option "qa-testing"
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering"
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps" [selected]
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Поведение зависит от Telegram WebView, запуска, initData или платформенного API
+          - button "Убрать этот навык":
+          - combobox "Навык":
+            - option "agent-llm-evals"
+            - option "agent-workflows"
+            - option "ai-platform-llmops"
+            - option "api-contract-engineering"
+            - option "application-security-engineering"
+            - option "audience-adaptation"
+            - option "business-product-consulting"
+            - option "computer-vision-data-and-labeling"
+            - option "computer-vision-evaluation"
+            - option "computer-vision-inference-optimization"
+            - option "computer-vision-modeling-and-training"
+            - option "computer-vision-system-design"
+            - option "data-engineering"
+            - option "database-engineering"
+            - option "execution-writing"
+            - option "flutter-skill"
+            - option "genai-security-testing"
+            - option "information-decision-support"
+            - option "information-editing"
+            - option "information-explanation"
+            - option "information-presentation"
+            - option "information-research-synthesis"
+            - option "information-source-summary"
+            - option "information-writing"
+            - option "ios-app-development"
+            - option "llm-council"
+            - option "llm-inference-optimization"
+            - option "llm-system-design"
+            - option "ml-system-design"
+            - option "neural-training-systems"
+            - option "nlp-modeling-and-adaptation"
+            - option "node-typescript-backend-engineering"
+            - option "platform-devops-engineering"
+            - option "product-design"
+            - option "python-backend-engineering"
+            - option "qa-testing"
+            - option "rag-engineering"
+            - option "security-review"
+            - option "software-engineering" [selected]
+            - option "sre-reliability-engineering"
+            - option "swift-skill"
+            - option "system-design"
+            - option "technical-writing"
+            - option "telegram-mini-apps"
+            - option "web-frontend-engineering"
+          - textbox "Когда применять": Изменение затрагивает общую архитектуру кода или миграцию компонентов
+          - button "Убрать этот навык":
+        - button "Добавить навык для ситуации"
+        - generic "Точные версии навыков"
+      - generic "Причина изменения"
+      - button "Сохранить изменения"
+      - button "Обновить · сохранить черновик"
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

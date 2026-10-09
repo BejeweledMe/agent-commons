@@ -15,7 +15,7 @@ Supersedes `docs/VISION.md`, `docs/visual_multi_agent_orchestrator_prd.md`,
 
 Agent Commons is a local web application in which one person runs a product
 through a team of AI agents. The person describes the outcome, hires agents from
-a shared library of specializations, watches the work on a board and in a task
+a shared library of roles, watches the work on a board and in a task
 tracker, talks to agents in scoped conversations, opens each agent's results,
 and records the final human decision on every piece of work.
 
@@ -40,14 +40,14 @@ sessions, and leave a handoff the next one can act on.
 
 ## The product promise
 
-- **Work is visible as work.** A project opens on its board; the task tracker
+- **Work is visible as work.** A project opens on its task map; the task tracker
   answers what the team is doing now, what is blocked and where a human is
   needed. History is available for investigation, never as the home screen.
 - **Provider output is never truth.** A finished run is an outcome report. An
   independent review judges one exact revision. Acceptance is a separate,
   recorded human decision, and it is the only thing rendered green.
 - **Creating a plan and starting a provider are different actions.** Applying a
-  blueprint creates agents and tasks and starts nothing; every launch is
+  team template creates agents and tasks and starts nothing; every launch is
   explicit, bounded in time and shown truthfully while it waits.
 - **Everything survives a context reset.** Tasks, claims, reviews, findings,
   decisions and handoffs are append-only records; boards, briefs and indexes are
@@ -60,10 +60,10 @@ sessions, and leave a handoff the next one can act on.
 
 | Surface | Route | What it holds |
 | --- | --- | --- |
-| Board | `/work` (home of a project) | Agents as cards, agent links as edges, department frames from blueprint applications; the arrangement is the user's layout, never a canonical fact ([ADR 0020](adr/0020-project-board-home.md)) |
-| Tasks | `/work?view=work` | The tracker: now / map / all-tasks views, task inspector, run preparation, review and acceptance actions |
-| Agents | `/work?view=…` | Hiring an agent from a specialization; the same action is available from the board |
-| Library | `/work?view=library` | Skills in groups, specializations, blueprints; service-wide, shared by all projects ([ADR 0016](adr/0016-service-library-and-live-workspace.md)) |
+| Tasks / Задачи | `/work` (project home), `/work?view=work` | Dominant task map between compact navigation and the main project conversation; details open in temporary windows without resizing the map ([ADR 0027](adr/0027-agent-organization-and-method-edits.md)) |
+| Agents / Агенты | `/work?view=board` | The other central map tab: agent cards, organizational hierarchy, recorded communication links and department frames; the arrangement remains operational state ([ADR 0020](adr/0020-project-board-home.md), [ADR 0027](adr/0027-agent-organization-and-method-edits.md)) |
+| Agents | `/work?view=…` | Hiring an agent from a role; the same action is available from the board |
+| Library | `/work?view=library` | Skills in groups, Roles / Роли and Team templates / Шаблоны команд; service-wide, shared by all projects ([ADR 0016](adr/0016-service-library-and-live-workspace.md)) |
 | Settings | `/work?view=settings` | Workspace initialization, provider runtime, project settings |
 | Results | agent name/avatar or a Results button | That producer's images and live previews, latest first, history kept ([ADR 0019](adr/0019-project-native-collaboration-and-outputs.md)) |
 | Gallery | `/gallery` | Design packages and their screens |
@@ -75,7 +75,7 @@ project and must not gain features.
 ## The working model
 
 ```text
-Project → Agents (from specializations) → Tasks → Run → independent Review → human Acceptance
+Project → Agents (from roles) → Tasks → Run → independent Review → human Acceptance
 ```
 
 A run reports an outcome; a review judges one exact revision; acceptance is the
@@ -112,10 +112,10 @@ the ledger or code term where it differs. One thing, one word, per language.
 | --- | --- | --- |
 | Project / Проект | A connected repository folder and the boundary of its board, agents, tasks, conversations and results | `workspace` (ledger root), `project` (registry) |
 | Skill / Навык | A versioned instruction set in the service library; grants no tools or permissions | `skill`; the repository's `commons-*` client skills are a client integration, not library skills |
-| Specialization / Специализация | A provider-neutral definition of a responsibility and its skill set; the template an agent is hired from | `specialization` |
-| Agent / Агент | A named instance of a specialization inside a project: name, provider, profile, model, pinned skill versions. Target first-level word; the shipped UI still says "role" in the hire form, the model hint and the board introduction (`Role name`, `role_model_help`, `board_intro`) until work package WP-30 of the [consolidation plan](plans/2026-09-18-consolidation-and-wave-4-plan.md) renames those strings | ledger `agent`, historically and in several current strings "role" |
+| Role / Роль | A provider-neutral definition of a responsibility and its skill set; the template an agent is hired from. Its library navigation label is Roles / Роли | `specialization`, `specialization_ref`; canonical names remain unchanged |
+| Agent / Агент | A named instance of a role inside a project: name, provider, profile, model, pinned skill versions. The card leads with the profession and distinguishes the instance below it; hiring creates an agent, not another library role | ledger `agent`, historically "role" |
 | Profile / Профиль | The operator-owned provider launch configuration (CLI, model, permissions) defined outside the project | `profile` in `runtime.yaml` / `profiles.yaml` |
-| Blueprint / Шаблон проекта | A versioned definition of a team, its tasks and dependencies; applying it creates agents and tasks and starts nothing | `blueprint`, `blueprint_application` ([ADR 0021](adr/0021-objective-blueprint-application-provenance.md)) |
+| Team template / Шаблон команды | A versioned definition of a team, its tasks and dependencies; applying it creates agents and tasks and starts nothing. Its library navigation label is Team templates / Шаблоны команд | `blueprint`, `blueprint_application` ([ADR 0021](adr/0021-objective-blueprint-application-provenance.md)) |
 | Objective / Цель | The canonical record of what a set of tasks is for; a task inherits the objective of its blueprint application when it has none | `objective`, `objective_id` |
 | Component / Компонент | An explicit planning task that groups a part of the product; its own criteria, lifecycle and acceptance remain independent of its children | `task_kind=component` ([ADR 0024](adr/0024-explicit-task-hierarchy.md)) |
 | Task / Задача | The expected result, its result criteria, optional parent and independent prerequisites | `task`; "acceptance criteria" is the stored field name |

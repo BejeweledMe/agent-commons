@@ -32,6 +32,7 @@ from agent_commons.storage.opstate import (
     strict_state_bytes,
 )
 
+from .budget import OperatorBudgetExhaustedError, ProviderUnitBudget
 from .diagnostics import DiagnosticCode, classify_process_result, sanitize_provider_stderr_tail
 from .model import BuiltinProfileId, CorrelationIds, Provider, _safe_identifier
 from .policy import OperatorLimits, PolicyViolationError, RuntimePolicy, RuntimeUsage
@@ -736,6 +737,54 @@ class AttemptStore:
             return "parent_concurrency"
         return None
 
+    def _provider_unit_budget(
+        self,
+        documents: list[tuple[Path, dict[str, Any]]],
+        *,
+        parent_session_id: str,
+        provider: Provider,
+        budget_scope: str | None = None,
+    ) -> ProviderUnitBudget:
+        # Match the union once: a tree and its requester may overlap. Every
+        # reservation counts, including failures before the provider started.
+        used = sum(
+            _attempt_from_mapping(raw).child_policy.max_budget_microusd is None
+            for _, document in documents
+            if str(document["spec"]["provider"]) == provider.value
+            and (
+                str(document["spec"]["correlation"]["parent_session_id"]) == parent_session_id
+                or (
+                    budget_scope is not None
+                    and _budget_scope_of(document["spec"]["correlation"]) == budget_scope
+                )
+            )
+            for raw in document["attempts"]
+        )
+        return ProviderUnitBudget(
+            provider, self.operator_limits.provider_units_cap(provider.value), used
+        )
+
+    def observe_provider_budget(
+        self,
+        *,
+        parent_session_id: str,
+        profile_id: BuiltinProfileId,
+        budget_scope: str | None = None,
+    ) -> ProviderUnitBudget:
+        """Read an advisory snapshot without creating state or reserving a unit.
+
+        New root requests have no existing tree, so their admission observation
+        uses requester scope. Reservation repeats this under the attempt lock.
+        """
+        if not parent_session_id:
+            raise ValidationError("an operator budget needs a requesting session")
+        return self._provider_unit_budget(
+            self._documents(),
+            parent_session_id=parent_session_id,
+            provider=profile_id.provider,
+            budget_scope=budget_scope,
+        )
+
     def _assert_budget_available(
         self,
         documents: list[tuple[Path, dict[str, Any]]],
@@ -764,9 +813,14 @@ class AttemptStore:
         ]
         monetary = spec.child_policy.max_budget_microusd
         if monetary is None:
-            used = sum(attempt.child_policy.max_budget_microusd is None for attempt in attempts)
-            if used >= self.operator_limits.provider_units_cap(spec.provider.value):
-                raise PolicyViolationError("operator provider_units budget is exhausted")
+            observation = self._provider_unit_budget(
+                documents,
+                parent_session_id=spec.correlation.parent_session_id,
+                provider=spec.provider,
+                budget_scope=scope,
+            )
+            if observation.exhausted:
+                raise OperatorBudgetExhaustedError(observation, spec.profile_id)
             return
         request_committed = attempts_started * monetary
         if request_committed + monetary > int(spec.parent_policy.max_budget_microusd or 0):

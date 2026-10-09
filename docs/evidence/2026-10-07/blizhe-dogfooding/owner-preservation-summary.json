@@ -1,0 +1,17 @@
+{
+  "baseline_sha256": "94185f39ce00dc388b7fef38ec18261b0208d229e66bb31b37bfab2001f9b460",
+  "after_preparation_sha256": "bc012fed0e36ffaef4eb43166a2719b5c96cf42e6a52eb59579ad5f598939211",
+  "checks": {
+    "branch": true,
+    "head": true,
+    "origin_main": true,
+    "status_entry_count": true,
+    "status_sha256": true,
+    "git_info_exclude_sha256": true,
+    "nested_repositories": true,
+    "files": true
+  },
+  "file_count": 4815,
+  "coverage": "All files represented by current dirty Git status, expanding embedded repositories via their tracked and non-ignored inventories. Ignored dependency caches, ignored secrets, and Git internals are excluded. File content is not copied.",
+  "observed_at": "2026-10-06T23:22:42.601526+00:00"
+}

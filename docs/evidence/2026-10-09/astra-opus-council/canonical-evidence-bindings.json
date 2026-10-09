@@ -1,0 +1,135 @@
+{
+  "implementation-source-manifest.json": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.5N0BGKMWF7E9VH7GX0KQ4480MV",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2BSCS6FQ07SRAMEQGD25D",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-implementation-source-manifest.json-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.1795a530f04dfd793bf4f57ad6ac0eb5a127244295421537c4ea3d8cb514454c",
+    "repaired": false,
+    "revision": "evt.01M4F2BSCS6FQ07SRAMEQGD25D"
+  },
+  "integration-review.json": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.799DSMKDZQ7CBQ0MQM5FN7C3C7",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2CBTMK866DJA38V54E9ZF",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-integration-review.json-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.88d6e5a98e5a4ad991710fbf712b51e6e9be80fc98c6061dfd5e2a5954092d2f",
+    "repaired": false,
+    "revision": "evt.01M4F2CBTMK866DJA38V54E9ZF"
+  },
+  "browser-observations.json": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.3NM43TCW994DXVGJWK090135NV",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2CYH18TC4N3WFTWQG01D8",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-browser-observations.json-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.edbfd443bd5e0644aa8cd75c166bb8669f1c28189e2c91375d7963dc63f5e383",
+    "repaired": false,
+    "revision": "evt.01M4F2CYH18TC4N3WFTWQG01D8"
+  },
+  "canary-final.json": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.37QMGYWKEA97QTQCQJKHNDTDCP",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2DH5H4V6JG6G5VV61KDHG",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-canary-final.json-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.278c988fc89dbd82054e26e3a8ca1456269d042da6a71c8f554ed0d70aacc8bd",
+    "repaired": false,
+    "revision": "evt.01M4F2DH5H4V6JG6G5VV61KDHG"
+  },
+  "final-checks.json": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.2NWS4M4T764VX2N7B84KYQBAHC",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2RD4RW44EX7HSTT0W5DDZ",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-final-checks.json-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.1a9c56aa6d8a1b3ba829b31d04663a89320b9bafc4ad7351797cb9f758291d03",
+    "repaired": false,
+    "revision": "evt.01M4F2RD4RW44EX7HSTT0W5DDZ"
+  },
+  "2026-10-09-dogfooding-remediation.md": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.4QNT8GP23TCSE2GAXE02RP6Q0Z",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2RZWXDG7JCZAFA1VQTW15",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-2026-10-09-dogfooding-remediation.md-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.8279b7c21f6fb9b0d47365ca481731f522967656164315a1753684aa6a8112a5",
+    "repaired": false,
+    "revision": "evt.01M4F2RZWXDG7JCZAFA1VQTW15"
+  },
+  "verification.md": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.2E815DMBMY10EXFW9DC039H7PQ",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4F2SJP332K8E8CR7QH7RENA",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-final-verification.md-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.ef060776cfddee3bb50016f539e4c88aec1920b89c723faef570a81950e92c90",
+    "repaired": false,
+    "revision": "evt.01M4F2SJP332K8E8CR7QH7RENA"
+  }
+}

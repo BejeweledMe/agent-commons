@@ -1,9 +1,12 @@
+import { TrackerFreshnessNotice } from "./TrackerFreshnessNotice.js";
+import { Modal } from "./Modal.js";
 import { type KeyboardEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { ApiProblem, requestOutcome, type WorkApi } from "../api";
 import { recordInstrumentation } from "../instrumentation.js";
 import type { TasksView } from "../appRouteState.js";
 import type { TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
+import type { MapViewportStore } from "../mapViewport.js";
 import { bucketTasksForNow, filterTrackerTasks, TASK_FILTERS, taskFilterLabel, taskObservationCurrent, trackerCapacityOnlyGap, type NowBuckets, type TaskFilter } from "../taskPresentation.js";
 import { trackerLoadFailed, trackerLoadSucceeded, trackerStreamSucceeded, type TrackerViewState } from "../trackerState.js";
 import { TaskInspector, TaskState, type RenderedTask } from "./TaskInspector.js";
@@ -17,19 +20,29 @@ type Props = {
   onObservation?: (state: TrackerViewState) => void;
   locale: Locale;
   text: (key: MessageKey) => string;
+  /** The selected node: the map's own state, and the scope of branch focus. */
   selectedTaskId: string | null;
-  onSelectTask: (id: string | null) => void;
+  /** Clicking a task: select it and open its details on demand. */
+  onSelectTask: (id: string) => void;
+  /** Keyboard movement: select without opening or closing any panel. */
+  onFocusTask: (id: string) => void;
+  /** Which task's detail panel is open, independently of the selection. */
+  detailTaskId: string | null;
+  /** Closing the detail panel leaves the selection, focus and viewport alone. */
+  onCloseDetail: () => void;
   onLaunchTask: (id: string) => void;
   search: string;
   filter: TaskFilter;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: TaskFilter) => void;
-  /** Which of Now / Map / All tasks is open; presentation route state only. */
+  /** Which of Map / Now / All tasks is open; presentation route state only. */
   tasksView: TasksView;
   onTasksViewChange: (value: TasksView) => void;
-  /** Narrow the tracker to one role's tasks (navigation state from the board). */
+  /** Narrow the tracker to one agent's tasks (navigation state from the board). */
   agentId?: string | null;
   onClearAgent?: () => void;
+  viewports?: MapViewportStore;
+  projectId?: string | null;
 };
 type TrackerTaskActionName = "request_review" | "accept_task" | "reopen_task";
 /** `expectedRevision` is the revision the inspector rendered when the intent was formed; accept and return post exactly it. */
@@ -40,8 +53,6 @@ type TrackerActionState =
   | { kind: "success"; message: MessageKey }
   | { kind: "error"; code: string; safeNextActions: readonly string[]; uncertain: boolean; intent: TaskActionIntent };
 type TaskActionDraft = { reviewCriteria: string; acceptSummary: string; reopenReason: string; reopenConfirmed: boolean };
-const PRIMARY_FILTERS: readonly TaskFilter[] = ["all", "attention", "active"];
-const MORE_FILTERS = TASK_FILTERS.filter((value) => !PRIMARY_FILTERS.includes(value));
 const emptyDraft: TaskActionDraft = { reviewCriteria: "", acceptSummary: "", reopenReason: "", reopenConfirmed: false };
 const emptyBuckets: NowBuckets = { needs_you: [], in_progress: [], next: [], settled: [] };
 function criteriaLines(value: string): readonly string[] {
@@ -63,18 +74,18 @@ function trackerActionFailure(error: unknown): { code: string; safeNextActions: 
   };
 }
 
-export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onLaunchTask, search, filter, onSearchChange, onFilterChange, tasksView, onTasksViewChange, agentId = null, onClearAgent }: Props): ReactElement {
+export function TrackerSection({ api, writesEnabled = false, onObservation, locale, text, selectedTaskId, onSelectTask, onFocusTask, detailTaskId, onCloseDetail, onLaunchTask, search, filter, onSearchChange, onFilterChange, tasksView, onTasksViewChange, agentId = null, onClearAgent, viewports, projectId = null }: Props): ReactElement {
   const [state, setState] = useState<TrackerViewState>({ kind: "loading" });
   const [editorEntries, setEditorEntries] = useState<TaskEditorEntries>({});
-  const selectedTaskRef = useRef(selectedTaskId);
-  selectedTaskRef.current = selectedTaskId;
+  const detailTaskRef = useRef(detailTaskId);
+  detailTaskRef.current = detailTaskId;
   const [drafts, setDrafts] = useState<Readonly<Record<string, TaskActionDraft>>>({});
   const [actionStates, setActionStates] = useState<Readonly<Record<string, TrackerActionState>>>({});
-  const { reviewCriteria, acceptSummary, reopenReason, reopenConfirmed } = drafts[selectedTaskId ?? ""] ?? emptyDraft;
-  const actionState = actionStates[selectedTaskId ?? ""] ?? { kind: "idle" };
+  const { reviewCriteria, acceptSummary, reopenReason, reopenConfirmed } = drafts[detailTaskId ?? ""] ?? emptyDraft;
+  const actionState = actionStates[detailTaskId ?? ""] ?? { kind: "idle" };
   function updateDraft(changes: Partial<TaskActionDraft>): void {
-    if (selectedTaskId === null) return;
-    setDrafts((current) => ({ ...current, [selectedTaskId]: { ...(current[selectedTaskId] ?? emptyDraft), ...changes } }));
+    if (detailTaskId === null) return;
+    setDrafts((current) => ({ ...current, [detailTaskId]: { ...(current[detailTaskId] ?? emptyDraft), ...changes } }));
   }
   const setReviewCriteria = (value: string): void => updateDraft({ reviewCriteria: value });
   const setAcceptSummary = (value: string): void => updateDraft({ acceptSummary: value });
@@ -112,19 +123,21 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
   const navigableTasks: readonly TrackerTask[] = tasksView === "now"
     ? [...buckets.needs_you, ...buckets.in_progress, ...buckets.next]
     : visibleTasks;
-  const selectedTask = tasks.find((task) => task.taskId === selectedTaskId) ?? null;
-  const actionsCurrent = writesEnabled && state.kind === "ready" && selectedTask !== null
-    && taskObservationCurrent(state.snapshot, selectedTask)
+  const detailTask = tasks.find((task) => task.taskId === detailTaskId) ?? null;
+  const actionsCurrent = writesEnabled && state.kind === "ready" && detailTask !== null
+    && taskObservationCurrent(state.snapshot, detailTask)
     && state.connection !== "disconnected";
-  function selectTask(taskId: string | null): void {
+  function selectTask(taskId: string): void {
     onSelectTask(taskId);
-    if (taskId === null) {
-      const previousId = selectedTaskId;
-      requestAnimationFrame(() => {
-        const button = previousId === null ? undefined : taskButtons.current.get(previousId);
-        (button ?? searchField.current)?.focus();
-      });
-    }
+  }
+  /** Closing returns focus to the task it was about, and changes nothing else. */
+  function closeDetail(): void {
+    const previousId = detailTaskId;
+    onCloseDetail();
+    requestAnimationFrame(() => {
+      const button = previousId === null ? undefined : taskButtons.current.get(previousId);
+      (button ?? searchField.current)?.focus({ preventScroll: true });
+    });
   }
   function moveTaskFocus(event: KeyboardEvent<HTMLButtonElement>, taskId: string): void {
     if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key) || navigableTasks.length === 0) return;
@@ -134,7 +147,7 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
       : event.key === "ArrowDown" || event.key === "ArrowRight" ? (current + 1) % navigableTasks.length
         : (current - 1 + navigableTasks.length) % navigableTasks.length;
     const nextId = navigableTasks[next].taskId;
-    selectTask(nextId);
+    onFocusTask(nextId);
     taskButtons.current.get(nextId)?.focus();
   }
   function taskActionIntent(action: TrackerTaskActionName, task: TrackerTask, expectedRevision: string | null): TaskActionIntent {
@@ -316,55 +329,28 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
   const { snapshot } = state;
   const stale = snapshot.state === "stale" || snapshot.freshness.state === "stale" || snapshot.freshness.resumeGap || state.connection === "disconnected";
   return <section className="tracker-section work-tracker" aria-label={text("tracker_title")}>
+    {/* The map pane: the work area itself, which keeps the full height it is
+        given and stays mounted underneath temporary dialogs. */}
+    <div className="work-map-pane">
     <div className="task-view-toolbar">
       {/* Search and the status filters belong to Map and All tasks; the Now
           columns are the filter, so no inert control is offered there. */}
-      {tasksView === "now" ? null : <div className="task-search-field"><label htmlFor="task-view-search">{text("task_view_search")}</label>
-      <input id="task-view-search" ref={searchField} type="search" value={search} maxLength={200} onChange={(event) => onSearchChange(event.target.value)} /></div>}
-      <div className="tracker-connection" role="status">{text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}</div>
+      {tasksView === "now" ? null : <div className="task-search-field"><label className="visually-hidden" htmlFor="task-view-search">{text("task_view_search")}</label>
+      <input id="task-view-search" ref={searchField} placeholder={text("task_view_search")} type="search" value={search} maxLength={200} onChange={(event) => onSearchChange(event.target.value)} /></div>}
+      <div className="tracker-connection" role="status" data-connection={state.connection} title={text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}><span aria-hidden="true">●</span><span className="visually-hidden">{text(state.connection === "connected" ? "tracker_updates_connected" : state.connection === "connecting" ? "tracker_updates_connecting" : "tracker_updates_disconnected")}</span></div>
       <button type="button" className="button button-secondary button-inline" onClick={() => void load(new AbortController().signal)}>{text("task_view_refresh")}</button>
+      {stale ? <TrackerFreshnessNotice freshness={snapshot.freshness} locale={locale} text={text} onRefresh={() => void load(new AbortController().signal)} /> : null}
+      <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${navigableTasks.length}/${tasks.length}`}>{navigableTasks.length}/{tasks.length}</span>
     </div>
     {agentId !== null ? <p className="notice tracker-agent-filter" role="status">{text("tracker_agent_filter")}: <strong>{(state.kind === "ready" ? state.snapshot.tasks.find((task) => task.suggestedAgentId === agentId)?.suggestedRoleName ?? state.snapshot.runs.find((run) => run.agentId === agentId)?.roleName : null) ?? agentId}</strong>{onClearAgent ? <button type="button" className="notice-link" onClick={onClearAgent}>{text("tracker_agent_filter_clear")}</button> : null}</p> : null}
-    {tasksView === "now" ? null : <div className="task-view-filters" role="group" aria-label={text("task_view_filter")}>
-      {PRIMARY_FILTERS.map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => onFilterChange(value)}>{text(taskFilterLabel[value])}</button>)}
-      <label className="task-more-filter" htmlFor="task-more-filter">
-        <span className="visually-hidden">{text("task_view_more_status")}</span>
-        <select id="task-more-filter" value={MORE_FILTERS.includes(filter) ? filter : ""}
-          onChange={(event) => { const next = event.target.value; if (MORE_FILTERS.some((value) => value === next)) onFilterChange(next as TaskFilter); }}>
-          <option value="" disabled>{text("task_view_more_status")}</option>
-          {MORE_FILTERS.map((value) => <option key={value} value={value}>{text(taskFilterLabel[value])}</option>)}
-        </select>
-      </label>
-    </div>}
-    {stale ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_stale_title")}</strong><p>{text(snapshot.freshness.resumeGap ? "tracker_resume_gap" : "tracker_stale_next")}</p></div> : null}
-    {(snapshot.state === "partial" && !trackerCapacityOnlyGap(snapshot)) || snapshot.truncated ? <div className="tracker-state tracker-state-warning" role="status"><strong>{text("tracker_partial_title")}</strong><p>{text("tracker_partial_next")}</p></div> : null}
+    {(snapshot.state === "partial" && !trackerCapacityOnlyGap(snapshot)) || snapshot.truncated ? <details className="tracker-state tracker-state-warning tracker-compact-notice"><summary>{text("tracker_partial_title")}</summary><p>{text("tracker_partial_next")}</p></details> : null}
     {snapshot.state === "error" ? <div className="tracker-state tracker-state-error" role="alert"><strong>{text("tracker_projection_error_title")}</strong><p>{text("tracker_projection_error_next")}</p></div> : null}
     {snapshot.state === "loading" ? <p role="status">{text("tracker_loading")}</p> : null}
-    <div className={`task-workspace${selectedTaskId !== null ? " task-workspace-selected" : ""}`}>
-      <section className="task-list-pane" aria-labelledby="task-list-title">
-        <h2 id="task-list-title">{text("tracker_title")} <span className="task-list-count" aria-label={`${text("task_view_task_count")}: ${navigableTasks.length}/${tasks.length}`}>{navigableTasks.length}/{tasks.length}</span></h2>
-        <TaskViews view={tasksView} onViewChange={onTasksViewChange} snapshot={snapshot} visibleTasks={visibleTasks} buckets={buckets}
-          selectedTaskId={selectedTaskId} locale={locale} text={text} onSelectTask={selectTask} onTaskKeyDown={moveTaskFocus}
-          registerTaskButton={(taskId, element) => { if (element) taskButtons.current.set(taskId, element); else taskButtons.current.delete(taskId); }}
-          onClearFilters={() => { onSearchChange(""); onFilterChange("all"); }} />
-      </section>
-      {selectedTaskId === null ? <div className="task-inspector task-inspector-empty"><p>{text("task_view_no_selection")}</p></div>
-        : <div onKeyDown={(event) => {
-          if (event.key === "Escape" && !(event.target instanceof HTMLSelectElement)) { event.preventDefault(); selectTask(null); }
-        }}>
-          {selectedTask === null ? <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-missing-title"><header className="inspector-header"><h2 id="inspector-missing-title">{text("inspector_missing")}</h2><button type="button" className="button button-secondary" onClick={() => selectTask(null)}>{text("inspector_close")}</button></header><p>{text("inspector_missing_help")}</p><details className="inspector-technical"><summary>{text("inspector_technical")}</summary><code>{selectedTaskId}</code></details></section>
-            : <TaskInspector api={api} task={selectedTask} tasks={tasks} runs={snapshot.runs} sourceRevision={snapshot.sourceRevision} locale={locale} text={text} actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={selectTask} onLaunchTask={onLaunchTask}>
-              {({ revision }: RenderedTask) => <>{trackerTaskActions(selectedTask, revision)}
-              <TaskEditor api={api} task={selectedTask} tasks={tasks} sourceRevision={snapshot.sourceRevision} locale={locale}
-                entries={editorEntries} setEntries={setEditorEntries}
-                writesEnabled={writesEnabled} actionsCurrent={actionsCurrent} onSelectTask={(id) => {
-                  if (selectedTaskRef.current === selectedTask.taskId) selectTask(id);
-                }}
-                onChanged={() => void load(new AbortController().signal)} />
-            </>}
-            </TaskInspector>}
-        </div>}
-    </div>
+    <TaskViews filterControl={tasksView === "now" ? null : <label className="task-filter-control"><span className="visually-hidden">{text("task_view_filter")}</span><select value={filter} onChange={(event) => onFilterChange(event.currentTarget.value as TaskFilter)}>{TASK_FILTERS.map((value) => <option key={value} value={value}>{text(taskFilterLabel[value])}</option>)}</select></label>} view={tasksView} onViewChange={onTasksViewChange} snapshot={snapshot} visibleTasks={visibleTasks} buckets={buckets}
+      selectedTaskId={selectedTaskId} locale={locale} text={text} onSelectTask={selectTask} onFocusTask={onFocusTask} onTaskKeyDown={moveTaskFocus}
+      registerTaskButton={(taskId, element) => { if (element) taskButtons.current.set(taskId, element); else taskButtons.current.delete(taskId); }}
+      onClearFilters={() => { onSearchChange(""); onFilterChange("all"); }}
+      viewports={viewports} projectId={projectId} selectionKey={JSON.stringify([filter, search, agentId])} />
     <details className="tracker-diagnostics inspector-technical"><summary>{text("task_view_diagnostics")}</summary>
       <dl className="tracker-summary"><div><dt>{text("tracker_source_revision")}</dt><dd><code>{snapshot.sourceRevision ?? "—"}</code></dd></div>
         <div><dt>{text("tracker_truncated")}</dt><dd>{text(snapshot.truncated ? "tracker_truncated_yes" : "tracker_truncated_no")}</dd></div>
@@ -374,5 +360,21 @@ export function TrackerSection({ api, writesEnabled = false, onObservation, loca
       </dl>
       <p className="small-copy">{text("tracker_critical_path_note")}</p><p><code>{snapshot.criticalPathTaskIds.join(" → ") || "—"}</code></p>
     </details>
+    </div>
+    {/* The task detail: an on-demand panel, never a permanent column. Closing
+        it changes nothing about the map. */}
+    {detailTaskId === null ? null : <Modal title={text("work_panel_detail")} closeLabel={text("inspector_close")} onClose={closeDetail} className="work-panel-detail">
+      {detailTask === null ? <section className="task-inspector" tabIndex={-1} aria-labelledby="inspector-missing-title"><header className="inspector-header"><h2 id="inspector-missing-title">{text("inspector_missing")}</h2><button type="button" className="button button-secondary" onClick={closeDetail}>{text("inspector_close")}</button></header><p>{text("inspector_missing_help")}</p><details className="inspector-technical"><summary>{text("inspector_technical")}</summary><code>{detailTaskId}</code></details></section>
+        : <TaskInspector api={api} task={detailTask} tasks={tasks} runs={snapshot.runs} sourceRevision={snapshot.sourceRevision} locale={locale} text={text} actionsCurrent={actionsCurrent} writesEnabled={writesEnabled} onSelectTask={(id) => { if (id === null) closeDetail(); else onSelectTask(id); }} onLaunchTask={onLaunchTask}>
+          {({ revision }: RenderedTask) => <>{trackerTaskActions(detailTask, revision)}
+          <TaskEditor api={api} task={detailTask} tasks={tasks} sourceRevision={snapshot.sourceRevision} locale={locale}
+            entries={editorEntries} setEntries={setEditorEntries}
+            writesEnabled={writesEnabled} actionsCurrent={actionsCurrent} onSelectTask={(id) => {
+              if (detailTaskRef.current === detailTask.taskId) onSelectTask(id);
+            }}
+            onChanged={() => void load(new AbortController().signal)} />
+        </>}
+        </TaskInspector>}
+    </Modal>}
   </section>;
 }

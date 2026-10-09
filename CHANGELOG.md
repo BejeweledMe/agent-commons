@@ -13,6 +13,29 @@ finished plans at the top level.
 
 ## Unreleased
 
+- Compact agent settings with fixed tabs and actions, a human-owner entry to the
+  main chat, explicit supervisor and connection controls, and a separate activity
+  rail with stable Tasks / Agents tabs. Cards use consistent automatic spacing,
+  profession-first titles and command hints. See the
+  [completed plan](docs/archive/plans/2026-10-09-navigation-hierarchy.md).
+
+- **Two maps and full-size details.** Task and agent maps share the main
+  workspace with neutral styling and vector icons. Task details open above the
+  map and close with Escape without squeezing the canvas. Agent settings
+  expose organizational supervisors, permissions and exact method versions;
+  changing one agent's methods leaves other agents unchanged. Organizational
+  relationships remain separate from creator provenance and authority.
+
+- **A task map with a main project chat.** The workspace opens on the task map,
+  with compact navigation, adjustable side panes and details opened on demand.
+  Map navigation preserves context, and project chat stays separate from task
+  conversations. Explicit saved text drafts survive reloads. Workers can publish
+  retained text reports and hand exact results to independent review; task
+  evidence is readable and paginated. Launch preparation explains remaining
+  capacity, project environment observations and provider qualification steps.
+  Current task reviews take priority over historical failed-run diagnostics.
+  See [the workspace decision](docs/adr/0026-map-first-workspace.md).
+
 - **Results load in the common project panel.** Agent galleries and task results
   use the actual panel port when checking live previews. Projects whose old
   operational-state directory disappeared can be explicitly rebound to a

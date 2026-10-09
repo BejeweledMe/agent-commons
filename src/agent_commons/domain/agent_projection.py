@@ -52,6 +52,7 @@ class AgentRecord(Mapping[str, object]):
 
         data = self.to_dict()
         data.setdefault("created_by_agent_id", None)
+        data.setdefault("supervisor_agent_id", None)
         data.setdefault("turnover_budget", None)
         data.setdefault("template", False)
         data["created_event_id"] = event_id

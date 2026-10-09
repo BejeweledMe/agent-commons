@@ -1,0 +1,534 @@
+[
+  {
+    "name": "01-agents-desktop-ru",
+    "note": "Открытая пользователем карта агентов, до действий аудита.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "SUMMARY",
+        "text": "Список агентов"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "02-settings-general-ru",
+    "note": "Открыты настройки Frontend-инженера; вкладка Основное.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Основное"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "03-settings-general-ready",
+    "note": "Настройки загружены, без редактирования.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Основное"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "04-settings-skills",
+    "note": "Вкладка Навыки, выбранный набор.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Навыки"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "05-settings-permissions",
+    "note": "Вкладка Права, верх тела.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Права"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "06-settings-links",
+    "note": "Вкладка Связи, без создания или изменения связи.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Связи"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "07-hire-dialog",
+    "note": "Нанять роль: окно сразу после открытия, прокрутка вверху.",
+    "metrics": {
+      "active": {
+        "label": "Закрыть",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "08-tasks-dependencies",
+    "note": "Карта задач: Зависимости, исходный сохранённый масштаб.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "A",
+        "text": "Задачи"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "09-task-detail",
+    "note": "Открыта принятая задача TOOL с карты.",
+    "metrics": {
+      "active": {
+        "label": "Закрыть детали",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "10-task-detail-settled",
+    "note": "Задача TOOL после загрузки.",
+    "metrics": {
+      "active": {
+        "label": "Закрыть детали",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "11-new-task",
+    "note": "Открыта форма новой задачи без заполнения/отправки.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "INPUT",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "12-task-structure",
+    "note": "Карта задач: Структура.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Новая задача"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "13-roles-library",
+    "note": "Роли: первая видимая часть каталога.",
+    "metrics": {
+      "active": {
+        "label": "Роли",
+        "tag": "A",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "14-skills-library",
+    "note": "Навыки: первая часть каталога.",
+    "metrics": {
+      "active": {
+        "label": "Навыки",
+        "tag": "A",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "15-team-templates",
+    "note": "Шаблоны команд: первая часть каталога.",
+    "metrics": {
+      "active": {
+        "label": "Шаблоны команд",
+        "tag": "A",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "16-environment-settings",
+    "note": "Настройки рабочего пространства и исполнителей.",
+    "metrics": {
+      "active": {
+        "label": "Настройки",
+        "tag": "A",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "17-agent-results",
+    "note": "Результаты агента Frontend — переход по заголовку карточки.",
+    "metrics": {
+      "active": {
+        "label": "Закрыть результаты",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "18-agent-results-settled",
+    "note": "Результаты агента после ответа сервера.",
+    "metrics": {
+      "active": {
+        "label": "Закрыть результаты",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "19-agents-compact",
+    "note": "Узкое окно: задан override 880×560; фактические CSS размеры в steps.json.",
+    "metrics": {
+      "active": {
+        "label": "Открыть галерею результатов агента Blizhe Frontend · TOOL",
+        "tag": "BUTTON",
+        "text": "FFrontend-инженер"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 700,
+      "scrollHeight": 700,
+      "scrollWidth": 1100,
+      "width": 1100
+    }
+  },
+  {
+    "name": "20-compact-chat",
+    "note": "Чат открыт при узком окне.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Закрыть панель"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 700,
+      "scrollHeight": 700,
+      "scrollWidth": 1100,
+      "width": 1100
+    }
+  },
+  {
+    "name": "21-agents-800",
+    "note": "Агенты при фактической ширине около 800 CSS px; viewport измерен.",
+    "metrics": {
+      "active": {
+        "label": "Чат",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 600,
+      "scrollHeight": 600,
+      "scrollWidth": 800,
+      "width": 800
+    }
+  },
+  {
+    "name": "22-settings-800",
+    "note": "Основное при 800 CSS px. Для попадания в карточку потребовалось Показать всё после resize.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Основное"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 600,
+      "scrollHeight": 600,
+      "scrollWidth": 800,
+      "width": 800
+    }
+  },
+  {
+    "name": "23-agents-390",
+    "note": "Агенты при около 390 CSS px: сохранённый viewport после fit на 800.",
+    "metrics": {
+      "active": {
+        "label": "Настройки агента",
+        "tag": "BUTTON",
+        "text": ""
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 675,
+      "scrollHeight": 675,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "name": "24-tasks-390",
+    "note": "Задачи при около 390 CSS px.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "A",
+        "text": "Задачи"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 675,
+      "scrollHeight": 675,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "name": "25-tasks-en",
+    "note": "Задачи: английский, размер окна восстановлен.",
+    "metrics": {
+      "active": {
+        "label": "Switch to English",
+        "tag": "BUTTON",
+        "text": "EN"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "26-keyboard-end-100",
+    "note": "Dependencies: 100%, End на первом узле; фактический фокус и viewBox в keyboard-map.json.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "ПринятоSEARCH-EVAL · Собрать воспроизводимую проверку качестваBlizhe Search · Codex · codexтребуется действие оператора"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "27-role-instructions",
+    "note": "Каталог ролей: Открыть инструкции у первой роли.",
+    "metrics": {
+      "active": {
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Открыть инструкции"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  },
+  {
+    "name": "28-role-instructions-settled",
+    "note": "Открыть инструкции после загрузки.",
+    "metrics": {
+      "active": {
+        "label": "Бизнес-консультант по текущему результату",
+        "tag": "SECTION",
+        "text": "Бизнес-консультант по текущему результатуСоздать свою копиюНайти и обосновать ближайшее изменение продукта или работы ко"
+      },
+      "assets": [
+        "/work/assets/work-PxYvY7EH.js",
+        "/work/assets/work-CpKWf9wd.css"
+      ],
+      "height": 642,
+      "scrollHeight": 642,
+      "scrollWidth": 1434,
+      "width": 1434
+    }
+  }
+]

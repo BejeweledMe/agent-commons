@@ -316,7 +316,7 @@ test("Prepare run only navigates and prefills, and no scope issues a request",as
  const body=main.match(/function prepareRunForConversation[\s\S]*?\n {2}\}/)[0];
  assert.match(body,/prepareRunTaskId\(scope, routeRef\.current\.taskId\)/);
  assert.match(body,/prepareLaunch\(taskId\)/);
- assert.match(body,/navigate\(\{ view: "work", composer: false \}\)/);
+ assert.match(body,/navigate\(\{ view: "work", panel: null \}\)/);
  assert.doesNotMatch(body,/api|fetch|await|POST/);
  assert.match(main,/onPrepareRun=\{prepareRunForConversation\}/);
 });

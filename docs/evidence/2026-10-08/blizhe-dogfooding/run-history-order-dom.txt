@@ -1,0 +1,35 @@
+:
+          - heading "Run history" [level=3]
+        - list:
+          - strong: Blizhe Search · Codex
+          - generic: operator action is required
+          - paragraph: codex · Oct 8, 2026, 11:58 PM
+          - paragraph: "Attempt limit: 20 min"
+          - generic "Run details"
+          - strong: Blizhe QA · PHOTO и SEARCH
+          - generic: operator action is required
+          - paragraph: codex · Oct 8, 2026, 11:40 PM
+          - paragraph: "Attempt limit: 15 min"
+          - generic "Run details"
+          - strong: Blizhe Search · Codex
+          - generic: operator action is required
+          - paragraph: codex · Oct 8, 2026, 11:29 PM
+          - paragraph: "Attempt limit: 30 min"
+          - generic "Run details"
+          - strong: Blizhe QA · PHOTO и SEARCH
+          - generic: the provider process is running
+          - paragraph: codex · Oct 9, 2026, 12:02 AM
+          - paragraph: "Attempt limit: 15 min"
+          - generic "Run details"
+          - strong: Blizhe QA · PHOTO и SEARCH
+          - generic: operator action is required
+          - paragraph: codex · Oct 8, 2026, 11:44 PM
+          - paragraph: "Attempt limit: 15 min"
+          - generic "Run details"
+          - strong: Blizhe QA · PHOTO и SEARCH
+          - generic: canonical completion was recorded
+          - paragraph: codex · Oct 8, 2026, 11:49 PM
+          - paragraph: "Attempt limit: 15 min"
+          - generic "Run details"
+        - paragraph: Context and design are selected when preparing a run; they are not implied by this task record.
+      - generic "Workspace diagnostics"

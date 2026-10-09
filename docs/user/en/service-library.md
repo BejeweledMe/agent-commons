@@ -1,13 +1,13 @@
 # Skills, specializations, blueprints and the task graph
 
-The installation includes 45 professional skills and 30 specializations owned
+The installation includes 45 professional skills and 31 specializations owned
 by the service. No Codex or Claude home-directory skill installation is needed.
 Each hired agent pins an exact specialization and its skill versions. The
 ledger and the hire form call that standing record a *role*.
 
 ## Start with a blueprint
 
-Open **Library → Blueprints**. Seven are built in: web application,
+Open **Team templates** in the narrow left rail. Seven are built in: web application,
 mobile application, Telegram Mini App, grounded AI assistant, improve an
 existing service, feature delivery, and product discovery. Preview the tasks
 and dependencies. Name the work and describe the audience, desired outcome and
@@ -36,22 +36,39 @@ grant no tools or permissions. A built-in skill exposes its instructions and
 reference resources; editing creates a custom version. Custom updates retain
 older versions for existing roles.
 
-In **Specializations**, define responsibility, instructions and a primary skill.
+In **Roles**, define responsibility, instructions and a primary skill.
 Select additional core methods and conditional routes from the service library.
 These are available methods, not a request to load every instruction at once.
 
 In **Agents**, choose the specialization, project name, provider, profile and
 model. You can hire from the same form or from the Board's side panel. “Claude
-Frontend” and “Codex Frontend” can share a specialization. Existing hires keep
-their versions; hire a new instance to adopt a changed definition. The primary
+Frontend” and “Codex Frontend” can share a specialization. Existing agents keep
+their exact versions until explicitly edited. The primary
 skill is delivered at launch; permitted companion resources are read
 progressively. Missing or changed versions refuse instead of silently dropping
 instructions.
 
+Open an agent's settings from **Agents** to change its name, organizational
+supervisor, context and permissions. Its model, profile and creator remain
+visible as fixed identity. Adding a child creates a separate agent under the
+selected supervisor; it starts no run and grants no extra authority.
+Communication links explicitly distinguish asking a question from handing off
+work. Reparenting refuses self-links, cycles and unavailable supervisors.
+
+The methods editor creates an agent-specific version of the specialization
+and binds that exact version to the selected agent. Its peers keep their
+versions. Requested or live work and unfinished reviews must be resolved
+before changing methods. If saving fails after a version was created, retry
+the same operation to finish the binding; do not create a second copy. A
+revision conflict keeps the form available so you can reload deliberately.
+
 ## Edit and observe work
 
-**Tasks** offers a dependency graph and a task list. Prerequisites appear above
-dependent tasks. Click a node for details, or use arrows, Home/End and Tab.
+**Tasks** and **Agents** share the central workspace. Task structure,
+dependencies and the task list remain available. Prerequisites appear above
+dependent tasks. Click a node for a large temporary detail window; close it
+with the cross or Escape to return to the same map position. With nested
+windows, Escape closes only the topmost one. Use arrows, Home/End and Tab.
 The list remains available on narrow screens and for large graphs. The
 **Board** shows the same team as cards, links and department frames; its
 arrangement is your layout and changes no work record.
@@ -79,9 +96,11 @@ a read receipt.
 
 A message supports up to 10 PNG/JPEG images and 10 other files, 15,000,000 bytes
 each. Attachment bytes stay in private service storage outside the project and
-canonical ledger. Drafts survive switching views/projects in the open app;
-a page reload clears the local text draft. An uncertain send must retry the same
-operation before editing its frozen content.
+canonical ledger. Drafts survive switching views/projects in the open app.
+Use **Save draft** to retain text privately across reloads, then explicitly
+restore or delete it. This saves no attachments and sends no message. Unsaved
+text is still lost on reload. An uncertain send must retry the same operation
+before editing its frozen content.
 
 **Results** appears on a task or agent when accessible outputs exist. It shows
 that producer's image designs and separate live frontend previews, labelled as
@@ -104,3 +123,20 @@ Follow the refusal in **Settings**. Library tests do not certify live providers.
 L1/R2 and remaining Grok constraints stay explicit in the
 [current programme](../../archive/plans/agent-platform-implementation-program.md).
 The graph does not automatically schedule every task.
+
+The narrow left rail contains **Roles**, **Skills**, **Team templates**,
+**Context**, and **Settings**. The adjacent sidebar contains projects and the
+selected project’s main chat.
+
+On **Agents**, **You · owner** opens the existing main project chat. Solid
+lines show saved supervisors; dashed owner lines mean project membership.
+Names never assign supervisors. Choose **Assign supervisor** on a card, select
+an agent and save. **Connections** opens communication-link creation and closure;
+supervision grants no communication authority. Enable extra edges in **Map layers**.
+Use **Arrange automatically** to replace a saved manual arrangement. Agent
+settings use a compact window with fixed tabs and actions; only the body scrolls.
+
+Cards lead with the profession from the role catalog, followed by the agent's
+distinct name and a brief description. Hover to read the complete text or a
+command's purpose. Automatic arrangement uses equal card sizes and spacing;
+manual moves preserve your chosen positions.

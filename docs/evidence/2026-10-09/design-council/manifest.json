@@ -1,0 +1,410 @@
+{
+  "created_at": "2026-10-09T12:56:48.440050+00:00",
+  "files": [
+    {
+      "path": "01-agents-desktop-ru.dom.txt",
+      "sha256": "8c717ca7734ab7c211d557ce560af31913f2e2d1ccb3cef2e12b4867b5af6a3c",
+      "bytes": 13697
+    },
+    {
+      "path": "02-settings-general-ru.dom.txt",
+      "sha256": "c7c1a7ea7534853b9d5056fe15c026ddf01433a86a7ef201c8fff1a344daee10",
+      "bytes": 14120
+    },
+    {
+      "path": "03-settings-general-ready.dom.txt",
+      "sha256": "18cfca6ab1944b43821d55823229d9f11335d958d217d51eba4feefde77c001d",
+      "bytes": 15494
+    },
+    {
+      "path": "04-settings-skills.dom.txt",
+      "sha256": "303d2cca5d22eab20722b9cb63fff01a3a5dc145b25bdbda23ef94ec0db8a480",
+      "bytes": 31171
+    },
+    {
+      "path": "05-settings-permissions.dom.txt",
+      "sha256": "de0998ae2dfc8f8e2751d6e03d04681434e08d7a5763cb6a436780063253775d",
+      "bytes": 16419
+    },
+    {
+      "path": "06-settings-links.dom.txt",
+      "sha256": "a57d47f9b8385f6f24ce40ef3a86912dde0e4c05c72f5270232d5465be5fec8a",
+      "bytes": 15455
+    },
+    {
+      "path": "07-hire-dialog.dom.txt",
+      "sha256": "d311fe5853afdf015b32490ae5e9c6a6fc52d1ea339730e60dd1a5b92f22ba22",
+      "bytes": 22607
+    },
+    {
+      "path": "08-tasks-dependencies.dom.txt",
+      "sha256": "562a9e124894b6b3dd20b5582a057ae03f407c1284b326cff0ed073f1f1a7698",
+      "bytes": 14740
+    },
+    {
+      "path": "09-task-detail.dom.txt",
+      "sha256": "665b12ff069d933909c1a12ae35757d770112cc824af539387dd667c17dd363a",
+      "bytes": 19567
+    },
+    {
+      "path": "10-task-detail-settled.dom.txt",
+      "sha256": "06727391c19e21e3ac0e023a01d3ded1163b9fe08eec4029c250ef5d77a5899f",
+      "bytes": 27579
+    },
+    {
+      "path": "11-new-task.dom.txt",
+      "sha256": "343d91b875f86b64e16cf59be0766b9f84ea9035e01f2693a947238d31ad8b16",
+      "bytes": 18385
+    },
+    {
+      "path": "12-task-structure.dom.txt",
+      "sha256": "ed796008a65203a418398af3af9bbdda6258452e2689d5da21f5343de8b0e281",
+      "bytes": 14107
+    },
+    {
+      "path": "13-roles-library.dom.txt",
+      "sha256": "45ca832e4be8012ee9e20615587d385c182c0494f9b811835f65469daff9a49b",
+      "bytes": 25980
+    },
+    {
+      "path": "14-skills-library.dom.txt",
+      "sha256": "5da1c79ded3fa8b195fb818fededa97a2f11b983c72f804eded26792b732d757",
+      "bytes": 32024
+    },
+    {
+      "path": "15-team-templates.dom.txt",
+      "sha256": "61cdfcf086d6ec76310a2fd617a02dc0b457fbc23d12645248119b9a537285a5",
+      "bytes": 9246
+    },
+    {
+      "path": "16-environment-settings.dom.txt",
+      "sha256": "3963b75347efbfe7bf886540261d4ffb56b910790d59e47e69816123b619aabd",
+      "bytes": 14108
+    },
+    {
+      "path": "17-agent-results.dom.txt",
+      "sha256": "ee1b4f0adf90931fc0433e81368203c6f932246d502d7546d589ec875ca5de61",
+      "bytes": 14717
+    },
+    {
+      "path": "18-agent-results-settled.dom.txt",
+      "sha256": "a08c7261cfa46820a1616ac77ff23d463df502a95cf83aa51904e739ce142f57",
+      "bytes": 14805
+    },
+    {
+      "path": "19-agents-compact.dom.txt",
+      "sha256": "db4c930ae3b458ee1d3bc099f2cc654a9b4feb7fcb00e060404104e0990d4c5a",
+      "bytes": 10847
+    },
+    {
+      "path": "20-compact-chat.dom.txt",
+      "sha256": "08c3bbc81bb91f51d9b4b8d203173f98d2e5c8329688d79792cd59cc016b7ad8",
+      "bytes": 11642
+    },
+    {
+      "path": "21-agents-800.dom.txt",
+      "sha256": "3090ec157981f2040d998e0c50a34208c0e320c0346a69c9a6ca8693b25d2d5a",
+      "bytes": 10827
+    },
+    {
+      "path": "22-settings-800.dom.txt",
+      "sha256": "1166b28b614e37e5d45c19d9f0c2e056a0fc4f0708dcb283e8dc5701f56579f2",
+      "bytes": 12624
+    },
+    {
+      "path": "23-agents-390.dom.txt",
+      "sha256": "c906d51afd50caa3878dbf4d69f9ad548944c7f7cb8f6765a3ffd5053f27aaf3",
+      "bytes": 10827
+    },
+    {
+      "path": "24-tasks-390.dom.txt",
+      "sha256": "74fb61e189112c3194b51663b525f2dc30f4ae195fc63dbd1c35fda0edc151d8",
+      "bytes": 10930
+    },
+    {
+      "path": "25-tasks-en.dom.txt",
+      "sha256": "898de9ea8e3876c6c3c71f2483ca0c3b901e654474aff18f3aa9655ccd4f4151",
+      "bytes": 11336
+    },
+    {
+      "path": "26-keyboard-end-100.dom.txt",
+      "sha256": "eb803ec1be00a4dcfe75afbf63a814dc2898fbfed6e1e63d5ab40acc21377d9b",
+      "bytes": 15114
+    },
+    {
+      "path": "27-role-instructions.dom.txt",
+      "sha256": "27e275a6707030cd92d23c012b66576f0bd8219defa12a47acd3415c25b2722c",
+      "bytes": 26056
+    },
+    {
+      "path": "28-role-instructions-settled.dom.txt",
+      "sha256": "98527fa82b0f389c24d4e5399a3c1784d78c1e8a7943201b2562c9f21b8852d0",
+      "bytes": 28934
+    },
+    {
+      "path": "README.md",
+      "sha256": "e90cf5224daa9aef39d07453957907f6bce118ab993bf102dbb1ae7978f9340c",
+      "bytes": 34821
+    },
+    {
+      "path": "agent-card-geometry.json",
+      "sha256": "a47a6cf109b2bfe30cf216135bce7f98862d0226b228f5e915c8a7f3848a84ae",
+      "bytes": 5855
+    },
+    {
+      "path": "base-evidence-manifest.json",
+      "sha256": "a819169402331467f6ecc54b09819bdb24ad698b9df665089f4d28684ddda7f4",
+      "bytes": 8320
+    },
+    {
+      "path": "candidate-mapping.json",
+      "sha256": "d7b7293f729ec6fd7749d70db4c4640035b52620b2d349516a2f98636ed19bcb",
+      "bytes": 106
+    },
+    {
+      "path": "candidates-anonymous.md",
+      "sha256": "908e9b5880e2161649483c7979fe5fa6cff1a2baa4825a842f4fac108ffd4efb",
+      "bytes": 91417
+    },
+    {
+      "path": "capture-notes.md",
+      "sha256": "c57758fc9c4f9199bd5898c406479b47f8947e9c5d5906e8208ed443594143db",
+      "bytes": 1632
+    },
+    {
+      "path": "grok-critique-status.json",
+      "sha256": "ee83dbe8e3e712f59c6176371f2cbb863c402ee0f09f956da3a6dca78d6aa5fc",
+      "bytes": 331
+    },
+    {
+      "path": "grok-first.md",
+      "sha256": "747817d93c02bc3f3559cc9b326af23a37e88a94b433ed84118fc318179aaa23",
+      "bytes": 17106
+    },
+    {
+      "path": "grok-peer-limit.png",
+      "sha256": "52ef7497d711c76de9511d6e9c5d601522b1ccb132788de7225391a5c955c1c5",
+      "bytes": 67033
+    },
+    {
+      "path": "grok-web-model-source.txt",
+      "sha256": "149f67c693fc162394dd3d28b2412c9968c1c5c71c036447da31780fc399c201",
+      "bytes": 221
+    },
+    {
+      "path": "grok-web-provenance.json",
+      "sha256": "473c1e1ad008934f4f5ec7775d46a082e83841565aa8e6a5614595d6bafb5b5a",
+      "bytes": 432
+    },
+    {
+      "path": "keyboard-map.json",
+      "sha256": "5d4c43ad3292958dcd1aaa61b8d6789f0e31d33b562a5f27ea0e64a1b591630c",
+      "bytes": 866
+    },
+    {
+      "path": "peer-supplement.md",
+      "sha256": "fee92018fe2cf9499e755c7583924c361a3865356db5cae88a85d440347973d7",
+      "bytes": 6013
+    },
+    {
+      "path": "run-provenance.json",
+      "sha256": "fa92af5733e5917a061fe8d6b8c753d17141897d30884fd02556e8c4467d57e5",
+      "bytes": 1035
+    },
+    {
+      "path": "screenshots/01-agents-desktop-ru.png",
+      "sha256": "6a3bb7332f788fd314d14f14c1264cea4e5035144c0b2c7a949d21813706c66a",
+      "bytes": 86341
+    },
+    {
+      "path": "screenshots/02-settings-general-ru.png",
+      "sha256": "949576f45bfbcbf65141723d5e732e986d34a499c83470cfe27c1a731461cf9c",
+      "bytes": 38472
+    },
+    {
+      "path": "screenshots/03-settings-general-ready.png",
+      "sha256": "3d1fad0ee6a26812d6fa55cc2663550e119c7aaa7063671d28be94720042a880",
+      "bytes": 59303
+    },
+    {
+      "path": "screenshots/04-settings-skills.png",
+      "sha256": "7798398ee891146b12df38bfc3bec92b386a89791855888a8857741dc376d4c9",
+      "bytes": 73424
+    },
+    {
+      "path": "screenshots/05-settings-permissions.png",
+      "sha256": "b8c811413852faa8deaa124949b5a3b6ad7f3b1049ba3a3d9e23aaa054e81a26",
+      "bytes": 73006
+    },
+    {
+      "path": "screenshots/06-settings-links.png",
+      "sha256": "a7ebe03e148c7f2a5c3f6b802611d8dd39590b87b2dec6f8b069f68b01284cc0",
+      "bytes": 56933
+    },
+    {
+      "path": "screenshots/07-hire-dialog.png",
+      "sha256": "31302ed8974dca949042999291a2bd03485202d4ff3411a219cbde6b148678bf",
+      "bytes": 62217
+    },
+    {
+      "path": "screenshots/08-tasks-dependencies.png",
+      "sha256": "7db74211d4425f5495e039cbb85a55b55fb224d58be17c6fd9ee5e227b63b714",
+      "bytes": 78563
+    },
+    {
+      "path": "screenshots/09-task-detail.png",
+      "sha256": "dde0bb038a673c7f7c2f87f990a893842e690d8a405b39920aff2ea6e99ff3d2",
+      "bytes": 57095
+    },
+    {
+      "path": "screenshots/10-task-detail-settled.png",
+      "sha256": "138922882c0d88a1eb0b5b83cb89460e0431cef5764938070b710a44a4aa48a6",
+      "bytes": 59783
+    },
+    {
+      "path": "screenshots/11-new-task.png",
+      "sha256": "180d5b38fe10ec2c75b34d9e55d74f0b4d186389bc16f6fb19143ff7bb7afd19",
+      "bytes": 48775
+    },
+    {
+      "path": "screenshots/12-task-structure.png",
+      "sha256": "3e61490a45a0ace5d0c9fd623e2943cfd49517be0bd8d5b9da4b3bc8b5d49dfe",
+      "bytes": 73302
+    },
+    {
+      "path": "screenshots/13-roles-library.png",
+      "sha256": "442993c43506c43d659d29c7f978ac41b7e6e92df1088da207ee4007987c684f",
+      "bytes": 92659
+    },
+    {
+      "path": "screenshots/14-skills-library.png",
+      "sha256": "76bcdeae67fd549921128e523edb3e8f569f56296ee4facd0ff55713fc9352ec",
+      "bytes": 69625
+    },
+    {
+      "path": "screenshots/15-team-templates.png",
+      "sha256": "2763091564ae453ab89849bcc57b46ef97c8c147638d04fd94127c5aec45cbd1",
+      "bytes": 98769
+    },
+    {
+      "path": "screenshots/16-environment-settings.png",
+      "sha256": "18ba48b0fb2b85d4816d9cb126246fc4486e7af01e00d0270682005273a0a71a",
+      "bytes": 67901
+    },
+    {
+      "path": "screenshots/17-agent-results.png",
+      "sha256": "4dbeafd18a4eb018abc59aa4476dcc04912e804b922148dc161d5c53ebac6db0",
+      "bytes": 63024
+    },
+    {
+      "path": "screenshots/18-agent-results-settled.png",
+      "sha256": "951b2ce07d53d3a44b1006c8cd857668de7ce2f7b526b0eb7c1cf91e408fb741",
+      "bytes": 65891
+    },
+    {
+      "path": "screenshots/19-agents-compact.png",
+      "sha256": "edb89c87cc20eaf20f5720ba976ff7fcdc71ec2af5d0237fc5e46f02b9a5f486",
+      "bytes": 68748
+    },
+    {
+      "path": "screenshots/20-compact-chat.png",
+      "sha256": "af14b59a4519c68586f1211f9ba02a49a6cabf21563f100fa27d78791a069dd1",
+      "bytes": 67590
+    },
+    {
+      "path": "screenshots/21-agents-800.png",
+      "sha256": "b76919ad21dd093b3106431f6c46140102f8e1b88531c17dbe6261f2bf480179",
+      "bytes": 54428
+    },
+    {
+      "path": "screenshots/22-settings-800.png",
+      "sha256": "14e4ade59d72ef8611af28cde9834cd727ec836d5746394348dfb26b4c956ef4",
+      "bytes": 38711
+    },
+    {
+      "path": "screenshots/23-agents-390.png",
+      "sha256": "1fccd772247a55d3368339a712ed5b546c11f9ce517e2748275857d594716922",
+      "bytes": 28125
+    },
+    {
+      "path": "screenshots/24-tasks-390.png",
+      "sha256": "b1a63d5b13671324d24f5f78c30a6feb8b755d3420405f9377a4f5c0bf85fd59",
+      "bytes": 32810
+    },
+    {
+      "path": "screenshots/25-tasks-en.png",
+      "sha256": "dc4ac112f04693ba5b2dc271deaad00ab738d7074894b7e7f9e56f9e00c234c1",
+      "bytes": 68294
+    },
+    {
+      "path": "screenshots/26-keyboard-end-100.png",
+      "sha256": "2ee8ac8fbdb1a475d1b7d738a18b2f799fc789ee7273f8ffe8538b5b70fd0542",
+      "bytes": 82511
+    },
+    {
+      "path": "screenshots/27-role-instructions.png",
+      "sha256": "39a464fa8edf69f4c09ad3c83fbaa2defb5be5539f65a46d588f183fd5075cd5",
+      "bytes": 104306
+    },
+    {
+      "path": "screenshots/28-role-instructions-settled.png",
+      "sha256": "9c9d0631c06172764ef6b1686e0ddef72bb32368b641d5a3cb38c532dfddc4d1",
+      "bytes": 117092
+    },
+    {
+      "path": "shared-brief.md",
+      "sha256": "9f3902922524d7d04c467c8444f1571c958e7d37bfa639df8e4177b8f4f8e829",
+      "bytes": 4734
+    },
+    {
+      "path": "sol-critique.md",
+      "sha256": "16768bae9b953960b3b8fad5e99f7c84cc78ed412e8ce4d11b05d59f6de528dd",
+      "bytes": 26272
+    },
+    {
+      "path": "sol-first.md",
+      "sha256": "a70b1f141dcfac15a8c44baa3ec087c5676d5db5d0711bc13de7093ada420955",
+      "bytes": 35211
+    },
+    {
+      "path": "sonnet-critique-provenance.json",
+      "sha256": "72ae08e4ca5d2ec71518a8f7caa1fcce69dfaf374d40e529e15a627829fc30d5",
+      "bytes": 1014
+    },
+    {
+      "path": "sonnet-critique.md",
+      "sha256": "97cea1428d215289777c5f0977f08571dda226c6f731332d7955b13c92c4cc24",
+      "bytes": 15252
+    },
+    {
+      "path": "sonnet-first-provenance.json",
+      "sha256": "138de1f657e1965475a2cda1a24941d5ce128bf06a024e3aa65711066c869853",
+      "bytes": 1074
+    },
+    {
+      "path": "sonnet-first.md",
+      "sha256": "dcf7750a05a64c7a098dd5f428e3c8373313cd04dddb4b2ce2acd587e75b1b21",
+      "bytes": 39512
+    },
+    {
+      "path": "source-manifest.json",
+      "sha256": "fd24e31d4b06375fd2679f87a85a295f392b124659caa310a5bcc8101f71f737",
+      "bytes": 28178
+    },
+    {
+      "path": "source-snapshot.zip",
+      "sha256": "f847154faf1e3a02f82af5a0d6693c6d8082036be91fa7c55ed544c76e2df02e",
+      "bytes": 867419
+    },
+    {
+      "path": "steps.json",
+      "sha256": "5bb8ebc6cfc5bbe8393083bb5bec31db000959086fa3bc6960af2ff69f30cec4",
+      "bytes": 13935
+    },
+    {
+      "path": "task-modal-geometry.json",
+      "sha256": "323118f483ba5cbb3a826098f89a84c94351dbdf2d40bc7c7e1c4c180df13b20",
+      "bytes": 1029
+    }
+  ]
+}

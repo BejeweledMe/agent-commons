@@ -1,0 +1,58 @@
+{
+  "before": {
+    "frame": {
+      "bottom": 530,
+      "height": 370,
+      "left": 230,
+      "right": 805,
+      "top": 160,
+      "width": 575,
+      "x": 230,
+      "y": 160
+    },
+    "viewBox": "-36.7 0 1765.41 1136",
+    "viewport": {
+      "height": 570,
+      "width": 1147
+    }
+  },
+  "during": {
+    "dialog": {
+      "bottom": 546,
+      "height": 522,
+      "left": 24,
+      "right": 1123,
+      "top": 24,
+      "width": 1099,
+      "x": 24,
+      "y": 24
+    },
+    "frame": {
+      "bottom": 530,
+      "height": 370,
+      "left": 230,
+      "right": 805,
+      "top": 160,
+      "width": 575,
+      "x": 230,
+      "y": 160
+    },
+    "modal": true,
+    "viewBox": "-36.7 0 1765.41 1136"
+  },
+  "after": {
+    "dialogs": 0,
+    "focus": "ПринятоREASONS · Исключить приватные сигналы из объясненийBlizhe Backend · CONFIG и REASONS · codexтребуется действие оператора",
+    "frame": {
+      "bottom": 530,
+      "height": 370,
+      "left": 230,
+      "right": 805,
+      "top": 160,
+      "width": 575,
+      "x": 230,
+      "y": 160
+    },
+    "viewBox": "-36.7 0 1765.41 1136"
+  }
+}

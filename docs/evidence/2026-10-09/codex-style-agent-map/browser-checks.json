@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-09",
+  "browser": "Chrome on macOS, existing user window",
+  "task_map": {"before_original": [299.85, 242], "after": [575, 370], "viewport": [1147, 570], "native_modal": [1099, 522], "geometry_and_viewbox_unchanged": true, "nested_escape_topmost_only": true, "focus_returns_to_task": true},
+  "maps": {"independent_positions_retained": true, "task_viewbox": "222.4 -262.8 1779.2 971.6", "agent_transform": "translate(-26.1px, -12.5959px) scale(0.704054)"},
+  "isolated_mutations": ["agent name and supervisor", "fork and bind individual specialization with qa-testing", "explicit ask grant with turnover budget 2", "separate ask and handoff_work links", "child creation through role form"],
+  "issues_found_and_fixed": ["write transport rejected non-read routes", "rights without budget lacked an explanatory validation", "new child did not trigger structure refresh", "launch options omitted existing specialization and model fields"],
+  "limits": ["No physical trackpad smoothness measurement", "Synthetic eligibility seam for hiring; no provider execution configured in UI fixture", "Default layout screenshots use the current system dark theme; light tokens exist but OS theme was not changed", "No browser performance trace or broad load benchmark"]
+}

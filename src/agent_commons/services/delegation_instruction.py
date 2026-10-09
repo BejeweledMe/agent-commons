@@ -221,7 +221,15 @@ typed needs-operator or input-needed outcome instead."""
         )
     else:
         result_protocol = f"""For implementation, follow the target acceptance criteria and normal
-task/artifact/review workflow. Do not claim success until the required typed
+task/artifact/review workflow. For a task text report, publish bounded inline
+content with commons_publish_text_result, then explicitly call
+commons_complete_task_result with the original delegated revision and the
+published artifact IDs, commons_submit_task_result with the completed revision,
+and commons_finalize_task_result with the submitted revision. Each phase uses
+its own stable idempotency key; retry identical arguments after a lost response.
+These scoped tools never approve or accept the task. If using this report flow,
+its finalization replaces the generic terminal sequence below.
+Do not claim success until the required typed
 result reference already exists and the exact delegated work is complete.
 The only successful terminal sequence is: first call commons_show_delegation;
 then call {succeed_delegation_tool} exactly once with

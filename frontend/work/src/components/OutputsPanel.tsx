@@ -3,7 +3,9 @@ import type { WorkApi } from "../api.js";
 import type { Locale } from "../i18n.js";
 import { OutputsApi, OutputPreviewQueue, outputStatus, presentCurrent, reviewLabel } from "../outputsApi.js";
 import { outputText } from "../outputsStrings.js";
-import { canViewImage, canDownloadBuild, filterOutputs, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions, type OutputKindFilter, type ReviewState } from "../outputsTypes.js";
+import { pushDialog } from "../dialogStack.js";
+import { Icon } from "./Icon.js";
+import { canReadReport, type TextResultContent, canViewImage, canDownloadBuild, filterOutputs, liveNavigation, scopeKey, type LiveOutput, type ImageOutput, type OutputList, type OutputScope, type OutputVersions, type OutputKindFilter, type ReviewState } from "../outputsTypes.js";
 
 type Selection = { owner: OutputsApi; projectId: string | null; scope: OutputScope; title: string; opener: HTMLButtonElement };
 type OutputContext = { api: OutputsApi; locale: Locale; revision: string; open: (scope: OutputScope, title: string, opener: HTMLButtonElement) => void };
@@ -12,7 +14,8 @@ const Context = createContext<OutputContext | null>(null);
 export function OutputsWorkspace({ api: transport, projectId, revision, locale, children, onOpenTask, taskTitles, agentNames }: {
   api: WorkApi; projectId: string | null; revision: string | null; locale: Locale; children: ReactNode; onOpenTask?: (taskId: string) => void; taskTitles?: ReadonlyMap<string, string>; agentNames?: ReadonlyMap<string, string>;
 }): ReactElement {
-  const api = useMemo(() => new OutputsApi(transport), [transport]);
+  const api = useMemo(() => new OutputsApi(transport), [projectId]);
+  api.setTransport(transport);
   const [selected, setSelected] = useState<Selection | null>(null);
   useEffect(() => () => api.dispose(), [api]);
   const visible = selected?.owner === api && selected.projectId === projectId ? selected : null;
@@ -21,12 +24,13 @@ export function OutputsWorkspace({ api: transport, projectId, revision, locale, 
   }), [api, projectId, revision, locale]);
   function close(selection: Selection): void {
     setSelected((current) => current === selection ? null : current);
-    if (selection.owner === api && selection.projectId === projectId && selection.opener.isConnected) selection.opener.focus();
+    // `preventScroll`: the gallery closes without moving the surface under it.
+    if (selection.owner === api && selection.projectId === projectId && selection.opener.isConnected) selection.opener.focus({ preventScroll: true });
   }
   return <Context.Provider value={context}>{children}{visible ? <OutputsPanel key={scopeKey(visible.scope)} api={api} scope={visible.scope} title={visible.title} locale={locale} revision={revision ?? ""} onClose={() => close(visible)} onOpenTask={onOpenTask ? (taskId) => { close(visible); onOpenTask(taskId); } : undefined} taskTitles={taskTitles} agentNames={agentNames} /> : null}</Context.Provider>;
 }
 
-export function OutputsButton({ scope, title, eager = false }: { scope: OutputScope; title: string; eager?: boolean }): ReactElement {
+export function OutputsButton({ scope, title, eager = false, compact = false }: { scope: OutputScope; title: string; eager?: boolean; compact?: boolean }): ReactElement {
   const context = useContext(Context), host = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(eager);
   const [result, setResult] = useState<{ owner: OutputsApi; key: string; revision: string; total: number } | null>(null);
@@ -38,7 +42,7 @@ export function OutputsButton({ scope, title, eager = false }: { scope: OutputSc
     return () => observer.disconnect();
   }, [eager]);
   useEffect(() => {
-    if (!owner || !visible) return;
+    if (!owner || !visible || compact) return;
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
     const load = (): void => {
       void presentCurrent(owner.summary(scope, revision), controller.signal,
@@ -46,8 +50,9 @@ export function OutputsButton({ scope, title, eager = false }: { scope: OutputSc
         () => { setResult(null); timer = setTimeout(load, 15_000); });
     };
     load(); return () => { controller.abort(); clearTimeout(timer); };
-  }, [owner, key, revision, visible]);
+  }, [owner, key, revision, visible, compact]);
   const total = result?.owner === owner && result?.key === key && result?.revision === revision ? result.total : null;
+  if (compact) return <span className="outputs-entry" ref={host}>{context ? <button className="icon-button" type="button" aria-label={`${outputText(context.locale, "results")} ${title}`} title={outputText(context.locale, "results")} onClick={(event) => context.open(scope, title, event.currentTarget)}><Icon name="results" /></button> : null}</span>;
   return <span className="outputs-entry" ref={host}>{context ? <OutputsAction count={total} locale={context.locale} title={title} onOpen={(button) => context.open(scope, title, button)} /> : null}</span>;
 }
 
@@ -57,13 +62,13 @@ export function OutputsAction({ count, locale, title, onOpen }: { count: number 
 }
 
 /** This entry is independent of summary counts, so an empty or failed gallery stays reachable. */
-export function AgentGalleryButton({ scope, title }: { scope: OutputScope; title: string }): ReactElement {
+export function AgentGalleryButton({ scope, title, displayTitle }: { scope: OutputScope; title: string; displayTitle?: string }): ReactElement {
   const context = useContext(Context);
-  return <AgentGalleryAction title={title} locale={context?.locale ?? "en"} disabled={!context} onOpen={(button) => context?.open(scope, title, button)} />;
+  return <AgentGalleryAction title={title} displayTitle={displayTitle} locale={context?.locale ?? "en"} disabled={!context} onOpen={(button) => context?.open(scope, title, button)} />;
 }
-export function AgentGalleryAction({ title, locale, disabled = false, onOpen }: { title: string; locale: Locale; disabled?: boolean; onOpen: (button: HTMLButtonElement) => void }): ReactElement {
+export function AgentGalleryAction({ title, displayTitle = title, locale, disabled = false, onOpen }: { title: string; displayTitle?: string; locale: Locale; disabled?: boolean; onOpen: (button: HTMLButtonElement) => void }): ReactElement {
   return <button type="button" className="board-role-gallery nodrag nowheel" aria-haspopup="dialog" aria-label={`${outputText(locale, "openGallery")} ${title}`} title={`${outputText(locale, "openGallery")} ${title}`} disabled={disabled} onClick={(event) => onOpen(event.currentTarget)}>
-    <span className="board-role-avatar" aria-hidden="true">{Array.from(title.trim())[0] ?? "·"}</span><span className="board-role-name">{title}</span>
+    <span className="board-role-avatar" aria-hidden="true">{Array.from(displayTitle.trim())[0] ?? "·"}</span><span className="board-role-name">{displayTitle}</span>
   </button>;
 }
 
@@ -83,10 +88,19 @@ export function OutputsPanel({ api, scope, title, locale, revision, onClose, onO
     previewRequest.current?.abort(); previewRequest.current = null;
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current); objectUrl.current = null;
   }
-  useEffect(() => { const node = dialog.current; node?.showModal(); return () => node?.close(); }, []);
+  // Registered in the shared stack: a gallery opened from inside a task detail
+  // answers Escape alone and leaves the detail open underneath.
+  useEffect(() => {
+    const node = dialog.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const registration = pushDialog();
+    if (node !== null && !node.open) node.showModal();
+    return () => { registration.release(); node?.close(); if (opener?.isConnected) opener.focus({ preventScroll: true }); };
+  }, []);
   useEffect(() => {
     releasePreview(); setPreview(null); const controller = new AbortController();
-    setState(null);
+    // Keep exact cards mounted during a same-scope refresh, so expanded
+    // retained reports and the gallery selection survive ordinary polling.
     let timer: ReturnType<typeof setTimeout> | undefined;
     const load = (): void => { void presentCurrent(api.list(scope, versions, controller.signal), controller.signal,
       (value) => { setState({ owner: api, key, versions, revision, kind: "ready", value }); timer = setTimeout(load, 15_000); },
@@ -103,28 +117,28 @@ export function OutputsPanel({ api, scope, title, locale, revision, onClose, onO
       setPreview({ owner: api, key, versions, outputId: item.outputId, contentRevision: item.contentRevision, kind: "ready", url });
     }, () => setPreview({ owner: api, key, versions, outputId: item.outputId, contentRevision: item.contentRevision, kind: "error" }));
   }
-  const current = state?.owner === api && state.key === key && state.versions === versions && state.revision === revision ? state : null;
+  const current = state?.owner === api && state.key === key && state.versions === versions ? state : null;
   const items = current?.kind === "ready" ? filterOutputs(current.value.items, filter) : [];
   const currentPreview = preview?.owner === api && preview.key === key && preview.versions === versions && items.some((item) => item.kind !== "live_preview" && item.outputId === preview.outputId && item.contentRevision === preview.contentRevision && canViewImage(item)) ? preview : null;
   const attribution = { onOpenTask, taskTitles, agentNames };
   function dismiss(): void { dialog.current?.close(); onClose(); }
-  return <dialog className="outputs-dialog" ref={dialog} aria-labelledby={heading} onCancel={(event) => { event.preventDefault(); event.stopPropagation(); dismiss(); }}>
-    <header className="outputs-heading"><div><p className="small-copy">{text("gallery")}</p><h2 id={heading}>{text("titlePrefix")} {title}</h2></div><button autoFocus type="button" className="button button-secondary button-inline" onClick={dismiss}>{text("close")}</button></header>
+  return <dialog className="outputs-dialog" ref={dialog} aria-labelledby={heading} onCancel={(event) => { event.preventDefault(); event.stopPropagation(); dismiss(); }} onKeyDown={(event) => { if (event.key === "Escape") event.stopPropagation(); }}>
+    <header className="outputs-heading"><div><p className="small-copy">{text("gallery")}</p><h2 id={heading}>{text("titlePrefix")} {title}</h2></div><button autoFocus type="button" className="icon-button outputs-close" aria-label={text("close")} title={text("close")} onClick={dismiss}><Icon name="close" size={18} /></button></header>
     <div className="outputs-toolbar"><div role="group" aria-label={text("versionFilter")}>
       <button type="button" className="button button-secondary button-inline" aria-pressed={versions === "latest"} onClick={() => setVersions("latest")}>{text("latest")}</button>
       <button type="button" className="button button-secondary button-inline" aria-pressed={versions === "all"} onClick={() => setVersions("all")}>{text("history")}</button>
     </div><div role="group" aria-label={text("kindFilter")}>
-      {(["all", "images", "builds", "live"] as const).map((kind) => <button key={kind} type="button" className="button button-secondary button-inline" aria-pressed={filter === kind} onClick={() => setFilter(kind)}>{text(kind === "all" ? "allKinds" : kind === "images" ? "images" : kind === "builds" ? "builds" : "liveKinds")}</button>)}
+      {(["all", "images", "builds", "reports", "live"] as const).map((kind) => <button key={kind} type="button" className="button button-secondary button-inline" aria-pressed={filter === kind} onClick={() => setFilter(kind)}>{text(kind === "all" ? "allKinds" : kind === "images" ? "images" : kind === "builds" ? "builds" : kind === "reports" ? "reports" : "liveKinds")}</button>)}
     </div><button type="button" className="button button-secondary button-inline" onClick={() => setAttempt((value) => value + 1)}>{text(current?.kind === "error" ? "retry" : "refresh")}</button></div>
     {current === null ? <p role="status">{text("loading")}</p> : current.kind === "error" ? <p role="alert">{text("failed")}</p> : items.length === 0 ? <p role="status">{text(current.value.items.length === 0 ? "galleryEmpty" : "filterEmpty")}</p> : <ul className="outputs-list">{items.map((item) => item.kind === "live_preview" ? <LivePreviewCard key={item.outputId} item={item} locale={locale} now={now} uiOrigin={window.location.origin} {...attribution} /> : <li key={item.outputId} data-expanded={currentPreview?.outputId === item.outputId && currentPreview.kind === "ready"}>
-      {item.kind !== "static_build" && <ImageThumbnail key={`${item.outputId}:${item.contentRevision}:${item.state}:${item.historicalPreviewVerified}:${revision}:${attempt}`} api={api} queue={queue} scope={scope} versions={versions} item={item} locale={locale} root={dialog.current} />}
-      <p className="small-copy">{text(item.kind === "design_image" ? "designImage" : item.kind === "static_build" ? "staticBuild" : "generatedImage")}</p><h3>{item.title}</h3><p className="outputs-status" data-status={outputStatus(item, now)}>{text(outputStatus(item, now))}</p>
+      {(item.kind === "artifact_image" || item.kind === "design_image") && <ImageThumbnail key={`${item.outputId}:${item.contentRevision}:${item.state}:${item.historicalPreviewVerified}:${revision}:${attempt}`} api={api} queue={queue} scope={scope} versions={versions} item={item} locale={locale} root={dialog.current} />}
+      <p className="small-copy">{text(item.kind === "design_image" ? "designImage" : item.kind === "static_build" ? "staticBuild" : item.kind === "text_result" ? "textReport" : "generatedImage")}</p><h3>{item.title}</h3><p className="outputs-status" data-status={outputStatus(item, now)}>{text(outputStatus(item, now))}</p>
       <p className="small-copy">{text(item.retained ? "retainedBytes" : "sourceBytes")}</p>
       <p className="outputs-review" data-result-review={item.resultReviewState ?? "none"}>{text(item.resultReviewState === "approved" ? "resultApproved" : item.resultReviewState === "returned" ? "resultReturned" : item.resultReviewState === "awaiting" ? "resultAwaiting" : "resultUnreviewed")}</p>
       <ReviewStateLine state={item.reviewState} locale={locale} />
       <p className="small-copy">{text(item.latest ? "current" : "previous")} · {item.versionCount} {text("versions")}</p>
       <OutputAttribution item={item} locale={locale} {...attribution} />
-      {item.kind === "static_build" ? <BuildDownloadAction api={api} scope={scope} item={item} locale={locale} /> : <ImagePreviewAction item={item} locale={locale} onOpen={() => void openImage(item)} />}
+      {item.kind === "text_result" ? <TextReportCard api={api} scope={scope} item={item} locale={locale} /> : item.kind === "static_build" ? <BuildDownloadAction api={api} scope={scope} item={item} locale={locale} /> : <ImagePreviewAction item={item} locale={locale} onOpen={() => void openImage(item)} />}
       {currentPreview?.outputId !== item.outputId ? null : currentPreview.kind === "loading" ? <p role="status">{text("imageLoading")}</p> : currentPreview.kind === "error" ? <p role="alert">{text("imageFailed")}</p> : currentPreview.kind === "ready" ? <img className="outputs-image" src={currentPreview.url} alt={item.title} width={item.width ?? undefined} height={item.height ?? undefined} /> : null}
     </li>)}</ul>}
   </dialog>;
@@ -207,4 +221,24 @@ export function BuildDownloadAction({ api, scope, item, locale }: { api: Outputs
     } catch { if (!active.signal.aborted) setState("error"); }
   }
   return <div><button type="button" className="button button-secondary button-inline" disabled={!canDownloadBuild(item) || state === "loading"} onClick={() => void download()}>{outputText(locale, "downloadBuild")}</button><p className="small-copy">{outputText(locale, "openLocally")}</p>{state === "error" ? <p role="alert">{outputText(locale, "imageFailed")}</p> : null}</div>;
+}
+
+/** Report prose is rendered as text; the request binds the exact card and scope. */
+export function TextReportCard({ api, scope, item, locale }: { api: OutputsApi; scope: OutputScope; item: ImageOutput; locale: Locale }): ReactElement {
+  const [state, setState] = useState<{ kind: "loading" | "error" } | { kind: "ready"; value: TextResultContent } | null>(null);
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => { setState(null); return () => request.current?.abort(); }, [api, scopeKey(scope), item.outputId, item.contentRevision]);
+  const t = (key: Parameters<typeof outputText>[1]): string => outputText(locale, key);
+  async function read(): Promise<void> {
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    setState({ kind: "loading" });
+    await presentCurrent(api.text(scope, item, controller.signal), controller.signal,
+      (value) => setState({ kind: "ready", value }), () => setState({ kind: "error" }));
+  }
+  return <div className="outputs-report"><p className="inspector-prose">{item.summary}</p>
+    {item.checks?.length ? <><h4>{t("checks")}</h4><ul>{item.checks.map((check, index) => <li key={index}>{check}</li>)}</ul></> : null}
+    {item.historicalPreviewVerified ? <p className="small-copy">{t("historicalHelp")}</p> : null}
+    {canReadReport(item) ? <button className="button button-secondary" type="button" disabled={state?.kind === "loading"} onClick={() => void read()}>{t(state?.kind === "error" ? "retry" : "readReport")}</button> : null}
+    {state?.kind === "loading" ? <p role="status">{t("loading")}</p> : state?.kind === "error" ? <p role="alert">{t("failed")}</p> : state?.kind === "ready" && canReadReport(item) ? <pre className="outputs-report-text">{state.value.content}</pre> : null}
+  </div>;
 }

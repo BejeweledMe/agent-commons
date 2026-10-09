@@ -229,7 +229,7 @@ def test_v7_stamp_uses_existing_projection_upgrade_guard(
 
     create(manager, "component", task_kind="component")
     events = [record.event for record in manager.events.iter_events()]
-    assert projection.LEDGER_SEMANTICS_VERSION == 7
+    assert projection.LEDGER_SEMANTICS_VERSION >= 7
     monkeypatch.setattr(projection, "LEDGER_SEMANTICS_VERSION", 6)
     old_projection = projection.project_events(events)
     assert old_projection.semantics_required == 7

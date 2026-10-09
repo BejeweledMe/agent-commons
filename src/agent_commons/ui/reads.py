@@ -117,6 +117,16 @@ def findings_for_task(snapshot: Any, task_id: str) -> list[dict[str, object]]:
 class UIReads:
     """Read-only UI models, layered over ``UIContext``'s shared state."""
 
+    def agent_details(self, agent_id: str) -> dict[str, Any]:
+        from agent_commons.services.agent_details import agent_details
+
+        return agent_details(
+            self.manager(),
+            agent_id,
+            library=self.library_store(),
+            catalog=load_role_catalog(self._catalog_path, workspace_root=self.repo),
+        )
+
     def provider_auth_status(self, *, profile_id: str) -> dict[str, Any]:
         """Return one short-lived, secret-free provider availability snapshot."""
 
@@ -642,6 +652,8 @@ class UIReads:
                 "name": rec.get("name"),
                 "profile_id": rec.get("profile_id"),
                 "context_mode": rec.get("context_mode", "fresh"),
+                "model": role_model(rec),
+                "specialization_ref": rec.get("specialization_ref"),
             }
             for rid, rec in sorted(snapshot.agents.items())
             if rec.get("state") == "active" and not rec.get("template")

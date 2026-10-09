@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-06",
+  "source_sha": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+  "release": "/Users/dmitrijersov/.local/share/agent-commons/blizhe-dogfooding/2026-10-06/release-6e169573439e",
+  "cli": "/Users/dmitrijersov/.local/share/agent-commons/blizhe-dogfooding/2026-10-06/release-6e169573439e/bin/agent-commons",
+  "mcp": "/Users/dmitrijersov/.local/share/agent-commons/blizhe-dogfooding/2026-10-06/release-6e169573439e/bin/agent-commons-mcp",
+  "profile_config": "/Users/dmitrijersov/.local/share/agent-commons/blizhe-dogfooding/2026-10-06/release-6e169573439e/runtime.yaml",
+  "state_base": "/Users/dmitrijersov/.local/share/agent-commons/blizhe-dogfooding/2026-10-06/runtime-state",
+  "panel": "http://127.0.0.1:8793/work",
+  "mode": "single-project",
+  "blizhe_sha": "cbdcad62052808343feca6a0a84a8b9b9e54976a",
+  "blizhe_dirty_entries": 44,
+  "asset": "work-C0nYR3qF.js",
+  "tool_version": "0.1.0",
+  "model_runs_this_continuation": 0,
+  "canaries_this_continuation": 0
+}

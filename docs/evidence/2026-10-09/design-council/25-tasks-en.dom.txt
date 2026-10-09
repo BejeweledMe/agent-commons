@@ -1,0 +1,207 @@
+- main:
+  - navigation "Workspace sections":
+    - link "Workspace":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Roles":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Skills":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Team templates":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Context":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Settings":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+  - complementary "Workspace navigation":
+    - complementary "Projects":
+      - paragraph: Agent Commons
+      - heading "Projects" [level=2]
+      - button "New project"
+      - generic: Search projects
+      - searchbox "Search projects"
+      - list:
+        - button "agent-commons Ready":
+          - strong:
+            - text: agent-commons
+          - generic: Ready
+        - 'generic "Project actions: agent-commons"':
+          - generic: "Project actions: agent-commons"
+        - button "board-demo Workspace unavailable" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Workspace unavailable
+        - 'generic "Project actions: board-demo"':
+          - generic: "Project actions: board-demo"
+        - button "blizhe-webapp Ready":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Ready
+        - 'generic "Project actions: blizhe-webapp"':
+          - generic: "Project actions: blizhe-webapp"
+        - button "blizhe-worktree Workspace unavailable" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Workspace unavailable
+        - 'generic "Project actions: blizhe-worktree"':
+          - generic: "Project actions: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Ready":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Ready
+        - 'generic "Project actions: Blizhe · улучшения 2026-10-07"':
+          - generic: "Project actions: Blizhe · улучшения 2026-10-07"
+        - button "Main chat":
+          - text: Main chat
+      - generic "Archived projects"
+    - generic: Workspace and runtime are configured
+    - paragraph: Local workspace · your repository
+  - separator "Sidebar width"
+  - group "Workspace layout":
+    - button "Sidebar" [pressed]:
+    - button "Chat" [pressed]:
+    - generic "Layout"
+  - heading "Tasks" [level=1]
+  - generic "Language":
+    - button "Switch to English" [active] [pressed]: EN
+    - button "Switch to Russian": RU
+  - navigation "Project maps":
+    - link "Tasks":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+      - text: Tasks
+    - link "Agents":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+      - text: Agents
+    - button "New task"
+  - region "Tasks":
+    - region "Tasks and runs":
+      - generic: Find a task
+      - searchbox "Find a task"
+      - status "Automatic updates connected":
+        - text: ●
+        - generic: Automatic updates connected
+      - button "Refresh"
+      - generic "Check freshness"
+      - 'generic "Tasks shown: 14/14"': 14/14
+      - generic: Task status
+      - combobox "Task status":
+        - option "Working set"
+        - option "All tasks" [selected]
+        - option "Needs attention"
+        - option "Ready"
+        - option "Assigned"
+        - option "Active"
+        - option "Blocked"
+        - option "Completed"
+        - option "In review"
+        - option "Accepted"
+        - option "Cancelled"
+      - tablist "Task views":
+        - tab "Now"
+        - tab "Map" [selected]
+        - tab "List"
+      - generic: Map relationships
+      - combobox "Map relationships":
+        - option "Structure" [selected]
+        - option "Dependencies"
+      - paragraph: Choose a task for details. Use arrow keys, Home, or End to move between task cards.
+      - tabpanel "Map":
+        - region "Structure":
+          - paragraph: Structure groups work. Dependencies control readiness. Child completion never accepts its parent.
+          - generic "Map controls"
+          - generic "Help"
+          - group "Map scale":
+            - button "Zoom out": −
+            - status: 33%
+            - button "Zoom in": +
+            - button "Fit"
+            - button "Actual size": 100%
+          - region "Structure":
+            - img "Structure":
+              - strong: Project
+              - generic: Structure
+              - button "Task PHOTO · Подключить OpenAI Decisions для проверки фото accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: PHOTO · Подключить OpenAI Decisions для проверки фото
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task TOOL · Ограничить lint, сборку и watch accepted — the exact reviewed revision was accepted" [pressed]:
+                - generic: Task
+                - strong: TOOL · Ограничить lint, сборку и watch
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task CONFIG · Согласовать проверку конфигурации rate limit ready — Ready for assignment":
+                - generic: Task
+                - strong: CONFIG · Согласовать проверку конфигурации rate limit
+                - code: ready
+                - text: — Ready for assignment
+              - button "Task REASONS · Исключить приватные сигналы из объяснений accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: REASONS · Исключить приватные сигналы из объяснений
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task BASE · Проверить исходную версию и сохранность работы владельца accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: BASE · Проверить исходную версию и сохранность работы владельца
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Component SEARCH · Консилиум и завершение умного поиска ready — Ready for assignment":
+                - generic: Component
+                - strong: SEARCH · Консилиум и завершение умного поиска
+                - code: ready
+                - text: — Ready for assignment
+              - button "Task SEARCH-BOUNDS · Ограничить запросы и добор кандидатов accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: SEARCH-BOUNDS · Ограничить запросы и добор кандидатов
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task SEARCH-INDEX · Ограничить небезопасную переиндексацию accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: SEARCH-INDEX · Ограничить небезопасную переиндексацию
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task SEARCH-B · Независимый аудит и дизайн Claude ready — Ready for assignment":
+                - generic: Task
+                - strong: SEARCH-B · Независимый аудит и дизайн Claude
+                - code: ready
+                - text: — Ready for assignment
+              - button "Task SEARCH-C · Критика и проверка решений по коду ready — Ready for assignment":
+                - generic: Task
+                - strong: SEARCH-C · Критика и проверка решений по коду
+                - code: ready
+                - text: — Ready for assignment
+              - button "Task SEARCH-A · Независимый аудит и дизайн Codex ready — Ready for assignment":
+                - generic: Task
+                - strong: SEARCH-A · Независимый аудит и дизайн Codex
+                - code: ready
+                - text: — Ready for assignment
+              - button "Task SEARCH-RANK · Согласовать каталог и расчёт ранга accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: SEARCH-RANK · Согласовать каталог и расчёт ранга
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+              - button "Task SEARCH-EVAL · Собрать воспроизводимую проверку качества accepted — the exact reviewed revision was accepted":
+                - generic: Task
+                - strong: SEARCH-EVAL · Собрать воспроизводимую проверку качества
+                - code: accepted
+                - text: — the exact reviewed revision was accepted
+      - generic "Workspace diagnostics"
+  - separator "Chat width"
+  - generic "Chat":
+    - region "Main project chat":
+      - heading "Main project chat" [level=2]
+      - paragraph: "Recipient: Blizhe · улучшения 2026-10-07"
+      - paragraph: Availability unknown
+      - button "Prepare run"
+      - paragraph: No messages yet.
+      - list "Conversation"
+      - generic: Message
+      - textbox "Message"
+      - button "Add images or files"
+      - generic "Limits"
+      - button "Send message" [disabled]
+      - generic "Saved draft"

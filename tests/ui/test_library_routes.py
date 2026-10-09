@@ -35,7 +35,7 @@ def test_read_only_library_is_useful_without_content_or_write_routes(tmp_path: P
     assert response.status_code == 200
     body = response.json()
     assert len(body["skills"]) == 45
-    assert len(body["roles"]) == 30
+    assert len(body["roles"]) == 31
     assert not body["editing_enabled"]
     assert "system_prompt" not in response.text
     ref = body["roles"][0]["ref"]

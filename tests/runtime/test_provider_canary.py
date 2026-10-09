@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_commons import __file__ as package_file
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudePermissionMode,
@@ -39,6 +40,8 @@ def _executable(path: Path, body: str) -> Path:
 def _mcp_executable(tmp_path: Path) -> Path:
     return _executable(
         tmp_path / "agent-commons-mcp",
+        "import sys\n"
+        f"sys.path.insert(0, {str(Path(package_file).resolve().parent.parent)!r})\n"
         "from agent_commons.mcp.server import main\nraise SystemExit(main())\n",
     )
 
@@ -209,12 +212,19 @@ def test_grok_provider_canary_proves_skill_aware_real_terminal_mcp_completion(
 
 
 @pytest.mark.parametrize("provider_name", ("claude", "codex"))
+@pytest.mark.parametrize("text_result_flow", (False, True))
 def test_builder_canary_proves_scoped_terminal_flow_and_records_receipt(
     tmp_path: Path,
     provider_name: str,
+    text_result_flow: bool,
 ) -> None:
     fixture = f"fake_{provider_name}_mcp_provider.py"
     provider_source = (Path(__file__).parents[1] / "fixtures" / fixture).read_text(encoding="utf-8")
+    if text_result_flow:
+        assert "USE_TEXT_RESULT_FLOW = False" in provider_source
+        provider_source = provider_source.replace(
+            "USE_TEXT_RESULT_FLOW = False", "USE_TEXT_RESULT_FLOW = True"
+        )
     executable = _executable(tmp_path / f"fake-{provider_name}", provider_source)
     profiles = _builder_profiles(
         executable,
@@ -235,12 +245,19 @@ def test_builder_canary_proves_scoped_terminal_flow_and_records_receipt(
 
     assert report["ok"] is True, report
     assert report["purpose"] == "implementation"
+    assert report["result_refs_match"] is True
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+    assert report["child_session_closed"] is True
     assert report["skill_refs"] == ["commons-start"]
     assert report["initialization"] == {
         "state": "ready",
         "supported": True,
         "blocks_launch": False,
+        "timeout_seconds": 15,
+        "duration_seconds": report["initialization"]["duration_seconds"],
     }
+    assert report["initialization"]["duration_seconds"] >= 0
     receipt = ProviderQualificationStore(tmp_path / "qualified-state").read(
         next(iter(profiles.profile_ids))
     )
@@ -333,6 +350,10 @@ def test_grok_builder_canary_proves_skill_aware_scoped_terminal_flow(
     assert report["ok"] is True, report
     assert report["provider"] == "grok"
     assert report["purpose"] == "implementation"
+    assert report["result_refs_match"] is True
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+    assert report["child_session_closed"] is True
     assert report["skill_refs"] == ["commons-start"]
     assert report["canonical_state"] == "succeeded"
     assert report["process_canonical_mismatch"] is False
@@ -576,3 +597,37 @@ def test_grok_provider_version_drops_noncanonical_provider_content(
         )
         is None
     )
+
+
+def test_builder_canary_reports_invalid_terminal_refs_without_qualifying(tmp_path: Path) -> None:
+    provider_source = (
+        Path(__file__).parents[1] / "fixtures" / "fake_codex_mcp_provider.py"
+    ).read_text(encoding="utf-8")
+    original = "result_refs = [f\"{target['kind']}:{target['id']}\"]"
+    assert original in provider_source
+    provider_source = provider_source.replace(
+        original,
+        "result_refs = [f\"{target['kind']}:{target['id']}\", "
+        "f\"event:{delegation['target_revision']}\"]",
+    )
+    profiles = _builder_profiles(
+        _executable(tmp_path / "fake-codex", provider_source),
+        _mcp_executable(tmp_path),
+        provider_name="codex",
+    )
+    report = run_codex_builder_compatibility_canary(
+        profiles, wall_time_seconds=60, qualification_state_root=tmp_path / "qualification"
+    )
+    assert report["ok"] is False
+    assert report["result_refs_match"] is False
+    assert report["canonical_state"] == "succeeded"
+    assert report["process"]["outcome"] == "succeeded"
+    assert report["workflow_diagnostic_code"] == "none"
+    assert report["terminal_tool_completions"] == 1
+    assert report["terminal_tool_rejections"] == 0
+    assert report["child_session_closed"] is True
+    receipt = ProviderQualificationStore(tmp_path / "qualification").read(
+        next(iter(profiles.profile_ids))
+    )
+    assert receipt is not None and receipt.qualified is False
+    assert receipt.behavioral_canary is False

@@ -1,0 +1,207 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Задачи" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - navigation "Карты проекта":
+    - link "Задачи":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+      - text: Задачи
+    - link "Агенты":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+      - text: Агенты
+    - button "Новая задача" [active]
+  - region "Задачи":
+    - region "Задачи и прогоны":
+      - generic: Найти задачу
+      - searchbox "Найти задачу"
+      - status "Автоматические обновления подключены":
+        - text: ●
+        - generic: Автоматические обновления подключены
+      - button "Обновить"
+      - generic "Проверьте данные"
+      - 'generic "Показано задач: 14/14"': 14/14
+      - generic: Статус задачи
+      - combobox "Статус задачи":
+        - option "Рабочий набор"
+        - option "Все задачи" [selected]
+        - option "Требуют внимания"
+        - option "Готовы к работе"
+        - option "Назначены"
+        - option "В работе"
+        - option "Заблокированы"
+        - option "Завершены"
+        - option "На проверке"
+        - option "Приняты"
+        - option "Отменены"
+      - tablist "Представления задач":
+        - tab "Сейчас"
+        - tab "Карта" [selected]
+        - tab "Список"
+      - generic: Связи на карте
+      - combobox "Связи на карте":
+        - option "Структура" [selected]
+        - option "Зависимости"
+      - paragraph: Выберите задачу для подробностей. Между карточками задач можно перемещаться стрелками, Home и End.
+      - tabpanel "Карта":
+        - region "Структура":
+          - paragraph: Структура объединяет работу. Зависимости определяют готовность. Завершение подзадачи не принимает родителя.
+          - generic "Управление"
+          - generic "Справка"
+          - group "Масштаб карты":
+            - button "Уменьшить масштаб": −
+            - status: 33%
+            - button "Увеличить масштаб": +
+            - button "Вписать"
+            - button "Исходный масштаб": 100%
+          - region "Структура":
+            - img "Структура":
+              - strong: Проект
+              - generic: Структура
+              - button "Задача PHOTO · Подключить OpenAI Decisions для проверки фото accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: PHOTO · Подключить OpenAI Decisions для проверки фото
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача TOOL · Ограничить lint, сборку и watch accepted — точная проверенная редакция принята" [pressed]:
+                - generic: Задача
+                - strong: TOOL · Ограничить lint, сборку и watch
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача CONFIG · Согласовать проверку конфигурации rate limit ready — Готова к назначению":
+                - generic: Задача
+                - strong: CONFIG · Согласовать проверку конфигурации rate limit
+                - code: ready
+                - text: — Готова к назначению
+              - button "Задача REASONS · Исключить приватные сигналы из объяснений accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: REASONS · Исключить приватные сигналы из объяснений
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача BASE · Проверить исходную версию и сохранность работы владельца accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: BASE · Проверить исходную версию и сохранность работы владельца
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Компонент SEARCH · Консилиум и завершение умного поиска ready — Готова к назначению":
+                - generic: Компонент
+                - strong: SEARCH · Консилиум и завершение умного поиска
+                - code: ready
+                - text: — Готова к назначению
+              - button "Задача SEARCH-BOUNDS · Ограничить запросы и добор кандидатов accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: SEARCH-BOUNDS · Ограничить запросы и добор кандидатов
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача SEARCH-INDEX · Ограничить небезопасную переиндексацию accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: SEARCH-INDEX · Ограничить небезопасную переиндексацию
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача SEARCH-B · Независимый аудит и дизайн Claude ready — Готова к назначению":
+                - generic: Задача
+                - strong: SEARCH-B · Независимый аудит и дизайн Claude
+                - code: ready
+                - text: — Готова к назначению
+              - button "Задача SEARCH-C · Критика и проверка решений по коду ready — Готова к назначению":
+                - generic: Задача
+                - strong: SEARCH-C · Критика и проверка решений по коду
+                - code: ready
+                - text: — Готова к назначению
+              - button "Задача SEARCH-A · Независимый аудит и дизайн Codex ready — Готова к назначению":
+                - generic: Задача
+                - strong: SEARCH-A · Независимый аудит и дизайн Codex
+                - code: ready
+                - text: — Готова к назначению
+              - button "Задача SEARCH-RANK · Согласовать каталог и расчёт ранга accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: SEARCH-RANK · Согласовать каталог и расчёт ранга
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске
+                - code: accepted
+                - text: — точная проверенная редакция принята
+              - button "Задача SEARCH-EVAL · Собрать воспроизводимую проверку качества accepted — точная проверенная редакция принята":
+                - generic: Задача
+                - strong: SEARCH-EVAL · Собрать воспроизводимую проверку качества
+                - code: accepted
+                - text: — точная проверенная редакция принята
+      - generic "Диагностика рабочего пространства"
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

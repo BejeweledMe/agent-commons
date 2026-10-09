@@ -1,11 +1,11 @@
 import type { TrackerSnapshot, TrackerTask } from "./contracts";
 import type { MessageKey } from "./i18n";
 
-export type TaskFilter = "all" | "attention" | "ready" | "assigned" | "active" | "blocked"
+export type TaskFilter = "working" | "all" | "attention" | "ready" | "assigned" | "active" | "blocked"
   | "completed" | "review" | "accepted" | "cancelled";
-export const TASK_FILTERS: readonly TaskFilter[] = ["all", "attention", "ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"];
+export const TASK_FILTERS: readonly TaskFilter[] = ["working", "all", "attention", "ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"];
 export const taskFilterLabel: Readonly<Record<TaskFilter, MessageKey>> = {
-  all: "task_view_all", attention: "task_view_attention", ready: "task_view_ready",
+  working: "task_view_working", all: "task_view_all", attention: "task_view_attention", ready: "task_view_ready",
   assigned: "task_view_assigned", active: "task_view_active", blocked: "task_view_blocked",
   completed: "task_view_completed", review: "task_view_review", accepted: "task_view_accepted", cancelled: "task_view_cancelled"
 };
@@ -68,6 +68,7 @@ export function filterTrackerTasks(snapshot: TrackerSnapshot, filter: TaskFilter
   const query = search.trim().toLocaleLowerCase();
   const roleTaskIds = agentTaskIds(snapshot, agentId);
   return snapshot.tasks.filter((task) => (filter === "all"
+    || (filter === "working" && !["accepted", "cancelled"].includes(task.taskState))
     || (filter === "attention" ? task.awaitsHuman || attentionIds.has(task.taskId) : task.taskState === filter))
     && (roleTaskIds === null || roleTaskIds.has(task.taskId))
     && (!query || [task.title, task.roleName ?? "", task.taskId].some((value) => value.toLocaleLowerCase().includes(query))));

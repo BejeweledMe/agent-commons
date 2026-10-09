@@ -76,15 +76,9 @@ export function selectGraphTasks(tasks: readonly TrackerTask[], edges: readonly 
     .slice().sort((a, b) => a.taskId.localeCompare(b.taskId));
 }
 
-/** Numeric SVG sizing keeps zoom compatible with the no-inline-style CSP. */
-export function graphViewport(width: number, height: number, zoom: number): { width: number; height: number; zoom: number } {
-  const bounded = Number.isFinite(zoom) ? Math.min(2, Math.max(0.25, zoom)) : 1;
-  return { width: Math.round(width * bounded), height: Math.round(height * bounded), zoom: bounded };
-}
-
-export function fitGraphZoom(width: number, availableWidth: number): number {
-  return width > 0 && availableWidth > 0 ? Math.min(1, Math.max(0.25, availableWidth / width)) : 1;
-}
+// Panning and zooming are numeric `viewBox` arithmetic in `mapViewport.ts`:
+// one implementation serves Structure and Dependencies, and it needs no inline
+// style under the strict CSP.
 
 export function buildTaskGraph(tasks: readonly TrackerTask[], edges: readonly TrackerEdge[], selectedTaskId: string | null, focusSelected: boolean | GraphFocus = true, search = ""): TaskGraphLayout {
   const focus = typeof focusSelected === "boolean" ? (focusSelected ? "connected" : "all") : focusSelected;

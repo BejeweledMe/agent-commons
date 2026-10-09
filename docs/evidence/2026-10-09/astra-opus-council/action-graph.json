@@ -1,0 +1,309 @@
+{
+  "schema": "agent_commons.authored-action-plan.v1",
+  "baseline": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "observed_at": "2026-10-09",
+  "live_status": false,
+  "status_note": "Авторский итог локальной реализации, не live проекция и не общая пользовательская приёмка. Источники, тесты и внешние границы в verification.md; canonical lifecycle отдельно.",
+  "nodes": [
+    {
+      "id": "D0",
+      "title": "Контракт рабочего пространства",
+      "owner": "Opus + Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "Владелец",
+        "G8",
+        "WP-18/19/42"
+      ],
+      "change": "Согласовать три области, вкладки, состояния и главную проектную беседу; поправить ADR 0020 отдельным решением.",
+      "acceptance": "Проверяемое соответствие Sidebar | Map | Main Chat, без постоянного инспектора.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B1",
+      "title": "Следующее действие и состояние задачи",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-40",
+        "UX-45",
+        "G8",
+        "WP-22/23"
+      ],
+      "change": "Матрица server next_action: текущая проверка, активный прогон, stale revision, policy и приёмка.",
+      "acceptance": "Current independent approved → принять; changes_requested → исправить; active/stale блокировки сохранены.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B2",
+      "title": "Сохранение ссылок при CLI submit",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-48",
+        "G8"
+      ],
+      "change": "Отсутствие --artifact-ref передаёт None; явная последовательность сохраняет смысл замены.",
+      "acceptance": "Omission не очищает доказательства; явная очистка отдельно проверена; stale refs отказаны.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B3",
+      "title": "Бюджет запуска",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-57",
+        "WP-22/23"
+      ],
+      "change": "Общий расчёт union tree/session/provider для precheck и reservation; безопасный DTO остатков.",
+      "acceptance": "Исчерпание до создания лишней delegation; гонка повторно проверяется атомарно; API operator_budget_exhausted, canonical budget_exhausted.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B4",
+      "title": "Готовая специализация QA",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-37",
+        "G8"
+      ],
+      "change": "Добавить versioned qa-reviewer; сохранить qa-engineer и закреплённые версии.",
+      "acceptance": "Новая QA совместима с независимым reviewer, старые агенты не переписаны.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B5",
+      "title": "Среда проекта и probe провайдера",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-42",
+        "UX-43",
+        "UX-47",
+        "G2/G9"
+      ],
+      "change": "Отдельные read-only признаки dependencies/toolchain; измеряемый bounded initialization probe; UI действие квалификации.",
+      "acceptance": "Нет автоматического запуска package scripts; среда отделена от provider qualification; timeout не ослабляет изоляцию.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B6",
+      "title": "Канал ответа исполнителю",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-52",
+        "G8"
+      ],
+      "change": "Locked/idempotent ensure адресованного task conversation до работы провайдера.",
+      "acceptance": "Запуск новой задачи не требует предварительно открыть чат; worker видит только адресованные разговоры.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B7",
+      "title": "Сохранённый текстовый результат",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-38",
+        "UX-39",
+        "G5/G7/G8"
+      ],
+      "change": "Bounded inline text/report → retained immutable bytes; exact task/delegation scope; явные complete/submit/finalize.",
+      "acceptance": "Crash/retry сходится; worker не получает acceptance; verification не наследует authoring tools.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B8",
+      "title": "Читаемые доказательства",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-44",
+        "UX-58",
+        "G8"
+      ],
+      "change": "DTO полного описания и точных result refs с именами/summary/checks, ограниченная пагинация.",
+      "acceptance": "Все 52 refs доступны; смена task revision между страницами требует обновления; никакого произвольного чтения путей.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "B9",
+      "title": "Раскладка и явные черновики",
+      "owner": "Codex",
+      "hard_dependencies": [],
+      "source_refs": [
+        "UX-15",
+        "Владелец",
+        "G8"
+      ],
+      "change": "Отдельное приватное principal/project/scope operational storage с CAS, квотами, явными Save/Delete.",
+      "acceptance": "Reload восстанавливает подтверждённый текст; конфликт вкладок не затирается; без browser storage, autosend или reuse attachment reservations.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "F1",
+      "title": "Sidebar | Map | Main Chat",
+      "owner": "Opus",
+      "hard_dependencies": [
+        "D0"
+      ],
+      "source_refs": [
+        "Владелец",
+        "UX-46",
+        "UX-50",
+        "G8"
+      ],
+      "change": "Полноразмерная карта по умолчанию; узкие переставляемые/сворачиваемые/изменяемые панели; прочее по запросу.",
+      "acceptance": "1042×467 и обычный MacBook: карта видна сразу; нет четвёртой постоянной колонки; проектный чат явно отдельный.",
+      "status": "implemented_verified_locally",
+      "implementation_owner": "Opus initial implementation; Codex integration after Claude usage limit"
+    },
+    {
+      "id": "F2",
+      "title": "Жесты и сохранение контекста карты",
+      "owner": "Opus",
+      "hard_dependencies": [
+        "F1"
+      ],
+      "source_refs": [
+        "UX-54",
+        "G4/G6",
+        "WP-25/27"
+      ],
+      "change": "Двухосевой pan, pinch вокруг курсора, drag пустого холста, клавиатура/список; отдельные selected/focus/viewport/detail.",
+      "acceptance": "Закрытие деталей не меняет 9/14 на 14/14; обновление не сбрасывает viewport; жесты локальны карте.",
+      "status": "implemented_verified_locally",
+      "implementation_owner": "Opus initial implementation; Codex integration after Claude usage limit"
+    },
+    {
+      "id": "F3",
+      "title": "Разговор и доступный composer",
+      "owner": "Opus",
+      "hard_dependencies": [
+        "F1"
+      ],
+      "source_refs": [
+        "UX-15",
+        "UX-53",
+        "UX-55",
+        "UX-56"
+      ],
+      "change": "Встроенный главный чат, явные task/agent scopes, общий session transport; Save/Restore draft после B9.",
+      "acceptance": "Текстовое поле получает click/Tab в EN/RU после отправки/scroll; ответ не выдумывает ack; чтение страницы не создаёт сообщение.",
+      "status": "implemented_verified_locally",
+      "implementation_owner": "Opus initial implementation; Codex integration after Claude usage limit"
+    },
+    {
+      "id": "F4",
+      "title": "Подробности, результаты, история",
+      "owner": "Opus",
+      "hard_dependencies": [
+        "F1",
+        "B8"
+      ],
+      "source_refs": [
+        "UX-39",
+        "UX-44",
+        "UX-51",
+        "UX-58",
+        "UX-59",
+        "G8"
+      ],
+      "change": "Подробности как временная вкладка; полное описание, имена результатов, технические refs в disclosure; сортировка времени.",
+      "acceptance": "Новый QA первый с датой через полночь; нет raw-ID стены; gallery вход по аватару/имени сохраняется.",
+      "status": "implemented_verified_locally",
+      "implementation_owner": "Opus initial implementation; Codex integration after Claude usage limit"
+    },
+    {
+      "id": "F5",
+      "title": "Сохранение и причины отказа",
+      "owner": "Opus",
+      "hard_dependencies": [
+        "B3",
+        "B5"
+      ],
+      "source_refs": [
+        "UX-41",
+        "UX-43",
+        "UX-45",
+        "UX-50",
+        "UX-56",
+        "WP-22/23/30"
+      ],
+      "change": "Сохранение/подтверждение/ошибка refresh отдельно, типизированный budget, явная qualification CTA, единый словарь.",
+      "acceptance": "Не повторяет подтверждённый POST; uncertain retry сохраняет identity; настоящая auth ошибка не скрывается.",
+      "status": "implemented_verified_locally",
+      "implementation_owner": "Opus initial implementation; Codex integration after Claude usage limit"
+    },
+    {
+      "id": "I1",
+      "title": "Интеграция и сквозной маршрут",
+      "owner": "Codex",
+      "hard_dependencies": [
+        "B1",
+        "B2",
+        "B4",
+        "B6",
+        "B7",
+        "B9",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "source_refs": [
+        "G9"
+      ],
+      "change": "Один integrator, bundle, scoped handoff→QA return→fix→fresh review→отдельная приёмка.",
+      "acceptance": "Синтетический цикл и реальный ограниченный canary; точные source/profile/evidence записаны.",
+      "status": "implemented_verified_locally"
+    },
+    {
+      "id": "V1",
+      "title": "Проверка нового рабочего места",
+      "owner": "Codex + независимый reviewer",
+      "hard_dependencies": [
+        "I1"
+      ],
+      "source_refs": [
+        "UX-01",
+        "UX-32",
+        "G9",
+        "WP-24/25"
+      ],
+      "change": "make check, обе TS сборки, wheel/install, browser EN/RU, непустая/пустая gallery, доступность; независимое exact-review.",
+      "acceptance": "Actual served DOM/screenshots, нет перекрытого composer; review неподвижной границы; физические жесты не приписывать synthetic тесту.",
+      "status": "implemented_verified_locally"
+    }
+  ],
+  "soft_edges": [
+    [
+      "B6",
+      "F3"
+    ],
+    [
+      "B7",
+      "F4"
+    ],
+    [
+      "B9",
+      "F1"
+    ],
+    [
+      "B9",
+      "F3"
+    ],
+    [
+      "B1",
+      "F5"
+    ]
+  ],
+  "open_external_boundaries": [
+    "WP-20 measured latency",
+    "L1 authenticated Linux",
+    "human usability/physical trackpad acceptance"
+  ]
+}

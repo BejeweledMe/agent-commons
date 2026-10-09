@@ -115,7 +115,8 @@ _LIFETIME_CLOSING_TASK_STATES = frozenset({"accepted", "cancelled"})
 #: instead of reporting integrity findings it cannot judge. Version 7 adds
 #: explicit task hierarchy and freezes its semantics under correction. Strict
 #: old storage schemas can reject new fields before reaching this diagnostic.
-LEDGER_SEMANTICS_VERSION = 7
+#: Version 8 adds organization and human-only exact specialization changes.
+LEDGER_SEMANTICS_VERSION = 8
 
 #: Event types whose replay depends on newer-than-v1 semantics, and the
 #: version each one requires.  Writers consult this to stamp the ledger
@@ -133,6 +134,7 @@ SEMANTICS_SENSITIVE_EVENTS = {
     "task.dependencies_revised": 5,
     "thread.conversation_bound": 6,
     "task.hierarchy_changed": 7,
+    "agent.configuration_changed": 8,
 }
 
 

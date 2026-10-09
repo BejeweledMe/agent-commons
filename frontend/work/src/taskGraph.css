@@ -3,9 +3,7 @@
 .task-graph-legend li>span { width:1.5rem; text-align:center; font-weight:800; border:1px solid currentColor; border-radius:.3rem; }
 .task-graph-focus { display:flex; align-items:center; gap:.45rem; font-size:.84rem; margin:.6rem 0; }
 .task-graph-focus input { width:auto; margin:0; }
-.task-graph-scroll { max-height:64vh; overflow:auto; border:1px solid var(--border-1); background:var(--surface-1); border-radius:.6rem; }
-.task-graph-scroll svg { display:block; }
-.task-graph-fallback { display:grid; gap:.5rem; list-style:none; padding:0; max-height:64vh; overflow:auto; }
+.task-graph-fallback { display:grid; gap:.5rem; list-style:none; padding:0; min-height:0; overflow:auto; }
 .task-graph-fallback button { width:100%; text-align:left; }
 .task-graph-edges path { fill:none; stroke:var(--text-3); stroke-width:1.5; }
 .task-graph svg marker path { fill:var(--text-3); }
@@ -33,7 +31,7 @@
 .task-editor-dependency input { flex:0 0 auto; width:auto; margin-top:.15rem; }
 .task-editor-cancel { border-top:1px solid var(--border-1); margin-top:1rem; padding-top:.8rem; }
 .task-editor-error { overflow-wrap:anywhere; }
-@media (max-width:760px) { .task-graph-scroll { max-height:50vh; } .task-graph-node { touch-action:manipulation; } }
+@media (max-width:760px) { .task-graph-node { touch-action:manipulation; } }
 
 .task-graph-node[data-graph-state="completed"] { background:var(--surface-2); color:var(--text-1); border-color:var(--border-2); }
 .task-graph-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; margin:.6rem 0; }
@@ -57,3 +55,57 @@
 .hierarchy-depth-4 { padding-inline-start: 5rem; }
 .hierarchy-depth-5 { padding-inline-start: 6.25rem; }
 .hierarchy-depth-6 { padding-inline-start: 7.5rem; }
+
+/* The task map canvas. It takes the whole height of its pane, and the viewBox
+   is the only thing that moves: no inline style, no transform plumbing. */
+.task-graph { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
+.task-graph > .small-copy { flex:0 0 auto; }
+.map-canvas { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+.map-canvas-toolbar { flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; margin:.4rem 0; }
+.map-canvas-zoom { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; margin-inline-start:auto; }
+.map-canvas-zoom-level { min-width:3.5rem; text-align:center; font-size:.8rem; color:var(--text-2); }
+.map-canvas-frame { flex:1 1 auto; min-height:200px; border:1px solid var(--border-1); background:var(--surface-1); border-radius:.6rem;
+  overflow:hidden; touch-action:none; cursor:grab; overscroll-behavior:contain; }
+.map-canvas-frame-dragging { cursor:grabbing; }
+.map-canvas-frame:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.map-canvas-svg { display:block; width:100%; height:100%; }
+.map-canvas-gestures { flex:0 0 auto; margin:.35rem 0 0; }
+.map-kind-row { flex:0 0 auto; align-items:center; gap:.5rem; }
+.task-graph-legend { flex:0 0 auto; }
+.task-hierarchy-list { overflow-y:auto; min-height:0; }
+
+.task-graph-node-status { font-weight: 500; }
+.task-graph-node[data-graph-state="accepted"] { background: var(--surface-2); border-width: 2px; border-style: solid; }
+.task-graph-node strong { font-weight: 500; }
+
+/* UX-01: reading bands. Node geometry never changes — only what a node shows.
+   Hiding is display:none, so a hidden control leaves the tab order with it and
+   focus can never be parked on something invisible. */
+.map-canvas-frame[data-zoom-band="overview"] .task-graph-node-role,
+.map-canvas-frame[data-zoom-band="overview"] .task-graph-node-run,
+.map-canvas-frame[data-zoom-band="overview"] .task-graph-node-boundary,
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node-role,
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node-run,
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node-boundary,
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node-title { display:none; }
+.map-canvas-frame[data-zoom-band="overview"] .task-graph-node-title { font-size:1.5rem; -webkit-line-clamp:3; }
+.map-canvas-frame[data-zoom-band="overview"] .task-graph-node-status { font-size:1.15rem; }
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node-status { font-size:2.2rem; }
+.map-canvas-frame[data-zoom-band="far"] .task-graph-node { justify-content:center; align-items:center; }
+
+/* The selected element's own strip: document scale, inside the map toolbar.
+   Not a sidebar, not a permanent inspector — one row that keeps the selection
+   readable and its actions reachable at any reading band. */
+.map-selected-strip { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.4rem .5rem; border:1px solid var(--border-2); border-radius:.45rem; background:var(--surface-2); font-size:.86rem; }
+.map-selected-title { font-weight:600; flex:1 1 12rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.map-selected-state { font-size:.78rem; font-weight:700; }
+.map-selected-empty { margin:0; flex:1 1 12rem; color:var(--text-2); font-size:.82rem; }
+.map-fit-hint { margin:.35rem 0 0; font-size:.82rem; color:var(--text-2); }
+
+/* UX-10: a narrow window keeps every map action reachable by wrapping, and the
+   document itself never overflows sideways. */
+@media (max-width:640px) {
+  .map-canvas-toolbar { flex-wrap:wrap; }
+  .map-selected-strip { font-size:.82rem; }
+  .map-selected-title { flex-basis:100%; }
+}

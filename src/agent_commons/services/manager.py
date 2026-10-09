@@ -1168,9 +1168,20 @@ class CommonsManager(
         except KeyError as exc:
             raise ValidationError(f"no canonical payload schema for {event_type}") from exc
         specialized_hire = event_type == "agent.created" and "specialization_ref" in payload_value
+        agent_configuration_v3 = (
+            event_type == "agent.created" and "supervisor_agent_id" in payload_value
+        ) or (
+            event_type == "agent.reconfigured"
+            and isinstance(payload_value.get("changes"), Mapping)
+            and bool(
+                {"supervisor_agent_id", "specialization_ref"} & payload_value["changes"].keys()
+            )
+        )
         task_creation_v2 = event_type == "task.created" and "objective_id" in payload_value
         if specialized_hire:
             payload_schema = "commons.payload.agent.v2"
+        if agent_configuration_v3:
+            payload_schema = "commons.payload.agent.v3"
         if task_creation_v2:
             payload_schema = "commons.payload.task.v2"
         conversation_write = family == "thread" and any(
@@ -1263,6 +1274,8 @@ class CommonsManager(
                     payload_value,
                     session,
                 )
+                if agent_configuration_v3:
+                    self._require_ledger_semantics("agent.configuration_changed")
                 if specialized_hire:
                     self._require_ledger_semantics("agent.specialization_bound")
                 if conversation_write:

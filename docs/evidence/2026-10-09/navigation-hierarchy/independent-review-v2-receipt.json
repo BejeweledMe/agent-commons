@@ -1,0 +1,1 @@
+{"created":true,"entity_ref":{"id":"review.65H6EB6A2J7VBMAD49J6ZWT84D","kind":"review"},"event_id":"evt.01M4G4EQER37Y6BR6K6Q30SSEQ","event_type":"review.completed","idempotency_key":"oct09-navigation-review-v2-final","index":{"mode":"deferred","next_action":"agent-commons index rebuild","synchronized":false},"repaired":false,"revision":"evt.01M4G4EQER37Y6BR6K6Q30SSEQ"}

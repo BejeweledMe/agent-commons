@@ -3,23 +3,29 @@ import type { WorkApi } from "../api.js";
 import type { Locale } from "../i18n.js";
 import { ConversationApi, deliverySteps, scopeKey, UNKNOWN_AVAILABILITY, type Attachment, type AvailabilityState, type ConversationScope, type Delivery, type RecipientAvailability } from "../conversationApi.js";
 import { ConversationDraftGuard, ConversationObjectUrl, ConversationSessions, ConversationSession } from "../conversationState.js";
+import { ConversationTextDraftApi, hasSavedText, savedDraftDiffers, savedDraftOf, SavedTextDraftController, type TextDraftStatus } from "../conversationTextDraft.js";
 import { conversationText } from "../conversationStrings.js";
+import { pushDialog } from "../dialogStack.js";
+import { Icon } from "./Icon.js";
 
 const availabilityCopy = { active: "availabilityActive", inactive: "availabilityInactive", unknown: "availabilityUnknown" } as const satisfies Record<AvailabilityState, string>;
 type Selection = { scope: ConversationScope; title: string; opener: HTMLButtonElement };
-type Workspace = { locale: Locale; open: (selection: Selection) => void };
+type Workspace = { locale: Locale; open: (selection: Selection) => void; transport: ConversationApi; drafts: ConversationTextDraftApi; sessions: ConversationSessions; projectId: string | null; writesEnabled: boolean; onPrepareRun?: (scope: ConversationScope) => void };
 const Context = createContext<Workspace | null>(null);
 // `variant`/`label` let one caller — the decision card, when the next action is
 // answering a worker — present this same entry as that card's primary control.
-export function ConversationButton({ scope, title, variant = "secondary", label }: { scope: ConversationScope; title: string; variant?: "primary" | "secondary"; label?: string }) {
+export function ConversationButton({ scope, title, variant = "secondary", label, compact = false }: { scope: ConversationScope; title: string; variant?: "primary" | "secondary"; label?: string; compact?: boolean }) {
   const workspace = useContext(Context); if (!workspace) return null;
   const text = conversationText(workspace.locale);
-  return <button type="button" className={`button button-${variant} button-inline conversation-entry`} aria-haspopup="dialog" aria-label={label === undefined ? `${text.for} ${title}` : `${label} ${text.for} ${title}`} onClick={(event) => workspace.open({ scope, title, opener: event.currentTarget })}>{label ?? text.conversation}</button>;
+  return <button type="button" className={compact ? "icon-button conversation-entry" : `button button-${variant} button-inline conversation-entry`} title={compact ? text.conversation : undefined} aria-haspopup="dialog" aria-label={label === undefined ? `${text.for} ${title}` : `${label} ${text.for} ${title}`} onClick={(event) => workspace.open({ scope, title, opener: event.currentTarget })}>{compact ? <Icon name="chat" /> : label ?? text.conversation}</button>;
 }
 export function ConversationWorkspace({ api, projectId, locale, writesEnabled, sessions, onPrepareRun, children }: { api: WorkApi; projectId: string | null; locale: Locale; writesEnabled: boolean; sessions: ConversationSessions; onPrepareRun?: (scope: ConversationScope) => void; children: ReactNode }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const transport = useMemo(() => new ConversationApi(api), [api]);
-  const close = () => { const opener = selection?.opener; setSelection(null); if (opener?.isConnected) opener.focus(); };
+  const drafts = useMemo(() => new ConversationTextDraftApi(api), [api]);
+  // `preventScroll`: handing focus back must never move the map or the history
+  // the person was reading behind this dialog.
+  const close = () => { const opener = selection?.opener; setSelection(null); if (opener?.isConnected) opener.focus({ preventScroll: true }); };
   // One handler for every session's RAM draft, armed only while something is unsent.
   useEffect(() => {
     const guard = new ConversationDraftGuard(window, sessions);
@@ -28,10 +34,70 @@ export function ConversationWorkspace({ api, projectId, locale, writesEnabled, s
     return () => { unsubscribe(); guard.release(); };
   }, [sessions]);
   const prepare = onPrepareRun ? (scope: ConversationScope) => { close(); onPrepareRun(scope); } : undefined;
-  return <Context.Provider value={{ locale, open: setSelection }}>{children}{selection ? <ConversationDialog key={`${projectId}/${scopeKey(selection.scope)}`} api={transport} session={sessions.get(projectId ?? "legacy", selection.scope, transport)} scope={selection.scope} title={selection.title} locale={locale} writable={writesEnabled} onClose={close} onPrepareRun={prepare} /> : null}</Context.Provider>;
+  return <Context.Provider value={{ locale, open: setSelection, transport, drafts, sessions, projectId, writesEnabled, onPrepareRun }}>{children}{selection ? <ConversationDialog key={`${projectId}/${scopeKey(selection.scope)}`} api={transport} drafts={drafts} session={sessions.get(projectId ?? "legacy", selection.scope, transport)} scope={selection.scope} title={selection.title} locale={locale} writable={writesEnabled} onClose={close} onPrepareRun={prepare} /> : null}</Context.Provider>;
 }
-function ConversationDialog({ api, session, scope, title, locale, writable, onClose, onPrepareRun }: { api: ConversationApi; session: ConversationSession; scope: ConversationScope; title: string; locale: Locale; writable: boolean; onClose: () => void; onPrepareRun?: (scope: ConversationScope) => void }) {
-  const ref = useRef<HTMLDialogElement>(null), heading = useId(), inputId = useId(), hintId = useId();
+/**
+ * The project's own conversation, embedded in the work area beside the map.
+ *
+ * Its recipient is the project and only the project: selecting a task on the
+ * map never changes who this chat writes to. A task's or an agent's
+ * conversation is a separate, explicitly scoped surface.
+ */
+export function ProjectChat({ title, collapsed, onToggle, toggleLabel }: { title: string; collapsed?: boolean; onToggle?: () => void; toggleLabel?: string }): ReactElement | null {
+  const workspace = useContext(Context);
+  if (!workspace) return null;
+  const scope: ConversationScope = { kind: "project" };
+  const text = conversationText(workspace.locale);
+  const session = workspace.sessions.get(workspace.projectId ?? "legacy", scope, workspace.transport);
+  const heading = "project-chat-title";
+  return <section className="project-chat" aria-labelledby={heading} data-collapsed={collapsed === true ? "true" : "false"}>
+    <header className="project-chat-header">
+      <div>
+        <h2 id={heading}>{text.mainChat}</h2>
+        <p className="small-copy project-chat-recipient">{text.mainChatRecipient}: {title}</p>
+      </div>
+      {onToggle ? <button type="button" className="button button-secondary button-inline" aria-expanded={collapsed !== true} onClick={onToggle}>{toggleLabel ?? text.close}</button> : null}
+    </header>
+    {collapsed === true ? null : <ConversationContent key={`${workspace.projectId}/project`} api={workspace.transport} drafts={workspace.drafts}
+      session={session} scope={scope} locale={workspace.locale} writable={workspace.writesEnabled} variant="panel"
+      onPrepareRun={workspace.onPrepareRun ? () => workspace.onPrepareRun?.(scope) : undefined} />}
+  </section>;
+}
+function ConversationDialog({ api, drafts, session, scope, title, locale, writable, onClose, onPrepareRun }: { api: ConversationApi; drafts: ConversationTextDraftApi; session: ConversationSession; scope: ConversationScope; title: string; locale: Locale; writable: boolean; onClose: () => void; onPrepareRun?: (scope: ConversationScope) => void }) {
+  const ref = useRef<HTMLDialogElement>(null), heading = useId();
+  const text = conversationText(locale);
+  // Registered in the shared stack: a conversation opened from inside a task
+  // detail answers Escape alone, and the surfaces under it stay open.
+  useEffect(() => {
+    const dialog = ref.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const registration = pushDialog();
+    if (dialog !== null && !dialog.open) dialog.showModal();
+    return () => { registration.release(); if (dialog?.open) dialog.close(); if (opener?.isConnected) opener.focus({ preventScroll: true }); };
+  }, []);
+  return <dialog className="conversation-dialog" ref={ref} aria-labelledby={heading} onCancel={(event) => { event.preventDefault(); event.stopPropagation(); onClose(); }} onKeyDown={(event) => { if (event.key === "Escape") event.stopPropagation(); }}>
+    <header className="conversation-header"><div>
+      <h2 id={heading}>{text.for} {title}</h2><p>{text[scope.kind]}</p>
+    </div><button type="button" className="icon-button conversation-close" aria-label={text.close} title={text.close} onClick={onClose}><Icon name="close" size={18} /></button></header>
+    <ConversationContent api={api} drafts={drafts} session={session} scope={scope} locale={locale} writable={writable} variant="dialog"
+      onPrepareRun={onPrepareRun ? () => onPrepareRun(scope) : undefined} />
+  </dialog>;
+}
+
+/**
+ * The history and composer of one conversation, shared by the embedded project
+ * chat and the scoped dialog.
+ *
+ * Opening it only reads: `connect(false)` never creates a thread, and the
+ * polling lease is shared with every other surface showing the same scope.
+ * A conversation comes into existence on the first explicit message intent.
+ */
+export function ConversationContent({ api, drafts, session, scope, locale, writable, variant, onPrepareRun }: {
+  api: ConversationApi; drafts: ConversationTextDraftApi; session: ConversationSession; scope: ConversationScope;
+  locale: Locale; writable: boolean; variant: "dialog" | "panel"; onPrepareRun?: () => void;
+}): ReactElement {
+  const inputId = useId(), hintId = useId(), draftStatusId = useId();
+  const fileInput = useRef<HTMLInputElement>(null);
   const snapshot = useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   const [visible, setVisible] = useState(100), [archiveId, setArchiveId] = useState<string | null>(null);
   const archive = useMemo(() => {
@@ -41,17 +107,26 @@ function ConversationDialog({ api, session, scope, title, locale, writable, onCl
   const historySession = archive ?? session;
   const history = useSyncExternalStore(historySession.subscribe, historySession.snapshot, historySession.snapshot);
   useEffect(() => { if (archive) void archive.connect(false); setVisible(100); }, [archive]);
-  const text = conversationText(locale), locked = session.locked, canWrite = !archiveId && writable && (snapshot.conversation?.state === "open" || locked);
-  useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => { if (dialog?.open) dialog.close(); }; }, []);
-  useEffect(() => { let disposed = false, timer: ReturnType<typeof setTimeout>; const poll = async () => { await session.connect(writable); if (!disposed) timer = setTimeout(poll, 4000); }; void poll(); return () => { disposed = true; clearTimeout(timer); }; }, [session, writable]);
+  const text = conversationText(locale), locked = session.locked;
+  // Nothing exists yet is still writable: the thread appears on the first send.
+  const canWrite = !archiveId && writable && (snapshot.conversation === null || snapshot.conversation.state === "open" || locked);
+  // One shared read loop per session, whatever shows it. A view writes nothing.
+  useEffect(() => session.startPolling(4000), [session]);
+  const draft = useTextDraft(drafts, scope, writable, session);
   const thread = history.conversation?.thread_id;
   // Read-only: absence stays unknown, and Prepare run only navigates and prefills.
   const availability = snapshot.conversation?.recipient_availability ?? UNKNOWN_AVAILABILITY;
-  return <dialog className="conversation-dialog" ref={ref} aria-labelledby={heading} onCancel={(event) => { event.preventDefault(); onClose(); }}>
-    <header className="conversation-header"><div>
-      <h2 id={heading}>{text.for} {title}</h2><p>{text[scope.kind]}</p>
-      <AvailabilityChip availability={availability} locale={locale} onPrepareRun={onPrepareRun ? () => onPrepareRun(scope) : undefined} />
-    </div><button type="button" className="button button-secondary" onClick={onClose}>{text.close}</button></header>
+  const saved = savedDraftOf(draft.status);
+  async function submit(): Promise<void> {
+    if (!canWrite) return;
+    const sending = { text: snapshot.text, reply: snapshot.reply };
+    const recorded = await session.sendMessage();
+    // Only a recorded message may clear its own saved copy, and only when the
+    // saved bytes are the ones that were sent.
+    if (recorded) await draft.clearAfterSend(sending);
+  }
+  return <div className={`conversation-content conversation-content-${variant}`}>
+    <AvailabilityChip availability={availability} locale={locale} onPrepareRun={onPrepareRun} />
     {snapshot.archives.some((item) => item.thread_id !== snapshot.conversation?.thread_id) ? <label className="conversation-history-picker">{text.history}<select value={archiveId ?? ""} onChange={(event) => setArchiveId(event.target.value || null)}><option value="">{text.current}</option>{snapshot.archives.filter((item) => item.thread_id !== snapshot.conversation?.thread_id).map((item, index) => <option key={item.thread_id} value={item.thread_id}>{text.closed} {index + 1} · {item.message_count}</option>)}</select></label> : null}
     <div className="conversation-history">
       {history.loading ? <p role="status">{text.loading}</p> : null}
@@ -73,25 +148,70 @@ function ConversationDialog({ api, session, scope, title, locale, writable, onCl
         </li>)}
       </ol>
     </div>
-    {!archiveId ? <form className="conversation-composer" onSubmit={(event) => { event.preventDefault(); if (canWrite) void session.send(); }}>
+    {!archiveId ? <form className="conversation-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       {!writable ? <p>{text.readonly}</p> : null}
       {snapshot.sendState === "recorded" ? <p role="status">{text.recordedNotice}</p> : null}
       {snapshot.sendState === "refused" ? <p role="alert">{text[snapshot.refusal === "expired" ? "expired" : snapshot.refusal === "revision" ? "revision" : "validation"]}</p> : null}
       {snapshot.sendState === "uncertain" ? <p className="conversation-notice" role="alert">{text.uncertain}</p> : null}
       {snapshot.reply ? <div className="conversation-reply">{text.replying} <button className="button button-secondary button-inline" disabled={locked} type="button" onClick={() => session.setReply(null)}>{text.cancelReply}</button></div> : null}
-      <label htmlFor={inputId}>{text.message}</label><textarea id={inputId} rows={3} value={snapshot.text} disabled={!writable || !session.canEditText} aria-describedby={hintId} onChange={(event) => session.setText(event.target.value)} />
+      <label className={variant === "panel" ? "visually-hidden" : undefined} htmlFor={inputId}>{text.message}</label><textarea id={inputId} rows={3} placeholder={text.messagePlaceholder} value={snapshot.text} disabled={!writable || !session.canEditText} aria-describedby={hintId} onChange={(event) => session.setText(event.target.value)} />
       {new TextEncoder().encode(snapshot.text).length > 64_000 ? <p role="alert">{text.bytes}</p> : null}
-      <p id={hintId} className="conversation-hint">{text.limits}</p>
       {snapshot.fileProblem ? <p role="alert">{text[snapshot.fileProblem]}</p> : null}
-      <ul className="conversation-uploads">{snapshot.uploads.map((item) => <li key={item.id}>
+      {snapshot.uploads.length > 0 ? <ul className="conversation-uploads">{snapshot.uploads.map((item) => <li key={item.id}>
         {item.category === "image" && item.state === "ready" ? <LocalImage file={item.file} name={item.file.name} locale={locale} /> : null}
         <div><strong>{item.file.name}</strong><small>{formatBytes(item.file.size)} · {text[({ queued: "queuedUpload", uploading: "uploading", ready: "ready", uncertain: "uploadUncertain", rejected: "uploadRejected", removing: "removing", remove_uncertain: "removeUncertain" } as const)[item.state]]}</small></div>
         {item.state === "uncertain" ? <button disabled={locked || !canWrite} className="button button-secondary button-inline" type="button" onClick={() => session.retryUpload(item.id)}>{text.retry}</button> : null}
         {["queued", "ready", "rejected", "remove_uncertain"].includes(item.state) ? <button disabled={locked || !canWrite} className="button button-secondary button-inline" type="button" onClick={() => void session.remove(item.id)}>{item.state === "remove_uncertain" ? text.retryRemove : text.remove}</button> : null}
-      </li>)}</ul>
-      <div className="conversation-compose-actions"><label className="conversation-file-label">{text.attach}<input type="file" multiple disabled={!canWrite || locked} onChange={(event) => { session.addFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }} /></label><button className="button button-primary" type="submit" disabled={!canWrite || (snapshot.sendState !== "uncertain" && !session.canSend)}>{snapshot.sendState === "sending" ? text.sending : snapshot.sendState === "uncertain" ? text.retrySend : text.send}</button></div>
+      </li>)}</ul> : null}
+      <div className="conversation-compose-actions"><button className="button button-secondary button-inline conversation-attach" type="button" aria-label={text.attach} title={text.attach} disabled={!canWrite || locked} onClick={() => fileInput.current?.click()}><Icon name="attachment" /><span>{text.attachShort}</span></button><input ref={fileInput} className="visually-hidden" aria-label={text.attach} tabIndex={-1} type="file" multiple disabled={!canWrite || locked} onChange={(event) => { void session.attachFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }} /><details className="conversation-compose-help"><summary>{text.limitsLabel}</summary><p id={hintId} className="conversation-hint">{text.limits}</p></details><button className="button button-primary" type="submit" disabled={!canWrite || (snapshot.sendState !== "uncertain" && !session.canSubmit)}>{snapshot.sendState === "sending" ? text.sending : snapshot.sendState === "uncertain" ? text.retrySend : text.send}</button></div>
+      {/* The saved draft: explicit, confirmed, and never a second place a
+          message could be sent from. */}
+      <details className="conversation-draft-menu"><summary>{text.draftTools}{draft.status.kind === "saving" ? ` · ${text.draftSaving}` : draft.status.kind === "saved" && saved?.text ? ` · ${text.draftSaved}` : ["conflict", "unavailable", "stale_saved"].includes(draft.status.kind) ? ` · ${text.draftAttention}` : ""}</summary><div className="conversation-draft-controls">
+        <p className="conversation-hint" id={draftStatusId} role="status">{text[draftStatusCopy(draft.status)]}{saved?.updatedAt ? ` · ${new Date(saved.updatedAt).toLocaleString(locale)}` : ""}</p>
+        <button type="button" className="button button-secondary button-inline" aria-describedby={draftStatusId}
+          disabled={!writable || draft.busy || (!draft.uncertain && snapshot.text.length === 0)}
+          onClick={() => void draft.save(snapshot.text, snapshot.reply)}>{draft.uncertain ? text.retryDraft : text.saveDraft}</button>
+        {hasSavedText(draft.status) && !draft.uncertain ? <button type="button" className="button button-secondary button-inline" disabled={!writable || draft.busy}
+          onClick={() => void draft.remove()}>{text.deleteDraft}</button> : null}
+        {savedDraftDiffers(draft.status, snapshot.text, snapshot.reply) ? <button type="button" className="button button-secondary button-inline"
+          disabled={!session.canEditText} onClick={() => { const value = savedDraftOf(draft.status); if (value) { session.setText(value.text); session.setReply(value.replyToMessageId); } }}>{text.restoreDraft}</button> : null}
+        {(draft.status.kind === "conflict" || (draft.status.kind === "unavailable" && !draft.uncertain)) ? <button type="button" className="button button-secondary button-inline" disabled={draft.busy}
+          onClick={() => void draft.reload()}>{text.reloadDraft}</button> : null}
+      </div></details>
     </form> : <p className="conversation-hint">{text.closedNotice}</p>}
-  </dialog>;
+  </div>;
+}
+
+function draftStatusCopy(status: TextDraftStatus): "draftUnknown" | "draftNone" | "draftSaved" | "draftSaving" | "draftConflict" | "draftUnavailable" | "draftStale" {
+  switch (status.kind) {
+    case "saving": return "draftSaving";
+    case "saved": return status.draft.text.length > 0 ? "draftSaved" : "draftNone";
+    case "conflict": return "draftConflict";
+    case "unavailable": return "draftUnavailable";
+    case "stale_saved": return "draftStale";
+    case "none": return "draftNone";
+    default: return "draftUnknown";
+  }
+}
+
+/**
+ * The saved-draft side of the composer. Nothing here autosaves; a conflict
+ * keeps what the operator typed and offers an explicit reload; a draft that
+ * could not be cleared after a send says so instead of being resent.
+ */
+const textDraftOwners = new WeakMap<ConversationSession, SavedTextDraftController>();
+function useTextDraft(api: ConversationTextDraftApi, scope: ConversationScope, writable: boolean, session: ConversationSession) {
+  let owner = textDraftOwners.get(session);
+  if (!owner) { owner = new SavedTextDraftController(api, scope); textDraftOwners.set(session, owner); }
+  owner.setApi(api);
+  const snapshot = useSyncExternalStore(owner.subscribe, owner.snapshot, owner.snapshot);
+  useEffect(() => { void owner.read(); }, [owner]);
+  return { ...snapshot,
+    save: (text: string, reply: string | null) => writable ? owner.write(text, reply) : Promise.resolve(false),
+    remove: () => writable ? owner.write("", null) : Promise.resolve(false),
+    reload: () => owner.read(true),
+    clearAfterSend: (sent: { text: string; reply: string | null }) => owner.clearAfterSend(sent)
+  };
 }
 /**
  * Reads the server's conservative availability. The secondary action is a
@@ -102,7 +222,8 @@ export function AvailabilityChip({ availability, locale, onPrepareRun }: { avail
   const text = conversationText(locale);
   return <div className={`conversation-availability conversation-availability-${availability.state}`}>
     <p><span aria-hidden="true" className="conversation-availability-icon" />{text[availabilityCopy[availability.state]]}</p>
-    {availability.state !== "active" && onPrepareRun ? <button type="button" className="button button-secondary button-inline conversation-prepare" onClick={onPrepareRun}>{text.prepareRun}</button> : null}
+    {availability.state === "unknown" ? <details className="conversation-availability-help"><summary>{text.availabilityHelpLabel}</summary><p className="small-copy">{text.availabilityUnknownHelp}</p></details> : null}
+    {availability.state !== "active" && onPrepareRun ? <button type="button" className="button button-secondary button-inline conversation-prepare" title={text.prepareRunHelp} onClick={onPrepareRun}>{text.prepareRun}</button> : null}
   </div>;
 }
 /**

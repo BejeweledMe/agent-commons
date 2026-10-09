@@ -106,11 +106,14 @@ def _image_wire(item: ImageOutput) -> dict[str, object]:
         "height": item.height,
     }
 
-    if item.kind in {"artifact_image", "static_build"}:
+    if item.kind in {"artifact_image", "static_build", "text_result"}:
         for field in ("package_id", "package_revision", "screen_id"):
             value.pop(field)
         value["delegation_revision"] = item.delegation_revision
         value["historical_preview_verified"] = item.historical_preview_verified
+    if item.kind == "text_result":
+        value["summary"] = item.summary
+        value["checks"] = list(item.checks)
     return value
 
 
@@ -173,6 +176,28 @@ def register_output_routes(
             ).to_wire(),
             manager_factory,
             live_registry_factory,
+        )
+
+    @routes.get("/api/outputs/task-results/{task_id}", dependencies=dependencies)
+    async def task_results(
+        task_id: str, task_revision: str = "", offset: int = 0, limit: int = 32
+    ) -> Response:
+        from agent_commons.services.result_details import task_result_details
+
+        return await _read(
+            lambda _reads: task_result_details(
+                manager_factory(), task_id, task_revision, offset=offset, limit=limit
+            ),
+            manager_factory,
+        )
+
+    @routes.get("/api/outputs/text/{artifact_id}/{artifact_revision}", dependencies=dependencies)
+    async def text_result(
+        artifact_id: str, artifact_revision: str, scope_kind: str = "", scope_id: str = ""
+    ) -> Response:
+        return await _read(
+            lambda reads: reads.read_text(scope_kind, scope_id, artifact_id, artifact_revision),
+            manager_factory,
         )
 
     @routes.get("/api/outputs/builds/{artifact_id}/{artifact_revision}", dependencies=dependencies)

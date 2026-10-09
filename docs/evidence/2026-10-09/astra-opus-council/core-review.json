@@ -1,0 +1,14 @@
+{
+  "scope": "execution_plan follow-up source snapshot core-review-v2",
+  "reviewer": "requested native gpt-6-astra; no separate runtime attestation",
+  "first_verdict": "changes_requested",
+  "addressed": "Current task review must own action/evidence despite historical terminal run gaps; live/unknown/contradictory guards remain",
+  "second_verdict": "approved, scoped advisory code review",
+  "snapshot_manifest_verified": true,
+  "reviewer_ran_full_tests": false,
+  "author_tests": {
+    "worker": "84 passed in execution_plan/work_metrics/tracker_reads",
+    "integrator": "49 passed in execution_plan/project_environment/launch_readiness"
+  },
+  "canonical_acceptance": false
+}

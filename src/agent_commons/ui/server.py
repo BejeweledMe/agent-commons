@@ -30,6 +30,7 @@ from agent_commons.core.canonical import loads_json_strict
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.context_pack import ContextPackRefusal
 from agent_commons.errors import CommonsError
+from agent_commons.runtime.budget import OperatorBudgetExhaustedError
 from agent_commons.runtime.collaboration_storage import collaboration_state_root
 from agent_commons.runtime.live_previews import LivePreviewRegistry
 from agent_commons.services.artifact_content import ArtifactPreviewReader, ArtifactPreviewRefusal
@@ -75,6 +76,7 @@ from agent_commons.ui.task_edit_routes import register_task_edit_reads, register
 from agent_commons.ui.tracker_reads import ObservedTrackerSource
 from agent_commons.ui.tracker_routes import register_tracker_routes
 from agent_commons.ui.work_routes import register_work_routes
+from agent_commons.ui.workspace_preferences import register_workspace_preference_routes
 
 
 class _ExpectedShutdownCancellationFilter(logging.Filter):
@@ -157,6 +159,8 @@ MUTATING_ROUTES = (
 #: Private collaboration bytes and preview metadata never enter canonical events.
 #: Authentication and read-only registration still seal this operational surface.
 PRIVATE_COLLABORATION_ROUTES = (
+    ("POST", "/api/workspace/preferences"),
+    ("POST", "/api/conversations/text-draft"),
     ("POST", "/api/outputs/live-previews"),
     # The project board arrangement (ADR 0020): positions and department frames,
     # operational state under the state root, never a canonical fact.
@@ -654,6 +658,13 @@ def create_app(
         register_writes=context.operator_panel and not read_only,
     )
 
+    register_workspace_preference_routes(
+        api_routes,
+        dependencies=reads_workspace,
+        owner_factory=context.writer,
+        register_writes=context.operator_panel and not read_only,
+    )
+
     register_conversation_routes(
         api_routes,
         dependencies=reads_workspace,
@@ -791,6 +802,43 @@ def create_app(
             )
         except CommonsError as exc:
             return _error(409, getattr(exc, "code", type(exc).__name__), str(exc))
+
+    @api_routes.get("/api/work/project-environment", dependencies=reads_workspace)
+    async def project_environment() -> Response:
+        from agent_commons.services.project_environment import read_project_environment
+
+        try:
+            result = await asyncio.to_thread(read_project_environment, context.repo)
+        except OSError:
+            return _error(
+                409,
+                "project_environment_unavailable",
+                "Project prerequisites could not be observed.",
+            )
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+    @api_routes.get("/api/work/agents/{agent_id}", dependencies=reads_workspace)
+    async def agent_details(agent_id: str) -> Response:
+        from agent_commons.services.agent_details import AgentDetailsError
+
+        try:
+            result = await asyncio.to_thread(context.agent_details, agent_id)
+        except AgentDetailsError as exc:
+            return _error(exc.status, exc.code, str(exc))
+        except (CommonsError, OSError):
+            return _error(409, "agent_details_unavailable", "Agent settings could not be read.")
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+    @api_routes.get("/api/work/launch-budget/{profile_id}", dependencies=reads_workspace)
+    async def launch_budget(profile_id: str) -> Response:
+        """Reserved launch units for this panel's current requesting session."""
+        try:
+            result = await asyncio.to_thread(context._launch_coordinator.launch_budget, profile_id)
+        except (CommonsError, ValueError, OSError):
+            return _error(
+                409, "launch_budget_unavailable", "The operator launch budget is unavailable."
+            )
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
     @api_routes.get("/api/work/provider-availability", dependencies=reads_workspace)
     async def provider_availability() -> Response:
@@ -981,6 +1029,18 @@ async def _guarded(action: Callable[..., Any], context: UIContext, **kwargs: Any
 
     try:
         result = await asyncio.to_thread(action, **kwargs)
+    except OperatorBudgetExhaustedError as exc:
+        return JSONResponse(
+            {
+                "error": {
+                    "code": exc.code,
+                    "message": str(exc),
+                    "safe_next_actions": list(exc.safe_next_actions),
+                    "budget": exc.budget,
+                }
+            },
+            status_code=409,
+        )
     except WorkerIneligibleError as exc:
         return JSONResponse({"code": "worker_ineligible", "refusal": exc.refusal}, status_code=409)
     except CommonsError as exc:
@@ -1138,6 +1198,7 @@ def _register_writes(router: _RouteGroup, context: UIContext) -> None:
             # so `reconfigure` below has no such field and will not get one.
             model=body.get("model"),
             created_by_agent_id=body.get("created_by_agent_id"),
+            supervisor_agent_id=body.get("supervisor_agent_id"),
             from_preset_id=body.get("from_preset_id"),
             specialization_ref=body.get("specialization_ref"),
             idempotency_key=body.get("idempotency_key"),

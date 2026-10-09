@@ -36,12 +36,14 @@ contract test. The status written in each ADR remains the detailed record.
 | [0017](0017-project-scoped-service-host.md) | Proposed in text; implemented and merged (PR #8, 2026-09-08) | One authenticated local host, immutable project contexts, safe registry/create/connect and project-scoped Work/Gallery. |
 | [0018](0018-role-connections-and-execution-modes.md) | Proposed | Future role connection, API/local, SGR and conversation contracts; no runtime capability or live qualification claimed. |
 | [0019](0019-project-native-collaboration-and-outputs.md) | Accepted direction, implementation open | Compact project shell, grouped reusable library, producer-scoped outputs, private message attachments and truthful human/agent delivery; current program is on the self-improvement branch. |
-| [0020](0020-project-board-home.md) | Accepted by the owner, implemented | A project opens on its infinite board: roles as cards, agent links as edges, departments as frames; the task tracker is a separate tab; the arrangement is operational state behind `/api/board`, never canonical. |
+| [0020](0020-project-board-home.md) | Accepted and implemented; home placement superseded by ADR 0026 | Agent cards, recorded links and operational department frames remain; task map replaces the board as project home. |
 | [0021](0021-objective-blueprint-application-provenance.md) | Accepted 2026-09-11; implemented in wave 3 (WP-11.2) | Canonical objective links and immutable blueprint-application provenance; board frames may reference an application but remain operational state. |
 | [0022](0022-legacy-panel-retirement.md) | Accepted 2026-09-18; implementation pending (C6) | The legacy single-file panel leaves the product: `/` redirects to `/work`, the asset and its text-pinning tests are removed, the single-writer rule survives only for the Work bundle. |
 | [0023](0023-incremental-ledger-validation.md) | Draft proposal | Incremental ledger validation on the canonical write path: byte-identity re-verification and bulk receipt loading replace repeated full revalidation; `doctor` unchanged. |
 
 | [0024](0024-explicit-task-hierarchy.md) | Implemented proposal; acceptance separate | Explicit task/component containment, independent dependencies, CAS editing and no inherited acceptance. |
+| [0026](0026-map-first-workspace.md) | Owner-authorized direction; implementation verification separate | Dominant task map, movable side panes, main project conversation, on-demand details and private explicit saved drafts. |
+| [0027](0027-agent-organization-and-method-edits.md) | Owner-authorized direction; implementation verification separate | Dual maps, temporary modal details, explicit agent organization and exact per-agent method edits. |
 
 | [0025](0025-retained-worker-results.md) | Implemented; acceptance separate | Bounded retained image/static-build bytes and exact artifact review; download-only frontend bundles. |
 

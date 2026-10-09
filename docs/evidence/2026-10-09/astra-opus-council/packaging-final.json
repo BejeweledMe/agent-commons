@@ -1,0 +1,41 @@
+{
+  "checks": [
+    {
+      "check": "wheel-final-build",
+      "exit_code": 0,
+      "seconds": 10.57
+    },
+    {
+      "check": "wheel-final-venv",
+      "exit_code": 0,
+      "seconds": 0.05
+    },
+    {
+      "check": "wheel-final-install",
+      "exit_code": 0,
+      "seconds": 1.0
+    },
+    {
+      "check": "wheel-final-cli",
+      "exit_code": 0,
+      "seconds": 1.65
+    },
+    {
+      "check": "wheel-final-mcp",
+      "exit_code": 0,
+      "seconds": 0.67
+    },
+    {
+      "check": "wheel-final-import",
+      "exit_code": 0,
+      "seconds": 0.06
+    },
+    {
+      "check": "uv-tool-final-assets",
+      "exit_code": 0,
+      "seconds": 2.0
+    }
+  ],
+  "wheel_name": "agent_commons-0.1.0-py3-none-any.whl",
+  "wheel_sha256": "e7e42fb31d590621602913e9429a1480ee7e722d895ac81969831c46428a7324"
+}

@@ -749,7 +749,12 @@ def test_every_event_spec_has_only_its_explicit_complete_payload_families() -> N
 
     assert set(index) == set(EVENT_SPECS)
     versioned_families = {
-        "agent.created": {"commons.payload.agent.v1", "commons.payload.agent.v2"},
+        "agent.created": {
+            "commons.payload.agent.v1",
+            "commons.payload.agent.v2",
+            "commons.payload.agent.v3",
+        },
+        "agent.reconfigured": {"commons.payload.agent.v1", "commons.payload.agent.v3"},
         "thread.opened": {"commons.payload.thread.v1", "commons.payload.thread.v2"},
         "thread.replied": {"commons.payload.thread.v1", "commons.payload.thread.v2"},
         # ADR 0021 (WP-11.2): task.created gained a nullable objective_id in payload v2.

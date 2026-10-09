@@ -164,7 +164,7 @@ test("late or aborted detail requests cannot overwrite a new task selection", as
 });
 
 test("filters preserve canonical distinctions and attention can come from the attention projection", () => {
-  const tasks = TASK_FILTERS.filter((value) => !["all", "attention"].includes(value)).map((state, index) => task({ taskId: `task.${index}`, taskState: state, title: `Task ${state}` }));
+  const tasks = TASK_FILTERS.filter((value) => !["working", "all", "attention"].includes(value)).map((state, index) => task({ taskId: `task.${index}`, taskState: state, title: `Task ${state}` }));
   const snapshot = { tasks, attention: [{ taskId: tasks[0].taskId }] };
   for (const current of tasks) assert.deepEqual(filterTrackerTasks(snapshot, current.taskState, ""), [current]);
   assert.deepEqual(filterTrackerTasks(snapshot, "attention", ""), [tasks[0]]);
@@ -537,14 +537,14 @@ for (const locale of ["en", "ru"]) {
     ];
     for (const item of cases) {
       const visible = initiallyVisible(card(item.current, { locale, runs: item.runs }));
-      for (const [label, sentence] of [["decision_happening", item.happening],
+      for (const [label, sentence] of [["decision_task_now", item.happening],
         ["decision_responsible", item.responsible], ["decision_next", item.next]]) {
         assert.ok(visible.includes(text(label)), `${item.name}: ${label}`);
         assert.ok(visible.includes(sentence), `${item.name}: ${sentence}`);
       }
       // The three questions keep their order, and no raw canonical value leaks
       // into the answers.
-      assert.ok(visible.indexOf(text("decision_happening")) < visible.indexOf(text("decision_responsible")));
+      assert.ok(visible.indexOf(text("decision_task_now")) < visible.indexOf(text("decision_responsible")));
       assert.ok(visible.indexOf(text("decision_responsible")) < visible.indexOf(text("decision_next")));
       if (item.current.nextAction.includes("_")) assert.equal(visible.includes(item.current.nextAction), false, item.name);
       assert.equal(visible.includes(item.current.taskId), false, item.name);
@@ -606,7 +606,7 @@ test("attached findings are an owned allowlist and a malformed entry is a protoc
 });
 
 test("green marks accepted work and nothing else", () => {
-  for (const state of TASK_FILTERS.filter((value) => !["all", "attention"].includes(value))) {
+  for (const state of TASK_FILTERS.filter((value) => !["working", "all", "attention"].includes(value))) {
     const markup = renderToStaticMarkup(card(task({ taskState: state })));
     assert.equal(markup.includes('data-accepted="true"'), state === "accepted", state);
     assert.ok(markup.includes(`data-accepted="${state === "accepted" ? "true" : "false"}"`), state);
@@ -615,8 +615,8 @@ test("green marks accepted work and nothing else", () => {
   // read by the accepted card alone.
   const css = readFileSync(resolve(root, "src/styles.css"), "utf8");
   assert.match(css, /\.decision-card\[data-accepted="true"\] \{/);
-  for (const value of ["#143220", "#72ca8a", "#d9ffe5"]) {
-    assert.equal((css.match(new RegExp(value, "g")) ?? []).length, 1, value);
+  for (const token of ["--status-accepted", "--status-accepted-surface", "--status-accepted-text"]) {
+    assert.equal((css.match(new RegExp(`${token}:`, "g")) ?? []).length, 2, `${token} is declared once per theme`);
   }
   for (const token of ["--status-accepted-surface", "--status-accepted", "--status-accepted-text"]) {
     const uses = [...css.matchAll(new RegExp(`var\\(${token}\\)`, "g"))];

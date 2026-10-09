@@ -1,0 +1,51 @@
+{
+  "schema": "navigation-hierarchy-final-gate.v1",
+  "source_manifest": "source-manifest-v2.json",
+  "source_manifest_sha256": "f5cadd135f8000ed22ad8a9b5f87b0573caf1ef3995be39e5a6619ce37853fac",
+  "source_files_unchanged": 26,
+  "command": "PATH=/opt/homebrew/opt/node@24/bin:$PATH make check",
+  "exit_code": 0,
+  "work_tests": 472,
+  "gallery_tests": 27,
+  "pytest": {
+    "passed": 3034,
+    "skipped": 14,
+    "warnings": 2,
+    "seconds": 915.47
+  },
+  "log_sha256": "eefc2c1036876bd5e4013851c78105992e2608e17d917889b2ef419e0566ca75",
+  "review_id": "review.65H6EB6A2J7VBMAD49J6ZWT84D",
+  "review_completion": "evt.01M4G4EQER37Y6BR6K6Q30SSEQ",
+  "target_task": "task.3T57N4BYSCQBKVGYG391J8RGWJ",
+  "target_revision": "evt.01M4G48F2VH35NA87CVMQC7BYF",
+  "proof_files": [
+    {
+      "path": "browser-measurements-v2.json",
+      "sha256": "c83c9dc2a1332ed19a44cb2aa04c34d0394e4bcc62df466990eeee7e87380f5a"
+    },
+    {
+      "path": "workspace-ru-v2.png",
+      "sha256": "714d7a5b9d7666dd54e2edda2bd06e7e83cddfe03b8f527b53806b735a283f35"
+    },
+    {
+      "path": "tree-ru-v2.png",
+      "sha256": "e05cfe801a5185f3517fde8879b0d8467feef6d1bc25540c565a29b1533fe2f7"
+    },
+    {
+      "path": "live-agent-settings-ru-v2.png",
+      "sha256": "e88f76ed8606636625f6e3568a77ec013778738e2f64594f072225e0fa297ec7"
+    },
+    {
+      "path": "codex-canary-final.json",
+      "sha256": "6d54a60fe31f21df6f9bb579ed03ebb343b181963bf675c0aa024159bbe3ba3e"
+    },
+    {
+      "path": "independent-review-v2.md",
+      "sha256": "7f224c58f26e2a19f64b05084771f0ab3b41686ff1d438eb653bcc85da9d0bf2"
+    },
+    {
+      "path": "independent-review-v2-receipt.json",
+      "sha256": "724e7ba038bc5c18ddd817adc09a98d27cbbe87376569c3ea3605f6faedea45a"
+    }
+  ]
+}

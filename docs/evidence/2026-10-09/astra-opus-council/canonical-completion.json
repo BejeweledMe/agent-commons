@@ -1,0 +1,96 @@
+{
+  "state": "six local work packages independently reviewed and accepted",
+  "scope": "Oct09 plan, preferences, frontend, core, text results and registry; broader backlog/user acceptance excluded",
+  "source_manifest_sha256": "0fe67f419ea39e777f1162f3b87adecd942a767ad240b73573628484c564871b",
+  "tasks": [
+    {
+      "task_id": "task.0F9YB0W004AQG68SZV261CDZ9H",
+      "title": "Plan Commons remediation from October 8–9 dogfooding with Astra and Opus",
+      "target_revision": "evt.01M4F2VMWC8N36PQZY7D733M82",
+      "review_id": "review.2M00VVY90HQKV3NXD904QZAS3A",
+      "review_revision": "evt.01M4F2WH8WY20ZKHDZ1BYZ1900",
+      "criteria": [
+        "Both requested model lanes and their critiques are retained with honest runtime provenance or explicit failure limitations.",
+        "Russian plan maps all actionable UX observations to bounded work packages, source seams, prerequisites, acceptance criteria and verification, with a machine-readable acyclic graph and readable diagram.",
+        "Plan statuses are not implementation or acceptance evidence. Following the owner request to implement, observed defects, hypotheses, verified changes and untested boundaries are reported separately with exact source/test evidence; existing backlog is reconciled rather than duplicated."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F3XQY2N4E7J9SA8QKTX447",
+      "completed_review_revision": "evt.01M4F3KRTJ2MFF0CR3BY63FV5B"
+    },
+    {
+      "task_id": "task.0Z7GFZ4MJST2AZ47JNAQ2HR69J",
+      "title": "Persist workspace layout and explicit private conversation text drafts",
+      "target_revision": "evt.01M4F2Y8SHNEN9B8FECJWTNKNP",
+      "review_id": "review.6QXZVYMTMEEJZNQ3SBJS9HPV68",
+      "review_revision": "evt.01M4F2Z59D273PY2ZVJ2YAWGJV",
+      "criteria": [
+        "Layout sizes/collapse/swap persist with atomic concurrent CAS and safe defaults.",
+        "Text drafts are private project/scope/principal bounded data with explicit saves and conflicts; no autosend and no attachment draft reuse.",
+        "Readonly/auth/first-run route registration and invalid data/concurrent overwrite tests pass."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F3Z63ZQCP9ST0AWWX2TEJ7",
+      "completed_review_revision": "evt.01M4F3MMTX8CE165A0PY5KSM10"
+    },
+    {
+      "task_id": "task.5D7YTVDXFQA0N0YF5BBGHBA1M5",
+      "title": "Implement map-first workspace with main project chat",
+      "target_revision": "evt.01M4F30WS7EJVZSAPP5YX0YZC2",
+      "review_id": "review.40Q19MMTHYJG02AYECHQZHP97S",
+      "review_revision": "evt.01M4F31S4ZZZ9EKHGPK1K9DA67",
+      "criteria": [
+        "Map is default primary full-height workspace; project main chat separate from task conversations; inspector is on demand.",
+        "Panels collapse/resize/reposition; map pan/zoom and closing detail preserve branch; EN/RU composer remains usable at 1042x467.",
+        "Frontend source and behavioral tests pass; no inline styles/browser content storage; parent integrates assets and verifies actual UI."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F40MMTCDXWH7Z97CMKNR1W",
+      "completed_review_revision": "evt.01M4F3NGXWDX48NBT0GPVQYCDY"
+    },
+    {
+      "task_id": "task.1CRWSYAWDR1BTTXZ05B1Q1J133",
+      "title": "Oct09 bounded backend remediation: review, evidence, launch and runtime",
+      "target_revision": "evt.01M4F33GVY2RS7PC9CJ41DSKTY",
+      "review_id": "review.0Y2JZ34W8PMJNXXJ4B082G5H9X",
+      "review_revision": "evt.01M4F34CYJG5HZH2N6M4QRQ54X",
+      "criteria": [
+        "Current review verdict takes precedence over historical terminal runs while active and stale guards remain conservative.",
+        "CLI omitted evidence is retained and explicit clear remains available.",
+        "Budget precheck gives typed bounded observations and the atomic reservation remains authoritative.",
+        "QA reviewer specialization, bounded initialization diagnostics and prelaunch task conversation work with focused regression tests."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F423017PHT7R8P4JDRV1B7",
+      "completed_review_revision": "evt.01M4F3PD73SZVPWFTEENC2SNAQ"
+    },
+    {
+      "task_id": "task.613Y702X9MBQEME718EP7WS61W",
+      "title": "Implement retained scoped text result handoff and paginated evidence details",
+      "target_revision": "evt.01M4F364SNPZFQTM2ZWKCWFZZJ",
+      "review_id": "review.4WEZZE0ZANTH02493AGX8568MY",
+      "review_revision": "evt.01M4F371GPA7GQFV8FQ6VCTF1D",
+      "criteria": [
+        "Builder-only report publication retains safe inline UTF-8 and exact provenance; retries survive partial writes.",
+        "Complete and submit remain explicit and review acceptance is never implied; all 52 evidence refs paginated."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F43H4N8YEE28Y7FEVTBGGF",
+      "completed_review_revision": "evt.01M4F3Q947W89PTD9YDM15TF6W"
+    },
+    {
+      "task_id": "task.36MYXVQK414234YWWRDESZXZ2Y",
+      "title": "Revalidate an existing project state identity explicitly",
+      "target_revision": "evt.01M4F38SDBD3BHSHV42YRYQ64E",
+      "review_id": "review.6XAMR4VY2VH2B41SK307CW0MRP",
+      "review_revision": "evt.01M4F39NYV9P0Z1CTHA2M6SM82",
+      "criteria": [
+        "Explicit opt-in same-path recovery verifies canonical integrity and ownership, uses expected revision and idempotency, and rejects links or unrelated paths.",
+        "Synthetic security, concurrency, crash/replay and CLI tests pass before independent review."
+      ],
+      "state": "accepted",
+      "accepted_revision": "evt.01M4F44ZH2DKNN0YAZ308AR1WN",
+      "completed_review_revision": "evt.01M4F3R55SS43V8PPMYRCGCJTH"
+    }
+  ]
+}

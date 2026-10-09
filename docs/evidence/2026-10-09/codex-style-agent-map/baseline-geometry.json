@@ -1,0 +1,25 @@
+{
+  "viewport": {
+    "width": 1147,
+    "height": 570,
+    "devicePixelRatio": 2
+  },
+  "appContent": {
+    "width": 599,
+    "height": 570
+  },
+  "workArea": {
+    "width": 567,
+    "height": 514
+  },
+  "map": {
+    "width": 299.8515625,
+    "height": 242
+  },
+  "detailColumn": {
+    "width": 255.1484375,
+    "height": 470
+  },
+  "openNativeDialogs": 0,
+  "finding": "Opening task details participates in layout and shrinks task canvas."
+}

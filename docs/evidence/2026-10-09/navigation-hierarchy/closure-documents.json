@@ -1,0 +1,21 @@
+{
+  "scope": "Post-acceptance plan archive, link updates and evidence report; runtime sources unchanged",
+  "files": [
+    {
+      "path": "docs/archive/plans/2026-10-09-navigation-hierarchy.md",
+      "sha256": "64efde09d2f5c9d74a9e4f1f465825e130a33e4d05b00e5e1b3570dac03e5071"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "9935b24c1d37b25e738d15934935780c148846c8b6bc55cb6930af727acf5248"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "2c75062b858bbe36b6d18e58002244240fab17176ed401f382f5801e4de2b2d7"
+    },
+    {
+      "path": "docs/evidence/2026-10-09/navigation-hierarchy/verification.md",
+      "sha256": "a059a3eb0ae5659753e12d63eb4febb6b042b80154cef48bfb9ff9ad9cc278a7"
+    }
+  ]
+}

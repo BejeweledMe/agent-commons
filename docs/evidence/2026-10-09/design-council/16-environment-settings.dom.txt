@@ -1,0 +1,221 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Настройки" [active]:
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Настройки" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - region "Настройки":
+    - region "Подготовьте рабочее пространство":
+      - heading "Подготовьте рабочее пространство" [level=2]
+      - paragraph: Рабочее пространство готово
+      - paragraph: Чтобы агент мог начать работу, нужен runtime. Настройка проверит локальные провайдеры и запишет только сгенерированную конфигурацию.
+    - heading "Проект" [level=2]
+    - paragraph: dogfooding-20261007
+    - button "Показать полный путь"
+    - heading "Окружение проекта" [level=3]
+    - paragraph: Необязательная проверка корневых манифестов, lock-файлов, инструментов и наличия зависимостей. Наличие не подтверждает успешную сборку. Пакеты не устанавливаются, скрипты проекта не запускаются.
+    - button "Проверить окружение"
+    - status "Доступность провайдера":
+      - heading "Доступность провайдера" [level=3]
+      - article:
+        - paragraph:
+          - strong: claude-builder
+          - text: — claude
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Проверочный запуск не удался
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Обязательный проверочный запуск завершился ошибкой. Устраните причину и повторите проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+      - article:
+        - paragraph:
+          - strong: claude-independent-reviewer
+          - text: — claude
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Нужен проверочный запуск
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Для этого точного профиля нужен успешный проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+      - article:
+        - paragraph:
+          - strong: codex-builder
+          - text: — codex / gpt-6-astra
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Проверочный запуск не удался
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Обязательный проверочный запуск завершился ошибкой. Устраните причину и повторите проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+          - listitem: Для этого профиля недоступен enforceable денежный бюджет.
+      - article:
+        - paragraph:
+          - strong: codex-independent-reviewer
+          - text: — codex / gpt-6-astra
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Проверочный запуск не удался
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Обязательный проверочный запуск завершился ошибкой. Устраните причину и повторите проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+          - listitem: Для этого профиля недоступен enforceable денежный бюджет.
+      - article:
+        - paragraph:
+          - strong: grok-builder
+          - text: — grok
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Нужен проверочный запуск
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Для этого точного профиля нужен успешный проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+          - listitem: Для этого профиля недоступен enforceable денежный бюджет.
+      - article:
+        - paragraph:
+          - strong: grok-independent-reviewer
+          - text: — grok
+        - list:
+          - generic: Установка
+          - generic: Установлено
+          - generic: Инициализация
+          - generic: Ещё не проверялось
+          - generic: Проверочный запуск
+          - generic: Нужен проверочный запуск
+          - generic: Вход
+          - generic: Вход выполнен
+        - paragraph: Для этого точного профиля нужен успешный проверочный запуск.
+        - generic "Выполнить ограниченную проверку провайдера"
+        - generic "Технические подробности"
+        - list:
+          - listitem: Resume недоступен; восстановление создаёт новый ограниченный прогон.
+          - listitem: Для этого профиля недоступен enforceable денежный бюджет.
+    - region "Локальные счётчики использования":
+      - heading "Локальные счётчики использования" [level=2]
+      - paragraph: Небольшой локальный подсчёт того, как часто завершается каждый вид действия, чтобы эту панель было проще улучшать. Пока вы не включите — он выключен.
+      - checkbox "Локальные счётчики использования"
+      - generic: Локальные счётчики использования
+      - paragraph: По умолчанию выключено. Если выключить, подсчёт прекращается сразу.
+      - generic "Что считается, а что нет"
+      - heading "Посчитано на данный момент" [level=3]
+      - paragraph: Пока ничего не посчитано.
+      - button "Очистить локальные счётчики"
+    - heading "Диагностика и восстановление" [level=2]
+    - paragraph: Используйте существующую панель для подробного мониторинга прогонов и восстановления, пока эта новая поверхность развивается.
+    - link "Открыть старую панель":
+      - /url: /
+    - button "Обновить статус"
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

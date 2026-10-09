@@ -124,3 +124,79 @@ test("auto-layout is deterministic and follows reporting lines downward", () => 
   assert.ok(first[B].y > first[A].y, "the role that reports to another sits below it");
   assert.deepEqual(board.autoLayout([], [], { x: 0, y: 0 }), {});
 });
+
+test("owner is navigation outside canonical agents; only supervisors set tree ranks", () => {
+  const roles = [role(A, "Builder"), role(B, "Tech lead"), role(C, "Designer")];
+  const graph = { roles: [A, B, C], links: [], reportsTo: [{from: B, to: A}], supervisedBy: [{from: A, to: B}, {from: C, to: B}] };
+  const model = board.buildBoardModel(roles, graph, {kind: "loading"}, board.EMPTY_LAYOUT);
+  const at = id => model.nodes.find(n => n.id === id).position;
+  assert.ok(at(A).y > at(B).y && at(C).y > at(B).y, "creator provenance cannot invert supervision");
+  assert.ok(model.ownerPosition.y < at(B).y);
+  assert.deepEqual(model.ownerMembers, [B]);
+  assert.deepEqual(model.nodes.map(n => n.id), [A, B, C], "human is never a fake canonical role");
+  assert.deepEqual(board.layoutBody(board.EMPTY_LAYOUT).positions, {});
+  const flat = board.buildBoardModel(roles, {...graph, supervisedBy: []}, {kind: "loading"}, board.EMPTY_LAYOUT);
+  assert.equal(flat.nodes[0].position.y, flat.nodes[1].position.y, "name Tech lead is not authority");
+  assert.deepEqual(flat.ownerMembers, [A,B,C]);
+});
+
+test("a missing supervisor remains outside the map rather than becoming a false root", () => {
+  const value = graph(); value.nodes[0].attrs.supervisor_agent_id = C;
+  const parsed = board.parseBoardGraph(value);
+  const model = board.buildBoardModel([role(A,"A"),role(B,"B")], parsed, {kind:"loading"}, board.EMPTY_LAYOUT);
+  assert.equal(model.nodes[0].supervisorId, C);
+  assert.ok(!model.ownerMembers.includes(A));
+});
+
+test("unrelated roles wrap as a forest instead of shrinking one very long row", () => {
+  const ids = Array.from({length: 9}, (_, i) => id("agent", String(i)));
+  const positions = board.autoLayout(ids, [], {x:0,y:0});
+  assert.ok(Math.max(...Object.values(positions).map(p=>p.x)) <= 2 * (board.ROLE_NODE_WIDTH + 48));
+  assert.equal(new Set(Object.values(positions).map(p=>p.y)).size, 3);
+  assert.deepEqual(positions, board.autoLayout(ids, [], {x:0,y:0}));
+});
+
+test("card copy leads with profession and retains its concrete scope without inventing a role", () => {
+  assert.deepEqual(board.roleCardCopy("Map-check child", { name: "Frontend engineer · JavaScript / TypeScript", description: "Builds browser interactions." }), {
+    cardTitle: "Frontend engineer", cardDescription: "JavaScript / TypeScript · Builds browser interactions."
+  });
+  assert.deepEqual(board.roleCardCopy("QA 2", { name: "Project · QA reviewer", description: "Checks results.", ref: { source: "custom" } }), { cardTitle: "Project · QA reviewer", cardDescription: "Checks results." });
+  assert.deepEqual(board.roleCardCopy("Custom agent"), { cardTitle: "Custom agent", cardDescription: "" });
+  assert.deepEqual(board.roleCardCopy("Research", { name: "Researcher", description: "Checks sources." }), { cardTitle: "Researcher", cardDescription: "Checks sources." });
+});
+
+test("automatic sibling branches have equal rank gaps with one shared card height", () => {
+  const D = id("agent", "D4"), E = id("agent", "E5");
+  const positions = board.autoLayout([A, B, C, D, E], [{ from: B, to: A }, { from: C, to: A }, { from: D, to: B }, { from: E, to: C }], { x: 0, y: 0 });
+  const gaps = [[B, A], [C, A], [D, B], [E, C]].map(([child, parent]) => positions[child].y - positions[parent].y - board.ROLE_NODE_HEIGHT);
+  assert.deepEqual(gaps, [72, 72, 72, 72]);
+});
+
+
+test("board task preparation uses the chosen agent while preserving an exact pending intent", () => {
+  const draft = { taskId: "task.new", agentId: "old", contextPackKey: "ctx", designPackageKey: "", limitMinutes: "9" };
+  assert.deepEqual(board.boardLaunchDraft(draft, null, "task.new", "chosen"), { ...draft, agentId: "chosen" });
+  assert.equal(board.boardLaunchDraft(draft, null, "task.other", "chosen"), draft, "a delayed selection cannot change another task's form");
+  const pending = { input: { taskId: "task.new", agentId: "frozen" }, draft: { ...draft, agentId: "frozen" } };
+  assert.deepEqual(board.boardLaunchDraft(draft, pending, "task.new", "chosen"), pending.draft);
+  assert.equal(pending.draft.agentId, "frozen");
+  assert.equal(board.boardLaunchDraft(draft, { ...pending, input: { taskId: "task.other" } }, "task.new", "chosen").agentId, "chosen");
+});
+
+test("board task picker distinguishes loading and failed projections from a readable task list", () => {
+  assert.equal(board.boardPickerState({ kind: "loading" }), "loading");
+  assert.equal(board.boardPickerState({ kind: "failure" }), "failure");
+  for (const [state, expected] of [["loading", "loading"], ["error", "failure"], ["ready", "ready"]]) {
+    assert.equal(board.boardPickerState({ kind: "ready", snapshot: { state } }), expected);
+  }
+});
+
+test("working zoom centres an actual fixed-size agent card without altering manual positions", () => {
+  const nodes = [{ id: A, position: { x: 317, y: -92 } }, { id: B, position: { x: 850, y: 271 } }];
+  const original = structuredClone(nodes);
+  assert.equal(board.boardFocusRole(nodes, B), nodes[1]);
+  assert.equal(board.boardFocusRole(nodes, "missing"), nodes[0]);
+  assert.equal(board.boardFocusRole([], null), null);
+  assert.deepEqual(board.roleCardCentre(nodes[1].position), { x: 850 + 132, y: 271 + 124 });
+  assert.deepEqual(nodes, original);
+});

@@ -134,6 +134,8 @@ _ROLE_MUTABLE_FIELDS = {
     # dropped those grants can shed one.  The lifecycle keeps it monotone
     # against the creator, exactly as creation does.
     "turnover_budget",
+    "supervisor_agent_id",
+    "specialization_ref",
 }
 
 
@@ -200,6 +202,10 @@ def _validate_agent_created(
         if payload.get("origin") != "human" or payload.get("template"):
             raise ValidationError("specializations require a direct human hire")
         validate_specialization_selection(payload.get("skills"), payload.get("tool_allowlist"))
+    if "supervisor_agent_id" in payload:
+        _validate_supervisor_id(payload["supervisor_agent_id"])
+        if payload.get("origin") != "human":
+            raise ValidationError("organization requires a direct human hire")
     _validate_agent_grants(payload["grants"], "grants")
     _validate_agent_lifetime(payload["lifetime"])
     if payload["profile_id"] not in PROFILE_NARROWING:
@@ -258,6 +264,12 @@ def _validate_agent_reconfigured(
     unsupported = sorted(set(changes) - _ROLE_MUTABLE_FIELDS)
     if unsupported:
         raise ValidationError("changes contains immutable agent fields: " + ", ".join(unsupported))
+    if "supervisor_agent_id" in changes:
+        _validate_supervisor_id(changes["supervisor_agent_id"])
+    if "specialization_ref" in changes:
+        from agent_commons.library import validate_library_ref
+
+        validate_library_ref(changes["specialization_ref"], kind="role")
     if "grants" in changes:
         _validate_agent_grants(changes["grants"], "changes.grants")
     if "context_mode" in changes and changes["context_mode"] not in CONTEXT_MODES:
@@ -284,6 +296,44 @@ def _validate_agent_reconfigured(
             raise ValidationError("isolation_downgrade names the agent:isolation_downgrade gate")
         if not isinstance(downgrade["reason"], str) or not downgrade["reason"].strip():
             raise ValidationError("isolation_downgrade.reason must be a non-empty string")
+
+
+def _validate_supervisor_id(value: Any) -> None:
+    if value is not None and not is_typed_id(value, "agent"):
+        raise ValidationError("supervisor_agent_id must be an agent identifier or null")
+
+
+def _require_persistent_role(record: Mapping[str, Any]) -> None:
+    if (
+        record.get("state", "active") != "active"
+        or record.get("template", False)
+        or (record.get("lifetime") or {}).get("kind") != "persistent"
+    ):
+        raise LifecycleConflictError(
+            "configuration requires an active persistent non-template role"
+        )
+
+
+def _validate_supervisor(
+    context: RoleTransitionContext, record: Mapping[str, Any], supervisor_id: str | None
+) -> None:
+    validate_specialization_actor(context.snapshot, context.actor_session_id)
+    _require_persistent_role(record)
+    if supervisor_id is None:
+        return
+    agent_id = str(record.get("agent_id") or record["id"])
+    if supervisor_id == agent_id:
+        raise LifecycleConflictError("supervisor_agent_id cannot refer to the role itself")
+    supervisor = context.require_entity("agent", supervisor_id)
+    _require_persistent_role(supervisor)
+    seen = {agent_id}
+    current: str | None = supervisor_id
+    while current is not None:
+        if current in seen:
+            raise LifecycleConflictError("supervisor_agent_id would create an organizational cycle")
+        seen.add(current)
+        parent = context.snapshot.agents.get(current)
+        current = parent.get("supervisor_agent_id") if parent else None
 
 
 def _validate_role_bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
@@ -395,6 +445,8 @@ def _validate_agent_creation(
 ) -> None:
     if "specialization_ref" in payload:
         validate_specialization_actor(context.snapshot, context.actor_session_id)
+    if "supervisor_agent_id" in payload:
+        _validate_supervisor(context, payload, payload["supervisor_agent_id"])
     creator_id = payload.get("created_by_agent_id")
     acting = context.acting_agent_id
     origin = str(payload["origin"])
@@ -497,6 +549,24 @@ def _validate_agent_reconfiguration(
     payload: Mapping[str, Any],
 ) -> None:
     changes = dict(payload["changes"])
+    if "supervisor_agent_id" in changes:
+        _validate_supervisor(context, current, changes["supervisor_agent_id"])
+    if "specialization_ref" in changes:
+        validate_specialization_actor(context.snapshot, context.actor_session_id)
+        _require_persistent_role(current)
+        if "specialization_ref" not in current:
+            raise LifecycleConflictError("only a specialized role can change specialization")
+        if changes["specialization_ref"] != current["specialization_ref"]:
+            blockers = retirement_blockers(
+                agents=context.snapshot.agents,
+                delegations=context.snapshot.delegations,
+                reviews=context.snapshot.reviews,
+                agent_id=str(payload["agent_id"]),
+            )
+            if blockers:
+                raise LifecycleConflictError(
+                    "a role owing live work cannot change specialization: " + "; ".join(blockers)
+                )
     if "specialization_ref" in current:
         validate_specialization_selection(
             changes.get("skills", current.get("skills")),

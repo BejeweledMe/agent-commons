@@ -1,0 +1,55 @@
+{
+  "artifact": {
+    "content_copied": false,
+    "created": true,
+    "entity_ref": {
+      "id": "artifact.5J84RTD266MK9PFH8R29C75JAS",
+      "kind": "artifact"
+    },
+    "event_id": "evt.01M4G4X81X9Q45Z9NTXG16GP35",
+    "event_type": "artifact.registered",
+    "idempotency_key": "oct09-navigation-final-gate",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "manifest_id": "mft.artifact.sha256.730bec1726ec61361ad011019e6a52d3dbee22ccba352f03febabd54d8f3069c",
+    "repaired": false,
+    "revision": "evt.01M4G4X81X9Q45Z9NTXG16GP35"
+  },
+  "verification": {
+    "created": true,
+    "entity_ref": {
+      "id": "verification.0YS2JH8SSE9W7NDXXNDWJRVHSX",
+      "kind": "verification"
+    },
+    "event_id": "evt.01M4G4XVEZ7EFJ1X2R0W5Q596Q",
+    "event_type": "verification.recorded",
+    "idempotency_key": "oct09-navigation-final-verification",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4G4XVEZ7EFJ1X2R0W5Q596Q"
+  },
+  "acceptance": {
+    "created": true,
+    "entity_ref": {
+      "id": "task.3T57N4BYSCQBKVGYG391J8RGWJ",
+      "kind": "task"
+    },
+    "event_id": "evt.01M4G4YTTKACSANTWRPRDJVBYZ",
+    "event_type": "task.accepted",
+    "idempotency_key": "oct09-navigation-accept-v2",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4G4YTTKACSANTWRPRDJVBYZ"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "session_id": "session.871afefa5bbd4048bcb88e77007403e0",
+  "reviews": [
+    {
+      "scope": "frontend",
+      "review_id": "review.72QK8Z4C4F3J57CMV8KFJHFW1W",
+      "target_revision": "evt.01M4FXE2B5AXMDQA33JTCZGSFN",
+      "verdict": "changes_requested",
+      "receipt": {
+        "created": true,
+        "entity_ref": {
+          "id": "review.72QK8Z4C4F3J57CMV8KFJHFW1W",
+          "kind": "review"
+        },
+        "event_id": "evt.01M4FXW6ZRW6E879MS9RSV6GK9",
+        "event_type": "review.completed",
+        "idempotency_key": "oct09-style-astra-frontend-review-v1",
+        "index": {
+          "mode": "deferred",
+          "next_action": "agent-commons index rebuild",
+          "synchronized": false
+        },
+        "repaired": false,
+        "revision": "evt.01M4FXW6ZRW6E879MS9RSV6GK9"
+      }
+    },
+    {
+      "scope": "backend",
+      "review_id": "review.1A9GM4XR5DKWGBV3PS80QTY521",
+      "target_revision": "evt.01M4FXFXGRMZP2PM2SN7BK38XT",
+      "verdict": "approved",
+      "receipt": {
+        "created": true,
+        "entity_ref": {
+          "id": "review.1A9GM4XR5DKWGBV3PS80QTY521",
+          "kind": "review"
+        },
+        "event_id": "evt.01M4FXWTCAQ4J9ASHHR39DNSTH",
+        "event_type": "review.completed",
+        "idempotency_key": "oct09-style-astra-backend-review-v1",
+        "index": {
+          "mode": "deferred",
+          "next_action": "agent-commons index rebuild",
+          "synchronized": false
+        },
+        "repaired": false,
+        "revision": "evt.01M4FXWTCAQ4J9ASHHR39DNSTH"
+      }
+    }
+  ],
+  "handoff": {
+    "created": true,
+    "entity_ref": {
+      "id": "handoff.0R38K6280KF9R8JPJTRHSHSAZN",
+      "kind": "handoff"
+    },
+    "event_id": "evt.01M4FXYNE26MYRDSMYBG3QZ809",
+    "event_type": "handoff.created",
+    "idempotency_key": "oct09-style-astra-review-handoff-v1",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4FXYNE26MYRDSMYBG3QZ809"
+  },
+  "session_end": {
+    "capabilities": [],
+    "client": "codex-desktop",
+    "closed_at": "2026-10-09T08:55:11.476386Z",
+    "effective_status": "closed",
+    "expires_at": "2026-10-09T10:48:10.844007Z",
+    "last_seen_at": "2026-10-09T08:55:11.476386Z",
+    "model": null,
+    "model_family": null,
+    "opened_at": "2026-10-09T08:48:10.844007Z",
+    "principal": "codex",
+    "role": "independent-reviewer",
+    "schema": "agent_commons.session.v1",
+    "session_id": "session.871afefa5bbd4048bcb88e77007403e0",
+    "software": "codex",
+    "source_producer": null,
+    "stable_instance_id": "oct09-style-independent-final-review",
+    "status": "closed"
+  }
+}

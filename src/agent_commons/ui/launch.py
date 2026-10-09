@@ -23,8 +23,12 @@ from agent_commons.runtime import (
     ContextBindingRequest,
     DesignPackageBindingRequest,
 )
+from agent_commons.runtime.attempts import AttemptStore
+from agent_commons.runtime.budget import OperatorBudgetExhaustedError, ProviderUnitBudget
 from agent_commons.runtime.model import BuiltinProfileId
+from agent_commons.services.conversations import Conversations
 from agent_commons.services.manager import CommonsManager
+from agent_commons.services.task_launch import create_task_delegation
 from agent_commons.ui.provider_auth import (
     UIProviderAuthCoordinator,
     provider_auth_launch_refusal,
@@ -208,6 +212,38 @@ class UILaunchCoordinator:
             library_store=self._context.library_store(),
         )
 
+    def budget_observation(
+        self,
+        profile_id: str,
+        *,
+        parent_session_id: str | None = None,
+    ) -> ProviderUnitBudget:
+        """Observe the operator's next root launch without opening or renewing a session."""
+        from agent_commons.services.delegation_runtime import load_runtime_configuration
+
+        context = self._context
+        manager = context.manager()
+        if parent_session_id is None:
+            if context._session_owner is not None:
+                parent_session_id = context._session_owner.session_id
+            elif context._session_provider is not None:
+                parent_session_id = context._session_provider()
+            else:
+                parent_session_id = context._writer_session_id
+        manager.sessions.require_active(parent_session_id)
+        config = load_runtime_configuration(context._profile_config, workspace_root=context.repo)
+        profile = config.profiles.get(BuiltinProfileId(profile_id))
+        return AttemptStore(
+            manager.paths.state_root,
+            operator_limits=config.limits,
+            read_only=True,
+        ).observe_provider_budget(
+            parent_session_id=str(parent_session_id), profile_id=profile.profile_id
+        )
+
+    def launch_budget(self, profile_id: str) -> dict[str, object]:
+        return self.budget_observation(profile_id).to_wire(BuiltinProfileId(profile_id))
+
     def run(self, request: LaunchRequest) -> LaunchResult:
         """Record a bounded delegation for a role, then run it through the broker."""
 
@@ -270,6 +306,15 @@ class UILaunchCoordinator:
         auth_status = self.provider_auth_status(profile_id)
         if auth_status["blocks_launch"]:
             raise provider_auth_launch_refusal(auth_status)
+        # A replay of an already recorded request consumes no new unit. Its
+        # exact content is still checked by create_delegation and the broker.
+        replay = request.idempotency_key and snapshot.delegations.get(
+            writer._new_entity_id("delegation", "delegation.requested", request.idempotency_key)
+        )
+        if not replay:
+            budget = self.budget_observation(profile_id, parent_session_id=writer.session_id)
+            if budget.exhausted:
+                raise OperatorBudgetExhaustedError(budget, BuiltinProfileId(profile_id))
         runtime: DelegationRuntimeService | None = None
         if (
             request.context.mode is ContextBindingMode.ACCUMULATED
@@ -310,7 +355,14 @@ class UILaunchCoordinator:
                 )
             admitted = True
         try:
-            delegation = writer.create_delegation(
+            # Every task worker must have a bounded, correctly addressed return
+            # channel before provider work starts. Existing scopes are reused.
+            Conversations(writer).ensure(
+                scope={"kind": "task", "id": request.task_id},
+                idempotency_key=f"launch-conversation-{request.task_id}",
+            )
+            delegation = create_task_delegation(
+                writer,
                 target_ref={"kind": "task", "id": request.task_id},
                 target_revision=str(task.get("effective_revision") or task["revision"]),
                 target_profile=profile_id,
@@ -356,7 +408,8 @@ class UILaunchCoordinator:
                     )
                     context.invalidate()
                     return
-                safe_summary = _safe_launch_failure_summary(exc)
+                budget_failure = isinstance(exc, OperatorBudgetExhaustedError)
+                safe_summary = str(exc) if budget_failure else _safe_launch_failure_summary(exc)
                 _LOG.warning(
                     "UI launch of %s failed before canonical finalization; "
                     "provider details were suppressed",
@@ -366,7 +419,7 @@ class UILaunchCoordinator:
                     writer.mark_delegation_needs_operator(
                         delegation_id,
                         str(delegation["revision"]),
-                        reason_code="launch_failed",
+                        reason_code="budget_exhausted" if budget_failure else "launch_failed",
                         summary=safe_summary,
                         idempotency_key=f"{launch_key}:launch-failed",
                     )

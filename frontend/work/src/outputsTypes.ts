@@ -8,10 +8,11 @@ export type OutputProvenance = Readonly<{
   producerSessionId: string | null; producerDelegationId: string | null; delegationRevision: string | null;
 }>;
 export type ImageOutput = OutputProvenance & Readonly<{
-  kind: "design_image" | "artifact_image" | "static_build";
+  kind: "design_image" | "artifact_image" | "static_build" | "text_result";
   outputId: string; title: string; artifactId: string; artifactRevision: string; contentRevision: string;
   recordedAt: string | null; packageId: string | null; packageRevision: string | null; screenId: string | null;
-  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg" | "application/zip";
+  state: OutputState; reason: string | null; mediaType: "image/png" | "image/jpeg" | "application/zip" | "text/plain; charset=utf-8";
+  summary?: string; checks?: readonly string[];
   latest: boolean; versionCount: number; width: number | null; height: number | null;
   historicalPreviewVerified?: boolean; retained?: boolean; resultReviewState?: ReviewState | null; reviewState: ReviewState | null;
 }>;
@@ -72,8 +73,9 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
       keys(item, "kind output_id series_id title package_id package_revision screen_id artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id recorded_at media_type classification state reason latest version_count width height", "review_state result_review_state retained");
       const packageId = id(item.package_id, "design_package"), packageRevision = id(item.package_revision, "evt"), screenId = id(item.screen_id, "screen");
       if (item.output_id !== `${packageId}@${packageRevision}:${screenId}` || item.series_id !== `${packageId}:${screenId}`) fail();
-    } else if ((item.kind === "artifact_image" || item.kind === "static_build")) {
-      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", "review_state result_review_state retained");
+    } else if ((item.kind === "artifact_image" || item.kind === "static_build" || item.kind === "text_result")) {
+      keys(item, "kind output_id series_id title artifact_id artifact_revision content_revision task_id task_revision producer_session_id producer_agent_id producer_delegation_id delegation_revision recorded_at media_type classification state reason latest version_count width height historical_preview_verified", item.kind === "text_result" ? "review_state result_review_state retained summary checks" : "review_state result_review_state retained");
+      if (item.kind === "text_result") { reportProse(item.summary, 4096); reportChecks(item.checks); }
       if (item.output_id !== `${id(item.artifact_id, "artifact")}@${id(item.artifact_revision, "evt")}` || typeof item.series_id !== "string" || !/^generated\.[a-f0-9]{64}$/.test(item.series_id)) fail();
       if (typeof item.historical_preview_verified !== "boolean" || (item.historical_preview_verified && (item.state !== "stale" || item.reason !== "producer_task_revision_changed"))) fail();
       id(item.delegation_revision, "evt"); id(item.producer_agent_id, "agent"); id(item.producer_delegation_id, "delegation");
@@ -87,13 +89,13 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
     }
     if ((scope.kind === "task" && item.task_id !== scope.id) || (scope.kind === "agent" && item.producer_agent_id !== scope.id)) fail();
     if (typeof item.content_revision !== "string" || !DIGEST.test(item.content_revision) || !["public", "internal"].includes(item.classification as string)) fail();
-    if (item.kind === "static_build" ? item.media_type !== "application/zip" || item.retained !== true : item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
+    if (item.kind === "text_result" ? item.media_type !== "text/plain; charset=utf-8" || item.retained !== true : item.kind === "static_build" ? item.media_type !== "application/zip" || item.retained !== true : item.media_type !== "image/png" && item.media_type !== "image/jpeg") fail();
     if (item.retained !== undefined && typeof item.retained !== "boolean") fail();
     if (!["unchecked", "ready", "stale", "unavailable"].includes(item.state as string) || typeof item.latest !== "boolean" || (versions === "latest" && !item.latest)) fail();
     if (item.reason !== null && (typeof item.reason !== "string" || !REASONS.has(item.reason))) fail();
     if (item.recorded_at !== null && (typeof item.recorded_at !== "string" || !Number.isFinite(Date.parse(item.recorded_at)) || item.recorded_at.length > 64)) fail();
     const width = item.width === null ? null : count(item.width), height = item.height === null ? null : count(item.height);
-    if (item.state === "ready" && (item.reason !== null || (item.kind === "static_build" ? width !== null || height !== null : !width || !height || width * height > 16_000_000))) fail();
+    if (item.state === "ready" && (item.reason !== null || ((item.kind === "static_build" || item.kind === "text_result") ? width !== null || height !== null : !width || !height || width * height > 16_000_000))) fail();
     if (item.state !== "ready" && (width !== null || height !== null)) fail();
     const versionCount = count(item.version_count); if (!versionCount) fail();
     seen.add(item.output_id as string);
@@ -105,6 +107,7 @@ export function parseOutputList(value: unknown, expected: OutputScope, versions:
       kind: item.kind, outputId: item.output_id as string, title: text(item.title), artifactId: id(item.artifact_id, "artifact"), contentRevision: item.content_revision,
       state: item.state as OutputState, reason: item.reason as string | null, mediaType: item.media_type as ImageOutput["mediaType"], latest: item.latest,
       versionCount, width, height, historicalPreviewVerified: item.kind !== "design_image" && item.historical_preview_verified === true,
+      ...(item.kind === "text_result" ? { summary: reportProse(item.summary, 4096), checks: reportChecks(item.checks) } : {}),
       retained: item.retained === true, resultReviewState: reviewState(item.result_review_state), reviewState: reviewState(item.review_state) };
   });
   return { scope, versions, items };
@@ -152,11 +155,36 @@ export function liveNavigation(item: LiveOutput, now: number, uiOrigin: string):
 
 /** Viewing exact verified pixels never promotes historical task output to current readiness. */
 export function canViewImage(item: ImageOutput): boolean {
-  return item.kind !== "static_build" && (item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true));
+  return (item.kind === "design_image" || item.kind === "artifact_image") && (item.state === "ready" || (item.kind === "artifact_image" && item.state === "stale" && item.reason === "producer_task_revision_changed" && item.historicalPreviewVerified === true));
 }
 export function canDownloadBuild(item: ImageOutput): boolean { return item.kind === "static_build" && (item.state === "ready" || item.historicalPreviewVerified === true); }
 
-export type OutputKindFilter = "all" | "images" | "builds" | "live";
+export type OutputKindFilter = "all" | "images" | "builds" | "reports" | "live";
 export function filterOutputs(items: OutputList["items"], filter: OutputKindFilter): OutputList["items"] {
-  return filter === "all" ? items : items.filter((item) => filter === "live" ? item.kind === "live_preview" : filter === "builds" ? item.kind === "static_build" : item.kind === "design_image" || item.kind === "artifact_image");
+  return filter === "all" ? items : items.filter((item) => filter === "live" ? item.kind === "live_preview" : filter === "builds" ? item.kind === "static_build" : filter === "reports" ? item.kind === "text_result" : item.kind === "design_image" || item.kind === "artifact_image");
+}
+
+export function reportProse(value: unknown, limit: number): string {
+  if (typeof value !== "string" || new TextEncoder().encode(value).length > limit || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)) fail();
+  return value;
+}
+export function reportChecks(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length > 32) fail();
+  return value.map((item) => reportProse(item, 1024));
+}
+export function canReadReport(item: ImageOutput): boolean {
+  return item.kind === "text_result" && (item.state === "ready" || item.historicalPreviewVerified === true);
+}
+export type TextResultContent = Readonly<{ artifactId: string; artifactRevision: string; contentRevision: string; title: string; summary: string; checks: readonly string[]; content: string; taskId: string; taskRevision: string }>;
+export function parseTextResultContent(value: unknown, scope: OutputScope, item: ImageOutput): TextResultContent {
+  const row = object(value);
+  keys(row, "schema artifact_id artifact_revision content_revision title summary checks content task_id task_revision");
+  if (item.kind !== "text_result" || row.schema !== "agent_commons.text-result-content.v1"
+    || row.artifact_id !== item.artifactId || row.artifact_revision !== item.artifactRevision || row.content_revision !== item.contentRevision
+    || row.task_id !== item.taskId || row.task_revision !== item.taskRevision || row.title !== item.title
+    || (scope.kind === "task" ? row.task_id !== scope.id : item.producerAgentId !== scope.id)) fail();
+  const summary = reportProse(row.summary, 4096), checks = reportChecks(row.checks);
+  if (summary !== item.summary || JSON.stringify(checks) !== JSON.stringify(item.checks)) fail();
+  return { artifactId: item.artifactId, artifactRevision: item.artifactRevision, contentRevision: item.contentRevision, title: item.title, summary, checks,
+    content: reportProse(row.content, 65536), taskId: item.taskId, taskRevision: item.taskRevision };
 }

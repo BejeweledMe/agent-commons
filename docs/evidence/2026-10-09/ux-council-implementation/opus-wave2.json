@@ -1,0 +1,10 @@
+{
+  "model_requested": "opus",
+  "attempt_id": "attempt.5R1TC6WSM34EWFMAX8EV52VRBG",
+  "state": "failed",
+  "exit_code": 1,
+  "duration_seconds": 716.3847158749995,
+  "partial_edits": true,
+  "provider_availability_followup": "You've hit your session limit · resets 8:40pm (Europe/Moscow)",
+  "subsequent_work": "Codex integration, after Opus process exit; no claim of Opus completing phase2"
+}

@@ -933,14 +933,18 @@ def _task_with_artifacts(
     expected_revision: str,
     summary: str,
     artifact_ref: tuple[str, ...],
+    clear_artifacts: bool,
     idempotency_key: str | None,
 ) -> None:
+    if clear_artifacts and artifact_ref:
+        raise click.UsageError("--clear-artifacts cannot be combined with --artifact-ref")
+    refs = _refs(artifact_ref, field="artifact_ref", allowed_kinds=("artifact",))
     state.emit(
         getattr(state.manager(), method)(
             entity_id,
             expected_revision,
             summary=summary,
-            artifact_refs=_refs(artifact_ref, field="artifact_ref", allowed_kinds=("artifact",)),
+            artifact_refs=refs if artifact_ref or clear_artifacts else None,
             idempotency_key=idempotency_key,
         )
     )
@@ -950,6 +954,7 @@ def _task_with_artifacts(
 @_expected
 @click.option("--summary", required=True)
 @click.option("--artifact-ref", multiple=True)
+@click.option("--clear-artifacts", is_flag=True, help="Explicitly remove all attached evidence.")
 @_idem
 @click.pass_obj
 def task_complete(
@@ -958,6 +963,7 @@ def task_complete(
     expected_revision: str,
     summary: str,
     artifact_ref: tuple[str, ...],
+    clear_artifacts: bool,
     idempotency_key: str | None,
 ) -> None:
     """Complete active implementation work."""
@@ -969,6 +975,7 @@ def task_complete(
         expected_revision,
         summary,
         artifact_ref,
+        clear_artifacts,
         idempotency_key,
     )
 
@@ -977,6 +984,7 @@ def task_complete(
 @_expected
 @click.option("--summary", required=True)
 @click.option("--artifact-ref", multiple=True)
+@click.option("--clear-artifacts", is_flag=True, help="Explicitly remove all attached evidence.")
 @_idem
 @click.pass_obj
 def task_submit(
@@ -985,6 +993,7 @@ def task_submit(
     expected_revision: str,
     summary: str,
     artifact_ref: tuple[str, ...],
+    clear_artifacts: bool,
     idempotency_key: str | None,
 ) -> None:
     """Submit completed work for review."""
@@ -996,6 +1005,7 @@ def task_submit(
         expected_revision,
         summary,
         artifact_ref,
+        clear_artifacts,
         idempotency_key,
     )
 

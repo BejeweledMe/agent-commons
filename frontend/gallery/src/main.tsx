@@ -1,3 +1,4 @@
+import { readLocalePreference, writeLocalePreference } from "../../shared/localePreference.js";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -153,7 +154,7 @@ function ScreenCard({ packageValue, screen, locale, open }: ScreenCardProps): Re
 }
 
 function GalleryApp(): ReactElement {
-  const [locale, setLocale] = useState<Locale>("en");
+  const [locale, setLocale] = useState<Locale>(readLocalePreference);
   const [state, setState] = useState<GalleryState>({ kind: "checking" });
   const [apiBase, setApiBase] = useState("");
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() => projectFromSearch(window.location.search));
@@ -186,6 +187,7 @@ function GalleryApp(): ReactElement {
 
   useEffect(() => {
     applyDocumentLocale(document.documentElement, locale);
+    writeLocalePreference(locale);
   }, [locale]);
 
   useEffect(() => {

@@ -1,7 +1,8 @@
-import { type KeyboardEvent, type ReactElement, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
 import { TASKS_VIEWS, type TasksView } from "../appRouteState.js";
 import type { TrackerSnapshot, TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
+import type { MapViewportStore } from "../mapViewport.js";
 import { taskGraphText } from "../taskGraphStrings.js";
 import { NOW_COLUMNS, nowColumnEmpty, nowColumnLabel, type NowBuckets } from "../taskPresentation.js";
 import { OutputsButton } from "./OutputsPanel.js";
@@ -14,6 +15,7 @@ const tabLabel: Readonly<Record<TasksView, MessageKey>> = {
 };
 
 type Props = {
+  filterControl?: ReactNode;
   view: TasksView;
   onViewChange: (view: TasksView) => void;
   snapshot: TrackerSnapshot;
@@ -25,17 +27,24 @@ type Props = {
   locale: Locale;
   text: (key: MessageKey) => string;
   onSelectTask: (taskId: string) => void;
+  /** Move the selection without opening a panel over the map. */
+  onFocusTask?: (taskId: string) => void;
   onTaskKeyDown: (event: KeyboardEvent<HTMLButtonElement>, taskId: string) => void;
   registerTaskButton: (taskId: string, element: HTMLButtonElement | null) => void;
   onClearFilters: () => void;
+  /** Reading positions, kept per project, map kind and drawing. */
+  viewports?: MapViewportStore;
+  projectId?: string | null;
+  selectionKey?: string;
 };
 
 /**
- * The three presentations of the Tasks tab (ADR 0020, item 6): Now, Map and All
- * tasks. Exactly one is in the DOM at a time. Map owns its scoped capacity check
- * so a small selected component remains navigable in a large project.
+ * The three presentations of the work area: Map, Now and All tasks. Map is the
+ * default and owns the full height of the pane; exactly one presentation is in
+ * the DOM at a time. Map owns its scoped capacity check so a small selected
+ * component remains navigable in a large project.
  */
-export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets, selectedTaskId, locale, text, onSelectTask, onTaskKeyDown, registerTaskButton, onClearFilters }: Props): ReactElement {
+export function TaskViews({ filterControl, view, onViewChange, snapshot, visibleTasks, buckets, selectedTaskId, locale, text, onSelectTask, onFocusTask, onTaskKeyDown, registerTaskButton, onClearFilters, viewports, projectId, selectionKey }: Props): ReactElement {
   const [mapKind, setMapKind] = useState<"structure" | "dependencies">("dependencies");
   const tabs = useRef(new Map<TasksView, HTMLButtonElement>());
   const t = (key: Parameters<typeof taskGraphText>[1]): string => taskGraphText(locale, key);
@@ -89,7 +98,7 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
       </div>
       {buckets.settled.length > 0 ? <p className="now-settled small-copy">
         {text("task_view_now_settled")} <span className="task-list-count">{buckets.settled.length}</span>
-        <button type="button" className="notice-link" onClick={() => onViewChange("all")}>{text("task_view_tab_all")}</button>
+        <button type="button" className="notice-link" onClick={() => { onClearFilters(); onViewChange("all"); }}>{text("task_view_tab_all")}</button>
       </p> : null}
     </>;
   }
@@ -97,13 +106,9 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
   function mapView(): ReactElement {
     if (visibleTasks.length === 0 && snapshot.tasks.length > 0) return filteredToNothing();
     return <>
-      <div className="button-row" role="group" aria-label={text("hierarchy_view")}>
-        <button type="button" className="button button-secondary" aria-pressed={mapKind === "structure"} onClick={() => setMapKind("structure")}>{text("hierarchy_structure")}</button>
-        <button type="button" className="button button-secondary" aria-pressed={mapKind === "dependencies"} onClick={() => setMapKind("dependencies")}>{text("task_dependencies")}</button>
-      </div>
-      {mapKind === "structure" ? <TaskHierarchy tasks={visibleTasks} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} text={text} />
-        : <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} locale={locale} />}
-      {visibleTasks.length !== snapshot.tasks.length ? <p className="small-copy">{t("filtered")}</p> : null}
+      {visibleTasks.length !== snapshot.tasks.length ? <p className="visually-hidden">{t("filtered")}</p> : null}
+      {mapKind === "structure" ? <TaskHierarchy tasks={visibleTasks} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} onFocusTask={onFocusTask} text={text} viewports={viewports} projectId={projectId} selectionKey={selectionKey} registerTaskButton={registerTaskButton} />
+        : <TaskGraph tasks={visibleTasks} edges={snapshot.edges} selectedTaskId={selectedTaskId} onSelectTask={onSelectTask} onFocusTask={onFocusTask} locale={locale} viewports={viewports} projectId={projectId} selectionKey={selectionKey} registerTaskButton={registerTaskButton} />}
     </>;
   }
 
@@ -113,6 +118,7 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
   }
 
   return <>
+    <div className="task-view-navigation">{filterControl}
     <div className="task-view-tabs" role="tablist" aria-label={text("task_view_tabs_label")}>
       {TASKS_VIEWS.map((value) => <button className="button button-secondary" key={value} type="button" role="tab"
         id={`task-view-tab-${value}`} aria-controls="task-view-panel" aria-selected={view === value} tabIndex={view === value ? 0 : -1}
@@ -121,8 +127,10 @@ export function TaskViews({ view, onViewChange, snapshot, visibleTasks, buckets,
         {text(tabLabel[value])}
       </button>)}
     </div>
+    {view === "map" ? <label className="map-kind-control"><span className="visually-hidden">{text("hierarchy_view")}</span><select value={mapKind} onChange={(event) => setMapKind(event.currentTarget.value as "structure" | "dependencies")}><option value="structure">{text("hierarchy_structure")}</option><option value="dependencies">{text("map_dependencies_short")}</option></select></label> : null}
+    </div>
     <p className="visually-hidden" id="tracker-keyboard-help">{text("tracker_keyboard_help")}</p>
-    <div className="task-view-panel" id="task-view-panel" role="tabpanel" aria-labelledby={`task-view-tab-${view}`}>
+    <div className={`task-view-panel task-view-panel-${view}`} id="task-view-panel" role="tabpanel" aria-labelledby={`task-view-tab-${view}`}>
       {snapshot.state === "empty" ? <p>{text("tracker_empty")}</p>
         : view === "now" ? nowView() : view === "map" ? mapView() : allView()}
     </div>

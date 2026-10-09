@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -45,7 +45,7 @@ from .model import (
 from .skill_projection import EphemeralSkillBundle, compile_skill_bundle, verify_skill_bundle
 from .subprocess_runner import SubprocessRunner
 
-PROVIDER_INITIALIZATION_TIMEOUT_SECONDS = 5
+PROVIDER_INITIALIZATION_TIMEOUT_SECONDS = 15
 PROVIDER_INITIALIZATION_MAX_OUTPUT_BYTES = 64 * 1024
 _INITIALIZATION_SESSION_ID = "provider-initialization-probe"
 
@@ -383,7 +383,12 @@ class ProviderInitializationProbe:
         timeout_seconds: int = PROVIDER_INITIALIZATION_TIMEOUT_SECONDS,
         max_output_bytes: int = PROVIDER_INITIALIZATION_MAX_OUTPUT_BYTES,
     ) -> None:
-        if timeout_seconds < 1 or not 1 <= max_output_bytes <= 64 * 1024:
+        if (
+            type(timeout_seconds) is not int
+            or not 1 <= timeout_seconds <= 60
+            or type(max_output_bytes) is not int
+            or not 1 <= max_output_bytes <= 64 * 1024
+        ):
             raise ConfigurationError("provider initialization probe limits are invalid")
         self.runner = runner or SubprocessRunner()
         self.adapters = adapters or default_adapter_registry()
@@ -438,7 +443,11 @@ class ProviderInitializationProbe:
                 provider=profile.provider,
                 state=ProviderInitializationState.UNAVAILABLE,
             )
-        return adapter.classify_initialization(profile, result)
+        return replace(
+            adapter.classify_initialization(profile, result),
+            timeout_seconds=self.timeout_seconds,
+            duration_seconds=result.duration_seconds,
+        )
 
 
 def launch_instruction_with_context(instruction: str, context: ContextBinding) -> str:

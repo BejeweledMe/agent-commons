@@ -1,0 +1,21 @@
+{
+  "exit_code": 1,
+  "seconds": 484.6,
+  "timed_out": false,
+  "reported_models": [
+    "claude-opus-5"
+  ],
+  "is_error": true,
+  "subtype": "success",
+  "requested_alias": "opus",
+  "outcome": "partial implementation; provider refused further requests with HTTP 403 Request not allowed",
+  "partial_files": [
+    "frontend/work/src/components/Icon.tsx",
+    "frontend/work/src/components/Modal.tsx",
+    "frontend/work/src/dialogStack.ts",
+    "frontend/work/src/components/ConversationPanel.tsx",
+    "frontend/work/src/components/OutputsPanel.tsx"
+  ],
+  "continuation": "Codex frontend agent continues from these source files in the same isolated worktree",
+  "claim": "This is not a successful completed Opus frontend run."
+}

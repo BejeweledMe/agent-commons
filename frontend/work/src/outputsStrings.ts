@@ -1,6 +1,6 @@
 import { translate, type Locale, type MessageKey } from "./i18n.js";
 
-const KEYS = ["reviewCommandContext","staticBuild", "builds", "downloadBuild", "openLocally", "retainedBytes", "sourceBytes", "resultAwaiting", "resultApproved", "resultReturned", "resultUnreviewed",
+const KEYS = ["reports", "textReport", "readReport", "checks", "evidenceStale", "taskChanged", "loadMoreEvidence", "reviewCommandContext","staticBuild", "builds", "downloadBuild", "openLocally", "retainedBytes", "sourceBytes", "resultAwaiting", "resultApproved", "resultReturned", "resultUnreviewed",
   "galleryEmpty", "gallery", "openGallery", "versionFilter", "kindFilter", "allKinds", "images", "liveKinds", "retry", "filterEmpty", "designImage", "generatedImage", "noThumbnail", "task", "agent", "producerUnknown", "technicalDetails", "address",
   "live",
   "starting",

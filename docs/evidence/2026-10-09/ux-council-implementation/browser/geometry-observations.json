@@ -1,0 +1,766 @@
+[
+  {
+    "case": "tasks14-default",
+    "camera": "0 -265.43 2500 1206.86",
+    "documentWidth": 1434,
+    "height": 642,
+    "lang": "ru",
+    "map": {
+      "bottom": 602.890625,
+      "height": 394.775390625,
+      "left": 273.984375,
+      "right": 1091.7578125,
+      "top": 208.115234375,
+      "width": 817.7734375,
+      "x": 273.984375,
+      "y": 208.115234375
+    },
+    "width": 1434
+  },
+  {
+    "case": "tasks14-keyboard-End-working",
+    "active": "В очередиПроверка полного интерфейсаПредлагаемый агент: Независимая проверка интерфейса · codexТекущего запуска нет",
+    "camera": "568.23 271.22 817.77 394.78",
+    "map": {
+      "bottom": 602.890625,
+      "height": 394.775390625,
+      "left": 273.984375,
+      "right": 1091.7578125,
+      "top": 208.115234375,
+      "width": 817.7734375,
+      "x": 273.984375,
+      "y": 208.115234375
+    },
+    "rect": {
+      "bottom": 588.3023376464844,
+      "height": 167.46417236328125,
+      "left": 833.274658203125,
+      "right": 1076.4933471679688,
+      "top": 420.8381652832031,
+      "width": 243.21868896484375,
+      "x": 833.274658203125,
+      "y": 420.8381652832031
+    },
+    "strip": "В очередиПроверка полного интерфейсаОткрытьРабочий масштаб"
+  },
+  {
+    "case": "tasks14-resize",
+    "camera": "485.1 109.85 984.02 717.52",
+    "documentWidth": 1600,
+    "height": 1000,
+    "map": {
+      "bottom": 960.390625,
+      "height": 717.51953125,
+      "left": 273.984375,
+      "right": 1258.0078125,
+      "top": 242.87109375,
+      "width": 984.0234375,
+      "x": 273.984375,
+      "y": 242.87109375
+    },
+    "width": 1600
+  },
+  {
+    "case": "tasks14-resize",
+    "camera": "596.98 109.85 760.27 717.52",
+    "documentWidth": 1376,
+    "height": 1000,
+    "map": {
+      "bottom": 960.390625,
+      "height": 717.51953125,
+      "left": 273.984375,
+      "right": 1034.2578125,
+      "top": 242.87109375,
+      "width": 760.2734375,
+      "x": 273.984375,
+      "y": 242.87109375
+    },
+    "width": 1376
+  },
+  {
+    "case": "tasks14-resize",
+    "camera": "597.6 109.85 759.02 717.52",
+    "documentWidth": 1375,
+    "height": 1000,
+    "map": {
+      "bottom": 960.390625,
+      "height": 717.51953125,
+      "left": 273.984375,
+      "right": 1033.0078125,
+      "top": 242.87109375,
+      "width": 759.0234375,
+      "x": 273.984375,
+      "y": 242.87109375
+    },
+    "width": 1375
+  },
+  {
+    "case": "tasks14-resize",
+    "camera": "511.1 172.35 932.02 592.52",
+    "documentWidth": 1000,
+    "height": 875,
+    "map": {
+      "bottom": 835.390625,
+      "height": 592.51953125,
+      "left": 55.986328125,
+      "right": 988.0078125,
+      "top": 242.87109375,
+      "width": 932.021484375,
+      "x": 55.986328125,
+      "y": 242.87109375
+    },
+    "width": 1000
+  },
+  {
+    "case": "tasks14-resize",
+    "camera": "767.35 134 419.52 669.23",
+    "documentWidth": 487,
+    "height": 1055,
+    "map": {
+      "bottom": 1015.390625,
+      "height": 669.228515625,
+      "left": 55.986328125,
+      "right": 475.5078125,
+      "top": 346.162109375,
+      "width": 419.521484375,
+      "x": 55.986328125,
+      "y": 346.162109375
+    },
+    "width": 487
+  },
+  {
+    "case": "tasks14-css-breakpoint",
+    "requestedCSS": {
+      "width": 1280,
+      "height": 800
+    },
+    "camera": "645.1 218.47 664.02 500.29",
+    "documentWidth": 1280,
+    "height": 800,
+    "map": {
+      "bottom": 760.390625,
+      "height": 500.29296875,
+      "left": 273.984375,
+      "right": 938.0078125,
+      "top": 260.09765625,
+      "width": 664.0234375,
+      "x": 273.984375,
+      "y": 260.09765625
+    },
+    "width": 1280
+  },
+  {
+    "case": "tasks14-css-breakpoint",
+    "requestedCSS": {
+      "width": 1101,
+      "height": 800
+    },
+    "camera": "734.48 238.46 485.27 460.3",
+    "documentWidth": 1101,
+    "height": 800,
+    "map": {
+      "bottom": 760.390625,
+      "height": 460.302734375,
+      "left": 273.984375,
+      "right": 759.2578125,
+      "top": 300.087890625,
+      "width": 485.2734375,
+      "x": 273.984375,
+      "y": 300.087890625
+    },
+    "width": 1101
+  },
+  {
+    "case": "tasks14-css-breakpoint",
+    "requestedCSS": {
+      "width": 1100,
+      "height": 800
+    },
+    "camera": "461.1 209.85 1032.02 517.52",
+    "documentWidth": 1100,
+    "height": 800,
+    "map": {
+      "bottom": 760.390625,
+      "height": 517.51953125,
+      "left": 55.986328125,
+      "right": 1088.0078125,
+      "top": 242.87109375,
+      "width": 1032.021484375,
+      "x": 55.986328125,
+      "y": 242.87109375
+    },
+    "width": 1100
+  },
+  {
+    "case": "tasks14-css-breakpoint",
+    "requestedCSS": {
+      "width": 800,
+      "height": 700
+    },
+    "camera": "611.1 248.79 732.02 439.64",
+    "documentWidth": 800,
+    "height": 700,
+    "map": {
+      "bottom": 660.390625,
+      "height": 439.638671875,
+      "left": 55.986328125,
+      "right": 788.0078125,
+      "top": 220.751953125,
+      "width": 732.021484375,
+      "x": 55.986328125,
+      "y": 220.751953125
+    },
+    "width": 800
+  },
+  {
+    "case": "tasks14-css-breakpoint",
+    "requestedCSS": {
+      "width": 390,
+      "height": 844
+    },
+    "camera": "816.1 281.98 322.02 373.27",
+    "documentWidth": 390,
+    "height": 844,
+    "map": {
+      "bottom": 804.140625,
+      "height": 373.271484375,
+      "left": 55.986328125,
+      "right": 378.0078125,
+      "top": 430.869140625,
+      "width": 322.021484375,
+      "x": 55.986328125,
+      "y": 430.869140625
+    },
+    "width": 390
+  },
+  {
+    "case": "task-detail-map-retained",
+    "before": {
+      "camera": "-262.89 -89.39 817.77 394.78",
+      "rect": {
+        "bottom": 602.890625,
+        "height": 394.775390625,
+        "left": 273.984375,
+        "right": 1091.7578125,
+        "top": 208.115234375,
+        "width": 817.7734375,
+        "x": 273.984375,
+        "y": 208.115234375
+      }
+    },
+    "after": {
+      "camera": "-262.89 -89.39 817.77 394.78",
+      "focus": "Готово к запускуДлинный brief — сохранение абзацевПредлагаемый агент: Каталог и найм — Север · codexТекущего запуска нет",
+      "rect": {
+        "bottom": 602.890625,
+        "height": 394.775390625,
+        "left": 273.984375,
+        "right": 1091.7578125,
+        "top": 208.115234375,
+        "width": 817.7734375,
+        "x": 273.984375,
+        "y": 208.115234375
+      }
+    }
+  },
+  {
+    "case": "128 tasks keyboard End",
+    "observed": {
+      "active": {
+        "bottom": 588.3023376464844,
+        "height": 167.46417236328125,
+        "left": 833.274169921875,
+        "right": 1076.492935180664,
+        "top": 420.8381652832031,
+        "width": 243.21876525878903,
+        "x": 833.274169921875,
+        "y": 420.8381652832031
+      },
+      "canvas": {
+        "bottom": 602.265625,
+        "height": 393.525390625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 208.740234375,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 208.740234375
+      },
+      "count": 128,
+      "name": "QA задача 125 — настройки — Queued",
+      "overflow": false,
+      "viewBox": "10228.23 501.22 817.77 394.78"
+    }
+  },
+  {
+    "case": "128 tasks structure keyboard End",
+    "observed": {
+      "active": {
+        "bottom": 489.2282104492187,
+        "height": 167.46414184570312,
+        "left": 833.272216796875,
+        "right": 1076.4928894042969,
+        "top": 321.7640686035156,
+        "width": 243.22067260742188,
+        "x": 833.272216796875,
+        "y": 321.7640686035156
+      },
+      "canvas": {
+        "bottom": 602.265625,
+        "height": 393.525390625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 208.740234375,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 208.740234375
+      },
+      "count": 128,
+      "name": "QA задача 042 — каталог — Ready for assignment",
+      "viewBox": "33136.23 600.61 817.77 394.78"
+    }
+  },
+  {
+    "case": "20 agents fit before floor fix",
+    "observed": {
+      "count": 20,
+      "frame": {
+        "bottom": 629.8828125,
+        "height": 459.0625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 170.8203125,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 170.8203125
+      },
+      "rects": [
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 844.9072265625,
+          "right": 898.0337524414062,
+          "top": 426.4816589355469,
+          "width": 53.12652587890625,
+          "x": 844.9072265625,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 719.332763671875,
+          "right": 772.4592895507812,
+          "top": 426.4816589355469,
+          "width": 53.12652587890625,
+          "x": 719.332763671875,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 970.481689453125,
+          "right": 1023.6082153320312,
+          "top": 426.4816589355469,
+          "width": 53.12652587890625,
+          "x": 970.481689453125,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 656.5455322265625,
+          "right": 709.6719818115234,
+          "top": 426.4816589355469,
+          "width": 53.12644958496094,
+          "x": 656.5455322265625,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 411.9919204711914,
+          "height": 49.90741729736328,
+          "left": 970.481689453125,
+          "right": 1023.6082153320312,
+          "top": 362.0845031738281,
+          "width": 53.12652587890625,
+          "x": 970.481689453125,
+          "y": 362.0845031738281
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 907.694580078125,
+          "right": 960.821029663086,
+          "top": 426.4816589355469,
+          "width": 53.12644958496094,
+          "x": 907.694580078125,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 593.75830078125,
+          "right": 646.8847503662109,
+          "top": 426.4816589355469,
+          "width": 53.12644958496094,
+          "x": 593.75830078125,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 468.1838684082031,
+          "right": 521.3103179931641,
+          "top": 426.4816589355469,
+          "width": 53.12644958496094,
+          "x": 468.1838684082031,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 405.3966064453125,
+          "right": 458.5230941772461,
+          "top": 426.4816589355469,
+          "width": 53.126487731933594,
+          "x": 405.3966064453125,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 540.786262512207,
+          "height": 49.90741729736328,
+          "left": 530.9710693359375,
+          "right": 584.0975570678711,
+          "top": 490.87884521484375,
+          "width": 53.126487731933594,
+          "x": 530.9710693359375,
+          "y": 490.87884521484375
+        },
+        {
+          "bottom": 347.59476470947266,
+          "height": 49.90741729736328,
+          "left": 625.1519165039062,
+          "right": 678.2784042358398,
+          "top": 297.6873474121094,
+          "width": 53.126487731933594,
+          "x": 625.1519165039062,
+          "y": 297.6873474121094
+        },
+        {
+          "bottom": 540.786262512207,
+          "height": 49.90741729736328,
+          "left": 593.75830078125,
+          "right": 646.8847503662109,
+          "top": 490.87884521484375,
+          "width": 53.12644958496094,
+          "x": 593.75830078125,
+          "y": 490.87884521484375
+        },
+        {
+          "bottom": 411.9919204711914,
+          "height": 49.90741729736328,
+          "left": 844.9072265625,
+          "right": 898.0337524414062,
+          "top": 362.0845031738281,
+          "width": 53.12652587890625,
+          "x": 844.9072265625,
+          "y": 362.0845031738281
+        },
+        {
+          "bottom": 411.9919204711914,
+          "height": 49.90741729736328,
+          "left": 625.1519165039062,
+          "right": 678.2784042358398,
+          "top": 362.0845031738281,
+          "width": 53.126487731933594,
+          "x": 625.1519165039062,
+          "y": 362.0845031738281
+        },
+        {
+          "bottom": 411.9919204711914,
+          "height": 49.90741729736328,
+          "left": 405.3966064453125,
+          "right": 458.5230941772461,
+          "top": 362.0845031738281,
+          "width": 53.126487731933594,
+          "x": 405.3966064453125,
+          "y": 362.0845031738281
+        },
+        {
+          "bottom": 411.9919204711914,
+          "height": 49.90741729736328,
+          "left": 342.609375,
+          "right": 395.7358627319336,
+          "top": 362.0845031738281,
+          "width": 53.126487731933594,
+          "x": 342.609375,
+          "y": 362.0845031738281
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 782.1200561523438,
+          "right": 835.2465057373047,
+          "top": 426.4816589355469,
+          "width": 53.12644958496094,
+          "x": 782.1200561523438,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 530.9710693359375,
+          "right": 584.0975570678711,
+          "top": 426.4816589355469,
+          "width": 53.126487731933594,
+          "x": 530.9710693359375,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 476.38907623291016,
+          "height": 49.90741729736328,
+          "left": 342.609375,
+          "right": 395.7358627319336,
+          "top": 426.4816589355469,
+          "width": 53.126487731933594,
+          "x": 342.609375,
+          "y": 426.4816589355469
+        },
+        {
+          "bottom": 540.786262512207,
+          "height": 49.90741729736328,
+          "left": 656.5455322265625,
+          "right": 709.6719818115234,
+          "top": 490.87884521484375,
+          "width": 53.12644958496094,
+          "x": 656.5455322265625,
+          "y": 490.87884521484375
+        }
+      ],
+      "sizes": [
+        "263.994pxx247.998px"
+      ]
+    }
+  },
+  {
+    "case": "Hire first form at 1280x600",
+    "observed": {
+      "active": {
+        "bottom": 322.041015625,
+        "height": 40.849609375,
+        "left": 72.6171875,
+        "right": 632.6171875,
+        "top": 281.19140625,
+        "width": 560,
+        "x": 72.6171875,
+        "y": 281.19140625
+      },
+      "dialog": {
+        "bottom": 575.99609375,
+        "height": 551.9921875,
+        "left": 24.00390625,
+        "right": 1255.99609375,
+        "top": 24.00390625,
+        "width": 1231.9921875,
+        "x": 24.00390625,
+        "y": 24.00390625
+      },
+      "focused": "specialization-search",
+      "hiredDisclosure": [
+        {
+          "open": false,
+          "text": "Saved runtime templates"
+        },
+        {
+          "open": false,
+          "text": "Advanced: provider and model"
+        },
+        {
+          "open": false,
+          "text": "Agents already hired (50)"
+        }
+      ],
+      "viewport": [
+        1280,
+        600
+      ]
+    }
+  },
+  {
+    "case": "50 agents corrected fit",
+    "observed": {
+      "allVisible": true,
+      "band": "far",
+      "camera": "transform: translate(68px, 197.555px) scale(0.062638);",
+      "count": 51,
+      "frame": {
+        "bottom": 629.8828125,
+        "height": 459.0625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 170.8203125,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 170.8203125
+      },
+      "sizes": [
+        "263.994pxx247.998px"
+      ]
+    }
+  },
+  {
+    "case": "50 agents secondary Fit control",
+    "observed": {
+      "allVisible": true,
+      "camera": "transform: translate(37px, 194.646px) scale(0.0683407);"
+    }
+  },
+  {
+    "case": "50 agents fit at 390",
+    "observed": {
+      "allVisible": true,
+      "camera": "transform: translate(26px, 270.381px) scale(0.0247425);",
+      "overflow": false,
+      "viewport": [
+        390,
+        844
+      ]
+    }
+  },
+  {
+    "case": "50 agents centre-preserving resize 1434 to 800",
+    "before": {
+      "frame": {
+        "bottom": 629.8828125,
+        "height": 459.0625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 170.8203125,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 170.8203125
+      },
+      "style": "transform: translate(68px, 197.555px) scale(0.062638);"
+    },
+    "after": {
+      "frame": {
+        "bottom": 687.3828125,
+        "height": 471.93359375,
+        "left": 56.611328125,
+        "right": 787.3828125,
+        "top": 215.44921875,
+        "width": 730.771484375,
+        "x": 56.611328125,
+        "y": 215.44921875
+      },
+      "style": "transform: translate(25px, 204.055px) scale(0.062638);"
+    }
+  },
+  {
+    "case": "Long skill condition at 800",
+    "observed": {
+      "dialog": {
+        "bottom": 660,
+        "height": 620,
+        "left": 15.99609375,
+        "right": 783.994140625,
+        "top": 40,
+        "width": 767.998046875,
+        "x": 15.99609375,
+        "y": 40
+      },
+      "dialogOverflow": false,
+      "field": {
+        "bottom": 585,
+        "height": 83.994140625,
+        "left": 36.62109375,
+        "right": 721.376953125,
+        "top": 501.005859375,
+        "width": 684.755859375,
+        "x": 36.62109375,
+        "y": 501.005859375
+      },
+      "length": 1879,
+      "pageOverflow": false,
+      "rows": [],
+      "viewport": [
+        800,
+        700
+      ]
+    }
+  },
+  {
+    "case": "Empty output filters",
+    "observed": [
+      {
+        "filter": "Reports",
+        "text": "Design gallery\n\nResults for QA #26 — участок 19\nLatest\nAll versions\nAll results\nImages\nBuilds\nReports\nLive previews\nRefresh\n\nNo results have been recorded for this selection yet: reports, builds, images or live previews."
+      },
+      {
+        "filter": "Builds",
+        "text": "Design gallery\n\nResults for QA #26 — участок 19\nLatest\nAll versions\nAll results\nImages\nBuilds\nReports\nLive previews\nRefresh\n\nNo results have been recorded for this selection yet: reports, builds, images or live previews."
+      },
+      {
+        "filter": "Images",
+        "text": "Design gallery\n\nResults for QA #26 — участок 19\nLatest\nAll versions\nAll results\nImages\nBuilds\nReports\nLive previews\nRefresh\n\nNo results have been recorded for this selection yet: reports, builds, images or live previews."
+      },
+      {
+        "filter": "Live previews",
+        "text": "Design gallery\n\nResults for QA #26 — участок 19\nLatest\nAll versions\nAll results\nImages\nBuilds\nReports\nLive previews\nRefresh\n\nNo results have been recorded for this selection yet: reports, builds, images or live previews."
+      },
+      {
+        "filter": "All results",
+        "text": "Design gallery\n\nResults for QA #26 — участок 19\nLatest\nAll versions\nAll results\nImages\nBuilds\nReports\nLive previews\nRefresh\n\nNo results have been recorded for this selection yet: reports, builds, images or live previews."
+      }
+    ]
+  },
+  {
+    "case": "Prepare run selected agent and single chrome",
+    "observed": {
+      "agent": "QA #26 — участок 19",
+      "close": 1,
+      "h2": [
+        "Start work on this task",
+        "Start the run"
+      ],
+      "rect": {
+        "bottom": 594.4921875,
+        "height": 594.4921875,
+        "left": 0,
+        "right": 1240,
+        "top": 0,
+        "width": 1240,
+        "x": 0,
+        "y": 0
+      }
+    }
+  },
+  {
+    "case": "Real Blizhe task modal preserves map",
+    "before": {
+      "rect": {
+        "bottom": 602.265625,
+        "height": 393.525390625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 208.740234375,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 208.740234375
+      },
+      "viewBox": "-330.61 0 2353.21 1136"
+    },
+    "after": {
+      "rect": {
+        "bottom": 602.265625,
+        "height": 393.525390625,
+        "left": 274.609375,
+        "right": 1091.1328125,
+        "top": 208.740234375,
+        "width": 816.5234375,
+        "x": 274.609375,
+        "y": 208.740234375
+      },
+      "viewBox": "-330.61 0 2353.21 1136"
+    }
+  }
+]

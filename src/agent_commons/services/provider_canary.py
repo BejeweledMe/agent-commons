@@ -11,7 +11,7 @@ from typing import Any
 
 from agent_commons import __version__
 from agent_commons.catalog import empty_catalog
-from agent_commons.errors import ConfigurationError
+from agent_commons.errors import CommonsError, ConfigurationError
 from agent_commons.runtime import (
     BuiltinProfileId,
     ClaudeRunnerProfile,
@@ -123,6 +123,68 @@ def _provider_version(
     raise ConfigurationError("provider canary has no version renderer")  # pragma: no cover
 
 
+def _implementation_result_refs_match(
+    manager: CommonsManager,
+    *,
+    task_ref: Mapping[str, str],
+    target_revision: str,
+    delegation: Mapping[str, Any],
+    child_session_id: str,
+) -> bool:
+    """Grade canonical builder results without granting a closed child authority."""
+    refs = delegation.get("result_refs")
+    if refs == [task_ref]:
+        return True  # The existing generic terminal protocol remains supported.
+    if (
+        not isinstance(refs, list)
+        or len(refs) != 2
+        or refs[0] != task_ref
+        or not isinstance(refs[1], dict)
+        or set(refs[1]) != {"kind", "id"}
+        or refs[1]["kind"] != "event"
+    ):
+        return False
+    try:
+        snapshot = manager.snapshot()
+        task = snapshot.tasks.get(task_ref["id"])
+        terminal = manager.events.get(delegation["revision"]).event
+        submitted = manager.events.get(refs[1]["id"]).event
+        completed = manager.events.get(submitted["payload"]["expected_revision"]).event
+        bindings = completed["payload"].get("artifact_bindings")
+        return (
+            delegation.get("state") == "succeeded"
+            and delegation.get("purpose") == "implementation"
+            and delegation.get("target_ref") == task_ref
+            and delegation.get("target_revision") == target_revision
+            and delegation.get("child_session_id") == child_session_id
+            and snapshot.entity_revision("delegation", delegation["id"]) == delegation["revision"]
+            and terminal["event_type"] == "delegation.succeeded"
+            and terminal["actor"]["session_id"] == child_session_id
+            and terminal["payload"].get("delegation_id") == delegation["id"]
+            and terminal["payload"].get("result_refs") == refs
+            and task is not None
+            and task.get("state") == "review"
+            and snapshot.entity_revision("task", task_ref["id"]) == refs[1]["id"]
+            and snapshot.entity_revision_actor("task", task_ref["id"], refs[1]["id"])
+            == child_session_id
+            and submitted["event_type"] == "task.submitted"
+            and submitted["actor"]["session_id"] == child_session_id
+            and submitted["payload"].get("task_id") == task_ref["id"]
+            and completed["event_type"] == "task.completed"
+            and completed["actor"]["session_id"] == child_session_id
+            and completed["payload"].get("task_id") == task_ref["id"]
+            and completed["payload"].get("expected_revision") == target_revision
+            and isinstance(bindings, list)
+            and bool(bindings)
+            and submitted["payload"].get("artifact_bindings") == bindings
+            and submitted["payload"].get("artifact_refs")
+            == completed["payload"].get("artifact_refs")
+            and task.get("artifact_bindings") == bindings
+        )
+    except (CommonsError, KeyError, TypeError, ValueError, OSError):
+        return False
+
+
 def _run_compatibility_canary(
     profiles: ProfileRegistry,
     *,
@@ -231,6 +293,8 @@ def _run_compatibility_canary(
             "state": initialization.state.value,
             "supported": initialization.supported,
             "blocks_launch": initialization.blocks_launch,
+            "timeout_seconds": initialization.timeout_seconds,
+            "duration_seconds": initialization.duration_seconds,
         }
         if initialization.blocks_launch:
             report = {
@@ -419,10 +483,21 @@ def _run_compatibility_canary(
                 if len(verifications) == 1
                 else []
             )
+        result_refs_match = (
+            _implementation_result_refs_match(
+                manager,
+                task_ref=task["entity_ref"],
+                target_revision=task["revision"],
+                delegation=canonical,
+                child_session_id=result["attempt"]["correlation"]["child_session_id"],
+            )
+            if purpose == "implementation"
+            else canonical.get("result_refs") == expected_result_refs
+        )
         ok = (
             result["process"]["outcome"] == "succeeded"
             and canonical["state"] == "succeeded"
-            and canonical.get("result_refs") == expected_result_refs
+            and result_refs_match
             and joined["canonical_state"] == "succeeded"
             and joined["workflow_diagnostic_code"] == "none"
             and joined["process_canonical_mismatch"] is False
@@ -454,6 +529,7 @@ def _run_compatibility_canary(
                 "output_truncated": process["output_truncated"],
             },
             "canonical_state": canonical["state"],
+            "result_refs_match": result_refs_match,
             "workflow_diagnostic_code": joined["workflow_diagnostic_code"],
             "process_canonical_mismatch": joined["process_canonical_mismatch"],
             "terminal_tool_calls": joined["terminal_tool_calls"],

@@ -1,0 +1,18 @@
+{
+  "projectA": {
+    "transform": "transform: translate(-88.62px, 168.589px) scale(0.351236);"
+  },
+  "restoredA": {
+    "transform": "transform: translate(-88.62px, 168.589px) scale(0.351236);"
+  },
+  "secondProject": {
+    "transform": "transform: translate(-26.1px, 150.033px) scale(0.292697);"
+  },
+  "restoredDraft": "Тест черновика — не сохранять",
+  "draftWasNotSubmitted": true,
+  "dropdownGeometry": {
+    "left": 230,
+    "right": 570,
+    "width": 340
+  }
+}

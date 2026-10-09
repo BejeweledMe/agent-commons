@@ -357,6 +357,35 @@ by default, no capability flag required. That surface is an adapter over
 second write path, and the capability-granting half of the catalogue is not
 editable from it.
 
+### Agent organization and method versions
+
+[ADR 0027](adr/0027-agent-organization-and-method-edits.md) separates an editable
+organizational supervisor from immutable creator provenance. Human operators
+create or reconfigure `supervisor_agent_id` with canonical revision checks;
+null clears it. The parent must be an active persistent non-template agent and
+the graph must remain acyclic. These validations run under the canonical lock
+and during replay. Organizational edges grant no authority, inheritance,
+recursive execution or retirement cascade. `created_by_agent_id` retains its
+existing security meaning. The UI projects organization as `supervised_by`.
+
+Modern method edits save an immutable library role and CAS-reconfigure the
+agent's exact `specialization_ref`. The writer composes and retains the full
+role/skill bundle from trusted service storage. A real binding change requires
+an unbound human operator and no requested/active/input-needed delegation or
+unfinished review. Legacy skill arrays remain separate. Identical committed
+retries recover the original receipt before checking later lifecycle changes;
+new changes with stale revisions refuse. No historical role version or other
+agent's binding is updated implicitly.
+
+These fields use `agent.v3` and reader semantics floor 8; v1/v2 keep a null
+supervisor by default and their existing semantics. Historical supervisor and
+specialization bindings are immutable to event correction. Operator editing
+reads full values and the revision through `/api/work/agents/{id}`; a DTO above
+512 KiB refuses rather than returning shortened editable arrays. Library
+version saving and canonical rebinding are separate retryable operations, not
+a cross-store transaction. A saved but unbound version remains available for
+retry and does not change a running agent.
+
 ## 11. Keep Git operations explicit
 
 Agent Commons does not stage, commit, push, merge, publish, or assign ownership
@@ -442,3 +471,39 @@ manifest-only reads do not. Binary assets have verified hashes but are not rende
 by the build-file tool. Evidence coverage is separate from a substantive review:
 criteria/summary must state visual, execution and test limitations honestly. Changed
 artifact binding, missing bytes, failed verification and out-of-scope reads refuse.
+
+### Text reports and explicit task handoff
+
+Implementation workers additionally receive `commons_publish_text_result`,
+`commons_complete_task_result`, `commons_submit_task_result` and
+`commons_finalize_task_result`. Verification and review workers do not inherit
+these authoring tools. Every operation derives its task and delegation from the
+bound child session, validates the exact expected revision and uses an explicit
+idempotency key. Publication retains inline UTF-8 text (at most 64 KiB), a title
+(256 bytes), summary (4096 bytes) and at most 32 check descriptions (512 bytes
+each). It accepts no arbitrary source path and uses the same immutable content
+store and quota as other results.
+
+Before a UI implementation launch binds its delegation revision, a locked,
+retry-convergent transition activates a ready or assigned task. It preserves
+owner and exact-revision checks. Publication leaves task state unchanged.
+Completion binds 1–64 exact artifacts
+published by that worker; submission preserves the same evidence set and moves
+the completed revision to review. Finalization records the submitted task/event
+references in the delegation outcome. None of these operations approves a review
+or accepts the task. After success, a fresh MCP process exposes only the exact
+terminal receipt retry; a changed key or payload refuses, and no authoring tools
+remain available. An omitted CLI `--artifact-ref` preserves existing evidence;
+an explicit replacement remains distinct from omission.
+
+Output projections include `kind: text_result` with human title, summary and
+checks. Authenticated `/api/outputs/text/{artifact_id}/{artifact_revision}` reads
+return verified retained text for the requested task/agent scope, never an
+unverified source-path fallback. The task-details endpoint
+`/api/outputs/task-results/{task_id}` requires the exact `task_revision` and
+returns full description and acceptance criteria with bounded evidence pages
+(1–64 entries, default 32), total and next offset. The complete DTO is capped at
+512 KiB; oversize content refuses explicitly instead of silently truncating.
+Every page rechecks the revision; changed tasks refuse with
+`results_task_revision_changed`. Identifiers are provenance, not the primary
+human description of a result. Stale bindings remain visibly stale.

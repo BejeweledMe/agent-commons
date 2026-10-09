@@ -1,5 +1,5 @@
 import type { WorkApi } from "./api.js";
-import { OutputsError, canViewImage, canDownloadBuild, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type LiveOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions, type ReviewState } from "./outputsTypes.js";
+import { OutputsError, canReadReport, parseTextResultContent, type TextResultContent, canViewImage, canDownloadBuild, parseOutputList, parseOutputSummary, scopeKey, type ImageOutput, type LiveOutput, type OutputList, type OutputScope, type OutputSummary, type OutputVersions, type ReviewState } from "./outputsTypes.js";
 import type { OutputMessage } from "./outputsStrings.js";
 
 export type OutputStatus = Extract<OutputMessage, "latestResult" | "earlierViewable" | "earlierVersion" | "previewExpired" | "addressUnavailable" | "previewNotVerified" | "previewUnavailable" | "starting" | "reported_ready">;
@@ -13,7 +13,7 @@ export function outputStatus(item: ImageOutput | LiveOutput, now: number): Outpu
     if (item.state === "unavailable") return "addressUnavailable";
     return item.state;
   }
-  if (canViewImage(item) || canDownloadBuild(item)) return item.state === "ready" && item.latest ? "latestResult" : "earlierViewable";
+  if (canViewImage(item) || canDownloadBuild(item) || canReadReport(item)) return item.state === "ready" && item.latest ? "latestResult" : "earlierViewable";
   if (item.state === "unchecked") return "previewNotVerified";
   if (item.state === "unavailable") return "previewUnavailable";
   return "earlierVersion";
@@ -22,13 +22,15 @@ const REVIEW_LABELS = { awaiting: "reviewAwaiting", approved: "reviewApproved", 
 /** Only a server-supplied review state produces a review label; freshness never does. */
 export function reviewLabel(state: ReviewState | null): OutputMessage | null { return state === null ? null : REVIEW_LABELS[state]; }
 
-type Transport = Pick<WorkApi, "readOutputs" | "readOutputImage"> & Partial<Pick<WorkApi, "readOutputBuild">>;
+type Transport = Pick<WorkApi, "readOutputs" | "readOutputImage"> & Partial<Pick<WorkApi, "readOutputBuild" | "readOutputText">>;
 export class OutputsApi {
   private requests = new Set<AbortController>();
   private summaries = new Map<string, Promise<OutputSummary>>();
   private revision = "";
   private summaryExpiry = new Map<string, number>();
-  constructor(private readonly transport: Transport) {}
+  constructor(private transport: Transport) {}
+  /** The owning workspace replaces authentication for this same project only. */
+  setTransport(transport: Transport): void { this.transport = transport; }
   dispose(): void { for (const controller of this.requests) controller.abort(); this.requests.clear(); this.summaries.clear(); this.summaryExpiry.clear(); }
   summary(scope: OutputScope, revision = ""): Promise<OutputSummary> {
     if (this.revision !== revision) { this.dispose(); this.revision = revision; }
@@ -43,6 +45,13 @@ export class OutputsApi {
   }
   async list(scope: OutputScope, versions: OutputVersions, signal: AbortSignal): Promise<OutputList> {
     scopeKey(scope); return parseOutputList(await this.transport.readOutputs(scope.kind, scope.id, versions, false, signal), scope, versions);
+  }
+  async text(scope: OutputScope, item: ImageOutput, signal: AbortSignal): Promise<TextResultContent> {
+    if (!canReadReport(item) || !this.transport.readOutputText) throw new OutputsError();
+    const content = parseTextResultContent(await this.transport.readOutputText(item.artifactId, item.artifactRevision, scope.kind, scope.id, signal), scope, item);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content.content));
+    if (signal.aborted || `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}` !== item.contentRevision) throw new OutputsError();
+    return content;
   }
   async build(scope: OutputScope, item: ImageOutput, signal: AbortSignal): Promise<Blob> {
     if (!canDownloadBuild(item) || !this.transport.readOutputBuild) throw new OutputsError();

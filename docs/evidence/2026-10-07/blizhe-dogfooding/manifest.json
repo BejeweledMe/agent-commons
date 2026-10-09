@@ -1,0 +1,130 @@
+[
+  {
+    "file": "V01-board-EN.jpg",
+    "sha256": "aab0b572a73cb6956b5695ecb7028e8067c8b21c8fc1ed5605f4e2834135e88e",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Доска Blizhe",
+    "steps": "Общая панель 8794 → blizhe-webapp; видны семь ролей; EN/RU."
+  },
+  {
+    "file": "V01-board-RU.jpg",
+    "sha256": "8cd0bb8030bcc0d5224c94a8d0347dd440b1cc81f3ebe10b7ca1abe15f3f7143",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Доска Blizhe",
+    "steps": "Общая панель 8794 → blizhe-webapp; видны семь ролей; EN/RU."
+  },
+  {
+    "file": "V02-gallery-EN.jpg",
+    "sha256": "a5802f32ea1ed915dfacdcf975c56e279cbce92b730c3f3cbd46ac7eb9d5b282",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Пустая галерея Blizhe",
+    "steps": "Доска Blizhe → имя Blizhe Frontend — TOOL → дождаться пустого состояния; EN/RU."
+  },
+  {
+    "file": "V02-gallery-RU.jpg",
+    "sha256": "772d824552fe970ebcdd790040695062689076141b812c671a9d84808798344d",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Пустая галерея Blizhe",
+    "steps": "Доска Blizhe → имя Blizhe Frontend — TOOL → дождаться пустого состояния; EN/RU."
+  },
+  {
+    "file": "V03-dependencies-EN.jpg",
+    "sha256": "275d3fe2bf7af72c290611b4250f54729e5452f73bfa9b79bfa50f03d35d18e7",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Задачи-предпосылки",
+    "steps": "Blizhe → Задачи → Карта → Задачи-предпосылки; все 6 задач; EN/RU."
+  },
+  {
+    "file": "V03-dependencies-RU.jpg",
+    "sha256": "ef8b7e3536cdf5e5b666b61e91114d1ef542e2098f43f7a477690de11dcd217a",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Задачи-предпосылки",
+    "steps": "Blizhe → Задачи → Карта → Задачи-предпосылки; все 6 задач; EN/RU."
+  },
+  {
+    "file": "V04-structure-EN.jpg",
+    "sha256": "dfca533ffc129f5ce0d37efcb9fbe8ff802d56956368bc72a09c7d4da1c4ca7e",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Структура",
+    "steps": "Blizhe → Задачи → Карта → Структура; EN/RU."
+  },
+  {
+    "file": "V04-structure-RU.jpg",
+    "sha256": "24892c89ad4b26f450d10f7deb1dbd034f6d10d3a7c0a8270e408ad91b6ae711",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Структура",
+    "steps": "Blizhe → Задачи → Карта → Структура; EN/RU."
+  },
+  {
+    "file": "V05-draft-before-EN.jpg",
+    "sha256": "7cdaabd115339b655e813a4f351967b9d5324bee5d246d4031c6cef382fe943d",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Черновик до смены проекта",
+    "steps": "Новая задача → выбрать Компонент → заполнить три поля; Create task не нажимать; EN/RU."
+  },
+  {
+    "file": "V05-draft-before-RU.jpg",
+    "sha256": "637bf609bce08c49999b2c7e239b9ed41b981edec00c47ab024177fb1cda3859",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Черновик до смены проекта",
+    "steps": "Новая задача → выбрать Компонент → заполнить три поля; Create task не нажимать; EN/RU."
+  },
+  {
+    "file": "V06-draft-after-switch-EN.jpg",
+    "sha256": "b5ac7cc74262d5a0b548768d973ebe50c3cfb54dcf4f0504c8a0fcaa1893dd14",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Черновик после возврата",
+    "steps": "С заполненным черновиком перейти agent-commons → blizhe-webapp → снова Новая задача; текст и Component восстановлены; EN/RU."
+  },
+  {
+    "file": "V06-draft-after-switch-RU.jpg",
+    "sha256": "f1b27a81b9bc1c14931f7a090a9fb3b077e5fd819399cf4ecaa0f453abce27a3",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Черновик после возврата",
+    "steps": "С заполненным черновиком перейти agent-commons → blizhe-webapp → снова Новая задача; текст и Component восстановлены; EN/RU."
+  },
+  {
+    "file": "V07-draft-after-reload-EN.jpg",
+    "sha256": "cfa433bfebb4bbc17053dd60e3589eeba395d1c0f032d356dc56cf908e748b2b",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Форма после reload",
+    "steps": "Перезагрузить открытую форму с черновиком → пустые поля и Task, язык EN; затем только переключить RU."
+  },
+  {
+    "file": "V07-draft-after-reload-RU.jpg",
+    "sha256": "80735d90b4e32d6032152bc36d27c1aca3a2381d881f7f609a5138b98df58c45",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Форма после reload",
+    "steps": "Перезагрузить открытую форму с черновиком → пустые поля и Task, язык EN; затем только переключить RU."
+  },
+  {
+    "file": "V08-original-gallery-EN.jpg",
+    "sha256": "662fa5f79d7c4b0e53de454334ed7670dfa1a85d7a489dad51426d1b5c8d8b9c",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Исходный сценарий UX-32",
+    "steps": "Проект agent-commons → Доска → Self-improvement · Frontend → дождаться пустого состояния; EN/RU."
+  },
+  {
+    "file": "V08-original-gallery-RU.jpg",
+    "sha256": "bd4e4880b4013b3868a2a121b15f22d184492669b829cbebe1515aae46c618d8",
+    "commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "Исходный сценарий UX-32",
+    "steps": "Проект agent-commons → Доска → Self-improvement · Frontend → дождаться пустого состояния; EN/RU."
+  }
+]

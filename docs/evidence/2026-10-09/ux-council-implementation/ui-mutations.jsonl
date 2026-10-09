@@ -1,0 +1,4 @@
+{"time": "2026-10-09T17:24:38.395215+00:00", "method": "POST", "route": "/api/library/role", "status": 200, "fixture_blocked": false}
+{"time": "2026-10-09T17:24:38.671436+00:00", "method": "POST", "route": "/api/agents/agent.3RET1XQJX47F0VR3ZYN1HBNBCM/reconfigure", "status": 200, "fixture_blocked": false}
+{"time": "2026-10-09T17:25:03.296868+00:00", "method": "POST", "route": "/api/agents/agent.3RET1XQJX47F0VR3ZYN1HBNBCM/reconfigure", "status": 200, "fixture_blocked": false}
+{"time": "2026-10-09T17:29:33.313747+00:00", "method": "POST", "route": "/api/conversations/thread.4YPVWGW3M1VTA15Q9TQWCN3PVD/messages", "status": 200, "fixture_blocked": false}

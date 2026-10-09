@@ -1,0 +1,35 @@
+{
+  "observed_at": "2026-10-06T23:24:04.343384+00:00",
+  "commons_sha": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "asset": "work-C0nYR3qF.js",
+  "cli_version": "0.1.0",
+  "worktree": "/Users/dmitrijersov/Desktop/blizhe-workspaces/dogfooding-20261007",
+  "branch": "codex/blizhe-improvement-20261007",
+  "blizhe_head": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+  "workspace": "workspace.01M49QQ08RM5XYPSX1G3KNN2G1",
+  "project": "project.a3724d82fded96d1de2d845e394e928f",
+  "base_task": "task.2R17J2DE17C34H066W5PNXHKJJ",
+  "canaries_started": 0,
+  "project_runs_started": 0,
+  "tasks_created": 4,
+  "roles_created": 0,
+  "accepted_results": 0,
+  "owner_preservation": {
+    "baseline_sha256": "94185f39ce00dc388b7fef38ec18261b0208d229e66bb31b37bfab2001f9b460",
+    "after_preparation_sha256": "bc012fed0e36ffaef4eb43166a2719b5c96cf42e6a52eb59579ad5f598939211",
+    "checks": {
+      "branch": true,
+      "head": true,
+      "origin_main": true,
+      "status_entry_count": true,
+      "status_sha256": true,
+      "git_info_exclude_sha256": true,
+      "nested_repositories": true,
+      "files": true
+    },
+    "file_count": 4815,
+    "coverage": "All files represented by current dirty Git status, expanding embedded repositories via their tracked and non-ignored inventories. Ignored dependency caches, ignored secrets, and Git internals are excluded. File content is not copied.",
+    "observed_at": "2026-10-06T23:22:42.601526+00:00"
+  },
+  "screenshots_added": 11
+}

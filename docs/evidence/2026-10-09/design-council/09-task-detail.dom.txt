@@ -1,0 +1,271 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=detail
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=detail
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=detail
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=detail
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=detail
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=detail
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Задачи" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - navigation "Карты проекта":
+    - link "Задачи":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=detail
+      - text: Задачи
+    - link "Агенты":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=detail
+      - text: Агенты
+    - button "Новая задача"
+  - region "Задачи":
+    - region "Задачи и прогоны":
+      - generic: Найти задачу
+      - searchbox "Найти задачу"
+      - status "Автоматические обновления подключены":
+        - text: ●
+        - generic: Автоматические обновления подключены
+      - button "Обновить"
+      - generic "Проверьте данные"
+      - 'generic "Показано задач: 14/14"': 14/14
+      - generic: Статус задачи
+      - combobox "Статус задачи":
+        - option "Рабочий набор"
+        - option "Все задачи" [selected]
+        - option "Требуют внимания"
+        - option "Готовы к работе"
+        - option "Назначены"
+        - option "В работе"
+        - option "Заблокированы"
+        - option "Завершены"
+        - option "На проверке"
+        - option "Приняты"
+        - option "Отменены"
+      - tablist "Представления задач":
+        - tab "Сейчас"
+        - tab "Карта" [selected]
+        - tab "Список"
+      - generic: Связи на карте
+      - combobox "Связи на карте":
+        - option "Структура"
+        - option "Зависимости" [selected]
+      - paragraph: Выберите задачу для подробностей. Между карточками задач можно перемещаться стрелками, Home и End.
+      - tabpanel "Карта":
+        - region "Граф зависимостей":
+          - paragraph: Предварительные задачи расположены выше зависимых. Выберите задачу, чтобы увидеть её результат и текущий запуск.
+          - generic "Управление"
+          - option "Все подходящие задачи" [selected]
+          - option "Выбранная задача и связанная работа"
+          - option "Выбранная задача и предварительные"
+          - option "Выбранная задача и зависимые"
+          - generic "Справка"
+          - group "Масштаб карты":
+            - button "Уменьшить масштаб": −
+            - status: 38%
+            - button "Увеличить масштаб": +
+            - button "Вписать"
+            - button "Исходный масштаб": 100%
+          - region "Граф зависимостей":
+            - img "Граф зависимостей":
+              - button "Готово к запуску SEARCH · Консилиум и завершение умного поиска Агент не назначен Текущего запуска нет":
+                - text: Готово к запуску
+                - strong: SEARCH · Консилиум и завершение умного поиска
+                - generic: Агент не назначен
+                - generic: Текущего запуска нет
+              - button "Не подтверждено SEARCH-C · Критика и проверка решений по коду Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Не подтверждено
+                - strong: SEARCH-C · Критика и проверка решений по коду
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+              - button "Принято BASE · Проверить исходную версию и сохранность работы владельца Blizhe Lead · BASE · codex требуется действие оператора":
+                - text: Принято
+                - strong: BASE · Проверить исходную версию и сохранность работы владельца
+                - generic: Blizhe Lead · BASE · codex
+                - generic: требуется действие оператора
+              - button "Принято TOOL · Ограничить lint, сборку и watch Blizhe Frontend · TOOL · codex требуется действие оператора" [pressed]:
+                - text: Принято
+                - strong: TOOL · Ограничить lint, сборку и watch
+                - generic: Blizhe Frontend · TOOL · codex
+                - generic: требуется действие оператора
+              - button "Готово к запуску CONFIG · Согласовать проверку конфигурации rate limit Агент не назначен Текущего запуска нет":
+                - text: Готово к запуску
+                - strong: CONFIG · Согласовать проверку конфигурации rate limit
+                - generic: Агент не назначен
+                - generic: Текущего запуска нет
+              - button "Принято REASONS · Исключить приватные сигналы из объяснений Blizhe Backend · CONFIG и REASONS · codex требуется действие оператора":
+                - text: Принято
+                - strong: REASONS · Исключить приватные сигналы из объяснений
+                - generic: Blizhe Backend · CONFIG и REASONS · codex
+                - generic: требуется действие оператора
+              - button "Готово к запуску SEARCH-B · Независимый аудит и дизайн Claude Агент не назначен Текущего запуска нет":
+                - text: Готово к запуску
+                - strong: SEARCH-B · Независимый аудит и дизайн Claude
+                - generic: Агент не назначен
+                - generic: Текущего запуска нет
+              - button "Не подтверждено SEARCH-A · Независимый аудит и дизайн Codex Blizhe Search · Codex · codex каноническое завершение записано":
+                - text: Не подтверждено
+                - strong: SEARCH-A · Независимый аудит и дизайн Codex
+                - generic: Blizhe Search · Codex · codex
+                - generic: каноническое завершение записано
+              - button "Принято PHOTO · Подключить OpenAI Decisions для проверки фото Blizhe Backend · PHOTO · codex требуется действие оператора":
+                - text: Принято
+                - strong: PHOTO · Подключить OpenAI Decisions для проверки фото
+                - generic: Blizhe Backend · PHOTO · codex
+                - generic: требуется действие оператора
+              - button "Принято SEARCH-INDEX · Ограничить небезопасную переиндексацию Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Принято
+                - strong: SEARCH-INDEX · Ограничить небезопасную переиндексацию
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+              - button "Принято SEARCH-RANK · Согласовать каталог и расчёт ранга Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Принято
+                - strong: SEARCH-RANK · Согласовать каталог и расчёт ранга
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+              - button "Принято SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Принято
+                - strong: SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+              - button "Принято SEARCH-BOUNDS · Ограничить запросы и добор кандидатов Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Принято
+                - strong: SEARCH-BOUNDS · Ограничить запросы и добор кандидатов
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+              - button "Принято SEARCH-EVAL · Собрать воспроизводимую проверку качества Blizhe Search · Codex · codex требуется действие оператора":
+                - text: Принято
+                - strong: SEARCH-EVAL · Собрать воспроизводимую проверку качества
+                - generic: Blizhe Search · Codex · codex
+                - generic: требуется действие оператора
+      - generic "Диагностика рабочего пространства"
+      - dialog "Детали задачи":
+        - heading "Детали задачи" [level=2]
+        - button "Закрыть детали" [active]:
+        - region "TOOL · Ограничить lint, сборку и watch":
+          - heading "TOOL · Ограничить lint, сборку и watch" [level=2]
+          - 'button "Обсуждение: TOOL · Ограничить lint, сборку и watch"': Обсуждение
+          - 'region "Что происходит: точная проверенная редакция принята — Нет оставшейся работы"':
+            - 'heading "Что происходит: точная проверенная редакция принята — Нет оставшейся работы" [level=3]':
+              - generic: "Что происходит:"
+              - text: точная проверенная редакция принята — Нет оставшейся работы
+            - paragraph:
+              - generic: "Кто отвечает:"
+              - text: Blizhe Frontend · TOOL — отвечает за эту задачу
+            - paragraph:
+              - generic: "Что дальше:"
+              - text: сейчас дальнейших действий не требуется
+            - region "Изменить задачу":
+              - button "Изменить задачу"
+              - button "Добавить подзадачу"
+              - button "Добавить зависимую задачу"
+              - button "Отменить задачу"
+            - heading "Находки" [level=4]
+            - paragraph: Сервер пока не прикрепляет находки к записи задачи; смотрите список находок.
+            - generic "Подробности"
+          - status: Загружаем сведения о задаче…
+          - heading "Свидетельства" [level=3]
+          - generic: Данные о свидетельствах устарели
+          - paragraph: Полнота данных о свидетельствах не означает завершение или приёмку задачи.
+          - generic "История прогонов":
+            - heading "История прогонов" [level=3]
+          - list:
+            - strong: Blizhe QA · BASE и TOOL
+            - generic: каноническое завершение записано
+            - paragraph: codex · 8 окт. 2026 г., 20:41
+            - paragraph: "Лимит попытки: 15 мин"
+            - generic "Сведения о прогоне"
+            - strong: Blizhe Frontend · TOOL
+            - generic: требуется действие оператора
+            - paragraph: codex · 8 окт. 2026 г., 20:36
+            - paragraph: "Лимит попытки: 10 мин"
+            - generic "Сведения о прогоне"
+            - strong: Blizhe QA · BASE и TOOL
+            - generic: каноническое завершение записано
+            - paragraph: codex · 8 окт. 2026 г., 20:29
+            - paragraph: "Лимит попытки: 60 мин"
+            - generic "Сведения о прогоне"
+            - strong: Blizhe QA · BASE и TOOL
+            - generic: требуется действие оператора
+            - paragraph: codex · 8 окт. 2026 г., 20:23
+            - paragraph: "Лимит попытки: 60 мин"
+            - generic "Сведения о прогоне"
+            - strong: Blizhe Frontend · TOOL
+            - generic: требуется действие оператора
+            - paragraph: codex · 8 окт. 2026 г., 20:15
+            - paragraph: "Лимит попытки: 60 мин"
+            - generic "Сведения о прогоне"
+            - strong: Blizhe Frontend · TOOL
+            - generic: требуется действие оператора
+            - paragraph: codex · 8 окт. 2026 г., 19:43
+            - paragraph: "Лимит попытки: 60 мин"
+            - generic "Сведения о прогоне"
+          - paragraph: Контекст и дизайн выбираются при подготовке прогона; запись задачи сама по себе их не задаёт.
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

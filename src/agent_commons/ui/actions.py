@@ -461,6 +461,8 @@ class UIActions:
         expected_revision = fields.pop("expected_revision")
         manager = self.writer()
         changes = fields.get("changes") or {}
+        if "specialization_ref" in changes:
+            fields["library_store"] = self.library_store()
         if "skills" in changes or "tool_allowlist" in changes:
             record = manager.get_agent(agent_id)
             self._check_role_selection(

@@ -1,0 +1,194 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+  - button "Закрыть панель"
+  - group "Расположение рабочей области":
+    - button "Навигация":
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Агенты" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - navigation "Карты проекта":
+    - link "Задачи":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+      - text: Задачи
+    - link "Агенты":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+      - text: Агенты
+  - region "Агенты":
+    - button "Нанять роль"
+    - button "Добавить отдел"
+    - button "Показать всё"
+    - button "Расставить автоматически"
+    - generic "Список агентов"
+    - generic "Связи на карте"
+    - generic "Агенты":
+      - application:
+        - strong: Вы · владелец
+        - button "Главный чат":
+          - text: Главный чат
+        - button "Открыть галерею результатов агента Blizhe QA · BASE и TOOL":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · BASE и TOOL
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 2 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · BASE и TOOL"':
+        - button "Результаты Blizhe QA · BASE и TOOL":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · PHOTO":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · PHOTO
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · PHOTO"':
+        - button "Результаты Blizhe Backend · PHOTO":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Search · Codex":
+          - generic: И
+          - generic: Инженер RAG и retrieval
+        - generic: Нужны вы
+        - paragraph: Blizhe Search · Codex
+        - paragraph: Обеспечить проверяемый путь от разрешённых источников к релевантному evidence, grounded answer и корректному отказу при отсутствии оснований.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 2 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Search · Codex"':
+        - button "Результаты Blizhe Search · Codex":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Frontend · TOOL":
+          - generic: F
+          - generic: Frontend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Frontend · TOOL
+        - paragraph: JavaScript / TypeScript · Работающий браузерный сценарий с корректными состояниями и взаимодействием.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Frontend · TOOL"':
+        - button "Результаты Blizhe Frontend · TOOL":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Lead · BASE":
+          - generic: Т
+          - generic: Техлид реализации и интеграции
+        - generic: Свободна
+        - paragraph: Blizhe Lead · BASE
+        - paragraph: Довести сложную задачу разработки до целостного работающего результата, сохранив одного владельца реализации, интеграции и проверки.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Lead · BASE"':
+        - button "Результаты Blizhe Lead · BASE":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · CONFIG и REASONS":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · CONFIG и REASONS
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · CONFIG и REASONS"':
+        - button "Результаты Blizhe Backend · CONFIG и REASONS":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe QA · PHOTO и SEARCH":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · PHOTO и SEARCH
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · PHOTO и SEARCH"':
+        - button "Результаты Blizhe QA · PHOTO и SEARCH":
+        - button "Задачи":
+        - button "Дать задачу":
+        - button "Связи":
+          - text: Связи
+        - generic "Масштаб карты":
+          - button "Увеличить масштаб":
+          - button "Уменьшить масштаб":
+          - button "Показать всё":
+  - dialog "Чат":
+    - button "Закрыть панель" [active]
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - status: Загрузка обсуждения…
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

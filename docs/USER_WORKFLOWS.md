@@ -66,17 +66,14 @@ retirement. `agent retire --cascade` takes a role and everything it created out
 of service in one command, and refuses as a whole if any of them still owes a
 live delegation or an unfinished review. Nothing is ever deleted.
 
-`agent-commons ui` opens the same operations in a panel built
-around one home per kind of thing: a library sidebar (the board, runs, a
-two-minute Overview, Skills and Tools over the operator catalogue, the agent
-catalogue of role templates), the board in the centre, and the conversation —
-main chat plus the attention queue — docked right. Clicking a node opens its
-drawer, where Record, Settings, Links, Run and Message are tabs of the selected
-thing; the ring still marks anything waiting on a human. Hiring sits behind the
-board's + button (a new agent from scratch, or two clicks from a template), and
-dragging one of a role card's four ports onto another role opens a recorded
-link — closed later with a reason, never deleted. Anyone holding the printed
-token writes as the session the server was started with.
+`agent-commons ui` serves the Work application. Its primary workspace follows
+[ADR 0026](adr/0026-map-first-workspace.md): navigation, the task map and the
+main project conversation, with details opened on demand. The separate agent
+board retains recorded links and department frames. The
+[frontend contract](FRONTEND_CONTRACT.md) owns interaction and persistence
+rules; the [English](user/en/README.md) and [Russian](user/ru/README.md) guides
+describe operator actions. The printed single-use URL exchanges into a private
+same-origin session; it is not a reusable token in a query string.
 
 ## 2. Delegate one bounded local step
 
@@ -214,6 +211,12 @@ panel and use its fresh sign-in link. An already-mounted old binding refuses
 requests until restart. Recovery does not restore missing runs or attachments.
 Never edit `registry.json` or remove receipts to bypass an identity conflict.
 
+If the same registered directory still exists but its filesystem identity changed
+(for example after a volume remount), add `--verify-existing` to the recovery
+command. This explicit mode requires the exact existing registered path and
+rechecks ownership, checkout, Git, workspace and integrity before changing only
+the registry identity. It cannot redirect an existing binding to another root.
+
 **RU — восстановление привязки проекта.** Остановите панели этого проекта.
 В `support --show-paths` работающей установки найдите существующий точный каталог
 состояния, а не базовый каталог. Команда `project list` показывает ID и ревизию;
@@ -223,6 +226,10 @@ Never edit `registry.json` or remove receipts to bypass an identity conflict.
 тем же ключом; для новых параметров нужны новая ревизия и ключ. После этого
 перезапустите общую панель и откройте свежую ссылку входа. Потерянные запуски и
 вложения эта операция не восстанавливает. Не редактируйте реестр вручную.
+Если прежний точный каталог существует, но изменился его идентификатор файловой
+системы, добавьте `--verify-existing`: команда перепроверит принадлежность,
+checkout, Git, workspace и целостность и обновит только привязку в реестре.
+Перенаправить существующую привязку на другой путь этот режим не позволяет.
 
 ## 3. Prototype a product design
 

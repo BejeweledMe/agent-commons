@@ -1,0 +1,92 @@
+{
+  "worktree": "/Users/dmitrijersov/.codex/worktrees/oct09-result-handoff/agent-commons",
+  "base": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "files": [
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "status": "modified",
+      "sha256": "851558512af04205320d4af673fcb1e76d060b3c05f1e3f5ffd210e4783987fb"
+    },
+    {
+      "path": "src/agent_commons/mcp/text_result_tools.py",
+      "status": "new",
+      "sha256": "3dc2adfee12b5dbc4b1a1fc87f25483e5c2ab4ffebaf28c9a5e9c93bb69cde1d"
+    },
+    {
+      "path": "src/agent_commons/runtime/model.py",
+      "status": "modified",
+      "sha256": "b0fd6e47dedbdb12dc9117fa951ea5720d440b9db3fff3a10e49e230881a4676"
+    },
+    {
+      "path": "src/agent_commons/runtime/tool_audit.py",
+      "status": "modified",
+      "sha256": "cbac458b3a3b96b7a8949dad3b3c97ea6daab297ad8d492cb3b784b7c0bc42c9"
+    },
+    {
+      "path": "src/agent_commons/services/delegation_instruction.py",
+      "status": "modified",
+      "sha256": "f7e82c07ba9ed0a64a8c6d0ca1ca043410cf9de1e4126651412efa1c8c9d0b8d"
+    },
+    {
+      "path": "src/agent_commons/services/generated_outputs.py",
+      "status": "modified",
+      "sha256": "d76b082d44c24132dfd3277796a031972360e0a4988de2fc116eb5828854dff0"
+    },
+    {
+      "path": "src/agent_commons/services/outputs.py",
+      "status": "modified",
+      "sha256": "fc18ea5527b029c3e940f5f857d599949ca8615a68dc0803020ebb083c53f402"
+    },
+    {
+      "path": "src/agent_commons/services/result_details.py",
+      "status": "new",
+      "sha256": "a0509d64994ef53ace0c11c2bd436dca040c9845726ddde351434824a72cbeb0"
+    },
+    {
+      "path": "src/agent_commons/services/text_results.py",
+      "status": "new",
+      "sha256": "049dae351890a1c1c00598111cf1979a6daec8266aad1a5ba0605d5407c7fa29"
+    },
+    {
+      "path": "src/agent_commons/ui/output_routes.py",
+      "status": "modified",
+      "sha256": "cf44578574e51b2f8bfe48270d8ddb1612d5f00ef3dac38a4d617b1a4aa4203f"
+    },
+    {
+      "path": "tests/mcp/test_text_result_tools.py",
+      "status": "new",
+      "sha256": "b8e38cbcd075cc9fb472daf1cb47c5e1f6d46d0d4f0871909faf0c741278c81b"
+    }
+  ],
+  "checks": [
+    {
+      "suite": "text reports, image/build/history/output routes and services, delegation instructions, launch plan",
+      "passed": 153,
+      "seconds": 138.95
+    },
+    {
+      "suite": "text reports, real stdio full handoff, worker scope, MCP server, provider profiles, terminal audit (ambient state/session unset)",
+      "passed": 95,
+      "seconds": 101.53
+    },
+    {
+      "suite": "final typed-title metadata regression",
+      "passed": 1,
+      "seconds": 1.27
+    },
+    {
+      "suite": "ruff check, ruff format check, git diff --check",
+      "result": "passed"
+    }
+  ],
+  "coordination": {
+    "task_id": "task.613Y702X9MBQEME718EP7WS61W",
+    "session_id": "session.a731271e80164dc280f0a5fd466be574",
+    "status": "active awaiting root integration and source-bound review"
+  },
+  "limitations": [
+    "Root integration must run full make check, rebuild/reinstall the worker tool and re-canary profiles.",
+    "No automatic review request or acceptance; the owner performs independent review request and acceptance.",
+    "Publication accepts safe inline UTF-8 text up to 64 KiB, not arbitrary source paths; existing retained-store quotas apply."
+  ]
+}

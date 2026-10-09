@@ -1,0 +1,836 @@
+{
+  "boundary": "Only broken Markdown destinations in copied feedback snapshots rebased from original docs/handoffs context; prose, headings, dates, observations and images unchanged. Original bytes preserved in private operator-work/original-feedback-links. External Blizhe files read for existence only, never edited. These external links still require the local source checkout.",
+  "files": [
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-183405.md",
+      "original_sha256": "2b160e356a9025356f02d6da975aab96f58ed8755d4ed165e6d4d793117d3e4c",
+      "rebased_sha256": "6ae4a8c03ad987a0fb2ce4545f976f61ff0df35024d529751183e88a9c2e9966",
+      "links": [
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-184645.md",
+      "original_sha256": "0868243bed48f98bc215f339a270909e5f5dec627708815b24a59d0e5ddaf8c4",
+      "rebased_sha256": "b2e66e0cfbcdc793af9c77dc75df1d272056ad8834e8117f6e38df09606f3fc8",
+      "links": [
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-190336.md",
+      "original_sha256": "f7cbe9655496029f645029f63b9a5c591089e3526958ce922c16030c5302c98d",
+      "rebased_sha256": "4ad8425317b84d0a90aaf3d1b596c53911891cdba4b6e653de465916373670bc",
+      "links": [
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-193129.md",
+      "original_sha256": "a42e4e8e1bdab4a44bb36e7d7a3de3a9f7a3061a19cbf6d39fd60e0a2ca2765f",
+      "rebased_sha256": "68b43b1681bd1a2b806bd0eae283478b4a1a68acd2794f338b861093e00a3709",
+      "links": [
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-194505.md",
+      "original_sha256": "a9ff19798f79da7e5607ea2a262a98d5d3f10410701c593b2046377a3c29080e",
+      "rebased_sha256": "2a61e79f445d7ad4125d82300cd1f97285dac76bf18ab32c94af82d75d6b93fb",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-195129.md",
+      "original_sha256": "d350a8f85d6f546f7c32248d2515047b97728b95700779f84ac11e22831ab983",
+      "rebased_sha256": "8b9d628361bd458f84506842eb3525aebcc9f62f688a5110bc7e37fa7afcbc9a",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-200244.md",
+      "original_sha256": "f99e0fb0c588827ff59f11b73653f9f19fc5c7a8c0b107b61edf186da4ac0e6d",
+      "rebased_sha256": "1fec305c492379f771d925badb90efd37001ff19abd291cde1c3e7371332e947",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-201058.md",
+      "original_sha256": "e22e6866554fbadfd3343ff92390c8ffd71619f5045c96dd245ee414602675b2",
+      "rebased_sha256": "a0a5ed293a0b7709ddf3dfac7cbf7df7523a4f2e10d42416a77614ebf2720286",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-201632.md",
+      "original_sha256": "bc1dc9e06bf3ee272e6fd7faa2dce33dd0e2e7c403e1b3f0230b9f81033c893b",
+      "rebased_sha256": "84113dc10c8bce8feae3a07aab7c5165e77fd0b65d3f0580a0a8b1b91dbb3298",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-204610.md",
+      "original_sha256": "97f008419060cfb895e885fa28bfca3110e5737e660075892f7bd076c24b7662",
+      "rebased_sha256": "c042e8a7bf8f05e8cb7651227264be01dfa9b279f1baf16752fb90bdddfc2176",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-205141.md",
+      "original_sha256": "21c148bffd5a9187653493c4a8b25cf116dbe5674f18e6730ea433f4d12b963f",
+      "rebased_sha256": "b3fb6896744f76494bf9319a1fb060e2d08e504c37e3c7e16c0517ee07589336",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-210300.md",
+      "original_sha256": "dec317a1051688f2da887666cb90063afe17d7060905838e48fa35390bdcab70",
+      "rebased_sha256": "6566a3af62202a70393aca5ab09abf998cf97f2cf8448ec4ba64bea3e757a183",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-210811.md",
+      "original_sha256": "93cbb9ffa001baa1f5258d4d36d4d6574155fdc175394f01f83b43b481636d49",
+      "rebased_sha256": "1127df0f82f5919ae40ccc6c4bdb5ed8eec0c7c4d54d02218709fd8e81b69897",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-212738.md",
+      "original_sha256": "4e4f6d3676e8b5dddcebcca1dbf9788e05ae0248a793d618a2da0e207614d5e6",
+      "rebased_sha256": "4bfff7ee8f83e9b7764df44f2d806a29b50c23ba9327b92a764d506b8d4a2986",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/run-history-order-dom.txt",
+          "to": "run-history-order-dom.txt"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-213238.md",
+      "original_sha256": "d7d05eafa0cb57be7e17e4914c832370ead349c9835eb87e95cbd87f51d8d07b",
+      "rebased_sha256": "c783bfffa6d0b9e045db573a631a31c6c18b8464840d3d3d6cf3f9226770aec3",
+      "links": [
+        {
+          "from": "2026-09-21-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-09-21-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+          "to": "composer-overlap-dom.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/run-history-order-dom.txt",
+          "to": "run-history-order-dom.txt"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/decision.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/photo-live-smoke/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval/report.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval/report.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval/runbook.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval/runbook.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search-eval-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/search/program-graph.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-before-expansion.md",
+      "original_sha256": "cada29b40268c521766740e04a49c2bbdd80d5f7ec24dad6da5bb8556f4102ac",
+      "rebased_sha256": "85525c1d1e69746a731bfc26202f5410b8221dd817e2d4f1b4a31ea91f955349",
+      "links": [
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/boundary.json",
+          "to": "boundary.json"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+          "to": "initial-feedback.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/results/TOOL.md",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/results/TOOL.md"
+        },
+        {
+          "from": "../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/results/TOOL-checks.json",
+          "to": "../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/results/TOOL-checks.json"
+        }
+      ]
+    },
+    {
+      "file": "docs/evidence/2026-10-08/blizhe-dogfooding/initial-feedback.md",
+      "original_sha256": "38ece4e824b759acb428c5ab451030ff11ede33f4ca861d279bce2a5542949d0",
+      "rebased_sha256": "7ec703d2bdc39182dddceb518914924e4ec8842e75dc4a32a98bf8bce4d1c99b",
+      "links": [
+        {
+          "from": "2026-10-07-blizhe-dogfooding-feedback.md",
+          "to": "../../../handoffs/2026-10-07-blizhe-dogfooding-feedback.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+          "to": "manifest.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/journal.md",
+          "to": "journal.md"
+        },
+        {
+          "from": "../evidence/2026-10-08/blizhe-dogfooding/boundary.json",
+          "to": "boundary.json"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "checked_at": "2026-10-08T21:30:58.638455+00:00",
+  "doctor": {
+    "event_count": 582,
+    "index": null,
+    "issues": [],
+    "manifest_count": 294,
+    "ok": true,
+    "performance": {
+      "canonical_write_index_policy": "deferred",
+      "projection": {
+        "correction_candidates_examined": 0,
+        "correction_targets": 0,
+        "corrections_indexed": 0,
+        "events_replayed": 582,
+        "fixed_point_passes": 1
+      },
+      "receipt_scope_git_probes": 2,
+      "receipt_scope_refreshes": 1
+    },
+    "schema_count": 28,
+    "warnings": [
+      "read-only doctor skipped the writable SQLite projection",
+      "read-only doctor validated canonical history without receipt recovery state",
+      "review review.10JPNZGV7KBKRPCV57DJ2V91DN is stale for current target revision",
+      "review review.1QVFF16VNNPANP76WC3AMHNWG7 is stale for current target revision",
+      "review review.2WCDWNPT6MX4B8Z8H38H8AQNMS is stale for current target revision",
+      "review review.5WS0BEZYNCYNKB9GRAWT6YMHGY is stale for current target revision",
+      "review review.5XJRG6KY7C4TG1JM23CWHK05CP is stale for current target revision"
+    ],
+    "workspace_id": "workspace.01M49QQ08RM5XYPSX1G3KNN2G1"
+  },
+  "running_providers": 0,
+  "session_canonical_attempts": 31,
+  "session_codex_provider_attempts": 29,
+  "task_snapshot": [
+    {
+      "id": "task.0SQAJ6PMAE5VTN5JB6JA4M5HEP",
+      "title": "SEARCH-EVAL · Собрать воспроизводимую проверку качества",
+      "state": "accepted",
+      "revision": "evt.01M4EPT1BQ39Z0HGWQGHCYXN4X"
+    },
+    {
+      "id": "task.0TKT90MS7MNJ5566HJJNPG7H6E",
+      "title": "SEARCH-SAFE · Закрыть ошибки проверки доступа в поиске",
+      "state": "accepted",
+      "revision": "evt.01M4EGNWZSF1K7HMPWAH0M0B3G"
+    },
+    {
+      "id": "task.0ZH12ASZRMRM20JDBM23ZC7RE5",
+      "title": "SEARCH · Консилиум и завершение умного поиска",
+      "state": "ready",
+      "revision": "evt.01M4E809G2A1EXY8D994499TQG"
+    },
+    {
+      "id": "task.0ZWG3EM5JAXDA1HYANEFP33TCD",
+      "title": "SEARCH-RANK · Согласовать каталог и расчёт ранга",
+      "state": "accepted",
+      "revision": "evt.01M4EJFR34XCSEPE3G363F5JHY"
+    },
+    {
+      "id": "task.1M32YRKW7QPX3GC2CJRHYMR5JX",
+      "title": "SEARCH-A · Независимый аудит и дизайн Codex",
+      "state": "ready",
+      "revision": "evt.01M4E827TGRXYS79MWWRFZMV9E"
+    },
+    {
+      "id": "task.1TWM470FWGPK98MG2A1W857ZEX",
+      "title": "SEARCH-C · Критика и проверка решений по коду",
+      "state": "ready",
+      "revision": "evt.01M4EB1Q8612NS74DS0JX37EPH"
+    },
+    {
+      "id": "task.2PDW5QV03Z0DMZEQFBB42X2B51",
+      "title": "SEARCH-B · Независимый аудит и дизайн Claude",
+      "state": "ready",
+      "revision": "evt.01M4E8397HSYPW5YPVBM3EGYEA"
+    },
+    {
+      "id": "task.2R17J2DE17C34H066W5PNXHKJJ",
+      "title": "BASE · Проверить исходную версию и сохранность работы владельца",
+      "state": "accepted",
+      "revision": "evt.01M4E60FZ88RJ3NHR9N338ZHBQ"
+    },
+    {
+      "id": "task.3WYPRVQM1TGKRE5BJQ4T1KQ1GS",
+      "title": "REASONS · Исключить приватные сигналы из объяснений",
+      "state": "accepted",
+      "revision": "evt.01M4EEY55RP18Y4S9F60AM1G4K"
+    },
+    {
+      "id": "task.4C0H1EQEWAT60499996HAP6HZ9",
+      "title": "SEARCH-INDEX · Ограничить небезопасную переиндексацию",
+      "state": "accepted",
+      "revision": "evt.01M4EHQ9TDQ97WHKNM5EY4MK77"
+    },
+    {
+      "id": "task.56EPFF8F78K5TCCDVACNWG0231",
+      "title": "CONFIG · Согласовать проверку конфигурации rate limit",
+      "state": "ready",
+      "revision": "evt.01M49R46Z37805EPBZCEFVHK24"
+    },
+    {
+      "id": "task.5EAEMXJ1D55PVFRFNMGNWZZB6K",
+      "title": "TOOL · Ограничить lint, сборку и watch",
+      "state": "accepted",
+      "revision": "evt.01M4E9TANPR1VG8RNNK0NY882R"
+    },
+    {
+      "id": "task.5MMN8A76CBREQNXD8QWK06N5PV",
+      "title": "SEARCH-BOUNDS · Ограничить запросы и добор кандидатов",
+      "state": "accepted",
+      "revision": "evt.01M4ENCMMD1T78SYKH1Q1ZDZZQ"
+    },
+    {
+      "id": "task.5QAWFWFNHC305EWDYZT3C5E55F",
+      "title": "PHOTO · Подключить OpenAI Decisions для проверки фото",
+      "state": "accepted",
+      "revision": "evt.01M4EE5CM30ZSJRYM34VEFDJER"
+    }
+  ],
+  "repos": {
+    "agents": {
+      "branch": "codex/blizhe-improvement-20261007",
+      "head": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+      "dirty_entries": 43,
+      "expanded_dirty_entries": 1269
+    },
+    "owner": {
+      "branch": "main",
+      "head": "cbdcad62052808343feca6a0a84a8b9b9e54976a",
+      "dirty_entries": 44,
+      "expanded_dirty_entries": 162
+    },
+    "commons": {
+      "branch": "main",
+      "head": "9ba5cbd5962b74a80423138174de153418fc683c",
+      "dirty_entries": 6,
+      "expanded_dirty_entries": 182
+    }
+  },
+  "agent_lock_sha256": "e033e5945acf3a0374ac581482f66b6fb89c14a85143cacb4c671291097e9c02"
+}

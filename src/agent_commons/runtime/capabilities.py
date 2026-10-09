@@ -8,6 +8,7 @@ configuration, environment, or ephemeral instruction that implements it.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -726,10 +727,22 @@ class ProviderInitializationProbeSpec:
 class ProviderInitializationStatus:
     provider: Provider
     state: ProviderInitializationState
+    timeout_seconds: int | None = None
+    duration_seconds: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "provider", Provider(self.provider))
         object.__setattr__(self, "state", ProviderInitializationState(self.state))
+        if self.timeout_seconds is not None and (
+            type(self.timeout_seconds) is not int or not 1 <= self.timeout_seconds <= 60
+        ):
+            raise ValidationError("initialization timeout must be an integer in 1..60")
+        if self.duration_seconds is not None and (
+            type(self.duration_seconds) not in {int, float}
+            or not math.isfinite(self.duration_seconds)
+            or self.duration_seconds < 0
+        ):
+            raise ValidationError("initialization duration must be finite and nonnegative")
 
     @property
     def supported(self) -> bool:

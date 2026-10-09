@@ -175,4 +175,4 @@ def test_every_builtin_role_fits_all_three_provider_plans_without_live_providers
             assert not isinstance(validation, TypedRefusal), (role["ref"], identifier)
             assert planner.validate_instruction_size(validation) is None
             checked += 1
-    assert checked == 90
+    assert checked == 93

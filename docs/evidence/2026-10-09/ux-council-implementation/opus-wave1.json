@@ -1,0 +1,12 @@
+{
+  "requested_alias": "opus",
+  "actual_runtime_model": "not exposed by broker result",
+  "terminal": "needs_operator",
+  "summary": "Partial implementation, unverifiable here. The tool layer denied every command (node, tsc, node --test, git, plutil), so no type-check, test or build backs any edit, and commons_publish_text_result is denied for this worker, so the full UX01-19 mapping sits in the open blocker operation.1RTXXMQH1RN1FQPNCZYP2RX8RR rather than a typed artifact. Rather than edit nineteen surfaces blind I implemented UX-04 fully on both task maps, UX-01 for the task maps only, and UX-10 and UX-02 partially; UX-03, 05, 06, 07, 08, 09, 11, 12, 13, 14, 15, 16, 17 and 19 are untouched. Changed: new frontend/work/src/mapZoomBands.ts and tests/map-zoom-bands.test.mjs; edited components/MapCanvas.tsx, TaskGraph.tsx, TaskHierarchy.tsx, taskGraphStrings.ts, taskGraph.css, styles.css, i18n.json, main.tsx (hire panel only). No backend, bundle, doc, commit or push. Operator should run tsc and make check on this slice, then re-delegate the remaining fourteen items to a run that can execute commands.",
+  "attempt": "attempt.20HHTPKND3W5QNQCVE7CCCQ8XV",
+  "output_truncated": true,
+  "verification_by_parent": {
+    "typescript": "passed",
+    "focused_tests": 61
+  }
+}

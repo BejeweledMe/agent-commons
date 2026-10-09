@@ -1,3 +1,4 @@
+import { Icon } from "./Icon.js";
 import type { ReactNode } from "react";
 
 type WorkflowCardProps = {
@@ -11,7 +12,7 @@ export function WorkflowCard({ title, ready, children }: WorkflowCardProps): Rea
     <section className="workflow-card" aria-label={title}>
       <header className="workflow-card-header">
         <h2>{title}</h2>
-        <span aria-hidden="true" className={ready ? "status status-ready" : "status"}>{ready ? "✓" : "…"}</span>
+        <span aria-hidden="true" className={ready ? "status status-ready" : "status"}><Icon name={ready ? "check" : "dots"} /></span>
       </header>
       {children}
     </section>

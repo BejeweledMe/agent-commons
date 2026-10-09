@@ -20,7 +20,12 @@ from pathlib import Path
 from typing import Any
 
 from agent_commons.core.canonical import loads_json_strict
-from agent_commons.errors import ConfigurationError, IntegrityError, ValidationError
+from agent_commons.errors import (
+    ConfigurationError,
+    IntegrityError,
+    SecurityPolicyError,
+    ValidationError,
+)
 from agent_commons.storage.atomic import atomic_write_replace
 from agent_commons.storage.opstate import OperationalStoragePolicy, exclusive_lock
 
@@ -435,7 +440,14 @@ class ProjectRegistry:
             )
             recovery = (
                 isinstance(intent, dict)
-                and set(intent) == {"project_id", "expected_revision", "recover_state"}
+                and (
+                    set(intent) == {"project_id", "expected_revision", "recover_state"}
+                    or (
+                        set(intent)
+                        == {"project_id", "expected_revision", "recover_state", "verify_existing"}
+                        and intent.get("verify_existing") is True
+                    )
+                )
                 and intent.get("project_id") in project_ids
                 and isinstance(intent.get("expected_revision"), str)
                 and _lexical_absolute(intent.get("recover_state"))
@@ -654,18 +666,20 @@ class ProjectRegistry:
         *,
         state_root: Path,
         idempotency_key: str,
+        verify_existing: bool = False,
     ) -> dict[str, Any]:
-        """Explicitly replace a missing binding with an already-owned exact root.
+        """Recover a missing binding or explicitly revalidate its existing root.
 
-        This does not migrate or recreate operational data. The previous root
-        must be absent, and the replacement must already belong to the same
-        workspace and checkout. The old registration receipts remain intact.
+        Existing-root verification is opt-in and cannot change the registered
+        path. Both modes preserve operational data and prior registry receipts.
         """
         state = str(state_root.expanduser().absolute())
         if (
             not _valid_key(idempotency_key)
             or not isinstance(expected_revision, str)
+            or type(verify_existing) is not bool
             or not _normalized_absolute(state)
+            or (verify_existing and str(state_root) != state)
         ):
             raise ProjectRegistryRefusal("project_invalid", "Project recovery is invalid.")
         intent = {
@@ -673,6 +687,10 @@ class ProjectRegistry:
             "expected_revision": expected_revision,
             "recover_state": state,
         }
+        if verify_existing:
+            intent["verify_existing"] = True
+            if not self.root.is_dir() or not self.path.is_file():
+                raise ProjectRegistryRefusal("project_unknown", "Project was not found.", 404)
         self._ensure_root()
         with exclusive_lock(self.lock_path, policy=_REGISTRY_POLICY):
             document = self._load()
@@ -695,7 +713,18 @@ class ProjectRegistry:
                     raise ProjectRegistryRefusal(
                         "project_identity_conflict", "Project repository identity changed.", 409
                     )
-                if receipt is None:
+                if verify_existing:
+                    if (
+                        entry.state_binding != state
+                        or not _normalized_absolute(str(entry.checkout))
+                        or _directory_identity(Path(state)) is None
+                    ):
+                        raise ProjectRegistryRefusal(
+                            "project_state_binding_conflict",
+                            "Verification requires the exact existing registered state root.",
+                            409,
+                        )
+                elif receipt is None:
                     if entry.state_binding is None:
                         raise ProjectRegistryRefusal(
                             "project_state_not_missing",
@@ -725,15 +754,30 @@ class ProjectRegistry:
                         or ownership["match"] is not True
                         or manager.workspace_id != entry.workspace_id
                         or any(issue.severity == "error" for issue in manager.snapshot().issues)
+                        or (verify_existing and manager.doctor()["ok"] is not True)
                     ):
                         raise ValueError("binding mismatch")
-                except (ConfigurationError, IntegrityError, OSError, ValueError) as exc:
+                except (
+                    ConfigurationError,
+                    IntegrityError,
+                    SecurityPolicyError,
+                    ValidationError,
+                    OSError,
+                    ValueError,
+                ) as exc:
                     raise ProjectRegistryRefusal(
                         "project_recovery_unverified",
                         "The replacement must be an existing state root owned by this workspace.",
                         409,
                     ) from exc
-                if _directory_identity(Path(state)) != state_identity:
+                if _directory_identity(Path(state)) != state_identity or (
+                    verify_existing
+                    and (
+                        not _normalized_absolute(state)
+                        or not _normalized_absolute(str(entry.checkout))
+                        or _git_identity(entry.checkout) != entry.git_identity
+                    )
+                ):
                     raise ProjectRegistryRefusal(
                         "project_state_binding_conflict",
                         "Replacement state changed during recovery.",

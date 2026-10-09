@@ -1,0 +1,22 @@
+{
+  "reviewer": "independent native gpt-6-astra lane",
+  "scope": "48 immutable frontend files; v7 map Fit follow-up",
+  "verdict": "approved",
+  "boundary": "Source review only; browser evidence recorded separately. No formal task acceptance implied.",
+  "resolved_findings": [
+    "hook ordering",
+    "viewport identity",
+    "focus return",
+    "draft send/save race",
+    "multi-send confirmation queue",
+    "compact drawer project switch",
+    "compact geometry",
+    "Fit must cover full wide layout below20% without first-zoom snap"
+  ],
+  "v6": "All48 hashes verified; four-file explicit runtime config/state-path command guidance approved.",
+  "v7": {
+    "verdict": "approved",
+    "independent_arithmetic_checks": 59,
+    "patch_sha256": "f24230b25942bc9625ca7f156ba7d4ed010c35b6372f008382e91b486c2decbd"
+  }
+}

@@ -26,6 +26,12 @@ Its [frozen implementation evidence](evidence/2026-10-01/product-completion/REPO
 records source boundaries, product journeys, provider qualification and remaining gates.
 Nothing else in this tree is a backlog.
 
+The October 9 implementation follows the [frontend contract](FRONTEND_CONTRACT.md).
+Its revision-bound results are in the [workspace evidence](evidence/2026-10-09/astra-opus-council/verification.md)
+and [two-map follow-up evidence](evidence/2026-10-09/codex-style-agent-map/verification.md).
+[ADR 0027](adr/0027-agent-organization-and-method-edits.md) owns the distinction
+between organizational parents, immutable creator provenance and exact methods.
+
 Read the current decision registry through the command above. An ADR, proposal,
 review or completed task alone does not promote anything to project truth.
 Revision-bound results belong in their verification reports, not in repeated
@@ -38,10 +44,16 @@ status stamp with its opening date, contract, successor and source boundary.
 
 ## Historical plans
 
+- [UX council implementation](archive/plans/2026-10-09-ux-council-implementation.md) — completed local UI wave; [verification](evidence/2026-10-09/ux-council-implementation/verification.md).
+
+- [Compact settings and team navigation](archive/plans/2026-10-09-navigation-hierarchy.md) — completed local follow-up; [verification](evidence/2026-10-09/navigation-hierarchy/verification.md).
+
 All historical plans live in [`docs/archive/plans/`](archive/plans/). They
 explain past reasoning at their own source boundaries; none of them is the
 current backlog.
 
+- [October dogfooding action graph](archive/plans/2026-10-09-dogfooding-remediation.md)
+  and [two-map follow-up](archive/plans/2026-10-09-codex-style-agent-map.md) — completed local increments.
 - [Vision](archive/plans/VISION.md) — superseded by the product document.
 - [Visual orchestrator PRD](archive/plans/visual_multi_agent_orchestrator_prd.md)
   and [navigation plan](archive/plans/visual_orchestrator_plan.md) — superseded

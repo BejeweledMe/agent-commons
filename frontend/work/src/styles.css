@@ -1,36 +1,33 @@
-/* Semantic dark token system (WP-13.2). The app is dark only: these are the
-   absolute values of the one theme, not a theme switch. Every colour outside
-   this block is a var() reference, so a colour change happens here once. */
 :root {
   /* Surfaces, from the page floor up to the raised/hover level. */
-  --surface-1: #101319;
-  --surface-2: #1a2029;
-  --surface-3: #232b37;
+  --surface-1: #202020;
+  --surface-2: #252525;
+  --surface-3: #303030;
   /* Text, from primary reading text down to the quietest label. */
-  --text-1: #e8edf5;
-  --text-2: #a9b8d1;
-  --text-3: #889cb9;
+  --text-1: #e7e7e7;
+  --text-2: #b6b6b6;
+  --text-3: #949494;
   /* Borders: 1 is the default divider/outline, 2 the stronger control edge. */
-  --border-1: #52698c;
-  --border-2: #7184a4;
+  --border-1: #707070;
+  --border-2: #808080;
   /* Attention: something needs a person, and the amber notice family. */
   --status-attention: #e2b85e;
   --status-attention-surface: #302919;
   --status-attention-text: #ffd89c;
   /* Active: the currently selected route, tab, filter or row. */
-  --status-active: #21385e;
-  --status-active-border: #5778a6;
+  --status-active: #353535;
+  --status-active-border: #858585;
   /* Accepted: the one green in the app, for work that was actually accepted. */
   --status-accepted: #72ca8a;
-  --status-accepted-surface: #143220;
-  --status-accepted-text: #d9ffe5;
+  --status-accepted-surface: #26312b;
+  --status-accepted-text: #d4e4d8;
   /* Error: a refusal or failure, never a warning. */
   --status-error: #ff9aa8;
-  --status-error-surface: #2c202d;
+  --status-error-surface: #362728;
   --status-error-text: #ffbdc5;
-  --accent: #92b8ff;
+  --accent: #c2c2c2;
   /* Label on a filled accent surface, where --text-1 is too dim to stay AA. */
-  --text-on-accent: #ffffff;
+  --text-on-accent: #252525;
 
   /* Spacing scale: 4 8 12 16 24 32 48. */
   --space-1: 4px;
@@ -59,10 +56,11 @@
   --text-warning: var(--status-attention-text);
   --border: var(--border-1);
   --border-control: var(--border-2);
-  --button-primary: #4775c8;
-  --button-primary-hover: #3f68b1;
-  --dialog-backdrop: rgb(4 9 18 / 75%);
+  --button-primary: #e1e1e1;
+  --button-primary-hover: #ffffff;
+  --dialog-backdrop: rgb(0 0 0 / 55%);
   --shadow-dialog: rgb(0 0 0 / 20%);
+  color-scheme: dark;
   background: var(--surface-1);
   color: var(--text-1);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1310,3 +1308,400 @@ label { font-size: var(--type-3); font-weight: 550; }
 .instrumentation-counters thead th { color: var(--text-muted); font-weight: 600; }
 .instrumentation-counters tbody th { font-weight: 500; }
 .instrumentation-clear-confirm { margin-top: var(--space-3); }
+
+/* ===== The October 9 work area: sidebar | task map | project chat =====
+   The page itself never scrolls away from the map: the shell is exactly the
+   viewport, and each pane scrolls inside its own box. Widths arrive as
+   classes that set a custom property, because the CSP carries no
+   style-src-attr and an inline style attribute is never used. */
+.work-app.work-shell {
+  display: grid;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  --pane-rail: var(--pane-sidebar, 208px);
+  --pane-rail-gap: 10px;
+  --pane-chat-column: var(--pane-chat, 320px);
+  --pane-chat-gap: 10px;
+  grid-template-columns: var(--pane-rail) var(--pane-rail-gap) minmax(0, 1fr) var(--pane-chat-gap) var(--pane-chat-column);
+  grid-template-areas: "rail railsep center chatsep chat";
+}
+/* Swapping sides moves the panes, not their contents or their state. */
+.work-shell[data-swapped="true"] {
+  grid-template-columns: var(--pane-chat-column) var(--pane-chat-gap) minmax(0, 1fr) var(--pane-rail-gap) var(--pane-rail);
+  grid-template-areas: "chat chatsep center railsep rail";
+}
+.work-shell[data-sidebar="collapsed"] { --pane-rail: 0px; --pane-rail-gap: 0px; }
+.work-shell[data-chat="collapsed"] { --pane-chat-column: 0px; --pane-chat-gap: 0px; }
+.work-shell > .app-rail { grid-area: rail; }
+.work-shell > .app-content { grid-area: center; }
+.work-shell > .chat-pane { grid-area: chat; }
+.work-shell > .pane-separator-sidebar { grid-area: railsep; }
+.work-shell > .pane-separator-chat { grid-area: chatsep; }
+.work-shell .app-rail { position: static; height: auto; min-height: 0; overflow-y: auto; padding: var(--space-4) var(--space-3); }
+.work-shell .app-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.work-shell .app-header { flex: 0 0 auto; min-height: 0; padding: var(--space-3) var(--space-4); align-items: start; }
+.work-shell .app-header h1 { font-size: var(--type-5); }
+.work-shell .workspace-content { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; padding: 0 var(--space-4) var(--space-3); max-width: none; margin: 0; }
+.work-shell .workspace-content > .notice, .work-shell .workspace-content > .action-failure { flex: 0 0 auto; }
+/* Every view but the work area scrolls; the work area never does. */
+.work-shell .workspace-content > section { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.work-shell .workspace-content > section.work-area { overflow: hidden; display: flex; flex-direction: column; }
+.work-area-head { flex: 0 0 auto; }
+.work-area-head .workspace-toolbar { margin-bottom: var(--space-2); }
+.work-area-body { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--space-3); align-items: stretch; }
+/* The layout controls sit with the title, not in a column of their own. */
+.layout-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.layout-status { margin: 0; }
+/* The separator is a real control: visible, focusable and 10px wide. */
+.pane-separator { cursor: col-resize; display: flex; align-items: center; justify-content: center; background: transparent; touch-action: none; }
+.pane-separator:hover, .pane-separator:focus-visible { background: var(--surface-3); }
+.pane-separator-grip { display: block; width: 2px; height: 48px; border-radius: 2px; background: var(--border-1); }
+.pane-separator:hover .pane-separator-grip, .pane-separator:focus-visible .pane-separator-grip { background: var(--accent); }
+/* The project chat: one column, with the composer always reachable. */
+.chat-pane { min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--border-1); background: var(--surface-2); }
+.work-shell[data-swapped="true"] .chat-pane { border-left: 0; border-right: 1px solid var(--border-1); }
+.project-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.project-chat-header { flex: 0 0 auto; display: flex; align-items: start; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-1); }
+.project-chat-header h2 { font-size: var(--type-4); margin: 0; }
+.project-chat-recipient { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+/* The on-demand panels: task details, a new task, Prepare run. They sit
+   beside the map and never take permanent space from it. */
+.work-panel { flex: 0 0 auto; width: min(460px, 45%); min-width: 0; min-height: 0; overflow-y: auto; background: var(--surface-2); border-radius: 12px; }
+.work-panel[hidden] { display: none; }
+.work-panel-strip { display: inline-flex; align-items: center; gap: var(--space-2); }
+.work-panel-tab { font-size: var(--type-2); font-weight: 600; border-radius: 8px; padding: var(--space-1) var(--space-2); background: var(--status-active); color: var(--text-1); }
+.work-panel-new, .work-panel-run { padding: var(--space-4); }
+.work-panel-run.launch-composer { margin: 0; max-width: none; }
+.launch-budget { margin: var(--space-4) 0; border-left: 3px solid var(--border-1); padding-left: var(--space-3); }
+.launch-budget h3 { font-size: var(--type-3); margin-bottom: var(--space-1); }
+.launch-budget-values { list-style: none; margin: var(--space-2) 0; padding: 0; display: grid; gap: var(--space-1); font-size: var(--type-2); }
+/* The map pane keeps the whole height of the work area. */
+.work-shell .tracker-section.work-tracker { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; gap: var(--space-3); }
+.work-map-pane { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.work-map-pane > .task-view-toolbar, .work-map-pane > .task-view-filters, .work-map-pane > .tracker-state, .work-map-pane > .tracker-agent-filter { flex: 0 0 auto; }
+.work-map-pane > .task-view-tabs { flex: 0 0 auto; }
+.work-map-pane > .tracker-diagnostics { flex: 0 0 auto; }
+.work-map-pane .task-view-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* Now and All tasks scroll; the map itself does not. */
+.work-map-pane .task-view-panel-now, .work-map-pane .task-view-panel-all { overflow-y: auto; }
+/* One transient drawer on compact screens. The central map keeps its own frame. */
+.layout-menu { position: relative; }
+.layout-menu > summary { cursor: pointer; padding: var(--space-2); }
+.layout-menu-content { position: absolute; z-index: 30; right: 0; width: min(300px, 85vw); padding: var(--space-3); display: grid; gap: var(--space-2); background: var(--surface-2); border: 1px solid var(--border-1); border-radius: 8px; box-shadow: 0 8px 24px var(--shadow-dialog); }
+.work-shell .app-header > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.work-shell .app-header h1, .work-shell .layout-controls { margin: 0; }
+.compact-pane-backdrop, .compact-pane-close { display: none; }
+@media (max-width: 1100px) {
+  .work-app.work-shell, .work-shell[data-swapped="true"] { position: relative; grid-template-columns: minmax(0, 1fr); grid-template-areas: "center"; }
+  .work-shell > .app-rail, .work-shell > .chat-pane { position: absolute; z-index: 41; inset: 0 0 0 auto; width: min(400px, 92vw); height: 100%; background: var(--surface-2); box-shadow: -8px 0 24px var(--shadow-dialog); }
+  .work-shell > .app-rail { inset: 0 auto 0 0; }
+  .work-shell:not([data-compact-pane="sidebar"]) > .app-rail, .work-shell:not([data-compact-pane="chat"]) > .chat-pane { display: none; }
+  .work-shell > .chat-pane { display: flex; flex-direction: column; }
+  .compact-pane-close { display: block; flex: 0 0 auto; margin: var(--space-2); }
+  .compact-pane-backdrop { display: block; position: absolute; z-index: 40; inset: 0; width: 100%; height: 100%; background: var(--shadow-dialog); border: 0; border-radius: 0; }
+  .work-shell > .pane-separator { display: none; }
+  .work-area-body { position: relative; }
+  .work-panel { position: absolute; z-index: 10; inset-block: 0; inset-inline-end: 0; width: min(100%, 460px); border: 1px solid var(--border-1); }
+  .work-shell .app-header { padding: var(--space-2) var(--space-3); }
+  .work-shell .workspace-content { padding: 0 var(--space-3) var(--space-2); }
+}
+@media (max-height: 650px) {
+  .work-shell .task-graph > .small-copy, .work-shell .map-canvas-gestures { display: none; }
+  .work-shell .task-graph-field { gap: 2px; }
+  .work-shell .task-view-toolbar, .work-shell .task-view-filters, .work-shell .task-view-tabs, .work-shell .map-kind-row { margin-block: 2px; }
+  .work-shell .task-graph-toolbar, .work-shell .map-canvas-toolbar { margin-block: 2px; padding-block: 2px; }
+  .work-shell .map-canvas > .task-graph-list { margin-top: 2px; }
+  .work-shell .map-canvas > p { margin-block: 2px; }
+  .work-shell .task-graph-footer { font-size: var(--type-1); padding-block: 2px; }
+  .work-shell .task-graph-footer > p { margin-block: 2px; }
+}
+
+/* The 8px width steps of the two side panes. A class, never an inline style. */
+.pane-sidebar-160 { --pane-sidebar: 160px; }
+.pane-sidebar-168 { --pane-sidebar: 168px; }
+.pane-sidebar-176 { --pane-sidebar: 176px; }
+.pane-sidebar-184 { --pane-sidebar: 184px; }
+.pane-sidebar-192 { --pane-sidebar: 192px; }
+.pane-sidebar-200 { --pane-sidebar: 200px; }
+.pane-sidebar-208 { --pane-sidebar: 208px; }
+.pane-sidebar-216 { --pane-sidebar: 216px; }
+.pane-sidebar-224 { --pane-sidebar: 224px; }
+.pane-sidebar-232 { --pane-sidebar: 232px; }
+.pane-sidebar-240 { --pane-sidebar: 240px; }
+.pane-sidebar-248 { --pane-sidebar: 248px; }
+.pane-sidebar-256 { --pane-sidebar: 256px; }
+.pane-sidebar-264 { --pane-sidebar: 264px; }
+.pane-sidebar-272 { --pane-sidebar: 272px; }
+.pane-sidebar-280 { --pane-sidebar: 280px; }
+.pane-sidebar-288 { --pane-sidebar: 288px; }
+.pane-sidebar-296 { --pane-sidebar: 296px; }
+.pane-sidebar-304 { --pane-sidebar: 304px; }
+.pane-sidebar-312 { --pane-sidebar: 312px; }
+.pane-sidebar-320 { --pane-sidebar: 320px; }
+.pane-chat-280 { --pane-chat: 280px; }
+.pane-chat-288 { --pane-chat: 288px; }
+.pane-chat-296 { --pane-chat: 296px; }
+.pane-chat-304 { --pane-chat: 304px; }
+.pane-chat-312 { --pane-chat: 312px; }
+.pane-chat-320 { --pane-chat: 320px; }
+.pane-chat-328 { --pane-chat: 328px; }
+.pane-chat-336 { --pane-chat: 336px; }
+.pane-chat-344 { --pane-chat: 344px; }
+.pane-chat-352 { --pane-chat: 352px; }
+.pane-chat-360 { --pane-chat: 360px; }
+.pane-chat-368 { --pane-chat: 368px; }
+.pane-chat-376 { --pane-chat: 376px; }
+.pane-chat-384 { --pane-chat: 384px; }
+.pane-chat-392 { --pane-chat: 392px; }
+.pane-chat-400 { --pane-chat: 400px; }
+.pane-chat-408 { --pane-chat: 408px; }
+.pane-chat-416 { --pane-chat: 416px; }
+.pane-chat-424 { --pane-chat: 424px; }
+.pane-chat-432 { --pane-chat: 432px; }
+.pane-chat-440 { --pane-chat: 440px; }
+.pane-chat-448 { --pane-chat: 448px; }
+.pane-chat-456 { --pane-chat: 456px; }
+.pane-chat-464 { --pane-chat: 464px; }
+.pane-chat-472 { --pane-chat: 472px; }
+.pane-chat-480 { --pane-chat: 480px; }
+.pane-chat-488 { --pane-chat: 488px; }
+.pane-chat-496 { --pane-chat: 496px; }
+.pane-chat-504 { --pane-chat: 504px; }
+.pane-chat-512 { --pane-chat: 512px; }
+.pane-chat-520 { --pane-chat: 520px; }
+.pane-chat-528 { --pane-chat: 528px; }
+.pane-chat-536 { --pane-chat: 536px; }
+.pane-chat-544 { --pane-chat: 544px; }
+.pane-chat-552 { --pane-chat: 552px; }
+.pane-chat-560 { --pane-chat: 560px; }
+
+/* The map is the workspace. Its chrome has a bounded, compact footprint;
+   diagnostic prose and branch controls open over it instead of shrinking it. */
+.work-shell .app-header { padding-block: 6px; align-items: center; }
+.work-shell .app-header h1 { font-size: var(--type-4); }
+.work-shell .app-header .button, .work-shell .locale-button { min-height: 32px; padding: 5px 9px; font-size: var(--type-2); }
+.work-shell .layout-controls { gap: 6px; }
+.work-shell .layout-menu > summary { min-height: 28px; padding: 3px 8px; }
+.work-shell .workspace-toolbar[hidden] { display: none; }
+.work-shell .work-area-head .workspace-toolbar { margin: 0 0 4px; }
+.work-shell .task-view-toolbar { flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0 0 4px; }
+.work-shell .task-search-field { display: block; flex: 1 1 180px; max-width: none; min-width: 80px; }
+.work-shell .task-view-toolbar input { height: 32px; min-height: 32px; margin: 0; padding: 5px 9px; font-size: var(--type-2); }
+.work-shell .task-view-toolbar > .tracker-connection { align-self: center; flex: 0 0 auto; margin: 0; padding: 0; }
+.work-shell .tracker-connection[data-connection="connected"] { color: var(--accent); }
+.work-shell .task-view-toolbar > .button { min-height: 32px; padding: 5px 9px; }
+.work-shell .task-view-navigation { display: flex; align-items: center; flex: 0 0 auto; gap: 8px; margin: 0 0 4px; flex-wrap: wrap; }
+.work-shell .task-view-tabs { margin: 0; gap: 4px; flex-wrap: nowrap; }
+.work-shell .task-view-tabs .button { min-height: 32px; padding: 5px 9px; font-size: var(--type-2); }
+.work-shell .task-filter-control, .work-shell .map-kind-control { margin: 0; min-width: 0; flex: 0 1 160px; }
+.work-shell .task-filter-control select, .work-shell .map-kind-control select { display: block; width: 100%; min-height: 32px; height: 32px; margin: 0; padding: 4px 24px 4px 8px; font-size: var(--type-2); }
+.work-shell .tracker-compact-notice { position: relative; margin: 0 0 4px; padding: 3px 8px; font-size: var(--type-2); }
+.work-shell .tracker-compact-notice { padding-block: 0; }
+.work-shell .tracker-compact-notice > summary { cursor: pointer; min-height: 24px; padding: 2px 0; }
+.work-shell .tracker-compact-notice[open] > p { position: absolute; top: 100%; left: 0; z-index: 24; width: min(440px, 80vw); margin: 0; padding: 12px; border: 1px solid var(--border-1); background: var(--surface-2); box-shadow: 0 8px 24px var(--shadow-dialog); }
+.work-shell .tracker-diagnostics { position: relative; margin: 3px 0 0; padding-top: 0; font-size: var(--type-1); }
+.work-shell .tracker-diagnostics > summary { min-height: 24px; padding: 2px 0; }
+.work-shell .tracker-diagnostics[open] { max-height: 25dvh; overflow-y: auto; }
+.work-shell .map-canvas-toolbar { margin: 0 0 4px; padding: 0; align-items: center; gap: 6px; }
+.work-shell .map-canvas-toolbar .button { min-height: 30px; padding: 4px 8px; font-size: var(--type-2); }
+.work-shell .map-canvas-zoom { gap: 4px; }
+.work-shell .map-canvas-frame { min-height: 0; }
+.map-options { position: relative; flex: 0 0 auto; font-size: var(--type-2); }
+.map-options > summary { min-height: 28px; padding: 3px 8px; border: 1px solid var(--border-1); border-radius: 6px; cursor: pointer; }
+.map-options-body { position: absolute; top: calc(100% + 4px); left: 0; z-index: 25; display: grid; gap: 8px; width: min(350px, 75vw); max-height: 55dvh; overflow: auto; padding: 12px; border: 1px solid var(--border-1); border-radius: 8px; background: var(--surface-2); box-shadow: 0 8px 24px var(--shadow-dialog); }
+.map-options-body .task-graph-field { min-width: 0; }
+.map-options-body .task-graph-field input, .map-options-body .task-graph-field select { width: 100%; box-sizing: border-box; }
+.map-options-body > p { margin: 0; }
+
+/* Quiet, two-theme surfaces. All absolute colours stay in token declarations. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --surface-1: #fafafa; --surface-2: #f3f3f3; --surface-3: #e9e9e9;
+    --text-1: #262626; --text-2: #555555; --text-3: #686868;
+    --border-1: #8e8e8e; --border-2: #858585;
+    --status-active: #e4e4e4; --status-active-border: #858585;
+    --status-attention: #805a0a; --status-attention-surface: #f6efdf; --status-attention-text: #664808;
+    --status-accepted: #397349; --status-accepted-surface: #ecf2ee; --status-accepted-text: #315b3b;
+    --status-error: #a0353d; --status-error-surface: #f6e9e9; --status-error-text: #88333a;
+    --accent: #4d4d4d; --button-primary: #333333; --button-primary-hover: #494949; --text-on-accent: #ffffff;
+  }
+}
+.icon { display: inline-block; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+.icon-button { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; padding: 6px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); cursor: pointer; }
+.icon-button:hover:not(:disabled) { background: var(--surface-3); color: var(--text-1); }
+.icon-button:disabled { opacity: .4; cursor: default; }
+.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.work-shell .button { font-weight: 500; border-radius: 8px; font-size: var(--type-2); padding: 7px 11px; min-height: 32px; }
+.work-shell .button-secondary { border-color: var(--border-1); background: transparent; }
+.work-shell .app-header h1 { font-size: var(--type-3); font-weight: 500; }
+.work-shell .app-rail { background: var(--surface-1); }
+.work-shell .primary-navigation a { display: flex; align-items: center; gap: 9px; font-weight: 400; }
+.work-shell .project-list strong, .work-shell .project-list button, .work-shell .brand { font-weight: 500; }
+.work-shell .workspace-content { padding: 0 12px 12px; }
+.map-tabs { flex: 0 0 auto; display: flex; gap: 6px; padding: 0 0 10px; border-bottom: 1px solid var(--border-1); margin-bottom: 10px; }
+.map-tabs a { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; color: var(--text-2); text-decoration: none; border-radius: 8px; font-size: var(--type-3); }
+.map-tabs a[aria-current="page"] { background: var(--surface-3); color: var(--text-1); }
+.commons-dialog { position: fixed; inset: 0; margin: auto; padding: 0; width: min(1240px, calc(100vw - 48px)); height: min(920px, calc(100dvh - 48px)); max-width: none; max-height: none; border: 1px solid var(--border-2); border-radius: 14px; background: var(--surface-1); color: var(--text-1); box-shadow: 0 24px 100px var(--shadow-dialog); }
+.commons-dialog::backdrop { background: var(--dialog-backdrop); }
+.commons-dialog-medium { width: min(760px, calc(100vw - 40px)); height: min(700px, calc(100dvh - 40px)); }
+.commons-dialog-small { width: min(500px, calc(100vw - 32px)); height: auto; max-height: calc(100dvh - 32px); }
+.commons-dialog-frame { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.commons-dialog-head { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border-1); }
+.commons-dialog-titles { flex: 1; min-width: 0; }
+.commons-dialog-head h2 { font-size: var(--type-5); font-weight: 500; margin: 0; overflow-wrap: anywhere; }
+.commons-dialog-eyebrow, .commons-dialog-subtitle { margin: 4px 0; font-size: var(--type-2); color: var(--text-2); }
+.commons-dialog-body { flex: 1; min-height: 0; overflow: auto; padding: 24px; }
+.commons-dialog-footer { padding: 12px 24px; border-top: 1px solid var(--border-1); }
+.commons-dialog .task-inspector { max-width: none; border: 0; padding: 0; background: transparent; }
+.commons-dialog .inspector-header h2 { font-weight: 500; font-size: var(--type-6); max-width: 75ch; }
+.commons-dialog.work-panel-new, .commons-dialog.work-panel-run { padding: 0; }
+.commons-dialog .workflow-card { max-width: none; margin: 0; background: transparent; }
+.modal-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
+.modal-tab { border: 0; border-radius: 7px; padding: 8px 12px; color: var(--text-2); background: transparent; font: inherit; cursor: pointer; }
+.modal-tab[aria-selected="true"] { color: var(--text-1); background: var(--surface-3); }
+.agent-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 960px; }
+.agent-settings-grid label, .agent-setting-field { display: flex; flex-direction: column; gap: 7px; font-size: var(--type-2); }
+.agent-methods-list, .agent-checks { display: grid; gap: 10px; padding: 0; list-style: none; }
+.agent-checks { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.agent-checks label { display: flex; align-items: center; gap: 8px; font-size: var(--type-2); overflow-wrap: anywhere; }
+.agent-checks input { width: auto; }
+.agent-method-route { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto; gap: 10px; align-items: center; }
+.agent-settings-actions { display: flex; gap: 10px; align-items: center; margin-top: 24px; }
+.agent-links li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-1); }
+.agent-settings code { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .commons-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); } .commons-dialog-head, .commons-dialog-body { padding: 16px; } .agent-settings-grid, .agent-method-route { grid-template-columns: 1fr; } .map-tabs a { font-size: var(--type-2); padding: 8px; } }
+
+.work-shell .app-brand { font-size: 17px; font-weight: 500; margin-bottom: 24px; }
+.work-shell .project-sidebar-heading h2 { font-size: 13px; font-weight: 500; }
+.work-shell .project-list-item[aria-current="page"] { border-color: transparent; }
+.work-shell .project-list-item strong { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.work-shell .tracker-compact-notice { font-size: 12px; padding: 5px 8px; }
+.work-shell .project-chat-header h2 { font-size: 14px; font-weight: 500; }
+.commons-dialog .inspector-header > button:last-child { display: none; }
+@media (max-height: 650px) {
+  .work-shell .app-header { padding-block: 7px; }
+  .map-tabs { padding-bottom: 5px; margin-bottom: 5px; }
+  .map-tabs a { padding-block: 5px; }
+  .work-shell .task-view-toolbar input, .work-shell .task-view-filters select, .work-shell .map-kind-row select { min-height: 28px; padding-block: 4px; font-size: 12px; }
+  .work-shell .task-view-tabs .button, .work-shell .map-canvas .button { min-height: 28px; padding-block: 4px; }
+  .work-shell .board-toolbar-actions .button { font-size: 12px; padding: 5px 8px; min-height: 28px; }
+}
+
+.work-shell .button-secondary { border-color: transparent; }
+.work-shell .button-secondary:hover:not(:disabled) { background: var(--surface-3); }
+.commons-dialog-head, .commons-dialog-footer, .map-tabs, .agent-links li { border-color: color-mix(in srgb, var(--border-1) 40%, var(--surface-1)); }
+
+.agent-settings input[type="checkbox"] { display: inline-block; width: auto; vertical-align: middle; }
+
+/* Canvas tools float at its edge; opening them never changes its frame. */
+.work-shell .map-canvas { position: relative; }
+.work-shell .map-canvas-toolbar { position: absolute; inset: auto 8px 8px; z-index: 4; pointer-events: none; margin: 0; }
+.work-shell .map-canvas-toolbar > * { pointer-events: auto; background: var(--surface-2); border-radius: 7px; box-shadow: 0 2px 8px var(--shadow-dialog); }
+.work-shell .map-canvas-zoom { padding: 2px; }
+.work-shell .map-options-body { top: auto; bottom: calc(100% + 6px); max-height: 40dvh; }
+.work-shell .tracker-freshness { flex: 0 0 auto; margin: 0; padding: 0 6px; }
+.work-shell .tracker-freshness > summary { white-space: nowrap; }
+.work-shell .tracker-freshness[open] > p { left: auto; right: 0; }
+@media (max-width: 450px) {
+  .work-shell .task-view-toolbar { flex-wrap: wrap; }
+  .work-shell .tracker-freshness { order: 1; }
+  .work-shell .map-canvas-toolbar { gap: 4px; }
+  .work-shell .map-canvas-zoom { gap: 0; }
+  .work-shell .map-canvas-zoom-level { min-width: 2.5rem; }
+}
+
+/* Compact agent editor: fixed tabs/actions, one bounded scroll region. */
+.commons-dialog.agent-settings { width: min(780px, calc(100vw - 32px)); height: min(620px, calc(100dvh - 32px)); }
+.agent-settings .commons-dialog-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 16px 20px 8px; }
+.agent-settings .commons-dialog-head h2 { font-size: 18px; }
+.agent-settings .commons-dialog-close { grid-column: 2; grid-row: 1; }
+.agent-settings .commons-dialog-toolbar { grid-column: 1 / -1; grid-row: 2; }
+.agent-settings .modal-tabs { margin: 0; gap: 4px; }
+.agent-settings .modal-tab { font-size: 13px; padding: 7px 11px; }
+.agent-settings .commons-dialog-body { padding: 16px 20px; font-size: 13px; }
+.agent-settings .commons-dialog-body p { margin: 0 0 12px; line-height: 1.5; }
+.agent-settings .commons-dialog-body h3 { font-size: 14px; margin: 16px 0 8px; }
+.agent-settings .agent-settings-grid { gap: 14px 20px; }
+.agent-settings .agent-settings-grid label, .agent-settings .agent-setting-field { gap: 5px; min-width: 0; font-size: 13px; }
+.agent-settings input:not([type="checkbox"]), .agent-settings select { margin: 0; padding: 7px 10px; min-height: 36px; width: 100%; font-size: 13px; }
+.agent-settings .small-copy { font-size: 12px; }
+.agent-settings .agent-settings-grid + p { margin-top: 12px; }
+.agent-settings fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.agent-settings .agent-checks { gap: 6px 16px; margin-block: 8px; }
+.agent-settings .agent-checks label { font-size: 12px; }
+.agent-settings .agent-checks input { margin: 0; flex: 0 0 auto; }
+.agent-settings .commons-dialog-footer { padding: 10px 20px 14px; flex-shrink: 0; }
+.agent-settings-actions { flex-wrap: wrap; margin: 0; gap: 6px; }
+.agent-settings-actions .button { font-size: 12px; min-height: 32px; padding: 6px 10px; }
+.agent-reason { font-size: 12px; margin-bottom: 8px; }
+.agent-reason summary { cursor: pointer; color: var(--text-2); }
+.agent-reason input { margin-top: 6px !important; }
+.agent-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin: 16px 0 0; }
+.agent-facts div { min-width: 0; }
+.agent-facts dt { color: var(--text-2); font-size: 12px; }
+.agent-facts dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.agent-relationship-help { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.agent-links { list-style: none; padding: 0; margin: 0; }
+.agent-links li { padding: 8px 0; justify-content: space-between; }
+.agent-links span { min-width: 0; overflow-wrap: anywhere; }
+.agent-links .icon-button { flex-shrink: 0; }
+
+/* Global sections remain outside movable project and conversation panes. */
+.work-app.work-shell { grid-template-columns: 44px var(--pane-rail) var(--pane-rail-gap) minmax(0, 1fr) var(--pane-chat-gap) var(--pane-chat-column); grid-template-areas: "activity rail railsep center chatsep chat"; }
+.work-shell[data-swapped="true"] { grid-template-columns: 44px var(--pane-chat-column) var(--pane-chat-gap) minmax(0, 1fr) var(--pane-rail-gap) var(--pane-rail); grid-template-areas: "activity chat chatsep center railsep rail"; }
+.activity-rail { grid-area: activity; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border-right: 1px solid var(--border-1); background: var(--surface-2); overflow-y: auto; }
+.activity-rail a { width: 34px; min-height: 36px; display: grid; place-items: center; color: var(--text-2); border-radius: 8px; flex-shrink: 0; }
+.activity-rail a:hover, .activity-rail a[aria-current="page"] { background: var(--surface-3); color: var(--text-1); }
+.activity-divider { width: 20px; border-top: 1px solid var(--border-1); margin-block: 4px; }
+.activity-settings { margin-top: auto; }
+.project-chat-link { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 0 0 8px 20px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); text-align: start; font: inherit; font-size: 12px; cursor: pointer; }
+.project-chat-link:hover { background: var(--surface-3); color: var(--text-1); }
+.work-shell .app-header h1:not(.sr-only) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14rem; }
+.work-shell .app-header h1.sr-only { margin: -1px; }
+.map-tabs { align-items: center; min-height: 44px; }
+.map-tabs > .button { margin-left: auto; }
+@media (max-width: 1100px) {
+  .work-app.work-shell, .work-shell[data-swapped="true"] { grid-template-columns: 44px minmax(0, 1fr); grid-template-areas: "activity center"; }
+  .work-shell > .app-rail { left: 44px; width: min(400px, calc(100vw - 44px)); }
+}
+@media (max-width: 560px) {
+  .agent-settings .agent-settings-grid, .agent-facts, .agent-method-route { grid-template-columns: 1fr; }
+  .agent-settings .commons-dialog-head, .agent-settings .commons-dialog-body, .agent-settings .commons-dialog-footer { padding-inline: 14px; }
+  .agent-settings .modal-tab { padding-inline: 8px; }
+}
+.agent-settings label { margin: 0; font-weight: 500; }
+.agent-skill-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 14px; }
+.agent-skill-heading h3 { margin: 0 !important; }
+.agent-skill-heading .button { font-size: 12px; }
+
+/* UX-02: the people already hired sit below the hire form in a closed
+   disclosure, so nothing competes with the form itself. */
+.team-existing { margin-top: var(--space-4); }
+.team-existing > summary { cursor: pointer; }
+
+/* Method conditions remain editable at their full length inside the modal. */
+.agent-settings textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 84px; resize: vertical; margin: 0; padding: 8px 10px; font: inherit; }
+.agent-settings .agent-method-route { grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) auto; align-items: start; }
+.agent-settings .agent-method-route select { min-width: 0; }
+@media (max-width: 800px) { .agent-settings .agent-method-route { grid-template-columns: minmax(0, 1fr) auto; } .agent-settings .agent-method-route select { grid-column: 1 / -1; } }
+
+/* Task and library reading surfaces retain prose and local modal scrolling. */
+.task-brief-text { max-width: 70ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.task-brief-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 7; max-height: 10.5em; overflow: hidden; }
+.task-criteria { margin-top: 20px; }
+.task-criteria .inspector-criteria { max-width: 70ch; white-space: pre-wrap; }
+.decision-last-run { padding: 12px; border: 1px solid var(--border-1); border-radius: 8px; }
+.decision-last-run h4, .inspector-run-heading { margin: 0 0 6px; font-weight: 650; }
+.library-detail-modal .library-detail { margin: 0; padding: 0; border: 0; }
+.library-detail-modal .library-source-text { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 70ch; }
+.work-shell .tracker-freshness[open] > p { white-space: normal; overflow-wrap: anywhere; }
+.work-shell .tracker-freshness[open] > p .button { margin-top: 8px; }
+
+.task-brief-disclosure > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.task-brief-disclosure > summary h3 { margin: 0; }
+.task-brief-disclosure > summary span { color: var(--text-2); font-size: var(--type-2); }
+.task-brief-disclosure:not([open]) .task-brief-collapse, .task-brief-disclosure[open] .task-brief-expand, .task-brief-disclosure[open] + .task-brief-preview { display: none; }
+
+.task-composer-embedded { padding: 0; margin: 0; max-width: none; background: transparent; }

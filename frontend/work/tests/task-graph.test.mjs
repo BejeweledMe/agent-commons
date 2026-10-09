@@ -13,17 +13,18 @@ const compiled = mkdtempSync(resolve(tmpdir(), "agent-commons-task-graph-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), [
   "--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler",
   "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--resolveJsonModule", "--allowSyntheticDefaultImports", "--outDir", compiled,
-  ...["taskGraph.ts", "taskGraphApi.ts", "taskEditorState.ts", "taskPresentation.ts", "trackerState.ts", "components/TaskGraph.tsx", "components/TaskEditor.tsx", "components/TaskViews.tsx"].map((file) => resolve(root, "src", file))
+  ...["taskGraph.ts", "mapViewport.ts", "components/MapCanvas.tsx", "components/TaskHierarchy.tsx", "taskGraphApi.ts", "taskEditorState.ts", "taskPresentation.ts", "trackerState.ts", "components/TaskGraph.tsx", "components/TaskEditor.tsx", "components/TaskViews.tsx"].map((file) => resolve(root, "src", file))
 ], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 copyFileSync(resolve(root, "src/i18n.json"), resolve(compiled, "i18n.json"));
 const load = (file) => import(pathToFileURL(resolve(compiled, file + ".js")).href);
-const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, MAX_GRAPH_TASKS, NODE_HEIGHT, NODE_WIDTH, selectGraphTasks, focusedTaskIds, graphViewport, fitGraphZoom } = await load("taskGraph");
+const { buildTaskGraph, graphTaskState, wouldCreateTaskCycle, GRAPH_ICONS, MAX_GRAPH_TASKS, NODE_HEIGHT, NODE_WIDTH, selectGraphTasks, focusedTaskIds } = await load("taskGraph");
 const { TaskGraphApi, parseTaskEditDetail } = await load("taskGraphApi");
 const { taskEditorDraft, observeTaskEditorDraft, editorInput } = await load("taskEditorState");
 const { bucketTasksForNow, filterTrackerTasks, NOW_COLUMNS } = await load("taskPresentation");
 const { trackerStreamSucceeded } = await load("trackerState");
 const { TaskGraph } = await load("components/TaskGraph");
+const { MapViewportStore, contentSignature, fitViewport, panViewport, pointerAnchor, viewBoxAttribute, viewportKey, viewportZoom, zoomViewport, MAX_MAP_ZOOM, MIN_MAP_ZOOM } = await load("mapViewport");
 const { TaskEditor } = await load("components/TaskEditor");
 const { TaskViews } = await load("components/TaskViews");
 const { parseTrackerSnapshot } = await load("api");
@@ -57,6 +58,7 @@ const viewProps = (view, snapshot, overrides = {}) => ({
   registerTaskButton() {}, onClearFilters() {}, ...overrides
 });
 const occurrences = (html, pattern) => (html.match(pattern) ?? []).length;
+const MAP = /class="task-graph[ "]/g;
 
 test("real dependency edges lay out top to bottom, remain deterministic, and focus connected tasks", () => {
   const tasks = [task(), task(otherId, [taskId]), task(thirdId)];
@@ -94,7 +96,7 @@ test("accepted, completed and running are separate facts with status text and ic
   assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b/, "no raw colour in the graph stylesheet"); assert.match(css, /double/);
   for (const locale of ["en", "ru"]) {
     const html = renderToStaticMarkup(createElement(TaskGraph, { tasks: [task(taskId, [], { title: "<script>unsafe</script>", roleName: "Frontender", provider: "claude", phase: "running" })], edges: [], selectedTaskId: taskId, onSelectTask() {}, locale }));
-    assert.match(html, /Frontender · claude/); assert.match(html, /running/);
+    assert.match(html, /Frontender · claude/); assert.ok(html.includes(messages[locale].tracker_gloss_running));
     assert.match(html, /&lt;script&gt;/); assert.doesNotMatch(html, /style=|<script>/);
     for (const state of ["accepted", "completed", "active", "ready", "queued", "blocked"]) assert.match(html, new RegExp(`data-graph-state="${state}"`));
     assert.match(html, /aria-pressed="true"/);
@@ -104,11 +106,11 @@ test("accepted, completed and running are separate facts with status text and ic
 test("graph planned role hints remain distinct from the actual responsible role", () => {
   const props = { tasks: [task(taskId, [], { suggestedAgentId: `agent.${"0".repeat(26)}`, suggestedRoleName: "Frontend engineer", suggestedProvider: "claude" })], edges: [], selectedTaskId: taskId, onSelectTask() {}, locale: "en" };
   const planned = renderToStaticMarkup(createElement(TaskGraph, props));
-  assert.match(planned, /Suggested role: Frontend engineer · claude/);
+  assert.match(planned, /Suggested agent: Frontend engineer · claude/);
   assert.match(planned, /No current run/);
   const active = renderToStaticMarkup(createElement(TaskGraph, { ...props, tasks: [{ ...props.tasks[0], roleName: "Actual builder", provider: "codex", phase: "running" }] }));
   assert.match(active, /Actual builder · codex/);
-  assert.doesNotMatch(active, /Suggested role: Frontend engineer/);
+  assert.doesNotMatch(active, /Suggested agent: Frontend engineer/);
 });
 
 test("tracker suggestion parser requires a complete bounded metadata triple", () => {
@@ -231,7 +233,7 @@ test("an inspector remount can recover a retained unknown-outcome edit with its 
   const owner = readFileSync(resolve(root, "src/components/TrackerSection.tsx"), "utf8");
   assert.match(owner, /useState<TaskEditorEntries>/);
   assert.match(owner, /entries=\{editorEntries\} setEntries=\{setEditorEntries\}/);
-  assert.match(owner, /selectedTaskRef\.current === selectedTask\.taskId/);
+  assert.match(owner, /detailTaskRef\.current === detailTask\.taskId/);
 });
 
 const TASK_STATES = ["ready", "assigned", "active", "blocked", "completed", "review", "accepted", "cancelled"];
@@ -296,20 +298,20 @@ test("each Tasks view has one render path and Map scopes capacity after mounting
   const large = snapshotOf(many);
   const now = renderToStaticMarkup(createElement(TaskViews, viewProps("now", large)));
   assert.equal(occurrences(now, /class="task-list"/g), 0);
-  assert.equal(occurrences(now, /class="task-graph"/g), 0);
+  assert.equal(occurrences(now, MAP), 0);
   assert.equal(occurrences(now, /class="now-column-list"/g), 3, "three columns, one list each");
   const map = renderToStaticMarkup(createElement(TaskViews, viewProps("map", large)));
-  assert.equal(occurrences(map, /class="task-graph"/g), 1, "Map owns selection and capacity");
+  assert.equal(occurrences(map, MAP), 1, "Map owns selection and capacity");
   assert.equal(occurrences(map, /class="task-graph-fallback"/g), 1, "one fallback represents the visible selection");
   assert.equal(occurrences(map, /class="task-list"/g), 0, "the outer list does not duplicate Map");
   assert.doesNotMatch(map, /<svg/, "the oversized full selection stays a list");
   assert.ok(map.includes(messages.en["task_graph.graphLimit"]));
   const graph = renderToStaticMarkup(createElement(TaskViews, viewProps("map", snapshotOf(many.slice(0, 4)))));
-  assert.equal(occurrences(graph, /class="task-graph"/g), 1);
+  assert.equal(occurrences(graph, MAP), 1);
   assert.equal(occurrences(graph, /class="task-list"/g), 0, "under capacity the graph is the only render path");
   const all = renderToStaticMarkup(createElement(TaskViews, viewProps("all", large)));
   assert.equal(occurrences(all, /class="task-list"/g), 1);
-  assert.equal(occurrences(all, /class="task-graph"/g), 0);
+  assert.equal(occurrences(all, MAP), 0);
   assert.equal(occurrences(all, /class="now-column-list"/g), 0);
   const filtered = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("all", large), visibleTasks: [] }));
   assert.equal(occurrences(filtered, /class="task-list"/g), 0);
@@ -342,7 +344,7 @@ test("the three views are one accessible tab strip with EN and RU copy for every
 });
 
 
-test("a selected small component remains a graph in a 304-task Map", () => {
+test("explicit branch selection can bound a 304-task graph, while selection alone never narrows the map", () => {
   const many = Array.from({ length: 304 }, (_, index) => task(`task.${String(index).padStart(26, "0")}`));
   many[1] = { ...many[1], dependencyTaskIds: [many[0].taskId] };
   const edges = [edge(many[0].taskId, many[1].taskId)];
@@ -352,9 +354,9 @@ test("a selected small component remains a graph in a 304-task Map", () => {
   assert.deepEqual(focused.nodes.map((node) => node.task.taskId), [many[0].taskId, many[1].taskId]);
   const snapshot = snapshotOf(many, { edges });
   const html = renderToStaticMarkup(createElement(TaskViews, { ...viewProps("map", snapshot), selectedTaskId: many[1].taskId }));
-  assert.match(html, /<svg/);
-  assert.equal(occurrences(html, /class="task-graph-node"/g), 2);
-  assert.ok(!html.includes(messages.en["task_graph.graphLimit"]));
+  assert.doesNotMatch(html, /<svg/);
+  assert.ok(html.includes(messages.en["task_graph.graphLimit"]));
+  assert.equal(occurrences(html.slice(html.indexOf('class="task-graph-fallback"')), /<li>/g), 304, "the full untruncated list remains available until explicit focus/search");
   const chain = many.slice(0, 129).map((item, index, all) => ({ ...item, dependencyTaskIds: index ? [all[index - 1].taskId] : [] }));
   const chainEdges = chain.slice(1).map((item, index) => edge(chain[index].taskId, item.taskId));
   const oversized = buildTaskGraph(chain, chainEdges, chain[0].taskId);
@@ -405,23 +407,70 @@ test("diamond and wide layers have no overlap or backwards wrapping and stable r
   assert.ok(layout.edges.every((connection) => /^M [0-9.]+ [0-9.]+ L /.test(connection.path)), "use layout routing points");
 });
 
-test("zoom is bounded SVG sizing, and search/focus/fit/list controls render in both locales without inline styles", () => {
-  assert.deepEqual(graphViewport(400, 600, 1.5), { width: 600, height: 900, zoom: 1.5 });
-  assert.equal(graphViewport(400, 600, 5).zoom, 2);
-  assert.equal(graphViewport(400, 600, 0).zoom, 0.25);
-  assert.equal(graphViewport(400, 600, NaN).zoom, 1);
-  assert.equal(fitGraphZoom(1200, 600), 0.5);
-  assert.equal(fitGraphZoom(1200, 100), 0.25);
-  assert.equal(fitGraphZoom(400, 0), 1);
+test("the map is a numeric viewBox the operator pans and zooms, with no inline style", () => {
+  const frame = { width: 800, height: 600 };
+  const content = { width: 1600, height: 1200 };
+  const fitted = fitViewport(content, frame);
+  assert.equal(Math.round(viewportZoom(fitted, frame) * 100), 50, "fit shows the whole content");
+  assert.deepEqual([Math.round(fitted.width), Math.round(fitted.height)], [1600, 1200]);
+  // Zoom is bounded, and a bad number never produces a broken rectangle.
+  assert.equal(viewportZoom(zoomViewport(fitted, frame, 99, { x: 0.5, y: 0.5 }, content), frame), MAX_MAP_ZOOM);
+  assert.equal(viewportZoom(zoomViewport(fitted, frame, 0, { x: 0.5, y: 0.5 }, content), frame), MIN_MAP_ZOOM);
+  assert.equal(viewportZoom(zoomViewport(fitted, frame, NaN, { x: 0.5, y: 0.5 }, content), frame), 1);
+  // Pinching around the pointer keeps the point under it in place.
+  const anchor = { x: 0.25, y: 0.75 };
+  const before = { x: fitted.x + anchor.x * fitted.width, y: fitted.y + anchor.y * fitted.height };
+  const zoomed = zoomViewport(fitted, frame, 2, anchor, content);
+  assert.equal(Math.round(zoomed.x + anchor.x * zoomed.width), Math.round(before.x));
+  assert.equal(Math.round(zoomed.y + anchor.y * zoomed.height), Math.round(before.y));
+  assert.equal(pointerAnchor({ clientX: 300, clientY: 450 }, { left: 100, top: 150, width: 800, height: 600 }).x, 0.25);
+  // Two-finger panning moves the rectangle, bounded to a half frame of overscroll.
+  const panned = panViewport(zoomed, frame, 40, -20, content);
+  assert.ok(panned.x > zoomed.x && panned.y < zoomed.y);
+  assert.ok(panViewport(zoomed, frame, -100000, 0, content).x >= -zoomed.width * 0.5 - 1);
+  assert.ok(panViewport(zoomed, frame, 100000, 0, content).x <= content.width + zoomed.width * 0.5 + 1);
+  assert.equal(viewBoxAttribute({ x: 1.006, y: -2, width: 3, height: 4 }), "1.01 -2 3 4");
+  // One reading position per project, map kind and drawing; a refresh that
+  // changes nothing about the drawing keeps it.
+  const store = new MapViewportStore();
+  const signature = contentSignature({ count: 3, width: 100.4, height: 50.6, first: taskId });
+  assert.equal(signature, contentSignature({ count: 3, width: 100, height: 51, first: taskId }));
+  assert.notEqual(signature, contentSignature({ count: 4, width: 100, height: 51, first: taskId }));
+  const key = viewportKey({ projectId: "project.one", kind: "dependencies", focus: signature });
+  assert.notEqual(key, viewportKey({ projectId: "project.one", kind: "structure", focus: signature }));
+  assert.equal(store.get(key), null);
+  store.set(key, panned);
+  assert.deepEqual(store.get(key), panned);
+  store.clear(key);
+  assert.equal(store.get(key), null);
   for (const locale of ["en", "ru"]) {
     const html = renderToStaticMarkup(createElement(TaskGraph, { tasks: [task(otherId)], edges: [edge(taskId, otherId)], selectedTaskId: otherId, onSelectTask() {}, locale }));
-    for (const key of ["search", "focusLabel", "upstream", "downstream", "zoomIn", "zoomOut", "fit", "edgeMeaning", "hiddenPrerequisites", "list"]) assert.ok(html.includes(messages[locale][`task_graph.${key}`]), `${locale}.${key}`);
+    for (const key of ["search", "focusLabel", "upstream", "downstream", "zoomIn", "zoomOut", "fit", "reset", "gestures", "edgeMeaning", "hiddenPrerequisites", "list"]) assert.ok(html.includes(messages[locale][`task_graph.${key}`]), `${locale}.${key}`);
     assert.match(html, /type="search"/);
     assert.match(html, /<select/);
     assert.match(html, /<details/);
-    assert.match(html, /viewBox="0 0 /);
+    assert.match(html, /viewBox="/);
+    assert.match(html, /class="map-canvas-frame"/);
+    assert.match(html, /role="region"/);
+    assert.match(html, /tabindex="0"/);
     assert.doesNotMatch(html, /style=|<script/);
+    // The canvas is not a 64vh rectangle with its own scrollbars any more.
+    assert.doesNotMatch(html, /task-graph-scroll/);
   }
+  const structure = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: [task(taskId, [], { parentTaskId: null })], selectedTaskId: null, onSelectTask() {}, text: (key) => messages.en[key] }));
+  assert.match(structure, /class="map-canvas-frame"/, "Structure gets the same gestures as Dependencies");
+  assert.doesNotMatch(structure, /style=/);
+  const css = readFileSync(resolve(root, "src/taskGraph.css"), "utf8");
+  assert.doesNotMatch(css, /max-height:\s*64vh/, "the map takes the height it is given");
+  assert.match(css, /\.map-canvas-frame \{[^}]*touch-action:none/);
+  assert.match(css, /\.map-canvas-svg \{[^}]*height:100%/);
+  // The wheel listener is non-passive and scoped to the canvas element, so
+  // preventDefault never reaches the page or the project chat.
+  const canvas = readFileSync(resolve(root, "src/components/MapCanvas.tsx"), "utf8");
+  assert.match(canvas, /element\.addEventListener\("wheel", onWheel, \{ passive: false \}\)/);
+  assert.equal((canvas.match(/preventDefault\(\)/g) ?? []).length > 0, true);
+  assert.doesNotMatch(canvas, /window\.addEventListener\("wheel"|document\.addEventListener\("wheel"/);
+  assert.match(canvas, /event\.ctrlKey \|\| event\.metaKey/, "a trackpad pinch arrives as a ctrl-wheel");
 });
 
 const { hierarchyRows, hierarchyWouldCycle } = await load("taskHierarchy");
@@ -490,4 +539,39 @@ test("containment diagram applies branch/search before cap and remains bounded a
   const largeHtml = renderToStaticMarkup(createElement(TaskHierarchy, { tasks: nodes, selectedTaskId: null, onSelectTask() {}, text: (key) => messages.en[key] }));
   assert.doesNotMatch(largeHtml, /<svg/);
   assert.match(largeHtml, /task-hierarchy-list/);
+});
+
+
+test("structure map and selected strip lead with human task status in both languages", () => {
+  for (const locale of ["en", "ru"]) {
+    const html = renderToStaticMarkup(createElement(TaskHierarchy, {
+      tasks: [task(taskId, [], { title: "Selected task", taskState: "accepted" })],
+      selectedTaskId: taskId, onSelectTask() {}, text: (key) => messages[locale][key]
+    }));
+    const strip = html.match(/<div class="map-selected-strip">([\s\S]*?)<\/div>/)?.[1];
+    const svg = html.match(/<svg class="map-canvas-svg"[\s\S]*<\/svg>/)?.[0];
+    assert.ok(strip?.includes(messages[locale].tracker_gloss_accepted));
+    assert.ok(svg?.includes(messages[locale].tracker_gloss_accepted));
+    assert.match(svg, /data-graph-state="accepted"/, "the acceptance colour remains tied to the same task state");
+    assert.doesNotMatch(strip, /<code\b/);
+    assert.doesNotMatch(svg, /<code\b/);
+  }
+});
+
+test("both maps keep distinct title-bearing accessible names when far-band CSS hides all titles", () => {
+  for (const locale of ["en", "ru"]) {
+    const tasks = [task(taskId, [], { title: "Alpha unique", taskState: "ready" }), task(otherId, [], { title: "Beta unique", taskState: "ready" })];
+    const common = { tasks, selectedTaskId: null, onSelectTask() {} };
+    for (const html of [
+      renderToStaticMarkup(createElement(TaskGraph, { ...common, edges: [], locale })),
+      renderToStaticMarkup(createElement(TaskHierarchy, { ...common, text: (key) => messages[locale][key] }))
+    ]) {
+      const buttons = [...html.matchAll(/<button[^>]*class="task-graph-node"[^>]*>/g)].map((match) => match[0]);
+      assert.equal(buttons.length, 2);
+      const labels = buttons.map((button) => button.match(/aria-label="([^"]+)"/)?.[1]);
+      assert.ok(labels.some((label) => label?.includes("Alpha unique")));
+      assert.ok(labels.some((label) => label?.includes("Beta unique")));
+      assert.equal(new Set(labels).size, 2, "same-state tasks must still be distinguishable without visible title descendants");
+    }
+  }
 });

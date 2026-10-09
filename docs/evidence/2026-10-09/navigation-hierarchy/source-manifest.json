@@ -1,0 +1,122 @@
+{
+  "schema": "navigation-hierarchy-source.v1",
+  "base_head": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "scope": "Five UX follow-up requests; prior uncommitted accepted work preserved. Manifest paths are this increment and bundle.",
+  "files": [
+    {
+      "path": "frontend/work/src/components/AgentSettings.tsx",
+      "sha256": "9f86c67cb2cbc1af9695126e6390f3c71f2299009216ade577f310fe3fa4142e",
+      "bytes": 17494
+    },
+    {
+      "path": "frontend/work/src/components/AppHeader.tsx",
+      "sha256": "44af8ff892080e1c5f1c8332a96b70a9874a33a418f0f748235f9f5f94790dde",
+      "bytes": 1392
+    },
+    {
+      "path": "frontend/work/src/components/useCompactPane.ts",
+      "sha256": "88292a6b54fdcfe0a6ac92d31e1acf19c80a4c4918670d2abca38bd3d0bece2d",
+      "bytes": 2363
+    },
+    {
+      "path": "frontend/work/src/components/ProjectSidebar.tsx",
+      "sha256": "34e6551c16f36fb37a9b1d290aadc7e04453ceb611a3ba12f2ba42372593ac51",
+      "bytes": 7319
+    },
+    {
+      "path": "frontend/work/src/main.tsx",
+      "sha256": "c136daca1f6fafe8d257abdf3df1817ac559350587f366252041784fb7f2983c",
+      "bytes": 124259
+    },
+    {
+      "path": "frontend/work/src/i18n.json",
+      "sha256": "fd13c7519c716d7fa74aaea58478dfc952ab36b9b4a22349d76589b6ccb5f497",
+      "bytes": 229261
+    },
+    {
+      "path": "frontend/work/src/boardState.ts",
+      "sha256": "0f0298b7062929790ed1f5de0c4140e9cc2a86a55888abdddf7d1cab41036d1a",
+      "bytes": 18744
+    },
+    {
+      "path": "frontend/work/src/components/ProjectBoard.tsx",
+      "sha256": "7148a3c85d35921203f8c8037878584c68d2bd0e5e4fadc677526074ee5c14f5",
+      "bytes": 21294
+    },
+    {
+      "path": "frontend/work/src/styles.css",
+      "sha256": "08810a68c3bb06faa8e824fc61753abb58d8e55d15d4e78fe00d6b6211885eec",
+      "bytes": 81649
+    },
+    {
+      "path": "frontend/work/src/board.css",
+      "sha256": "0be3d34a9df37cfeecf6835058cf3508e5d48be4e7bd18f7fbcdc07f0a44db8b",
+      "bytes": 8865
+    },
+    {
+      "path": "frontend/work/tests/board-state.test.mjs",
+      "sha256": "ddd8c397adeb1b5396f4e96ec6274e067c7c4c4b16699104b19873c6d86a8151",
+      "bytes": 11216
+    },
+    {
+      "path": "frontend/work/tests/work-shell.test.mjs",
+      "sha256": "81b7efb4ced90c113c8d96d6e2b3a913b5b9f371a46887e35a4761ca4d90b5cf",
+      "bytes": 19420
+    },
+    {
+      "path": "frontend/work/tests/project-workspace.test.mjs",
+      "sha256": "9fef06a0955b1add40bb95d4c800e77750181407b3df7ee8c5c7695c3896c59a",
+      "bytes": 18008
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "722537371908837626a182e0ad1d9235de4353d5076679e7d76c08f4832c176f",
+      "bytes": 24848
+    },
+    {
+      "path": "docs/PRODUCT.md",
+      "sha256": "199076db9bb216ea445c6cf714c0f5588426cfe09bd66d8142ef90aa52d2a640",
+      "bytes": 10001
+    },
+    {
+      "path": "docs/user/en/service-library.md",
+      "sha256": "0a97e4777cad01f79583ce6d1e01a0a62db0c5ee93ce0842530c329750cc6f0f",
+      "bytes": 7931
+    },
+    {
+      "path": "docs/user/ru/service-library.md",
+      "sha256": "fc70c0046e8ac6299b983a12f661c149a69ab6df518861e510d1f77fc6b0577f",
+      "bytes": 15550
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "9befb8bb8236c65f0c003c49e573ac1c6322ee54be3bc0382e19812403c89df6",
+      "bytes": 7531
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "7a48963cf0eb9ef955b53e3f197749fd6a3bc638aed36a336e06075bb7e5b0cc",
+      "bytes": 49055
+    },
+    {
+      "path": "docs/plans/2026-10-09-navigation-hierarchy.md",
+      "sha256": "42b338f4d4e9302b5008c918fc320466cbbca43c535af83664128926ec3cab94",
+      "bytes": 2986
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/index.html",
+      "sha256": "f0e77093b4226ac684e8560104f90b308fe73b61d390d47c4fadebe34e88847f",
+      "bytes": 411
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-DJxA9TvK.css",
+      "sha256": "e176c7e6c07fdd6d8e8337abdd602d292e35cf02adef0d85820483d179719413",
+      "bytes": 110083
+    },
+    {
+      "path": "src/agent_commons/ui/static/work/assets/work-ClatTp59.js",
+      "sha256": "9e53d6b4d17aa0f135f43ec8e2a5c81ffda588681f4c36711b1cc6e7be8be763",
+      "bytes": 1077720
+    }
+  ]
+}

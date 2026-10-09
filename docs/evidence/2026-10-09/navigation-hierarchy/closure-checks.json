@@ -1,0 +1,7 @@
+{
+  "runtime_and_test_files_unchanged": 19,
+  "documentation_test": "tests/contract/test_documentation_map.py",
+  "passed": 5,
+  "exit_code": 0,
+  "post_acceptance_admin_manifest_sha256": "139653c0e35bf6b215be5ced2410e1a9b71d4ab39315af8d3254e477f8175dbf"
+}

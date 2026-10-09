@@ -1,0 +1,27 @@
+{
+  "schema": "oct09-core-followup.v1",
+  "base_patch_sha256": "aec11483731f883278f1578f4e04394cefca7db4d6ea335b5b95c84ce367ec25",
+  "patch": "/Users/dmitrijersov/Desktop/vibecoding/agent-commons/.git/worktrees/agent-commons1/oct09-core-followup-v1.patch",
+  "patch_sha256": "47ca5a168d5578215e240d40435f294b93231d92ab9d970ed101191352fe0ace",
+  "files": [
+    {
+      "path": "src/agent_commons/services/execution_plan.py",
+      "before_sha256": "e65ad0ede235c317434be1197ccbe29cced8784cdc97778121d1dfbccf911261",
+      "after_sha256": "aefab4d619ab088e82739ab06c34d990f0a9e0b3e97c70334fb7508b2ca9f385",
+      "after_bytes": 26562
+    },
+    {
+      "path": "tests/services/test_execution_plan.py",
+      "before_sha256": "68565cf6727071ac275444958bd050f97fd1cf687da03f00ca0c1d5817db21ef",
+      "after_sha256": "b0eb2459de9040807c92d59fc49f608f7938f45bc1efa0078434da34d469e4ef",
+      "after_bytes": 31697
+    }
+  ],
+  "fix": "Current fresh revision-bound review owns task evidence/action despite historical terminal run incompleteness; live, unknown and contradictory execution remain guards.",
+  "verification": {
+    "pytest": "84 passed: execution_plan, work_metrics, tracker_reads",
+    "lint": "passed on both changed Python files",
+    "format": "passed on both changed Python files",
+    "diff_check": "passed"
+  }
+}

@@ -1,6 +1,13 @@
+import { boardLaunchDraft } from "./boardState.js";
+import { readLocalePreference, writeLocalePreference } from "../../shared/localePreference.js";
+import { Modal } from "./components/Modal.js";
+import { Icon } from "./components/Icon.js";
+import { anyDialogOpen } from "./dialogStack.js";
+import { useCompactPane } from "./components/useCompactPane.js";
+import { ProjectEnvironment, ProviderQualificationAction } from "./components/ProjectEnvironment.js";
 import { ProjectCreation, type FolderPurpose, type FolderSelection } from "./projectCreation.js";
 import "./projectCreation.css";
-import { ConversationButton, ConversationWorkspace } from "./components/ConversationPanel.js";
+import { ConversationButton, ConversationWorkspace, ProjectChat } from "./components/ConversationPanel.js";
 import { ConversationSessions, prepareRunTaskId } from "./conversationState.js";
 import type { ConversationScope } from "./conversationApi.js";
 import "./conversation.css";
@@ -9,6 +16,7 @@ import "./outputs.css";
 import "@xyflow/react/dist/style.css";
 import "./board.css";
 import { ProjectBoard } from "./components/ProjectBoard.js";
+import { AgentBoardSessions } from "./agentBoardState.js";
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -30,9 +38,17 @@ import { StopReasonNotice } from "./components/StopReasonNotice.js";
 import { DEFAULT_RUN_LIMIT_MINUTES, MAX_RUN_LIMIT_MINUTES, MIN_RUN_LIMIT_MINUTES, freezeLaunchIntent, launchIntentIsVisible, restoreLaunchDraft, runLimitSeconds, type LaunchIntent, type RunDraft } from "./launchIntentState.js";
 import { taskDependencyCatalog } from "./taskDependencyState.js";
 import type { TrackerViewState } from "./trackerState.js";
-import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkRoute } from "./appRouteState";
+import { isEditingTarget, parseWorkRoute, workRouteHref, type WorkPanel, type WorkRoute } from "./appRouteState";
+import { MapViewportStore } from "./mapViewport.js";
+import { PaneSeparator } from "./components/PaneSeparator.js";
+import {
+  CHAT_MAX_WIDTH, CHAT_MIN_WIDTH, DEFAULT_WORKSPACE_LAYOUT, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH,
+  WorkspaceLayoutStore, WorkspacePreferenceSync, workspaceShellClasses,
+  type LayoutSaveState, type WorkspaceLayout
+} from "./workspaceLayout.js";
+import { budgetExhaustedRefusal, launchBudgetFromError, parseLaunchBudget, type LaunchBudget, type LaunchBudgetState } from "./launchBudget.js";
 import { ProjectDraftStore, ProjectReadRequest, ProjectRegistryApi, ProjectSelection, type ProjectInspection, type ProjectList } from "./projectWorkspace.js";
-import { providerReadinessLines, railSetupLabelKey, railSetupState } from "./setupReadiness.js";
+import { providerReadinessLines, railSetupLabelKey, railSetupState, selectedExecutorLabelKey } from "./setupReadiness.js";
 import { TrackerSection } from "./components/TrackerSection";
 import { InstrumentationSettings } from "./components/InstrumentationSettings.js";
 import { InstrumentationBatcher, recordInstrumentation, setInstrumentationSink, type InstrumentationHint, type InstrumentationPostOutcome } from "./instrumentation.js";
@@ -78,6 +94,7 @@ type RoleDraft = {
   modelMode: "profile" | "explicit";
   specializationRef: LibraryRef | null;
   specializationName: string;
+  supervisorAgentId?: string | null;
 };
 
 type TaskDraft = {
@@ -124,6 +141,24 @@ const guidanceActionMessage: Readonly<Record<SetupGuidanceNextActionKey, Message
   repair_workspace_configuration: "guidance_repair_configuration",
   setup_ready: "guidance_ready"
 };
+
+/** What the on-demand panel beside the map is called, in human words. */
+const workPanelLabel: Readonly<Record<WorkPanel, MessageKey>> = {
+  detail: "work_panel_detail",
+  new: "work_panel_new",
+  run: "work_panel_run"
+};
+
+/** Saving and saved are different outcomes, and so is "in memory only". */
+function layoutStatusKey(state: LayoutSaveState): MessageKey {
+  switch (state.kind) {
+    case "saving": return "workspace_layout_saving";
+    case "saved": return "workspace_layout_saved";
+    case "conflict": return "workspace_layout_conflict";
+    case "unavailable": return "workspace_layout_unavailable";
+    default: return "workspace_layout_idle";
+  }
+}
 
 const providerAuthStateMessage: Readonly<Record<ProviderAuthState, MessageKey>> = {
   ready: "provider_auth_ready",
@@ -233,15 +268,33 @@ function repositoryBasename(path: string): string {
 function WorkApp(): ReactElement {
   const projectCreation = useRef(new ProjectCreation());
   const conversationSessions = useRef(new ConversationSessions());
+  const agentBoardSessions = useRef(new AgentBoardSessions());
   const [route, setRoute] = useState<WorkRoute>(() => parseWorkRoute(window.location.search));
+  const compactPane = useCompactPane(route.projectId);
   const routeRef = useRef(route);
   const [search, setSearch] = useState("");
-  const [launchOpen, setLaunchOpen] = useState(false);
+  // Reading positions on the task map, per project, map kind and drawing. RAM
+  // only: a viewport is where the person is looking, not a record.
+  const viewportsRef = useRef(new MapViewportStore());
+  // The pane arrangement. The server owns it; this store owns what the person
+  // is doing to it right now, and a save happens when a gesture ends.
+  const layoutEntries = useRef(new Map<string, { store: WorkspaceLayoutStore; sync: WorkspacePreferenceSync }>());
+  const layoutKey = route.projectId ?? "legacy";
+  if (!layoutEntries.current.has(layoutKey)) {
+    const store = new WorkspaceLayoutStore();
+    layoutEntries.current.set(layoutKey, { store, sync: new WorkspacePreferenceSync(store) });
+  }
+  const layoutEntry = layoutEntries.current.get(layoutKey)!;
+  const layoutRef = useRef(layoutEntry.store);
+  layoutRef.current = layoutEntry.store;
+  const [, setLayoutRevision] = useState(0);
+  useEffect(() => layoutEntry.store.subscribe(() => setLayoutRevision((value) => value + 1)), [layoutEntry]);
   const [actionErrors, setActionErrors] = useState<Record<string, ActionError>>({});
   const newTaskButton = useRef<HTMLButtonElement>(null);
   const navigationRevision = useRef(0);
-  const [locale, setLocale] = useState<Locale>("en");
+  const [locale, setLocale] = useState<Locale>(readLocalePreference);
   const [state, setState] = useState<AppState>({ kind: "checking" });
+  useEffect(() => { if (state.kind !== "ready") compactPane.reset(); }, [state.kind]);
   // In-flight writes, per project and surface. A write gates writes, not reading.
   const mutationsRef = useRef(new MutationRegistry());
   const [mutationRevision, setMutationRevision] = useState(0);
@@ -262,6 +315,12 @@ function WorkApp(): ReactElement {
   // no run was created, the typed refusal is rendered beside the control that
   // asked for it, and the draft stays exactly as it was, in memory only.
   const [launchRefusal, setLaunchRefusal] = useState<{ taskId: string; refusal: StopReason } | null>(null);
+  // The operator's remaining launch allowance for the chosen agent's profile:
+  // reserved launches, never money. Unknown stays unknown.
+  const [launchBudget, setLaunchBudget] = useState<{ profileId: string; state: LaunchBudgetState }>({ profileId: "", state: { kind: "unknown" } });
+  // A launch the precheck refused because that allowance is used up. No
+  // attempt, no child session, and no automatic raise of the limit.
+  const [budgetRefusal, setBudgetRefusal] = useState<{ taskId: string; budget: LaunchBudget | null } | null>(null);
   const [showFullProjectPath, setShowFullProjectPath] = useState(false);
   const [configurationConfirmationOpen, setConfigurationConfirmationOpen] = useState(false);
   const [pendingLaunch, setPendingLaunch] = useState<LaunchIntent | null>(null);
@@ -370,6 +429,7 @@ function WorkApp(): ReactElement {
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    writeLocalePreference(locale);
   }, [locale]);
 
   const libraryAccessible = state.kind === "ready" && state.data.setup.state !== "setup_uninitialized" && state.data.setup.state !== "setup_not_a_repository";
@@ -450,6 +510,17 @@ function WorkApp(): ReactElement {
     }
   }
 
+  // Only a connected, loaded project can read private preferences. The queue is
+  // owned by that project and survives navigation and late responses in RAM.
+  const preferenceApi = state.kind === "ready" ? apiRef.current : null;
+  useEffect(() => {
+    if (preferenceApi === null) return;
+    void layoutEntry.sync.connect(preferenceApi);
+  }, [preferenceApi, layoutEntry]);
+  function saveLayout(layout: WorkspaceLayout): Promise<void> {
+    return layoutEntry.sync.request(layout);
+  }
+
   // Role first: without a chosen specialization there is nothing to ask the
   // server about, and the worker step stays disabled rather than guessing.
   const specializationKey = role.specializationRef === null ? "" : libraryRefKey(role.specializationRef);
@@ -488,6 +559,35 @@ function WorkApp(): ReactElement {
   }, [specializationKey, workersReadable, workerRefresh]);
 
   const workerState: WorkerPickerState = workers.key === specializationKey ? workers.state : { kind: "idle" };
+
+  // Prepare run explains the limit it will be launched under. The profile of
+  // the chosen agent decides which allowance is read; an unreadable or absent
+  // answer shows no number at all.
+  const runProfileId = useMemo(
+    () => state.kind === "ready" ? state.data.launch?.roles.find((option) => option.id === run.agentId)?.profileId ?? null : null,
+    [state, run.agentId]
+  );
+  const runPanelOpen = route.panel === "run";
+  useEffect(() => {
+    if (!runPanelOpen || runProfileId === null) {
+      setLaunchBudget({ profileId: "", state: { kind: "unknown" } });
+      return;
+    }
+    const controller = new AbortController();
+    const generation = projectSelectionRef.current.currentGeneration();
+    const projectId = routeRef.current.projectId;
+    const api = apiRef.current;
+    const stillCurrent = (): boolean => !controller.signal.aborted
+      && projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId;
+    setLaunchBudget({ profileId: runProfileId, state: { kind: "loading" } });
+    void api.readLaunchBudget(runProfileId, controller.signal).then((payload) => {
+      if (stillCurrent()) setLaunchBudget({ profileId: runProfileId, state: { kind: "ready", budget: parseLaunchBudget(payload, runProfileId) } });
+    }).catch(() => {
+      // Not readable is not zero: the surface says so and invents no count.
+      if (stillCurrent()) setLaunchBudget({ profileId: runProfileId, state: { kind: "unavailable" } });
+    });
+    return () => controller.abort();
+  }, [runPanelOpen, runProfileId, route.projectId]);
 
   function chooseSpecialization(selected: LibraryRole | null, showTeam = false): void {
     setRole((current) => ({ ...current, fromPresetId: "", specializationRef: selected?.ref ?? null,
@@ -529,21 +629,33 @@ function WorkApp(): ReactElement {
     }
   }
 
-  function selectTask(taskId: string | null): void {
-    navigate({ taskId });
-    setLaunchOpen(false);
-    if (taskId !== null && window.matchMedia("(max-width: 1000px)").matches) {
+  /**
+   * Opening a task: it becomes the selected node and its details open on
+   * demand beside the map. The map stays mounted; its focused branch and
+   * reading position are untouched.
+   */
+  function openTask(taskId: string): void {
+    navigate({ taskId, panel: "detail" });
+    if (window.matchMedia("(max-width: 1000px)").matches) {
       window.requestAnimationFrame(() => {
         if (routeRef.current.view !== "work" || routeRef.current.taskId !== taskId) return;
-        const inspector = document.querySelector<HTMLElement>(".task-workspace-selected .task-inspector");
-        inspector?.scrollIntoView({ block: "start", behavior: "auto" });
-        inspector?.focus({ preventScroll: true });
+        document.querySelector<HTMLElement>(".work-panel-detail .task-inspector")?.focus({ preventScroll: true });
       });
     }
   }
 
+  /** Moving the selection only: no panel opens, closes or changes. */
+  function focusTask(taskId: string): void {
+    navigate({ taskId });
+  }
+
+  /** Closing a panel never clears the selection or refits the map. */
+  function closePanel(): void {
+    navigate({ panel: null });
+  }
+
   function closeComposer(): void {
-    navigate({ composer: false });
+    closePanel();
     window.setTimeout(() => newTaskButton.current?.focus(), 0);
   }
 
@@ -555,8 +667,7 @@ function WorkApp(): ReactElement {
     const projectId = routeRef.current.projectId;
     const api = apiRef.current;
     setRun((current) => pendingLaunchRef.current?.input.taskId === taskId ? restoreLaunchDraft(pendingLaunchRef.current) : current.taskId === taskId ? current : { ...emptyRun, taskId });
-    navigate({ view: "work", taskId, composer: false });
-    setLaunchOpen(true);
+    navigate({ view: "work", taskId, panel: "run" });
     window.setTimeout(() => {
       if (projectSelectionRef.current.isCurrent(generation) && routeRef.current.projectId === projectId) {
         document.getElementById("run-role")?.focus();
@@ -580,7 +691,7 @@ function WorkApp(): ReactElement {
   function prepareRunForConversation(scope: ConversationScope): void {
     const taskId = prepareRunTaskId(scope, routeRef.current.taskId);
     if (taskId) prepareLaunch(taskId);
-    else navigate({ view: "work", composer: false });
+    else navigate({ view: "work", panel: null });
   }
 
   // Applying a blueprint creates roles and tasks only. Both offered intents
@@ -597,8 +708,7 @@ function WorkApp(): ReactElement {
       return;
     }
     setSearch("");
-    setLaunchOpen(false);
-    navigate({ view: "work", filter: "all", taskId: intent.taskId, composer: false });
+    navigate({ view: "work", filter: "all", taskId: intent.taskId, panel: "detail" });
   }
 
   useEffect(() => {
@@ -608,7 +718,6 @@ function WorkApp(): ReactElement {
       if (next.projectId !== routeRef.current.projectId) bindProject(next.projectId);
       routeRef.current = next;
       setRoute(next);
-      setLaunchOpen(false);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -616,16 +725,16 @@ function WorkApp(): ReactElement {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditingTarget(event.target)) return;
+      if (anyDialogOpen() || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditingTarget(event.target)) return;
       if (event.key.toLowerCase() === "n") {
         event.preventDefault();
-        navigate({ view: "work", composer: true });
+        navigate({ view: "work", panel: "new" });
         window.setTimeout(() => document.getElementById("task-title")?.focus(), 0);
       } else if (event.key === "/") {
         event.preventDefault();
         navigate({ view: "work" });
         window.setTimeout(() => document.querySelector<HTMLInputElement>(".task-view-toolbar input")?.focus(), 0);
-      } else if (event.key === "Escape" && route.composer) closeComposer();
+      } else if (event.key === "Escape" && route.panel === "new") closeComposer();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -773,7 +882,7 @@ function WorkApp(): ReactElement {
     // Drafts are intentionally RAM-only and keyed by opaque project identity.
     // Selection also closes the active tracker through a new immutable client.
     const selectedTaskId = bindProject(projectId);
-    navigate({ projectId, taskId: selectedTaskId, composer: false });
+    navigate({ projectId, taskId: selectedTaskId, panel: null });
   }
 
   function bindProject(projectId: string | null): string | null {
@@ -815,7 +924,6 @@ function WorkApp(): ReactElement {
     setTaskErrors(transient.taskErrors);
     setRunErrors(transient.runErrors);
     setTrackerObservation({ kind: "loading" });
-    setLaunchOpen(false);
     setAppliedBlueprint(null);
     setPendingApplication(null);
     setHireOpen(false);
@@ -973,6 +1081,7 @@ function WorkApp(): ReactElement {
         const created = await api.createRole(roleInput, signal, roleKey);
         if (!projectSelectionRef.current.isCurrent(generation) || routeRef.current.projectId !== projectId) return;
         setLastHiredRole({ id: created.agentId, name: roleInput.name });
+        setBoardRefreshKey((current) => current + 1);
         if (!pendingLaunchRef.current && navigationRevision.current === operationNavigation && launchSelectionVersion.current === operationSelection) {
           setRun((current) => current.taskId === operationRun.taskId && current.agentId === operationRun.agentId
             ? { ...current, agentId: created.agentId, taskId: targetTaskId, contextPackKey: "", designPackageKey: "" } : current);
@@ -1028,7 +1137,7 @@ function WorkApp(): ReactElement {
           parentTaskId: current.parentTaskId ?? null
         }) === JSON.stringify(input) ? emptyTask : current);
         if (navigationRevision.current === operationNavigation) {
-          navigate({ view: "work", taskId: result.taskId, composer: false });
+          navigate({ view: "work", taskId: result.taskId, panel: "detail" });
           setRun((current) => ({ ...current, taskId: result.taskId }));
         }
         setState((current) => current.kind === "ready" ? { ...current, notice: "created_task" } : current);
@@ -1119,8 +1228,7 @@ function WorkApp(): ReactElement {
     const restored = restoreLaunchDraft(intent);
     runRef.current = restored;
     setRun(restored);
-    navigate({ view: "work", taskId: intent.input.taskId, composer: false });
-    setLaunchOpen(true);
+    navigate({ view: "work", taskId: intent.input.taskId, panel: "run" });
   }
 
   function retryPendingLaunch(): void {
@@ -1189,6 +1297,7 @@ function WorkApp(): ReactElement {
       clearActionError("start-run");
       setRunLimitRefusal(null);
       setLaunchRefusal(null);
+      setBudgetRefusal(null);
       const controller = new AbortController();
       const started = performance.now();
       try {
@@ -1211,6 +1320,13 @@ function WorkApp(): ReactElement {
         // leaves the entered minutes untouched in the in-memory draft.
         if (isRunLimitRefusal(problem)) {
           setRunLimitRefusal({ taskId: intent.draft.taskId, limitMinutes: intent.draft.limitMinutes });
+        }
+        // The precheck refused before any attempt existed: the typed code, and
+        // the budget object it sent when that object is readable.
+        if (budgetExhaustedRefusal(error)) {
+          const refusedBudget = launchBudgetFromError(problem?.apiError ?? null);
+          setBudgetRefusal({ taskId: intent.draft.taskId, budget: refusedBudget });
+          if (refusedBudget !== null) setLaunchBudget({ profileId: refusedBudget.profileId, state: { kind: "ready", budget: refusedBudget } });
         }
         // A pre-attempt admission refusal: the closed code, the server's bounded
         // reason and one next action, tied to the task whose draft was refused.
@@ -1382,6 +1498,9 @@ function WorkApp(): ReactElement {
   // it without touching the draft it left untouched in memory.
   const launchRefused = launchRefusal !== null && launchRefusal.taskId === run.taskId
     ? launchRefusal.refusal : null;
+  // The refused allowance belongs to the task whose launch was refused.
+  const budgetRefused = budgetRefusal !== null && budgetRefusal.taskId === run.taskId ? budgetRefusal : null;
+  const visibleBudget = launchBudget.profileId !== "" && launchBudget.profileId === runProfileId ? launchBudget.state : { kind: "unknown" as const };
   const selectedProfileId = pendingLaunchVisible ? pendingLaunch?.profileId ?? undefined : selectedRole?.profileId;
   const selectedTeamTask = trackerObservation.kind === "ready" ? trackerObservation.snapshot.tasks.find((task) => task.taskId === route.taskId) : undefined;
   const selectedAvailability = data.providerAvailability.find(
@@ -1407,63 +1526,138 @@ function WorkApp(): ReactElement {
   }
 
   const workspaceInitialized = !["setup_uninitialized", "setup_not_a_repository"].includes(data.setup.state);
+  // Republished by the store on every change, including during a drag.
+  const layoutState = layoutEntry.store.snapshot();
+  const layout = layoutState.layout;
+  const projectTitle = projectList?.projects.find((project) => project.id === renderedProjectId)?.name
+    ?? data.meta.repo.split(/[\\/]/).pop() ?? text("shell_nav_work");
+  const openProjectChat = (): void => {
+    if (compactPane.compact) compactPane.show("chat");
+    else if (layout.chatCollapsed) void saveLayout(layoutRef.current.apply({ chatCollapsed: false }));
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>(".chat-pane .project-chat textarea")?.focus({ preventScroll: true }));
+  };
+  const activityRail = <nav className="activity-rail" aria-label={text("activity_navigation")} inert={compactPane.compact && compactPane.pane !== null}>
+    <a title={text("activity_workspace")} aria-label={text("activity_workspace")} aria-current={route.view === "work" || route.view === "board" ? "page" : undefined} href={workRouteHref({ ...route, view: "work" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "work" }); } }}><Icon name="project" size={20} /></a>
+    <div className="activity-divider" />
+    {(["roles", "skills", "blueprints", "context"] as const).map((tab) => <a key={tab} title={text(`library_${tab}`)} aria-label={text(`library_${tab}`)} aria-current={route.view === "library" && route.libraryTab === tab ? "page" : undefined} href={workRouteHref({ ...route, view: "library", libraryTab: tab })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "library", libraryTab: tab }); } }}><Icon name={tab === "roles" ? "supervisor" : tab === "skills" ? "skills" : tab === "blueprints" ? "agents" : "library"} size={20} /></a>)}
+    <a className="activity-settings" title={text("shell_nav_settings")} aria-label={text("shell_nav_settings")} aria-current={route.view === "settings" ? "page" : undefined} href={workRouteHref({ ...route, view: "settings" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "settings" }); } }}><Icon name="settings" size={20} /></a>
+  </nav>;
+  const sidebarPane = <aside className="app-rail" ref={compactPane.compact ? (element) => { compactPane.element.current = element; } : undefined} role={compactPane.compact ? "dialog" : undefined} aria-modal={compactPane.compact ? true : undefined} aria-label={text("shell_navigation")} tabIndex={compactPane.compact ? -1 : undefined}>
+    {compactPane.compact ? <button className="button button-secondary compact-pane-close" type="button" onClick={compactPane.close}>{text("workspace_close_pane")}</button> : null}
+    <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}
+      currentProjectId={route.projectId} onOpenChat={openProjectChat}
+      currentProjectPath={data.meta.repo}
+      legacy={legacyProjectHost}
+      locale={locale}
+      projects={projectList}
+      text={text}
+      onInspect={inspectProject}
+      onCreate={createProject}
+      onSelect={selectProject}
+      onUpdate={updateProject}
+    />
+    <div className="rail-status"><span className="status-dot" aria-hidden="true" data-state={railSetupState(data.setup.state)} />{text(railSetupLabelKey(data.setup.state))}</div>
+    {configured ? <p className="small-copy rail-help">{text(selectedExecutorLabelKey(selectedProfileId, selectedAvailability))}{selectedProfileId ? <> · <code>{selectedProfileId}</code></> : null}</p> : null}
+    <p className="small-copy rail-help">{text("shell_local_workspace")}</p>
+  </aside>;
+  const chatPane = <div className="chat-pane" ref={compactPane.compact ? (element) => { compactPane.element.current = element; } : undefined} role={compactPane.compact ? "dialog" : undefined} aria-modal={compactPane.compact ? true : undefined} aria-label={text("workspace_chat_short")} tabIndex={compactPane.compact ? -1 : undefined}>
+    {compactPane.compact ? <button className="button button-secondary compact-pane-close" type="button" onClick={compactPane.close}>{text("workspace_close_pane")}</button> : null}
+    {workspaceInitialized
+      ? <ProjectChat title={projectTitle} collapsed={false} />
+      : <section className="project-chat"><p className="small-copy">{text("workspace_needs_setup")}</p></section>}
+  </div>;
+  const sidebarSeparator = <PaneSeparator pane="sidebar" label={text("workspace_sidebar_width")}
+    value={layout.sidebarWidth} min={SIDEBAR_MIN_WIDTH} max={SIDEBAR_MAX_WIDTH}
+    direction={layout.panesSwapped ? -1 : 1} valueText={`${layout.sidebarWidth}px`}
+    onBeginDrag={() => layoutRef.current.beginDrag("sidebar")}
+    onResize={(width) => layoutRef.current.resize("sidebar", width)}
+    onCommit={(width) => { layoutRef.current.resize("sidebar", width); void saveLayout(layoutRef.current.endDrag()); }}
+    onReset={() => void saveLayout(layoutRef.current.apply({ sidebarWidth: DEFAULT_WORKSPACE_LAYOUT.sidebarWidth }))} />;
+  const chatSeparator = <PaneSeparator pane="chat" label={text("workspace_chat_width")}
+    value={layout.chatWidth} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH}
+    direction={layout.panesSwapped ? 1 : -1} valueText={`${layout.chatWidth}px`}
+    onBeginDrag={() => layoutRef.current.beginDrag("chat")}
+    onResize={(width) => layoutRef.current.resize("chat", width)}
+    onCommit={(width) => { layoutRef.current.resize("chat", width); void saveLayout(layoutRef.current.endDrag()); }}
+    onReset={() => void saveLayout(layoutRef.current.apply({ chatWidth: DEFAULT_WORKSPACE_LAYOUT.chatWidth }))} />;
   return (
     <ConversationWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId} locale={locale} writesEnabled={workspaceInitialized && data.meta.writesEnabled} sessions={conversationSessions.current} onPrepareRun={prepareRunForConversation}>
     <OutputsWorkspace key={renderedProjectId ?? "legacy"} api={renderedProjectApi} projectId={renderedProjectId}
       revision={trackerObservation.kind === "ready" ? trackerObservation.snapshot.sourceRevision : null} locale={locale}
       taskTitles={trackerObservation.kind === "ready" ? new Map(trackerObservation.snapshot.tasks.map((task) => [task.taskId, task.title])) : undefined}
       agentNames={new Map(roleOptions.map((agent) => [agent.id, agent.name]))}
-      onOpenTask={(taskId) => { navigate({ view: "work", filter: "all", agentId: null, taskId, composer: false }); setLaunchOpen(false); }}>
-    <main className="work-app">
-      <aside className="app-rail" aria-label={text("shell_navigation")}>
-        <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}
-          currentProjectId={route.projectId}
-          currentProjectPath={data.meta.repo}
-          legacy={legacyProjectHost}
-          locale={locale}
-          projects={projectList}
-          text={text}
-          onInspect={inspectProject}
-          onCreate={createProject}
-          onSelect={selectProject}
-          onUpdate={updateProject}
-        />
-        <nav className="primary-navigation">
-          {(["board", "work", "library", "settings"] as const).map((view) => <a key={view}
-            aria-current={route.view === view ? "page" : undefined}
-            href={workRouteHref({ ...route, view })}
-            onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view }); } }}>
-            {text(`shell_nav_${view}`)}
-          </a>)}
-        </nav>
-        <div className="rail-status"><span className="status-dot" aria-hidden="true" data-state={railSetupState(data.setup.state)} />{text(railSetupLabelKey(data.setup.state))}</div>
-        <p className="small-copy rail-help">{text("shell_local_workspace")}</p>
-      </aside>
-      <div className="app-content">
-        <AppHeader locale={locale} onLocaleChange={setLocale} text={text} title={text(`shell_nav_${route.view}`)} />
+      onOpenTask={(taskId) => navigate({ view: "work", filter: "all", agentId: null, taskId, panel: "detail" })}>
+    {/* The work area: a narrow sidebar, the task map at full height, and the
+        project chat. Both side panes resize, collapse and swap; the page
+        itself never scrolls away from the map. */}
+    <main className={`work-app ${workspaceShellClasses(layout)}`}
+      data-compact-pane={compactPane.pane ?? "none"}
+      data-sidebar={layout.sidebarCollapsed ? "collapsed" : "open"}
+      data-chat={layout.chatCollapsed ? "collapsed" : "open"}
+      data-swapped={layout.panesSwapped ? "true" : "false"}>
+      {activityRail}
+      {(compactPane.compact ? compactPane.pane !== "sidebar" : layout.sidebarCollapsed) ? null : sidebarPane}
+      {compactPane.compact || layout.sidebarCollapsed ? null : sidebarSeparator}
+      {compactPane.compact && compactPane.pane ? <button type="button" tabIndex={-1} className="compact-pane-backdrop" aria-label={text("workspace_close_pane")} onClick={compactPane.close} /> : null}
+      <div className="app-content" inert={compactPane.compact && compactPane.pane !== null}>
+        <AppHeader locale={locale} onLocaleChange={setLocale} text={text} title={text(`shell_nav_${route.view}`)} hideTitle={route.view === "work" || route.view === "board"}
+          layoutControls={<div className="layout-controls" role="group" aria-label={text("workspace_layout_label")}>
+            <button type="button" className="button button-secondary button-inline" aria-label={text("workspace_sidebar_short")} title={text("workspace_sidebar_short")} aria-pressed={compactPane.compact ? compactPane.pane === "sidebar" : !layout.sidebarCollapsed}
+              onClick={(event) => compactPane.compact ? compactPane.open("sidebar", event) : void saveLayout(layoutRef.current.apply({ sidebarCollapsed: !layout.sidebarCollapsed }))}>
+              <Icon name="sidebar" />
+            </button>
+            <button type="button" className="button button-secondary button-inline" aria-label={text("workspace_chat_short")} title={text("workspace_chat_short")} aria-pressed={compactPane.compact ? compactPane.pane === "chat" : !layout.chatCollapsed}
+              onClick={(event) => compactPane.compact ? compactPane.open("chat", event) : void saveLayout(layoutRef.current.apply({ chatCollapsed: !layout.chatCollapsed }))}>
+              <Icon name="chat-pane" />
+            </button>
+
+            <details className="layout-menu"><summary>{text("workspace_layout_menu")}</summary><div className="layout-menu-content">
+            <button type="button" className="button button-secondary button-inline" aria-pressed={layout.panesSwapped}
+              onClick={() => void saveLayout(layoutRef.current.apply({ panesSwapped: !layout.panesSwapped }))}>
+              {text("workspace_swap_panes")}
+            </button>
+            <button type="button" className="button button-secondary button-inline"
+              onClick={() => void saveLayout(layoutRef.current.restoreDefault())}>
+              {text("workspace_restore_layout")}
+            </button>
+            <p className="small-copy layout-status" role="status">{text(layoutStatusKey(layoutState.save))}</p>
+            {layoutState.save.kind === "conflict" ? <button type="button" className="button button-secondary button-inline"
+              onClick={() => void layoutEntry.sync.acceptConflict()}>
+              {text("workspace_layout_reload")}
+            </button> : null}
+            {layoutState.save.kind === "unavailable" ? <button type="button" className="button button-secondary button-inline" onClick={() => void layoutEntry.sync.retry()}>{text("workspace_layout_retry")}</button> : null}
+            </div></details>
+          </div>} />
         <div className="workspace-content">
+          {route.view === "work" || route.view === "board" ? <nav className="map-tabs" aria-label={text("map_tabs_label")}>
+            {(["work", "board"] as const).map((view) => <a key={view} href={workRouteHref({ ...route, view })} aria-current={route.view === view ? "page" : undefined} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view }); } }}><Icon name={view === "work" ? "map" : "agents"} />{text(view === "work" ? "map_tasks" : "map_agents")}</a>)}
+            {route.view === "work" ? <button ref={newTaskButton} className="button button-primary" disabled={!workspaceInitialized || !data.meta.writesEnabled} onClick={() => { navigate({ view: "work", panel: "new" }); window.setTimeout(() => document.getElementById("task-title")?.focus(), 0); }} type="button">{text("shell_new_task")}</button> : null}
+          </nav> : null}
           {notice !== null ? <p className="notice workspace-notice" role="status">{text(notice)}</p> : null}
           {actionFeedback("refresh")}
-          <section hidden={route.view !== "work"} aria-label={text("shell_nav_work")}>
-            <div className="workspace-toolbar"><p className="small-copy">{text("shell_work_intro")}</p>
-              <div className="workspace-toolbar-actions">
-                {workspaceInitialized ? <ConversationButton scope={{ kind: "project" }} title={projectList?.projects.find((project) => project.id === renderedProjectId)?.name ?? data.meta.repo.split(/[\\/]/).pop() ?? text("shell_nav_work")} /> : null}
-                <button ref={newTaskButton} className="button button-primary" disabled={!workspaceInitialized || !data.meta.writesEnabled} onClick={() => { navigate({ composer: true }); window.setTimeout(() => document.getElementById("task-title")?.focus(), 0); }} type="button">{text("shell_new_task")}</button>
-              </div>
+          <section hidden={route.view !== "work"} className="work-area" aria-label={text("shell_nav_work")}>
+            <div className="work-area-head">
+              {!configured ? <div className="notice setup-notice" role="status"><p>{text(workspaceInitialized ? "shell_provider_setup_later" : "workspace_needs_setup")}</p><button className="notice-link" onClick={() => navigate({ view: "settings" })} type="button">{text("shell_open_settings")}</button></div> : null}
             </div>
-            {!configured ? <div className="notice setup-notice" role="status"><p>{text(workspaceInitialized ? "shell_provider_setup_later" : "workspace_needs_setup")}</p><button className="notice-link" onClick={() => navigate({ view: "settings" })} type="button">{text("shell_open_settings")}</button></div> : null}
-            <div hidden={!route.composer}>
-              <TaskComposer draft={task} onChange={setTask} submitBlocked={actionErrors["create-task"]?.uncertain === true} errors={taskErrors} busy={writeInFlight} writesEnabled={workspaceInitialized && data.meta.writesEnabled} tasks={dependencies.tasks} dependencyStatus={dependencies.status} onSubmit={submitTask} onClose={closeComposer} onDependency={setTaskDependency} text={text} />
+            <div className="work-area-body">
+            {workspaceInitialized ? <TrackerSection api={apiRef.current} locale={locale} text={text} writesEnabled={data.meta.writesEnabled} onObservation={setTrackerObservation}
+              selectedTaskId={route.taskId} onSelectTask={openTask} onFocusTask={focusTask}
+              detailTaskId={route.view === "work" && route.panel === "detail" ? route.taskId : null} onCloseDetail={closePanel} onLaunchTask={prepareLaunch}
+              search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })}
+              tasksView={route.tasksView} onTasksViewChange={(tasksView) => navigate({ tasksView })}
+              agentId={route.agentId} onClearAgent={() => navigate({ agentId: null })}
+              viewports={viewportsRef.current} projectId={route.projectId} /> : null}
+            {route.view === "work" && route.panel === "new" ? <Modal title={text("shell_new_task")} closeLabel={text("shell_close")} onClose={closeComposer} size="medium" className="work-panel-new">
+              <TaskComposer embedded draft={task} onChange={setTask} submitBlocked={actionErrors["create-task"]?.uncertain === true} errors={taskErrors} busy={writeInFlight} writesEnabled={workspaceInitialized && data.meta.writesEnabled} tasks={dependencies.tasks} dependencyStatus={dependencies.status} onSubmit={submitTask} onClose={closeComposer} onDependency={setTaskDependency} text={text} />
               <MutationFeedback entries={projectMutations} surface="tasks" text={text} />
               {actionFeedback("create-task")}
-            </div>
+            </Modal> : null}
             {pendingLaunch !== null ? <LaunchRecoveryPanel intent={pendingLaunch}
-              visible={pendingLaunchVisible && launchOpen} busy={writeInFlight || !data.meta.writesEnabled}
+              visible={pendingLaunchVisible && route.panel === "run"} busy={writeInFlight || !data.meta.writesEnabled}
               uncertain={actionErrors["start-run"]?.uncertain === true}
               failureCode={actionErrors["start-run"]?.failure.code ?? null}
               onRestore={restorePendingLaunch} onRetry={retryPendingLaunch} onEdit={editRefusedLaunch} text={text} /> : null}
-            <div hidden={!launchOpen || route.taskId !== run.taskId} className="launch-composer">
-              <div className="composer-heading"><h2>{text("shell_launch_task")}</h2><button className="button button-secondary button-inline" type="button" onClick={() => setLaunchOpen(false)}>{text("shell_close")}</button></div>
+            {route.view === "work" && route.panel === "run" && route.taskId === run.taskId ? <Modal title={text("shell_launch_task")} closeLabel={text("shell_close")} onClose={closePanel} className="work-panel-run launch-composer">
           <WorkflowCard ready={false} title={text("step_run")}>
             <p className="small-copy">{text("shell_launch_help")}</p>
             <p className="launch-task-title">{taskOptions.find((option) => option.id === run.taskId)?.title ?? run.taskId}</p>
@@ -1545,7 +1739,7 @@ function WorkApp(): ReactElement {
             {notice === "run_started" && launchedTaskId === run.taskId ? (
               <div className="notice" role="status">
                 <p>{text("run_started_help")}</p>
-                <button className="notice-link" type="button" onClick={() => { navigate({ view: "work", taskId: run.taskId }); setLaunchOpen(false); }}>{text("shell_view_task")}</button>
+                <button className="notice-link" type="button" onClick={() => navigate({ view: "work", taskId: run.taskId, panel: "detail" })}>{text("shell_view_task")}</button>
               </div>
             ) : null}
             <form noValidate onSubmit={submitRun}>
@@ -1625,6 +1819,30 @@ function WorkApp(): ReactElement {
                 {validation([...runErrors], "run-limit") ? <p className="field-error" id="run-limit-error">{text("form_error_run_limit")}</p> : null}
                 {runLimitRefused ? <p className="field-error" id="run-limit-refusal" role="alert">{text("run_limit_server_refusal")} {text("form_error_run_limit")}</p> : null}
                 {validation([...runErrors], "provider-availability") ? <p className="field-error">{text("form_error_provider_availability")}</p> : null}
+                {/* The allowance this run would be launched under: reserved
+                    launches for the chosen profile, never a sum of money, and
+                    never raised from here. */}
+                <section className="launch-budget" aria-labelledby="launch-budget-title">
+                  <h3 id="launch-budget-title">{text("budget_title")}</h3>
+                  <p className="small-copy">{text("budget_help")}</p>
+                  {visibleBudget.kind === "ready" ? <ul className="launch-budget-values">
+                    <li>{text("budget_limit")}: <strong>{visibleBudget.budget.limit}</strong></li>
+                    <li>{text("budget_used")}: <strong>{visibleBudget.budget.used}</strong></li>
+                    <li>{text("budget_remaining")}: <strong>{visibleBudget.budget.remaining}</strong></li>
+                  </ul> : <p className={visibleBudget.kind === "loading" ? "small-copy" : "field-error"}>
+                    {text(visibleBudget.kind === "loading" ? "budget_loading" : "budget_unknown")}
+                  </p>}
+                  {visibleBudget.kind === "ready" && visibleBudget.budget.exhausted
+                    ? <p className="field-error" role="status">{text("budget_exhausted")}</p> : null}
+                  <details className="inspector-technical"><summary>{text("shell_technical_details")}</summary>
+                    <p><code>{visibleBudget.kind === "ready" ? visibleBudget.budget.unit : "provider_units"}</code>{visibleBudget.kind === "ready" ? <> · <code>{visibleBudget.budget.profileId}</code></> : null}</p>
+                  </details>
+                </section>
+                {budgetRefused !== null ? <div className="launch-refusal" role="alert">
+                  <p className="field-error">{text("budget_refused")}</p>
+                  {budgetRefused.budget === null ? <p className="small-copy">{text("budget_unknown")}</p> : null}
+                  <code>operator_budget_exhausted</code>
+                </div> : null}
                 {launchRefused !== null ? <div className="launch-refusal" role="alert">
                   <p className="field-error">{text("launch_refused_before_attempt")}</p>
                   <StopReasonNotice reason={launchRefused} text={text} />
@@ -1635,40 +1853,30 @@ function WorkApp(): ReactElement {
             <MutationFeedback entries={projectMutations} surface="launch" text={text} />
 
           </WorkflowCard>
-            </div>
-            {workspaceInitialized ? <TrackerSection api={apiRef.current} locale={locale} text={text} writesEnabled={data.meta.writesEnabled} onObservation={setTrackerObservation}
-              selectedTaskId={route.taskId} onSelectTask={selectTask} onLaunchTask={prepareLaunch}
-              search={search} onSearchChange={setSearch} filter={route.filter} onFilterChange={(filter) => navigate({ filter })}
-              tasksView={route.tasksView} onTasksViewChange={(tasksView) => navigate({ tasksView })}
-              agentId={route.agentId} onClearAgent={() => navigate({ agentId: null })} /> : null}
+            </Modal> : null}
+          </div>
           </section>
           <section hidden={route.view !== "board"} aria-label={text("shell_nav_board")} className="board-view">
-            {/* Mounted only while visible: React Flow measures its viewport on mount, and a
-                board fitted inside a hidden section would come back as a dot in the corner. */}
-            {route.view === "board" && workspaceInitialized ? <ProjectBoard api={renderedProjectApi} locale={locale} text={text} roles={roleOptions} tracker={trackerObservation}
+            {/* The project-owned session survives provider remounts when switching projects. */}
+            {workspaceInitialized ? <ProjectBoard onOpenProjectChat={openProjectChat} session={agentBoardSessions.current.forProject(renderedProjectId)} api={renderedProjectApi} locale={locale} text={text} rolesReady={launch !== null} roles={roleOptions} tracker={trackerObservation}
+              active={route.view === "board"} library={libraryState} onChanged={() => { setBoardRefreshKey((n) => n + 1); void refresh(); }}
+              onConfigureChild={(supervisorAgentId) => { setRole((current) => ({ ...current, supervisorAgentId })); setHireOpen(true); }}
               writesEnabled={data.meta.writesEnabled && configured} refreshKey={boardRefreshKey} selectedTaskId={route.taskId}
-              onOpenTasks={(agentId) => navigate({ view: "work", agentId, composer: false })}
-              onGiveTask={(agentId) => {
-                const taskId = route.taskId;
-                if (taskId === null) { navigate({ view: "work", agentId, composer: false }); return; }
+              onOpenTasks={(agentId) => navigate({ view: "work", agentId, panel: null })}
+              onGiveTask={(agentId, taskId) => {
+                // UX-03: the board already asked which task, explicitly, in its
+                // own picker. This only opens Prepare run for that exact task
+                // and prefills the agent; it issues no assignment and no launch,
+                // and it never overrides a pending launch's own task.
                 prepareLaunch(taskId);
-                if (pendingLaunchRef.current?.input.taskId !== taskId) setRun((current) => ({ ...current, agentId }));
-                navigate({ view: "work", composer: false });
+                setRun((current) => boardLaunchDraft(current, pendingLaunchRef.current, taskId, agentId));
+                navigate({ view: "work" });
               }}
               onAddDepartment={() => navigate({ view: "library", libraryTab: "blueprints" })}
               pendingApplication={pendingApplication} onApplicationPlaced={() => setPendingApplication(null)}
-              hireOpen={hireOpen} onHireOpenChange={setHireOpen}
+              hireOpen={hireOpen && route.view === "board"} onHireOpenChange={setHireOpen}
               hirePanel={<>
             {lastHiredRole ? <p className="notice" role="status">{text("created_role")}: <strong>{lastHiredRole.name}</strong>{route.taskId ? <button type="button" className="notice-link" onClick={() => { if (route.taskId) { prepareLaunch(route.taskId); if (!pendingLaunchRef.current) setRun((current) => ({ ...current, agentId: lastHiredRole.id })); } }}>{text("shell_use_role")}</button> : null}</p> : null}
-            <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
-              <OutputsButton scope={{ kind: "agent", id: option.id }} title={option.name} />
-              <ConversationButton scope={{ kind: "agent", id: option.id }} title={option.name} />
-              {/* Opens Prepare run for the selected task and issues nothing, so a
-                  write elsewhere never takes this away. */}
-              <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled}
-                onClick={() => { if (!selectedTeamTask) return; prepareLaunch(selectedTeamTask.taskId); if (pendingLaunchRef.current?.input.taskId !== selectedTeamTask.taskId) setRun((current) => ({ ...current, agentId: option.id })); }}>{text("shell_use_role")}</button>
-            </li>)}</ul>
-            {roleOptions.length === 0 ? <p className="empty-guidance">{text("shell_no_active_roles")}</p> : null}
           <WorkflowCard ready={roleOptions.length > 0} title={text("step_role")}>
             <p className="small-copy">{text("role_help")}</p>
             <form id="hire-role-form" noValidate onSubmit={submitRole}>
@@ -1703,6 +1911,11 @@ function WorkApp(): ReactElement {
                   value={role.name}
                 />
                 {validation([...roleErrors], "name") ? <p className="field-error" id="role-name-error">{text("form_error_role_name")}</p> : null}
+                {/* UX-02: the supervisor follows the three fields the hire
+                    actually needs. A subagent still arrives with its
+                    supervisor prefilled, which is why the control stays
+                    visible instead of moving into the advanced disclosure. */}
+                <label>{text("agent_supervisor")}<select value={role.supervisorAgentId ?? ""} onChange={(event) => setRole((current) => ({ ...current, supervisorAgentId: event.target.value || null }))}><option value="">{text("agent_no_supervisor")}</option>{roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>
                 {/* Closed by default: provider and model already default to the
                     chosen worker's own, and stay editable for the rare override. */}
                 <details className="role-advanced"><summary>{text("role_advanced")}</summary>
@@ -1736,6 +1949,21 @@ function WorkApp(): ReactElement {
             <MutationFeedback entries={projectMutations} surface="roles" text={text} />
             {actionFeedback("create-role")}
           </WorkflowCard>
+          {/* UX-02: the hire form comes first and nothing competes with it.
+              The people already hired stay reachable here, in a disclosure
+              closed by default, below the form — the same actions are on each
+              agent's own board card. Opening this writes nothing. */}
+          <details className="team-existing"><summary>{text("shell_existing_team")} ({roleOptions.length})</summary>
+            <ul className="team-role-list">{roleOptions.map((option) => <li key={option.id}><div><strong>{option.name}</strong><p className="small-copy">{option.specializationRef ? <><code>{option.specializationRef.id}</code> · </> : null}<code>{option.profileId}</code>{option.model ? <> · <code>{option.model}</code></> : null} · {option.contextMode === "fresh" ? text("context_fresh") : text("context_accumulated")}</p></div>
+              <OutputsButton scope={{ kind: "agent", id: option.id }} title={option.name} />
+              <ConversationButton scope={{ kind: "agent", id: option.id }} title={option.name} />
+              {/* Opens Prepare run for the selected task and issues nothing, so a
+                  write elsewhere never takes this away. */}
+              <button className="button button-secondary button-inline" type="button" disabled={!selectedTeamTask || !data.meta.writesEnabled}
+                onClick={() => { if (!selectedTeamTask) return; prepareLaunch(selectedTeamTask.taskId); if (pendingLaunchRef.current?.input.taskId !== selectedTeamTask.taskId) setRun((current) => ({ ...current, agentId: option.id })); }}>{text("shell_use_role")}</button>
+            </li>)}</ul>
+            {roleOptions.length === 0 ? <p className="empty-guidance">{text("shell_no_active_roles")}</p> : null}
+          </details>
               </>} /> : route.view === "board" ? <div className="notice setup-notice" role="status"><p>{text("workspace_needs_setup")}</p><button className="notice-link" type="button" onClick={() => navigate({ view: "settings" })}>{text("shell_nav_settings")}</button></div> : null}
           </section>
           <section hidden={route.view !== "library"} aria-label={text("shell_nav_library")}>
@@ -1826,6 +2054,7 @@ function WorkApp(): ReactElement {
             {actionFeedback("runtime")}
           </WorkflowCard>
             <div className="settings-panel"><h2>{text("shell_project_details")}</h2><p className="project-name">{showFullProjectPath ? <code>{data.meta.repo}</code> : repositoryBasename(data.meta.repo)}</p><button className="notice-link" type="button" onClick={() => setShowFullProjectPath((visible) => !visible)}>{text(showFullProjectPath ? "hide_full_project_path" : "show_full_project_path")}</button></div>
+            <ProjectEnvironment api={renderedProjectApi} locale={locale} />
             <section aria-labelledby="provider-availability-title" className="provider-availability" role="status">
               <h3 id="provider-availability-title">{text("provider_availability_title")}</h3>
               {data.providerAvailability.length === 0 ? (
@@ -1849,6 +2078,7 @@ function WorkApp(): ReactElement {
                       ? text("provider_availability_launchable")
                       : text(availabilityRefusalMessage[availability.refusal?.code ?? "provider_authentication_unconfirmed"])}
                   </p>
+                  <ProviderQualificationAction availability={availability} locale={locale} />
                   <details className="provider-readiness-technical">
                     <summary>{text("provider_readiness_technical")}</summary>
                     <ul className="small-copy">
@@ -1877,6 +2107,8 @@ function WorkApp(): ReactElement {
           </section>
         </div>
       </div>
+      {compactPane.compact || layout.chatCollapsed ? null : chatSeparator}
+      {(compactPane.compact ? compactPane.pane !== "chat" : layout.chatCollapsed) ? null : chatPane}
     </main>
     </OutputsWorkspace>
     </ConversationWorkspace>

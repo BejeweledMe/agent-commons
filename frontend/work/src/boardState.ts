@@ -1,3 +1,4 @@
+import { restoreLaunchDraft, type LaunchIntent, type RunDraft } from "./launchIntentState.js";
 import dagre from "@dagrejs/dagre";
 import type { RoleOption, TrackerSnapshot } from "./contracts.js";
 import type { BlueprintApplication } from "./libraryTypes.js";
@@ -10,8 +11,10 @@ import type { TrackerViewState } from "./trackerState.js";
  * canonical state, and a missing arrangement only costs an auto-layout.
  */
 
+export const OWNER_NODE_ID = "project-owner";
+export const OWNER_NODE_HEIGHT = 116;
 export const ROLE_NODE_WIDTH = 264;
-export const ROLE_NODE_HEIGHT = 140;
+export const ROLE_NODE_HEIGHT = 248;
 export const FRAME_PADDING = 32;
 export const FRAME_HEADER = 44;
 const AGENT_ID = /^agent\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
@@ -21,7 +24,7 @@ const COORDINATE_LIMIT = 1_000_000;
 export class BoardError extends Error {}
 
 export type BoardLink = Readonly<{ id: string; from: string; to: string; allowedAction: string | null; state: string | null }>;
-export type BoardGraph = Readonly<{ roles: readonly string[]; links: readonly BoardLink[]; reportsTo: readonly Readonly<{ from: string; to: string }>[] }>;
+export type BoardGraph = Readonly<{ supervisorIds?: Readonly<Record<string, string>>; roles: readonly string[]; links: readonly BoardLink[]; supervisedBy: readonly Readonly<{ from: string; to: string }>[]; reportsTo: readonly Readonly<{ from: string; to: string }>[] }>;
 export type BoardPosition = Readonly<{ x: number; y: number }>;
 export type BoardFrame = Readonly<{ id: string; title: string; x: number; y: number; width: number; height: number; members: readonly string[]; blueprintId: string | null }>;
 export type BoardLayout = Readonly<{ revision: number; positions: Readonly<Record<string, BoardPosition>>; frames: readonly BoardFrame[] }>;
@@ -29,9 +32,18 @@ export type RoleActivity = "running" | "queued" | "attention" | "idle";
 export type BoardRoleNode = Readonly<{
   id: string; name: string; specialization: string | null; profileId: string; model: string | null; contextMode: "fresh" | "accumulated";
   activity: RoleActivity; runPhase: string | null; openTaskCount: number; taskCount: number; awaitsHuman: boolean;
-  position: BoardPosition; frameId: string | null; placed: boolean;
+  supervisorId: string | null; position: BoardPosition; frameId: string | null; placed: boolean;
 }>;
-export type BoardModel = Readonly<{ nodes: readonly BoardRoleNode[]; frames: readonly BoardFrame[]; links: readonly BoardLink[]; reportsTo: readonly Readonly<{ from: string; to: string }>[] }>;
+export type BoardModel = Readonly<{ ownerPosition: BoardPosition; ownerMembers: readonly string[]; nodes: readonly BoardRoleNode[]; frames: readonly BoardFrame[]; links: readonly BoardLink[]; supervisedBy: readonly Readonly<{ from: string; to: string }>[]; reportsTo: readonly Readonly<{ from: string; to: string }>[] }>;
+
+/** Profession first; the caller retains the agent's distinct name separately. */
+export function roleCardCopy(agentName: string, role?: Readonly<{ name: string; description: string; ref?: { source: string } }>): { cardTitle: string; cardDescription: string } {
+  if (!role) return { cardTitle: agentName, cardDescription: "" };
+  // Custom role labels are operator-authored: their separators may be part of
+  // the profession, rather than the built-in catalog’s technology suffix.
+  const [profession, ...details] = role.ref?.source === "custom" ? [role.name] : role.name.split(" · ");
+  return { cardTitle: profession.trim() || agentName, cardDescription: [...details, role.description].filter(Boolean).join(" · ") };
+}
 
 export const EMPTY_LAYOUT: BoardLayout = Object.freeze({ revision: 0, positions: Object.freeze({}), frames: Object.freeze([]) });
 
@@ -50,20 +62,24 @@ export function parseBoardGraph(value: unknown): BoardGraph {
   const root = object(value);
   if (!Array.isArray(root.nodes) || !Array.isArray(root.edges)) throw new BoardError("graph is malformed");
   const roles: string[] = [];
+  const supervisorIds: Record<string, string> = {};
   const linkNodes = new Map<string, { allowedAction: string | null; state: string | null; from: string | null; to: string | null }>();
   for (const raw of root.nodes) {
     const node = object(raw);
     const id = typeof node.id === "string" ? node.id : "";
     const attrs = typeof node.attrs === "object" && node.attrs !== null ? node.attrs as Record<string, unknown> : {};
     if (node.kind === "agent" && AGENT_ID.test(id) && attrs.template !== true && node.state !== "retired") roles.push(id);
+    if (node.kind === "agent" && typeof attrs.supervisor_agent_id === "string" && AGENT_ID.test(attrs.supervisor_agent_id)) supervisorIds[id] = attrs.supervisor_agent_id;
     if (node.kind === "agent_link" && typeof id === "string") {
       linkNodes.set(id, { allowedAction: optionalText(attrs.allowed_action), state: optionalText(node.state), from: null, to: null });
     }
   }
   const reportsTo: { from: string; to: string }[] = [];
+  const supervisedBy: { from: string; to: string }[] = [];
   for (const raw of root.edges) {
     const edge = object(raw);
     const from = typeof edge.from === "string" ? edge.from : "", to = typeof edge.to === "string" ? edge.to : "";
+    if (edge.kind === "supervised_by" && AGENT_ID.test(from) && AGENT_ID.test(to)) supervisedBy.push({ from, to });
     if (edge.kind === "reports_to" && AGENT_ID.test(from) && AGENT_ID.test(to)) reportsTo.push({ from, to });
     const link = linkNodes.get(from);
     if (link && AGENT_ID.test(to)) {
@@ -78,7 +94,7 @@ export function parseBoardGraph(value: unknown): BoardGraph {
       links.push({ id, from: link.from, to: link.to, allowedAction: link.allowedAction, state: link.state });
     }
   }
-  return { roles, links, reportsTo: reportsTo.filter((edge) => known.has(edge.from) && known.has(edge.to)) };
+  return { roles, supervisorIds, links, supervisedBy: supervisedBy.filter((edge) => known.has(edge.from) && known.has(edge.to)), reportsTo: reportsTo.filter((edge) => known.has(edge.from) && known.has(edge.to)) };
 }
 
 /** The stored arrangement. Absent fields read as "not placed", never as a default place. */
@@ -155,17 +171,29 @@ export function positionsInsideFrame(frame: BoardFrame): Record<string, BoardPos
 /** Ranked auto-layout for roles that have no stored place; reporting lines flow downward. */
 export function autoLayout(roleIds: readonly string[], edges: readonly Readonly<{ from: string; to: string }>[], origin: BoardPosition): Record<string, BoardPosition> {
   if (roleIds.length === 0) return {};
-  const graph = new dagre.graphlib.Graph();
-  graph.setGraph({ rankdir: "TB", nodesep: 48, ranksep: 72, marginx: 0, marginy: 0 });
-  graph.setDefaultEdgeLabel(() => ({}));
-  for (const id of roleIds) graph.setNode(id, { width: ROLE_NODE_WIDTH, height: ROLE_NODE_HEIGHT });
   const known = new Set(roleIds);
+  const graph = new dagre.graphlib.Graph();
+  for (const id of roleIds) graph.setNode(id);
   for (const edge of edges) if (known.has(edge.from) && known.has(edge.to) && edge.from !== edge.to) graph.setEdge(edge.to, edge.from);
-  dagre.layout(graph);
   const positions: Record<string, BoardPosition> = {};
-  for (const id of roleIds) {
-    const node = graph.node(id);
-    positions[id] = { x: Math.round(origin.x + node.x - ROLE_NODE_WIDTH / 2), y: Math.round(origin.y + node.y - ROLE_NODE_HEIGHT / 2) };
+  // A forest of unrelated roles is packed into readable rows. Only recorded
+  // supervisors determine ranks within each tree; names and creator edges do not.
+  let x = 0, y = 0, rowHeight = 0;
+  for (const members of dagre.graphlib.alg.components(graph)) {
+    const tree = new dagre.graphlib.Graph();
+    tree.setGraph({ rankdir: "TB", nodesep: 48, ranksep: 72, marginx: 0, marginy: 0 });
+    tree.setDefaultEdgeLabel(() => ({}));
+    const included = new Set(members);
+    for (const id of members) tree.setNode(id, { width: ROLE_NODE_WIDTH, height: ROLE_NODE_HEIGHT });
+    for (const edge of graph.edges()) if (included.has(edge.v) && included.has(edge.w)) tree.setEdge(edge.v, edge.w);
+    dagre.layout(tree);
+    const width = tree.graph().width ?? ROLE_NODE_WIDTH, height = tree.graph().height ?? ROLE_NODE_HEIGHT;
+    if (x > 0 && x + width > ROLE_NODE_WIDTH * 3 + 96) { x = 0; y += rowHeight + 72; rowHeight = 0; }
+    for (const id of members) {
+      const node = tree.node(id);
+      positions[id] = { x: Math.round(origin.x + x + node.x - ROLE_NODE_WIDTH / 2), y: Math.round(origin.y + y + node.y - ROLE_NODE_HEIGHT / 2) };
+    }
+    x += width + 48; rowHeight = Math.max(rowHeight, height);
   }
   return positions;
 }
@@ -200,7 +228,7 @@ export function buildBoardModel(roles: readonly RoleOption[], graph: BoardGraph 
   for (const frame of layout.frames) for (const member of frame.members) if (!frameOf.has(member)) frameOf.set(member, frame.id);
   const unplaced = roles.filter((role) => !(role.id in layout.positions) && !frameOf.has(role.id)).map((role) => role.id);
   const placedRight = Math.max(0, ...layout.frames.map((frame) => frame.x + frame.width), ...Object.values(layout.positions).map((point) => point.x + ROLE_NODE_WIDTH));
-  const generated = autoLayout(unplaced, [...(graph?.reportsTo ?? []), ...(graph?.links ?? [])], { x: placedRight + (placedRight > 0 ? 96 : 0), y: 0 });
+  const generated = autoLayout(unplaced, graph?.supervisedBy ?? [], { x: placedRight + (placedRight > 0 ? 96 : 0), y: 0 });
   const framePositions: Record<string, BoardPosition> = {};
   for (const frame of layout.frames) Object.assign(framePositions, positionsInsideFrame(frame));
   const nodes = roles.map((role): BoardRoleNode => {
@@ -211,15 +239,44 @@ export function buildBoardModel(roles: readonly RoleOption[], graph: BoardGraph 
       id: role.id, name: role.name, specialization: role.specializationRef?.id ?? null, profileId: role.profileId, model: role.model ?? null, contextMode: role.contextMode,
       activity: state.activity, runPhase: state.runPhase, awaitsHuman: state.awaitsHuman,
       taskCount: state.taskIds.size, openTaskCount: [...state.taskIds].filter((taskId) => !closed.has(taskId)).length,
+      supervisorId: graph?.supervisorIds?.[role.id] ?? graph?.supervisedBy.find((edge) => edge.from === role.id)?.to ?? null,
       position, frameId: frameOf.get(role.id) ?? null, placed: stored !== undefined || role.id in framePositions
     };
   });
   const known = new Set(roles.map((role) => role.id));
   return {
     nodes, frames: layout.frames,
+    // This is navigation and project membership, never a synthetic agent or
+    // canonical supervision. Preserve absent endpoints from node attributes.
+    ownerMembers: nodes.filter((node) => graph?.roles.includes(node.id) && node.supervisorId === null).map((node) => node.id),
+    ownerPosition: {
+      x: nodes.length ? Math.round((Math.min(...nodes.map((node) => node.position.x)) + Math.max(...nodes.map((node) => node.position.x))) / 2) : 0,
+      y: Math.min(0, ...nodes.map((node) => node.position.y), ...layout.frames.map((frame) => frame.y)) - OWNER_NODE_HEIGHT - 72
+    },
+    supervisedBy: (graph?.supervisedBy ?? []).filter((edge) => known.has(edge.from) && known.has(edge.to)),
     links: (graph?.links ?? []).filter((link) => known.has(link.from) && known.has(link.to)),
     reportsTo: (graph?.reportsTo ?? []).filter((edge) => known.has(edge.from) && known.has(edge.to))
   };
+}
+
+/**
+ * The centre of a role card in board units (UX-01: cards are a fixed
+ * 264×248 at every reading band, so the centre is arithmetic on the stored
+ * position and never a measurement).
+ */
+export function roleCardCentre(position: BoardPosition): BoardPosition {
+  return { x: Math.round(position.x + ROLE_NODE_WIDTH / 2), y: Math.round(position.y + ROLE_NODE_HEIGHT / 2) };
+}
+
+/**
+ * The role the working-zoom action centres on: the selected one when there is
+ * a selection, otherwise the first real role on the board. `null` only when the
+ * board holds no roles at all — in which case the action changes scale alone
+ * and never moves to an invented position.
+ */
+export function boardFocusRole(nodes: readonly BoardRoleNode[], selectedId: string | null): BoardRoleNode | null {
+  if (nodes.length === 0) return null;
+  return nodes.find((node) => node.id === selectedId) ?? nodes[0];
 }
 
 /** The frame whose area contains a role's top-left corner, if any. */
@@ -269,4 +326,16 @@ export function removeFrame(layout: BoardLayout, frameId: string): BoardLayout {
 /** Forget every stored place so the next build lays the roles out again; frames keep their members. */
 export function resetPositions(layout: BoardLayout): BoardLayout {
   return { ...layout, positions: {} };
+}
+
+/** Choosing a board task only prepares a draft; an uncertain intent stays exact. */
+export function boardLaunchDraft(draft: RunDraft, pending: LaunchIntent | null, taskId: string, agentId: string): RunDraft {
+  if (pending?.input.taskId === taskId) return restoreLaunchDraft(pending);
+  return draft.taskId === taskId ? { ...draft, agentId } : draft;
+}
+
+/** A successfully transported tracker can still report an unreadable projection. */
+export function boardPickerState(tracker: TrackerViewState): "loading" | "failure" | "ready" {
+  if (tracker.kind !== "ready") return tracker.kind;
+  return tracker.snapshot.state === "error" ? "failure" : tracker.snapshot.state === "loading" ? "loading" : "ready";
 }

@@ -1,0 +1,10 @@
+{
+  "requestedModel": "grok-4.7",
+  "surface": "grok.com Expert",
+  "officialMapping": "https://grok.com/release-notes/oct-03-2026",
+  "reportedRuntimeModel": null,
+  "conversationUrl": "https://grok.com/c/61c811de-9f38-4a09-849e-9f1612563af0?rid=c48226a7-50c2-4829-a45d-d629243c2f7f",
+  "terminal": "visible_final_answer",
+  "sourceArchive": "agent-commons-design-audit.zip",
+  "firstAnswerCapturedAt": "2026-10-09T12:48:08.675Z"
+}

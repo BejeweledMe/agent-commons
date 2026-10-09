@@ -1,0 +1,163 @@
+{
+  "schema": "oct09-core-source-handoff.v1",
+  "base_commit": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "worktree": "/Users/dmitrijersov/.codex/worktrees/oct09-codex-core/agent-commons",
+  "patch": "/Users/dmitrijersov/Desktop/vibecoding/agent-commons/.git/worktrees/agent-commons1/oct09-core-backend.patch",
+  "patch_sha256": "aec11483731f883278f1578f4e04394cefca7db4d6ea335b5b95c84ce367ec25",
+  "files": [
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "tracked": true,
+      "sha256": "c72887670d542c0f99b71dd4df0798fed0fcc45cbd9ce67ac6d9648f8abe7bec",
+      "bytes": 92906
+    },
+    {
+      "path": "src/agent_commons/library.py",
+      "tracked": true,
+      "sha256": "01782f9a1587546c6900407cedaab5d6ab5ed7ded880ca5c2fa02331a8e02b63",
+      "bytes": 27808
+    },
+    {
+      "path": "src/agent_commons/resources/library/manifest.json",
+      "tracked": true,
+      "sha256": "8d7348494259ae18904410303f7ebfb9eaec06142f57bb2186fb54eed218ad30",
+      "bytes": 164041
+    },
+    {
+      "path": "src/agent_commons/resources/library/roles/qa-reviewer.json",
+      "tracked": false,
+      "sha256": "efe02981ffb007b393115b9600523f14e47d55035ba0cbc3f6381ee13d0d986e",
+      "bytes": 8094
+    },
+    {
+      "path": "src/agent_commons/runtime/attempts.py",
+      "tracked": true,
+      "sha256": "e3269f0bf6e734efb98ccffc283a28faac4c72d354f24ccf98264ad29febc7c3",
+      "bytes": 52891
+    },
+    {
+      "path": "src/agent_commons/runtime/budget.py",
+      "tracked": false,
+      "sha256": "1876075f753346e5070524a6cb2f10611a452c2e7b3a8e0b75a6e14a4f0e91d7",
+      "bytes": 1590
+    },
+    {
+      "path": "src/agent_commons/runtime/capabilities.py",
+      "tracked": true,
+      "sha256": "dd664925c46845b1337bfda6a352b25515d7f03f059123d54a0a5eecf7ded5ba",
+      "bytes": 30584
+    },
+    {
+      "path": "src/agent_commons/runtime/launch.py",
+      "tracked": true,
+      "sha256": "fe0c70829ae72ad1d0bd87c2a0d98ecb422b725ccff4ed0f51852753720d5428",
+      "bytes": 20630
+    },
+    {
+      "path": "src/agent_commons/services/execution_plan.py",
+      "tracked": true,
+      "sha256": "e65ad0ede235c317434be1197ccbe29cced8784cdc97778121d1dfbccf911261",
+      "bytes": 26238
+    },
+    {
+      "path": "src/agent_commons/services/project_environment.py",
+      "tracked": false,
+      "sha256": "f831160b1f7ab35b1085d793af68d3081c3b09164d0106aac526a2e79dfec8f7",
+      "bytes": 7789
+    },
+    {
+      "path": "src/agent_commons/services/provider_canary.py",
+      "tracked": true,
+      "sha256": "56385ed082dd6740c4845034299ae120e50a1a4f9acc7a685426939e52f6c987",
+      "bytes": 27063
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "tracked": true,
+      "sha256": "d015726a369587b5187ca59082684ec0a9cc9610d9de0b365ef7a48f52ef3e65",
+      "bytes": 22050
+    },
+    {
+      "path": "src/agent_commons/ui/server.py",
+      "tracked": true,
+      "sha256": "70bf911feb8bf30c602695e46bf4bcaa8e08f8447d6e37f6677ec106698e568d",
+      "bytes": 72276
+    },
+    {
+      "path": "tests/cli/test_task_evidence.py",
+      "tracked": false,
+      "sha256": "7a128f8bb4017db69c6e447d127b0bc570da71c65b59ff2791e64e98c4d72149",
+      "bytes": 2763
+    },
+    {
+      "path": "tests/runtime/test_attempts.py",
+      "tracked": true,
+      "sha256": "e9eb5b11f6306504a4a40ee897575879205fdd47c2f242a30faadc8fed233e16",
+      "bytes": 29524
+    },
+    {
+      "path": "tests/runtime/test_launch_plan.py",
+      "tracked": true,
+      "sha256": "54f521b699ba0281b3dd16c458eb5f9fd82d2a59a4ce528c32a7acdec586f08a",
+      "bytes": 19963
+    },
+    {
+      "path": "tests/runtime/test_provider_canary.py",
+      "tracked": true,
+      "sha256": "d5d830127c897be244f5f2fb8677e18da5eda4de28b49b2006c490249d110974",
+      "bytes": 19661
+    },
+    {
+      "path": "tests/services/test_execution_plan.py",
+      "tracked": true,
+      "sha256": "68565cf6727071ac275444958bd050f97fd1cf687da03f00ca0c1d5817db21ef",
+      "bytes": 28211
+    },
+    {
+      "path": "tests/services/test_library.py",
+      "tracked": true,
+      "sha256": "78d59b55dc4bbb6779480e1699db3d2284d4201a72782f1d55ca0653cf89ec2e",
+      "bytes": 14619
+    },
+    {
+      "path": "tests/services/test_project_environment.py",
+      "tracked": false,
+      "sha256": "4b51614dda41d895f995404177267dcfcc6fda59cdea38bd44c2edfc197e23f8",
+      "bytes": 3847
+    },
+    {
+      "path": "tests/ui/test_launch_readiness.py",
+      "tracked": false,
+      "sha256": "e233a6d8a879782fbe0ff1b58461343796120ef9e34284206a91176eff01d784",
+      "bytes": 6019
+    },
+    {
+      "path": "tests/ui/test_library_routes.py",
+      "tracked": true,
+      "sha256": "95be43fecb2ee7b174adbe293c164624daff137f53d7250a63dfe549126d5b3a",
+      "bytes": 3261
+    },
+    {
+      "path": "tests/ui/test_worker_eligibility.py",
+      "tracked": true,
+      "sha256": "935e4e31e0bc85313279599124fcff92dc71c64489d86dd9e21b4779decbfd73",
+      "bytes": 9506
+    }
+  ],
+  "verification": {
+    "focused_sweep": "264 passed, one misplaced test fixture subsequently corrected",
+    "affected_rerun": "13 passed (environment, launch-budget/readiness, library routes)",
+    "lint": "21 changed Python files passed ruff check",
+    "format": "21 changed Python files passed ruff format --check",
+    "diff_check": "git diff --check passed",
+    "provider_runs": 0,
+    "fullcheck": "parent integration responsibility"
+  },
+  "boundaries": [
+    "UX52 applies to UI task launch",
+    "environment observation is advisory presence only; build_verified false",
+    "budget observation advisory; atomic reservation remains authoritative",
+    "additive qa-reviewer; historical provenance retained",
+    "no frontend/docs/generated assets/commits"
+  ]
+}

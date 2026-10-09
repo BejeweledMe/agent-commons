@@ -274,7 +274,7 @@ def test_work_reads_project_identity_only_through_the_authenticated_opaque_api_b
     assert "showFullProjectPath" in entry
     assert 'href="/"' in entry
     assert "shell_view_task" in entry
-    assert 'navigate({ view: "work", taskId: run.taskId })' in entry
+    assert 'navigate({ view: "work", taskId: run.taskId, panel: "detail" })' in entry
     assert "shell_diagnostics" in entry
 
 

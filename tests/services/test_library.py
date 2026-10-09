@@ -37,7 +37,7 @@ def _manager(tmp_path: Path) -> CommonsManager:
 def test_builtin_inventory_is_complete_private_and_available_without_setup(tmp_path: Path) -> None:
     store = LibraryStore(tmp_path / "library")
     catalog = store.catalog()
-    assert len(catalog["roles"]) == 30
+    assert len(catalog["roles"]) == 31
     assert len(catalog["skills"]) == 45
     assert len({role["group"] for role in catalog["roles"]}) == 8
     assert not (tmp_path / "library").exists()

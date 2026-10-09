@@ -1,0 +1,170 @@
+{
+  "head": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "inputs": [
+    {
+      "path": "docs/handoffs/2026-10-08-blizhe-dogfooding-feedback.md",
+      "sha256": "7e6841da7c868fffc5eead3f3e3bdaed6b1eab87e393acca3a1a24d8aa8ce2f7",
+      "bytes": 54852
+    },
+    {
+      "path": "docs/evidence/2026-10-08/blizhe-dogfooding/journal.md",
+      "sha256": "123c54552acba513f11cb5a8dc1d31695384ae38a092367fa080ab056ccc6cb8",
+      "bytes": 64893
+    },
+    {
+      "path": "docs/evidence/2026-10-08/blizhe-dogfooding/manifest.md",
+      "sha256": "0d308a4a930b8afb21cb5bf2a1c744f162fb824530473605c435a7f9b60eb5ed",
+      "bytes": 43559
+    },
+    {
+      "path": "docs/evidence/2026-10-08/blizhe-dogfooding/composer-overlap-dom.json",
+      "sha256": "b5bb993d14765d779034d578c9fe4cd749e8884159fc084d93fe0db816086f17",
+      "bytes": 1286
+    },
+    {
+      "path": "docs/evidence/2026-10-08/blizhe-dogfooding/run-history-order-dom.txt",
+      "sha256": "61a4f0e3ebfb851da86daf76da494ddce939c07ab58044ed1151c991e143e725",
+      "bytes": 1614
+    },
+    {
+      "path": "docs/PRODUCT.md",
+      "sha256": "d00bea7e60032d31efac2917aff7d98f57b8541dd409831c564152a719d77bec",
+      "bytes": 9789
+    },
+    {
+      "path": "docs/FRONTEND_CONTRACT.md",
+      "sha256": "ebe56a187e51cff9223100d4406c4e54ea511ed5afec2b8cb7c866ba32d40197",
+      "bytes": 21353
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "aea8b65f599670c885f105daec4f2a04042017e64efb6a8a7b7b84c011d56837",
+      "bytes": 5479
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "dc28959219cb8c2f4ac875e308c10979ac03a10519590071c5c39d5d2fbe0e2f",
+      "bytes": 6798
+    },
+    {
+      "path": "docs/plans/2026-10-01-gpt6-and-product-completion.md",
+      "sha256": "0fabc4d90d9f49fc846acdf17aa31b0e2651f570a93cc15381bcc26452dcd703",
+      "bytes": 40307
+    },
+    {
+      "path": "src/agent_commons/services/execution_plan.py",
+      "sha256": "5e3d060453632a0b6fe8708ba7744c98cd902f1cee4554a6dcac53d5fb396aba",
+      "excerpt_ranges": [
+        [
+          446,
+          530
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/services/tasks.py",
+      "sha256": "7b044bef6bdc7fc154ff80d10e4236daf9de1e9ea236407bf94df37e6add1d75",
+      "excerpt_ranges": [
+        [
+          241,
+          310
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/cli/__init__.py",
+      "sha256": "f8b5e29fcab1ae63073aeff71351a53fb30250108cba7f9b35e6a91b0c5a84f9",
+      "excerpt_ranges": [
+        [
+          923,
+          1008
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/services/worker_eligibility.py",
+      "sha256": "e52f060c6e60baa4a71537ae229ee3837d04fe0a4e328ee1d3f64942bc79cb75",
+      "excerpt_ranges": [
+        [
+          1,
+          145
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/runtime/attempts.py",
+      "sha256": "32bb01167fa93774377905b5ea75c4aef6e1a50aef1827a7dccf0ae74aeb5081",
+      "excerpt_ranges": [
+        [
+          738,
+          785
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/runtime/launch.py",
+      "sha256": "b7da3a0063c5411e8efc09de753e8d7e6b57a1376ca5f4a261e0f0b2394ee03a",
+      "excerpt_ranges": [
+        [
+          40,
+          53
+        ],
+        [
+          375,
+          454
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "sha256": "c717adb44d87d6e18a6a47f70525533dad1b6f4143a6ba8c5f8ce82ed1e1c08f",
+      "excerpt_ranges": [
+        [
+          42,
+          57
+        ],
+        [
+          312,
+          395
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/ui/tracker_reads.py",
+      "sha256": "df127afd5ad3b2beb20cdfc1e2356a5063c83b898cfc27653e4433c6dcbf5667",
+      "excerpt_ranges": [
+        [
+          195,
+          245
+        ]
+      ]
+    },
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "sha256": "064633ba080cb2e3e1d62aef51160e7a53723c697b2cb4d787b500768bbaa611",
+      "excerpt_ranges": [
+        [
+          168,
+          220
+        ],
+        [
+          713,
+          775
+        ]
+      ]
+    },
+    {
+      "path": "frontend/work/src/components/TaskInspector.tsx",
+      "sha256": "d806f8529a9551f5dd1fb7cf03d14cc7f88722b8cdb42f46287b796427186c7e",
+      "excerpt_ranges": [
+        [
+          1,
+          190
+        ]
+      ]
+    }
+  ],
+  "packet_sha256": "d0b3157c94c3e10cbfe546826fa5cd2366484414d835d728e85df5f8755e4849",
+  "bytes": 299744,
+  "pixels_provided": false
+}

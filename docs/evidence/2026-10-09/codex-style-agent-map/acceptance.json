@@ -1,0 +1,36 @@
+[
+  {
+    "created": true,
+    "entity_ref": {
+      "id": "task.3NX9WHMPVZ279J8V827QQBNR5H",
+      "kind": "task"
+    },
+    "event_id": "evt.01M4FZMF4YBW9GS98P0BR70FTE",
+    "event_type": "task.accepted",
+    "idempotency_key": "oct09-style-frontend-accepted-final",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4FZMF4YBW9GS98P0BR70FTE"
+  },
+  {
+    "created": true,
+    "entity_ref": {
+      "id": "task.7XP27WGW4N1SZMHPBEYW6P5X7Q",
+      "kind": "task"
+    },
+    "event_id": "evt.01M4FZNDZ0DZWRBGY8ZDRKPQGN",
+    "event_type": "task.accepted",
+    "idempotency_key": "oct09-style-backend-accepted-final",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4FZNDZ0DZWRBGY8ZDRKPQGN"
+  }
+]

@@ -1,3 +1,5 @@
+import { TaskBrief } from "./TaskBrief.js";
+import { TaskResults } from "./TaskResults.js";
 import { ConversationButton } from "./ConversationPanel.js";
 import { DecisionCard, TaskState } from "./DecisionCard.js";
 import { OutputsButton } from "./OutputsPanel.js";
@@ -41,6 +43,11 @@ export function updateDetailPresentation(previous: DetailPresentation, current: 
     : previous.current.taskId === current.taskId ? previous.lastReady : null };
 }
 
+/** Start time defines run recency; later updates to an old run cannot reorder it. */
+export function newestTaskRuns(runs: readonly TrackerRun[], taskId: string): readonly TrackerRun[] {
+  const time = (run: TrackerRun): number => Date.parse(run.startedAt ?? run.finishedAt ?? run.updatedAt ?? "") || 0;
+  return runs.filter((run) => run.taskId === taskId).sort((a, b) => time(b) - time(a) || b.delegationId.localeCompare(a.delegationId));
+}
 export function TaskInspector(props: Props): ReactElement {
   const { api, task, sourceRevision } = props;
   const [presentation, setPresentation] = useState<DetailPresentation>({ current: { kind: "loading", taskId: task.taskId }, lastReady: null });
@@ -59,20 +66,22 @@ export function TaskInspector(props: Props): ReactElement {
   return <TaskInspectorContent {...props}
     headerActions={<><OutputsButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} eager /><ConversationButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} /></>}
     answerControl={<ConversationButton scope={{ kind: "task", id: task.taskId }} title={task.title || task.taskId} variant="primary" label={props.text("decision_answer_worker")} />}
+    resultContent={selectedState.kind === "ready" || presentation.lastReady?.taskId === task.taskId ? <TaskResults api={api} taskId={task.taskId} revision={selectedState.kind === "ready" ? selectedState.detail.revision : presentation.lastReady!.revision} locale={props.locale} onRefresh={() => setAttempt((value) => value + 1)} /> : null}
     detailState={selectedState} cachedDetail={presentation.lastReady?.taskId === task.taskId ? presentation.lastReady : null} onRefresh={() => setAttempt((value) => value + 1)} />;
 }
 
 export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsCurrent, writesEnabled,
-  onSelectTask, onLaunchTask, children, detailState, cachedDetail = null, headerActions = null, answerControl = null, onRefresh }: Omit<Props, "api"> & {
+  onSelectTask, onLaunchTask, children, detailState, cachedDetail = null, headerActions = null, answerControl = null, resultContent = null, onRefresh }: Omit<Props, "api"> & {
     detailState: TaskDetailState;
     cachedDetail?: TaskDetail | null;
     headerActions?: ReactNode;
     answerControl?: ReactNode;
+    resultContent?: ReactNode;
     onRefresh: () => void;
   }): ReactElement {
   const detailsCurrent = detailState.kind === "ready" && detailState.taskId === task.taskId;
   const detail = detailsCurrent ? detailState.detail : cachedDetail?.taskId === task.taskId ? cachedDetail : null;
-  const taskRuns = runs.filter((run) => run.taskId === task.taskId);
+  const taskRuns = newestTaskRuns(runs, task.taskId);
   // The action panel is given the very revision this render shows, so an
   // accept or return can only ever target what the person looked at.
   const rendered: RenderedTask = { revision: detail?.revision ?? null };
@@ -96,23 +105,25 @@ export function TaskInspectorContent({ task, tasks, runs, locale, text, actionsC
         <button className="button button-secondary" type="button" onClick={onRefresh}>{text("inspector_detail_retry")}</button>
       </div> : null}
     {!detailsCurrent && detail !== null ? <p className="inspector-notice" role="status">{text("inspector_detail_cached")}</p> : null}
-    {detail === null ? null : <>
+    {detail === null || resultContent !== null ? null : <>
         {detail.truncated ? <p className="inspector-section inspector-notice" role="status">{text("inspector_partial")}</p> : null}
-        <details key={`${task.taskId}:goal`} className="inspector-section inspector-disclosure" open><summary><h3>{text("inspector_goal")}</h3></summary><p className="inspector-prose">{detail.description}</p>
-          <h3>{text("inspector_criteria")}</h3><ul className="inspector-criteria">{detail.acceptanceCriteria.map((item, index) => <li key={index}>{item}</li>)}</ul>
-        </details>
+        <div className="inspector-section"><TaskBrief key={`${task.taskId}:goal`} description={detail.description} text={text} />
+          <section className="task-criteria"><h3>{text("inspector_criteria")}</h3><ul className="inspector-criteria">{detail.acceptanceCriteria.map((item, index) => <li key={index}>{item}</li>)}</ul></section>
+        </div>
         {detail.summary !== null ? <details key={`${task.taskId}:summary`} className="inspector-section inspector-disclosure" open={detail.summary !== null}><summary><h3>{text("inspector_summary")}</h3></summary><p className="inspector-prose">{detail.summary}</p></details> : null}
       </>}
 
-    <section className="inspector-section inspector-evidence-state"><h3>{text("inspector_evidence")}</h3>
+    <section className="inspector-section inspector-evidence-state">{resultContent === null ? <h3>{text("inspector_evidence")}</h3> : null}
       <TaskState domain="evidence" value={task.evidenceState} text={text} plain />
       <p className="small-copy">{text("inspector_evidence_help")}</p>
-      {detail === null ? null : detail.evidenceRefs.length === 0 ? <p className="small-copy">{text("inspector_no_evidence")}</p>
-        : <ul>{detail.evidenceRefs.map((ref) => <li key={`${ref.id}@${ref.revision}`}><code>{ref.id} @ {ref.revision}</code></li>)}</ul>}
+      {resultContent ?? (detail === null ? null : detail.evidenceRefs.length === 0 ? <p className="small-copy">{text("inspector_no_evidence")}</p>
+        : <ul>{detail.evidenceRefs.map((ref) => <li key={`${ref.id}@${ref.revision}`}><code>{ref.id} @ {ref.revision}</code></li>)}</ul>)}
     </section>
     <details key={`${task.taskId}:runs`} className="inspector-section inspector-disclosure" open={taskRuns.length > 0}><summary><h3>{text("inspector_runs")}</h3></summary>
+      <p className="small-copy">{text("inspector_runs_context")}</p>
       {taskRuns.length === 0 ? <p>{text("inspector_no_runs")}</p> : <ol className="inspector-run-list">
-        {taskRuns.map((run) => <li key={run.delegationId}>
+        {taskRuns.map((run, index) => <li key={run.delegationId}>
+          {index === 0 ? <p className="inspector-run-heading">{text("inspector_last_run")}</p> : null}
           <strong>{run.roleName ?? text("inspector_unassigned")}</strong>
           <TaskState domain="run" value={run.phase} text={text} plain />
           <p className="small-copy">{run.provider ?? "—"} · {date(run.finishedAt ?? run.updatedAt ?? run.startedAt)}</p>

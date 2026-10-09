@@ -12,7 +12,7 @@ const compiled = mkdtempSync(resolve(tmpdir(), "commons-work-shell-"));
 execFileSync(resolve(root, "node_modules/.bin/tsc"), ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--lib", "ES2022,DOM", "--jsx", "react-jsx", "--outDir", compiled, resolve(root, "src/appRouteState.ts"), resolve(root, "src/setupReadiness.ts"), resolve(root, "src/launchIntentState.ts"), resolve(root, "src/api.ts"), resolve(root, "src/components/TaskComposer.tsx"), resolve(root, "src/components/ProjectSidebar.tsx")], { cwd: root });
 symlinkSync(resolve(root, "node_modules"), resolve(compiled, "node_modules"), "dir");
 const { parseWorkRoute, workRouteHref, sanitizedWorkLocation, isEditingTarget } = await import(pathToFileURL(resolve(compiled, "appRouteState.js")));
-const { railSetupLabelKey, railSetupState } = await import(pathToFileURL(resolve(compiled, "setupReadiness.js")));
+const { railSetupLabelKey, railSetupState, selectedExecutorLabelKey } = await import(pathToFileURL(resolve(compiled, "setupReadiness.js")));
 const { TaskComposer } = await import(pathToFileURL(resolve(compiled, "components/TaskComposer.js")));
 const { ProjectSidebar } = await import(pathToFileURL(resolve(compiled, "components/ProjectSidebar.js")));
 const { ProjectArchiveDialog } = await import(pathToFileURL(resolve(compiled, "components/ProjectArchiveDialog.js")));
@@ -24,51 +24,64 @@ const styles = readFileSync(resolve(root, "src/styles.css"), "utf8");
 const mainSource = readFileSync(resolve(root, "src/main.tsx"), "utf8");
 const id = `task.${"0".repeat(26)}`;
 
-test("route roundtrip preserves task, canonical filter, Library tab and composer across refresh/back", () => {
+test("route roundtrip preserves task, canonical filter, Library tab and the open panel across refresh/back", () => {
   for (const view of ["board", "work", "library", "settings"]) {
-    const state = { projectId: null, view, taskId: id, agentId: null, filter: "accepted", tasksView: "now", libraryTab: "context", composer: true };
+    const state = { projectId: null, view, taskId: id, agentId: null, filter: "accepted", tasksView: "now", libraryTab: "context", panel: "detail" };
     const href = workRouteHref(state);
     assert.deepEqual(parseWorkRoute(new URL(href, "http://localhost").search), state);
   }
   assert.equal(parseWorkRoute(`?task=${id}`).taskId, id, "route parsing must not guess whether a selected task still exists");
   for (const libraryTab of ["roles", "skills", "blueprints", "context"]) {
-    const state = { projectId: null, view: "library", taskId: id, agentId: null, filter: "all", tasksView: "now", libraryTab, composer: false };
+    const state = { projectId: null, view: "library", taskId: id, agentId: null, filter: "all", tasksView: "map", libraryTab, panel: null };
     assert.deepEqual(parseWorkRoute(new URL(workRouteHref(state), "http://localhost").search), state);
   }
   assert.equal(parseWorkRoute("?view=library&tab=templates").libraryTab, "blueprints", "legacy template links still open project templates");
   assert.equal(parseWorkRoute("?view=team").view, "board", "task-first Agents links open the board");
-  assert.equal(parseWorkRoute("").view, "board", "a project opens on its board");
+  // The owner-approved work area is the task map; the board is one tab in it.
+  assert.equal(parseWorkRoute("").view, "work", "a project opens on its task map");
+  assert.equal(parseWorkRoute("").tasksView, "map");
+  assert.equal(parseWorkRoute("").panel, null, "nothing is open beside the map until it is asked for");
   const agent = `agent.${"0".repeat(26)}`;
   assert.equal(parseWorkRoute(`?view=work&agent=${agent}`).agentId, agent);
   assert.equal(parseWorkRoute("?view=work&agent=agent.nope").agentId, null);
-  assert.equal(workRouteHref({ projectId: null, view: "work", taskId: null, agentId: agent, filter: "all", tasksView: "now", libraryTab: "roles", composer: false }), `/work?view=work&agent=${agent}`);
+  assert.equal(workRouteHref({ projectId: null, view: "work", taskId: null, agentId: agent, filter: "all", tasksView: "map", libraryTab: "roles", panel: null }), `/work?agent=${agent}&filter=all`);
 });
 
-test("the Tasks tab opens on Now and carries only the allowlisted presentation parameter", () => {
-  const base = { projectId: null, view: "work", taskId: null, agentId: null, filter: "all", tasksView: "now", libraryTab: "roles", composer: false };
-  assert.equal(parseWorkRoute("").tasksView, "now", "the Tasks tab opens on Now");
-  assert.equal(parseWorkRoute("?view=work").tasksView, "now");
+test("the work area opens on the map and carries only the allowlisted presentation parameters", () => {
+  const base = { projectId: null, view: "work", taskId: null, agentId: null, filter: "working", tasksView: "map", libraryTab: "roles", panel: null };
+  assert.equal(parseWorkRoute("").tasksView, "map", "the work area opens on the map");
+  assert.equal(parseWorkRoute("?view=work").tasksView, "map");
   for (const tasksView of ["now", "map", "all"]) {
     const state = { ...base, tasksView };
     assert.deepEqual(parseWorkRoute(new URL(workRouteHref(state), "http://localhost").search), state, tasksView);
   }
-  // Strict parsing: anything else, including canonical task state, becomes Now.
-  for (const rejected of ["graph", "list", "Now", "now,map", "", "accepted", "review", "../../other"]) {
-    assert.equal(parseWorkRoute(`?view=work&tasks=${encodeURIComponent(rejected)}`).tasksView, "now", rejected);
+  // Strict parsing: anything else, including canonical task state, becomes the map.
+  for (const rejected of ["graph", "list", "Map", "now,map", "", "accepted", "review", "../../other"]) {
+    assert.equal(parseWorkRoute(`?view=work&tasks=${encodeURIComponent(rejected)}`).tasksView, "map", rejected);
   }
-  assert.equal(workRouteHref(base), "/work?view=work", "the default view is never serialized");
-  assert.equal(workRouteHref({ ...base, tasksView: "map" }), "/work?view=work&tasks=map");
-  assert.equal(workRouteHref({ ...base, tasksView: "all" }), "/work?view=work&tasks=all");
-  // The Library tab parameter and the task/role parameters are untouched by it.
-  assert.equal(parseWorkRoute("?view=library&tab=context&tasks=map").libraryTab, "context");
-  assert.equal(parseWorkRoute("?view=library&tab=context&tasks=map").tasksView, "map");
-  assert.equal(sanitizedWorkLocation("/work", "?view=work&tasks=map&q=private+search"), "/work?view=work&tasks=map");
+  // The open panel is its own state: a closed detail never clears the task.
+  for (const panel of ["detail", "new", "run"]) {
+    const state = { ...base, taskId: id, panel };
+    assert.deepEqual(parseWorkRoute(new URL(workRouteHref(state), "http://localhost").search), state, panel);
+  }
+  for (const rejected of ["results", "chat", "Detail", "detail,new", ""]) {
+    assert.equal(parseWorkRoute(`?panel=${encodeURIComponent(rejected)}`).panel, null, rejected);
+  }
+  assert.equal(parseWorkRoute("?new=task").panel, "new", "the task-first composer link still opens that panel");
+  assert.equal(workRouteHref(base), "/work", "the default view and map are never serialized");
+  assert.equal(workRouteHref({ ...base, tasksView: "now" }), "/work?tasks=now");
+  assert.equal(workRouteHref({ ...base, tasksView: "all" }), "/work?tasks=all");
+  assert.equal(workRouteHref({ ...base, view: "board" }), "/work?view=board");
+  // The Library tab parameter and the task/agent parameters are untouched by it.
+  assert.equal(parseWorkRoute("?view=library&tab=context&tasks=now").libraryTab, "context");
+  assert.equal(parseWorkRoute("?view=library&tab=context&tasks=now").tasksView, "now");
+  assert.equal(sanitizedWorkLocation("/work", "?view=work&tasks=now&q=private+search"), "/work?tasks=now");
   assert.match(mainSource, /tasksView=\{route\.tasksView\} onTasksViewChange=\{\(tasksView\) => navigate\(\{ tasksView \}\)\}/);
 });
 test("auth URL scrub preserves only approved navigation and never search/draft or exchange material", () => {
   const href = sanitizedWorkLocation("/work", `?view=library&tab=design&task=${id}&filter=review&q=private+search&token=secret&description=draft&c=exchange`);
-  assert.equal(href, `/work?view=work&task=${id}&filter=review`);
-  assert.deepEqual(parseWorkRoute("?view=admin&task=../../other&filter=finished&tab=secret&tasks=secret&new=run"), { projectId: null, view: "board", taskId: null, agentId: null, filter: "all", tasksView: "now", libraryTab: "roles", composer: false });
+  assert.equal(href, `/work?task=${id}&filter=review&panel=detail`);
+  assert.deepEqual(parseWorkRoute("?view=admin&task=../../other&filter=finished&tab=secret&tasks=secret&new=run&panel=secret"), { projectId: null, view: "work", taskId: null, agentId: null, filter: "working", tasksView: "map", libraryTab: "roles", panel: null });
 });
 test("shortcuts ignore editable controls", () => {
   class Element { constructor(editable) { this.editable = editable; } closest() { return this.editable ? this : null; } }
@@ -231,12 +244,12 @@ test("Settings carries the local usage counters beside the existing panels, read
   assert.equal(messages.ru.instrumentation_toggle_label, "Локальные счётчики использования");
   // Class-based styling only, and no acceptance colour for a counting section.
   assert.match(styles, /\.instrumentation-counters \{ border-collapse: collapse;/);
-  assert.doesNotMatch(styles.slice(styles.indexOf(".instrumentation-panel")), /#[0-9a-fA-F]{3,8}\b/);
+  assert.doesNotMatch(styles.slice(styles.indexOf(".instrumentation-panel")).replace(/:root\s*\{[^}]*\}/g, ""), /#[0-9a-fA-F]{3,8}\b/);
 });
 
-test("project shell copy names the Board and Tasks tabs clearly and keeps Context guidance plain in both languages", () => {
-  assert.equal(messages.en.shell_nav_board, "Board");
-  assert.equal(messages.ru.shell_nav_board, "Доска");
+test("project shell copy names the agent map and tasks clearly and keeps Context guidance plain in both languages", () => {
+  assert.equal(messages.en.shell_nav_board, "Agents");
+  assert.equal(messages.ru.shell_nav_board, "Агенты");
   assert.equal(messages.en.shell_nav_work, "Tasks");
   assert.equal(messages.ru.shell_nav_work, "Задачи");
   assert.doesNotMatch(messages.en.context_packs_intro, /revision|canonical|bounded/i);
@@ -251,4 +264,13 @@ test("i18n registry has the same keys in both locales and no empty strings", () 
       assert.notEqual(value, "", `${locale}.${key}`);
     }
   }
+});
+
+
+test("workspace setup and selected executor observations do not borrow another profile's readiness", () => {
+  assert.equal(selectedExecutorLabelKey(undefined, { profileId: "other", launchable: true }), "rail_executor_none");
+  assert.equal(selectedExecutorLabelKey("chosen", undefined), "rail_executor_unknown");
+  assert.equal(selectedExecutorLabelKey("chosen", { profileId: "other", launchable: false }), "rail_executor_unknown");
+  assert.equal(selectedExecutorLabelKey("chosen", { profileId: "chosen", launchable: true }), "rail_executor_ready");
+  assert.equal(selectedExecutorLabelKey("chosen", { profileId: "chosen", launchable: false }), "rail_executor_attention");
 });

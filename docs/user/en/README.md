@@ -23,11 +23,24 @@ The product follows one simple chain:
 Task → choose an agent → Run → independent Review → human Acceptance
 ```
 
-A project opens on the **Board**. Every agent you hire is a card, a recorded
-link between two agents is an edge, and applying a blueprint draws its agents
-and tasks inside a department frame. Arranging cards and frames is your own
-layout: it never changes tasks, runs, reviews or acceptance. The task tracker
-lives in the **Tasks** tab.
+A project opens on its **task map**, between compact navigation and the main
+project conversation. Structure shows components and subtasks; Dependencies
+shows prerequisites. The default working set omits accepted and cancelled tasks;
+select All to include history. Task details, results and run preparation open when needed.
+The **Board** remains available for agent cards, recorded agent links and
+department frames. Its arrangement never changes work or acceptance.
+
+Resize the side panes by dragging their separators, or focus a separator and
+use the arrow keys. Layout controls collapse either pane, swap sides or restore
+the default. The map keeps its reading position when details close. Two-finger
+scroll pans the map; a trackpad pinch zooms around the pointer. Zoom, Fit and
+keyboard controls remain available. Scrolling the chat scrolls its history.
+
+The main chat stays addressed to the project when you select a task. Open a
+task or agent conversation explicitly to change scope. **Save draft** retains
+only unsent text and its reply target in private workspace storage; saving does
+not send a message. Restore or delete it explicitly. Attachments are separate,
+and an unsaved local draft can still be lost on reload.
 
 ### Agent
 
@@ -111,7 +124,7 @@ gallery and run history; installed skill and blueprint definitions are shared.
 Choose **New project**, enter its name and an absolute workspace path, then
 **Check workspace** and **Create project**. Choose the existing-repository option
 to connect a checkout you already have. A new project opens its blueprint
-library; apply a blueprint there or open the **Board** for an empty start.
+library; apply a blueprint there or open **Tasks** for an empty start.
 Creating a project does not launch a provider.
 
 Task and Library drafts are kept separately in browser memory while switching.
@@ -252,7 +265,7 @@ to launch or accept work.
 
 ### Reuse templates, context and design
 
-Open **Library** for 30 specializations, 45 grouped skills and seven built-in
+Open **Library** for 31 specializations, including QA reviewer, 45 grouped skills and seven built-in
 blueprints. Create or update skills, specializations and custom blueprints in
 the UI; skill groups can be archived and restored. A blueprint creates agents
 and tasks from your project brief and starts nothing; its confirmation leads to

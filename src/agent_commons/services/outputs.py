@@ -26,6 +26,7 @@ from agent_commons.services.artifact_content import (
 )
 from agent_commons.services.generated_outputs import producer_for_task, validated_generated_metadata
 from agent_commons.services.output_content import BUILD_KIND, OutputContentStore
+from agent_commons.services.text_results import TEXT_KIND, read_retained_text
 
 ScopeKind = Literal["task", "agent"]
 OutputState = Literal["unchecked", "ready", "stale", "unavailable"]
@@ -106,12 +107,14 @@ class ImageOutput:
     version_count: int
     width: int | None = None
     height: int | None = None
-    kind: Literal["design_image", "artifact_image", "static_build"] = "design_image"
+    kind: Literal["design_image", "artifact_image", "static_build", "text_result"] = "design_image"
     delegation_revision: str | None = None
     historical_preview_verified: bool = False
     review_state: ReviewState | None = None
     result_review_state: ReviewState | None = None
     retained: bool = False
+    summary: str | None = None
+    checks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,7 +164,7 @@ class OutputReads:
         for item in items:
             historical = (
                 isinstance(item, ImageOutput)
-                and item.kind in {"artifact_image", "static_build"}
+                and item.kind in {"artifact_image", "static_build", "text_result"}
                 and item.state == "stale"
                 and item.reason == "producer_task_revision_changed"
             )
@@ -171,7 +174,7 @@ class OutputReads:
                         reader = self._reader_factory(self._manager)
                     checked = (
                         self._verify_build(item)
-                        if item.kind == "static_build"
+                        if item.kind in {"static_build", "text_result"}
                         else self._verify(item, reader)
                     )
                     item = (
@@ -325,10 +328,10 @@ class OutputReads:
             reason = None
             if not _exact(snapshot.tasks.get(task["id"]), task["revision"]):
                 state, reason = "stale", "producer_task_revision_changed"
-            elif (
-                manifest.get("media_type") not in _SAFE_MEDIA
-                and metadata["output_kind"] != BUILD_KIND
-            ):
+            elif manifest.get("media_type") not in _SAFE_MEDIA and metadata["output_kind"] not in {
+                BUILD_KIND,
+                TEXT_KIND,
+            }:
                 state, reason = "unavailable", "output_preview_unsupported"
             items.append(
                 ImageOutput(
@@ -353,7 +356,11 @@ class OutputReads:
                     reason=reason,
                     latest=True,
                     version_count=1,
-                    kind="static_build"
+                    summary=metadata.get("summary"),
+                    checks=tuple(metadata.get("checks") or ()),
+                    kind="text_result"
+                    if metadata["output_kind"] == TEXT_KIND
+                    else "static_build"
                     if metadata["output_kind"] == BUILD_KIND
                     else "artifact_image",
                     retained=metadata.get("retained_content") is not None,
@@ -465,10 +472,58 @@ class OutputReads:
         manifest = self._manager.get_artifact_bundle(artifact_id)["manifest"]
         return OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
 
+    def read_text(
+        self, scope_kind: str, scope_id: str, artifact_id: str, artifact_revision: str
+    ) -> dict[str, Any]:
+        _, _, items = self._metadata(scope_kind, scope_id, "all")
+        item = next(
+            (
+                item
+                for item in items
+                if isinstance(item, ImageOutput)
+                and item.kind == "text_result"
+                and item.artifact_id == artifact_id
+                and item.artifact_revision == artifact_revision
+            ),
+            None,
+        )
+        if item is None:
+            raise unavailable()
+        try:
+            bundle = self._manager.get_artifact_bundle(artifact_id)
+            manifest = bundle["manifest"]
+            if (
+                not _exact(bundle["artifact"], artifact_revision)
+                or manifest.get("revision") != item.content_revision
+            ):
+                raise unavailable()
+            content = read_retained_text(self._manager, manifest)
+        except Exception:
+            raise unavailable() from None
+        return {
+            "schema": "agent_commons.text-result-content.v1",
+            "artifact_id": artifact_id,
+            "artifact_revision": artifact_revision,
+            "content_revision": item.content_revision,
+            "title": item.title,
+            "summary": item.summary,
+            "checks": list(item.checks),
+            "content": content,
+            "task_id": item.task_id,
+            "task_revision": item.task_revision,
+        }
+
     def _verify_build(self, item: ImageOutput) -> ImageOutput:
         try:
             manifest = self._manager.get_artifact_bundle(item.artifact_id)["manifest"]
-            OutputContentStore(self._manager).read(item.content_revision, manifest["size_bytes"])
+            if item.kind == "text_result":
+                if manifest.get("revision") != item.content_revision:
+                    raise unavailable()
+                read_retained_text(self._manager, manifest)
+            else:
+                OutputContentStore(self._manager).read(
+                    item.content_revision, manifest["size_bytes"]
+                )
         except Exception:
             return replace(item, state="unavailable", reason="output_preview_unavailable")
         return replace(item, state="ready")

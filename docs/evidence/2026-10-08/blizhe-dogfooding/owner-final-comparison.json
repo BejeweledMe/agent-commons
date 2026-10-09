@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-10-08T21:30:54.966870+00:00",
+  "source_snapshot_sha256": "b53532bb334007dde6bc9de743410022107cd42b4adda6abf8c373e8e6097f93",
+  "status_entries": 44,
+  "covered_files": 825,
+  "nested_repositories": 1,
+  "matches": {
+    "owner-after-photo-accepted-20261008.json": {
+      "branch": true,
+      "head": true,
+      "origin_main": true,
+      "status_sha256": true,
+      "git_info_exclude_sha256": true,
+      "nested_repositories": true,
+      "files": true
+    },
+    "owner-after-rank-20261008.json": {
+      "branch": true,
+      "head": true,
+      "origin_main": true,
+      "status_sha256": true,
+      "git_info_exclude_sha256": true,
+      "nested_repositories": true,
+      "files": true
+    }
+  },
+  "coverage": "All files represented by current dirty Git status, expanding embedded repositories via their tracked and non-ignored inventories. Ignored dependency caches, ignored secrets, and Git internals are excluded. File content is not copied.",
+  "caveat": "Six clean historical nested worktrees disappeared between 18:41 and 19:00 UTC; actor unknown. Current comparison does not claim all original 4815 files remain."
+}

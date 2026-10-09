@@ -1,0 +1,44 @@
+[
+  {
+    "step": "Frontend gallery EN",
+    "elapsed_to_observation_ms": 8507,
+    "note": "Верхняя граница между действием и наблюдением, включает работу инструментов; не серверная latency"
+  },
+  {
+    "step": "Blizhe gallery EN/RU",
+    "result": "Пустое состояние без ошибки"
+  },
+  {
+    "step": "Карты Blizhe",
+    "result": "6 задач; BASE needs_operator в истории, три зависимых узла; структура отдельно, все узлы типа Задача. Нового запуска нет."
+  },
+  {
+    "step": "Переход Blizhe → agent-commons",
+    "elapsed_to_observation_ms": 21594,
+    "note": "Верхняя граница, включает промежуточные действия инструментов"
+  },
+  {
+    "step": "Возврат agent-commons → Blizhe",
+    "elapsed_to_observation_ms": 5029,
+    "url": "http://127.0.0.1:8794/work?project=project.8d0b5b1f055a792caebc2b5ba24c65f5&view=work&tasks=map",
+    "draft_visible": false
+  },
+  {
+    "step": "Повторное открытие формы после смены проекта",
+    "draft_visible": true
+  },
+  {
+    "step": "Первое чтение после reload",
+    "elapsed_to_observation_ms": 7867,
+    "draft_visible": false,
+    "note": "Ожидание textbox вернуло tool timeout; итог оценивается по свежему UI"
+  },
+  {
+    "step": "reload итог",
+    "result": "Поля пусты, Component сброшен на Task, язык RU сброшен на EN; после фиксации возвращён RU, пустая форма закрыта."
+  },
+  {
+    "step": "Исходный сценарий UX-32, Self-improvement · Frontend",
+    "result": "EN/RU — пустая галерея без ошибки; воспроизведение отказа 6 октября теперь не подтверждается"
+  }
+]

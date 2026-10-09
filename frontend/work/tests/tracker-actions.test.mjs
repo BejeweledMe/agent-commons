@@ -202,7 +202,7 @@ test("the tracker hands its action panel the revision the inspector rendered", (
   // every accept/return intent from that value and posts it unchanged.
   assert.match(inspector, /const rendered: RenderedTask = \{ revision: detail\?\.revision \?\? null \}/);
   assert.match(inspector, /typeof children === "function" \? children\(rendered\) : children/);
-  assert.match(tracker, /\(\{ revision \}: RenderedTask\) => <>\{trackerTaskActions\(selectedTask, revision\)\}/);
+  assert.match(tracker, /\(\{ revision \}: RenderedTask\) => <>\{trackerTaskActions\(detailTask, revision\)\}/);
   assert.match(tracker, /api\.acceptTask\(taskId, value as string, key, signal, expectedRevision\)/);
   assert.match(tracker, /api\.reopenTask\(taskId, value as string, key, signal, expectedRevision\)/);
   assert.match(tracker, /expectedRevision === null/, "an unrendered revision is refused, not fetched");
@@ -214,7 +214,10 @@ test("Now, Map and All tasks select through the one inspector path and one task 
   const views = readFileSync(resolve(root, "src/components/TaskViews.tsx"), "utf8");
   // One selection callback and one keyboard handler serve every view, so the
   // inspector, its task actions and the keyboard help do not fork per view.
-  assert.match(tracker, /onSelectTask=\{selectTask\} onTaskKeyDown=\{moveTaskFocus\}/);
+  // One selection callback, one focus callback and one keyboard handler serve
+  // every view: opening a task and merely moving the selection stay distinct.
+  assert.match(tracker, /onSelectTask=\{selectTask\} onFocusTask=\{onFocusTask\} onTaskKeyDown=\{moveTaskFocus\}/);
+  assert.match(tracker, /detailTaskId=\{route\.panel === "detail" \? route\.taskId : null\}|detailTaskId, onCloseDetail/, "the open detail is its own state");
   assert.equal((views.match(/function taskRow\(/g) ?? []).length, 1);
   assert.equal((views.match(/onSelectTask\(task\.taskId\)/g) ?? []).length, 1);
   assert.match(views, /onSelectTask=\{onSelectTask\}/, "graph nodes select the same task the rows do");

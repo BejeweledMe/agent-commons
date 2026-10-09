@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import type { Locale, MessageKey } from "../i18n";
 
@@ -7,13 +7,17 @@ type AppHeaderProps = {
   locale: Locale;
   text: (key: MessageKey) => string;
   onLocaleChange: (locale: Locale) => void;
+  /** Collapse, swap and restore for the two side panes. */
+  layoutControls?: ReactNode;
+  hideTitle?: boolean;
 };
 
-export function AppHeader({ locale, text, title, onLocaleChange }: AppHeaderProps): ReactElement {
+export function AppHeader({ locale, text, title, onLocaleChange, layoutControls, hideTitle }: AppHeaderProps): ReactElement {
   return (
     <header className="app-header">
       <div>
-        <h1>{title}</h1>
+        {layoutControls}
+        <h1 className={hideTitle ? "sr-only" : undefined}>{title}</h1>
       </div>
       <div className="locale-switcher" aria-label={text("language")}>
         <button

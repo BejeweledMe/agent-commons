@@ -1,5 +1,10 @@
 # ADR 0020: Доска проекта как главный экран
 
+> **2026-10-09 amendment:** [ADR 0026](0026-map-first-workspace.md) supersedes
+> the home-screen and task-tracker placement by direct owner instruction.
+> The task map becomes the primary workspace; the agent board, recorded links
+> and operational department frames retain the semantics recorded below.
+
 > **English summary.** A project opens on an infinite board (React Flow):
 > standing agents are cards, `agent_link` records are edges, departments are
 > frames created by blueprint applications. Node positions and frames are

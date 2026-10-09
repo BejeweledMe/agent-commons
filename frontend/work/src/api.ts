@@ -374,7 +374,10 @@ function parseApiError(value: unknown): ApiError | null {
   return {
     code,
     message: stringAt(error, "message"),
-    safeNextActions: stringsAt(error, "safe_next_actions")
+    safeNextActions: stringsAt(error, "safe_next_actions"),
+    // One additive refusal detail travels with its own code and nothing else:
+    // the launch-budget object of an exhausted precheck, unvalidated here.
+    ...(code === "operator_budget_exhausted" ? { budget: isObject(error.budget) ? error.budget : null } : {})
   };
 }
 
@@ -2061,6 +2064,7 @@ export class WorkApi {
       contextMode: string;
       fromPresetId?: string;
       specializationRef?: LibraryRef | null;
+      supervisorAgentId?: string | null;
       model?: string;
       modelMode?: "profile" | "explicit";
     },
@@ -2074,6 +2078,7 @@ export class WorkApi {
       {
         name: input.name,
         rationale: input.rationale,
+        ...(input.supervisorAgentId ? { supervisor_agent_id: input.supervisorAgentId } : {}),
         ...(input.fromPresetId ? { from_preset_id: input.fromPresetId } : {
           profile_id: input.profileId,
           context_mode: input.contextMode,
@@ -2268,6 +2273,28 @@ export class WorkApi {
     await this.post("/instrumentation/clear", { expected_revision: expectedRevision }, signal);
   }
 
+  /**
+   * The operator's remaining launch allowance for one profile: reserved
+   * process launches, never money. The caller tolerates an unavailable read
+   * and shows nothing rather than a guessed count.
+   */
+  async readLaunchBudget(profileId: string, signal: AbortSignal): Promise<unknown> {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(profileId)) throw new ApiProblem(400, null);
+    return this.get(`/work/launch-budget/${encodeURIComponent(profileId)}`, signal);
+  }
+
+  /**
+   * The operator's pane arrangement. Private operational state on this host,
+   * like the board layout, and never browser storage. Both directions use the selected project workspace and operator identity.
+   */
+  async readWorkspacePreferences(signal: AbortSignal): Promise<unknown> {
+    return this.get("/workspace/preferences", signal);
+  }
+
+  async writeWorkspacePreferences(body: JsonObject, signal: AbortSignal): Promise<unknown> {
+    return this.post("/workspace/preferences", body, signal);
+  }
+
   async readGraph(signal: AbortSignal): Promise<unknown> {
     return this.get("/graph", signal);
   }
@@ -2282,7 +2309,7 @@ export class WorkApi {
   }
 
   /** Open a recorded link between two standing roles; the ledger, not the canvas, holds the edge. */
-  async openAgentLink(input: { fromAgentId: string; toAgentId: string; allowedAction: "ask" | "delegate"; reason: string }, signal: AbortSignal, idempotencyKey = crypto.randomUUID()): Promise<unknown> {
+  async openAgentLink(input: { fromAgentId: string; toAgentId: string; allowedAction: "ask" | "handoff_work"; reason: string }, signal: AbortSignal, idempotencyKey: string = crypto.randomUUID()): Promise<unknown> {
     const agent = /^agent\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
     if (!agent.test(input.fromAgentId) || !agent.test(input.toAgentId) || input.fromAgentId === input.toAgentId) throw new ApiProblem(400, null);
     return this.post("/agent-links", {
@@ -2297,6 +2324,22 @@ export class WorkApi {
     const query = new URLSearchParams({ scope_kind: kind, scope_id: id });
     if (!summary) query.set("versions", versions);
     return this.get(`/outputs${summary ? "/summary" : ""}?${query}`, signal);
+  }
+
+  async readOutputText(artifactId: string, artifactRevision: string, kind: "task" | "agent", scopeId: string, signal: AbortSignal): Promise<unknown> {
+    if (!/^artifact\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactId) || !/^evt\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(artifactRevision)
+      || !["task", "agent"].includes(kind) || !new RegExp(`^${kind}\\.[0-7][0-9A-HJKMNP-TV-Z]{25}$`).test(scopeId)) throw new ApiProblem(400, null);
+    return this.get(`/outputs/text/${encodeURIComponent(artifactId)}/${encodeURIComponent(artifactRevision)}?${new URLSearchParams({ scope_kind: kind, scope_id: scopeId })}`, signal);
+  }
+
+  async readTaskResults(taskId: string, revision: string, offset: number, limit: number, signal: AbortSignal): Promise<unknown> {
+    if (!/^task\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(taskId) || !/^evt\.[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(revision)
+      || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 64) throw new ApiProblem(400, null);
+    return this.get(`/outputs/task-results/${encodeURIComponent(taskId)}?${new URLSearchParams({ task_revision: revision, offset: String(offset), limit: String(limit) })}`, signal);
+  }
+
+  async readProjectEnvironment(signal: AbortSignal): Promise<unknown> {
+    return this.get("/work/project-environment", signal);
   }
 
   async readOutputImage(artifactId: string, signal: AbortSignal): Promise<Blob> {
@@ -2381,6 +2424,13 @@ export class WorkApi {
       throw new ApiProblem(response.status, parseApiError(await responsePayload(response)));
     }
     try { return await boundedAttachmentBlob(response); } catch { throw new ApiProblem(502, null); }
+  }
+
+  /** Narrow operator editor transport; the generic library/work reader stays closed. */
+  async writeAgentSettings(path: string, body: Readonly<Record<string, unknown>>, signal: AbortSignal): Promise<unknown> {
+    if (!/^\/agents\/agent\.[0-7][0-9A-HJKMNP-TV-Z]{25}\/reconfigure$/.test(path)
+      && !/^\/agent-links(?:\/agent_link\.[0-7][0-9A-HJKMNP-TV-Z]{25}\/close)?$/.test(path)) throw new ApiProblem(400, null);
+    return this.post(path, body as JsonObject, signal);
   }
 
   async requestData(path: string, options: { method?: "GET" | "POST"; body?: unknown; signal: AbortSignal }): Promise<unknown> {

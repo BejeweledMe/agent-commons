@@ -1,0 +1,123 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Шаблоны команд" [active]:
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Библиотека" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - region "Библиотека":
+    - tablist "Библиотека":
+      - tab "Роли32"
+      - tab "Навыки45"
+      - tab "Шаблоны команд7" [selected]
+      - tab "Контекст"
+    - tabpanel "Шаблоны команд7":
+      - region "Начать с готового процесса":
+        - heading "Начать с готового процесса" [level=2]
+        - paragraph: Выберите готовый процесс или создайте свой состав команды и зависимости задач.
+        - button "Обновить библиотеку"
+        - button "Новый процесс"
+        - checkbox "Показать архивные процессы"
+        - text: Показать архивные процессы
+        - button "Веб-приложение От первого пользовательского сценария до работающего веб-приложения. 5 ролей · 5 задач":
+          - strong: Веб-приложение
+          - generic: От первого пользовательского сценария до работающего веб-приложения.
+          - generic: 5 ролей · 5 задач
+        - button "Мобильное приложение Выбрать платформу, спроектировать опыт и собрать проверенный клиент. 3 ролей · 4 задач":
+          - strong: Мобильное приложение
+          - generic: Выбрать платформу, спроектировать опыт и собрать проверенный клиент.
+          - generic: 3 ролей · 4 задач
+        - button "Telegram Mini App Собрать Mini App с учётом платформы, авторизации и браузера. 4 ролей · 5 задач":
+          - strong: Telegram Mini App
+          - generic: Собрать Mini App с учётом платформы, авторизации и браузера.
+          - generic: 4 ролей · 5 задач
+        - button "AI-помощник с поиском по данным Связать полезную задачу, поиск по данным, интерфейс и оценку качества. 4 ролей · 5 задач":
+          - strong: AI-помощник с поиском по данным
+          - generic: Связать полезную задачу, поиск по данным, интерфейс и оценку качества.
+          - generic: 4 ролей · 5 задач
+        - button "Улучшить существующий сервис Разобрать конкретную проблему, устранить причину и проверить результат. 4 ролей · 5 задач":
+          - strong: Улучшить существующий сервис
+          - generic: Разобрать конкретную проблему, устранить причину и проверить результат.
+          - generic: 4 ролей · 5 задач
+        - 'button "Реализация функции Спланировать, реализовать и независимо проверить ограниченное изменение. Рекомендуемые профили: claude-builder и claude-independent-reviewer. 2 ролей · 2 задач"':
+          - strong: Реализация функции
+          - generic: "Спланировать, реализовать и независимо проверить ограниченное изменение. Рекомендуемые профили: claude-builder и claude-independent-reviewer."
+          - generic: 2 ролей · 2 задач
+        - 'button "Продуктовое исследование Собрать доказательства, затем проверить рекомендацию до решения владельца. Рекомендуемые профили: claude-builder и claude-independent-reviewer. 2 ролей · 2 задач"':
+          - strong: Продуктовое исследование
+          - generic: "Собрать доказательства, затем проверить рекомендацию до решения владельца. Рекомендуемые профили: claude-builder и claude-independent-reviewer."
+          - generic: 2 ролей · 2 задач
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

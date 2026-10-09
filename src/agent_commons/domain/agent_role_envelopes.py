@@ -27,6 +27,8 @@ class AgentLifetimePayload(TypedDict):
 
 
 class AgentChangesPayload(TypedDict):
+    supervisor_agent_id: NotRequired[str | None]
+    specialization_ref: NotRequired[dict[str, JsonValue]]
     name: NotRequired[str]
     grants: NotRequired[AgentGrantsPayload]
     context_mode: NotRequired[str]
@@ -41,6 +43,7 @@ class IsolationDowngradePayload(TypedDict):
 
 
 class AgentCreatedPayload(TypedDict):
+    supervisor_agent_id: NotRequired[str | None]
     agent_id: str
     name: str
     profile_id: str
@@ -145,6 +148,9 @@ class AgentChanges:
     tool_allowlist: tuple[str, ...] | None
     has_turnover_budget: bool
     turnover_budget: int | None
+    has_supervisor_agent_id: bool = False
+    supervisor_agent_id: str | None = None
+    specialization_ref: FrozenJsonObject | None = None
 
     @classmethod
     def from_payload(cls, value: Mapping[str, object]) -> AgentChanges:
@@ -156,6 +162,9 @@ class AgentChanges:
             tool_allowlist=_optional_string_tuple(value, "tool_allowlist"),
             has_turnover_budget="turnover_budget" in value,
             turnover_budget=_optional_nullable_int(value, "turnover_budget"),
+            has_supervisor_agent_id="supervisor_agent_id" in value,
+            supervisor_agent_id=_optional_string(value, "supervisor_agent_id"),
+            specialization_ref=_optional_frozen_object(value, "specialization_ref"),
         )
 
     def to_payload(self) -> AgentChangesPayload:
@@ -172,6 +181,12 @@ class AgentChanges:
             payload["tool_allowlist"] = list(self.tool_allowlist)
         if self.has_turnover_budget:
             payload["turnover_budget"] = self.turnover_budget
+        if self.has_supervisor_agent_id:
+            payload["supervisor_agent_id"] = self.supervisor_agent_id
+        if self.specialization_ref is not None:
+            from .envelopes import thaw_json_object
+
+            payload["specialization_ref"] = thaw_json_object(self.specialization_ref)
         return payload
 
 
@@ -221,6 +236,8 @@ class AgentCreatedEnvelope(AgentEnvelope):
     proposal_ref: TypedRef | None
     extensions: FrozenJsonObject | None
     specialization_ref: FrozenJsonObject | None = None
+    has_supervisor_agent_id: bool = False
+    supervisor_agent_id: str | None = None
     event_type: AgentCreatedEventType = "agent.created"
 
     def to_payload(self) -> AgentCreatedPayload:
@@ -241,6 +258,8 @@ class AgentCreatedEnvelope(AgentEnvelope):
             payload["template"] = self.template
         if self.has_created_by_agent_id:
             payload["created_by_agent_id"] = self.created_by_agent_id
+        if self.has_supervisor_agent_id:
+            payload["supervisor_agent_id"] = self.supervisor_agent_id
         if self.has_turnover_budget:
             payload["turnover_budget"] = self.turnover_budget
         if self.skills is not None:
@@ -362,6 +381,8 @@ def parse_agent_role_envelope(
             template=_optional_bool(payload, "template"),
             has_created_by_agent_id="created_by_agent_id" in payload,
             created_by_agent_id=_optional_string(payload, "created_by_agent_id"),
+            has_supervisor_agent_id="supervisor_agent_id" in payload,
+            supervisor_agent_id=_optional_string(payload, "supervisor_agent_id"),
             has_turnover_budget="turnover_budget" in payload,
             turnover_budget=_optional_nullable_int(payload, "turnover_budget"),
             skills=_optional_string_tuple(payload, "skills"),

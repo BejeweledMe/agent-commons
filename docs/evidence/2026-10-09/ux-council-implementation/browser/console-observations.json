@@ -1,0 +1,13 @@
+{
+  "small": [
+    {
+      "level": "error",
+      "message": "grm ERROR [iterable] ░░ Not supported: in app messages from Iterable",
+      "timestamp": "2026-10-09T17:24:41.185Z",
+      "url": "chrome-extension://kbfnbcaeplbcioakkpcpgfkobkghlhen/src/js/Grammarly.js"
+    }
+  ],
+  "medium": [],
+  "large": [],
+  "real": []
+}

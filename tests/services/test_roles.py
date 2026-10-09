@@ -29,7 +29,7 @@ _SIGNATURES = {
         "turnover_budget: 'int | None' = None, template: 'bool' = False, model: 'str | None' = "
         "None, specialization_ref: 'Mapping[str, str] | None' = None, "
         "library_store: 'Any | None' = None, created_by_agent_id: 'str | None' = None, "
-        "approval: 'str | None' = None, "
+        "supervisor_agent_id: 'str | None' = None, approval: 'str | None' = None, "
         "proposal_ref: 'Mapping[str, str] | None' = None, idempotency_key: 'str | None' = None) "
         "-> 'dict[str, Any]'"
     ),
@@ -49,7 +49,8 @@ _SIGNATURES = {
     ),
     "reconfigure_agent": (
         "(self, agent_id: 'str', expected_revision: 'str', *, changes: 'Mapping[str, Any]', "
-        "reason: 'str', isolation_downgrade_reason: 'str | None' = None, idempotency_key: 'str | "
+        "reason: 'str', isolation_downgrade_reason: 'str | None' = None, "
+        "library_store: 'Any | None' = None, idempotency_key: 'str | "
         "None' = None) -> 'dict[str, Any]'"
     ),
     "retire_agent": (

@@ -18,6 +18,7 @@ from agent_commons.domain.execution_plan import (
 from agent_commons.domain.snapshot import ProjectSnapshot
 from agent_commons.domain.work_state import EvidenceState, FreshnessState, NextAction, RunPhase
 from agent_commons.services.execution_plan import build_execution_plan
+from agent_commons.services.work_metrics import build_work_health
 
 NOW = "2026-08-30T10:01:00Z"
 CAPACITY = {"active": 1, "limit": 4, "queued": 0, "queue_capacity": 8}
@@ -693,3 +694,167 @@ def test_malformed_and_stale_graph_sources_are_typed() -> None:
     )
     assert wrong_limit_type.state is PlanState.ERROR
     assert PlanGap.GRAPH_MALFORMED in wrong_limit_type.gaps
+
+
+@pytest.mark.parametrize(
+    ("verdict", "stale", "target", "expected"),
+    [
+        ("approved", False, "evt.task.mid.1", NextAction.ACCEPT_TASK),
+        ("changes_requested", False, "evt.task.mid.1", NextAction.REVISE_WORK),
+        ("requested", False, "evt.task.mid.1", NextAction.WAIT_FOR_REVIEW),
+        ("approved", True, "evt.task.mid.1", NextAction.REQUEST_REVIEW),
+        ("approved", False, "evt.old", NextAction.REQUEST_REVIEW),
+    ],
+)
+def test_terminal_run_does_not_replace_current_review_decision(verdict, stale, target, expected):
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = "review"
+    snapshot.delegations["delegation.1"]["state"] = "succeeded"
+    snapshot.reviews["review.mid"] = {
+        **snapshot.reviews["review.dep"],
+        "id": "review.mid",
+        "review_id": "review.mid",
+        "state": verdict,
+        "stale": stale,
+        "target_ref": {"kind": "task", "id": "task.mid"},
+        "target_revision": target,
+    }
+    plan = build_execution_plan(snapshot, [_attempt(state="succeeded")], generated_at=NOW)
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert node.next_action is expected
+
+
+@pytest.mark.parametrize("task_state", ["ready", "review"])
+def test_live_run_owns_readiness_even_if_task_ready_or_review_approved(task_state):
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = task_state
+    snapshot.reviews["review.mid"] = {
+        **snapshot.reviews["review.dep"],
+        "id": "review.mid",
+        "review_id": "review.mid",
+        "target_ref": {"kind": "task", "id": "task.mid"},
+        "target_revision": "evt.task.mid.1",
+    }
+    plan = build_execution_plan(snapshot, [_attempt()], generated_at=NOW)
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert node.next_action is NextAction.WAIT_FOR_RUN
+    assert node.readiness is ReadinessState.IN_PROGRESS
+    assert node.task_state == task_state
+
+
+def test_older_live_run_cannot_be_hidden_by_newer_finished_run():
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = "ready"
+    snapshot.delegations["delegation.2"] = _delegation(
+        "task.mid", state="succeeded", delegation_id="delegation.2"
+    )
+    plan = build_execution_plan(
+        snapshot,
+        [
+            _attempt(),
+            _attempt(
+                delegation_id="delegation.2",
+                attempt_id="attempt.2",
+                state="succeeded",
+                updated_at="2026-08-30T10:00:59Z",
+            ),
+        ],
+        generated_at=NOW,
+    )
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert node.phase is RunPhase.RUNNING
+    assert node.next_action is NextAction.WAIT_FOR_RUN
+
+
+def test_stale_projection_cannot_offer_accept_despite_approved_review():
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = "review"
+    snapshot.delegations["delegation.1"]["state"] = "succeeded"
+    snapshot.reviews["review.mid"] = {
+        **snapshot.reviews["review.dep"],
+        "id": "review.mid",
+        "review_id": "review.mid",
+        "target_ref": {"kind": "task", "id": "task.mid"},
+        "target_revision": "evt.task.mid.1",
+    }
+    plan = build_execution_plan(
+        snapshot, [_attempt(state="succeeded")], generated_at="2026-08-30T11:00:00Z"
+    )
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert node.next_action is NextAction.INSPECT_MISSING_EVIDENCE
+
+
+@pytest.mark.parametrize(
+    ("verdict", "expected"),
+    [("approved", NextAction.ACCEPT_TASK), ("changes_requested", NextAction.REVISE_WORK)],
+)
+def test_current_review_survives_historical_pre_provider_refusal(verdict, expected):
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = "review"
+    snapshot.delegations["delegation.1"]["state"] = "needs_operator"
+    snapshot.delegations["delegation.1"]["recorded_at"] = "2026-08-30T09:00:00Z"
+    snapshot.reviews["review.mid"] = {
+        **snapshot.reviews["review.dep"],
+        "id": "review.mid",
+        "review_id": "review.mid",
+        "state": verdict,
+        "target_ref": {"kind": "task", "id": "task.mid"},
+        "target_revision": "evt.task.mid.1",
+    }
+    # The current canonical task is freshly observed even though the aggregate
+    # graph is old and this legitimate pre-provider refusal has no attempt.
+    observation = {
+        "generated_at": NOW,
+        "canonical_observed_at": NOW,
+        "graph": {"generated_at": "2026-08-30T09:00:00Z", "limits": {"truncated": False}},
+    }
+    health = build_work_health(snapshot, [], **observation)
+    assert health.freshness is FreshnessState.STALE
+    run = next(run for run in health.runs if run.task_id == "task.mid")
+    assert run.phase is RunPhase.NEEDS_OPERATOR
+    assert run.evidence_state is EvidenceState.PARTIAL
+    assert "attempt" in run.missing_fields
+    acceptance = next(item for item in health.acceptances if item.task_id == "task.mid")
+    assert acceptance.evidence_state is EvidenceState.COMPLETE
+    assert acceptance.next_action is expected
+
+    plan = build_execution_plan(snapshot, [], **observation)
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert plan.freshness is FreshnessState.STALE
+    assert node.freshness is FreshnessState.FRESH
+    assert node.next_action is expected
+    assert node.evidence_state is EvidenceState.COMPLETE
+    assert node.phase is RunPhase.NEEDS_OPERATOR
+
+
+@pytest.mark.parametrize("unresolved", ["unknown", "contradictory_attempt"])
+def test_current_review_does_not_hide_unresolved_older_execution(unresolved):
+    snapshot = _snapshot()
+    snapshot.tasks["task.mid"]["state"] = "review"
+    snapshot.reviews["review.mid"] = {
+        **snapshot.reviews["review.dep"],
+        "id": "review.mid",
+        "review_id": "review.mid",
+        "target_ref": {"kind": "task", "id": "task.mid"},
+        "target_revision": "evt.task.mid.1",
+    }
+    snapshot.delegations["delegation.1"]["state"] = (
+        "unknown" if unresolved == "unknown" else "needs_operator"
+    )
+    snapshot.delegations["delegation.2"] = _delegation(
+        "task.mid", state="succeeded", delegation_id="delegation.2"
+    )
+    attempts = [_attempt()] if unresolved == "contradictory_attempt" else []
+    attempts.append(
+        _attempt(
+            delegation_id="delegation.2",
+            attempt_id="attempt.2",
+            state="succeeded",
+            updated_at="2026-08-30T10:00:59Z",
+        )
+    )
+    plan = build_execution_plan(snapshot, attempts, generated_at=NOW, canonical_observed_at=NOW)
+    node = next(node for node in plan.nodes if node.task_id == "task.mid")
+    assert node.next_action is NextAction.INSPECT_MISSING_EVIDENCE
+    assert node.evidence_state is EvidenceState.PARTIAL
+    assert node.phase is (RunPhase.UNKNOWN if unresolved == "unknown" else RunPhase.NEEDS_OPERATOR)

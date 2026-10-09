@@ -540,3 +540,24 @@ def test_plan_refuses_context_it_does_not_actually_carry(tmp_path: Path) -> None
             invocation_fingerprint=fresh.invocation_fingerprint,
             context=context,
         )
+
+
+@pytest.mark.parametrize("timeout", [True, 0, 61, 1.5])
+def test_initialization_timeout_is_explicitly_bounded(timeout):
+    with pytest.raises(ConfigurationError, match="limits"):
+        ProviderInitializationProbe(timeout_seconds=timeout)
+
+
+def test_initialization_default_allows_slow_no_model_start_and_exposes_only_timings(tmp_path):
+    class SlowInitialization:
+        def run(self, invocation, **values):
+            assert values["timeout_seconds"] == 15
+            return replace(_result(), duration_seconds=6.34, stdout=b"token=never-expose-this")
+
+    status = ProviderInitializationProbe(runner=SlowInitialization()).probe(
+        _profile(BuiltinProfileId.CLAUDE_BUILDER), workspace_root=tmp_path
+    )
+    assert status.state is ProviderInitializationState.READY
+    assert status.timeout_seconds == 15
+    assert status.duration_seconds == 6.34
+    assert "never-expose" not in repr(status)

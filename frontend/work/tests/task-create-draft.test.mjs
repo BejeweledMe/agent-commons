@@ -37,7 +37,8 @@ for (const extra of [{}, { taskKind: "component", parentTaskId: null }, { taskKi
     const f = fixture(extra); f.submit(); f.confirm(); await tick();
     assert.equal(f.requests.length, 1);
     assert.deepEqual(f.draft, emptyTask);
-    assert.deepEqual(f.navigation, [{ view: "work", taskId: "task.created", composer: false }]);
+    // Creation selects the exact returned task and opens its details on demand.
+    assert.deepEqual(f.navigation, [{ view: "work", taskId: "task.created", panel: "detail" }]);
     assert.equal(f.errors.length, 0);
   });
 }

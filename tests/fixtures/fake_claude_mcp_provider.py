@@ -40,6 +40,57 @@ def _value(result: Any) -> Any:
     raise RuntimeError("MCP tool returned no structured value")
 
 
+USE_TEXT_RESULT_FLOW = False
+
+
+async def _publish_task_report(session: ClientSession, delegation: dict[str, Any]) -> None:
+    published = _value(
+        await session.call_tool(
+            "commons_publish_text_result",
+            {
+                "title": "Canary source inspection",
+                "summary": "The exact scoped source returns 42.",
+                "checks": ["Read src/canary.py through the scoped tool."],
+                "content": "Inspected answer(): it returns the integer 42.",
+                "expected_task_revision": delegation["target_revision"],
+                "idempotency_key": "hermetic-report-publish",
+            },
+        )
+    )
+    completed = _value(
+        await session.call_tool(
+            "commons_complete_task_result",
+            {
+                "expected_task_revision": delegation["target_revision"],
+                "summary": "Inspection complete.",
+                "artifact_ids": [published["artifact_id"]],
+                "idempotency_key": "hermetic-report-complete",
+            },
+        )
+    )
+    submitted = _value(
+        await session.call_tool(
+            "commons_submit_task_result",
+            {
+                "expected_task_revision": completed["revision"],
+                "summary": "Ready for independent review.",
+                "artifact_ids": [published["artifact_id"]],
+                "idempotency_key": "hermetic-report-submit",
+            },
+        )
+    )
+    _value(
+        await session.call_tool(
+            "commons_finalize_task_result",
+            {
+                "expected_task_revision": submitted["revision"],
+                "summary": "Submitted the exact retained inspection report.",
+                "idempotency_key": "hermetic-report-finalize",
+            },
+        )
+    )
+
+
 async def _run() -> None:
     _assert_commons_start_projection(sys.stdin.read())
     arguments = sys.argv[1:]
@@ -164,6 +215,9 @@ async def _run() -> None:
                         {"delegation_id": delegation_id},
                     )
                 )
+                if USE_TEXT_RESULT_FLOW:
+                    await _publish_task_report(session, delegation)
+                    return
                 target = delegation["target_ref"]
                 result_refs = [f"{target['kind']}:{target['id']}"]
             delegation = _value(

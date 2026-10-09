@@ -1,0 +1,43 @@
+{
+  "requested_model": "opus",
+  "mode": "manual isolated Claude CLI with explicit Read/Edit/Write/Glob/Grep/Bash; no plugins/MCP/hooks/browser",
+  "exit_code": 1,
+  "elapsed_seconds": 2055.25,
+  "timeout_seconds": 3600,
+  "is_error": true,
+  "subtype": "success",
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 3051,
+      "outputTokens": 11,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.003106,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-opus-5": {
+      "inputTokens": 318,
+      "outputTokens": 156264,
+      "cacheReadInputTokens": 46445091,
+      "cacheCreationInputTokens": 436814,
+      "webSearchRequests": 0,
+      "costUSD": 31.49887549999999,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 41333,
+      "canonicalModel": "claude-opus-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "num_turns": 169,
+  "stop_reason": "stop_sequence",
+  "limitation": "Claude session limit reached; reset indicated06:30 Europe/Moscow. No completed handoff or full frontend verification claimed.",
+  "snapshot_files": 32
+}

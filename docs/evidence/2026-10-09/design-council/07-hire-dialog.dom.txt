@@ -1,0 +1,372 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&filter=all&tab=context
+    - link "Роли":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=skills
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=blueprints
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&filter=all&tab=context
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&filter=all&tab=context
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Агенты" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - navigation "Карты проекта":
+    - link "Задачи":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&filter=all&tab=context
+      - text: Задачи
+    - link "Агенты":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=board&filter=all&tab=context
+      - text: Агенты
+  - region "Агенты":
+    - button "Нанять роль" [expanded]
+    - button "Добавить отдел"
+    - button "Показать всё"
+    - button "Расставить автоматически"
+    - generic "Список агентов"
+    - generic "Связи на карте"
+    - generic "Агенты":
+      - application:
+        - strong: Вы · владелец
+        - button "Главный чат":
+          - text: Главный чат
+        - button "Открыть галерею результатов агента Blizhe QA · BASE и TOOL":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · BASE и TOOL
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 2 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · BASE и TOOL"':
+        - button "Результаты Blizhe QA · BASE и TOOL":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · PHOTO":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · PHOTO
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · PHOTO"':
+        - button "Результаты Blizhe Backend · PHOTO":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Search · Codex":
+          - generic: И
+          - generic: Инженер RAG и retrieval
+        - generic: Нужны вы
+        - paragraph: Blizhe Search · Codex
+        - paragraph: Обеспечить проверяемый путь от разрешённых источников к релевантному evidence, grounded answer и корректному отказу при отсутствии оснований.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 2 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Search · Codex"':
+        - button "Результаты Blizhe Search · Codex":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Frontend · TOOL":
+          - generic: F
+          - generic: Frontend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Frontend · TOOL
+        - paragraph: JavaScript / TypeScript · Работающий браузерный сценарий с корректными состояниями и взаимодействием.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Frontend · TOOL"':
+        - button "Результаты Blizhe Frontend · TOOL":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Lead · BASE":
+          - generic: Т
+          - generic: Техлид реализации и интеграции
+        - generic: Свободна
+        - paragraph: Blizhe Lead · BASE
+        - paragraph: Довести сложную задачу разработки до целостного работающего результата, сохранив одного владельца реализации, интеграции и проверки.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Lead · BASE"':
+        - button "Результаты Blizhe Lead · BASE":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe Backend · CONFIG и REASONS":
+          - generic: B
+          - generic: Backend-инженер
+        - generic: Свободна
+        - paragraph: Blizhe Backend · CONFIG и REASONS
+        - paragraph: Node.js / TypeScript · Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 1 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe Backend · CONFIG и REASONS"':
+        - button "Результаты Blizhe Backend · CONFIG и REASONS":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - button "Открыть галерею результатов агента Blizhe QA · PHOTO и SEARCH":
+          - generic: B
+          - generic: Blizhe · независимый QA reviewer
+        - generic: Свободна
+        - paragraph: Blizhe QA · PHOTO и SEARCH
+        - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+        - button "Назначить руководителя":
+          - text: Назначить руководителя
+        - paragraph: "Задачи: 7 · 0 открытых"
+        - button "Настройки агента":
+        - button "Навыки":
+        - button "Права":
+        - button "Добавить подагента":
+        - 'button "Обсуждение: Blizhe QA · PHOTO и SEARCH"':
+        - button "Результаты Blizhe QA · PHOTO и SEARCH":
+        - button "Задачи":
+        - button "Дать задачу" [disabled]:
+        - button "Связи":
+          - text: Связи
+        - generic "Масштаб карты":
+          - button "Увеличить масштаб":
+          - button "Уменьшить масштаб":
+          - button "Показать всё":
+    - dialog "Нанять роль":
+      - heading "Нанять роль" [level=2]
+      - button "Закрыть" [active]:
+      - list:
+        - strong: Blizhe QA · BASE и TOOL
+        - paragraph:
+          - code: blizhe-qa-reviewer
+          - text: ·
+          - code: codex-independent-reviewer
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe QA · BASE и TOOL"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe Backend · PHOTO
+        - paragraph:
+          - code: node-backend-engineer
+          - text: ·
+          - code: codex-builder
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe Backend · PHOTO"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe Search · Codex
+        - paragraph:
+          - code: rag-engineer
+          - text: ·
+          - code: codex-builder
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe Search · Codex"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe Frontend · TOOL
+        - paragraph:
+          - code: frontend-engineer
+          - text: ·
+          - code: codex-builder
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe Frontend · TOOL"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe Lead · BASE
+        - paragraph:
+          - code: delivery-tech-lead
+          - text: ·
+          - code: codex-builder
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe Lead · BASE"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe Backend · CONFIG и REASONS
+        - paragraph:
+          - code: node-backend-engineer
+          - text: ·
+          - code: codex-builder
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe Backend · CONFIG и REASONS"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+        - strong: Blizhe QA · PHOTO и SEARCH
+        - paragraph:
+          - code: blizhe-qa-reviewer
+          - text: ·
+          - code: codex-independent-reviewer
+          - text: · С чистого листа — без унаследованного контекста работы
+        - 'button "Обсуждение: Blizhe QA · PHOTO и SEARCH"': Обсуждение
+        - button "Выбрать для текущей задачи" [disabled]
+      - region "Наймите агента":
+        - heading "Наймите агента" [level=2]
+        - paragraph: Сначала выберите специализацию — сервер покажет воркеров, которых может подтвердить для неё. Задайте имя агента и выберите подтверждённого воркера. Провайдер и модель — в разделе «Дополнительно». Из одной специализации можно нанять несколько агентов с разными именами.
+        - text: Руководитель
+        - combobox "Руководитель":
+          - option "Без руководителя" [selected]
+          - option "Blizhe QA · BASE и TOOL"
+          - option "Blizhe Backend · PHOTO"
+          - option "Blizhe Search · Codex"
+          - option "Blizhe Frontend · TOOL"
+          - option "Blizhe Lead · BASE"
+          - option "Blizhe Backend · CONFIG и REASONS"
+          - option "Blizhe QA · PHOTO и SEARCH"
+        - generic: Найти специализацию
+        - searchbox "Найти специализацию"
+        - generic: Специализация
+        - combobox "Специализация":
+          - option "Без специализации" [selected]
+          - option "Бизнес-консультант по текущему результату"
+          - option "Советник по стратегии и будущему портфелю"
+          - option "Продуктовый менеджер"
+          - option "Продуктовый дизайнер"
+          - option "Автор и редактор"
+          - option "Технический писатель"
+          - option "Системный архитектор"
+          - option "Техлид реализации и интеграции"
+          - option "Инженер качества программного обеспечения"
+          - option "Независимый QA Reviewer"
+          - option "Blizhe · независимый QA reviewer · Своя"
+          - option "Frontend-инженер · JavaScript / TypeScript"
+          - option "Backend-инженер · Node.js / TypeScript"
+          - option "Backend-инженер · Python"
+          - option "Инженер баз данных"
+          - option "Data Engineer · pipelines и качество данных"
+          - option "ML team lead"
+          - option "Инженер классического ML"
+          - option "Инженер компьютерного зрения"
+          - option "Инженер текстовых моделей и адаптации"
+          - option "Инженер систем нейронного обучения"
+          - option "Инженер LLM-продуктов"
+          - option "Инженер RAG и retrieval"
+          - option "Инженер агентных процессов"
+          - option "Инженер оценки AI"
+          - option "Оптимизатор self-hosted LLM inference"
+          - option "DevOps / Platform Delivery Engineer"
+          - option "SRE · надёжность и инциденты"
+          - option "MLOps / LLMOps / AI Platform Engineer"
+          - option "Application Security Engineer"
+          - option "AI Safety / LLM Security Operations Engineer"
+          - option "Независимый Security Reviewer"
+        - paragraph: Здесь выбирается специализация. Провайдер, модель и полномочия задаются отдельно. Каждый наём создаёт отдельную именованную роль проекта.
+        - generic "Сохранённые шаблоны исполнения"
+        - option "Создать без шаблона" [selected]
+        - group "Исполнитель":
+          - generic: Исполнитель
+          - paragraph: Сначала выберите специализацию. Затем сервер перечислит исполнителей, которых он подтверждает для этой точной версии.
+          - list
+        - generic: Имя агента
+        - textbox "Имя агента":
+          - /placeholder: Например, Backend-разработчик
+        - 'generic "Дополнительно: провайдер и модель"'
+        - option "Выберите провайдера" [selected]
+        - option "claude"
+        - option "codex"
+        - option "grok"
+        - option "Использовать модель профиля исполнения" [selected]
+        - option "Выбрать модель для этой роли"
+        - generic: За что отвечает этот агент
+        - textbox "За что отвечает этот агент":
+          - /placeholder: Например, реализовать и проверить сервисный слой
+        - generic: Начальный контекст
+        - combobox "Начальный контекст":
+          - option "С чистого листа — без унаследованного контекста работы" [selected]
+          - option "С накопленным контекстом — для запуска нужен опубликованный пакет контекста"
+        - button "Нанять агента"
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

@@ -1,0 +1,60 @@
+{
+  "session_id": "session.abe2bb248ac947cb9630dfb263fd41d0",
+  "review_id": "review.2ZTX4G1192YQK1YMWT5FZKESMR",
+  "target_revision": "evt.01M4FYT73XK0J0KF2P89GA1ABE",
+  "verdict": "approved",
+  "report": "/private/tmp/oct09-style-independent-review-v2.md",
+  "receipt": {
+    "created": true,
+    "entity_ref": {
+      "id": "review.2ZTX4G1192YQK1YMWT5FZKESMR",
+      "kind": "review"
+    },
+    "event_id": "evt.01M4FZ347MJW8Q9YNN0HJAJGAM",
+    "event_type": "review.completed",
+    "idempotency_key": "oct09-style-astra-frontend-review-v2",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4FZ347MJW8Q9YNN0HJAJGAM"
+  },
+  "handoff": {
+    "created": true,
+    "entity_ref": {
+      "id": "handoff.68ZEYZD6ADVJ7SE99FMTPKE6CZ",
+      "kind": "handoff"
+    },
+    "event_id": "evt.01M4FZ3ZEHBRB171PPR5CJSQDS",
+    "event_type": "handoff.created",
+    "idempotency_key": "oct09-style-astra-review-v2-handoff",
+    "index": {
+      "mode": "deferred",
+      "next_action": "agent-commons index rebuild",
+      "synchronized": false
+    },
+    "repaired": false,
+    "revision": "evt.01M4FZ3ZEHBRB171PPR5CJSQDS"
+  },
+  "session_end": {
+    "capabilities": [],
+    "client": "codex-desktop",
+    "closed_at": "2026-10-09T09:15:34.050307Z",
+    "effective_status": "closed",
+    "expires_at": "2026-10-09T10:12:17.833734Z",
+    "last_seen_at": "2026-10-09T09:15:34.050307Z",
+    "model": null,
+    "model_family": null,
+    "opened_at": "2026-10-09T09:12:17.833734Z",
+    "principal": "codex",
+    "role": "independent-reviewer",
+    "schema": "agent_commons.session.v1",
+    "session_id": "session.abe2bb248ac947cb9630dfb263fd41d0",
+    "software": "codex",
+    "source_producer": null,
+    "stable_instance_id": "oct09-style-independent-review-v2",
+    "status": "closed"
+  }
+}

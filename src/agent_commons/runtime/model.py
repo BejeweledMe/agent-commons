@@ -146,6 +146,12 @@ _CLAUDE_COMMONS_COLLABORATION_TOOLS = (
     "mcp__agent-commons__commons_publish_design_image",
     "mcp__agent-commons__commons_publish_static_build",
 )
+_CLAUDE_COMMONS_TEXT_RESULT_TOOLS = (
+    "mcp__agent-commons__commons_publish_text_result",
+    "mcp__agent-commons__commons_complete_task_result",
+    "mcp__agent-commons__commons_submit_task_result",
+    "mcp__agent-commons__commons_finalize_task_result",
+)
 _CLAUDE_COMMONS_REVIEW_TOOLS = (
     "mcp__agent-commons__commons_record_verification",
     "mcp__agent-commons__commons_read_output_image",
@@ -301,6 +307,8 @@ def _worker_tools(
     tools += _CLAUDE_COMMONS_CHAT_TOOLS
     if purpose in {"implementation", "verification"}:
         tools += _CLAUDE_COMMONS_COLLABORATION_TOOLS
+    if purpose == "implementation":
+        tools += _CLAUDE_COMMONS_TEXT_RESULT_TOOLS
     if profile_id.independent_reviewer:
         tools += (
             _CLAUDE_COMMONS_REVIEW_TOOLS

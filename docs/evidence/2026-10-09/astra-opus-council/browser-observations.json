@@ -1,0 +1,171 @@
+{
+  "environment": "Chrome on macOS; synthetic fixture8795 except explicitly named real primary8794/Blizhe observations",
+  "observations": [
+    {
+      "check": "all52evidence",
+      "items": 52,
+      "hasCount": true,
+      "hasLast": true,
+      "mainChat": 1
+    },
+    {
+      "check": "fullDescription",
+      "has24": true,
+      "has1": true,
+      "characters": 6947
+    },
+    {
+      "check": "designerGallery",
+      "images": [],
+      "hasBuild": 1
+    },
+    {
+      "check": "galleryVersions",
+      "hasImageV1": true,
+      "hasImageV2": true,
+      "hasBuildV1": true,
+      "hasBuildV2": true
+    },
+    {
+      "check": "retainedTextReport",
+      "count": 1,
+      "characters": 449,
+      "excerpt": "# Synthetic verification report v2\n\n## Что подготовлено\n\n14 bilingual tasks, hierarchy and dependencies; exact evidence pages; retained PNG and static build history.\n\n## Checks\n\nThese labels describe "
+    },
+    {
+      "check": "compactEN",
+      "drawers": 0,
+      "frame": {
+        "bottom": 407.3721466064453,
+        "height": 184.5951690673828,
+        "left": 11.99573802947998,
+        "right": 1030.7315168380735,
+        "top": 222.7769775390625,
+        "width": 1018.7357788085938,
+        "x": 11.99573802947998,
+        "y": 222.7769775390625
+      },
+      "horizontalOverflow": false,
+      "viewport": [
+        1042,
+        467
+      ]
+    },
+    {
+      "check": "compactRUComposer",
+      "focused": true,
+      "hit": true,
+      "rect": {
+        "bottom": 273.5440216064453,
+        "height": 80,
+        "left": 655.632080078125,
+        "right": 1030.7315063476562,
+        "top": 193.5440216064453,
+        "width": 375.0994262695313,
+        "x": 655.632080078125,
+        "y": 193.5440216064453
+      },
+      "value": "Синтетическая проверка: текстовое поле доступно, сообщение не отправлено."
+    },
+    {
+      "check": "compactSidebarKeyboard",
+      "trap": {
+        "focus": "Провайдеры",
+        "inside": true
+      },
+      "escape": {
+        "dialogs": 0,
+        "focus": "Навигация"
+      }
+    },
+    {
+      "check": "keyboardMap",
+      "before": "-1250 0 4999.99 906",
+      "pan": "-750 0 4999.99 906",
+      "zoom": "-250 90.6 3999.99 724.8"
+    },
+    {
+      "check": "nativeWheelPan",
+      "before": "-250 90.6 3999.99 724.8",
+      "after": "-250 543.6 3999.99 724.8",
+      "changed": true
+    },
+    {
+      "check": "finalCompactRU",
+      "frame": {
+        "bottom": 431.3707275390625,
+        "height": 252.5852203369141,
+        "left": 11.99573802947998,
+        "right": 1030.7315168380735,
+        "top": 178.78550720214844,
+        "width": 1018.7357788085938,
+        "x": 11.99573802947998,
+        "y": 178.78550720214844
+      },
+      "overflow": false,
+      "viewport": [
+        1042,
+        467
+      ]
+    },
+    {
+      "check": "draft-save-reload-restore-send",
+      "saved": "Synthetic draft persistence — тест сохранения 2026-10-09.",
+      "restored_exactly": true,
+      "sidebar_width_before": 208,
+      "keyboard_resized": 216,
+      "after_reload": 216
+    },
+    {
+      "check": "swap-panels",
+      "chat_on_left": true,
+      "sidebar_on_right": true,
+      "restored_defaults": true,
+      "confirmed_send_removed_saved_draft": true
+    },
+    {
+      "check": "real-registry-recovery",
+      "project": "Blizhe · улучшения 2026-10-07",
+      "available": true,
+      "working_set": "5/14",
+      "console_errors": 0
+    },
+    {
+      "check": "empty-agent-gallery",
+      "agent": "Synthetic QA reviewer",
+      "state": "No images or live previews have been recorded for this selection.",
+      "load_error": false
+    },
+    {
+      "check": "primary71-fit-v7",
+      "all_within": true,
+      "frame": {
+        "height": 249,
+        "width": 521,
+        "x": 235,
+        "y": 180
+      },
+      "nodes": 71,
+      "viewBox": "0 -2353.54 14092 6763.08"
+    },
+    {
+      "check": "final-real-Blizhe-all-map",
+      "tasks": "14/14",
+      "viewport": {
+        "width": 1512,
+        "height": 900
+      },
+      "canvas": {
+        "width": 932,
+        "height": 681
+      },
+      "script": "work-Bfmv5CVs.js",
+      "console_errors": 0
+    }
+  ],
+  "limits": [
+    "Physical trackpad pinch not attested",
+    "No paid provider launch in synthetic UI",
+    "EN/RU geometry images v6; final real map images and fit check v7"
+  ]
+}

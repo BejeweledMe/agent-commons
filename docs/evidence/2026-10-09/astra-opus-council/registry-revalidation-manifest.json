@@ -1,0 +1,40 @@
+{
+  "base_kind": "frozen result-handoff v2 plus full task description DTO",
+  "workspace": "/Users/dmitrijersov/.codex/worktrees/oct09-result-handoff/agent-commons",
+  "files": [
+    {
+      "path": "src/agent_commons/ui/project_registry.py",
+      "before_sha256": "32a3e8ae56bff4942cf03ffd923daeab2ca44615d69955507fdfc2032b86734e",
+      "after_sha256": "d83ec2a5206aef8f225a5f95e04d1257f0c119dfd06f4bda54e05a0ae0b355ea",
+      "primary_matches_before": true
+    },
+    {
+      "path": "src/agent_commons/cli/projects.py",
+      "before_sha256": "776b02bc06f6a83d73d97783c7905b5f063ffb30021a7b11bb1fd0bf25057ea6",
+      "after_sha256": "6a8d21e36b278997376885bd8dba0fc7ad5f86db4f8330f99ef4ccc883609197",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/cli/test_project_cli.py",
+      "before_sha256": "e1182f731e98d47a9b45bb4ebfacd356de1afa1622d41afa334dbc24db16cc01",
+      "after_sha256": "77bd6d4f4a76a8603fa371ae87f594b59da663d7ce6017771361c07065f30460",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/ui/test_project_registry_revalidation.py",
+      "before_sha256": null,
+      "after_sha256": "43ed984c098bf25dc945647c7bfabeabec3c7cb6f5103f9c36bc3a40cd2990c1",
+      "primary_matches_before": true
+    }
+  ],
+  "task_id": "task.36MYXVQK414234YWWRDESZXZ2Y",
+  "task_revision": "evt.01M4EYD4M20QERJB0R7RNK9HA9",
+  "claim_id": "claim.451bcc9e9df24f5e8700646badad1db4",
+  "checks": [
+    "80 registry/revalidation/host/operations/CLI tests passed in43.70s",
+    "26 initial focused tests passed in14.07s",
+    "Ruff check/format passed",
+    "git diff --check passed"
+  ],
+  "command": "agent-commons project recover-state PROJECT_ID EXPECTED_REVISION --state-root EXACT_REGISTERED_STATE_ROOT --verify-existing --idempotency-key OPERATION_KEY"
+}

@@ -231,3 +231,21 @@ def test_read_only_client_can_read_eligibility_but_cannot_hire(
         )
     assert response.status_code == 200, response.text
     assert refused.status_code == 404
+
+
+def test_builtin_qa_reviewer_is_review_eligible_without_changing_qa_engineer(
+    workspace, monkeypatch
+):
+    fixture = _ready_fixture(workspace, monkeypatch)
+    with _client(fixture["context"]) as client:
+        for profile in ("claude-independent-reviewer", "codex-independent-reviewer"):
+            assert (
+                _worker(_payload(client, _role_ref("qa-reviewer")), profile)["eligibility"]
+                == "eligible"
+            )
+            assert (
+                _worker(_payload(client, _role_ref("qa-engineer")), profile)["eligibility"]
+                == "ineligible"
+            )
+    detail = LibraryStore().resolve(_role_ref("qa-reviewer"))
+    assert detail["content"]["entry_skill"]["id"] == "qa-testing"

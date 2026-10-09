@@ -1,0 +1,43 @@
+{
+  "mechanism": "recover-state --verify-existing; exact registered roots only",
+  "guard_review": "independent read-only path/owner/Git/workspace/snapshot/doctor validation; device drift with same inode",
+  "results": [
+    {
+      "project": {
+        "archived": false,
+        "available": true,
+        "id": "project.11c1396973e712f6f97e70e227c98750",
+        "name": "agent-commons",
+        "revision": "sha256:969ec2d6bbecd606ac371d0c6f316a7bedccc13579e17345d13c01f3c5163963",
+        "state": "ready",
+        "workspace_id": "workspace.01KXG0E9R9C1JAEZYMH12FQN4Z"
+      },
+      "revision": "sha256:535037acc5303075076235a87504928112a46fd6228ce6519dd3ae0be5884d60"
+    },
+    {
+      "project": {
+        "archived": false,
+        "available": true,
+        "id": "project.8d0b5b1f055a792caebc2b5ba24c65f5",
+        "name": "blizhe-webapp",
+        "revision": "sha256:d4e818d83dd551ead5683cce444a5e351871e720efecf02017817991cc25cd77",
+        "state": "ready",
+        "workspace_id": "workspace.01KYG43061DG8ZVWP83BNZFWF1"
+      },
+      "revision": "sha256:667a6857594a454e2ab2b3a25e4829bdf14acb6ded7adb26dc6a89d457ce9f38"
+    },
+    {
+      "project": {
+        "archived": false,
+        "available": true,
+        "id": "project.a3724d82fded96d1de2d845e394e928f",
+        "name": "Blizhe · улучшения 2026-10-07",
+        "revision": "sha256:b8d666bb7b6e5db11561645eb94266ae4a6bebbf93a240f5acba6f76c50d7d97",
+        "state": "ready",
+        "workspace_id": "workspace.01M49QQ08RM5XYPSX1G3KNN2G1"
+      },
+      "revision": "sha256:44bdbdd8e66017b24c2c369d5a9599a2519ca6f6d1afef0fe7c1d7ac811abc79"
+    }
+  ],
+  "boundary": "Only registry binding identities changed. No Blizhe source edits. Missing demo/old-worktree folders remain unavailable."
+}

@@ -18,6 +18,9 @@ export class ConversationSession {
   private uploading = false;
   private generation = 0;
   private read: Promise<void> | null = null;
+  private pollers = 0;
+  private pollOwner = 0;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(readonly api: Transport, readonly scope: ConversationScope, private readonly pinned?: Conversation) {
     if (pinned) this.value = { ...this.value, conversation: pinned };
   }
@@ -53,6 +56,66 @@ export class ConversationSession {
       finally { this.connecting = null; this.set({ loading: false }); }
     })();
     return this.connecting;
+  }
+  /**
+   * Explicit message intent. Viewing a conversation reads; only an operator who
+   * is actually writing may cause the thread to exist, so every surface opens
+   * with `connect(false)` and calls this on the first real write intent.
+   */
+  async intendToWrite(): Promise<void> {
+    // A read-only poll can already own connection discovery. Finish it before
+    // the explicit write intent decides whether a thread still needs creation.
+    if (this.connecting) await this.connecting;
+    if (this.value.conversation === null) await this.connect(true);
+  }
+  /** Attaching a file is a write intent: it needs a reservation on a thread. */
+  async attachFiles(files: readonly File[]): Promise<void> {
+    await this.intendToWrite();
+    this.addFiles(files);
+  }
+  /** Send, creating the thread first if this is the first message in it. */
+  async sendMessage(): Promise<boolean> {
+    if (this.value.intent === null) await this.intendToWrite();
+    // A failed creation leaves the typed text untouched and nothing recorded.
+    if (this.value.conversation === null) return false;
+    return this.send();
+  }
+  /**
+   * Whether the Send control may be offered. Before a thread exists there is
+   * nothing to revise and no reservation to hold, so prose alone is enough;
+   * once it exists the full `canSend` contract applies.
+   */
+  get canSubmit(): boolean {
+    if (this.locked) return false;
+    if (this.value.conversation !== null) return this.canSend;
+    return this.value.uploads.length === 0 && this.value.text.trim().length > 0
+      && new TextEncoder().encode(this.value.text).length <= 64_000;
+  }
+  /**
+   * One polling loop per session, however many surfaces show it: the embedded
+   * project chat and an opened dialog share this lease instead of each running
+   * their own timer. Polling only ever reads.
+   */
+  startPolling(intervalMs = 4000): () => void {
+    this.pollers += 1;
+    if (this.pollers === 1) void this.poll(intervalMs, ++this.pollOwner);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.pollers -= 1;
+      if (this.pollers <= 0) {
+        this.pollOwner++;
+        if (this.pollTimer !== null) clearTimeout(this.pollTimer);
+        this.pollTimer = null;
+      }
+    };
+  }
+  private async poll(intervalMs: number, owner: number): Promise<void> {
+    if (this.pollers <= 0 || owner !== this.pollOwner) return;
+    await this.connect(false);
+    if (this.pollers <= 0 || owner !== this.pollOwner) return;
+    this.pollTimer = setTimeout(() => { this.pollTimer = null; void this.poll(intervalMs, owner); }, intervalMs);
   }
   refresh(): Promise<void> {
     if (!this.value.conversation) return Promise.resolve();
@@ -139,8 +202,8 @@ export class ConversationSession {
     } catch { this.file(id, { state: "remove_uncertain" }); }
   }
   get canSend(): boolean { return !this.locked && this.value.conversation?.state === "open" && !this.value.readError && this.value.uploads.every((item) => item.state === "ready") && (this.value.text.trim().length > 0 || this.value.uploads.length > 0) && new TextEncoder().encode(this.value.text).length <= 64_000; }
-  async send(): Promise<void> {
-    if (this.value.sendState === "sending" || (!this.value.intent && !this.canSend)) return;
+  async send(): Promise<boolean> {
+    if (this.value.sendState === "sending" || (!this.value.intent && !this.canSend)) return false;
     const conversation = this.value.conversation!;
     const intent = this.value.intent ?? Object.freeze({ body: this.value.text, expected_revision: conversation.revision, idempotency_key: key(), ...(this.value.uploads.length ? { draft_id: this.draft!.draft_id } : {}), ...(this.value.reply ? { reply_to_message_id: this.value.reply } : {}) });
     this.set({ intent, sendState: "sending", refusal: null });
@@ -152,6 +215,7 @@ export class ConversationSession {
       this.set({ text: "", reply: null, uploads: [], intent: null, sendState: "recorded", conversation: { ...this.value.conversation!, revision: result.revision, recipient_availability: UNKNOWN_AVAILABILITY }, readError: false, fileProblem: null });
       const pending = this.read; if (pending) await pending;
       await this.refresh();
+      return true;
     } catch (error) {
       const revision = error instanceof ApiProblem && error.status === 409 && error.apiError?.code === "conversation_revision_conflict";
       const validation = error instanceof ApiProblem && error.status === 422 && error.apiError?.code === "conversation_invalid_message";
@@ -165,6 +229,7 @@ export class ConversationSession {
       }
       else if (revision || validation) { this.generation++; this.set({ intent: null, sendState: "refused", refusal: revision ? "revision" : "validation", readError: true }); const pending = this.read; if (pending) await pending; await this.refresh(); }
       else this.set({ sendState: "uncertain" });
+      return false;
     }
   }
 }

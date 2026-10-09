@@ -5,7 +5,8 @@ import { stateLabel } from "../taskPresentation.js";
 
 export type TaskDraft = { title: string; description: string; criteria: string; dependencyIds: readonly string[]; taskKind?: "task" | "component"; parentTaskId?: string | null };
 
-export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = false, writesEnabled, tasks, dependencyStatus = "current", onSubmit, onClose, onDependency, text }: {
+export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = false, writesEnabled, tasks, dependencyStatus = "current", embedded = false, onSubmit, onClose, onDependency, text }: {
+  embedded?: boolean;
   draft: TaskDraft;
   onChange: (draft: TaskDraft) => void;
   errors: ReadonlySet<string>;
@@ -19,10 +20,10 @@ export function TaskComposer({ draft, onChange, errors, busy, submitBlocked = fa
   onDependency: (id: string, selected: boolean) => void;
   text: (key: MessageKey) => string;
 }): ReactElement {
-  return <section className="task-composer" aria-labelledby="task-composer-title" onKeyDown={(event) => {
-    if (event.key === "Escape" && !(event.target instanceof HTMLSelectElement)) { event.stopPropagation(); onClose(); }
+  return <section className={`task-composer${embedded ? " task-composer-embedded" : ""}`} aria-labelledby={embedded ? undefined : "task-composer-title"} onKeyDown={(event) => {
+    if (!embedded && event.key === "Escape" && !(event.target instanceof HTMLSelectElement)) { event.stopPropagation(); onClose(); }
   }}>
-    <div className="composer-heading"><h2 id="task-composer-title">{text("shell_new_task")}</h2><button className="button button-secondary button-inline" type="button" onClick={onClose}>{text("shell_close")}</button></div>
+    {embedded ? null : <div className="composer-heading"><h2 id="task-composer-title">{text("shell_new_task")}</h2><button className="button button-secondary button-inline" type="button" onClick={onClose}>{text("shell_close")}</button></div>}
     <p className="small-copy">{text("shell_composer_intro")}</p>
     <form noValidate onSubmit={onSubmit}>
       <fieldset disabled={!writesEnabled || busy}>

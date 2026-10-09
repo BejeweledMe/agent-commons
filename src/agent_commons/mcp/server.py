@@ -179,17 +179,29 @@ _COMMON_WORKER_TOOL_NAMES = frozenset(
         "commons_reply_thread",
     }
 )
-IMPLEMENTATION_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
-    "commons_succeed_delegation",
-    "commons_publish_live_preview",
-    "commons_publish_design_image",
-    "commons_publish_static_build",
-    "commons_read_message",
-    "commons_read_message_image",
-    "commons_read_message_file",
-    "commons_acknowledge_message",
+_TEXT_RESULT_WORKER_TOOL_NAMES = {
+    "commons_publish_text_result",
+    "commons_complete_task_result",
+    "commons_submit_task_result",
+    "commons_finalize_task_result",
 }
-VERIFICATION_WORKER_TOOL_NAMES = IMPLEMENTATION_WORKER_TOOL_NAMES | {"commons_record_verification"}
+IMPLEMENTATION_WORKER_TOOL_NAMES = (
+    _COMMON_WORKER_TOOL_NAMES
+    | _TEXT_RESULT_WORKER_TOOL_NAMES
+    | {
+        "commons_succeed_delegation",
+        "commons_publish_live_preview",
+        "commons_publish_design_image",
+        "commons_publish_static_build",
+        "commons_read_message",
+        "commons_read_message_image",
+        "commons_read_message_file",
+        "commons_acknowledge_message",
+    }
+)
+VERIFICATION_WORKER_TOOL_NAMES = (
+    IMPLEMENTATION_WORKER_TOOL_NAMES - _TEXT_RESULT_WORKER_TOOL_NAMES
+) | {"commons_record_verification"}
 INDEPENDENT_REVIEW_WORKER_TOOL_NAMES = _COMMON_WORKER_TOOL_NAMES | {
     "commons_read_output_image",
     "commons_read_build_file",
@@ -320,6 +332,7 @@ def build_server(
     active_session_id = getattr(commons, "session_id", None)
     requested_binding = delegation_id or os.environ.get("AGENT_COMMONS_DELEGATION_ID")
     binding_snapshot: Any | None = None
+    terminal_result_replay = False
 
     def live_snapshot() -> Any:
         # The synchronized SQLite projection is disposable operational state:
@@ -358,6 +371,13 @@ def build_server(
             if state in LIVE_WORKER_DELEGATION_STATES and child_session_id == active_session_id:
                 worker = candidate
                 break
+            if state == "succeeded" and child_session_id == active_session_id:
+                from agent_commons.services.text_results import has_terminal_result_receipt
+
+                if has_terminal_result_receipt(commons, binding_snapshot, candidate):
+                    worker = candidate
+                    terminal_result_replay = True
+                    break
             if (
                 child_session_id not in {None, active_session_id}
                 or state not in NON_TERMINAL_DELEGATION_STATES
@@ -389,12 +409,12 @@ def build_server(
         worker = worker_matches[0] if worker_matches else None
     workspace = (
         ScopedRepoReader(commons, git_executable=git_executable)
-        if worker is not None and catalog_only_purpose is None
+        if worker is not None and catalog_only_purpose is None and not terminal_result_replay
         else None
     )
     worker_artifact_bundles = (
         _freeze_worker_artifact_bundles(commons, worker, snapshot=binding_snapshot)
-        if worker is not None and catalog_only_purpose is None
+        if worker is not None and catalog_only_purpose is None and not terminal_result_replay
         else None
     )
     worker_read_artifact_manifests: dict[str, str] = {}
@@ -402,7 +422,7 @@ def build_server(
     worker_tasks: tuple[dict[str, Any], ...] = ()
     worker_verifications: tuple[dict[str, Any], ...] = ()
     worker_verification_binding: tuple[dict[str, Any], str] | None = None
-    if worker is not None and catalog_only_purpose is None:
+    if worker is not None and catalog_only_purpose is None and not terminal_result_replay:
         evidence_snapshot = binding_snapshot or live_snapshot()
         worker_reviews = tuple(
             dict(review)
@@ -507,9 +527,12 @@ def build_server(
         root_only: bool = False,
         worker_only: bool = False,
         worker_purposes: tuple[str, ...] = (),
+        worker_terminal_retry: bool = False,
         enabled: bool = True,
     ) -> Callable[[Callable[..., Any]], Any]:
         def decorator(function: Callable[..., Any]) -> Any:
+            if terminal_result_replay and function.__name__ != "commons_finalize_task_result":
+                return function
             if not enabled or (
                 (root_only and worker is not None)
                 or (worker_only and worker is None)
@@ -533,7 +556,8 @@ def build_server(
                         except Exception:
                             pass
                     try:
-                        require_live_worker()
+                        if not worker_terminal_retry:
+                            require_live_worker()
                         result = function(*args, **kwargs)
                     except Exception as exc:
                         if terminal and terminal_audit is not None:
@@ -727,6 +751,10 @@ def build_server(
     from agent_commons.mcp.design_output_tools import register_design_output_tools
 
     register_design_output_tools(register, commons, require_live_worker, worker_binding=worker)
+
+    from agent_commons.mcp.text_result_tools import register_text_result_tools
+
+    register_text_result_tools(register, commons, worker_binding=worker)
 
     @register(_READ_ONLY, worker_only=True)
     def commons_list_my_threads() -> list[dict[str, Any]]:
@@ -983,12 +1011,29 @@ def build_server(
             else commons.get_artifact_bundle(artifact_id)
         )
         manifest = bundle["manifest"]
-        source = manifest.get("source") or {}
-        result = workspace.read_registered_artifact(
-            source_path=str(source.get("path", "")),
-            expected_revision=str(manifest.get("revision", "")),
-            expected_size=int(manifest.get("size_bytes", -1)),
-        )
+        if (manifest.get("metadata") or {}).get("output_kind") == "task_text_result":
+            from agent_commons.services.text_results import read_retained_text
+
+            current = commons.get_artifact_bundle(artifact_id)
+            if current["artifact"].get("manifest_ref") != bundle["artifact"].get(
+                "manifest_ref"
+            ) or current["artifact"].get("classification") not in {"internal", "public"}:
+                raise LifecycleConflictError("reviewer output binding has changed")
+            content = read_retained_text(commons, manifest)
+            result = {
+                "path": manifest["source"]["path"],
+                "sha256": manifest["revision"][7:],
+                "content": content,
+                "redactions": [],
+                "content_complete": True,
+            }
+        else:
+            source = manifest.get("source") or {}
+            result = workspace.read_registered_artifact(
+                source_path=str(source.get("path", "")),
+                expected_revision=str(manifest.get("revision", "")),
+                expected_size=int(manifest.get("size_bytes", -1)),
+            )
         worker_read_artifact_manifests[artifact_id] = str(bundle["artifact"]["manifest_ref"])
         return result
 

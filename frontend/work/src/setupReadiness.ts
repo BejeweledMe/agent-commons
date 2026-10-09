@@ -31,6 +31,16 @@ export function railSetupLabelKey(state: string): MessageKey {
   return SETUP_LABELS[state] ?? "not_configured";
 }
 
+/** A different profile's failed check says nothing about the selected one. */
+export function selectedExecutorLabelKey(
+  profileId: string | undefined,
+  availability: Pick<ProviderAvailability, "profileId" | "launchable"> | undefined
+): MessageKey {
+  if (profileId === undefined) return "rail_executor_none";
+  if (availability === undefined || availability.profileId !== profileId) return "rail_executor_unknown";
+  return availability.launchable ? "rail_executor_ready" : "rail_executor_attention";
+}
+
 export type ReadinessTone = "ok" | "attention" | "unknown";
 export type ReadinessStage = "installation" | "initialization" | "check_run" | "sign_in";
 

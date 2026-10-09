@@ -7,6 +7,8 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -742,3 +744,76 @@ def test_state_written_before_the_tree_was_recorded_still_reads(tmp_path: Path) 
     loaded = reopened.list_attempts()
     assert [attempt.correlation.root_delegation_id for attempt in loaded] == [None]
     assert loaded[0].correlation.budget_scope == loaded[0].correlation.delegation_id
+
+
+def test_budget_observation_preserves_session_tree_union_and_provider_partition(tmp_path):
+    store = AttemptStore(
+        tmp_path / "state", operator_limits=OperatorLimits(parent_provider_units=8)
+    )
+    base = spec(tmp_path)
+    parent = base.parent_policy
+    root = base.correlation.delegation_id
+    for index, (session, tree, profile) in enumerate(
+        [
+            (base.correlation.parent_session_id, root, BuiltinProfileId.CODEX_BUILDER),
+            ("session.other", root, BuiltinProfileId.CODEX_BUILDER),
+            ("session.other", "delegation.other", BuiltinProfileId.CODEX_BUILDER),
+            (base.correlation.parent_session_id, root, BuiltinProfileId.CLAUDE_BUILDER),
+        ]
+    ):
+        request = replace(
+            base,
+            idempotency_key=f"scope-{index}",
+            profile_id=profile,
+            provider=profile.provider,
+            correlation=replace(
+                base.correlation,
+                parent_session_id=session,
+                root_delegation_id=tree,
+                child_session_id=f"session.child{index}",
+            ),
+        )
+        attempt = store.reserve(request, parent_policy=parent).attempt
+        store.transition(attempt.attempt_id, AttemptState.FAILED, reason="start_failed")
+    observation = store.observe_provider_budget(
+        parent_session_id=base.correlation.parent_session_id,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+        budget_scope=root,
+    )
+    assert observation.used == 2  # overlap counted once; foreign tree/provider excluded
+    assert observation.remaining == 6
+    root_observation = store.observe_provider_budget(
+        parent_session_id=base.correlation.parent_session_id,
+        profile_id=BuiltinProfileId.CODEX_BUILDER,
+    )
+    assert root_observation.used == 1
+
+
+def test_two_advisory_budget_reads_cannot_bypass_atomic_reservation(tmp_path):
+    from agent_commons.runtime.budget import OperatorBudgetExhaustedError
+
+    store = AttemptStore(
+        tmp_path / "state", operator_limits=OperatorLimits(parent_provider_units=1)
+    )
+    base = spec(tmp_path)
+    barrier = threading.Barrier(2)
+
+    def reserve(index):
+        assert not store.observe_provider_budget(
+            parent_session_id=base.correlation.parent_session_id, profile_id=base.profile_id
+        ).exhausted
+        barrier.wait(timeout=5)
+        try:
+            return store.reserve(
+                replace(base, idempotency_key=f"race-{index}"), parent_policy=base.parent_policy
+            )
+        except OperatorBudgetExhaustedError as exc:
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(reserve, [1, 2]))
+    errors = [value for value in results if isinstance(value, OperatorBudgetExhaustedError)]
+    assert len(errors) == 1
+    assert errors[0].budget["remaining"] == 0
+    assert errors[0].canonical_reason_code == "budget_exhausted"
+    assert len(store.list_attempts()) == 1

@@ -45,7 +45,7 @@ _BANDS = {
 #: is real in the ledger, not a visual convention, so the projection carries it
 #: rather than leaving the frontend to guess from edge kinds.
 _PERMANENT_EDGES = frozenset(
-    {"spawned", "requested_by", "runs_as", "owns", "depends_on", "reports_to"}
+    {"spawned", "requested_by", "runs_as", "owns", "depends_on", "reports_to", "supervised_by"}
 )
 
 #: Nodes are dropped in this order when the graph exceeds its bounds; terminal
@@ -127,6 +127,8 @@ def _node(
         "agent_id",
         "allowed_action",
         "retired_by",
+        "supervisor_agent_id",
+        "created_by_agent_id",
         # A review carries the producing role's context mode and how many times
         # it has judged this subject before, so an accumulated-context verdict
         # does not read as a clean-slate one.
@@ -350,6 +352,9 @@ def build_graph(
         creator = record.get("created_by_agent_id")
         if creator and str(creator) in known:
             edges.append(_edge("reports_to", identifier, str(creator)))
+        supervisor = record.get("supervisor_agent_id")
+        if supervisor and str(supervisor) in known:
+            edges.append(_edge("supervised_by", identifier, str(supervisor)))
     for identifier, record in sorted(snapshot.agent_links.items()):
         for predicate, key in (("link_from", "from_agent_id"), ("link_to", "to_agent_id")):
             other = record.get(key)

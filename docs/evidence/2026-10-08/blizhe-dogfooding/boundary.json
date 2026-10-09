@@ -1,0 +1,40 @@
+{
+  "commons_sha": "9ba5cbd5962b74a80423138174de153418fc683c",
+  "asset": "work-C0nYR3qF.js",
+  "branch": "codex/blizhe-improvement-20261007",
+  "head": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+  "status": "?? .agent-commons/\n?? docs/dogfooding/\n",
+  "artifact_checksums": {
+    "BASE.md": true,
+    "verify_base.py": true,
+    "base-evidence.json": true,
+    "upstream-evidence.json": true
+  },
+  "new_canaries": 0,
+  "new_project_runs": 0,
+  "accepted_results": 0,
+  "continuation_20261008": {
+    "authorized_window_utc": [
+      "2026-10-08T16:19:31Z",
+      "2026-10-08T22:19:31Z"
+    ],
+    "authorized_project_runs": 3,
+    "project_runs_used": 2,
+    "canaries_used": 0,
+    "base_review": "approved",
+    "base_acceptance_event": "evt.01M4E60FZ88RJ3NHR9N338ZHBQ",
+    "tool_state": "needs_operator",
+    "tool_delegation": "delegation.052VYW5C362BYXX3Y5KVPQ20D9",
+    "tool_implementation": false,
+    "branch": "codex/blizhe-improvement-20261007",
+    "sha": "ae2de22f81767c63c3b2806343f2ca0be196aa2a",
+    "owner_status_entries": 44,
+    "owner_file_count": 4815,
+    "owner_nested_repositories": 7,
+    "owner_baseline_comparison": "all compared fields equal",
+    "owner_after_manifest_sha256": "5c54f2ac15f363fe4f8dc3a5ae51d79ae2d34bbe932b73679622028272e07549",
+    "doctor_canonical_ok": true,
+    "doctor_events": 42,
+    "doctor_manifests": 5
+  }
+}

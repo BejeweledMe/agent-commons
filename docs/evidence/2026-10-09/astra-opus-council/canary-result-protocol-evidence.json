@@ -1,0 +1,51 @@
+{
+  "base_kind": "current frozen primary canary sources",
+  "workspace": "/Users/dmitrijersov/.codex/worktrees/oct09-result-handoff/agent-commons",
+  "files": [
+    {
+      "path": "src/agent_commons/services/provider_canary.py",
+      "before_sha256": "56385ed082dd6740c4845034299ae120e50a1a4f9acc7a685426939e52f6c987",
+      "after_sha256": "cc254ea2534215bf42d9e06edd5d26c88640534e263cafc8d4787ada2bece783",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/runtime/test_provider_canary.py",
+      "before_sha256": "d5d830127c897be244f5f2fb8677e18da5eda4de28b49b2006c490249d110974",
+      "after_sha256": "4b8ed10e4d0712d149e91ba7bcb81ed4e0a26566e3f7c23a8462be51ad848e55",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/fixtures/fake_codex_mcp_provider.py",
+      "before_sha256": "04ddff1ed4a869373512538c68811dff90ba363c755c51d5ab707d82c27371a2",
+      "after_sha256": "63f5fd3307bbadc91d52a72b9b6af49e4c75330e1fa7bf814396377f4324b073",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/fixtures/fake_claude_mcp_provider.py",
+      "before_sha256": "30c5cd76d359128f2aa532015e06ac50462369d7772af8c3f3ecf6845395b642",
+      "after_sha256": "82fc7c1500f55f75c521af62c2a58c2619fb183a8754a59fe2695a055689de59",
+      "primary_matches_before": true
+    },
+    {
+      "path": "tests/runtime/test_canary_result_refs.py",
+      "before_sha256": null,
+      "after_sha256": "2b75712603017ee7da9d7b6ddfff606ce2a56777ca06e7699fb3936dd1f6def3",
+      "primary_matches_before": true
+    }
+  ],
+  "diagnostic": "result_refs_match:boolean",
+  "validation_overlay": "/tmp/oct09-canary-integrated-validation (frozen primary src/tests with these five changed files overlaid)",
+  "checks": [
+    "40 integrated synthetic canary/result-ref tests passed in125.16s",
+    "10 isolated canonical binding tests passed in10.07s",
+    "Ruff check/format passed",
+    "git diff --check passed",
+    "40 integrated synthetic tests passed in125.16s"
+  ],
+  "real_provider_runs": 0,
+  "independent_review": {
+    "verdict": "approved",
+    "reviewer": "native gpt-6-astra",
+    "patch_sha256": "7ae9a349bc7a525ced93e6ffa54492563fac3cc3b530799bb60c981fa21eaa88"
+  }
+}

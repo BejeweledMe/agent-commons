@@ -1,0 +1,84 @@
+{
+  "make_check": {
+    "exit_code": 0,
+    "frontend_work": {
+      "passed": 513,
+      "failed": 0
+    },
+    "frontend_gallery": {
+      "passed": 27,
+      "failed": 0
+    },
+    "pytest": {
+      "passed": 3034,
+      "skipped": 14,
+      "warnings": 2,
+      "seconds": 934.96
+    },
+    "skip_limits": [
+      "opt-in large performance benchmark",
+      "withheld automatic grant-level cases",
+      "CI-only assertion"
+    ],
+    "log_sha256": "92978e0cdfd1640015c677fc09cf597c9def4b90530b30625eee8fb824adac57"
+  },
+  "typescript": {
+    "work": "passed",
+    "gallery": "passed"
+  },
+  "independent_review": {
+    "v1": {
+      "tests": 211,
+      "verdict": "changes_requested",
+      "finding": "P2 far task accessible names"
+    },
+    "v2": {
+      "tests": 58,
+      "verdict": "changes_requested",
+      "finding": "P2 agent Fit floor"
+    },
+    "v4": {
+      "tests": 59,
+      "verdict": "approved",
+      "receipt": "evt.01M4GWX2G1SRAX66PZM5ETXC4C"
+    }
+  },
+  "installed_assets_match_checkout": true,
+  "browser": {
+    "fixtures": [
+      {
+        "tasks": 14,
+        "agents": 7
+      },
+      {
+        "tasks": 40,
+        "agents": 20
+      },
+      {
+        "tasks": 128,
+        "agents": 50
+      }
+    ],
+    "css_widths": [
+      1280,
+      1101,
+      1100,
+      800,
+      390
+    ],
+    "short_screen": [
+      1280,
+      600
+    ],
+    "browser_zoom_100_percent_verified": false,
+    "app_console_errors_observed": 0,
+    "extension_error": "One Grammarly chrome-extension error in small fixture; not attributed to app"
+  },
+  "provider_run_ui_and_populated_preview": "not verified by this wave",
+  "documentation_after_archive": {
+    "passed": 5,
+    "seconds": 0.12
+  },
+  "git_diff_check": "passed",
+  "unchanged_reviewed_code_and_assets": 170
+}

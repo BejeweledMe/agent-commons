@@ -55,3 +55,50 @@
 
 .conversation-history-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 20px var(--space-3); }
 .conversation-history-picker select { min-width: 0; max-width: 100%; }
+
+/* The shared body of a conversation: one column, the history taking what is
+   left and the composer always fully visible. At 1042x467 the textarea stays
+   on screen and keeps its own click and Tab target in both languages. */
+.conversation-content { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.conversation-content > .conversation-availability { flex: 0 0 auto; margin: var(--space-2) var(--space-4) 0; }
+.conversation-content .conversation-history { flex: 1 1 auto; min-height: 48px; overflow-y: auto; }
+.conversation-content .conversation-composer { flex: 0 1 auto; max-height: 62%; overflow-y: auto; }
+.conversation-content .conversation-composer textarea { min-height: 56px; }
+/* The embedded project chat is narrow: the composer keeps the same hit
+   targets with tighter padding. */
+.conversation-content-panel .conversation-history { padding: var(--space-3) var(--space-4); }
+.conversation-content-panel .conversation-composer { padding: var(--space-3) var(--space-4) var(--space-4); }
+.conversation-content-panel .conversation-compose-actions { gap: var(--space-2); margin-top: var(--space-2); }
+.conversation-content-panel .conversation-file-label { max-width: 100%; }
+.conversation-content-panel .conversation-message { padding: var(--space-3); }
+/* Saved drafts: explicit controls with a status that is never a guess. */
+.conversation-draft-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); border-top: 1px solid var(--border); padding-top: var(--space-2); }
+.conversation-draft-controls p { flex: 1 1 100%; margin: 0; }
+
+/* A compact composer leaves room for the conversation, including in a drawer. */
+.conversation-content-panel > .conversation-availability { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; margin:6px 12px 0; font-size:var(--type-2); }
+.conversation-content-panel .conversation-availability p { margin:0; }
+.conversation-content-panel .conversation-prepare { min-height:28px; padding:4px 8px; font-size:var(--type-2); }
+.conversation-content-panel .conversation-composer { flex:0 0 auto; padding:8px 12px; max-height:52%; }
+.conversation-content-panel .conversation-composer textarea { min-height:72px; height:80px; max-height:160px; margin:0 0 6px; padding:8px; font-size:var(--type-2); }
+.conversation-content-panel .conversation-compose-actions { flex-direction:row; align-items:center; flex-wrap:nowrap; gap:6px; margin:0; }
+.conversation-content-panel .conversation-compose-actions > .button { width:auto; min-height:30px; padding:4px 8px; font-size:var(--type-2); }
+.conversation-content-panel .conversation-compose-actions > .button-primary { margin-left:auto; }
+.conversation-compose-help { position:relative; font-size:var(--type-1); }
+.conversation-compose-help > summary, .conversation-draft-menu > summary { cursor:pointer; }
+.conversation-content-panel .conversation-compose-actions:has(.conversation-compose-help[open]) { flex-wrap:wrap; }
+.conversation-compose-help[open] { flex:1 0 100%; order:3; }
+.conversation-compose-help > p { margin:6px 0 0; padding:8px; background:var(--surface-2); border:1px solid var(--border-1); border-radius:6px; }
+.conversation-draft-menu { margin-top:6px; font-size:var(--type-1); }
+.conversation-draft-controls { margin-top:4px; padding-top:4px; gap:6px; }
+.conversation-draft-controls .button { min-height:28px; padding:4px 8px; font-size:var(--type-2); }
+
+/* One visible attachment action; the native picker opens from that action. */
+.conversation-compose-actions > input[type="file"] { display:none; }
+.conversation-content-panel .conversation-compose-help > summary { min-height:28px; padding:3px 0; }
+.conversation-content-panel .conversation-draft-menu > summary { min-height:24px; padding:2px 0; }
+
+/* Compact explanations stay secondary; the message history keeps the space. */
+.conversation-availability-help summary { min-height: 24px; padding: 2px 0; font-size: .8rem; cursor: pointer; }
+.conversation-availability-help p { max-width: 60ch; margin: 4px 0; }
+.conversation-attach { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

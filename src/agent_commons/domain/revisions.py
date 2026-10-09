@@ -57,6 +57,8 @@ CORRECTION_IMMUTABLE_FIELDS = frozenset(
         "origin",
         "approval",
         "created_by_agent_id",
+        "supervisor_agent_id",
+        "specialization_ref",
         "lifetime",
         "profile_id",
         "template",
@@ -94,6 +96,14 @@ def structural_correction_changes(
             "parent_task_id"
         ) != after.get("parent_task_id"):
             changed.add("changes.parent_task_id")
+    if "agent_id" in original:
+        before = original.get("changes")
+        after = replacement.get("changes")
+        before = before if isinstance(before, Mapping) else {}
+        after = after if isinstance(after, Mapping) else {}
+        for field in ("supervisor_agent_id", "specialization_ref"):
+            if (field in before) != (field in after) or before.get(field) != after.get(field):
+                changed.add(f"changes.{field}")
     return tuple(sorted(changed))
 
 

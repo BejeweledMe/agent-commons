@@ -1,0 +1,21 @@
+{
+  "reviewer": "independent native gpt-6-astra",
+  "verdict": "approved scoped source review, conditional on exact final make check passing",
+  "source_manifest_sha256": "0fe67f419ea39e777f1162f3b87adecd942a767ad240b73573628484c564871b",
+  "source_paths_verified": 102,
+  "python_source_sha256": "cff1614b0667aeaea72be82c8c0133f4c45bd3fb3bb590af230795cd785a2441",
+  "checks": [
+    "100 file hashes and two absent old assets verified",
+    "Post-install real canary exact source, terminal receipt, process result and child closure verified",
+    "Wheel hash and referenced final assets verified",
+    "17-node plan DAG verified",
+    "All six canonical task criteria assessed against scoped code reviews and retained evidence"
+  ],
+  "findings": [],
+  "limits": [
+    "Full green pending at review time; root must record exact final result",
+    "macOS/local; physical pinch and Linux not attested",
+    "Browser measurements assessed from root evidence, not repeated by reviewer",
+    "No fresh real Claude canary or general user acceptance"
+  ]
+}

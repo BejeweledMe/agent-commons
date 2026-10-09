@@ -1,0 +1,8 @@
+BASE независимая проверка — уточнение оператора, 2026-10-08.
+Review: review.7KAFA5HNJ5JJ3FTBN6PJFECWNG @ evt.01M4E5MFPY2E0WK21ZNCJMVTEV.
+Проверяемая задача: task.2R17J2DE17C34H066W5PNXHKJJ @ evt.01M4E5M38YEVPTT6W785WTHJ4K.
+Handoff: handoff.3GA4XTVG3ESD2RB5KVHPQCT16M.
+Все 5 BASE-файлов зарегистрированы без изменения байтов. Исходный needs_operator остаётся историей, не вердиктом.
+Контрольный снимок владельца перед QA: 2026-10-08T16:32:01Z, SHA256 af54c8c7c54e94f2ce9bdccec4f954f5af3439933178100acb1f262bb21008af.
+Сравнение с owner-baseline: branch/head/origin_main/status_sha256/git_info_exclude_sha256/nested_repositories/files совпадают; 44 записи, 4815 файлов, 7 вложенных репозиториев. Это свидетельство оператора, не независимое чтение владельца проверяющим.
+Нужен честный независимый verdict по всем шести критериям. Не реализовывать BASE заново, не редактировать проверяемые файлы, не commit/push/PR/Linear/SQL, не писать в оригинальный checkout. Приёмка остаётся владельцу.

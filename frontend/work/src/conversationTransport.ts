@@ -14,12 +14,18 @@ export function conversationPath(path: string, method: "GET" | "POST", rawFile: 
       if (pairs.some(([key]) => key !== "scope_kind" && key !== "scope_id")) throw Error("conversation_query");
       const kind = url.searchParams.get("scope_kind") ?? "project", id = url.searchParams.get("scope_id");
       if (kind === "project" ? id !== null : !["task", "agent"].includes(kind) || !new RegExp(`^${kind}\\.${typed}$`).test(id ?? "")) throw Error("conversation_scope");
+    } else if (pathname === "/conversations/text-draft") {
+      // The saved prose draft of one scope. Same closed scope vocabulary as the
+      // conversation list: a principal may only ask for a scope it names.
+      if (pairs.some(([key]) => key !== "scope_kind" && key !== "scope_id")) throw Error("conversation_query");
+      const kind = url.searchParams.get("scope_kind") ?? "project", id = url.searchParams.get("scope_id");
+      if (kind === "project" ? id !== null : !["task", "agent"].includes(kind) || !new RegExp(`^${kind}\\.${typed}$`).test(id ?? "")) throw Error("conversation_scope");
     } else if (new RegExp(`^/conversations/${thread}/messages$`).test(pathname)) {
       if (pairs.length > 1 || pairs.some(([key, value]) => key === "tail" ? value !== "true" : !["after", "before"].includes(key) || !new RegExp(`^${message}$`).test(value))) throw Error("conversation_query");
     } else if (!new RegExp(`^/conversations/${thread}/drafts/${draft}$`).test(pathname) || pairs.length) throw Error("conversation_path");
   } else if (new RegExp(`^/conversations/${thread}/drafts/${draft}/attachments$`).test(pathname)) {
     if (!rawFile || pairs.length !== 1 || url.searchParams.get("filename") !== rawFile.name) throw Error("conversation_upload");
-  } else if (rawFile || pairs.length || !(pathname === "/conversations" || new RegExp(`^/conversations/${thread}/(?:messages|drafts)$`).test(pathname) || new RegExp(`^/conversations/${thread}/drafts/${draft}/attachments/${attachment}/remove$`).test(pathname))) throw Error("conversation_path");
+  } else if (rawFile || pairs.length || !(pathname === "/conversations" || pathname === "/conversations/text-draft" || new RegExp(`^/conversations/${thread}/(?:messages|drafts)$`).test(pathname) || new RegExp(`^/conversations/${thread}/drafts/${draft}/attachments/${attachment}/remove$`).test(pathname))) throw Error("conversation_path");
   return path;
 }
 export function attachmentPath(threadId: string, messageId: string, attachmentId: string): string {

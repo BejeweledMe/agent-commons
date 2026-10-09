@@ -316,7 +316,7 @@ def test_readonly_server_registers_only_conversation_reads(writable):
         manage_shutdown=False,
     )
     routes = [(route.path, route.methods) for route in app.routes if "conversations" in route.path]
-    assert len(routes) == 3
+    assert len(routes) == 4  # Includes the separate private saved-text read.
     assert all(methods == {"GET"} for _, methods in routes)
     with TestClient(app, base_url=f"http://127.0.0.1:{PORT}") as client:
         assert client.get(BASE, headers=authorized()).status_code == 200

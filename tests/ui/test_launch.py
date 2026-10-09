@@ -232,9 +232,16 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         encoding="utf-8",
     )
 
+    library = LibraryStore(
+        workspace["repo"].parent / "library",
+        workspace_root=workspace["repo"],
+        state_root=workspace["state_root"],
+    )
+
     def runtime_factory(bound_manager: CommonsManager) -> DelegationRuntimeService:
         return DelegationRuntimeService(
             bound_manager,
+            library_store=library,
             runner=runner,  # type: ignore[arg-type]
             profiles=default_profile_registry(
                 claude_executable="/bin/echo",
@@ -261,6 +268,7 @@ def _launch_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
         writer_session_id=str(session["session_id"]),
         profile_config=profile_config,
         runtime_factory=runtime_factory,
+        library_root=library.root,
     )
     return {
         "context": context,

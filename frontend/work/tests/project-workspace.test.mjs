@@ -103,7 +103,9 @@ test("returning to A retains its exact RAM-only uncertain intent without exposin
 test("Back/Forward-safe route carries only the opaque project identity", () => {
   const state = routes.parseWorkRoute(`?project=${projectA}&view=work&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
   assert.equal(state.projectId, projectA);
-  assert.equal(routes.workRouteHref(state), `/work?project=${projectA}&view=work&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV`);
+  // The work area is the default view, so only the project and the selected
+  // task survive the roundtrip.
+  assert.equal(routes.workRouteHref(state), `/work?project=${projectA}&task=task.01ARZ3NDEKTSV4RRFFQ69G5FAV&panel=detail`);
   assert.equal(routes.parseWorkRoute(`?project=${projectA}&view=team`).view, "board", "old Agents links land on the project board");
   assert.equal(routes.sanitizedWorkLocation("/work", `?project=${projectA}&brief=private&path=%2Fsecret`), `/work?project=${projectA}`);
 });
@@ -151,7 +153,7 @@ test("the shell clears the old project view before a scoped load and pins async 
   assert.match(shellSource, /const attemptGeneration = projectSelectionRef\.current\.currentGeneration\(\)/);
   assert.match(shellSource, /if \(!stillCurrent\(\)\) return;[\s\S]*replaceProviderStatus\(status\)/);
   assert.match(shellSource, /const projectId = routeRef\.current\.projectId;[\s\S]*const submit = async[\s\S]*if \(routeRef\.current\.projectId !== projectId\) return;[\s\S]*const generation = projectSelectionRef\.current\.currentGeneration\(\)/);
-  assert.match(shellSource, /navigate\(\{ projectId, taskId: selectedTaskId, composer: false \}\)/);
+  assert.match(shellSource, /navigate\(\{ projectId, taskId: selectedTaskId, panel: null \}\)/);
 });
 
 test("a write blocks the writes that share the server lock and leaves reading and navigation open", () => {
@@ -176,7 +178,7 @@ test("a write blocks the writes that share the server lock and leaves reading an
     "opening Prepare run issues nothing and stays available");
   assert.match(shellSource, /disabled=\{actionError\.retryKind === "mutation" && writeInFlight\}/,
     "retrying a failed read is a read");
-  const navigation = shellSource.slice(shellSource.indexOf('<nav className="primary-navigation">'), shellSource.indexOf('<div className="rail-status">'));
+  const navigation = shellSource.slice(shellSource.indexOf('<nav className="activity-rail"'), shellSource.indexOf("  const sidebarPane ="));
   const toolbar = shellSource.slice(shellSource.indexOf("<TrackerSection"), shellSource.indexOf("onClearAgent"));
   const library = shellSource.slice(shellSource.indexOf("<LibrarySection"), shellSource.indexOf("onTabChange"));
   for (const region of [navigation, toolbar, library]) assert.ok(region.length > 0, "the read region under test was found");

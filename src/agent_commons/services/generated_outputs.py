@@ -10,9 +10,11 @@ from typing import Any
 
 from agent_commons.core.ids import is_typed_id
 from agent_commons.domain.snapshot import ProjectSnapshot
+from agent_commons.errors import ValidationError
 from agent_commons.services.output_content import BUILD_KIND
 
 OUTPUT_KIND = "task_design_image"
+TEXT_KIND = "task_text_result"
 
 
 def generated_series(delegation_id: str, source_path: str) -> str:
@@ -70,8 +72,19 @@ def validated_generated_metadata(
                 "retained_content",
                 "build_files",
             },
+            {
+                "output_kind",
+                "output_task",
+                "output_delegation",
+                "series_id",
+                "title",
+                "retained_content",
+                "summary",
+                "checks",
+            },
         )
-        or value["output_kind"] not in {OUTPUT_KIND, BUILD_KIND}
+        or value["output_kind"] not in {OUTPUT_KIND, BUILD_KIND, TEXT_KIND}
+        or (value["output_kind"] != TEXT_KIND and bool({"summary", "checks"} & set(value)))
     ):
         return None
     task = value["output_task"]
@@ -120,6 +133,20 @@ def validated_generated_metadata(
         "size_bytes": manifest.get("size_bytes"),
     }:
         return None
+    if value["output_kind"] == TEXT_KIND:
+        from agent_commons.services.text_results import MAX_TEXT_BYTES, TEXT_MEDIA, validate_report
+
+        try:
+            validate_report(title, value.get("summary"), value.get("checks"))
+        except (ValidationError, ValueError, TypeError):
+            return None
+        if (
+            retained is None
+            or manifest.get("media_type") != TEXT_MEDIA
+            or type(manifest.get("size_bytes")) is not int
+            or not 1 <= manifest["size_bytes"] <= MAX_TEXT_BYTES
+        ):
+            return None
     if value["output_kind"] == BUILD_KIND:
         files = value.get("build_files")
         if (
@@ -159,6 +186,14 @@ def validated_generated_metadata(
     producer = producer_for_task(snapshot, session, task["id"], delegations)
     if producer is None or producer[0] != delegation["id"]:
         return None
+    if value["output_kind"] == TEXT_KIND:
+        producing_run = snapshot.delegations.get(delegation["id"])
+        if (
+            producing_run is None
+            or producing_run.get("purpose") != "implementation"
+            or producing_run.get("target_revision") != task["revision"]
+        ):
+            return None
     if (
         artifact.get("classification") not in {"internal", "public"}
         or manifest.get("classification") != artifact.get("classification")

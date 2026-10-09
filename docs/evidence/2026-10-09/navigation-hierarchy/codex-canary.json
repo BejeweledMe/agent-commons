@@ -1,0 +1,14 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "ok": true,
+  "profile_id": "codex-builder",
+  "provider": "codex",
+  "provider_version": "codex-cli 0.159.3",
+  "model": "gpt-6-astra",
+  "canonical_state": "succeeded",
+  "child_session_closed": true,
+  "terminal_tool_calls": 1,
+  "terminal_tool_completions": 1,
+  "terminal_tool_rejections": 0,
+  "agent_commons_source_sha256": "285f9c773f9e650057a9ba244e1bc9a4533f43bfff6647a81fd576a683a9d109"
+}

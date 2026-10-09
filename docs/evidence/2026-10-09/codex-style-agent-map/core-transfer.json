@@ -1,0 +1,90 @@
+{
+  "task_id": "task.7XP27WGW4N1SZMHPBEYW6P5X7Q",
+  "patch_sha256": "938e188ad205d966cab417781369331d4b59c500ce1e96039cb97fd0a3becb2a",
+  "files": [
+    {
+      "path": "src/agent_commons/domain/agent_projection.py",
+      "change": "modified",
+      "before_sha256": "fdace80c1264c84cf53e5c0392195124614c50f36fb556c6e627afcb0cf695fa",
+      "sha256": "e551066130dcb59785fc0b51a2730b4a032a582deeacf55e9ff43b924b774b83",
+      "bytes": 4309
+    },
+    {
+      "path": "src/agent_commons/domain/agent_role_envelopes.py",
+      "change": "modified",
+      "before_sha256": "411733be5a43f237047dac0b61bbc0197ad9e6ae9d9a34f369791e4b7f8a4fe2",
+      "sha256": "f7fcb22ff646e9dd9bd20d9631f00b1d67c5c59268a16c9a3ead35c6c342aaa5",
+      "bytes": 17811
+    },
+    {
+      "path": "src/agent_commons/domain/projection.py",
+      "change": "modified",
+      "before_sha256": "966731b45994ddcc34d325fb879d77e5c084ae285edb7e852248716f485e8d3c",
+      "sha256": "3bbfa6b0406d68056ae98a5ffaaa48599ace5d25af8955f9861e6d4d540a3aa2",
+      "bytes": 55542
+    },
+    {
+      "path": "src/agent_commons/domain/revisions.py",
+      "change": "modified",
+      "before_sha256": "c14b569fc9d51cdaeaac97f6d302da54f89fefd0f75898cf0a9e7058e9963392",
+      "sha256": "d508672508e6fba7f4a3341c6277a1cf783601876e8200dac649c627e03017b7",
+      "bytes": 7912
+    },
+    {
+      "path": "src/agent_commons/domain/roles.py",
+      "change": "modified",
+      "before_sha256": "0e07e84ba166b4a8439a76d4b2081454ac1daf528fba3c4c8bf782a4f6c2df9f",
+      "sha256": "d60b23b19236b9f5aa9727b8073af4fcb80edcfc7eaf95beab6699248e0fe45e",
+      "bytes": 43343
+    },
+    {
+      "path": "src/agent_commons/resources/schemas/domain/agent.v3.schema.json",
+      "change": "added",
+      "before_sha256": null,
+      "sha256": "da7eaf42a4bc1f2c3a1df3101155a7a5072de5185e99a745e94c894a3dc6bf69",
+      "bytes": 6902
+    },
+    {
+      "path": "src/agent_commons/services/manager.py",
+      "change": "modified",
+      "before_sha256": "4ca10ba6e7f31c2b90d153ce21675eacc75c5e8758a6cbb524fb91d84c9a64bb",
+      "sha256": "5db66268ae5b63bbb366e83bf80a536ddb7aab0c92aeff24a1db53e14081cbef",
+      "bytes": 69795
+    },
+    {
+      "path": "src/agent_commons/services/roles.py",
+      "change": "modified",
+      "before_sha256": "5cf239c2e47b39b19fd324562669071086356e564ba4eb01013857866e0e373d",
+      "sha256": "de0b526515114e16f3e8f3c48dd3d86370569af6532937294ccb665c3207d392",
+      "bytes": 23928
+    },
+    {
+      "path": "tests/domain/test_agent_projection.py",
+      "change": "modified",
+      "before_sha256": "e7c6fd00ccba187d6f401a2b4aafaac5089614d5656b94fac78bb991a5bf05e4",
+      "sha256": "a0d521b173f013376d3e9cade7057c8ca1a9bb3a9499ea2c57872d36d641821c",
+      "bytes": 6390
+    },
+    {
+      "path": "tests/services/test_agent_configuration.py",
+      "change": "added",
+      "before_sha256": null,
+      "sha256": "29b8c77a0702daf0e539024fe9a85453cefe46af8edb18f6582f5f1e280bf854",
+      "bytes": 21411
+    },
+    {
+      "path": "tests/services/test_roles.py",
+      "change": "modified",
+      "before_sha256": "b919bbcfed025381705269d38502cfb938af72a5178d2d28a752585c56933ff6",
+      "sha256": "adb0a87ac157857f27cbb88251057679ea40d9852f1d122713453c350d2bb414",
+      "bytes": 3775
+    },
+    {
+      "path": "tests/services/test_task_hierarchy_corrections.py",
+      "change": "modified",
+      "before_sha256": "26e106569cc455353a53904c394af8f614e17cd39a71a47b02474e5f2cee2bec",
+      "sha256": "cb877a599eaf13dddaeb466242c2108d788ad47b7e951d4a81e6483fc32fb5ca",
+      "bytes": 9759
+    }
+  ]
+}

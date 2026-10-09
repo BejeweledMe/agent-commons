@@ -1,0 +1,362 @@
+- main:
+  - navigation "Разделы приложения":
+    - link "Рабочая область":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Роли" [active]:
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+    - link "Навыки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=skills&panel=none
+    - link "Шаблоны команд":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=blueprints&panel=none
+    - link "Контекст":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=library&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&tab=context&panel=none
+    - link "Настройки":
+      - /url: /work?project=project.a3724d82fded96d1de2d845e394e928f&view=settings&task=task.5EAEMXJ1D55PVFRFNMGNWZZB6K&filter=all&panel=none
+  - complementary "Разделы проекта":
+    - complementary "Проекты":
+      - paragraph: Agent Commons
+      - heading "Проекты" [level=2]
+      - button "Новый проект"
+      - generic: Поиск проектов
+      - searchbox "Поиск проектов"
+      - list:
+        - button "agent-commons Готов":
+          - strong:
+            - text: agent-commons
+          - generic: Готов
+        - 'generic "Действия с проектом: agent-commons"':
+          - generic: "Действия с проектом: agent-commons"
+        - button "board-demo Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: board-demo
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: board-demo"':
+          - generic: "Действия с проектом: board-demo"
+        - button "blizhe-webapp Готов":
+          - strong:
+            - text: blizhe-webapp
+          - generic: Готов
+        - 'generic "Действия с проектом: blizhe-webapp"':
+          - generic: "Действия с проектом: blizhe-webapp"
+        - button "blizhe-worktree Рабочее пространство недоступно" [disabled]:
+          - strong:
+            - text: blizhe-worktree
+          - generic: Рабочее пространство недоступно
+        - 'generic "Действия с проектом: blizhe-worktree"':
+          - generic: "Действия с проектом: blizhe-worktree"
+        - button "Blizhe · улучшения 2026-10-07 Готов":
+          - strong:
+            - text: Blizhe · улучшения 2026-10-07
+          - generic: Готов
+        - 'generic "Действия с проектом: Blizhe · улучшения 2026-10-07"':
+          - generic: "Действия с проектом: Blizhe · улучшения 2026-10-07"
+        - button "Главный чат":
+          - text: Главный чат
+      - generic "Архивные проекты"
+    - generic: Рабочее пространство и исполнители настроены
+    - paragraph: Локальная работа · ваш репозиторий
+  - separator "Ширина боковой панели"
+  - group "Расположение рабочей области":
+    - button "Навигация" [pressed]:
+    - button "Чат" [pressed]:
+    - generic "Вид"
+  - heading "Библиотека" [level=1]
+  - generic "Язык":
+    - button "Переключить на английский": EN
+    - button "Переключить на русский" [pressed]: RU
+  - region "Библиотека":
+    - tablist "Библиотека":
+      - tab "Роли32" [selected]
+      - tab "Навыки45"
+      - tab "Шаблоны команд7"
+      - tab "Контекст"
+    - tabpanel "Роли32":
+      - region "Роли":
+        - heading "Роли" [level=2]
+        - paragraph: Встроены в сервис и доступны проекту. Изучайте инструкции, создавайте свои версии и добавляйте именованные роли в разделе «Роли».
+        - button "Обновить библиотеку"
+        - text: Поиск по библиотеке
+        - searchbox "Поиск по библиотеке"
+        - text: Группа
+        - combobox "Группа":
+          - option "Все группы" [selected]
+          - option "Бизнес и продукт"
+          - option "Тексты и коммуникация"
+          - option "Архитектура и качество"
+          - option "Frontend и backend"
+          - option "Данные и хранение"
+          - option "ML, CV, LLM и агентные процессы"
+          - option "Инфраструктура и эксплуатация"
+          - option "Безопасность и независимая оценка"
+        - button "Добавить специализацию"
+        - article:
+          - paragraph: Встроенная · Бизнес и продукт
+          - heading "Бизнес-консультант по текущему результату" [level=3]
+          - paragraph: Найти и обосновать ближайшее изменение продукта или работы команды, которое улучшает текущий бизнес-результат с учётом полной стоимости и ограничений.
+          - paragraph:
+            - code: business-operator
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Бизнес и продукт
+          - heading "Советник по стратегии и будущему портфелю" [level=3]
+          - paragraph: Обосновать направление развития и набор стратегических ставок с ясными условиями продолжения, изменения или прекращения.
+          - paragraph:
+            - code: strategy-advisor
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Бизнес и продукт
+          - heading "Продуктовый менеджер" [level=3]
+          - paragraph: Выбрать проверяемое продуктовое изменение, которое ценно пользователю и жизнеспособно для бизнеса, и довести его требования до измеримого результата.
+          - paragraph:
+            - code: product-manager
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Бизнес и продукт
+          - heading "Продуктовый дизайнер" [level=3]
+          - paragraph: Создать и проверить пользовательский опыт, в котором целевая аудитория может достичь нужного результата в нормальных и существенных ошибочных сценариях.
+          - paragraph:
+            - code: product-designer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Тексты и коммуникация
+          - heading "Автор и редактор" [level=3]
+          - paragraph: Создать или улучшить содержательный текст, который точно выполняет задачу читателя и сохраняет согласованную границу фактов, смысла и источников.
+          - paragraph:
+            - code: writer-editor
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Тексты и коммуникация
+          - heading "Технический писатель" [level=3]
+          - paragraph: Подготовить технический документ, по которому читатель может корректно понять систему, проверить вывод или выполнить действие при известных условиях.
+          - paragraph:
+            - code: technical-writer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Архитектура и качество
+          - heading "Системный архитектор" [level=3]
+          - paragraph: Выбрать минимальную жизнеспособную архитектуру с явными источниками истины, контрактами, гарантиями отказа и путём безопасного изменения.
+          - paragraph:
+            - code: system-architect
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Архитектура и качество
+          - heading "Техлид реализации и интеграции" [level=3]
+          - paragraph: Довести сложную задачу разработки до целостного работающего результата, сохранив одного владельца реализации, интеграции и проверки.
+          - paragraph:
+            - code: delivery-tech-lead
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Архитектура и качество
+          - heading "Инженер качества программного обеспечения" [level=3]
+          - paragraph: Дать достаточные воспроизводимые доказательства программного поведения на значимых рисках и сделать сбои проверки понятными и устранимыми.
+          - paragraph:
+            - code: qa-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Frontend и backend
+          - heading "Frontend-инженер · JavaScript / TypeScript" [level=3]
+          - paragraph: Работающий браузерный сценарий с корректными состояниями и взаимодействием.
+          - paragraph:
+            - code: frontend-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Frontend и backend
+          - heading "Backend-инженер · Node.js / TypeScript" [level=3]
+          - paragraph: Корректный и ограниченный жизненный цикл Node-сервиса и его бизнес-эффектов.
+          - paragraph:
+            - code: node-backend-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Frontend и backend
+          - heading "Backend-инженер · Python" [level=3]
+          - paragraph: Корректные Python API и фоновые задачи с явными ресурсами, транзакциями и эффектами.
+          - paragraph:
+            - code: python-backend-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Данные и хранение
+          - heading "Инженер баз данных" [level=3]
+          - paragraph: Доказуемые инварианты хранения, эффективный доступ и восстанавливаемые изменения данных.
+          - paragraph:
+            - code: database-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Данные и хранение
+          - heading "Data Engineer · pipelines и качество данных" [level=3]
+          - paragraph: Воспроизводимые данные нужной полноты, времени, происхождения и доступности.
+          - paragraph:
+            - code: data-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "ML team lead" [level=3]
+          - paragraph: Довести согласованный ML-результат до проверяемой интеграции и передачи назначенному эксплуатационному владельцу.
+          - paragraph:
+            - code: ml-team-lead
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер классического ML" [level=3]
+          - paragraph: Создать или исправить predictive ML-путь с валидным сравнением, воспроизводимым поведением и доказательствами результата в заданном контексте применения.
+          - paragraph:
+            - code: ml-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер компьютерного зрения" [level=3]
+          - paragraph: Довести визуальную задачу до проверяемого perception pipeline с согласованными входами, данными, моделью, качеством и условиями исполнения.
+          - paragraph:
+            - code: cv-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер текстовых моделей и адаптации" [level=3]
+          - paragraph: Выбрать или адаптировать минимально достаточную текстовую модель, закрывающую измеренный capability gap с сохранением требуемого общего поведения.
+          - paragraph:
+            - code: nlp-adaptation-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер систем нейронного обучения" [level=3]
+          - paragraph: Обеспечить корректное и измеримо эффективное исполнение согласованного neural training run, включая восстановление согласованного состояния.
+          - paragraph:
+            - code: training-systems-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер LLM-продуктов" [level=3]
+          - paragraph: Создать или исправить минимальную композицию LLM-продукта, которая выполняет пользовательский task contract в согласованных границах качества, доступа, стоимости и отказа.
+          - paragraph:
+            - code: llm-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер RAG и retrieval" [level=3]
+          - paragraph: Обеспечить проверяемый путь от разрешённых источников к релевантному evidence, grounded answer и корректному отказу при отсутствии оснований.
+          - paragraph:
+            - code: rag-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер агентных процессов" [level=3]
+          - paragraph: Создать или исправить минимальный агентный execution pattern, который достигает проверенного терминального исхода в заданных границах полномочий, состояния и восстановления.
+          - paragraph:
+            - code: agent-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Инженер оценки AI" [level=3]
+          - paragraph: Получить воспроизводимые, калиброванные и предметно корректные доказательства поведения AI-кандидата против заданного контракта, с явными пределами выпускного заключения.
+          - paragraph:
+            - code: ai-evaluation-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · ML, CV, LLM и агентные процессы
+          - heading "Оптимизатор self-hosted LLM inference" [level=3]
+          - paragraph: Измеримо улучшить self-hosted LLM request execution при сохранении согласованных качества, policy, latency и recovery constraints.
+          - paragraph:
+            - code: llm-inference-optimizer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Инфраструктура и эксплуатация
+          - heading "DevOps / Platform Delivery Engineer" [level=3]
+          - paragraph: Воспроизводимый путь от исходного изменения к артефакту, среде, выпуску и восстановлению.
+          - paragraph:
+            - code: devops-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Инфраструктура и эксплуатация
+          - heading "SRE · надёжность и инциденты" [level=3]
+          - paragraph: Пользовательская надёжность сервиса и доказанное восстановление после отказа.
+          - paragraph:
+            - code: sre-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Инфраструктура и эксплуатация
+          - heading "MLOps / LLMOps / AI Platform Engineer" [level=3]
+          - paragraph: Совместимое, наблюдаемое и восстанавливаемое исполнение AI-нагрузок на общей платформе.
+          - paragraph:
+            - code: ai-platform-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Безопасность и независимая оценка
+          - heading "Application Security Engineer" [level=3]
+          - paragraph: Защитные контроли приложения, работающие на реальной доверенной границе.
+          - paragraph:
+            - code: appsec-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Безопасность и независимая оценка
+          - heading "AI Safety / LLM Security Operations Engineer" [level=3]
+          - paragraph: Безопасные границы LLM/RAG/agents с сохранением полезности разрешённых сценариев.
+          - paragraph:
+            - code: genai-safety-engineer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Безопасность и независимая оценка
+          - heading "Независимый Security Reviewer" [level=3]
+          - paragraph: Ограниченное доказательствами заключение о security claims конкретного артефакта.
+          - paragraph:
+            - code: security-reviewer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Встроенная · Архитектура и качество
+          - heading "Независимый QA Reviewer" [level=3]
+          - paragraph: Независимая проверка точной редакции результата и её доказательств.
+          - paragraph:
+            - code: qa-reviewer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+        - article:
+          - paragraph: Своя · Архитектура и качество
+          - heading "Blizhe · независимый QA reviewer" [level=3]
+          - paragraph: "Независимая проверка готового результата Blizhe по критериям задачи: воспроизводимые доказательства, вердикт и замечания. Исполнитель только для review, без реализации и самостоятельной приёмки."
+          - paragraph:
+            - code: blizhe-qa-reviewer
+          - button "Открыть инструкции"
+          - button "Выбрать для раздела «Роли»"
+  - separator "Ширина чата"
+  - generic "Чат":
+    - region "Главный чат проекта":
+      - heading "Главный чат проекта" [level=2]
+      - paragraph: "Получатель: Blizhe · улучшения 2026-10-07"
+      - paragraph: Доступность неизвестна
+      - button "Подготовить запуск"
+      - paragraph: Сообщений пока нет.
+      - list "Обсуждение"
+      - generic: Сообщение
+      - textbox "Сообщение"
+      - button "Добавить изображения или файлы"
+      - generic "Ограничения"
+      - button "Отправить сообщение" [disabled]
+      - generic "Черновик"

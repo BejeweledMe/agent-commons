@@ -1,0 +1,17 @@
+{
+  "label": "before-settings",
+  "observed_at": "2026-10-09T17:22:31.811046+00:00",
+  "events": {
+    "files": 24,
+    "sha256": "575b55e74d5997abf6c6fb762fbc1173c9055ed2a7bf00d2d0e8ca6c28c7c691"
+  },
+  "manifests": {
+    "files": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "library": {
+    "files": 35,
+    "sha256": "634105d60d996495e7aada9693733eb1394b7ac5bf705c1d10b4672b513c8f7d"
+  },
+  "mutations": []
+}

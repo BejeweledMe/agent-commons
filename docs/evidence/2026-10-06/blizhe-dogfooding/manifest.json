@@ -1,0 +1,82 @@
+[
+  {
+    "file": "V01-board-EN.jpg",
+    "sha256": "5f04b97ea8fdd3d47ef4cc0bcf5aae8eef569c9d0af2b8c0464f1333c7c2811a",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "screen": "Доска / Board",
+    "steps": "Запуск ui --single-project; одноразовый вход; для RU — переключатель языка.",
+    "asset": "work-C0nYR3qF.js"
+  },
+  {
+    "file": "V01-board-RU.jpg",
+    "sha256": "94269da560665d4a38dd2f658d393f7c7208537dd0f85e94c7665b4fc89b7165",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "screen": "Доска / Board",
+    "steps": "Запуск ui --single-project; одноразовый вход; для RU — переключатель языка.",
+    "asset": "work-C0nYR3qF.js"
+  },
+  {
+    "file": "V02-main-board-EN.jpg",
+    "sha256": "71d16e8f32c2e0c26dc8ad6cfa2bf7dccc0fcb76ff6e371488e69061b2963460",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V02-main-board-EN",
+    "steps": "make sync → env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked agent-commons ui --port 8794 --no-browser → свежий одноразовый URL → Доска, проект agent-commons; переключение EN/RU."
+  },
+  {
+    "file": "V02-main-board-RU.jpg",
+    "sha256": "3babac1e809b1e992308960971faa001df11a1a9d90fcc8f2bd63d97d180edda",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V02-main-board-RU",
+    "steps": "make sync → env -u AGENT_COMMONS_STATE_ROOT -u AGENT_COMMONS_STATE_BASE -u AGENT_COMMONS_SESSION_ID uv run --locked agent-commons ui --port 8794 --no-browser → свежий одноразовый URL → Доска, проект agent-commons; переключение EN/RU."
+  },
+  {
+    "file": "V03-gallery-error-EN.jpg",
+    "sha256": "fa8fc2b7578916fcbb94f60d355e0085c15ba55119780c71a71550adf35b0abd",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V03-gallery-error-EN",
+    "steps": "Доска → имя Self-improvement · Frontend → ошибка загрузки галереи. EN: первоначальный отказ; повторить нажато один раз и снова отказ. RU: повторное открытие галереи после переключения языка."
+  },
+  {
+    "file": "V03-gallery-error-RU.jpg",
+    "sha256": "4e87d9ab21fee26736d7d5de726dcd93fc2e2cf7717657c3a1d14cf94aec317c",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V03-gallery-error-RU",
+    "steps": "Доска → имя Self-improvement · Frontend → ошибка загрузки галереи. EN: первоначальный отказ; повторить нажато один раз и снова отказ. RU: повторное открытие галереи после переключения языка."
+  },
+  {
+    "file": "V04-structure-EN.jpg",
+    "sha256": "26e4c93b1b34c770b3bd4bca114934425cf33684f74bbac4c83a8a55dae7e430",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V04-structure-EN",
+    "steps": "Задачи → Карта → Структура → поиск G6:; показаны 2 из 309 задач. Переключение EN/RU."
+  },
+  {
+    "file": "V04-structure-RU.jpg",
+    "sha256": "ec233a537c43105f25e9683d769247c154f16db289083cb9020acb4c0de67ac4",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V04-structure-RU",
+    "steps": "Задачи → Карта → Структура → поиск G6:; показаны 2 из 309 задач. Переключение EN/RU."
+  },
+  {
+    "file": "V05-dependencies-EN.jpg",
+    "sha256": "27e5f627023b60f97c60fda41f1523b1c9209ac0267ee8ff3404b8d3d9f9ceb8",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V05-dependencies-EN",
+    "steps": "Задачи → Карта → Задачи-предпосылки → Synthesize Corrected Architecture Improvement Plan; выбранная задача и связанная работа, 4 из 309 задач; переключение EN/RU."
+  },
+  {
+    "file": "V05-dependencies-RU.jpg",
+    "sha256": "f365926f40d4f1d676b9b1f90d2d7598b439f65ca594c011c5d02a0659ac14e4",
+    "commit": "6e169573439ed4ef44e56d50b3c75e56a4ce8b0f",
+    "asset": "work-C0nYR3qF.js",
+    "screen": "V05-dependencies-RU",
+    "steps": "Задачи → Карта → Задачи-предпосылки → Synthesize Corrected Architecture Improvement Plan; выбранная задача и связанная работа, 4 из 309 задач; переключение EN/RU."
+  }
+]

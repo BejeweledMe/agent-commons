@@ -261,7 +261,7 @@ def _manifest() -> dict[str, Any]:
     value = loads_json_strict(_resource_bytes("manifest.json", MAX_SNAPSHOT_BYTES))
     if not isinstance(value, dict) or value.get("schema") != "agent-commons.library-pack.v1":
         _refuse("Packaged library manifest is unsupported.")
-    if not isinstance(value.get("entries"), list) or len(value["entries"]) != 75:
+    if not isinstance(value.get("entries"), list) or len(value["entries"]) != 76:
         _refuse("Packaged library inventory is incomplete.")
     seen = set()
     for entry in value["entries"]:
@@ -280,7 +280,7 @@ def _manifest() -> dict[str, Any]:
         metadata["instruction" if ref.kind == "skill" else "system_prompt"] = "metadata"
         _content(ref.kind, metadata)
         seen.add((ref.kind, ref.id))
-    if sum(kind == "role" for kind, _identifier in seen) != 30:
+    if sum(kind == "role" for kind, _identifier in seen) != 31:
         _refuse("Packaged role inventory is incomplete.")
     return value
 

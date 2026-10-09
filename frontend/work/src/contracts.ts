@@ -10,6 +10,13 @@ export type ApiError = {
    * is never read as "no reason": the surface stays fail-closed either way.
    */
   refusal?: WorkerRefusal | null;
+  /**
+   * The additive launch-budget object an `operator_budget_exhausted` precheck
+   * sends with its refusal, exactly as received. `launchBudget.ts` validates
+   * it; an unreadable object leaves the refusal without a count rather than
+   * inventing one.
+   */
+  budget?: JsonObject | null;
 };
 
 /**

@@ -31,3 +31,8 @@
 .outputs-attribution dl > div { margin-block: 8px; }
 .outputs-attribution dd { margin: 0; overflow-wrap: anywhere; }
 .outputs-address { margin-block: 12px; overflow-wrap: anywhere; }
+
+.outputs-report-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60dvh; overflow: auto; padding: var(--space-3); background: var(--surface-1); }
+.outputs-report { min-width: 0; }
+.task-results li { overflow-wrap: anywhere; }
+.task-results h4 { margin-bottom: var(--space-1); }

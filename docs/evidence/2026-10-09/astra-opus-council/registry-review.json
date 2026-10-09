@@ -1,0 +1,7 @@
+{
+  "verdict": "approved",
+  "scope": "frozen registry-review-v1 four-file incremental patch",
+  "reviewer": "native gpt-6-astra, oct09_registry_review",
+  "checks": "Four frozen and base hashes verified; independent49registry/CLItests passed; doctorok",
+  "limits": "No live recovery yet; not whole-product approval"
+}

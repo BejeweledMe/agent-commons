@@ -1,0 +1,20 @@
+{
+  "source_snapshot": "prefs-review-v2",
+  "scope": "Private layout and explicit text draft storage only",
+  "reviewer": "native gpt-6-astra requested; runtime attestation unavailable",
+  "first_verdict": "changes_requested",
+  "addressed": [
+    "Serialized envelope bound before publication",
+    "Deleted drafts free active quota; monotonic clock prevents stale resurrection",
+    "Pending crash files recovered under common writer lock"
+  ],
+  "second_verdict": "approved, scoped advisory source reading",
+  "reviewer_ran_tests": false,
+  "author_verification": {
+    "focused": 20,
+    "command": ".venv/bin/python -m pytest tests/ui/test_workspace_preferences.py -q",
+    "result": "passed",
+    "includes": "cross-process CAS, lost response, escaped JSON transport size, active quota reclaim, actual os._exit before publish and before unlink"
+  },
+  "canonical_acceptance": false
+}

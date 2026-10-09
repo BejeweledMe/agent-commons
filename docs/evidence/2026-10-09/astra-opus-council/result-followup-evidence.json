@@ -1,0 +1,49 @@
+{
+  "base_kind": "frozen result-handoff v1 (uncommitted)",
+  "workspace": "/Users/dmitrijersov/.codex/worktrees/oct09-result-handoff/agent-commons",
+  "files": [
+    {
+      "path": "src/agent_commons/mcp/server.py",
+      "before_sha256": "851558512af04205320d4af673fcb1e76d060b3c05f1e3f5ffd210e4783987fb",
+      "after_sha256": "12c6537929859f7288d04e7618c1c803047c03596cf50cb4f0daa125c2997ef1",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/services/text_results.py",
+      "before_sha256": "049dae351890a1c1c00598111cf1979a6daec8266aad1a5ba0605d5407c7fa29",
+      "after_sha256": "0020ba5a28ba0d70f47649fee53fefe150c224c8c446d7bb192618c883a9df6d",
+      "new": false
+    },
+    {
+      "path": "src/agent_commons/services/task_launch.py",
+      "before_sha256": null,
+      "after_sha256": "9074b88a4f64e69aea47e8c90b91aa08a70027611b6d6577fddd37b5d3ee8f0a",
+      "new": true
+    },
+    {
+      "path": "src/agent_commons/ui/launch.py",
+      "before_sha256": "c717adb44d87d6e18a6a47f70525533dad1b6f4143a6ba8c5f8ce82ed1e1c08f",
+      "after_sha256": "35794fb2720bfeccaf645f4c2d86d18b93d1f2c7e6fb52f687d89d336042282c",
+      "new": false
+    },
+    {
+      "path": "tests/mcp/test_text_result_tools.py",
+      "before_sha256": "b8e38cbcd075cc9fb472daf1cb47c5e1f6d46d0d4f0871909faf0c741278c81b",
+      "after_sha256": "cb8d858fb0d13327b8145ad31b9478a071eded64494ccea6a326f94872256a46",
+      "new": false
+    },
+    {
+      "path": "tests/services/test_task_launch.py",
+      "before_sha256": null,
+      "after_sha256": "45b4a8464eacb1db82354c7284143fe729ed015bc00a1bc30f239994a6da2b98",
+      "new": true
+    },
+    {
+      "path": "tests/ui/test_text_result_launch.py",
+      "before_sha256": null,
+      "after_sha256": "091e6bad72d07ead80a88a683542423642b3b93f83cc0186cbc303d4645767b4",
+      "new": true
+    }
+  ],
+  "integration": "Apply result-followup.patch to v1. Merge launch-seam.patch as a tiny hunk; never replace root integrated launch.py."
+}

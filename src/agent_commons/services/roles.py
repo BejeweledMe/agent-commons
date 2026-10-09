@@ -107,6 +107,7 @@ class RoleCommands:
         specialization_ref: Mapping[str, str] | None = None,
         library_store: Any | None = None,
         created_by_agent_id: str | None = None,
+        supervisor_agent_id: str | None = None,
         approval: str | None = None,
         proposal_ref: Mapping[str, str] | None = None,
         idempotency_key: str | None = None,
@@ -187,6 +188,8 @@ class RoleCommands:
             payload["extensions"] = {"model": validate_model_name(model)}
         if specialization_ref is not None:
             payload["specialization_ref"] = dict(specialization_ref)
+        if supervisor_agent_id is not None:
+            payload["supervisor_agent_id"] = supervisor_agent_id
         if proposal_ref is not None:
             payload["proposal_ref"] = normalize_ref(proposal_ref)
         for field_name, values in (
@@ -362,9 +365,26 @@ class RoleCommands:
         changes: Mapping[str, Any],
         reason: str,
         isolation_downgrade_reason: str | None = None,
+        library_store: Any | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         key = self._idempotency_key("agent.reconfigured", idempotency_key)
+        changes = dict(changes)
+        if "specialization_ref" in changes:
+            from agent_commons.library import LibraryStore, validate_library_ref
+
+            reference = validate_library_ref(changes["specialization_ref"], kind="role")
+            store = library_store or LibraryStore(
+                workspace_root=self.repo_root,
+                state_root=self.paths.state_root,
+                state_base=getattr(self.paths, "state_base", None),
+            )
+            # Validate the complete exact bundle and retain every dependency.
+            # Actor, CAS and live-work guards belong inside record_event, after
+            # receipt lookup, so an identical committed retry still converges.
+            store.compose_role(reference)
+            store.retain(reference)
+            changes["specialization_ref"] = reference
         payload: dict[str, Any] = {
             "agent_id": agent_id,
             "expected_revision": expected_revision,

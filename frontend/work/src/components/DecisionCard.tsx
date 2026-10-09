@@ -1,3 +1,4 @@
+import { Icon } from "./Icon.js";
 import type { ReactElement, ReactNode } from "react";
 import type { TaskDetail, TrackerRun, TrackerTask } from "../contracts";
 import type { Locale, MessageKey } from "../i18n";
@@ -112,8 +113,8 @@ export function DecisionCard({ task, tasks, runs, detail, locale, text, actionsC
   return <section className="inspector-section decision-card" data-accepted={accepted ? "true" : "false"}
     data-attention={attention ? "true" : "false"} aria-labelledby="decision-card-title">
     <h3 id="decision-card-title" className="decision-line decision-happening">
-      <span className="decision-icon" aria-hidden="true">{accepted ? "✓" : attention ? "!" : "•"}</span>
-      <span className="decision-label">{text("decision_happening")}: </span>
+      <span className="decision-icon" aria-hidden="true"><Icon name={accepted ? "check" : attention ? "alert" : "info"} /></span>
+      <span className="decision-label">{text("decision_task_now")}: </span>
       <span className="decision-sentence">{happeningText(task, text)}</span>
     </h3>
     {readinessUnconfirmed(task) ? <p className="inspector-notice" role="status">{text("inspector_readiness_unknown")}</p> : null}
@@ -131,10 +132,13 @@ export function DecisionCard({ task, tasks, runs, detail, locale, text, actionsC
           required" copy for a run that stopped on the person; the canonical
           token itself stays in the details below, so nothing is hidden. */}
       <p><span className="decision-label">{text("decision_next")}: </span>
-        <span className="decision-sentence">{stop !== null && awaitingHuman
+        <span className="decision-sentence">{stop !== null && awaitingHuman && task.awaitsHuman
           ? text(stopReasonSentence(stop.code)) : text(stateLabel("action", task.nextAction))}</span></p>
-      {stop !== null ? <StopReasonNotice reason={stop} text={text} control={stopReasonControl}
-        showSentence={!awaitingHuman} className="inspector-notice" role="status" /> : null}
+      {stop !== null ? <div className="decision-last-run">
+        <h4>{text("inspector_last_run")}</h4><p className="small-copy">{text("inspector_runs_context")}</p>
+        <StopReasonNotice reason={stop} text={text} control={stopReasonControl}
+          showSentence={!awaitingHuman || !task.awaitsHuman} className="inspector-notice" role="status" />
+      </div> : null}
       {!actionsCurrent ? <p className="inspector-notice" role="status">{text(writesEnabled ? "inspector_actions_stale" : "inspector_actions_readonly")}</p> : null}
       {inProgress !== null ? <p className="inspector-notice" role="status">{text("decision_run_in_progress")}</p> : null}
       {offersPrepareRun ? <button className="button button-primary" type="button" disabled={!actionsCurrent || task.freshness !== "fresh" || readinessUnconfirmed(task)} onClick={() => onLaunchTask(task.taskId)}>{text("inspector_prepare_run")}</button> : null}

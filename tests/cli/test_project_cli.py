@@ -61,3 +61,40 @@ def test_project_listing_does_not_create_operator_storage(
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["projects"] == []
     assert not config.exists()
+
+
+def test_explicit_existing_state_revalidation_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.ui.test_project_registry_revalidation import _changed_device
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    repo = _repo(tmp_path / "repo")
+    CommonsManager.initialize(repo, integrations=())
+    manager = CommonsManager(repo, state_root=tmp_path / "state")
+    registry = ProjectRegistry()
+    project = registry.register_existing(repo, manager.paths.state_root)["project"]
+    _changed_device(monkeypatch, manager.paths.state_root)
+    runner = CliRunner()
+    command = [
+        "--json",
+        "project",
+        "recover-state",
+        project["id"],
+        project["revision"],
+        "--state-root",
+        str(manager.paths.state_root),
+        "--idempotency-key",
+        "verify-state",
+    ]
+    before = registry.path.read_bytes()
+    assert runner.invoke(cli, command).exit_code == 1
+    assert runner.invoke(cli, ["--read-only", *command, "--verify-existing"]).exit_code == 1
+    assert registry.path.read_bytes() == before
+    result = runner.invoke(cli, [*command, "--verify-existing"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["project"]["state"] == "ready"
+    assert str(tmp_path) not in result.output
+    replay = runner.invoke(cli, [*command, "--verify-existing"])
+    assert replay.exit_code == 0, replay.output
+    assert json.loads(replay.output) == json.loads(result.output)

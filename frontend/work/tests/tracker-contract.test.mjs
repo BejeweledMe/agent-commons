@@ -75,7 +75,7 @@ test("the Tasks tab keeps one render path per view and no graph-and-list duplica
   // Map scopes capacity after selecting/searching a component, independently of project size.
   assert.doesNotMatch(views, /overGraphCapacity|visibleTasks\.length > MAX_GRAPH_TASKS/);
   const graph = source("src/components/TaskGraph.tsx");
-  assert.match(graph, /buildTaskGraph\(tasks, edges, selectedTaskId, focus, search\)/);
+  assert.match(graph, /buildTaskGraph\(tasks, edges, anchor, focus, search\)/);
   assert.match(graph, /layout\.tooLarge \|\| layout\.invalid/);
   assert.equal((views.match(/className="task-list"/g) ?? []).length, 1, "there is one task list in one place");
   assert.equal((views.match(/<TaskGraph/g) ?? []).length, 1);

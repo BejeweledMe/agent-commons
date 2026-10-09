@@ -12,7 +12,7 @@ from ._shared import CLIState
 
 @click.group("project")
 def project_group() -> None:
-    """Inspect panel projects and recover a missing operational-state binding."""
+    """Inspect panel projects and explicitly recover operational-state bindings."""
 
 
 @project_group.command("list")
@@ -32,6 +32,11 @@ def list_projects(state: CLIState) -> None:
     required=True,
     help="Existing, owned exact state root; never a state base or a new directory.",
 )
+@click.option(
+    "--verify-existing",
+    is_flag=True,
+    help="Revalidate filesystem identity at the exact registered existing state root.",
+)
 @click.option("--idempotency-key", required=True)
 @click.pass_obj
 def recover_state(
@@ -40,11 +45,13 @@ def recover_state(
     expected_revision: str,
     replacement: Path,
     idempotency_key: str,
+    verify_existing: bool,
 ) -> None:
-    """Rebind a missing state root after verifying the registered workspace.
+    """Recover a missing root, or verify its existing registered filesystem identity.
 
     Stop panels using this project before recovery, then restart the common
-    panel. This changes the private registry only; it does not restore lost data.
+    panel. --verify-existing requires the exact existing registered path. This
+    changes the private registry only; it does not restore or rewrite state data.
     """
     if state.read_only:
         raise ValidationError("Project recovery is unavailable in read-only mode.")
@@ -54,5 +61,6 @@ def recover_state(
             expected_revision,
             state_root=replacement,
             idempotency_key=idempotency_key,
+            verify_existing=verify_existing,
         )
     )

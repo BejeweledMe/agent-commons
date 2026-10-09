@@ -128,6 +128,7 @@ def test_agent_record_is_frozen_and_preserves_replay_and_wire_shape() -> None:
         "actor": {"session_id": "session.test", "role_id": "builder"},
         "author_session_ids": ["session.test"],
         "created_by_agent_id": None,
+        "supervisor_agent_id": None,
         "template": False,
         "created_event_id": created["event_id"],
         "expected_revision": reconfigured["event_id"],
