@@ -87,20 +87,52 @@ def _markdown_documents() -> list[Path]:
     return documents
 
 
-def test_documentation_links_resolve_inside_the_repository() -> None:
+def _unresolved_links(document: Path, root: Path) -> list[str]:
     link_pattern = re.compile(r"\[[^\]]+\]\(([^)\s]+)(?:\s+[^)]*)?\)")
-
     missing: list[str] = []
-    for document in _markdown_documents():
-        text = document.read_text(encoding="utf-8")
-        for match in link_pattern.finditer(text):
-            raw_target = match.group(1).strip("<>")
-            target = raw_target.split("#", 1)[0]
-            if not target or target.startswith(("https://", "http://", "mailto:")):
-                continue
-            resolved = (document.parent / target).resolve()
-            if not resolved.exists():
-                line = text.count("\n", 0, match.start()) + 1
-                missing.append(f"{document.relative_to(ROOT)}:{line}: {raw_target}")
+    text = document.read_text(encoding="utf-8")
+    for match in link_pattern.finditer(text):
+        raw_target = match.group(1).strip("<>")
+        target = raw_target.split("#", 1)[0]
+        if not target or target.startswith(("https://", "http://", "mailto:")):
+            continue
+        resolved = (document.parent / target).resolve()
+        if not resolved.is_relative_to(root.resolve()) or not resolved.exists():
+            line = text.count("\n", 0, match.start()) + 1
+            missing.append(f"{document.relative_to(root)}:{line}: {raw_target}")
+    return missing
 
+
+def test_documentation_links_resolve_inside_the_repository() -> None:
+    missing = [
+        issue for document in _markdown_documents() for issue in _unresolved_links(document, ROOT)
+    ]
     assert not missing, "unresolved documentation links:\n" + "\n".join(missing)
+
+
+def test_existing_neighboring_files_do_not_make_documentation_portable(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (tmp_path / "external.md").write_text("Local-only evidence", encoding="utf-8")
+    (repo / "inside.md").write_text("Portable evidence", encoding="utf-8")
+    document = repo / "README.md"
+    document.write_text(
+        "[inside](inside.md)\n[outside](../external.md)\n[missing](missing.md)\n"
+        "[web](https://example.com/evidence)\n[anchor](#section)\n",
+        encoding="utf-8",
+    )
+    assert _unresolved_links(document, repo) == [
+        "README.md:2: ../external.md",
+        "README.md:3: missing.md",
+    ]
+
+
+def test_repository_symlink_cannot_hide_external_documentation(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    external = tmp_path / "external.md"
+    external.write_text("Local-only evidence", encoding="utf-8")
+    (repo / "alias.md").symlink_to(external)
+    document = repo / "README.md"
+    document.write_text("[outside](alias.md)", encoding="utf-8")
+    assert _unresolved_links(document, repo) == ["README.md:1: alias.md"]

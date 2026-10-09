@@ -111,7 +111,7 @@ Final review `review.2AZWQGMP9W2GV4WK6M9E61DMR7` — approved, independent=true,
 
 V01–V18 — вход, галерея, найм QA, BASE→TOOL, разговор/draft/reload, нужное действие оператора. V19 — retry form; V20 — SEARCH structure; V21 — QA retry; V22 — hire уже после долгого сохранения; V23 — неправильный CTA после approved TOOL. Основные пары EN/RU сохранены, кадры показывают видимую часть экрана. V14 и V22 имена содержат wait/long-save, но сами кадры сняты после ожидания. Auth flash наблюдался в DOM, отдельного синхронного кадра нет.
 
-[TOOL worker report](../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md), [operator build/watch](../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md), [cleanup fix и ограничения](../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md). Старый needs_operator report сохранён отдельно в `results/TOOL.*`.
+TOOL worker report (внешний файл, путь от этого отчёта: `../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-retry/TOOL.md`), operator build/watch (внешний файл, путь от этого отчёта: `../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-operator/verification.md`), cleanup fix и ограничения (внешний файл, путь от этого отчёта: `../../../../../../blizhe-workspaces/dogfooding-20261007/docs/dogfooding/2026-10-08/tool-review-fix/README.md`). Старый needs_operator report сохранён отдельно в `results/TOOL.*`.
 
 ## 8. Что НЕ проверено / не завершено
 
