@@ -1,0 +1,118 @@
+[
+  {
+    "path": "CHANGELOG.md",
+    "sha256": "29b843bcb1706fc16f553fc15101b2aaf34bbb982480ee70aea6363e02e0f417"
+  },
+  {
+    "path": "docs/FRONTEND_CONTRACT.md",
+    "sha256": "0c7ee667f07638e3684288016b89fdca4fd605d731dfdf89f16e5e47c4795d91"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-183405.md",
+    "sha256": "12a7bcee93bb79b9441435120e5240b6882633377d21796ea73b586266376800"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-184645.md",
+    "sha256": "0cf30144ce51ab55e033e70d01950550decb1b933c745c64e910a69d13468e6d"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-190336.md",
+    "sha256": "7084d51fb888bc771fdabaa87577c606ef263d53fa8d08b1434e9b47d7b5ef54"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-193129.md",
+    "sha256": "3af7666157873c2cd1957e25a2cc55f27cbbb021e5e1581a5ca5ce1a70e84fdb"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-194505.md",
+    "sha256": "7ef5cba643904a896d96cf09234bab555d6da2528919b0901b2b534a48e9bb28"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-195129.md",
+    "sha256": "abf4551861dce86bdec537c71a4d9e99925f9cc4d014b41422720273ee26f8cc"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-200244.md",
+    "sha256": "e048d893be44b8c64635870bf5597c694ec8adb5b53699ee4cd0c4a19772b76d"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-201058.md",
+    "sha256": "fe48718e487de1d45714f68026367d5097cbaf859f0c8a0c1c8f8b2e78e37ec6"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-201632.md",
+    "sha256": "a36c325a708dc086b50d498dba32a62b464ea9ef9d880f1fcd66664dfbc5523d"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-204610.md",
+    "sha256": "7fbb8b4322b28ce2edb0289ee7b3271a0bc261edccf438c66c44b09547018bca"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-205141.md",
+    "sha256": "6fb0acfdc3e040b45bf18ca2e50f45c2ac164d8f4d4a742098442518fca2feac"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-210300.md",
+    "sha256": "e2aecfb8f53c430fcd36b7e5a1104ccb98407ce86a1077162810642d30d89e0c"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-210811.md",
+    "sha256": "187a416aaeca0ed8ddaccc66b7eec7a5c29f60856a832bb603e40762481ab542"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-212738.md",
+    "sha256": "e52af518cbfa32c874b8cfe9b5930768fa2867fdd0e4ee34bc559936c50c0681"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-213238.md",
+    "sha256": "1c878ff56538c6d6e95b743daaac51ac662b20e5550f476da554c470cb18a31f"
+  },
+  {
+    "path": "docs/evidence/2026-10-08/blizhe-dogfooding/feedback-slice-before-expansion.md",
+    "sha256": "a95094ad56fef58825587833505a9a10690f89bd33bbd25602b672a2b027bf0b"
+  },
+  {
+    "path": "docs/handoffs/2026-10-08-blizhe-dogfooding-feedback.md",
+    "sha256": "b7d7780db8a97bfd70da9a304ef4f11f0cceb33949ecd60f4c03b12947f117d5"
+  },
+  {
+    "path": "frontend/work/src/api.ts",
+    "sha256": "6ec68563e323a1ffdd3522f16ffe534055409790622967a8139d781928f416ad"
+  },
+  {
+    "path": "frontend/work/src/i18n.json",
+    "sha256": "9b754321ef50eeadabf3a3e599e0d7a6efad22705fcdf9c35a1a3323c9335bab"
+  },
+  {
+    "path": "frontend/work/src/main.tsx",
+    "sha256": "4f51942a0c76f6b77f1ce1c1783053d1ecde0f606533d7f97c49d1615e23d88f"
+  },
+  {
+    "path": "frontend/work/src/styles.css",
+    "sha256": "7dd090ece11ef8cdc24288ea0266e7a4981d8f8536bb04f8f4a46b3a34263e47"
+  },
+  {
+    "path": "frontend/work/tests/task-inspector.test.mjs",
+    "sha256": "d24a249a4e66b0cbf20d320fa0a2127efbf04d90c63a1914b391839ddb388c2a"
+  },
+  {
+    "path": "src/agent_commons/ui/static/work/assets/work-4G19TXus.js",
+    "sha256": "b9a98d514d999c242343bef40872c40ee7f7442e88a1b0842ee32e8984cdb10a"
+  },
+  {
+    "path": "src/agent_commons/ui/static/work/assets/work-BOmGhuEa.css",
+    "sha256": "63388dd990cd8004461e2eeab1d9383640cab4b316cc9fe56385f62fc7aed28d"
+  },
+  {
+    "path": "src/agent_commons/ui/static/work/index.html",
+    "sha256": "3427c87d52ef93d7f5157da00c37511d6c60cf0cb6d9da97468f4475927839ad"
+  },
+  {
+    "path": "tests/contract/test_documentation_map.py",
+    "sha256": "63a16dabcd85a206de4d58aae2306c9924019f56453244cf0e95fed285e7a843"
+  },
+  {
+    "path": "tests/ui/test_work_app_contract.py",
+    "sha256": "bce31ebf791477c20ddc071348f59636c68629214a5c76b49ab240a84de44218"
+  }
+]

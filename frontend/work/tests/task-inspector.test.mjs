@@ -655,13 +655,13 @@ async function withStoredConnection(fragment, respond, check) {
   const calls = [];
   globalThis.window = {
     location: { pathname: "/work", search: `?view=work&task=${taskId}&q=private`, hash: fragment },
-    history: { replaceState: (_state, _title, url) => locations.push(url) },
+    history: { replaceState: (_state, _title, url) => { locations.push(url); globalThis.window.location.hash = ""; } },
     sessionStorage: { getItem: (name) => saved.get(name) ?? null, setItem: (name, value) => saved.set(name, value), removeItem: (name) => saved.delete(name) }
   };
   globalThis.fetch = async (url, init) => {
-    assert.equal(locations.length, 1, "scrub fragment before any restore or exchange request");
-    assert.equal(locations[0].includes("#"), false);
-    assert.equal(locations[0].includes("private"), false);
+    assert.ok(locations.length >= 1, "scrub fragment before any restore or exchange request");
+    assert.equal(locations.at(-1).includes("#"), false);
+    assert.equal(locations.at(-1).includes("private"), false);
     assert.equal(init.credentials, "same-origin");
     calls.push(url);
     return respond(url, init, { oldBase, newBase });
@@ -765,3 +765,138 @@ test("an entity 404 after successful restore does not invalidate the browser ses
     assert.equal(saved.get(key), oldBase);
   });
 });
+
+test("project switching reuses the connected host without another access probe", async () => {
+  await withStoredConnection("", (url, _init, { oldBase }) => {
+    assert.equal(url, `${oldBase}/projects`);
+    return reply({ projects: [] });
+  }, async ({ api, calls, oldBase, signal }) => {
+    await api.connect(signal);
+    await api.connect(signal);
+    api.forProject(`project.${"a".repeat(32)}`);
+    await api.connect(signal);
+    assert.deepEqual(calls, [`${oldBase}/projects`]);
+  });
+});
+
+for (const recovery of ["refresh", "handoff"]) {
+  test(`already-connected host recovers a restarted server on ${recovery}`, async () => {
+    let restarted = false;
+    await withStoredConnection("", (url, init, { oldBase, newBase }) => {
+      if (url === "/api/auth/exchange") {
+        assert.deepEqual(JSON.parse(init.body), { code: "fresh-code" });
+        return reply({ api_base: newBase });
+      }
+      return restarted && url.startsWith(oldBase) ? reply(null, 404) : reply({ projects: [] });
+    }, async ({ api, saved, key, oldBase, newBase, calls, signal }) => {
+      await api.connect(signal);
+      restarted = true;
+      if (recovery === "refresh") {
+        await assert.rejects(api.connect(signal, { revalidate: true }), (error) => error.status === 401);
+        assert.equal(saved.has(key), false, "a stale host prefix is cleared after both host probes refuse");
+        assert.deepEqual(calls, [`${oldBase}/projects`, `${oldBase}/projects`, `${oldBase}/setup`]);
+      }
+      globalThis.window.location.hash = "#c=fresh-code";
+      await api.connect(signal);
+      assert.equal(saved.get(key), newBase);
+      assert.equal(calls.filter((url) => url === "/api/auth/exchange").length, 1);
+      if (recovery === "handoff") {
+        assert.deepEqual(calls, [`${oldBase}/projects`, `${oldBase}/projects`, `${oldBase}/setup`, "/api/auth/exchange"]);
+      }
+      await api.connect(signal);
+      assert.equal(calls.at(-1), "/api/auth/exchange", "normal navigation resumes without another host probe");
+    });
+  });
+}
+
+test("explicit revalidation after an entity 404 preserves a live host session", async () => {
+  await withStoredConnection("", (url, _init, { oldBase }) => url === `${oldBase}/projects` ? reply({ projects: [] }) : reply(null, 404), async ({ api, saved, key, oldBase, calls, signal }) => {
+    await api.connect(signal);
+    await assert.rejects(api.forProject(`project.${"b".repeat(32)}`).load(signal), (error) => error.status === 404);
+    await api.connect(signal, { revalidate: true });
+    assert.equal(saved.get(key), oldBase);
+    assert.equal(calls.at(-1), `${oldBase}/projects`);
+    assert.equal(calls.includes("/api/auth/exchange"), false);
+  });
+});
+
+test("a scoped 401 invalidates the saved session even when the host already connected", async () => {
+  const storedWindow = globalThis.window, storedFetch = globalThis.fetch;
+  const base = `/api/${"a".repeat(32)}`, key = "agent_commons.ui.api_base";
+  const saved = new Map([[key, base]]), calls = [];
+  globalThis.window = { location: { pathname: "/work", search: "", hash: "" }, history: { replaceState() {} },
+    sessionStorage: { getItem: (k) => saved.get(k) ?? null, setItem: (k, v) => saved.set(k, v), removeItem: (k) => saved.delete(k) } };
+  globalThis.fetch = async (url, init) => {
+    calls.push(url); assert.equal(init.credentials, "same-origin");
+    return reply({}, url === `${base}/projects` ? 200 : 401);
+  };
+  try {
+    const api = new WorkApi(), signal = new AbortController().signal;
+    await api.connect(signal);
+    await assert.rejects(api.forProject(`project.${"b".repeat(32)}`).requestData("/work/tasks", { signal }), (e) => e.status === 401);
+    await assert.rejects(api.connect(signal), (e) => e.status === 401);
+    assert.equal(saved.has(key), false);
+    assert.equal(calls.length, 2, "no successful reconnect may be inferred after an expired cookie");
+  } finally { globalThis.window = storedWindow; globalThis.fetch = storedFetch; }
+});
+
+const corePayloads = {
+  "/setup": { state: "setup_configured", launch_enabled: true, writes_enabled: true },
+  "/meta": { repo: "/synthetic/project", writes_enabled: true },
+  "/work/setup-guidance": { blocker_code: null, tools: [], next_action_key: "setup_ready", location_label: null },
+  "/catalog": { profiles: ["codex-builder"] }
+};
+
+test("core workspace resolves without launching or waiting for slow provider probes", async () => {
+  const previous = globalThis.fetch, calls = [];
+  const base = `/api/${"a".repeat(32)}`, signal = new AbortController().signal;
+  let release;
+  const delayed = new Promise((resolve) => { release = resolve; });
+  globalThis.fetch = async (url) => {
+    const path = url.slice(base.length); calls.push(path);
+    if (corePayloads[path]) return reply(corePayloads[path]);
+    if (path === "/launch") return reply(null, 503); // Catalog-only reads stay useful.
+    await delayed;
+    return reply(null, 503);
+  };
+  try {
+    const api = new WorkApi(null, base);
+    const core = await api.load(signal, { deferProviderStatus: true });
+    assert.equal(core.meta.repo, "/synthetic/project");
+    assert.equal(core.catalog.profiles[0].id, "codex-builder");
+    assert.deepEqual(core.providerAvailability, []);
+    assert.deepEqual(core.providerAuth, []);
+    assert.deepEqual(new Set(calls), new Set(["/setup", "/meta", "/catalog", "/launch"]));
+    let settled = false;
+    const providers = api.loadProviderState(core, signal).then((result) => { settled = true; return result; });
+    await Promise.resolve(); assert.equal(settled, false, "optional probes are still in flight after the core read");
+    release();
+    const result = await providers;
+    assert.deepEqual(result.providerAuthErrors, ["codex-builder"]);
+    assert.deepEqual(result.providerAvailability, [], "failed probes never imply readiness");
+  } finally { release(); globalThis.fetch = previous; }
+});
+
+test("an aborted provider enrichment cannot return a result for the next project", async () => {
+  const previous = globalThis.fetch, controller = new AbortController();
+  globalThis.fetch = async () => { controller.abort(); throw new DOMException("aborted", "AbortError"); };
+  try {
+    const api = new WorkApi(null, `/api/${"a".repeat(32)}`);
+    await assert.rejects(api.loadProviderState({ catalog: null, launch: null }, controller.signal), (e) => e.name === "AbortError");
+  } finally { globalThis.fetch = previous; }
+});
+
+for (const refusedPath of ["/catalog", "/work/provider-availability"]) {
+  test(`session expiry in ${refusedPath} cannot masquerade as partial readiness`, async () => {
+    const previous = globalThis.fetch, base = `/api/${"a".repeat(32)}`;
+    globalThis.fetch = async (url) => {
+      const path = url.slice(base.length);
+      return reply(corePayloads[path] ?? null, path === refusedPath ? 401 : corePayloads[path] ? 200 : 503);
+    };
+    try {
+      const api = new WorkApi(null, base), signal = new AbortController().signal;
+      await assert.rejects(refusedPath === "/catalog" ? api.load(signal, { deferProviderStatus: true })
+        : api.loadProviderState({ catalog: null, launch: null }, signal), (e) => e.status === 401);
+    } finally { globalThis.fetch = previous; }
+  });
+}

@@ -1705,3 +1705,8 @@ label { font-size: var(--type-3); font-weight: 550; }
 .task-brief-disclosure:not([open]) .task-brief-collapse, .task-brief-disclosure[open] .task-brief-expand, .task-brief-disclosure[open] + .task-brief-preview { display: none; }
 
 .task-composer-embedded { padding: 0; margin: 0; max-width: none; background: transparent; }
+
+/* Pending project reads retain the navigable shell without another project's data. */
+.project-loading-content { flex: 1; min-height: 0; overflow: auto; padding: var(--space-5); color: var(--text-2); }
+.project-loading-chat { padding: var(--space-4); }
+.project-loading-chat h2 { font-size: var(--type-3); margin: 0 0 var(--space-2); }

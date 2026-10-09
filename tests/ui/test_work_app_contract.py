@@ -291,7 +291,7 @@ def test_work_setup_guidance_is_closed_typed_and_only_loaded_after_setup() -> No
     assert "SETUP_GUIDANCE_ACTION_KEYS" in api
     assert 'this.get("/work/setup-guidance", signal)' in api
     assert 'fetch("/api/work/setup-guidance"' not in api
-    assert 'setup.state !== "setup_uninitialized"' in api
+    assert '["setup_configured", "setup_uninitialized", "setup_not_a_repository"]' in api
     assert "error.status === 409" in api
     assert api.index('this.get("/setup", signal)') < api.index(
         'this.get("/work/setup-guidance", signal)'

@@ -1,0 +1,5 @@
+{
+  "route": "Blizhe to agent-commons",
+  "immediate": "- main:\n  - status:\n    - heading \"Проверяем защищённый доступ к рабочему пространству…\" [level=1]",
+  "observation": "Navigation absent at click and did not return within browser locator deadline (~6 seconds). First opposite transition was ready at 8511 ms (upper bound includes inter-call delay)."
+}

@@ -419,7 +419,7 @@ function parseSetupGuidance(value: unknown): SetupGuidance {
 }
 
 function shouldLoadSetupGuidance(setup: SetupStatus): boolean {
-  return setup.state !== "setup_uninitialized" && setup.state !== "setup_not_a_repository";
+  return !["setup_configured", "setup_uninitialized", "setup_not_a_repository"].includes(setup.state);
 }
 
 function parseMeta(value: unknown): WorkspaceMeta {
@@ -1746,6 +1746,7 @@ export function parseInstrumentation(value: unknown): Instrumentation {
 export class WorkApi {
   private taskWrites = new Map<string, { signature: string; body: Promise<string> }>();
   private apiBase = "";
+  private connected = false;
 
   /** A scoped client is immutable: an in-flight request can never follow a later project selection. */
   constructor(private readonly scopedProjectId: string | null = null, apiBase = "") {
@@ -1817,11 +1818,17 @@ export class WorkApi {
     });
   }
 
-  async connect(signal: AbortSignal): Promise<void> {
+  async connect(signal: AbortSignal, options: { revalidate?: boolean } = {}): Promise<void> {
     const exchangeCode = exchangeCodeFromFragment();
     window.history.replaceState(null, "", sanitizedWorkLocation(window.location.pathname, window.location.search));
 
+    // One browser session serves all project clients. Normal navigation uses
+    // its authenticated requests instead of probing the host again.
+    // Explicit refresh and new handoff links must detect a restarted server's
+    // stale opaque prefix, even on an already-connected instance.
+    if (!options.revalidate && exchangeCode === null && this.connected && this.apiBase && storedApiBase() === this.apiBase) return;
     if (await this.restoreStoredSession(signal)) {
+      this.connected = true;
       return;
     }
 
@@ -1843,6 +1850,7 @@ export class WorkApi {
     }
     try {
       this.apiBase = rememberApiBase(payload.api_base);
+      this.connected = true;
     } catch (error: unknown) {
       clearStoredApiBase();
       throw error;
@@ -1886,7 +1894,7 @@ export class WorkApi {
     }
   }
 
-  async load(signal: AbortSignal): Promise<WorkspaceData> {
+  async load(signal: AbortSignal, options: { deferProviderStatus?: boolean } = {}): Promise<WorkspaceData> {
     const [setupValue, metaValue] = await Promise.all([
       this.get("/setup", signal),
       this.get("/meta", signal)
@@ -1906,36 +1914,47 @@ export class WorkApi {
         providerAvailability: []
       };
     }
-    const [catalogResult, launchResult, availabilityResult] = await Promise.allSettled([
+    const [catalogResult, launchResult] = await Promise.allSettled([
       this.get("/catalog", signal),
-      this.get("/launch", signal),
-      this.get("/work/provider-availability", signal)
+      this.get("/launch", signal)
     ]);
+    for (const result of [catalogResult, launchResult]) {
+      if (result.status === "rejected" && result.reason instanceof ApiProblem && result.reason.status === 401) throw result.reason;
+    }
     if (catalogResult.status === "rejected" && launchResult.status === "rejected") {
       throw catalogResult.reason;
     }
     const catalog = catalogResult.status === "fulfilled" ? parseCatalog(catalogResult.value) : null;
     const launch = launchResult.status === "fulfilled" ? parseLaunch(launchResult.value) : null;
-    const providerAvailability = availabilityResult.status === "fulfilled"
-      ? parseProviderAvailabilityList(availabilityResult.value)
-      : [];
+    const workspace: WorkspaceData = { meta, setup, guidance, catalog, launch,
+      providerAuth: [], providerAuthErrors: [], providerAvailability: [] };
+    if (options.deferProviderStatus) return workspace;
+    return { ...workspace, ...await this.loadProviderState(workspace, signal) };
+  }
+
+  /** Provider CLI probes enrich readiness; they never hold the map's first render. */
+  async loadProviderState(
+    { catalog, launch }: Pick<WorkspaceData, "catalog" | "launch">,
+    signal: AbortSignal
+  ): Promise<Pick<WorkspaceData, "providerAuth" | "providerAuthErrors" | "providerAvailability">> {
     const profileIds = new Set<string>([
       ...(catalog?.profiles.map((profile) => profile.id) ?? []),
       ...(launch?.roles.map((role) => role.profileId) ?? [])
     ]);
     const orderedProfileIds = [...profileIds];
-    const authResults = await Promise.allSettled(
-      orderedProfileIds.map(async (profileId) => ({
-        profileId,
-        status: await this.providerAuthStatus(profileId, signal)
-      }))
-    );
+    const [availabilityResult, authResults] = await Promise.all([
+      Promise.allSettled([this.get("/work/provider-availability", signal)]).then(([result]) => result),
+      Promise.allSettled(orderedProfileIds.map(async (profileId) => ({
+        profileId, status: await this.providerAuthStatus(profileId, signal)
+      })))
+    ]);
+    signal.throwIfAborted();
+    for (const result of [availabilityResult, ...authResults]) {
+      if (result.status === "rejected" && result.reason instanceof ApiProblem && result.reason.status === 401) throw result.reason;
+    }
+    const providerAvailability = availabilityResult.status === "fulfilled"
+      ? parseProviderAvailabilityList(availabilityResult.value) : [];
     return {
-      meta,
-      setup,
-      guidance,
-      catalog,
-      launch,
       providerAuth: authResults.flatMap((result) => result.status === "fulfilled" ? [result.value.status] : []),
       providerAuthErrors: authResults.flatMap((result, index) => result.status === "rejected" ? [orderedProfileIds[index]] : []),
       providerAvailability

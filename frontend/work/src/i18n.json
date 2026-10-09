@@ -48,7 +48,7 @@
     "step_run": "Start the run",
     "step_ready": "Ready",
     "step_waiting": "Waiting",
-    "checking_access": "Checking secure workspace access…",
+    "checking_access": "Opening workspace…",
     "workspace_ready": "Workspace is ready",
     "workspace_needs_setup": "This workspace needs setup",
     "initialize_workspace": "Initialize workspace",
@@ -1329,7 +1329,8 @@
     "tracker_freshness_source": "Source: task and run tracker",
     "tracker_source_time_unknown": "Source update time is unavailable",
     "tracker_source_updated_time": "Latest source record",
-    "tracker_observed_snapshot_time": "Tracker data assembled"
+    "tracker_observed_snapshot_time": "Tracker data assembled",
+    "project_loading": "Loading project…"
   },
   "ru": {
     "app_title": "Начните сфокусированную работу",
@@ -1380,7 +1381,7 @@
     "step_run": "Запустите прогон",
     "step_ready": "Готово",
     "step_waiting": "Ожидание",
-    "checking_access": "Проверяем защищённый доступ к рабочему пространству…",
+    "checking_access": "Открываем рабочее пространство…",
     "workspace_ready": "Рабочее пространство готово",
     "workspace_needs_setup": "Этому рабочему пространству нужна настройка",
     "initialize_workspace": "Инициализировать рабочее пространство",
@@ -2661,6 +2662,7 @@
     "tracker_freshness_source": "Источник: трекер задач и прогонов",
     "tracker_source_time_unknown": "Время обновления источника неизвестно",
     "tracker_source_updated_time": "Последняя запись источника",
-    "tracker_observed_snapshot_time": "Данные трекера собраны"
+    "tracker_observed_snapshot_time": "Данные трекера собраны",
+    "project_loading": "Загружаем проект…"
   }
 }

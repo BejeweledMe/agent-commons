@@ -294,7 +294,7 @@ function WorkApp(): ReactElement {
   const navigationRevision = useRef(0);
   const [locale, setLocale] = useState<Locale>(readLocalePreference);
   const [state, setState] = useState<AppState>({ kind: "checking" });
-  useEffect(() => { if (state.kind !== "ready") compactPane.reset(); }, [state.kind]);
+  useEffect(() => { compactPane.reset(); }, [state.kind]);
   // In-flight writes, per project and surface. A write gates writes, not reading.
   const mutationsRef = useRef(new MutationRegistry());
   const [mutationRevision, setMutationRevision] = useState(0);
@@ -767,7 +767,7 @@ function WorkApp(): ReactElement {
     </div>;
   }
 
-  async function load(): Promise<void> {
+  async function load(refreshRegistry = false): Promise<void> {
     const projectGeneration = projectSelectionRef.current.currentGeneration();
     const read = readRequestRef.current.begin();
     const stillCurrent = (): boolean => projectSelectionRef.current.isCurrent(projectGeneration)
@@ -775,10 +775,11 @@ function WorkApp(): ReactElement {
     setState((current) => current.kind === "ready" ? current : { kind: "checking" });
     try {
       const host = hostApiRef.current;
-      await host.connect(read.signal);
+      await host.connect(read.signal, { revalidate: refreshRegistry });
       let projectApi = host;
       try {
-        const projects = await registryApiRef.current.list(read.signal);
+        const projects = !refreshRegistry && projectList !== null
+          ? projectList : await registryApiRef.current.list(read.signal);
         if (!stillCurrent()) return;
         setLegacyProjectHost(false);
         setProjectList(projects);
@@ -803,15 +804,34 @@ function WorkApp(): ReactElement {
       }
       apiRef.current = projectApi;
       libraryApiRef.current = new LibraryApi(projectApi);
-      const data = await projectApi.load(read.signal);
+      const data = await projectApi.load(read.signal, { deferProviderStatus: true });
       if (!stillCurrent()) return;
       setState((current) => ({ kind: "ready", data, notice: current.kind === "ready" ? current.notice : null }));
+      if (data.setup.state === "setup_configured") {
+        void projectApi.loadProviderState(data, read.signal).then((providers) => {
+          if (stillCurrent()) setState((current) => current.kind === "ready"
+            ? { ...current, data: { ...current.data, ...providers } } : current);
+        }).catch((error: unknown) => {
+          if (stillCurrent() && error instanceof ApiProblem && error.status === 401) {
+            setState({ kind: "failure", failure: failureFrom(error, text) });
+          }
+          // Offline and unavailable providers remain unknown; the map stays usable.
+        });
+      }
     } catch (error: unknown) {
+      // A server restart changes its opaque prefix and answers 404. Validate
+      // the host before presenting this as a missing project; an entity 404
+      // on a live host must not erase the shared browser session.
+      if (stillCurrent() && error instanceof ApiProblem && error.status === 404) {
+        try { await hostApiRef.current.connect(read.signal, { revalidate: true }); }
+        catch (recoveryError: unknown) { error = recoveryError; }
+      }
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
       if (!stillCurrent()) return;
-      setState((current) => current.kind === "ready" ? current : { kind: "failure", failure: failureFrom(error, text) });
+      setState((current) => current.kind === "ready" && !(error instanceof ApiProblem && error.status === 401)
+        ? current : { kind: "failure", failure: failureFrom(error, text) });
       recordActionError("refresh", error, () => void refresh());
     } finally { /* The next project selection owns cancellation of this request. */ }
   }
@@ -873,7 +893,7 @@ function WorkApp(): ReactElement {
 
   async function refresh(): Promise<void> {
     clearActionError("refresh");
-    await load();
+    await load(true);
     setBoardRefreshKey((current) => current + 1);
   }
 
@@ -1438,27 +1458,49 @@ function WorkApp(): ReactElement {
     void launchSelectedRun();
   }
 
-  if (state.kind === "checking") {
-    return (
-      <main className="work-app work-app-centered">
-        <section className="loading-panel" aria-live="polite" role="status">
-          <h1>{text("checking_access")}</h1>
+  const activityRail = <nav className="activity-rail" aria-label={text("activity_navigation")} inert={compactPane.compact && compactPane.pane !== null}>
+    <a title={text("activity_workspace")} aria-label={text("activity_workspace")} aria-current={route.view === "work" || route.view === "board" ? "page" : undefined} href={workRouteHref({ ...route, view: "work" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "work" }); } }}><Icon name="project" size={20} /></a>
+    <div className="activity-divider" />
+    {(["roles", "skills", "blueprints", "context"] as const).map((tab) => <a key={tab} title={text(`library_${tab}`)} aria-label={text(`library_${tab}`)} aria-current={route.view === "library" && route.libraryTab === tab ? "page" : undefined} href={workRouteHref({ ...route, view: "library", libraryTab: tab })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "library", libraryTab: tab }); } }}><Icon name={tab === "roles" ? "supervisor" : tab === "skills" ? "skills" : tab === "blueprints" ? "agents" : "library"} size={20} /></a>)}
+    <a className="activity-settings" title={text("shell_nav_settings")} aria-label={text("shell_nav_settings")} aria-current={route.view === "settings" ? "page" : undefined} href={workRouteHref({ ...route, view: "settings" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "settings" }); } }}><Icon name="settings" size={20} /></a>
+  </nav>;
+  if (state.kind !== "ready") {
+    const pendingLayout = layoutEntry.store.snapshot().layout;
+    const projectName = projectList?.projects.find((project) => project.id === route.projectId)?.name;
+    const title = projectName ?? text("project_sidebar_title");
+    return <main className={`work-app ${workspaceShellClasses(pendingLayout)}`}
+      data-compact-pane={compactPane.pane ?? "none"}
+      data-sidebar={pendingLayout.sidebarCollapsed ? "collapsed" : "open"}
+      data-chat={pendingLayout.chatCollapsed ? "collapsed" : "open"}
+      data-swapped={pendingLayout.panesSwapped ? "true" : "false"}>
+      {activityRail}
+      {(compactPane.compact ? compactPane.pane !== "sidebar" : pendingLayout.sidebarCollapsed) ? null :
+        <aside className="app-rail" ref={compactPane.compact ? (element) => { compactPane.element.current = element; } : undefined}
+          role={compactPane.compact ? "dialog" : undefined} aria-modal={compactPane.compact ? true : undefined}
+          aria-label={text("shell_navigation")} tabIndex={compactPane.compact ? -1 : undefined}>
+          {compactPane.compact ? <button className="button button-secondary compact-pane-close" type="button" onClick={compactPane.close}>{text("workspace_close_pane")}</button> : null}
+          {projectList !== null || legacyProjectHost ? <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}
+            currentProjectId={route.projectId} legacy={legacyProjectHost} locale={locale} projects={projectList} text={text}
+            onInspect={inspectProject} onCreate={createProject} onSelect={selectProject} onUpdate={updateProject} />
+            : <><p className="app-brand">Agent Commons</p><p role="status">{text("project_loading")}</p></>}
+        </aside>}
+      {compactPane.compact && compactPane.pane ? <button type="button" tabIndex={-1} className="compact-pane-backdrop" aria-label={text("workspace_close_pane")} onClick={compactPane.close} /> : null}
+      <div className="app-content" inert={compactPane.compact && compactPane.pane !== null}>
+        <AppHeader locale={locale} onLocaleChange={setLocale} text={text} title={title}
+          layoutControls={<div className="layout-controls" role="group" aria-label={text("workspace_layout_label")}>
+            <button type="button" className="button button-secondary button-inline" aria-label={text("workspace_sidebar_short")}
+              title={text("workspace_sidebar_short")} aria-pressed={compactPane.compact ? compactPane.pane === "sidebar" : !pendingLayout.sidebarCollapsed}
+              onClick={(event) => compactPane.compact ? compactPane.open("sidebar", event) : layoutRef.current.apply({ sidebarCollapsed: !pendingLayout.sidebarCollapsed })}><Icon name="sidebar" /></button>
+          </div>} />
+        <section className="project-loading-content">
+          {state.kind === "failure" ? <FailurePanel failure={state.failure} onRetry={() => void refresh()} text={text} />
+            : <p role="status">{text("project_loading")}</p>}
         </section>
-      </main>
-    );
-  }
-
-  if (state.kind === "failure") {
-    if (state.failure.code === "project_required") {
-      return <main className="work-app project-empty-app"><ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder} currentProjectId={null} legacy={false} locale={locale}
-        projects={projectList} text={text} onInspect={inspectProject}
-        onCreate={createProject} onSelect={selectProject} onUpdate={updateProject} /></main>;
-    }
-    return (
-      <main className="work-app work-app-centered">
-        <FailurePanel failure={state.failure} onRetry={() => void refresh()} text={text} />
-      </main>
-    );
+      </div>
+      {!compactPane.compact && !pendingLayout.chatCollapsed ? <aside className="chat-pane project-loading-chat" aria-label={text("workspace_chat_short")}>
+        <h2>{text("owner_chat")}</h2><p className="small-copy">{title}</p>
+      </aside> : null}
+    </main>;
   }
 
   const { data, notice } = state;
@@ -1536,12 +1578,6 @@ function WorkApp(): ReactElement {
     else if (layout.chatCollapsed) void saveLayout(layoutRef.current.apply({ chatCollapsed: false }));
     window.requestAnimationFrame(() => document.querySelector<HTMLElement>(".chat-pane .project-chat textarea")?.focus({ preventScroll: true }));
   };
-  const activityRail = <nav className="activity-rail" aria-label={text("activity_navigation")} inert={compactPane.compact && compactPane.pane !== null}>
-    <a title={text("activity_workspace")} aria-label={text("activity_workspace")} aria-current={route.view === "work" || route.view === "board" ? "page" : undefined} href={workRouteHref({ ...route, view: "work" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "work" }); } }}><Icon name="project" size={20} /></a>
-    <div className="activity-divider" />
-    {(["roles", "skills", "blueprints", "context"] as const).map((tab) => <a key={tab} title={text(`library_${tab}`)} aria-label={text(`library_${tab}`)} aria-current={route.view === "library" && route.libraryTab === tab ? "page" : undefined} href={workRouteHref({ ...route, view: "library", libraryTab: tab })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "library", libraryTab: tab }); } }}><Icon name={tab === "roles" ? "supervisor" : tab === "skills" ? "skills" : tab === "blueprints" ? "agents" : "library"} size={20} /></a>)}
-    <a className="activity-settings" title={text("shell_nav_settings")} aria-label={text("shell_nav_settings")} aria-current={route.view === "settings" ? "page" : undefined} href={workRouteHref({ ...route, view: "settings" })} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate({ view: "settings" }); } }}><Icon name="settings" size={20} /></a>
-  </nav>;
   const sidebarPane = <aside className="app-rail" ref={compactPane.compact ? (element) => { compactPane.element.current = element; } : undefined} role={compactPane.compact ? "dialog" : undefined} aria-modal={compactPane.compact ? true : undefined} aria-label={text("shell_navigation")} tabIndex={compactPane.compact ? -1 : undefined}>
     {compactPane.compact ? <button className="button button-secondary compact-pane-close" type="button" onClick={compactPane.close}>{text("workspace_close_pane")}</button> : null}
     <ProjectSidebar creation={projectCreation.current} onPickFolder={pickProjectFolder}

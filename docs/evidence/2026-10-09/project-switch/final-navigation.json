@@ -1,0 +1,15 @@
+{
+  "bundle": "work-4G19TXus.js",
+  "agentCommons": {
+    "elapsedMs": 340,
+    "navigationPresent": true,
+    "projectLoading": true,
+    "oldBlockingAccess": false
+  },
+  "blizhe": {
+    "elapsedMs": 278,
+    "navigationPresent": true,
+    "projectLoading": true,
+    "oldBlockingAccess": false
+  }
+}

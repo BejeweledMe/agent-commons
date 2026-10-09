@@ -1,0 +1,12 @@
+{
+  "schema": "agent_commons.provider_compatibility_canary.v1",
+  "ok": true,
+  "canonical_state": "succeeded",
+  "child_session_closed": true,
+  "profile_id": "claude-builder",
+  "provider": "claude",
+  "model": "opus",
+  "result_refs_match": true,
+  "process_canonical_mismatch": false,
+  "agent_commons_source_sha256": "285f9c773f9e650057a9ba244e1bc9a4533f43bfff6647a81fd576a683a9d109"
+}

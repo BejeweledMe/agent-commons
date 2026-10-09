@@ -1,0 +1,25 @@
+{
+  "schema": "agent-commons.project-switch-checks.v1",
+  "date": "2026-10-09",
+  "base_commit": "9ff2ce55ecb1d46875408c9b6c0f65b7efc76125",
+  "source_manifest": "review-manifest-v2.json",
+  "source_manifest_sha256": "2e13fe0aba60d237edcb46107d047a8bcd7774e3b72435ebf92dba044f426cbe",
+  "make_check": {
+    "exit_code": 0,
+    "work_passed": 522,
+    "gallery_passed": 27,
+    "python_passed": 3036,
+    "python_skipped": 14,
+    "python_warnings": 2,
+    "python_seconds": 923.5,
+    "log_sha256": "f6b66b089ec293c324a5da11f2b761500dbd7b1639fa6aa1dbaf632d2529c501"
+  },
+  "source_review": {
+    "verdict": "approved",
+    "review_id": "review.0E3S2RR5YYNR9SFG7HBQPC1MFT",
+    "revision": "evt.01M4H4FM26N1YE6RFN1GJ0XCZF"
+  },
+  "browser": "final-navigation.json",
+  "canary": "installed-canary-final.json",
+  "remote_ci": "Publication gate checked after commit; exact run recorded in canonical task handoff."
+}

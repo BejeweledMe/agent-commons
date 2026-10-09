@@ -13,6 +13,12 @@ finished plans at the top level.
 
 ## Unreleased
 
+- Switching projects keeps navigation available instead of showing a full-screen
+  access check. The connected local session is reused, and provider readiness
+  loads separately from the workspace; delayed responses cannot cross projects.
+  Explicit refresh and fresh local links recover a restarted server. Imported
+  evidence identifies external workspace paths without broken repository links.
+
 - Compact agent settings with fixed tabs and actions, a human-owner entry to the
   main chat, explicit supervisor and connection controls, and a separate activity
   rail with stable Tasks / Agents tabs. Cards use consistent automatic spacing,

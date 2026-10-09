@@ -235,6 +235,19 @@ string, an asset URL, source code, browser storage, or an `Authorization`
 header. Untrusted live previews are served on a separate origin and never
 receive Commons authentication or capabilities.
 
+Project navigation reuses the connected host session and the in-memory project
+registry. An explicit refresh revalidates the host session and reloads the
+registry. A bootstrap 404 revalidates the host before treating the project as
+missing, so server restarts can invalidate an old opaque prefix without clearing
+valid sessions for entity 404s. Fresh handoff fragments also bypass session reuse.
+The server still authenticates
+every request and validates the selected project binding; an expired session is
+not treated as an unavailable provider. A pending or failed project read retains
+the navigation shell and never retains another project's workspace data.
+Configured workspaces open without setup guidance or provider status probes in
+the critical path. Provider observations arrive separately, remain unknown until
+received, and are discarded if project selection or the read generation changes.
+
 ## Honesty rules
 
 - The client never advances state: every repaint after a write comes back from
